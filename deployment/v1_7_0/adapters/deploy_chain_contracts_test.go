@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMergeIfnNotEmpty(t *testing.T) {
+func TestMergeIfNotEmpty(t *testing.T) {
 	v170 := semver.MustParse("1.7.0")
 
 	t.Run("empty source returns base unchanged", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestMergeIfnNotEmpty(t *testing.T) {
 		assert.Equal(t, source.OffRamp.GasForCallExactCheck, merged.OffRamp.GasForCallExactCheck)
 		assert.Equal(t, source.OffRamp.MaxGasBufferToUpdateState, merged.OffRamp.MaxGasBufferToUpdateState)
 		require.NotNil(t, merged.FeeQuoter.MaxFeeJuelsPerMsg)
-		assert.True(t, merged.FeeQuoter.MaxFeeJuelsPerMsg.Cmp(merged.FeeQuoter.MaxFeeJuelsPerMsg) == 0)
+		assert.True(t, merged.FeeQuoter.MaxFeeJuelsPerMsg.Cmp(source.FeeQuoter.MaxFeeJuelsPerMsg) == 0)
 		require.NotNil(t, merged.FeeQuoter.USDPerLINK)
 		assert.True(t, merged.FeeQuoter.USDPerLINK.Cmp(source.FeeQuoter.USDPerLINK) == 0)
 	})

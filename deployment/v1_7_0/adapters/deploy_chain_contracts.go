@@ -96,7 +96,7 @@ type DeployChainContractsInput struct {
 	DeployerContract  string
 	DeployTestRouter  bool
 	ExistingAddresses []datastore.AddressRef
-	ContractParams DeployContractParams
+	ContractParams    DeployContractParams
 	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
 	// contracts remain owned by the deployer key. By default (false) the
 	// sequence looks up the existing CLLCCIP RBACTimelock in ExistingAddresses
@@ -133,7 +133,8 @@ var (
 
 func newDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	return &DeployChainContractsRegistry{
-		adapters: make(map[string]DeployChainContractsAdapter),
+		adapters:        make(map[string]DeployChainContractsAdapter),
+		configImporters: make(map[string]deploy.ConfigImporter),
 	}
 }
 

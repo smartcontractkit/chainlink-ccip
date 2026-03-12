@@ -33,10 +33,20 @@ type mockDeployAdapter struct {
 	errByChain    map[uint64]error
 }
 
+func (m *mockDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[adapters.DeployChainConfigCreatorInput, adapters.DeployContractParams, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"mock-set-contract-params",
+		semver.MustParse("2.0.0"),
+		"Mock sequence for setting contract params from imported config",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainConfigCreatorInput) (adapters.DeployContractParams, error) {
+			return adapters.DeployContractParams{}, nil
+		})
+}
+
 func (m *mockDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"mock-deploy-chain-contracts",
-		semver.MustParse("1.7.0"),
+		semver.MustParse("2.0.0"),
 		"Mock deploy sequence for testing",
 		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (sequences.OnChainOutput, error) {
 			if m.errByChain != nil {
@@ -218,9 +228,7 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 	}
 
 	env := newDeployTestEnv(t, []uint64{sel1})
-	registry := adapters.GetDeployChainContractsRegistry()
-	mcmsRegistry := cs_core.GetRegistry()
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -259,9 +267,8 @@ func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
 
 	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	mcmsRegistry := cs_core.GetRegistry()
 
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -302,9 +309,8 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 
 	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	mcmsRegistry := cs_core.GetRegistry()
 
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -333,12 +339,11 @@ func TestDeployChainContracts_Apply_PerChainOverrideIsUsed(t *testing.T) {
 
 	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, captureAdapter)
-	mcmsRegistry := cs_core.GetRegistry()
 
 	overrideCfg := newDefaultPerChainCfg()
 	overrideCfg.DeployerContract = "0x0000000000000000000000000000000000005678"
 
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -361,12 +366,22 @@ type capturingDeployAdapter struct {
 	captured *[]adapters.DeployChainContractsInput
 }
 
+func (c *capturingDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[adapters.DeployChainConfigCreatorInput, adapters.DeployContractParams, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"capturing-set-contract-params",
+		semver.MustParse("2.0.0"),
+		"Captures inputs for testing",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainConfigCreatorInput) (adapters.DeployContractParams, error) {
+			return adapters.DeployContractParams{}, nil
+		})
+}
+
 var _ adapters.DeployChainContractsAdapter = (*capturingDeployAdapter)(nil)
 
 func (c *capturingDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"capturing-deploy",
-		semver.MustParse("1.7.0"),
+		semver.MustParse("2.0.0"),
 		"Captures inputs for testing",
 		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (sequences.OnChainOutput, error) {
 			*c.captured = append(*c.captured, input)
@@ -387,9 +402,8 @@ func TestDeployChainContracts_Apply_AdapterErrorPropagated(t *testing.T) {
 
 	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	mcmsRegistry := cs_core.GetRegistry()
 
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -410,9 +424,8 @@ func TestDeployChainContracts_Apply_ReturnsError_WhenNoCommitteesHaveChainConfig
 	mock := &mockDeployAdapter{}
 	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	mcmsRegistry := cs_core.GetRegistry()
 
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -429,10 +442,7 @@ func TestDeployChainContracts_Apply_NoAdapterRegistered(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	env := newDeployTestEnv(t, []uint64{sel1})
 
-	registry := adapters.GetDeployChainContractsRegistry()
-	mcmsRegistry := cs_core.GetRegistry()
-
-	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
+	cs := changesets.DeployChainContracts()
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{

@@ -8,13 +8,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -170,7 +171,7 @@ func TestSetContractParamsFromImportedConfig(t *testing.T) {
 		switch chainSelector {
 		case 5009297550715157269:
 			// This chain has OnRamp 1.6.0 + OffRamp 1.6.0 + RMN 1.5.0: v1.6 and v1.5 merge.
-			// Merge order is paramsFrom1_6_0.MergeWithOverrideIfNotEmpty(paramsFrom1_5_0), so v1.5's GasForCallExactCheck (5000) overwrites v1.6's value.
+			// v1.5's GasForCallExactCheck (5000) is overwritten by v1.6's value.
 			require.Equal(t, feeAggregatorAddress, common.HexToAddress(generated.OnRamp.FeeAggregator),
 				"OnRamp.FeeAggregator should come from v1.6 OnRamp DynamicConfig")
 			require.Equal(t, uint16(6000), generated.OffRamp.GasForCallExactCheck,
