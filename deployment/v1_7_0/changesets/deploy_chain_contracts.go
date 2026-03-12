@@ -6,15 +6,19 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type DeployChainContractsPerChainCfg struct {
@@ -34,10 +38,13 @@ type DeployChainContractsPerChainCfg struct {
 }
 
 type DeployChainContractsCfg struct {
-	Topology       *offchain.EnvironmentTopology
-	ChainSelectors []uint64
-	DefaultCfg     DeployChainContractsPerChainCfg
-	ChainCfgs      map[uint64]DeployChainContractsPerChainCfg
+	Topology                                *offchain.EnvironmentTopology
+	ChainSelectors                          []uint64
+	DefaultCfg                              DeployChainContractsPerChainCfg
+	ChainCfgs                               map[uint64]DeployChainContractsPerChainCfg
+	IgnoreImportedConfigFromPreviousVersion bool // if true, the changeset will not import any config from previous version,
+	// and will only rely on the config provided in DeployChainContractsCfg, else it will import config from previous version
+	// and will give precedence to the imported config over the config provided in DeployChainContractsCfg.
 }
 
 func (c DeployChainContractsCfg) resolveChainCfg(sel uint64) DeployChainContractsPerChainCfg {
@@ -47,10 +54,8 @@ func (c DeployChainContractsCfg) resolveChainCfg(sel uint64) DeployChainContract
 	return c.DefaultCfg
 }
 
-func DeployChainContracts(
-	registry *adapters.DeployChainContractsRegistry,
-	mcmsReaderRegistry *changesets.MCMSReaderRegistry,
-) deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
+func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
+	mcmsReaderRegistry := changesets.GetRegistry()
 	validate := func(e deployment.Environment, cfg changesets.WithMCMS[DeployChainContractsCfg]) error {
 		if cfg.Cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
@@ -130,6 +135,42 @@ func DeployChainContracts(
 					Executors:          perChain.Executors,
 					MockReceivers:      perChain.MockReceivers,
 				},
+			}
+			if !cfg.Cfg.IgnoreImportedConfigFromPreviousVersion {
+				// so far we do not need any config from 1.5.0 , so only importing config from 1.6.0
+				// if in the future we need to import some config from 1.5.0,
+				// we should leverage lane version resolver to get the right adapter to import config
+				version := semver.MustParse("1.6.0")
+				configImporter, ok := registry.GetConfigImporter(sel, version)
+				if !ok {
+					return deployment.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", sel, version)
+				}
+				populateCfgOutput, err := deploy.PopulateMetaDataFromConfigImporter(e, configImporter, sel)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate metadata from config importer for chain %d: %w", sel, err)
+				}
+				// if the importer found config from previous version,
+				// import it and merge it with the input config, giving precedence to the imported config
+				if len(populateCfgOutput.Metadata.Contracts) > 0 {
+					importReport, err := operations.ExecuteSequence(
+						e.OperationsBundle,
+						adapter.SetContractParamsFromImportedConfig(),
+						e.BlockChains, adapters.DeployChainConfigCreatorInput{
+							ChainSelector:      sel,
+							ContractMeta:       populateCfgOutput.Metadata.Contracts,
+							ExistingAddresses:  existingAddresses,
+							UserProvidedConfig: input.ContractParams,
+						})
+					if err != nil {
+						return deployment.ChangesetOutput{Reports: allReports},
+							fmt.Errorf("failed to execute config importer sequence for chain %d: %w", sel, err)
+					}
+					allReports = append(allReports, importReport.ExecutionReports...)
+					input.ContractParams, err = input.ContractParams.MergeWithOverrideIfNotEmpty(importReport.Output)
+					if err != nil {
+						return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge imported config with input config for chain %d: %w", sel, err)
+					}
+				}
 			}
 
 			e.Logger.Infow(
