@@ -12,9 +12,12 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
+	usdc_token_pool_proxy "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
 )
 
 type RouterUpdater struct{}
@@ -94,6 +97,82 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 				return sequences.OnChainOutput{}, fmt.Errorf("error executing ApplyRampUpdates operation: %w", err)
 			}
 			writes = append(writes, out.Output)
+
+			// If LombardTokenPool 2.0.0 is in existingAddresses, set it on the TokenAdminRegistry for LBTC (same batch). Token address is read from the pool via GetToken.
+			lombardPoolAddr, lombardErr := datastore_utils.FindAndFormatRef(
+				tempDS,
+				datastore.AddressRef{
+					ChainSelector: input.ChainSelector,
+					Type:          datastore.ContractType(lombard_token_pool.ContractType),
+					Version:       lombard_token_pool.Version,
+				},
+				input.ChainSelector,
+				evm_datastore_utils.ToEVMAddress,
+			)
+			if lombardErr == nil {
+				tarAddr, tarErr := datastore_utils.FindAndFormatRef(
+					tempDS,
+					datastore.AddressRef{
+						ChainSelector: input.ChainSelector,
+						Type:          datastore.ContractType(token_admin_registry.ContractType),
+						Version:       token_admin_registry.Version,
+					},
+					input.ChainSelector,
+					evm_datastore_utils.ToEVMAddress,
+				)
+				if tarErr == nil {
+					getTokenReport, getTokenErr := cldf_ops.ExecuteOperation(b, lombard_token_pool.GetToken, c, contract.FunctionInput[struct{}]{
+						ChainSelector: input.ChainSelector,
+						Address:       lombardPoolAddr,
+					})
+					if getTokenErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("error getting token from LombardTokenPool: %w", getTokenErr)
+					}
+					setPoolOut, setPoolErr := cldf_ops.ExecuteOperation(b, token_admin_registry.SetPool, c, contract.FunctionInput[token_admin_registry.SetPoolArgs]{
+						ChainSelector: input.ChainSelector,
+						Address:       tarAddr,
+						Args: token_admin_registry.SetPoolArgs{
+							TokenAddress:     getTokenReport.Output,
+							TokenPoolAddress: lombardPoolAddr,
+						},
+					})
+					if setPoolErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("error executing TokenAdminRegistry SetPool for LBTC: %w", setPoolErr)
+					}
+					writes = append(writes, setPoolOut.Output)
+				}
+			}
+
+			// If USDCTokenPoolProxy 2.0.0 is in existingAddresses, update lockOrBurn mechanism to CCTP_V2_WITH_CCV for all remote chain selectors (same batch).
+			usdcProxyAddr, usdcProxyErr := datastore_utils.FindAndFormatRef(
+				tempDS,
+				datastore.AddressRef{
+					ChainSelector: input.ChainSelector,
+					Type:          datastore.ContractType(usdc_token_pool_proxy.ContractType),
+					Version:       usdc_token_pool_proxy.Version,
+				},
+				input.ChainSelector,
+				evm_datastore_utils.ToEVMAddress,
+			)
+			if usdcProxyErr == nil && len(input.RemoteChainSelectors) > 0 {
+				mechanisms := make([]uint8, len(input.RemoteChainSelectors))
+				for i := range mechanisms {
+					mechanisms[i] = 4 // CCTP_V2_WITH_CCV
+				}
+				updateMechOut, updateMechErr := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, c, contract.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
+					ChainSelector: input.ChainSelector,
+					Address:       usdcProxyAddr,
+					Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
+						RemoteChainSelectors: input.RemoteChainSelectors,
+						Mechanisms:           mechanisms,
+					},
+				})
+				if updateMechErr != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("error executing USDCTokenPoolProxy UpdateLockOrBurnMechanisms: %w", updateMechErr)
+				}
+				writes = append(writes, updateMechOut.Output)
+			}
+
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error creating batch operation: %w", err)

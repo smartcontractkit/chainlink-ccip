@@ -18,11 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	executor_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/executor"
 	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 )
@@ -86,11 +86,14 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get on ramp for dest %d from Router(%s) on chain %s: %w", remoteSelector, input.Router, chain, err)
 			}
-			if onRampAddrReport.Output != common.HexToAddress(input.OnRamp) {
+			// Only set an onRamp if none is currently set. It is unsafe to set an onRamp if one already exists.
+			if onRampAddrReport.Output == (common.Address{}) {
 				onRampAdds = append(onRampAdds, router.OnRamp{
 					DestChainSelector: remoteSelector,
 					OnRamp:            common.HexToAddress(input.OnRamp),
 				})
+			} else {
+				b.Logger.Info("OnRamp exists for dest chain %d, skipping onRamp set for safety", remoteSelector)
 			}
 
 			offRampAdds = append(offRampAdds, router.OffRamp{

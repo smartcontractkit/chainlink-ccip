@@ -54,6 +54,9 @@ type ConfigureLombardChainForLanesInput struct {
 	LocalAdapter string
 	// TokenQualifier is the qualifier for matching token with the tokenPool during deployment
 	TokenQualifier string
+	// RegisteredTokenPoolRef when set is used to resolve the token pool address (e.g. for LBTC), similar to USDC's RegisteredPoolRef.
+	// When empty, the pool is resolved by LombardTokenPool type + TokenQualifier from the datastore.
+	RegisteredTokenPoolRef datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteLombardChainConfig
 }

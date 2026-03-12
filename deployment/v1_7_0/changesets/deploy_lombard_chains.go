@@ -24,6 +24,8 @@ type LombardChainConfig struct {
 	// LocalAdapter is the optional local adapter for the Lombard token on this chain.
 	LocalAdapter   string
 	TokenQualifier string
+	// RegisteredTokenPoolRef when set is used to resolve the token pool in the configure step (e.g. for LBTC), similar to USDC's RegisteredPoolRef.
+	RegisteredTokenPoolRef datastore.AddressRef
 	// DeployerContract is a contract that can be used to deploy other contracts.
 	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
 	DeployerContract string
@@ -190,11 +192,12 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				RemoteChains: remoteChains,
 			}
 			in := adapters.ConfigureLombardChainForLanesInput{
-				ChainSelector:  chainSel,
-				Token:          chainCfg.Token,
-				LocalAdapter:   chainCfg.LocalAdapter,
-				TokenQualifier: chainCfg.TokenQualifier,
-				RemoteChains:   chainCfg.RemoteChains,
+				ChainSelector:           chainSel,
+				Token:                   chainCfg.Token,
+				LocalAdapter:            chainCfg.LocalAdapter,
+				TokenQualifier:          chainCfg.TokenQualifier,
+				RegisteredTokenPoolRef:  chainCfg.RegisteredTokenPoolRef,
+				RemoteChains:            chainCfg.RemoteChains,
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureLombardChainForLanes(), dep, in)
 			if err != nil {
