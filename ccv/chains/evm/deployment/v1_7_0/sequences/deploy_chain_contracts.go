@@ -6,7 +6,9 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -28,13 +30,34 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 )
+
+type proxyAcceptOwnershipArgs struct {
+	IsProposedOwner bool
+}
+
+var proxyAcceptOwnership = contract_utils.NewWrite(contract_utils.WriteParams[proxyAcceptOwnershipArgs, *proxy_bindings.Proxy]{
+	Name:         "proxy:accept-ownership",
+	Version:      proxy.Version,
+	Description:  "Accept ownership of the proxy",
+	ContractType: proxy.ContractType,
+	ContractABI:  proxy.ProxyABI,
+	NewContract:  proxy_bindings.NewProxy,
+	IsAllowedCaller: func(_ *proxy_bindings.Proxy, _ *bind.CallOpts, _ common.Address, args proxyAcceptOwnershipArgs) (bool, error) {
+		return args.IsProposedOwner, nil
+	},
+	Validate: func(proxyAcceptOwnershipArgs) error { return nil },
+	CallContract: func(p *proxy_bindings.Proxy, opts *bind.TransactOpts, _ proxyAcceptOwnershipArgs) (*types.Transaction, error) {
+		return p.AcceptOwnership(opts)
+	},
+})
 
 type MockReceiverParams struct {
 	Version *semver.Version
@@ -85,7 +108,7 @@ type FeeQuoterParams struct {
 type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
-	DynamicConfig executor.SetDynamicConfigArgs
+	DynamicConfig executor.DynamicConfig
 	Qualifier     string
 }
 
@@ -498,10 +521,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
 				dynamicConfigReport.Output.MinBlockConfirmations != executorParam.DynamicConfig.MinBlockConfirmations ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.SetDynamicConfigArgs]{
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.DynamicConfig]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorRef.Address),
-					Args: executor.SetDynamicConfigArgs{
+					Args: executor.DynamicConfig{
 						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
 						MinBlockConfirmations: executorParam.DynamicConfig.MinBlockConfirmations,
 						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
@@ -516,7 +539,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			// Deploy ExecutorProxy via CREATE2
 			var executorProxyRef *datastore.AddressRef
 			for _, ref := range input.ExistingAddresses {
-				if ref.Type == datastore.ContractType(executor.ProxyType) &&
+				if ref.Type == datastore.ContractType(ExecutorProxyType) &&
 					ref.Version.String() == executor.Version.String() &&
 					(qualifierPtr == nil || ref.Qualifier == *qualifierPtr) {
 					executorProxyRef = &ref
@@ -531,11 +554,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				deployExecutorProxyViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployContractViaCREATE2, chain, DeployContractViaCREATE2Input{
 					ChainSelector:  chain.Selector,
 					Qualifier:      *qualifierPtr,
-					Type:           datastore.ContractType(executor.ProxyType),
+					Type:           datastore.ContractType(ExecutorProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
-					ABI:            proxy.ABI,
-					BIN:            proxy.Bin,
+					ABI:            proxy.ProxyABI,
+					BIN:            proxy.ProxyBin,
 					ConstructorArgs: []any{
 						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
 						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.
@@ -555,10 +578,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				executorProxyRef = &deployExecutorProxyViaCREATE2Report.Output.Addresses[0]
 
 				// Accept ownership of the ExecutorProxy
-				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract_utils.FunctionInput[proxy.AcceptOwnershipArgs]{
+				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxyAcceptOwnership, chain, contract_utils.FunctionInput[proxyAcceptOwnershipArgs]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args: proxy.AcceptOwnershipArgs{
+					Args: proxyAcceptOwnershipArgs{
 						IsProposedOwner: true,
 					},
 				})
@@ -567,10 +590,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				}
 				writes = append(writes, acceptOwnershipReport.Output)
 			}
-			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorProxyRef.Address), executor.ProxyType, []common.Address{cllccipTimelockAddr}})
+			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorProxyRef.Address), ExecutorProxyType, []common.Address{cllccipTimelockAddr}})
 
 			// Fetch the target on the ExecutorProxy
-			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[any]{
+			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
 			})
@@ -592,7 +615,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 
 			// Fetch the fee aggregator on the ExecutorProxy
-			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[any]{
+			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
 			})
@@ -652,7 +675,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
 				}
-				if minimumBlockDepthReport.Output.Ret3 != mockReceiverParams.MinimumBlockDepth {
+				if minimumBlockDepthReport.Output.MinBlockDepth != mockReceiverParams.MinimumBlockDepth {
 					// Set the minimum block depth on the MockReceiver
 					setMinimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockDepth, chain, contract_utils.FunctionInput[uint16]{
 						ChainSelector: chain.Selector,
