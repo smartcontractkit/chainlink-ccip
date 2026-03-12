@@ -821,6 +821,10 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		if chainSelector == 5009297550715157269 {
 			input.RemoteChainSelectors = []uint64{15971525489660198786}
 		}
+		input.PreviousVersions = []*semver.Version{
+			semver.MustParse("1.5.0"),
+			semver.MustParse("1.6.0"),
+		}
 		// Execute the sequence
 		report, err := cldf_ops.ExecuteSequence(
 			e.OperationsBundle,
