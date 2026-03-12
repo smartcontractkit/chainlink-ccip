@@ -6,16 +6,16 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
+	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -62,10 +62,10 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSelector,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					ContractParams: testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned:  true,
+					ChainSelector:    chainSelector,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -110,9 +110,9 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				sequences.DeployChainContracts,
 				evmChain2,
 				sequences.DeployChainContractsInput{
-					ChainSelector:  remoteChainSelector,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					ContractParams: testsetup.CreateBasicContractParams(),
+					ChainSelector:    remoteChainSelector,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:   testsetup.CreateBasicContractParams(),
 					DeployerKeyOwned: true,
 				},
 			)
@@ -158,16 +158,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 						},
 					},
 					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteChainSelector: {
-							AllowlistEnabled:   false,
-							FeeUSDCents:        50,
-							GasForVerification: 50_000,
-							PayloadSizeBytes:   6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   []string{common.HexToAddress("0x01").String()},
-								Threshold: 1,
-							},
-						},
+						remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 					},
 				},
 			}
@@ -187,16 +178,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 						},
 					},
 					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						chainSelector: {
-							AllowlistEnabled:   false,
-							FeeUSDCents:        50,
-							GasForVerification: 50_000,
-							PayloadSizeBytes:   6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   []string{common.HexToAddress("0x01").String()},
-								Threshold: 1,
-							},
-						},
+						chainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 					},
 				},
 			}
@@ -331,7 +313,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
 
 			// Check outbound implementation on CommitteeVerifierResolver
-			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolverAddr), evmChain.Client)
+			boundResolver, err := versioned_verifier_resolver_latest.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolverAddr), evmChain.Client)
 			require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
 			outboundImpl, err := boundResolver.GetOutboundImplementation(&bind.CallOpts{Context: t.Context()}, remoteChainSelector, []byte{})
 			require.NoError(t, err, "GetOutboundImplementation should not error")
