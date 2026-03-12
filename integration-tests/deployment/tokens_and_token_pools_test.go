@@ -480,7 +480,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 					TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 						evmA.Chain.Selector: {
 							SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
-							TokenPoolVersion: v1_6_0,
+							TokenPoolVersion:      v1_6_0,
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmA.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
@@ -489,10 +489,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 									Type:          datastore.ContractType(evmTokenPoolType),
 									Version:       v1_5_1,
 								},
-								RegistryRef: datastore.AddressRef{
-									ChainSelector: evmA.Chain.Selector,
-									Address:       evmA.TAR.Address().Hex(),
-								},
+								RegistryRef: datastore.AddressRef{}, // inferred
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmB.Chain.Selector: {
 										OutboundRateLimiterConfig: defaultRL,
@@ -502,7 +499,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 						},
 						evmB.Chain.Selector: {
 							SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
-							TokenPoolVersion: v1_6_0,
+							TokenPoolVersion:      v1_6_0,
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmB.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
@@ -511,10 +508,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 									Type:          datastore.ContractType(evmTokenPoolType),
 									Version:       v1_5_1,
 								},
-								RegistryRef: datastore.AddressRef{
-									ChainSelector: evmB.Chain.Selector,
-									Address:       evmB.TAR.Address().Hex(),
-								},
+								RegistryRef: datastore.AddressRef{}, // inferred
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmA.Chain.Selector: {
 										OutboundRateLimiterConfig: defaultRL,
@@ -804,11 +798,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								ChainSelector: solbnm.Chain.Selector,
 								Address:       tokenAddr.Address,
 							},
-							RegistryRef: datastore.AddressRef{
-								ChainSelector: solbnm.Chain.Selector,
-								Address:       routerProgramId.String(),
-								Version:       v1_6_0,
-							},
+							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								evmA.Chain.Selector: {
 									OutboundRateLimiterConfig: defaultRL,
@@ -821,7 +811,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 					},
 					evmA.Chain.Selector: {
 						SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
-						TokenPoolVersion: v1_6_0,
+						TokenPoolVersion:      v1_6_0,
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							ChainSelector: evmA.Chain.Selector,
 							TokenPoolRef: datastore.AddressRef{
@@ -830,10 +820,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								Type:          datastore.ContractType(evmTokenPoolType),
 								Version:       v1_5_1,
 							},
-							RegistryRef: datastore.AddressRef{
-								ChainSelector: evmA.Chain.Selector,
-								Address:       evmA.TAR.Address().Hex(),
-							},
+							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
 									OutboundRateLimiterConfig: defaultRL,
@@ -843,7 +830,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 					},
 					evmB.Chain.Selector: {
 						SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
-						TokenPoolVersion: v1_6_0,
+						TokenPoolVersion:      v1_6_0,
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							ChainSelector: evmB.Chain.Selector,
 							TokenPoolRef: datastore.AddressRef{
@@ -852,10 +839,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								Type:          datastore.ContractType(evmTokenPoolType),
 								Version:       v1_5_1,
 							},
-							RegistryRef: datastore.AddressRef{
-								ChainSelector: evmB.Chain.Selector,
-								Address:       evmB.TAR.Address().Hex(),
-							},
+							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
 									OutboundRateLimiterConfig: defaultRL,
