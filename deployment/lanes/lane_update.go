@@ -223,6 +223,10 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuo
 			DestDataAvailabilityMultiplierBps: 1,
 			GasMultiplierWeiPerEth:            11e17,
 		},
+		V2Params: &FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
 	}
 	family, _ := chain_selectors.GetSelectorFamily(selector)
 	switch family {
