@@ -17,9 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -269,7 +270,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	}
 	params.MockReceivers = []sequences.MockReceiverParams{
 		{
-			Version: mock_receiver.Version,
+			Version: mock_receiver_v2.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					ChainSelector: chainSelector,
@@ -287,7 +288,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 			Qualifier: "q1",
 		},
 		{
-			Version: mock_receiver.Version,
+			Version: mock_receiver_v2.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					Type:      datastore.ContractType(committee_verifier.ContractType),
@@ -338,16 +339,16 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 
 	q1ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(mock_receiver.ContractType),
-		Version:       mock_receiver.Version,
+		Type:          datastore.ContractType(mock_receiver_v2.ContractType),
+		Version:       mock_receiver_v2.Version,
 		Qualifier:     "q1",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
 	q2ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(mock_receiver.ContractType),
-		Version:       mock_receiver.Version,
+		Type:          datastore.ContractType(mock_receiver_v2.ContractType),
+		Version:       mock_receiver_v2.Version,
 		Qualifier:     "q2",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)

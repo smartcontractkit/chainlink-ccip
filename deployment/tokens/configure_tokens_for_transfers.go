@@ -166,6 +166,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			TokenRef:                      token.TokenRef,
 			PoolType:                      tokenPool.Type.String(),
 			ExistingDataStore:             e.DataStore,
+			MinFinalityValue:              token.MinFinalityValue,
 			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
 			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
 			TimelockAddress:               timelockAddress,

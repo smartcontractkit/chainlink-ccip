@@ -396,8 +396,8 @@ func importConfigFromActivePool(
 		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
 	}
 	tav := typeAndVersionReport.Output
-	if tav.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
-		// Configuration import from another 2.0.0 pool is not currently supported
+	if tav.Version.GreaterThanEqual(semver.MustParse("1.7.0")) {
+		// Configuration import from another 1.7.0 pool is not currently supported
 		return nil, nil
 	}
 	if tav.Version.LessThan(semver.MustParse("1.5.1")) {
@@ -803,8 +803,8 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		}
 		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
 	default:
-		return nil, fmt.Errorf("unsupported onRamp version %s for onRamp %s on chain %s, cannot import token transfer fee config",
-			onRampTAV.String(), onRampAddr.Hex(), chain.String())
+		// Unsupported onRamp version, nothing to import.
+		return nil, nil
 	}
 }
 
