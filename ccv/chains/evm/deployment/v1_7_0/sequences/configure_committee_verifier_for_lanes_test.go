@@ -187,6 +187,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 					ChainSelector:  chainSelector,
 					ContractParams: testsetup.CreateBasicContractParams(),
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned:  true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -386,6 +387,7 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 					ChainSelector:  chainSelector,
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					ContractParams: testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned:  true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")

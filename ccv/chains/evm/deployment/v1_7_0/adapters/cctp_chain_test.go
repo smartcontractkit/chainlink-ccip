@@ -97,6 +97,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 			ChainSelector:  chainSelector,
 			ContractParams: testsetup.CreateBasicContractParams(),
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned: true, // Set DeployerKeyOwned to true to skip ownership transfer steps since this is a test environment and we don't have MCMS or timelocks set up
 		},
 	)
 	require.NoError(t, err, "Failed to deploy chain contracts")
