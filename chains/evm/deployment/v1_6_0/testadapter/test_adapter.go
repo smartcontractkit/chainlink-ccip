@@ -242,7 +242,7 @@ func (a *EVMAdapter) InvalidCCIPReceivers() [][]byte {
 	}
 }
 
-func (a *EVMAdapter) SetReceiverRejectAll(t *testing.T, rejectAll bool) error {
+func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error {
 	t.Skip(errors.ErrUnsupported.Error())
 	return nil
 }
