@@ -7,6 +7,8 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 
 replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 
+replace github.com/smartcontractkit/chainlink-ccip => ../../../.
+
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aws/smithy-go v1.24.0
