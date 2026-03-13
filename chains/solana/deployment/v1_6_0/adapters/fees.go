@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	fee_quoter_operations "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -30,13 +31,23 @@ func NewFeesAdapter(solAdapter *solseq.SolanaAdapter) *FeesAdapter {
 	}
 }
 
-func (a *FeesAdapter) getFeeQuoterAddress(ds datastore.DataStore, src uint64) (solana.PublicKey, error) {
-	fqAddr, err := a.sol.GetFQAddress(ds, src)
+func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
+	fqAddr, err := a.sol.GetFQAddress(e.DataStore, src)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
 
-	return solana.PublicKeyFromBytes(fqAddr), nil
+	feecontractref := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByAddress(solana.PublicKeyFromBytes(fqAddr).String()),
+		datastore.AddressRefByType(datastore.ContractType(fee_quoter_operations.ContractType)),
+		datastore.AddressRefByChainSelector(src),
+	)
+
+	if len(feecontractref) == 0 {
+		return datastore.AddressRef{}, fmt.Errorf("no address ref found for FeeQuoter contract at address %s on chain selector %d", fqAddr, src)
+	}
+
+	return feecontractref[0], nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
@@ -49,10 +60,12 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("solana chain not found for selector %d", src)
 	}
 
-	fqAddr, err := a.getFeeQuoterAddress(e.DataStore, src)
+	fqRef, err := a.GetFeeContractRef(e, src, dst)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
+
+	fqAddr := solana.MustPublicKeyFromBase58(fqRef.Address)
 
 	token, err := solana.PublicKeyFromBase58(address)
 	if err != nil {
@@ -91,10 +104,12 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			var result sequences.OnChainOutput
 			src := input.Selector
 
-			fqAddr, err := a.getFeeQuoterAddress(e.DataStore, src)
+			fqRef, err := a.GetFeeContractRef(e, src, 0)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 			}
+
+			fqAddr := solana.MustPublicKeyFromBase58(fqRef.Address)
 
 			remoteChainConfigs := map[uint64]map[solana.PublicKey]fee_quoter.TokenTransferFeeConfig{}
 			for dst, dstCfg := range input.Settings {
