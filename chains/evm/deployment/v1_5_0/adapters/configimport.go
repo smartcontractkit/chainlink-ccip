@@ -47,6 +47,12 @@ type ConfigImportAdapter struct {
 	TokenAdminReg common.Address
 	PriceRegistry common.Address
 	Router        common.Address
+
+	// connectedChainsCache memoizes the result of ConnectedChains per chain selector
+	// to avoid duplicate (potentially expensive) RPC work when the method is called
+	// multiple times for the same chain within the same adapter instance.
+	connectedChainsCache map[uint64][]uint64
+	connectedChainsMu    sync.Mutex
 }
 
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, sel uint64) error {
@@ -120,6 +126,20 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, sel uint64)
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
+	// Fast path: return cached result if available to avoid duplicate RPC work.
+	ci.connectedChainsMu.Lock()
+	if ci.connectedChainsCache == nil {
+		ci.connectedChainsCache = make(map[uint64][]uint64)
+	}
+	if cached, ok := ci.connectedChainsCache[chainsel]; ok {
+		// Return a copy to prevent callers from mutating the cached slice.
+		result := make([]uint64, len(cached))
+		copy(result, cached)
+		ci.connectedChainsMu.Unlock()
+		return result, nil
+	}
+	ci.connectedChainsMu.Unlock()
+
 	var connected []uint64
 	laneResolver := adapters1_2.LaneVersionResolver{}
 	remoteChainToVersionMap, _, err := laneResolver.DeriveLaneVersionsForChain(e, chainsel)
@@ -131,6 +151,17 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 			connected = append(connected, destSel)
 		}
 	}
+
+	// Cache the computed result for subsequent calls.
+	ci.connectedChainsMu.Lock()
+	if ci.connectedChainsCache == nil {
+		ci.connectedChainsCache = make(map[uint64][]uint64)
+	}
+	cached := make([]uint64, len(connected))
+	copy(cached, connected)
+	ci.connectedChainsCache[chainsel] = cached
+	ci.connectedChainsMu.Unlock()
+
 	return connected, nil
 }
 
