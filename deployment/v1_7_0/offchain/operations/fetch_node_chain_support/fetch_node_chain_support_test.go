@@ -150,26 +150,11 @@ func TestFetchNodeChainSupport_MultipleNOPs_MultipleChains_ReturnsAllSelectors(t
 	assert.Len(t, report.Output.SupportedChains["nop-2"], 1)
 }
 
-func TestFetchNodeChainSupport_NOPNotFound_ContinuesWithOtherNOPs(t *testing.T) {
+func TestFetchNodeChainSupport_NOPNotFound_ReturnsError(t *testing.T) {
 	mockClient := ccvmocks.NewMockJDClient(t)
 	mockClient.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
 		&nodev1.ListNodesResponse{
 			Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop-1"}},
-		}, nil,
-	)
-	mockClient.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				{
-					NodeId: "node-1",
-					Chain:  &nodev1.Chain{Type: nodev1.ChainType_CHAIN_TYPE_EVM, Id: "11155111"},
-					Ocr2Config: &nodev1.OCR2Config{
-						OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{
-							OnchainSigningAddress: "key-1",
-						},
-					},
-				},
-			},
 		}, nil,
 	)
 
@@ -179,15 +164,15 @@ func TestFetchNodeChainSupport_NOPNotFound_ContinuesWithOtherNOPs(t *testing.T) 
 		NOPAliases: []string{"nop-1", "non-existent-nop"},
 	}
 
-	report, err := operations.ExecuteOperation(bundle, FetchNodeChainSupport, FetchNodeChainSupportDeps{
+	_, err := operations.ExecuteOperation(bundle, FetchNodeChainSupport, FetchNodeChainSupportDeps{
 		JDClient: mockClient,
 		Logger:   logger.Test(t),
 		NodeIDs:  []string{"node-1"},
 	}, input)
 
-	require.NoError(t, err)
-	require.Len(t, report.Output.SupportedChains, 1)
-	assert.Contains(t, report.Output.SupportedChains, "nop-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "non-existent-nop")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestFetchNodeChainSupport_ListNodesError_ReturnsError(t *testing.T) {
@@ -317,7 +302,7 @@ func TestFetchNodeChainSupport_InvalidChainId_Skipped(t *testing.T) {
 	assert.Empty(t, report.Output.SupportedChains)
 }
 
-func TestFetchNodeChainSupport_AllNOPsNotFound_ReturnsEmpty(t *testing.T) {
+func TestFetchNodeChainSupport_AllNOPsNotFound_ReturnsError(t *testing.T) {
 	mockClient := ccvmocks.NewMockJDClient(t)
 	mockClient.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
 		&nodev1.ListNodesResponse{
@@ -331,12 +316,13 @@ func TestFetchNodeChainSupport_AllNOPsNotFound_ReturnsEmpty(t *testing.T) {
 		NOPAliases: []string{"nop-1", "nop-2"},
 	}
 
-	report, err := operations.ExecuteOperation(bundle, FetchNodeChainSupport, FetchNodeChainSupportDeps{
+	_, err := operations.ExecuteOperation(bundle, FetchNodeChainSupport, FetchNodeChainSupportDeps{
 		JDClient: mockClient,
 		Logger:   logger.Test(t),
 		NodeIDs:  []string{"node-1"},
 	}, input)
 
-	require.NoError(t, err)
-	assert.Empty(t, report.Output.SupportedChains)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nop-1")
+	assert.Contains(t, err.Error(), "not found")
 }
