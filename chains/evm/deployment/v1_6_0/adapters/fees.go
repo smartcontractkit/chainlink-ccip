@@ -54,7 +54,6 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 
 	}
 
-	// Since we're filtering by address+type+chain selector, there should be exactly one match
 	return feecontractref, nil
 }
 
