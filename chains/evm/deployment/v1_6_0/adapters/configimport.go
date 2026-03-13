@@ -2,18 +2,17 @@ package adapters
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	tokenadminops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -32,6 +31,12 @@ type ConfigImportAdapter struct {
 	OffRamp       common.Address
 	Router        common.Address
 	TokenAdminReg common.Address
+
+	// connectedChainsCache memoizes the result of ConnectedChains per chain selector
+	// to avoid duplicate (potentially expensive) RPC work when the method is called
+	// multiple times for the same chain within the same adapter instance.
+	connectedChainsCache map[uint64][]uint64
+	connectedChainsMu    sync.Mutex
 }
 
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelector uint64) error {
@@ -90,49 +95,52 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
 	}
+	remoteChains, err := ci.ConnectedChains(e, chainsel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connected chains for chain %d: %w", chainsel, err)
+	}
 	// get all supported tokens from token admin registry
-	return adapters1_5.GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain)
+	return adapters1_5.GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, remoteChains)
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
-	chain, ok := e.BlockChains.EVMChains()[chainsel]
-	if !ok {
-		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
+	// Fast path: return cached result if available to avoid duplicate RPC work.
+	ci.connectedChainsMu.Lock()
+	if ci.connectedChainsCache == nil {
+		ci.connectedChainsCache = make(map[uint64][]uint64)
 	}
-	routerAddr := ci.Router
-	if routerAddr == (common.Address{}) {
-		return nil, fmt.Errorf("router address not initialized for chain %d", chainsel)
+	if cached, ok := ci.connectedChainsCache[chainsel]; ok {
+		// Return a copy to prevent callers from mutating the cached slice.
+		result := make([]uint64, len(cached))
+		copy(result, cached)
+		ci.connectedChainsMu.Unlock()
+		return result, nil
 	}
-	// get all offRamps from router to find connected chains
-	routerC, err := router.NewRouter(ci.Router, chain.Client)
+	ci.connectedChainsMu.Unlock()
+
+	var connected []uint64
+	laneResolver := adapters1_2.LaneVersionResolver{}
+	remoteChainToVersionMap, _, err := laneResolver.DeriveLaneVersionsForChain(e, chainsel)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate router contract at %s on chain %d: %w", routerAddr.String(), chain.Selector, err)
+		return nil, fmt.Errorf("failed to derive lane versions for chain %d: %w", chainsel, err)
 	}
-	offRamps, err := routerC.GetOffRamps(&bind.CallOpts{
-		Context: e.GetContext(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get off ramps from router at %s on chain %d: %w", routerAddr.String(), chain.Selector, err)
-	}
-	connectedChains := make([]uint64, 0)
-	for _, offRamp := range offRamps {
-		// if the offramp's address matches our offramp, then we are connected to the source chain via 1.6
-		if offRamp.OffRamp == ci.OffRamp {
-			// get the onRamp on router for the source chain and check if it matches our onRamp, if it does then we are connected to that chain
-			// lanes are always bi-directional so source and destination chain selectors are interchangeable for the purpose of finding connected chains
-			onRamp, err := routerC.GetOnRamp(&bind.CallOpts{
-				Context: e.GetContext(),
-			}, offRamp.SourceChainSelector)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get on ramp for source chain selector %d from router at %s on chain %d: %w", offRamp.SourceChainSelector, routerAddr.String(), chain.Selector, err)
-			}
-			if onRamp != ci.OnRamp {
-				continue
-			}
-			connectedChains = append(connectedChains, offRamp.SourceChainSelector)
+	for destSel, version := range remoteChainToVersionMap {
+		if version.Equal(semver.MustParse("1.6.0")) {
+			connected = append(connected, destSel)
 		}
 	}
-	return connectedChains, nil
+
+	// Cache the computed result for subsequent calls.
+	ci.connectedChainsMu.Lock()
+	if ci.connectedChainsCache == nil {
+		ci.connectedChainsCache = make(map[uint64][]uint64)
+	}
+	cached := make([]uint64, len(connected))
+	copy(cached, connected)
+	ci.connectedChainsCache[chainsel] = cached
+	ci.connectedChainsMu.Unlock()
+
+	return connected, nil
 }
 
 func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
