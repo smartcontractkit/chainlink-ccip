@@ -12,7 +12,7 @@ OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_ONRAMP=1500
 OPTIMIZE_RUNS_OFFRAMP=25000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
-OPTIMIZE_RUNS_CCV_POOL=17000
+OPTIMIZE_RUNS_LARGE_POOL=17000
 
 
 PROJECT="ccip"
@@ -67,14 +67,17 @@ function getOptimizations() {
       "OffRamp")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
-      "LombardTokenPool")
-          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
-          ;;
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
+      "LombardTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
+        ;;
       "SiloedUSDCTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
+        ;;
+      "CrossChainPoolToken")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
         ;;
     esac
 
@@ -97,10 +100,11 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
-compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
-compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
+compileContract TokenPoolFactory
 compileContract rmn/RMNRemote
 compileContract rmn/RMNProxy
+compileContract tokens/BaseERC20
+compileContract tokens/CrossChainToken
 
 # Pools
 compileContract pools/LockReleaseTokenPool
@@ -108,6 +112,7 @@ compileContract pools/BurnMintTokenPool
 compileContract pools/BurnFromMintTokenPool
 compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
+compileContract pools/CrossChainPoolToken
 compileContract pools/TokenPool
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/ERC20LockBox
