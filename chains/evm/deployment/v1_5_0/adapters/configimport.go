@@ -222,30 +222,60 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			if err != nil {
 				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
 			}
+
+			// Cache the token address per pool so we only fetch it once, and
+			// track when certain pool methods appear to be unsupported so we
+			// can avoid repeated failed calls and warning spam.
+			var (
+				tokenAddr                  common.Address
+				tokenFetched               bool
+				isSupportedChainUnsupported bool
+				getTokenUnsupported        bool
+			)
+
 			for _, remoteChain := range remoteChains {
+				// If we've already determined that IsSupportedChain or GetToken
+				// are unsupported for this pool, stop checking further chains.
+				if isSupportedChainUnsupported || getTokenUnsupported {
+					break
+				}
+
 				supported, err := tokenPoolC.IsSupportedChain(&bind.CallOpts{
 					Context: grpCtx,
 				}, remoteChain)
 				if err != nil {
-					// if we fail to check if the pool supports a remote chain, we skip it and move on to avoid failing the entire config import
-					// since it's possible for some pools do not support the isSupportedChain function
+					// If we fail to check if the pool supports a remote chain,
+					// assume this method isn't supported by this pool, log once,
+					// and short-circuit to avoid failing the entire import and
+					// spamming warnings for every remote chain.
 					l.Warnf("failed to check if token pool at %s on chain %d supports remote chain %d: %v", poolAddr.String(), chain.Selector, remoteChain, err)
+					isSupportedChainUnsupported = true
+					break
+				}
+				if !supported {
 					continue
 				}
-				if supported {
-					tokenAddr, err := tokenPoolC.GetToken(&bind.CallOpts{
+
+				// Fetch the token address at most once per pool.
+				if !tokenFetched {
+					tokenAddr, err = tokenPoolC.GetToken(&bind.CallOpts{
 						Context: grpCtx,
 					})
 					if err != nil {
-						// if we fail to get the token address for a pool, we skip it and move on to avoid failing the entire config import
-						// since it's possible for some pools do not support the getToken function
+						// If we fail to get the token address for a pool, assume
+						// this method isn't supported or is consistently failing
+						// for this pool. Log once and short-circuit further
+						// attempts for this pool to avoid warning spam.
 						l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
-						continue
+						getTokenUnsupported = true
+						break
 					}
-					mu.Lock()
-					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
-					mu.Unlock()
+					tokenFetched = true
 				}
+
+				mu.Lock()
+				tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+				mu.Unlock()
 			}
 			return nil
 		})
