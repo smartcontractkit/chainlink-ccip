@@ -133,6 +133,10 @@ func (m *mockLaneAdapter) GetFQAddress(_ datastore.DataStore, _ uint64) ([]byte,
 	return []byte("0xFeeQuoter"), nil
 }
 
+func (m *mockLaneAdapter) DisableRemoteChain() *cldf_ops.Sequence[lanes.DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
 func newCommitteeVerifierTestEnv(t *testing.T, selectors []uint64) deployment.Environment {
 	t.Helper()
 	lggr := logger.Test(t)

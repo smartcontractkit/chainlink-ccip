@@ -191,7 +191,8 @@ func (c *configPollerV2) startBackgroundPolling() {
 //   - chainSel: The chain selector to retrieve configuration for
 //
 // Returns:
-//   - ChainConfigSnapshot containing the chain's configuration data
+//   - ChainConfigSnapshot containing the chain's configuration data.
+//     Deprecated: ChainConfigSnapshot.FeeQuoter is no longer populated; do not use it.
 //   - Error if no chain accessor exists, cache creation fails, or batch refresh fails
 func (c *configPollerV2) GetChainConfig(
 	ctx context.Context,

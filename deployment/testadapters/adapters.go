@@ -47,6 +47,9 @@ type MessageComponents struct {
 	TokenAmounts []TokenAmount
 }
 
+const ExtraArgGasLimit = "gasLimit|computeUnits"
+const ExtraArgOOO = "outOfOrderExecutionEnabled"
+
 // ExtraArgOpt is a generic representation of an extra arg that can be applied
 // to any kind of ccip message.
 // We use this to make it possible to specify extra args in a chain-agnostic way.
@@ -57,14 +60,14 @@ type ExtraArgOpt struct {
 
 func NewOutOfOrderExtraArg(outOfOrder bool) ExtraArgOpt {
 	return ExtraArgOpt{
-		Name:  "outOfOrderExecutionEnabled",
+		Name:  ExtraArgOOO,
 		Value: outOfOrder,
 	}
 }
 
 func NewGasLimitExtraArg(gasLimit *big.Int) ExtraArgOpt {
 	return ExtraArgOpt{
-		Name:  "gasLimit|computeUnits",
+		Name:  ExtraArgGasLimit,
 		Value: gasLimit,
 	}
 }
@@ -94,6 +97,10 @@ type TestAdapter interface {
 
 	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
+
+	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
+	// This is used for test cases with a a failing receiver.
+	SetReceiverRejectAll(ctx context.Context, rejectAll bool) error
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
