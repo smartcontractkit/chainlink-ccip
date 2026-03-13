@@ -75,7 +75,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 	}
 
 	// This gets the token transfer fee config for the given token from the FeeQuoter contract
-	// https://etherscan.io/address/0x40858070814a57FdF33a613ae84fE0a8b4a874f7#code#F1#L819
+	// https://etherscan.io/address/0x40858070814a57FdF33a613ae84fE0a8b4a874f7#code#F1#L819 --TODO: update comment with link to correct line in 2.0.0 version of FeeQuoter contract once available
 	cfg, err := fq.GetTokenTransferFeeConfig(&bind.CallOpts{Context: e.GetContext()}, dst, common.HexToAddress(address))
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get token transfer fee config from FeeQuoter at %s for src %d, dst %d, token %s: %w", fqAddr.Hex(), src, dst, address, err)
@@ -86,7 +86,8 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 		DestBytesOverhead: cfg.DestBytesOverhead,
 		DestGasOverhead:   cfg.DestGasOverhead,
 		IsEnabled:         cfg.IsEnabled,
-		MaxFeeUSDCents:    cfg.FeeUSDCents,
+		MaxFeeUSDCents:    0,               // Max fee is not defined in 2.0.0 version of FeeQuoter contract, so we set it to 0
+		MinFeeUSDCents:    cfg.FeeUSDCents, // In 2.0.0 version of FeeQuoter contract, there is only a single fee parameter (FeeUSDCents) https://github.com/smartcontractkit/chainlink-ccip/blob/73fcb2020b9335c965a7d2bb5d932c0fa05c7948/chains/evm/contracts/FeeQuoter.sol#L97
 	}, nil
 }
 
@@ -132,7 +133,7 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 								TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
 									DestBytesOverhead: feeCfg.DestBytesOverhead,
 									DestGasOverhead:   feeCfg.DestGasOverhead,
-									FeeUSDCents:       feeCfg.MaxFeeUSDCents,
+									FeeUSDCents:       feeCfg.MinFeeUSDCents,
 									IsEnabled:         feeCfg.IsEnabled,
 								},
 							},
