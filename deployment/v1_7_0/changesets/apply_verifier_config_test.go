@@ -345,6 +345,80 @@ func TestApplyVerifierConfig_MissingSignerAddressReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing signer address")
 }
 
+func TestApplyVerifierConfig_NoChainConfigsPreservesExistingJobs(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+
+	registry := adapters.NewVerifierConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, &mockVerifierJobConfigAdapter{})
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
+		Spec:     "existing-verifier-job",
+		JobID:    shared.JobID("nop1-agg-1-c1-verifier"),
+		NOPAlias: shared.NOPAlias("nop1"),
+		Mode:     shared.NOPModeStandalone,
+	}))
+	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
+
+	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{}, shared.NOPModeStandalone)
+	cs := changesets.ApplyVerifierConfig(registry)
+	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
+		Topology:                 topo,
+		CommitteeQualifier:       "c1",
+		DefaultExecutorQualifier: "pool1",
+		RevokeOrphanedJobs:       false,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, output.DataStore)
+
+	sealed := output.DataStore.Seal()
+	job, err := offchain.GetJob(sealed, shared.NOPAlias("nop1"), shared.JobID("nop1-agg-1-c1-verifier"))
+	require.NoError(t, err)
+	assert.Equal(t, "existing-verifier-job", job.Spec)
+}
+
+func TestApplyVerifierConfig_NoChainConfigsWithRevokeRemovesOrphanedJobs(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+
+	registry := adapters.NewVerifierConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, &mockVerifierJobConfigAdapter{})
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
+		Spec:     "orphaned-verifier-job",
+		JobID:    shared.JobID("nop1-agg-1-c1-verifier"),
+		NOPAlias: shared.NOPAlias("nop1"),
+		Mode:     shared.NOPModeStandalone,
+	}))
+	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
+		Spec:     "other-committee-job",
+		JobID:    shared.JobID("nop1-agg-1-c2-verifier"),
+		NOPAlias: shared.NOPAlias("nop1"),
+		Mode:     shared.NOPModeStandalone,
+	}))
+	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
+
+	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{}, shared.NOPModeStandalone)
+	cs := changesets.ApplyVerifierConfig(registry)
+	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
+		Topology:                 topo,
+		CommitteeQualifier:       "c1",
+		DefaultExecutorQualifier: "pool1",
+		RevokeOrphanedJobs:       true,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, output.DataStore)
+
+	sealed := output.DataStore.Seal()
+
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop1"), shared.JobID("nop1-agg-1-c1-verifier"))
+	require.Error(t, err, "orphaned c1 verifier job should be removed")
+
+	otherJob, err := offchain.GetJob(sealed, shared.NOPAlias("nop1"), shared.JobID("nop1-agg-1-c2-verifier"))
+	require.NoError(t, err, "c2 verifier job should be preserved")
+	assert.Equal(t, "other-committee-job", otherJob.Spec)
+}
+
 func TestApplyVerifierConfig_UsesAllCommitteeChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
