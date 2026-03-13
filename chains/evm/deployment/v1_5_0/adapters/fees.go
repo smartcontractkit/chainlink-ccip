@@ -12,6 +12,7 @@ import (
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -177,17 +178,23 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 		return datastore.AddressRef{}, fmt.Errorf("no OnRamp address found for src %d and dst %d", src, dst)
 	}
 
-	feecontractref := e.DataStore.Addresses().Filter(
-		datastore.AddressRefByAddress(cacheAddr.Hex()),
-		datastore.AddressRefByType(datastore.ContractType(onramp.ContractType)),
-		datastore.AddressRefByVersion(onramp.Version),
-		datastore.AddressRefByChainSelector(src),
+	filter := datastore.AddressRef{
+		Type:          datastore.ContractType(onramp.ContractType),
+		Address:       cacheAddr.Hex(),
+		ChainSelector: src,
+	}
+	feecontractref, err := datastore_utils.FindAndFormatRef(
+		e.DataStore,
+		filter,
+		src,
+		datastore_utils.FullRef,
 	)
 
-	if len(feecontractref) == 0 || len(feecontractref) > 1 {
-		return datastore.AddressRef{}, fmt.Errorf("incorrect number of address ref found for OnRamp contract at address %s on chain selector %d", cacheAddr.Hex(), src)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find FeeQuoter address ref for chain selector %d: %w", src, err)
 	}
-	return feecontractref[0], nil
+
+	return feecontractref, nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
