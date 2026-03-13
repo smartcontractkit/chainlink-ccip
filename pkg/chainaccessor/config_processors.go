@@ -29,8 +29,6 @@ func processConfigResults(
 			config.RMNProxy, err = processRMNProxyResults(results)
 		case consts.ContractNameRMNRemote:
 			config.RMNRemote, config.CurseInfo, err = processRMNRemoteResults(results, destChainSelector)
-		case consts.ContractNameFeeQuoter:
-			config.FeeQuoter, err = processFeeQuoterResults(results)
 		case consts.ContractNameOnRamp:
 			// Only process OnRamp results for source chains
 			if resultsChainSelector != destChainSelector {
@@ -284,25 +282,6 @@ func processRMNRemoteResults(
 	)
 
 	return config, curseInfo, nil
-}
-
-func processFeeQuoterResults(results []types.BatchReadResult) (cciptypes.FeeQuoterConfig, error) {
-	if len(results) != 1 {
-		return cciptypes.FeeQuoterConfig{}, fmt.Errorf("expected 1 fee quoter result, got %d", len(results))
-	}
-
-	val, err := results[0].GetResult()
-	if err != nil {
-		return cciptypes.FeeQuoterConfig{}, fmt.Errorf("get fee quoter result: %w", err)
-	}
-
-	if typed, ok := val.(*cciptypes.FeeQuoterStaticConfig); ok {
-		return cciptypes.FeeQuoterConfig{
-			StaticConfig: *typed,
-		}, nil
-	}
-
-	return cciptypes.FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
 func processRouterResults(results []types.BatchReadResult) (cciptypes.RouterConfig, error) {
