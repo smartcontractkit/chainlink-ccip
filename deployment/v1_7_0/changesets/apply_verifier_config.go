@@ -460,6 +460,7 @@ func getCommitteeChainSelectors(committee offchain.CommitteeConfig) ([]uint64, e
 		}
 		selectors = append(selectors, sel)
 	}
+	slices.Sort(selectors)
 	return selectors, nil
 }
 

@@ -256,7 +256,15 @@ func TestApplyVerifierConfig_HappyPathBuildsJobSpecs(t *testing.T) {
 		DefaultExecutorQualifier: "pool1",
 	})
 	require.NoError(t, err)
-	assert.NotNil(t, output.DataStore)
+	require.NotNil(t, output.DataStore)
+
+	sealed := output.DataStore.Seal()
+	for _, nop := range []string{"nop1", "nop2"} {
+		job, err := offchain.GetJob(sealed, shared.NOPAlias(nop), shared.JobID(nop+"-agg-1-c1-verifier"))
+		require.NoError(t, err, "job should exist for %s", nop)
+		assert.Contains(t, job.Spec, `type = "ccvcommitteeverifier"`)
+		assert.Contains(t, job.Spec, fmt.Sprintf("%d", sel1))
+	}
 }
 
 func TestApplyVerifierConfig_AdapterErrorPropagates(t *testing.T) {
@@ -310,7 +318,17 @@ func TestApplyVerifierConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 		TargetNOPs:               []shared.NOPAlias{"nop1"},
 	})
 	require.NoError(t, err)
-	assert.NotNil(t, output.DataStore)
+	require.NotNil(t, output.DataStore)
+
+	sealed := output.DataStore.Seal()
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop1"), shared.JobID("nop1-agg-1-c1-verifier"))
+	require.NoError(t, err, "targeted nop1 should have a job")
+
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop2"), shared.JobID("nop2-agg-1-c1-verifier"))
+	require.Error(t, err, "untargeted nop2 should not have a job")
+
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop3"), shared.JobID("nop3-agg-1-c1-verifier"))
+	require.Error(t, err, "untargeted nop3 should not have a job")
 }
 
 func TestApplyVerifierConfig_MissingSignerAddressReturnsError(t *testing.T) {

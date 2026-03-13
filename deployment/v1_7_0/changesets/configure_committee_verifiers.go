@@ -55,7 +55,7 @@ func ConfigureChainsForLanesFromTopology(
 			return fmt.Errorf("topology is required")
 		}
 
-		if len(cfg.Topology.NOPTopology.Committees) == 0 {
+		if cfg.Topology.NOPTopology == nil || len(cfg.Topology.NOPTopology.Committees) == 0 {
 			return fmt.Errorf("no committees defined in topology")
 		}
 

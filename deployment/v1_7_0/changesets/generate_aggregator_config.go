@@ -133,7 +133,10 @@ func buildQuorumConfigs(
 
 			chainSelectorStr := strconv.FormatUint(sigConfig.SourceChainSelector, 10)
 			if _, exists := quorumConfigs[chainSelectorStr]; exists {
-				continue
+				return nil, fmt.Errorf(
+					"duplicate quorum config for source chain %d in committee %q",
+					sigConfig.SourceChainSelector, committeeQualifier,
+				)
 			}
 
 			adapter, err := registry.GetByChain(sigConfig.SourceChainSelector)

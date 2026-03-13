@@ -199,7 +199,17 @@ func TestApplyExecutorConfig_HappyPathBuildsJobSpecs(t *testing.T) {
 		ExecutorQualifier: "pool1",
 	})
 	require.NoError(t, err)
-	assert.NotNil(t, output.DataStore)
+	require.NotNil(t, output.DataStore)
+
+	sealed := output.DataStore.Seal()
+	sel1Str := fmt.Sprintf("%d", sel1)
+	for _, nop := range []string{"nop1", "nop2"} {
+		jobID := shared.NewExecutorJobID(shared.NOPAlias(nop), shared.ExecutorJobScope{ExecutorQualifier: "pool1"})
+		job, err := offchain.GetJob(sealed, shared.NOPAlias(nop), jobID.ToJobID())
+		require.NoError(t, err, "job should exist for %s", nop)
+		assert.Contains(t, job.Spec, `type = "ccvexecutor"`)
+		assert.Contains(t, job.Spec, sel1Str)
+	}
 }
 
 func TestApplyExecutorConfig_NoDeployedChainsReturnsEmpty(t *testing.T) {
@@ -311,7 +321,22 @@ func TestApplyExecutorConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 		TargetNOPs:        []shared.NOPAlias{"nop1"},
 	})
 	require.NoError(t, err)
-	assert.NotNil(t, output.DataStore)
+	require.NotNil(t, output.DataStore)
+
+	sealed := output.DataStore.Seal()
+	scope := shared.ExecutorJobScope{ExecutorQualifier: "pool1"}
+
+	nop1JobID := shared.NewExecutorJobID(shared.NOPAlias("nop1"), scope)
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop1"), nop1JobID.ToJobID())
+	require.NoError(t, err, "targeted nop1 should have a job")
+
+	nop2JobID := shared.NewExecutorJobID(shared.NOPAlias("nop2"), scope)
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop2"), nop2JobID.ToJobID())
+	require.Error(t, err, "untargeted nop2 should not have a job")
+
+	nop3JobID := shared.NewExecutorJobID(shared.NOPAlias("nop3"), scope)
+	_, err = offchain.GetJob(sealed, shared.NOPAlias("nop3"), nop3JobID.ToJobID())
+	require.Error(t, err, "untargeted nop3 should not have a job")
 }
 
 func newTopologyWithChainConfigs(
