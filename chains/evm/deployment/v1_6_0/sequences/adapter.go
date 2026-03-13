@@ -153,7 +153,7 @@ var ConfigurePingPongSequence = operations.NewSequence(
 )
 
 // GetFeeQuoterAddress returns the address of the fee quoter contract for a given chain selector.
-// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version below 1.7.0
+// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version
 // (the next major version on or after 1.6.0).
 func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64) (datastore.AddressRef, error) {
 	var refs []datastore.AddressRef
@@ -164,13 +164,11 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	tooHighVersion := semver.MustParse("1.7.0")
+	// tooHighVersion := semver.MustParse("1.7.0") -- to unblock prod-testnet, skip the upper bound of the check
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version
-		// we want the latest version below 1.7.0
-		if v.GreaterThanEqual(latestVersion) &&
-			v.LessThan(tooHighVersion) {
+		if v.GreaterThanEqual(latestVersion) {
 			latestVersion = v
 			feeQRef = ref
 		}

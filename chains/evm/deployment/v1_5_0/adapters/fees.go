@@ -161,23 +161,33 @@ func (a *FeesAdapter) cacheOnRampAddress(e cldf.Environment, src uint64, dst uin
 	return nil
 }
 
-func (a *FeesAdapter) getOnRampAddress(e cldf.Environment, src uint64, dst uint64) (common.Address, error) {
+func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
 	err := a.cacheOnRampAddress(e, src, dst)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to cache OnRamp address for src %d and dst %d: %w", src, dst, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to cache OnRamp address for src %d and dst %d: %w", src, dst, err)
 	}
 
 	maybeAddr := a.getOnRampAddressInCache(src, dst)
 	if maybeAddr == nil {
-		return common.Address{}, fmt.Errorf("impossible state reached - OnRamp address for src %d and dst %d not found in cache after caching", src, dst)
+		return datastore.AddressRef{}, fmt.Errorf("impossible state reached - OnRamp address for src %d and dst %d not found in cache after caching", src, dst)
 	}
 
 	cacheAddr := *maybeAddr
 	if cacheAddr == (common.Address{}) {
-		return common.Address{}, fmt.Errorf("no OnRamp address found for src %d and dst %d", src, dst)
+		return datastore.AddressRef{}, fmt.Errorf("no OnRamp address found for src %d and dst %d", src, dst)
 	}
 
-	return cacheAddr, nil
+	feecontractref := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByAddress(cacheAddr.Hex()),
+		datastore.AddressRefByType(datastore.ContractType(onramp.ContractType)),
+		datastore.AddressRefByVersion(onramp.Version),
+		datastore.AddressRefByChainSelector(src),
+	)
+
+	if len(feecontractref) == 0 || len(feecontractref) > 1 {
+		return datastore.AddressRef{}, fmt.Errorf("incorrect number of address ref found for OnRamp contract at address %s on chain selector %d", cacheAddr.Hex(), src)
+	}
+	return feecontractref[0], nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
@@ -190,11 +200,12 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("chain with selector %d not defined", src)
 	}
 
-	onRampAddr, err := a.getOnRampAddress(e, src, dst)
+	onRampRef, err := a.GetFeeContractRef(e, src, dst)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get OnRamp address for src %d and dst %d: %w", src, dst, err)
 	}
 
+	onRampAddr := common.HexToAddress(onRampRef.Address)
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, chain.Client)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate OnRamp contract at address %s on chain selector %d: %w", onRampAddr.Hex(), src, err)
@@ -232,10 +243,11 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			src := input.Selector
 
 			for dst, dstCfg := range input.Settings {
-				onRampAddr, err := a.getOnRampAddress(e, src, dst)
+				onRampRef, err := a.GetFeeContractRef(e, src, dst)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get OnRamp address for src %d and dst %d: %w", src, dst, err)
 				}
+				onRampAddr := common.HexToAddress(onRampRef.Address)
 
 				updatesByChain := onramp.SetTokenTransferFeeConfigInput{}
 				for rawTokenAddress, feeCfg := range dstCfg {

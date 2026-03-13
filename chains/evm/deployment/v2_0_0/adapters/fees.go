@@ -2,13 +2,14 @@ package adapters
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	evmseq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -20,10 +21,10 @@ import (
 var _ fees.FeeAdapter = (*FeesAdapter)(nil)
 
 type FeesAdapter struct {
-	evm *evmseq.EVMAdapter
+	evm *evmseq16.EVMAdapter
 }
 
-func NewFeesAdapter(evmAdapter *evmseq.EVMAdapter) *FeesAdapter {
+func NewFeesAdapter(evmAdapter *evmseq16.EVMAdapter) *FeesAdapter {
 	return &FeesAdapter{
 		evm: evmAdapter,
 	}
@@ -66,7 +67,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 	}
 
 	fqAddr := common.HexToAddress(fqRef.Address)
-	fq, err := fee_quoter.NewFeeQuoter(fqAddr, chain.Client)
+	fq, err := fqops.NewFeeQuoterContract(fqAddr, chain.Client)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -86,31 +87,33 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 	return fees.TokenTransferFeeArgs{
 		DestBytesOverhead: cfg.DestBytesOverhead,
 		DestGasOverhead:   cfg.DestGasOverhead,
-		MinFeeUSDCents:    cfg.MinFeeUSDCents,
-		MaxFeeUSDCents:    cfg.MaxFeeUSDCents,
 		IsEnabled:         cfg.IsEnabled,
-		DeciBps:           cfg.DeciBps,
+		MaxFeeUSDCents:    cfg.FeeUSDCents,
 	}, nil
 }
 
 func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenTransferFee",
-		semver.MustParse("1.6.0"),
+		semver.MustParse("2.0.0"),
 		"Sets token transfer fee configuration on CCIP 1.6.0 FeeQuoter contracts",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.SetTokenTransferFeeSequenceInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			src := input.Selector
 
-			fqRef, errFq := a.GetFeeContractRef(e, src, 0) // dst is not needed to get the fee quoter address in 1.6
-			if errFq != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, errFq)
-			}
-
-			fqAddr := common.HexToAddress(fqRef.Address)
-
+			var fqRefs []datastore.AddressRef
 			updatesByChain := fqops.ApplyTokenTransferFeeConfigUpdatesArgs{}
+
 			for dst, dstCfg := range input.Settings {
+				fqRef, fqerr := a.GetFeeContractRef(e, src, dst)
+				if fqerr != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, fqerr)
+				}
+
+				// avoid duplicates when src & dst pairs share the same fee quoter contract
+				if !slices.ContainsFunc(fqRefs, func(ref datastore.AddressRef) bool { return ref.Address == fqRef.Address }) {
+					fqRefs = append(fqRefs, fqRef)
+				}
 
 				var tokensToUseDefaultFeeConfigs []fqops.TokenTransferFeeConfigRemoveArgs
 				var tokenTransferFeeConfigs []fqops.TokenTransferFeeConfigSingleTokenArgs
@@ -136,10 +139,8 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 								TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
 									DestBytesOverhead: feeCfg.DestBytesOverhead,
 									DestGasOverhead:   feeCfg.DestGasOverhead,
-									MinFeeUSDCents:    feeCfg.MinFeeUSDCents,
-									MaxFeeUSDCents:    feeCfg.MaxFeeUSDCents,
+									FeeUSDCents:       feeCfg.MaxFeeUSDCents,
 									IsEnabled:         feeCfg.IsEnabled,
-									DeciBps:           feeCfg.DeciBps,
 								},
 							},
 						)
@@ -163,11 +164,10 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			}
 
 			result, err := sequences.RunAndMergeSequence(b, chains,
-				evmseq.FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence,
-				evmseq.FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput{
-					UpdatesByChain: updatesByChain,
-					ChainSelector:  input.Selector,
-					Address:        fqAddr,
+				evmseq.SequenceFeeQuoterUpdate,
+				evmseq.FeeQuoterUpdate{
+					ChainSelector:     input.Selector,
+					ExistingAddresses: fqRefs,
 				},
 				result,
 			)

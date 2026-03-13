@@ -112,8 +112,18 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
 			}
 
+			feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, src.Settings[0].Selector) // feeContractRef is only used for verifying what versio of the fee adapter
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, src.Settings[0].Selector, err)
+			}
+			updater, exists := feeRegistry.GetFeeAdapter(srcFamily, feeContractRef.Version)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
+			}
+
 			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
+
 				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
 					if args, err := inferTokenTransferFeeArgs(adapter, e, src.Selector, dst.Selector, feeCfg); err != nil {
@@ -126,7 +136,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 			report, err := cldf_ops.ExecuteSequence(
 				e.OperationsBundle,
-				adapter.SetTokenTransferFee(e),
+				updater.SetTokenTransferFee(e),
 				e.BlockChains,
 				SetTokenTransferFeeSequenceInput{
 					Selector: src.Selector,
