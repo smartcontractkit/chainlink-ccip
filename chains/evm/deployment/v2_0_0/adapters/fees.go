@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -101,19 +100,14 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			var result sequences.OnChainOutput
 			src := input.Selector
 
-			var fqRefs []datastore.AddressRef
 			updatesByChain := fqops.ApplyTokenTransferFeeConfigUpdatesArgs{}
 
-			for dst, dstCfg := range input.Settings {
-				fqRef, fqerr := a.GetFeeContractRef(e, src, dst)
-				if fqerr != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, fqerr)
-				}
+			fqRef, errFq := a.GetFeeContractRef(e, src, 0) // dst is not needed to get the fee quoter address in 1.6.0+
+			if errFq != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, errFq)
+			}
 
-				// avoid duplicates when src & dst pairs share the same fee quoter contract
-				if !slices.ContainsFunc(fqRefs, func(ref datastore.AddressRef) bool { return ref.Address == fqRef.Address }) {
-					fqRefs = append(fqRefs, fqRef)
-				}
+			for dst, dstCfg := range input.Settings {
 
 				var tokensToUseDefaultFeeConfigs []fqops.TokenTransferFeeConfigRemoveArgs
 				var tokenTransferFeeConfigs []fqops.TokenTransferFeeConfigSingleTokenArgs
@@ -167,7 +161,7 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 				evmseq.SequenceFeeQuoterUpdate,
 				evmseq.FeeQuoterUpdate{
 					ChainSelector:     input.Selector,
-					ExistingAddresses: fqRefs,
+					ExistingAddresses: []datastore.AddressRef{fqRef},
 				},
 				result,
 			)

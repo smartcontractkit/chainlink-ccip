@@ -102,9 +102,9 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			var result sequences.OnChainOutput
 			src := input.Selector
 
-			fqRef, errFq := a.GetFeeContractRef(e, src, 0) // dst is not needed to get the fee quoter address in 1.6
-			if errFq != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, errFq)
+			fqRef, err := a.GetFeeContractRef(e, src, 0) // dst is not needed to get the fee quoter address in 1.6
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 			}
 
 			fqAddr := common.HexToAddress(fqRef.Address)
@@ -162,7 +162,7 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 				return result, nil
 			}
 
-			result, err := sequences.RunAndMergeSequence(b, chains,
+			result, err = sequences.RunAndMergeSequence(b, chains,
 				evmseq.FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence,
 				evmseq.FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput{
 					UpdatesByChain: updatesByChain,
