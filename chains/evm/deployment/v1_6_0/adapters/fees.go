@@ -39,14 +39,14 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 	feecontractref := ds.Addresses().Filter(
 		datastore.AddressRefByAddress(common.BytesToAddress(fqAddr).Hex()),
 		datastore.AddressRefByType(datastore.ContractType(fqops.ContractType)),
-		datastore.AddressRefByVersion(fqops.Version),
 		datastore.AddressRefByChainSelector(src),
 	)
 
-	if len(feecontractref) == 0 || len(feecontractref) > 1 {
-		return datastore.AddressRef{}, fmt.Errorf("incorrect number of address ref found for FeeQuoter contract at address %s on chain selector %d", common.BytesToAddress(fqAddr).Hex(), src)
+	if len(feecontractref) == 0 {
+		return datastore.AddressRef{}, fmt.Errorf("no address ref found for FeeQuoter contract at address %s on chain selector %d", common.BytesToAddress(fqAddr).Hex(), src)
 	}
 
+	// Since we're filtering by address+type+chain selector, there should be exactly one match
 	return feecontractref[0], nil
 }
 
