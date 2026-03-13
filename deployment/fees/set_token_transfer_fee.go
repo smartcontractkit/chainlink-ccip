@@ -120,7 +120,11 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, src.Settings[0].Selector, err)
 			}
-			updater, exists := feeRegistry.GetFeeAdapter(srcFamily, feeContractRef.Version)
+
+			v := feeContractRef.Version
+			lookupVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()))
+
+			updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, feeContractRef.Version.String())
 			}
