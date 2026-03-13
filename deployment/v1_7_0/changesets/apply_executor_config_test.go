@@ -3,6 +3,7 @@ package changesets_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -51,6 +52,7 @@ func newMinimalTopology(nopAliases []string, executorQualifier string, mode shar
 	for i, alias := range nopAliases {
 		nops[i] = offchain.NOPConfig{Alias: alias, Name: alias + "-name", Mode: mode}
 	}
+	dummyChain := strconv.FormatUint(chainsel.TEST_90000001.Selector, 10)
 	return &offchain.EnvironmentTopology{
 		IndexerAddress: []string{"http://indexer:8080"},
 		NOPTopology: &offchain.NOPTopology{
@@ -59,7 +61,9 @@ func newMinimalTopology(nopAliases []string, executorQualifier string, mode shar
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
 			executorQualifier: {
-				NOPAliases: nopAliases,
+				ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+					dummyChain: {NOPAliases: nopAliases, ExecutionInterval: 15_000_000_000},
+				},
 			},
 		},
 	}
@@ -113,7 +117,11 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 			input: changesets.ApplyExecutorConfigInput{
 				Topology: &offchain.EnvironmentTopology{
 					IndexerAddress: []string{"http://indexer:8080"},
-					ExecutorPools:  map[string]offchain.ExecutorPoolConfig{"pool1": {NOPAliases: []string{"nop1"}}},
+					ExecutorPools: map[string]offchain.ExecutorPoolConfig{"pool1": {
+						ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+							strconv.FormatUint(sel1, 10): {NOPAliases: []string{"nop1"}, ExecutionInterval: 15_000_000_000},
+						},
+					}},
 				},
 				ExecutorQualifier: "pool1",
 			},
@@ -450,7 +458,7 @@ func TestApplyExecutorConfig_PerChainNOPsOnlyIncludesAssignedChains(t *testing.T
 		"exec2 should only have chains where it is in the pool")
 }
 
-func TestApplyExecutorConfig_TopLevelNOPAliasesIncludesAllChains(t *testing.T) {
+func TestApplyExecutorConfig_AllChainsNOPsGetAllChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 	sel1Str := fmt.Sprintf("%d", sel1)
@@ -469,7 +477,15 @@ func TestApplyExecutorConfig_TopLevelNOPAliasesIncludesAllChains(t *testing.T) {
 	registry := adapters.NewExecutorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	topo := newMinimalTopology([]string{"exec1", "exec2"}, "pool1", shared.NOPModeStandalone)
+	topo := newTopologyWithChainConfigs(
+		[]string{"exec1", "exec2"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"exec1", "exec2"}, ExecutionInterval: 15_000_000_000},
+			sel2Str: {NOPAliases: []string{"exec1", "exec2"}, ExecutionInterval: 15_000_000_000},
+		},
+	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
 	cs := changesets.ApplyExecutorConfig(registry)
@@ -481,11 +497,11 @@ func TestApplyExecutorConfig_TopLevelNOPAliasesIncludesAllChains(t *testing.T) {
 
 	exec1Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec1", "pool1")
 	assert.ElementsMatch(t, []string{sel1Str, sel2Str}, exec1Chains,
-		"exec1 should have all chains when using top-level NOPAliases")
+		"exec1 should have all chains when listed on all chain configs")
 
 	exec2Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec2", "pool1")
 	assert.ElementsMatch(t, []string{sel1Str, sel2Str}, exec2Chains,
-		"exec2 should have all chains when using top-level NOPAliases")
+		"exec2 should have all chains when listed on all chain configs")
 }
 
 func TestApplyExecutorConfig_ExecutorPoolFieldMatchesChainPool(t *testing.T) {

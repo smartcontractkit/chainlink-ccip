@@ -57,7 +57,15 @@ func TestApplyExecutorConfig_GeneratesValidJobSpec(t *testing.T) {
 	registry := adapters.NewExecutorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
+	topo := newTopologyWithChainConfigs(
+		[]string{"nop1", "nop2"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+			sel2Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+		},
+	)
 	topo.IndexerAddress = []string{"http://indexer:8100", "http://indexer:8101"}
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
@@ -286,7 +294,16 @@ func TestApplyExecutorConfig_OnlyIncludesDeployedChains(t *testing.T) {
 	registry := adapters.NewExecutorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
+	topo := newTopologyWithChainConfigs(
+		[]string{"nop1"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"nop1"}, ExecutionInterval: 15 * time.Second},
+			sel2Str: {NOPAliases: []string{"nop1"}, ExecutionInterval: 15 * time.Second},
+			sel3Str: {NOPAliases: []string{"nop1"}, ExecutionInterval: 15 * time.Second},
+		},
+	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2, sel3})
 
 	cs := changesets.ApplyExecutorConfig(registry)
@@ -324,6 +341,7 @@ func TestApplyExecutorConfig_PoolMembershipIncludedInJobSpec(t *testing.T) {
 		{Alias: "nop2", Name: "nop2-name", Mode: shared.NOPModeStandalone},
 		{Alias: "nop3", Name: "nop3-name", Mode: shared.NOPModeStandalone},
 	}
+	sel1Str := fmt.Sprintf("%d", sel1)
 	topo := &offchain.EnvironmentTopology{
 		IndexerAddress: []string{"http://indexer:8080"},
 		NOPTopology: &offchain.NOPTopology{
@@ -332,7 +350,9 @@ func TestApplyExecutorConfig_PoolMembershipIncludedInJobSpec(t *testing.T) {
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
 			"pool1": {
-				NOPAliases: []string{"nop1", "nop2", "nop3"},
+				ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+					sel1Str: {NOPAliases: []string{"nop1", "nop2", "nop3"}, ExecutionInterval: 15 * time.Second},
+				},
 			},
 		},
 	}
@@ -501,7 +521,15 @@ func TestApplyExecutorConfig_UpdatesJobsWhenChainRemovedFromTopology(t *testing.
 	registry := adapters.NewExecutorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
+	topo := newTopologyWithChainConfigs(
+		[]string{"nop1", "nop2"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+			sel2Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+		},
+	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
 	cs := changesets.ApplyExecutorConfig(registry)
@@ -517,7 +545,14 @@ func TestApplyExecutorConfig_UpdatesJobsWhenChainRemovedFromTopology(t *testing.
 
 	mock.deployedChains["pool1"] = []uint64{sel1}
 
-	topoOneChain := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
+	topoOneChain := newTopologyWithChainConfigs(
+		[]string{"nop1", "nop2"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+		},
+	)
 	env.DataStore = firstOutput.DataStore.Seal()
 	secondOutput, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topoOneChain,
@@ -533,6 +568,7 @@ func TestApplyExecutorConfig_UpdatesJobsWhenChainRemovedFromTopology(t *testing.
 
 func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberAddedToPool(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
+	sel1Str := fmt.Sprintf("%d", sel1)
 
 	mock := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
@@ -556,7 +592,9 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberAddedToPool(t *testing.T) {
 			Committees: map[string]offchain.CommitteeConfig{},
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
-			"pool1": {NOPAliases: []string{"nop1", "nop2"}},
+			"pool1": {ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+				sel1Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+			}},
 		},
 	}
 
@@ -593,7 +631,9 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberAddedToPool(t *testing.T) {
 			Committees: map[string]offchain.CommitteeConfig{},
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
-			"pool1": {NOPAliases: []string{"nop1", "nop2", "nop3"}},
+			"pool1": {ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+				sel1Str: {NOPAliases: []string{"nop1", "nop2", "nop3"}, ExecutionInterval: 15 * time.Second},
+			}},
 		},
 	}
 
@@ -620,6 +660,7 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberAddedToPool(t *testing.T) {
 
 func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberRemovedFromPool(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
+	sel1Str := fmt.Sprintf("%d", sel1)
 
 	mock := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
@@ -644,7 +685,9 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberRemovedFromPool(t *testing.
 			Committees: map[string]offchain.CommitteeConfig{},
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
-			"pool1": {NOPAliases: []string{"nop1", "nop2", "nop3"}},
+			"pool1": {ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+				sel1Str: {NOPAliases: []string{"nop1", "nop2", "nop3"}, ExecutionInterval: 15 * time.Second},
+			}},
 		},
 	}
 
@@ -677,7 +720,9 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberRemovedFromPool(t *testing.
 			Committees: map[string]offchain.CommitteeConfig{},
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
-			"pool1": {NOPAliases: []string{"nop1", "nop2"}},
+			"pool1": {ChainConfigs: map[string]offchain.ChainExecutorPoolConfig{
+				sel1Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+			}},
 		},
 	}
 

@@ -49,10 +49,8 @@ func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry) deployment.C
 			return fmt.Errorf("executor pool %q not found in topology", cfg.ExecutorQualifier)
 		}
 
-		hasPoolNOPs := len(pool.NOPAliases) > 0
-		hasChainConfigs := len(pool.ChainConfigs) > 0
-		if !hasPoolNOPs && !hasChainConfigs {
-			return fmt.Errorf("executor pool %q has no NOPs and no chain_configs", cfg.ExecutorQualifier)
+		if len(pool.ChainConfigs) == 0 {
+			return fmt.Errorf("executor pool %q requires non-empty chain_configs", cfg.ExecutorQualifier)
 		}
 
 		poolNOPs := getExecutorPoolNOPAliases(pool)
@@ -203,21 +201,18 @@ func buildChainConfigs(
 }
 
 func getExecutorPoolNOPAliases(pool offchain.ExecutorPoolConfig) []shared.NOPAlias {
-	if len(pool.ChainConfigs) > 0 {
-		aliasSet := make(map[string]struct{})
-		for _, chainCfg := range pool.ChainConfigs {
-			for _, alias := range chainCfg.NOPAliases {
-				aliasSet[alias] = struct{}{}
-			}
+	aliasSet := make(map[string]struct{})
+	for _, chainCfg := range pool.ChainConfigs {
+		for _, alias := range chainCfg.NOPAliases {
+			aliasSet[alias] = struct{}{}
 		}
-		aliases := make([]string, 0, len(aliasSet))
-		for a := range aliasSet {
-			aliases = append(aliases, a)
-		}
-		slices.Sort(aliases)
-		return shared.ConvertStringToNopAliases(aliases)
 	}
-	return shared.ConvertStringToNopAliases(pool.NOPAliases)
+	aliases := make([]string, 0, len(aliasSet))
+	for a := range aliasSet {
+		aliases = append(aliases, a)
+	}
+	slices.Sort(aliases)
+	return shared.ConvertStringToNopAliases(aliases)
 }
 
 func validateExecutorChainSupport(
@@ -261,10 +256,6 @@ func validateExecutorChainSupport(
 }
 
 func getRequiredChainsForExecutorNOP(nopAlias string, pool offchain.ExecutorPoolConfig, deployedChains []uint64) ([]uint64, error) {
-	if len(pool.ChainConfigs) == 0 {
-		return deployedChains, nil
-	}
-
 	var requiredChains []uint64
 	for chainSelectorStr, chainCfg := range pool.ChainConfigs {
 		if !slices.Contains(chainCfg.NOPAliases, nopAlias) {
@@ -327,21 +318,16 @@ func buildExecutorJobSpecs(
 	for _, nopAlias := range nopAliases {
 		chainCfgs := make(map[string]offchain.ExecutorChainCfg)
 		for chainSelectorStr, genCfg := range chainConfigs {
-			executorPool := shared.ConvertNopAliasToString(poolNOPs)
-			executionInterval := pool.ExecutionInterval
-			if chainCfg, ok := pool.ChainConfigs[chainSelectorStr]; ok {
-				executorPool = chainCfg.NOPAliases
-				executionInterval = chainCfg.ExecutionInterval
-			}
-			if !slices.Contains(executorPool, string(nopAlias)) {
+			chainCfg, ok := pool.ChainConfigs[chainSelectorStr]
+			if !ok || !slices.Contains(chainCfg.NOPAliases, string(nopAlias)) {
 				continue
 			}
 			chainCfgs[chainSelectorStr] = offchain.ExecutorChainCfg{
 				OffRampAddress:         genCfg.OffRampAddress,
 				RmnAddress:             genCfg.RmnAddress,
 				DefaultExecutorAddress: genCfg.ExecutorProxyAddress,
-				ExecutorPool:           executorPool,
-				ExecutionInterval:      executionInterval,
+				ExecutorPool:           chainCfg.NOPAliases,
+				ExecutionInterval:      chainCfg.ExecutionInterval,
 			}
 		}
 

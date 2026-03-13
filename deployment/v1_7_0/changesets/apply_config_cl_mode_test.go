@@ -2,9 +2,11 @@ package changesets_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -303,7 +305,17 @@ func TestApplyExecutorConfig_FailsWhenNOPMissingChainSupport(t *testing.T) {
 	registry := adapters.NewExecutorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
-	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeCL)
+	sel1Str := fmt.Sprintf("%d", sel1)
+	sel2Str := fmt.Sprintf("%d", sel2)
+	topo := newTopologyWithChainConfigs(
+		[]string{"nop1", "nop2"},
+		"pool1",
+		shared.NOPModeCL,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+			sel2Str: {NOPAliases: []string{"nop1", "nop2"}, ExecutionInterval: 15 * time.Second},
+		},
+	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
 	mockJD := mocks.NewMockClient(t)
