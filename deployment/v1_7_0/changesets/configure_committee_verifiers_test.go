@@ -17,15 +17,44 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
+
+// lanesTest_MockReader was previously in configure_chains_for_lanes_test.go
+type lanesTest_MockReader struct{}
+
+func (m *lanesTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, _ mcms.Input) (mcms_types.ChainMetadata, error) {
+	return mcms_types.ChainMetadata{
+		MCMAddress:      "0xMCM",
+		StartingOpCount: 42,
+	}, nil
+}
+
+func (m *lanesTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0xTimelock",
+		Type:          "Timelock",
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *lanesTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0xMCM",
+		Type:          "MCM",
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
 
 var _ adapters.CommitteeVerifierContractAdapter = (*mockCommitteeVerifierContractAdapter)(nil)
 
@@ -50,38 +79,58 @@ func (m *mockCommitteeVerifierContractAdapter) ResolveCommitteeVerifierContracts
 	return contracts, nil
 }
 
-var _ adapters.ChainFamily = (*mockChainFamilyForVerifiers)(nil)
+var _ lanes.LaneAdapter = (*mockLaneAdapter)(nil)
 
-type mockChainFamilyForVerifiers struct {
+type mockLaneAdapter struct {
 	sequenceErr error
 }
 
-func (m *mockChainFamilyForVerifiers) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return []byte(ref.Address), nil
-}
-
-func (m *mockChainFamilyForVerifiers) ConfigureChainForLanes() *cldf_ops.Sequence[adapters.ConfigureChainForLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (m *mockLaneAdapter) ConfigureLaneLegAsSource() *cldf_ops.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"mock-configure-chain-for-lanes",
-		semver.MustParse("1.0.0"),
-		"Mock sequence",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.ConfigureChainForLanesInput) (sequences.OnChainOutput, error) {
+		"mock-configure-lane-leg-as-source",
+		semver.MustParse("2.0.0"),
+		"Mock source sequence",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 			if m.sequenceErr != nil {
 				return sequences.OnChainOutput{}, m.sequenceErr
 			}
 			return sequences.OnChainOutput{
-				Addresses: []datastore.AddressRef{
-					{
-						ChainSelector: input.ChainSelector,
-						Address:       input.Router,
-						Type:          "Router",
-						Version:       semver.MustParse("1.0.0"),
-					},
-				},
 				BatchOps: []mcms_types.BatchOperation{},
 			}, nil
 		},
 	)
+}
+
+func (m *mockLaneAdapter) ConfigureLaneLegAsDest() *cldf_ops.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"mock-configure-lane-leg-as-dest",
+		semver.MustParse("2.0.0"),
+		"Mock dest sequence",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
+			if m.sequenceErr != nil {
+				return sequences.OnChainOutput{}, m.sequenceErr
+			}
+			return sequences.OnChainOutput{
+				BatchOps: []mcms_types.BatchOperation{},
+			}, nil
+		},
+	)
+}
+
+func (m *mockLaneAdapter) GetOnRampAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return []byte("0xOnRamp"), nil
+}
+
+func (m *mockLaneAdapter) GetOffRampAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return []byte("0xOffRamp"), nil
+}
+
+func (m *mockLaneAdapter) GetRouterAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return []byte("0xRouter"), nil
+}
+
+func (m *mockLaneAdapter) GetFQAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return []byte("0xFeeQuoter"), nil
 }
 
 func newCommitteeVerifierTestEnv(t *testing.T, selectors []uint64) deployment.Environment {
@@ -190,8 +239,8 @@ func TestConfigureChainsForLanesFromTopology_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
-	chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, chainFamilyRegistry, nil)
+	laneRegistry := lanes.GetLaneAdapterRegistry()
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
 	tests := []struct {
 		name        string
@@ -250,8 +299,8 @@ func TestConfigureChainsForLanesFromTopology_AdapterNotRegistered(t *testing.T) 
 	sel2 := chainsel.TEST_90000002.Selector
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
-	chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, chainFamilyRegistry, nil)
+	laneRegistry := lanes.GetLaneAdapterRegistry()
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
 	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
 
@@ -274,10 +323,6 @@ func TestConfigureChainsForLanesFromTopology_AdapterNotRegistered(t *testing.T) 
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: sel1,
-				Router:        datastore.AddressRef{Type: "Router", Version: semver.MustParse("1.0.0")},
-				OnRamp:        datastore.AddressRef{Type: "OnRamp", Version: semver.MustParse("1.0.0")},
-				FeeQuoter:     datastore.AddressRef{Type: "FeeQuoter", Version: semver.MustParse("1.0.0")},
-				OffRamp:       datastore.AddressRef{Type: "OffRamp", Version: semver.MustParse("1.0.0")},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -301,8 +346,8 @@ func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T
 	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
 		resolveErr: fmt.Errorf("contract not deployed"),
 	})
-	chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, chainFamilyRegistry, nil)
+	laneRegistry := lanes.GetLaneAdapterRegistry()
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
 	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
 
@@ -325,10 +370,6 @@ func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: sel1,
-				Router:        datastore.AddressRef{Type: "Router", Version: semver.MustParse("1.0.0")},
-				OnRamp:        datastore.AddressRef{Type: "OnRamp", Version: semver.MustParse("1.0.0")},
-				FeeQuoter:     datastore.AddressRef{Type: "FeeQuoter", Version: semver.MustParse("1.0.0")},
-				OffRamp:       datastore.AddressRef{Type: "OffRamp", Version: semver.MustParse("1.0.0")},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -357,8 +398,8 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
 			},
 		},
 	})
-	chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, chainFamilyRegistry, nil)
+	laneRegistry := lanes.GetLaneAdapterRegistry()
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
 	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
 
@@ -381,10 +422,6 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: sel1,
-				Router:        datastore.AddressRef{Type: "Router", Version: semver.MustParse("1.0.0")},
-				OnRamp:        datastore.AddressRef{Type: "OnRamp", Version: semver.MustParse("1.0.0")},
-				FeeQuoter:     datastore.AddressRef{Type: "FeeQuoter", Version: semver.MustParse("1.0.0")},
-				OffRamp:       datastore.AddressRef{Type: "OffRamp", Version: semver.MustParse("1.0.0")},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -417,13 +454,15 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 		},
 	})
 
-	chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-	chainFamilyRegistry.RegisterChainFamily(chainsel.FamilyEVM, &mockChainFamilyForVerifiers{})
+	laneRegistry := lanes.GetLaneAdapterRegistry()
+	if _, ok := laneRegistry.GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0")); !ok {
+		laneRegistry.RegisterLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockLaneAdapter{})
+	}
 
 	mcmsReg := cs_core.GetRegistry()
 	mcmsReg.RegisterMCMSReader("evm", &lanesTest_MockReader{})
 
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, chainFamilyRegistry, mcmsReg)
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, mcmsReg)
 
 	env := newCommitteeVerifierTestEnvWithContracts(t, []uint64{sel1, sel2}, verifierAddr, resolverAddr)
 
@@ -447,10 +486,6 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: sel1,
-				Router:        datastore.AddressRef{Type: "Router", Version: semver.MustParse("1.0.0")},
-				OnRamp:        datastore.AddressRef{Type: "OnRamp", Version: semver.MustParse("1.0.0")},
-				FeeQuoter:     datastore.AddressRef{Type: "FeeQuoter", Version: semver.MustParse("1.0.0")},
-				OffRamp:       datastore.AddressRef{Type: "OffRamp", Version: semver.MustParse("1.0.0")},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -464,18 +499,37 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				DefaultExecutor: datastore.AddressRef{
+					ChainSelector: sel1,
+					Type:          "Executor",
+					Version:       semver.MustParse("1.0.0"),
+				},
+				FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
+					IsEnabled:    true,
+					MaxDataBytes: 50000,
+				},
+				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+					Enabled: true,
+				},
+				AddressBytesLength:   20,
+				BaseExecutionGasCost: 80000,
+				RemoteChains: map[uint64]lanes.ChainDefinition{
 					sel2: {
-						AllowTrafficFrom: true,
-						OnRamps: []datastore.AddressRef{
-							{Type: "OnRamp", Version: semver.MustParse("1.0.0")},
+						Selector: sel2,
+						DefaultExecutor: datastore.AddressRef{
+							ChainSelector: sel2,
+							Type:          "Executor",
+							Version:       semver.MustParse("1.0.0"),
 						},
-						OffRamp:         datastore.AddressRef{Type: "OffRamp", Version: semver.MustParse("1.0.0")},
-						DefaultExecutor: datastore.AddressRef{Type: "Executor", Version: semver.MustParse("1.0.0"), Address: "0xExec"},
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+						FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 50000,
 						},
+						ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+							Enabled: true,
+						},
+						AddressBytesLength:   20,
+						BaseExecutionGasCost: 80000,
 					},
 				},
 			},
@@ -494,8 +548,8 @@ func TestConfigureChainsForLanesFromTopology_CommitteeNotFound(t *testing.T) {
 	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
 		contractsByChainAndQualifier: map[string][]datastore.AddressRef{},
 	})
-	chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, chainFamilyRegistry, nil)
+	laneRegistry := lanes.GetLaneAdapterRegistry()
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
 	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
 
