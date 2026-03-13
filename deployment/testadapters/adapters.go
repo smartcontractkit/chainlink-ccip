@@ -90,7 +90,8 @@ type TestAdapter interface {
 	// and for Solana, the message type is ccip_router.SVM2AnyMessage.
 	BuildMessage(components MessageComponents) (any, error)
 
-	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, error)
+	// Send message returns the sequence number and message ID of the sent message, or an error if the send failed.
+	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, string, error)
 
 	// // RandomReceiver returns a random receiver for the given chain family.
 	// RandomReceiver() []byte
@@ -98,9 +99,18 @@ type TestAdapter interface {
 	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
 
+	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is
+	// expected to be an EOA and not a contract.
+	// t parameter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
+	EOAReceiver(t *testing.T) []byte
+
+	// InvalidAddresses returns a slice of invalid addresses for the given chain family, to be used in negative
+	// test cases.
+	InvalidAddresses() [][]byte
+
 	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
-	// This is used for test cases with a a failing receiver.
-	SetReceiverRejectAll(ctx context.Context, rejectAll bool) error
+	// This is used for test cases with a failing receiver.
+	SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
@@ -111,6 +121,9 @@ type TestAdapter interface {
 	// borsch for Solana, etc.
 	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 
+	// LowGasLimit returns a low gas limit value that can be used in tests to trigger out-of-gas errors.
+	LowGasLimit() *big.Int
+
 	// GetInboundNonce returns the inbound nonce for the given sender and source chain selector.
 	// For chains that don't have the concept of nonces, this will always return 0.
 	GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error)
@@ -118,20 +131,28 @@ type TestAdapter interface {
 	// ValidateCommit validates that the message specified by the given send event was committed.
 	ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange)
 
-	// ValidateExec validates that the message specified by the given send event was executed.
-	ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
+	// ValidateExecSuccess validates that the message specified by the given send event was executed.
+	ValidateExecSuccess(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
 
-	// AllowRouterToWithdrawTokens allows the router to withdraw tokens of the given address and amount from the deployer account.
+	// ValidateExecFails validates that the message specified by the given send event failed to execute.
+	ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64)
+
+	// AllowRouterToWithdrawTokens allows the router to withdraw tokens of the given address and amount from the deployer
+	// account.
 	AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error
 
 	// GetTokenBalance gets the token balance of the given owner address for the given token address.
 	GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error)
 
-	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing cross-chain token transfers.
+	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing
+	// cross-chain token transfers.
 	GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain
 
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
 	GetRegistryAddress() (string, error)
+
+	// CurrentBlock returns the current block number of the chain, if applicable.
+	CurrentBlock(t *testing.T) uint64
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
