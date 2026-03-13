@@ -16,6 +16,7 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -88,9 +89,8 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
-	fqReg := deployops.GetFQAndRampUpdaterRegistry()
 	// Now update to FeeQuoter 2.0.0
-	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
 	})
@@ -114,9 +114,9 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		fq16AddrRefs := e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chainSel),
 			datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
-			datastore.AddressRefByVersion(fq16ops.Version),
+			datastore.AddressRefByVersion(fq163ops.Version),
 		)
-		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.0 and chain selector %d", chainSel)
+		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.3 and chain selector %d", chainSel)
 		fq16Addr := common.HexToAddress(fq16AddrRefs[0].Address)
 		// check that the new fee quoter has the same config as the old fee quoter
 		fq16Contract, err := fq16.NewFeeQuoter(fq16Addr, chain.Client)
