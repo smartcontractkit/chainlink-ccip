@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 

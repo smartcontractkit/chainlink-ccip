@@ -6,24 +6,31 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/ethereum/go-ethereum/common"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	utils2 "github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	onrampv1_5ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	onrampv1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmadapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	evm_2_evm_onramp_v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	dseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-
-	evmadapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
-	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 )
 
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
@@ -68,7 +75,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTokenDestGasOverhead:       40000,
 						DefaultTxGasLimit:                 180000,
 						GasMultiplierWeiPerEth:            0,
-						GasPriceStalenessThreshold:        0,
+						GasPriceStalenessThreshold:        10,
 						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{
@@ -170,7 +177,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTokenDestGasOverhead:       40000,
 						DefaultTxGasLimit:                 180000,
 						GasMultiplierWeiPerEth:            0,
-						GasPriceStalenessThreshold:        0,
+						GasPriceStalenessThreshold:        10,
 						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{
@@ -426,6 +433,8 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 
 	// Chain 5009297550715157269: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
 	// Since no FeeQuoter v2.0.0 exists, it's a new deployment (ConstructorArgs populated)
+	// we will use only use RemoteChainSelector 15971525489660198786 in sequence input for 5009297550715157269
+	// therefore only 15971525489660198786's DestChainConfig and TokenTransferFeeConfig will be included in expected output
 	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
@@ -455,22 +464,6 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						LinkFeeMultiplierPercent:    90,
 					},
 				},
-				{
-					DestChainSelector: 4949039107694359620,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                10000,
-						MaxPerMsgGasLimit:           5000000,
-						DestGasOverhead:             100000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         utils.GetSelectorHex(4949039107694359620),
-						DefaultTokenFeeUSDCents:     0,
-						DefaultTokenDestGasOverhead: 0,
-						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
-				},
 			},
 			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 				{
@@ -482,29 +475,6 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 								FeeUSDCents:       4,
 								DestGasOverhead:   25000,
 								DestBytesOverhead: 80,
-								IsEnabled:         true,
-							},
-						},
-					},
-				},
-				{
-					DestChainSelector: 4949039107694359620,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
-						{
-							Token: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
-								FeeUSDCents:       5,
-								DestGasOverhead:   30000,
-								DestBytesOverhead: 100,
-								IsEnabled:         true,
-							},
-						},
-						{
-							Token: common.HexToAddress("0x3333333333333333333333333333333333333333"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
-								FeeUSDCents:       10,
-								DestGasOverhead:   40000,
-								DestBytesOverhead: 200,
 								IsEnabled:         true,
 							},
 						},
@@ -771,25 +741,54 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to write contract metadata to datastore")
 
+	// deploy a router in each chain
+	for _, chainSelector := range chainSelectorList {
+		chain := e.BlockChains.EVMChains()[chainSelector]
+		dRep, err2 := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.Deploy, chain, contract.DeployInput[routerops.ConstructorArgs]{
+			ChainSelector:  chainSelector,
+			TypeAndVersion: cldf.NewTypeAndVersion(routerops.ContractType, *routerops.Version),
+			Args: routerops.ConstructorArgs{
+				WrappedNative: utils2.RandomAddress(), // not relevant to this test, just needs to be populated with a valid address
+				RMNProxy:      utils2.RandomAddress(), // not relevant to this test, just needs to be populated with a valid address
+			},
+		})
+		require.NoError(t, err2, "Failed to deploy router on chain %d", chainSelector)
+		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(routerops.ContractType),
+			Version:       routerops.Version,
+			Address:       dRep.Output.Address,
+		}))
+	}
 	// Seal the datastore for use in the test
 	e.DataStore = ds.Seal()
-
+	deployOnRamps(t, e, 5009297550715157269, map[uint64]*semver.Version{
+		4949039107694359620:  semver.MustParse("1.5.0"),
+		15971525489660198786: semver.MustParse("1.6.0"),
+	})
+	deployOnRamps(t, e, 4949039107694359620, map[uint64]*semver.Version{
+		5009297550715157269:  semver.MustParse("1.5.0"),
+		15971525489660198786: semver.MustParse("1.6.0"),
+	})
+	deployOnRamps(t, e, 15971525489660198786, map[uint64]*semver.Version{
+		5009297550715157269: semver.MustParse("1.5.0"),
+	})
+	deployOnRamps(t, e, 5936861837188149645, map[uint64]*semver.Version{
+		15971525489660198786: semver.MustParse("1.5.0"),
+		5009297550715157269:  semver.MustParse("1.6.0"),
+		4949039107694359620:  semver.MustParse("1.6.0"),
+	})
 	// Get the FeeQuoterUpdater adapter (use concrete type so report.Output is sequences.FeeQuoterUpdate)
 	fquUpdater := evmadapter.FeeQuoterUpdater[sequences.FeeQuoterUpdate]{}
 
 	// Test the sequence for each chain selector that has a FeeQuoter
 	for _, chainSelector := range chainSelectorList {
-		_, ok := e.BlockChains.EVMChains()[chainSelector]
+		chain, ok := e.BlockChains.EVMChains()[chainSelector]
 		require.True(t, ok, "Chain with selector %d should exist", chainSelector)
 
 		// Build input from original slices so Version/Type match exactly (sealed datastore
 		// can alter refs and break GetAddressRef lookup for FeeQuoter 1.6.0).
-		existingAddresses := make([]datastore.AddressRef, 0)
-		for _, ref := range addressRefs {
-			if ref.ChainSelector == chainSelector {
-				existingAddresses = append(existingAddresses, ref)
-			}
-		}
+		existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
 		contractMeta := make([]datastore.ContractMetadata, 0)
 		for _, meta := range contractMetadata {
 			if meta.ChainSelector == chainSelector {
@@ -813,6 +812,19 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 			ContractMeta:      contractMeta,
 		}
 
+		// Get expected output (hardcoded based on contract_metadata.json)
+		expectedMap := getExpectedOutput()
+		expected, hasExpected := expectedMap[chainSelector]
+		require.True(t, hasExpected, "Expected output should exist for chain %d", chainSelector)
+
+		// to test selective remote Chain selectors
+		if chainSelector == 5009297550715157269 {
+			input.RemoteChainSelectors = []uint64{15971525489660198786}
+		}
+		input.PreviousVersions = []*semver.Version{
+			semver.MustParse("1.5.0"),
+			semver.MustParse("1.6.0"),
+		}
 		// Execute the sequence
 		report, err := cldf_ops.ExecuteSequence(
 			e.OperationsBundle,
@@ -834,11 +846,6 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		// Verify basic output structure
 		require.Equal(t, chainSelector, output.ChainSelector, "Chain selector should match input")
 		require.Equal(t, existingAddresses, output.ExistingAddresses, "Existing addresses should match input")
-
-		// Get expected output (hardcoded based on contract_metadata.json)
-		expectedMap := getExpectedOutput()
-		expected, hasExpected := expectedMap[chainSelector]
-		require.True(t, hasExpected, "Expected output should exist for chain %d", chainSelector)
 
 		// Verify that the output has meaningful data
 		// At least one of these should be populated:
@@ -865,6 +872,14 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 			require.NotEmpty(t, validMaxFee, "contract metadata for chain %d should define at least one MaxFeeJuelsPerMsg source", chainSelector)
 			require.True(t, validMaxFee[output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg.String()],
 				"MaxFeeJuelsPerMsg should be one of the values from contract metadata (FeeQuoter or OnRamp) on chain %d", chainSelector)
+			// sort PriceUpdaters for deterministic comparison since sequence may merge from multiple sources
+			sort.Slice(output.ConstructorArgs.PriceUpdaters, func(i, j int) bool {
+				return output.ConstructorArgs.PriceUpdaters[i].Hex() < output.ConstructorArgs.PriceUpdaters[j].Hex()
+			})
+			expected.ConstructorArgs.PriceUpdaters = append(expected.ConstructorArgs.PriceUpdaters, chain.DeployerKey.From)
+			sort.Slice(expected.ConstructorArgs.PriceUpdaters, func(i, j int) bool {
+				return expected.ConstructorArgs.PriceUpdaters[i].Hex() < expected.ConstructorArgs.PriceUpdaters[j].Hex()
+			})
 			require.ElementsMatch(t, expected.ConstructorArgs.PriceUpdaters, output.ConstructorArgs.PriceUpdaters,
 				"PriceUpdaters should match expected value on chain %d", chainSelector)
 		} else {
@@ -945,4 +960,208 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 		t.Logf("Successfully executed SequenceFeeQuoterInputCreation for chain %d", chainSelector)
 	}
+}
+
+// TestHandleEmptyGasPriceStalenessThreshold verifies HandleEmptyGasPriceStalenessThreshold behavior for
+// chains with zero GasPriceStalenessThreshold (e.g. Aptos/Sui that require manual gas price).
+// GasPricesPerRemoteChain uses string values (parsed as base-10 big.Int).
+func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
+	aptosSelector := uint64(743186221051783445)
+	suiSelector := uint64(9762610643973837292)
+
+	// EVM chain is not in gasPriceMandatoryForChainFamily -> expect error
+	t.Run("EVM_chain_returns_error", func(t *testing.T) {
+		evmChainSelector := uint64(5009297550715157269)
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GasPricesPerRemoteChain: map[uint64]string{evmChainSelector: "1000000000"},
+			},
+		}
+		priceUpdates, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
+		require.NoError(t, err)
+		require.Empty(t, priceUpdates, "Expected no gas price updates for EVM chain since staleness threshold is not empty")
+	})
+
+	// Chain in gasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error
+	t.Run("Aptos_or_Sui_with_nil_AdditionalConfig_returns_error", func(t *testing.T) {
+		input := deploy.FeeQuoterUpdateInput{ChainSelector: 1}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+	})
+
+	// Chain in gasPriceMandatoryForChainFamily but GasPricesPerRemoteChain is nil -> expect error
+	t.Run("Aptos_or_Sui_with_nil_GasPricesPerRemoteChain_returns_error", func(t *testing.T) {
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector:    1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+	})
+
+	// Chain in gasPriceMandatoryForChainFamily but remote chain not in map -> expect error
+	t.Run("Aptos_or_Sui_with_missing_remote_chain_in_map_returns_error", func(t *testing.T) {
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GasPricesPerRemoteChain: map[uint64]string{999: "1000000000"},
+			},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+	})
+
+	// Invalid gas price string (not a number) -> expect error
+	t.Run("invalid_gas_price_string_returns_error", func(t *testing.T) {
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GasPricesPerRemoteChain: map[uint64]string{aptosSelector: "not-a-number"},
+			},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+		require.Contains(t, err.Error(), "in input additional config")
+	})
+
+	// Chain in gasPriceMandatoryForChainFamily with valid gas price string -> success
+	t.Run("Aptos_and_Sui_with_gas_price_returns_updates", func(t *testing.T) {
+		gasPriceStr := "2000000000"
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GasPricesPerRemoteChain: map[uint64]string{
+					aptosSelector: gasPriceStr,
+					suiSelector:   gasPriceStr,
+				},
+			},
+		}
+		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
+		output, err = sequences.HandleEmptyGasPriceStalenessThreshold(suiSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, suiSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
+
+	})
+}
+
+// placeholder addresses used for OnRamp deploy in tests (contracts are not validated on simulated chain beyond non-zero)
+var (
+	linkToken                     = common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
+	rmnProxyPlaceholder           = common.HexToAddress("0x7777777777777777777777777777777777777777")
+	tokenAdminRegistryPlaceholder = common.HexToAddress("0x8888888888888888888888888888888888888888")
+	priceRegistryPlaceholder      = common.HexToAddress("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+)
+
+func deployOnRamps(t *testing.T, e *cldf.Environment, chainSelector uint64, remoteChains map[uint64]*semver.Version) {
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	routerOnRamps := make([]router.RouterOnRamp, 0)
+	routerRef := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(routerops.ContractType)),
+		datastore.AddressRefByVersion(routerops.Version))
+	require.Len(t, routerRef, 1, "There should be exactly one router deployed for chain %d", chainSelector)
+	routerAddr := common.HexToAddress(routerRef[0].Address)
+
+	for remoteChainSelector, version := range remoteChains {
+		var rampAddr datastore.AddressRef
+		switch version.String() {
+		case "1.5.0":
+			out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampv1_5ops.DeployOnRamp, chain, contract.DeployInput[onrampv1_5ops.ConstructorArgs]{
+				ChainSelector:  chainSelector,
+				TypeAndVersion: cldf.NewTypeAndVersion(onrampv1_5ops.ContractType, *onrampv1_5ops.Version),
+				Args: onrampv1_5ops.ConstructorArgs{
+					StaticConfig: evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampStaticConfig{
+						LinkToken:          linkToken,
+						ChainSelector:      chainSelector,
+						DestChainSelector:  remoteChainSelector,
+						DefaultTxGasLimit:  200000,
+						MaxNopFeesJuels:    big.NewInt(1000000000000000000),
+						PrevOnRamp:         common.Address{},
+						RmnProxy:           rmnProxyPlaceholder,
+						TokenAdminRegistry: tokenAdminRegistryPlaceholder,
+					},
+					DynamicConfig: evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampDynamicConfig{
+						Router:                            routerAddr,
+						MaxNumberOfTokensPerMsg:           5,
+						DestGasOverhead:                   100000,
+						DestGasPerPayloadByte:             16,
+						DestDataAvailabilityOverheadGas:   50000,
+						DestGasPerDataAvailabilityByte:    10,
+						DestDataAvailabilityMultiplierBps: 1000,
+						PriceRegistry:                     priceRegistryPlaceholder,
+						MaxDataBytes:                      10000,
+						MaxPerMsgGasLimit:                 5000000,
+						DefaultTokenFeeUSDCents:           0,
+						DefaultTokenDestGasOverhead:       0,
+						EnforceOutOfOrder:                 false,
+					},
+					RateLimiterConfig: evm_2_evm_onramp_v1_5_0.RateLimiterConfig{
+						IsEnabled: false,
+						Capacity:  big.NewInt(0),
+						Rate:      big.NewInt(0),
+					},
+					FeeTokenConfigs:            []evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampFeeTokenConfigArgs{},
+					TokenTransferFeeConfigArgs: []evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampTokenTransferFeeConfigArgs{},
+					NopsAndWeights:             []evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampNopAndWeight{},
+				},
+			})
+			require.NoError(t, err)
+			rampAddr = out.Output
+		case "1.6.0":
+			out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampv1_6ops.Deploy, chain, contract.DeployInput[onrampv1_6ops.ConstructorArgs]{
+				ChainSelector:  chainSelector,
+				TypeAndVersion: cldf.NewTypeAndVersion(onrampv1_6ops.ContractType, *onrampv1_6ops.Version),
+				Args: onrampv1_6ops.ConstructorArgs{
+					StaticConfig: onrampv1_6ops.StaticConfig{
+						ChainSelector:      chainSelector,
+						RmnRemote:          rmnProxyPlaceholder,
+						NonceManager:       utils2.RandomAddress(),
+						TokenAdminRegistry: tokenAdminRegistryPlaceholder,
+					},
+					DynamicConfig: onrampv1_6ops.DynamicConfig{
+						FeeQuoter:              utils2.RandomAddress(),
+						ReentrancyGuardEntered: false,
+						MessageInterceptor:     common.Address{},
+						FeeAggregator:          chain.DeployerKey.From,
+						AllowlistAdmin:         chain.DeployerKey.From,
+					},
+					DestChainConfigArgs: []onrampv1_6ops.DestChainConfigArgs{
+						{
+							DestChainSelector: remoteChainSelector,
+							Router:            routerAddr,
+							AllowlistEnabled:  false,
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			rampAddr = out.Output
+		}
+		routerOnRamps = append(routerOnRamps, router.RouterOnRamp{
+			DestChainSelector: remoteChainSelector,
+			OnRamp:            common.HexToAddress(rampAddr.Address),
+		})
+	}
+
+	_, err := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.ApplyRampUpdates, chain, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
+		ChainSelector: chainSelector,
+		Address:       routerAddr,
+		Args: routerops.ApplyRampsUpdatesArgs{
+			OnRampUpdates:  routerOnRamps,
+			OffRampAdds:    []router.RouterOffRamp{},
+			OffRampRemoves: nil,
+		},
+	})
+	require.NoError(t, err, "Failed to apply ramp updates for router on chain %d", chainSelector)
 }
