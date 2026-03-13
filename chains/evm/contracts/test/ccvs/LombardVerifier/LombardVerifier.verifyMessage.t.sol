@@ -257,6 +257,38 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }
 
+  function test_verifyMessage_WithLocalAdapter() public {
+    address localAdapter = makeAddr("localAdapter");
+
+    // s_destToken is a makeAddr label, so mock the approve calls that updateSupportedTokens triggers.
+    vm.mockCall(s_destToken, abi.encodeWithSignature("approve(address,uint256)"), abi.encode(true));
+
+    // Configure s_destToken with a local adapter. The bridge payload will encode
+    // localAdapter as the token instead of s_destToken.
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: s_destToken, localAdapter: localAdapter});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // The bridge payload encodes localAdapter as the token (not s_destToken).
+    bytes memory rawPayload = _generateValidRawPayload(
+      abi.encodePacked(localAdapter),
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
+    );
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
+
+    vm.startPrank(s_offRamp);
+
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
   function test_verifyMessage_RevertWhen_InvalidSender() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));

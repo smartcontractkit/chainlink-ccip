@@ -19,7 +19,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   error ExceedsMaxCCVs(uint256 provided, uint256 max);
   error InvalidCCV(address ccv);
   error InvalidDestChain(uint64 destChainSelector);
-  error Executor__RequestedBlockDepthTooLow(uint16 requestedBlockDepth, uint16 minBlockConfirmations);
+  error Executor__RequestedBlockDepthTooLow(uint16 blockConfirmationsRequested, uint16 minBlockConfirmations);
   error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
 
   event CCVAllowlistUpdated(bool enabled);
@@ -196,12 +196,12 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param requestedBlockDepth The requested block depth for the message. `0` indicates waiting for finality.
+  /// @param blockConfirmationsRequested The requested block confirmations for the message. `0` indicates waiting for finality.
   /// @param ccvs The CCVs that are requested on source.
   /// @return usdCentsFee The USD denominated fee for the executor.
   function getFee(
     uint64 destChainSelector,
-    uint16 requestedBlockDepth,
+    uint16 blockConfirmationsRequested,
     address[] calldata ccvs,
     bytes calldata, // extraArgs
     address // feeToken
@@ -210,8 +210,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     if (!remoteChainConfig.enabled) {
       revert InvalidDestChain(destChainSelector);
     }
-    if (requestedBlockDepth != 0 && requestedBlockDepth < s_dynamicConfig.minBlockConfirmations) {
-      revert Executor__RequestedBlockDepthTooLow(requestedBlockDepth, s_dynamicConfig.minBlockConfirmations);
+    if (blockConfirmationsRequested != 0 && blockConfirmationsRequested < s_dynamicConfig.minBlockConfirmations) {
+      revert Executor__RequestedBlockDepthTooLow(blockConfirmationsRequested, s_dynamicConfig.minBlockConfirmations);
     }
 
     if (s_dynamicConfig.ccvAllowlistEnabled) {

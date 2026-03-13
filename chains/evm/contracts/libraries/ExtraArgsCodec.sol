@@ -80,7 +80,7 @@ library ExtraArgsCodec {
     uint32 gasLimit;
     /// @notice The number of block confirmations to wait for. 0 means the default finality that the CCV considers
     /// final. Any non-zero value means a block depth. CCVs, Pools and the executor may all reject this value by
-    /// reverting the transaction on the source chain if they do not want to take on the risk of the block depth
+    /// reverting the transaction on the source chain if they do not want to take on the risk of the block confirmations
     /// specified.
     /// @dev May be zero to indicate waiting for finality is desired.
     uint16 blockConfirmations;

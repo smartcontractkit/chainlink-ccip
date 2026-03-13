@@ -100,11 +100,11 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     }
   }
 
-  /// @notice Provides the required and optional CCVs and min block depth for a source chain.
+  /// @notice Provides the required and optional CCVs and min block confirmations for a source chain.
   /// @dev OffRamp will apply the defaults for the lane if no CCVs are defined for a source chain.
-  /// @dev WARNING: minBlockDepth must be used carefully, when in doubt it's safer to require finality (minBlockDepth = 0) than
+  /// @dev WARNING: minBlockConfirmations must be used carefully, when in doubt it's safer to require finality (minBlockConfirmations = 0) than
   /// to allow FTF messages (any non-zero value) as FTF messages can be reorged.
-  function getCCVsAndMinBlockDepth(
+  function getCCVsAndMinBlockConfirmations(
     uint64 sourceChainSelector,
     bytes calldata
   )
@@ -116,14 +116,14 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
       address[] memory requiredCCVs,
       address[] memory optionalCCVs,
       uint8 optionalThreshold,
-      uint16 minBlockDepth
+      uint16 minBlockConfirmations
     )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
-    // If requireFinality is true, minBlockDepth = 0 (require finality).
-    // If requireFinality is false, minBlockDepth = 1 (allow any FTF level) - WARNING only use a finality of 1 when
+    // If requireFinality is true, minBlockConfirmations = 0 (require finality).
+    // If requireFinality is false, minBlockConfirmations = 1 (allow any FTF level) - WARNING only use a finality of 1 when
     // you use a trusted sender on the source chain that manages the finality risk when sending messages.
-    minBlockDepth = config.requireFinality ? 0 : 1;
-    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, minBlockDepth);
+    minBlockConfirmations = config.requireFinality ? 0 : 1;
+    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, minBlockConfirmations);
   }
 }

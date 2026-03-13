@@ -121,7 +121,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     // Mock receiver to return no required CCVs (so it falls back to defaults via address(0)).
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(
         new address[](0), // no required CCVs - will fall back to defaults.
         new address[](0), // no optional CCVs.
@@ -186,7 +186,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(new address[](0), receiverOptional, uint8(2))
     );
 
@@ -216,7 +216,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     receiverRequired[0] = s_requiredCCV;
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(receiverRequired, new address[](0), uint8(0))
     );
 
@@ -250,7 +250,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     receiverRequired[0] = s_requiredCCV;
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(receiverRequired, new address[](0), uint8(0))
     );
 
@@ -286,7 +286,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(new address[](0), receiverOptional, uint8(2))
     );
 
@@ -310,7 +310,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(new address[](0), receiverOptional, uint8(1))
     );
 

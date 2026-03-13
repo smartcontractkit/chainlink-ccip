@@ -15,14 +15,14 @@ contract Executor_getFee is ExecutorSetup {
   }
 
   function test_getFee_RevertWhen_Executor__RequestedBlockDepthTooLow() public {
-    uint16 requestedBlockDepth = MIN_BLOCK_CONFIRMATIONS - 1;
+    uint16 blockConfirmationsRequested = MIN_BLOCK_CONFIRMATIONS - 1;
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        Executor.Executor__RequestedBlockDepthTooLow.selector, requestedBlockDepth, MIN_BLOCK_CONFIRMATIONS
+        Executor.Executor__RequestedBlockDepthTooLow.selector, blockConfirmationsRequested, MIN_BLOCK_CONFIRMATIONS
       )
     );
-    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedBlockDepth, new address[](1), "", s_sourceFeeToken);
+    s_executor.getFee(DEST_CHAIN_SELECTOR, blockConfirmationsRequested, new address[](1), "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_InvalidDestChain() public {
