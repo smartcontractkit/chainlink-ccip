@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -117,16 +118,22 @@ type AggregatorConfig struct {
 }
 
 // ExecutorPoolConfig defines executor pool membership and configuration.
+// Per-chain NOPs and execution interval are defined in ChainConfigs.
 type ExecutorPoolConfig struct {
+	ChainConfigs      map[string]ChainExecutorPoolConfig `toml:"chain_configs"`
+	IndexerQueryLimit uint64                             `toml:"indexer_query_limit"`
+	BackoffDuration   time.Duration                      `toml:"backoff_duration"`
+	LookbackWindow    time.Duration                      `toml:"lookback_window"`
+	ReaderCacheExpiry time.Duration                      `toml:"reader_cache_expiry"`
+	MaxRetryDuration  time.Duration                      `toml:"max_retry_duration"`
+	WorkerCount       int                                `toml:"worker_count"`
+	NtpServer         string                             `toml:"ntp_server"`
+}
+
+// ChainExecutorPoolConfig defines executor pool membership and execution interval for a single chain.
+type ChainExecutorPoolConfig struct {
 	NOPAliases        []string      `toml:"nop_aliases"`
 	ExecutionInterval time.Duration `toml:"execution_interval"`
-	IndexerQueryLimit uint64        `toml:"indexer_query_limit"`
-	BackoffDuration   time.Duration `toml:"backoff_duration"`
-	LookbackWindow    time.Duration `toml:"lookback_window"`
-	ReaderCacheExpiry time.Duration `toml:"reader_cache_expiry"`
-	MaxRetryDuration  time.Duration `toml:"max_retry_duration"`
-	WorkerCount       int           `toml:"worker_count"`
-	NtpServer         string        `toml:"ntp_server"`
 }
 
 type MonitoringConfig struct {
@@ -252,6 +259,9 @@ func (c *CommitteeConfig) Validate(topology *NOPTopology) error {
 	}
 
 	for chainSelector, chainCfg := range c.ChainConfigs {
+		if _, err := strconv.ParseUint(chainSelector, 10, 64); err != nil {
+			return fmt.Errorf("committee chain_configs has invalid chain selector key %q: %w", chainSelector, err)
+		}
 		if len(chainCfg.NOPAliases) == 0 {
 			return fmt.Errorf("chain %q requires at least one NOP", chainSelector)
 		}
@@ -272,16 +282,22 @@ func (c *CommitteeConfig) Validate(topology *NOPTopology) error {
 }
 
 func (p *ExecutorPoolConfig) Validate(poolName string, topology *NOPTopology) error {
-	if len(p.NOPAliases) == 0 {
-		return fmt.Errorf("executor pool requires at least one NOP")
+	if len(p.ChainConfigs) == 0 {
+		return fmt.Errorf("executor pool %q requires non-empty chain_configs", poolName)
 	}
-
-	for _, alias := range p.NOPAliases {
-		if !topology.HasNOP(alias) {
-			return fmt.Errorf("executor pool references unknown NOP alias %q", alias)
+	for chainSelector, chainCfg := range p.ChainConfigs {
+		if _, err := strconv.ParseUint(chainSelector, 10, 64); err != nil {
+			return fmt.Errorf("executor pool %q has invalid chain selector key %q: %w", poolName, chainSelector, err)
+		}
+		if len(chainCfg.NOPAliases) == 0 {
+			return fmt.Errorf("executor pool %q chain %q requires at least one NOP", poolName, chainSelector)
+		}
+		for _, alias := range chainCfg.NOPAliases {
+			if !topology.HasNOP(alias) {
+				return fmt.Errorf("executor pool %q chain %q references unknown NOP alias %q", poolName, chainSelector, alias)
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -290,7 +306,18 @@ func (c *EnvironmentTopology) GetNOPsForPool(poolName string) ([]string, error) 
 	if !ok {
 		return nil, fmt.Errorf("executor pool %q not found", poolName)
 	}
-	return pool.NOPAliases, nil
+	nopSet := make(map[string]struct{})
+	for _, chainCfg := range pool.ChainConfigs {
+		for _, alias := range chainCfg.NOPAliases {
+			nopSet[alias] = struct{}{}
+		}
+	}
+	nops := make([]string, 0, len(nopSet))
+	for alias := range nopSet {
+		nops = append(nops, alias)
+	}
+	slices.Sort(nops)
+	return nops, nil
 }
 
 func (c *EnvironmentTopology) GetNOPsForCommittee(committeeQualifier string) ([]string, error) {
@@ -310,6 +337,7 @@ func (c *EnvironmentTopology) GetNOPsForCommittee(committeeQualifier string) ([]
 	for alias := range nopSet {
 		nops = append(nops, alias)
 	}
+	slices.Sort(nops)
 
 	return nops, nil
 }
@@ -330,8 +358,11 @@ func (c *EnvironmentTopology) GetCommitteesForNOP(nopAlias string) []string {
 func (c *EnvironmentTopology) GetPoolsForNOP(nopAlias string) []string {
 	var pools []string
 	for poolName, pool := range c.ExecutorPools {
-		if slices.Contains(pool.NOPAliases, nopAlias) {
-			pools = append(pools, poolName)
+		for _, chainCfg := range pool.ChainConfigs {
+			if slices.Contains(chainCfg.NOPAliases, nopAlias) {
+				pools = append(pools, poolName)
+				break
+			}
 		}
 	}
 	return pools

@@ -74,6 +74,11 @@ func buildAggregatorCommittee(
 ) (*offchain.Committee, error) {
 	ctx := context.Background()
 
+	type chainQualifier struct {
+		chainSelector uint64
+		qualifier     string
+	}
+	seen := make(map[chainQualifier]bool)
 	allCommittees := make(map[string][]*adapters.CommitteeState)
 	for _, sel := range chainSelectors {
 		adapter, err := registry.GetByChain(sel)
@@ -86,6 +91,14 @@ func buildAggregatorCommittee(
 			return nil, fmt.Errorf("failed to scan committee states on chain %d: %w", sel, err)
 		}
 		for _, state := range states {
+			key := chainQualifier{chainSelector: sel, qualifier: state.Qualifier}
+			if seen[key] {
+				return nil, fmt.Errorf(
+					"chain %d has multiple committee verifiers with qualifier %q",
+					sel, state.Qualifier,
+				)
+			}
+			seen[key] = true
 			allCommittees[state.Qualifier] = append(allCommittees[state.Qualifier], state)
 		}
 	}

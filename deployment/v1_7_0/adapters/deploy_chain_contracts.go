@@ -69,6 +69,7 @@ type MockReceiverDeployParams struct {
 	RequiredVerifiers []datastore.AddressRef
 	OptionalVerifiers []datastore.AddressRef
 	OptionalThreshold uint8
+	MinimumBlockDepth uint16
 	Qualifier         string
 }
 

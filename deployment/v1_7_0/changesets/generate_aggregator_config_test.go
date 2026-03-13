@@ -277,6 +277,124 @@ func TestGenerateAggregatorConfig_CommitteeNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), `committee "default" not found`)
 }
 
+func TestGenerateAggregatorConfig_DuplicateSourceChainAcrossDestinationsSucceeds(t *testing.T) {
+	destChainA := chainsel.TEST_90000001.Selector
+	destChainB := chainsel.TEST_90000002.Selector
+	sourceChain := chainsel.TEST_90000003.Selector
+
+	sourceChainStr := strconv.FormatUint(sourceChain, 10)
+	qualifier := "default"
+	verifierAddrA := "0x1111111111111111111111111111111111111111"
+	verifierAddrB := "0x2222222222222222222222222222222222222222"
+	verifierAddrSrc := "0x3333333333333333333333333333333333333333"
+	signer1 := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	signer2 := "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	// Each destination chain's verifier reports the same source chain signature config.
+	// This is the normal case: when a committee is deployed across multiple destination
+	// chains, each destination's verifier stores the same set of source chain configs.
+	mock := &mockOffchainConfigAdapter{
+		committeeStatesByChain: map[uint64][]*adapters.CommitteeState{
+			destChainA: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: destChainA,
+					Address:       verifierAddrA,
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sourceChain, Signers: []string{signer1, signer2}, Threshold: 2},
+					},
+				},
+			},
+			destChainB: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: destChainB,
+					Address:       verifierAddrB,
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sourceChain, Signers: []string{signer1, signer2}, Threshold: 2},
+					},
+				},
+			},
+		},
+		verifierAddresses: map[uint64]string{
+			destChainA:  verifierAddrA,
+			destChainB:  verifierAddrB,
+			sourceChain: verifierAddrSrc,
+		},
+	}
+
+	registry := newAggregatorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	ds := datastore.NewMemoryDataStore()
+	env := deployment.Environment{
+		DataStore:   ds.Seal(),
+		BlockChains: newTestBlockChains([]uint64{destChainA, destChainB, sourceChain}),
+	}
+
+	cs := changesets.GenerateAggregatorConfig(registry)
+	output, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
+		ServiceIdentifier:  "test-aggregator",
+		CommitteeQualifier: qualifier,
+		ChainSelectors:     []uint64{destChainA, destChainB, sourceChain},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, output.DataStore)
+
+	cfg, err := offchain.GetAggregatorConfig(output.DataStore.Seal(), "test-aggregator")
+	require.NoError(t, err)
+
+	qc := cfg.QuorumConfigs[sourceChainStr]
+	require.NotNil(t, qc, "quorum config for source chain must exist")
+	assert.Equal(t, verifierAddrSrc, qc.SourceVerifierAddress)
+	assert.Len(t, qc.Signers, 2)
+	assert.Equal(t, uint8(2), qc.Threshold)
+}
+
+func TestGenerateAggregatorConfig_DuplicateQualifierOnSameChainFails(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	qualifier := "default"
+
+	mock := &mockOffchainConfigAdapter{
+		committeeStatesByChain: map[uint64][]*adapters.CommitteeState{
+			sel1: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: sel1,
+					Address:       "0x1111111111111111111111111111111111111111",
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sel1, Signers: []string{"0xaaa"}, Threshold: 1},
+					},
+				},
+				{
+					Qualifier:     qualifier,
+					ChainSelector: sel1,
+					Address:       "0x2222222222222222222222222222222222222222",
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sel1, Signers: []string{"0xbbb"}, Threshold: 1},
+					},
+				},
+			},
+		},
+	}
+
+	registry := newAggregatorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	env := deployment.Environment{
+		BlockChains: newTestBlockChains([]uint64{sel1}),
+	}
+
+	cs := changesets.GenerateAggregatorConfig(registry)
+	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
+		ServiceIdentifier:  "test-aggregator",
+		CommitteeQualifier: qualifier,
+		ChainSelectors:     []uint64{sel1},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple committee verifiers with qualifier")
+}
+
 func TestGenerateAggregatorConfig_MissingAdapterForFamily(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
