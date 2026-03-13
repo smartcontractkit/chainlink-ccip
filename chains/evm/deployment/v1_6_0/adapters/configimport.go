@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -31,9 +32,11 @@ type ConfigImportAdapter struct {
 	Router        common.Address
 	TokenAdminReg common.Address
 
-	// cached connected chains and the chain selector they correspond to
-	connectedChainsCache         []uint64
-	connectedChainsChainSelector uint64
+	// connectedChainsCache memoizes the result of ConnectedChains per chain selector
+	// to avoid duplicate (potentially expensive) RPC work when the method is called
+	// multiple times for the same chain within the same adapter instance.
+	connectedChainsCache map[uint64][]uint64
+	connectedChainsMu    sync.Mutex
 }
 
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelector uint64) error {
@@ -101,10 +104,19 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
-	// return cached result if it matches the requested chain selector
-	if ci.connectedChainsCache != nil && ci.connectedChainsChainSelector == chainsel {
-		return ci.connectedChainsCache, nil
+	// Fast path: return cached result if available to avoid duplicate RPC work.
+	ci.connectedChainsMu.Lock()
+	if ci.connectedChainsCache == nil {
+		ci.connectedChainsCache = make(map[uint64][]uint64)
 	}
+	if cached, ok := ci.connectedChainsCache[chainsel]; ok {
+		// Return a copy to prevent callers from mutating the cached slice.
+		result := make([]uint64, len(cached))
+		copy(result, cached)
+		ci.connectedChainsMu.Unlock()
+		return result, nil
+	}
+	ci.connectedChainsMu.Unlock()
 
 	var connected []uint64
 	laneResolver := adapters1_2.LaneVersionResolver{}
@@ -118,8 +130,15 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 		}
 	}
 
-	ci.connectedChainsChainSelector = chainsel
-	ci.connectedChainsCache = connected
+	// Cache the computed result for subsequent calls.
+	ci.connectedChainsMu.Lock()
+	if ci.connectedChainsCache == nil {
+		ci.connectedChainsCache = make(map[uint64][]uint64)
+	}
+	cached := make([]uint64, len(connected))
+	copy(cached, connected)
+	ci.connectedChainsCache[chainsel] = cached
+	ci.connectedChainsMu.Unlock()
 
 	return connected, nil
 }
