@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -24,6 +25,7 @@ import (
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
@@ -179,4 +181,31 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		return datastore.AddressRef{}, fmt.Errorf("no fee quoter address found for chain selector %d", chainSelector)
 	}
 	return feeQRef, nil
+}
+
+func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
+	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
+	return ccipapi.FeeQuoterDestChainConfig{
+		IsEnabled:                         true,
+		MaxNumberOfTokensPerMsg:           10,
+		MaxDataBytes:                      30_000,
+		MaxPerMsgGasLimit:                 3_000_000,
+		DestGasOverhead:                   300_000,
+		DefaultTokenFeeUSDCents:           25,
+		DestGasPerPayloadByteBase:         16,
+		DestGasPerPayloadByteHigh:         40,
+		DestGasPerPayloadByteThreshold:    3000,
+		DestDataAvailabilityOverheadGas:   100,
+		DestGasPerDataAvailabilityByte:    16,
+		DestDataAvailabilityMultiplierBps: 1,
+		DefaultTokenDestGasOverhead:       90_000,
+		DefaultTxGasLimit:                 200_000,
+		GasMultiplierWeiPerEth:            11e17,
+		NetworkFeeUSDCents:                10,
+		ChainFamilySelector:               binary.BigEndian.Uint32(chainHex[:]),
+	}
+}
+
+func (a *EVMAdapter) GetDefaultGasPrice() *big.Int {
+	return big.NewInt(2e12)
 }
