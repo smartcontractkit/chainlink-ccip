@@ -30,6 +30,10 @@ type ConfigImportAdapter struct {
 	OffRamp       common.Address
 	Router        common.Address
 	TokenAdminReg common.Address
+
+	// cached connected chains and the chain selector they correspond to
+	connectedChainsCache         []uint64
+	connectedChainsChainSelector uint64
 }
 
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelector uint64) error {
@@ -97,6 +101,11 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
+	// return cached result if it matches the requested chain selector
+	if ci.connectedChainsCache != nil && ci.connectedChainsChainSelector == chainsel {
+		return ci.connectedChainsCache, nil
+	}
+
 	var connected []uint64
 	laneResolver := adapters1_2.LaneVersionResolver{}
 	remoteChainToVersionMap, _, err := laneResolver.DeriveLaneVersionsForChain(e, chainsel)
@@ -108,6 +117,10 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 			connected = append(connected, destSel)
 		}
 	}
+
+	ci.connectedChainsChainSelector = chainsel
+	ci.connectedChainsCache = connected
+
 	return connected, nil
 }
 
