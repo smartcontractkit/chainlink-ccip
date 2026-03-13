@@ -39,7 +39,6 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 	feecontractref := ds.Addresses().Filter(
 		datastore.AddressRefByAddress(common.BytesToAddress(fqAddr).Hex()),
 		datastore.AddressRefByType(datastore.ContractType(fqops.ContractType)),
-		datastore.AddressRefByVersion(fqops.Version),
 		datastore.AddressRefByChainSelector(src),
 	)
 
