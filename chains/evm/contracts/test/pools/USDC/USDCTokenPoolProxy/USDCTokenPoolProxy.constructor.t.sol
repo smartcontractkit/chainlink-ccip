@@ -1,0 +1,97 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {IPoolV1} from "../../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
+
+import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
+import {USDCSetup} from "../USDCSetup.t.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+
+contract USDCTokenPoolProxy_constructor is USDCSetup {
+  address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
+  address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
+  address internal s_cctpThroughCCVTokenPool = makeAddr("cctpThroughCCVTokenPool");
+  address internal s_lockReleasePool = makeAddr("lockReleasePool");
+  address internal s_cctpVerifier = makeAddr("cctpVerifier");
+
+  function test_constructor() public {
+    // Enable ERC165 for the pools.
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpThroughCCVTokenPool, type(IPoolV2).interfaceId);
+
+    USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
+      s_USDCToken,
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: address(0)
+      }),
+      address(s_router),
+      address(s_cctpVerifier)
+    );
+
+    USDCTokenPoolProxy.PoolAddresses memory pools = proxy.getPools();
+    assertEq(pools.cctpV1Pool, s_cctpV1Pool);
+    assertEq(pools.cctpV2Pool, s_cctpV2Pool);
+
+    (address token, address router, address cctpVerifier) = proxy.getStaticConfig();
+    assertEq(token, address(s_USDCToken));
+    assertEq(router, address(s_router));
+    assertEq(cctpVerifier, s_cctpVerifier);
+
+    assertTrue(proxy.supportsInterface(type(IPoolV1).interfaceId));
+    assertTrue(proxy.supportsInterface(type(IERC165).interfaceId));
+    assertTrue(proxy.isSupportedToken(address(s_USDCToken)));
+  }
+
+  // Reverts
+  function test_constructor_RevertWhen_TokenAddressIsZero() public {
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    new USDCTokenPoolProxy(
+      IERC20(address(0)),
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: address(0)
+      }),
+      address(s_router),
+      address(s_cctpVerifier)
+    );
+  }
+
+  function test_constructor_RevertWhen_RouterAddressIsZero() public {
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    new USDCTokenPoolProxy(
+      s_USDCToken, // Token
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: address(0)
+      }),
+      address(0), // Router
+      address(s_cctpVerifier)
+    );
+  }
+
+  function test_constructor_RevertWhen_CCTPVerifierAddressIsZero() public {
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    new USDCTokenPoolProxy(
+      s_USDCToken, // Token
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: address(0)
+      }),
+      address(s_router),
+      address(0) // CCTP Verifier
+    );
+  }
+}

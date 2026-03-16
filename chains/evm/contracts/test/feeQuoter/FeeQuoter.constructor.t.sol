@@ -6,57 +6,24 @@ import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 contract FeeQuoter_constructor is FeeQuoterSetup {
-  function test_Setup() public virtual {
+  function test_constructor() public virtual {
     address[] memory priceUpdaters = new address[](2);
     priceUpdaters[0] = STRANGER;
     priceUpdaters[1] = OWNER;
-    address[] memory feeTokens = new address[](2);
-    feeTokens[0] = s_sourceTokens[0];
-    feeTokens[1] = s_sourceTokens[1];
-    FeeQuoter.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new FeeQuoter.TokenPriceFeedUpdate[](2);
-    tokenPriceFeedUpdates[0] =
-      _getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
-    tokenPriceFeedUpdates[1] =
-      _getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[1], s_dataFeedByToken[s_sourceTokens[1]], 6);
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
 
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-      tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-    });
-    s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
-      priceUpdaters,
-      feeTokens,
-      tokenPriceFeedUpdates,
-      s_feeQuoterTokenTransferFeeConfigArgs,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
-      destChainConfigArgs
-    );
+    FeeQuoter.StaticConfig memory staticConfig =
+      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS});
+    s_feeQuoter =
+      new FeeQuoterHelper(staticConfig, priceUpdaters, s_feeQuoterTokenTransferFeeConfigArgs, destChainConfigArgs);
 
-    _assertFeeQuoterStaticConfigsEqual(s_feeQuoter.getStaticConfig(), staticConfig);
-    assertEq(feeTokens, s_feeQuoter.getFeeTokens());
+    assertEq(s_feeQuoter.getStaticConfig().linkToken, staticConfig.linkToken);
+    assertEq(s_feeQuoter.getStaticConfig().maxFeeJuelsPerMsg, staticConfig.maxFeeJuelsPerMsg);
+
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
 
-    _assertTokenPriceFeedConfigEquality(
-      tokenPriceFeedUpdates[0].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[0])
-    );
-
-    _assertTokenPriceFeedConfigEquality(
-      tokenPriceFeedUpdates[1].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[1])
-    );
-
-    assertEq(
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
-      s_feeQuoter.getPremiumMultiplierWeiPerEth(s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].token)
-    );
-
-    assertEq(
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth,
-      s_feeQuoter.getPremiumMultiplierWeiPerEth(s_feeQuoterPremiumMultiplierWeiPerEthArgs[1].token)
-    );
+    assertEq(0, s_feeQuoter.getFeeTokens().length);
 
     FeeQuoter.TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = s_feeQuoterTokenTransferFeeConfigArgs[0];
     for (uint256 i = 0; i < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++i) {
@@ -77,65 +44,25 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     }
   }
 
-  function test_RevertWhen_InvalidStalenessThreshold() public {
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS, tokenPriceStalenessThreshold: 0
-    });
-
+  function test_constructor_RevertWhen_InvalidLinkTokenEqZeroAddress() public {
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
 
     s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
+      FeeQuoter.StaticConfig({linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       new address[](0),
-      new address[](0),
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
   }
 
-  function test_RevertWhen_InvalidLinkTokenEqZeroAddress() public {
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS, tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-    });
-
+  function test_constructor_RevertWhen_InvalidMaxFeeJuelsPerMsg() public {
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
 
     s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
+      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0}),
       new address[](0),
-      new address[](0),
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
-  }
-
-  function test_RevertWhen_InvalidMaxFeeJuelsPerMsg() public {
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0, tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-    });
-
-    vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
-
-    s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
-      new address[](0),
-      new address[](0),
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
-      s_feeQuoterTokenTransferFeeConfigArgs,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
-      new FeeQuoter.DestChainConfigArgs[](0)
-    );
-  }
-
-  function _assertFeeQuoterStaticConfigsEqual(
-    FeeQuoter.StaticConfig memory a,
-    FeeQuoter.StaticConfig memory b
-  ) internal pure {
-    assertEq(a.linkToken, b.linkToken);
-    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
   }
 }

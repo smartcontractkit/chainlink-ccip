@@ -2,6 +2,7 @@ package mcms
 
 import (
 	"fmt"
+	"time"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -28,6 +29,15 @@ func (c *Input) Validate() error {
 		c.TimelockAction != mcms_types.TimelockActionBypass &&
 		c.TimelockAction != mcms_types.TimelockActionCancel {
 		return fmt.Errorf("invalid timelock action: %s", c.TimelockAction)
+	}
+	if c.ValidUntil <= 0 {
+		return fmt.Errorf("failed to validate MCMS input: ValidUntil must be a positive unix timestamp")
+	}
+	// check if ValidUntil is in the past
+	// current time in utc plus 10 minutes to account for any potential clock drift or delays in proposal creation
+	// this is to prevent proposals from being created with a ValidUntil that is already expired
+	if c.ValidUntil < uint32(time.Now().Add(10*time.Minute).UTC().Unix()) {
+		return fmt.Errorf("failed to validate MCMS input: ValidUntil must be in the future")
 	}
 	return nil
 }

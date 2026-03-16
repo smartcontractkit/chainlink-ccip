@@ -8,6 +8,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -16,13 +20,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"golang.org/x/sync/errgroup"
 
-	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
-
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/offramp"
@@ -35,9 +34,7 @@ import (
 )
 
 var (
-	getTokensPaginationSize = uint64(20)
-	// getSupportedTokensPoolConcurrency caps concurrent RPC calls when fetching supported tokens per pool.
-	// Limits in-flight requests to avoid overwhelming the node/provider (rate limits, timeouts) and memory.
+	getTokensPaginationSize           = uint64(20)
 	getSupportedTokensPoolConcurrency = 10
 )
 
@@ -258,10 +255,10 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			// track when certain pool methods appear to be unsupported so we
 			// can avoid repeated failed calls and warning spam.
 			var (
-				tokenAddr                  common.Address
-				tokenFetched               bool
+				tokenAddr                   common.Address
+				tokenFetched                bool
 				isSupportedChainUnsupported bool
-				getTokenUnsupported        bool
+				getTokenUnsupported         bool
 			)
 
 			for _, remoteChain := range remoteChains {

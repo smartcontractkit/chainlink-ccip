@@ -5,7 +5,7 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TokenPool_calculateLocalAmount is TokenPoolSetup {
   function test_calculateLocalAmount() public view {
@@ -43,7 +43,7 @@ contract TokenPool_calculateLocalAmount is TokenPoolSetup {
     vm.mockCall(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(localDecimals));
 
     s_tokenPool =
-      new TokenPoolHelper(s_token, localDecimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter));
+      new TokenPoolHelper(s_token, localDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
 
     vm.expectRevert(
       abi.encodeWithSelector(TokenPool.OverflowDetected.selector, remoteDecimals, localDecimals, remoteAmount)
@@ -60,7 +60,7 @@ contract TokenPool_calculateLocalAmount is TokenPoolSetup {
     vm.mockCall(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(localDecimals));
 
     s_tokenPool =
-      new TokenPoolHelper(s_token, localDecimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter));
+      new TokenPoolHelper(s_token, localDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
 
     vm.expectRevert(
       abi.encodeWithSelector(TokenPool.OverflowDetected.selector, remoteDecimals, localDecimals, remoteAmount)
@@ -89,7 +89,7 @@ contract TokenPool_calculateLocalAmount is TokenPoolSetup {
     vm.mockCall(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(localDecimals));
 
     s_tokenPool =
-      new TokenPoolHelper(s_token, localDecimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter));
+      new TokenPoolHelper(s_token, localDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
 
     vm.expectRevert(
       abi.encodeWithSelector(TokenPool.OverflowDetected.selector, remoteDecimals, localDecimals, remoteAmount)

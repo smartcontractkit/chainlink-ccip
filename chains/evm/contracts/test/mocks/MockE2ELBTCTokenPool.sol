@@ -4,8 +4,9 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice MockE2ELBTCTokenPool is a token pool used for e2e tests. It allows to burn tokens unconditionally,
 /// while requires specific structure for offchain token data
@@ -21,11 +22,11 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
 
   constructor(
     IBurnMintERC20 token,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     bytes memory destPoolData
-  ) TokenPool(token, 8, allowlist, rmnProxy, router) {
+  ) TokenPool(IERC20(address(token)), 8, advancedPoolHooks, rmnProxy, router) {
     s_destPoolData = destPoolData;
   }
 
@@ -35,7 +36,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
 
     IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
 
@@ -58,7 +59,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 amount = releaseOrMintIn.sourceDenominatedAmount;
-    _validateReleaseOrMint(releaseOrMintIn, amount);
+    _validateReleaseOrMint(releaseOrMintIn, amount, 0);
 
     if (s_destPoolData.length == 32) {
       (bytes memory payload,) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
