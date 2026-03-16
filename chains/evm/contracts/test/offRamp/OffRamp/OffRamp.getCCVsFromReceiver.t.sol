@@ -96,12 +96,12 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     assertEq(requiredFromReceiver[0], s_userRequiredCCV);
   }
 
-  function test_getCCVsFromReceiver_contractV2_FTF_succeedsWhenFinalityMeetsMinBlockDepth() public {
+  function test_getCCVsFromReceiver_contractV2_FTF_succeedsWhenFinalityMeetsMinBlockConfirmations() public {
     address[] memory userRequired = new address[](1);
     userRequired[0] = s_userRequiredCCV;
 
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
-    receiver.setMinBlockDepth(10);
+    receiver.setMinBlockConfirmations(10);
 
     (address[] memory requiredFromReceiver,,) =
       s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), s_sender, 10);
@@ -110,12 +110,12 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     assertEq(requiredFromReceiver[0], s_userRequiredCCV);
   }
 
-  function test_getCCVsFromReceiver_contractV2_FTF_succeedsWhenFinalityExceedsMinBlockDepth() public {
+  function test_getCCVsFromReceiver_contractV2_FTF_succeedsWhenFinalityExceedsMinBlockConfirmations() public {
     address[] memory userRequired = new address[](1);
     userRequired[0] = s_userRequiredCCV;
 
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
-    receiver.setMinBlockDepth(5);
+    receiver.setMinBlockConfirmations(5);
 
     (address[] memory requiredFromReceiver,,) =
       s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), s_sender, 10);
@@ -182,8 +182,8 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, s_sender, ftfBlockDepth);
   }
 
-  function test_getCCVsFromReceiver_RevertWhen_contractV2_MinBlockDepthZero_FTF() public {
-    // V2 receiver that returns minBlockDepth=0 (requires finality) should reject FTF.
+  function test_getCCVsFromReceiver_RevertWhen_contractV2_MinBlockConfirmationsZero_FTF() public {
+    // V2 receiver that returns minBlockConfirmations=0 (requires finality) should reject FTF.
     address[] memory userRequired = new address[](1);
     userRequired[0] = s_userRequiredCCV;
 
@@ -196,9 +196,9 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), s_sender, ftfBlockDepth);
   }
 
-  function test_getCCVsFromReceiver_RevertWhen_contractV2_FTF_BelowMinBlockDepth() public {
+  function test_getCCVsFromReceiver_RevertWhen_contractV2_FTF_BelowMinBlockConfirmations() public {
     MockReceiverV2 receiver = new MockReceiverV2(new address[](0), new address[](0), 0);
-    receiver.setMinBlockDepth(10);
+    receiver.setMinBlockConfirmations(10);
 
     uint16 insufficientFinality = 5;
     vm.expectRevert(

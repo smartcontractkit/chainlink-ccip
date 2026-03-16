@@ -6,13 +6,25 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
@@ -27,14 +39,27 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
+
+type proxyAcceptOwnershipArgs struct {
+	IsProposedOwner bool
+}
+
+var proxyAcceptOwnership = contract_utils.NewWrite(contract_utils.WriteParams[proxyAcceptOwnershipArgs, *proxy_bindings.Proxy]{
+	Name:         "proxy:accept-ownership",
+	Version:      proxy.Version,
+	Description:  "Accept ownership of the proxy",
+	ContractType: proxy.ContractType,
+	ContractABI:  proxy.ProxyABI,
+	NewContract:  proxy_bindings.NewProxy,
+	IsAllowedCaller: func(_ *proxy_bindings.Proxy, _ *bind.CallOpts, _ common.Address, args proxyAcceptOwnershipArgs) (bool, error) {
+		return args.IsProposedOwner, nil
+	},
+	Validate: func(proxyAcceptOwnershipArgs) error { return nil },
+	CallContract: func(p *proxy_bindings.Proxy, opts *bind.TransactOpts, _ proxyAcceptOwnershipArgs) (*types.Transaction, error) {
+		return p.AcceptOwnership(opts)
+	},
+})
 
 type MockReceiverParams struct {
 	Version *semver.Version
@@ -47,8 +72,8 @@ type MockReceiverParams struct {
 	// or will be deployed by the DeployChainContracts sequence.
 	OptionalVerifiers []datastore.AddressRef
 	OptionalThreshold uint8
-	// MinimumBlockDepth is the minimum block depth that the mock receiver will accept.
-	MinimumBlockDepth uint16
+	// MinimumBlockConfirmations is the minimum block depth that the mock receiver will accept.
+	MinimumBlockConfirmations uint16
 	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
 	// If only one mock receiver is deployed this can be left blank.
 	Qualifier string
@@ -85,7 +110,7 @@ type FeeQuoterParams struct {
 type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
-	DynamicConfig executor.SetDynamicConfigArgs
+	DynamicConfig executor.DynamicConfig
 	Qualifier     string
 }
 
@@ -498,10 +523,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
 				dynamicConfigReport.Output.MinBlockConfirmations != executorParam.DynamicConfig.MinBlockConfirmations ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.SetDynamicConfigArgs]{
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.DynamicConfig]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorRef.Address),
-					Args: executor.SetDynamicConfigArgs{
+					Args: executor.DynamicConfig{
 						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
 						MinBlockConfirmations: executorParam.DynamicConfig.MinBlockConfirmations,
 						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
@@ -516,7 +541,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			// Deploy ExecutorProxy via CREATE2
 			var executorProxyRef *datastore.AddressRef
 			for _, ref := range input.ExistingAddresses {
-				if ref.Type == datastore.ContractType(executor.ProxyType) &&
+				if ref.Type == datastore.ContractType(ExecutorProxyType) &&
 					ref.Version.String() == executor.Version.String() &&
 					(qualifierPtr == nil || ref.Qualifier == *qualifierPtr) {
 					executorProxyRef = &ref
@@ -531,11 +556,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				deployExecutorProxyViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployContractViaCREATE2, chain, DeployContractViaCREATE2Input{
 					ChainSelector:  chain.Selector,
 					Qualifier:      *qualifierPtr,
-					Type:           datastore.ContractType(executor.ProxyType),
+					Type:           datastore.ContractType(ExecutorProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
-					ABI:            proxy.ABI,
-					BIN:            proxy.Bin,
+					ABI:            proxy.ProxyABI,
+					BIN:            proxy.ProxyBin,
 					ConstructorArgs: []any{
 						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
 						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.
@@ -555,10 +580,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				executorProxyRef = &deployExecutorProxyViaCREATE2Report.Output.Addresses[0]
 
 				// Accept ownership of the ExecutorProxy
-				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract_utils.FunctionInput[proxy.AcceptOwnershipArgs]{
+				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxyAcceptOwnership, chain, contract_utils.FunctionInput[proxyAcceptOwnershipArgs]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args: proxy.AcceptOwnershipArgs{
+					Args: proxyAcceptOwnershipArgs{
 						IsProposedOwner: true,
 					},
 				})
@@ -567,10 +592,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				}
 				writes = append(writes, acceptOwnershipReport.Output)
 			}
-			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorProxyRef.Address), executor.ProxyType, []common.Address{cllccipTimelockAddr}})
+			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorProxyRef.Address), ExecutorProxyType, []common.Address{cllccipTimelockAddr}})
 
 			// Fetch the target on the ExecutorProxy
-			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[any]{
+			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
 			})
@@ -592,7 +617,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 
 			// Fetch the fee aggregator on the ExecutorProxy
-			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[any]{
+			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
 			})
@@ -623,10 +648,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if mockReceiverParams.Qualifier != "" {
 				qualifierPtr = &mockReceiverParams.Qualifier
 			}
-			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.Deploy, chain, contract_utils.DeployInput[mock_receiver_v2.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver_v2.ContractType, *mockReceiverParams.Version),
+			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
 				ChainSelector:  chain.Selector,
-				Args: mock_receiver_v2.ConstructorArgs{
+				Args: mock_receiver.ConstructorArgs{
 					Required:  requiredVerifiers,
 					Optional:  optionalVerifiers,
 					Threshold: mockReceiverParams.OptionalThreshold,
@@ -639,12 +664,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, deployReceiverReport.Output)
 
 			// Set minimum block depth on the MockReceiver if diff exists
-			if mockReceiverParams.MinimumBlockDepth != 0 {
+			if mockReceiverParams.MinimumBlockConfirmations != 0 {
 				// Get the minimum block depth on the MockReceiver
-				minimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockDepth, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockDepthArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-					Args: mock_receiver_v2.GetCCVsAndMinBlockDepthArgs{
+			minimumBlockConfirmations, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockConfirmations, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+				Args: mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs{
 						Arg0: chain.Selector,
 						Arg1: []byte{},
 					},
@@ -652,17 +677,17 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
 				}
-				if minimumBlockDepthReport.Output.Ret3 != mockReceiverParams.MinimumBlockDepth {
+				if minimumBlockConfirmations.Output.MinBlockDepth != mockReceiverParams.MinimumBlockConfirmations {
 					// Set the minimum block depth on the MockReceiver
-					setMinimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockDepth, chain, contract_utils.FunctionInput[uint16]{
+					setMinimumBlockConfirmationsReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockConfirmations, chain, contract_utils.FunctionInput[uint16]{
 						ChainSelector: chain.Selector,
 						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-						Args:          mockReceiverParams.MinimumBlockDepth,
+						Args:          mockReceiverParams.MinimumBlockConfirmations,
 					})
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set minimum block depth on MockReceiver: %w", err)
 					}
-					writes = append(writes, setMinimumBlockDepthReport.Output)
+					writes = append(writes, setMinimumBlockConfirmationsReport.Output)
 				}
 			}
 		}

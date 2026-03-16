@@ -458,6 +458,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// defaults are added if necessary. This function handles all the logic of combining the various sources of CCVs.
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param receiver The receiver of the message.
+  /// @param sender The sender of the message on the source chain.
   /// @param tokenTransfer The tokens transferred in the message.
   /// @param finality The finality requirement of the message.
   /// @param isTokenOnlyTransfer Whether the message is a token-only transfer (no exec).
@@ -692,16 +693,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes memory sender,
     uint16 messageRequestedBlockDepth
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // Default block depth requirement is 0, which means "wait for finality". A receiver implementing
+    // Default block confirmations requirement is 0, which means "wait for finality". A receiver implementing
     // IAny2EVMMessageReceiverV2 can return a different value.
     // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
     // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
-    uint16 minBlockDepth;
+    uint16 minBlockConfirmations;
 
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-      (requiredCCV, optionalCCVs, optionalThreshold, minBlockDepth) =
-        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockDepth(sourceChainSelector, sender);
+      (requiredCCV, optionalCCVs, optionalThreshold, minBlockConfirmations) =
+        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockConfirmations(sourceChainSelector, sender);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
@@ -715,12 +716,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // If non-zero it means FTF is enabled. Ensure it follows the min requirements from the receiver.
     if (messageRequestedBlockDepth != 0) {
       // If the receiver requires finality, but the msg is FTF, revert.
-      if (minBlockDepth == 0) {
-        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockDepth);
+      if (minBlockConfirmations == 0) {
+        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockConfirmations);
       }
-      // If the receiver specified a minBlockDepth that is higher than the message requested block depth, revert.
-      if (minBlockDepth > messageRequestedBlockDepth) {
-        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockDepth);
+      // If the receiver specified a minBlockConfirmations that is higher than the message requested block confirmations, revert.
+      if (minBlockConfirmations > messageRequestedBlockDepth) {
+        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockConfirmations);
       }
     }
 

@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	evmonrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
@@ -317,8 +317,8 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 				ChainSelector: chain.Selector,
 				ContractRef: []datastore.AddressRef{
 					{
-						Type:    datastore.ContractType(evmfqops.ContractType),
-						Version: evmfqops.Version,
+						Type:    datastore.ContractType(fq163ops.ContractType),
+						Version: fq163ops.Version,
 					},
 				},
 				ProposedOwner: timelockAddrs[chain.Selector],
@@ -364,7 +364,6 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 			Description:          "Transfer ownership test",
 		},
 	}
-
 	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
 	require.NoError(t, err)
 	require.Greater(t, len(transferOutput.Reports), 0)

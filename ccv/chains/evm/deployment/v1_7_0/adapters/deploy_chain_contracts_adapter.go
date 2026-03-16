@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
@@ -14,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -285,7 +286,7 @@ func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.Ex
 		result = append(result, sequences.ExecutorParams{
 			Version:       ep.Version,
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
-			DynamicConfig: executor.SetDynamicConfigArgs{
+			DynamicConfig: executor.DynamicConfig{
 				FeeAggregator:         feeAgg,
 				MinBlockConfirmations: ep.DynamicConfig.MinBlockConfirmations,
 				CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,
@@ -300,11 +301,12 @@ func convertMockReceivers(params []ccvadapters.MockReceiverDeployParams) []seque
 	result := make([]sequences.MockReceiverParams, 0, len(params))
 	for _, mr := range params {
 		result = append(result, sequences.MockReceiverParams{
-			Version:           mr.Version,
-			RequiredVerifiers: mr.RequiredVerifiers,
-			OptionalVerifiers: mr.OptionalVerifiers,
-			OptionalThreshold: mr.OptionalThreshold,
-			Qualifier:         mr.Qualifier,
+			Version:                   mr.Version,
+			RequiredVerifiers:         mr.RequiredVerifiers,
+			OptionalVerifiers:         mr.OptionalVerifiers,
+			OptionalThreshold:         mr.OptionalThreshold,
+			MinimumBlockConfirmations: mr.MinimumBlockConfirmations,
+			Qualifier:                 mr.Qualifier,
 		})
 	}
 	return result

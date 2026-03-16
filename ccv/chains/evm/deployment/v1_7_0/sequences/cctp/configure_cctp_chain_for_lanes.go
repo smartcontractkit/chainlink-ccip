@@ -25,8 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
 
@@ -275,7 +275,7 @@ func resolveConfigureCCTPChainRefs(
 		return refs, nil, fmt.Errorf("failed to find CCTPVerifier ref on chain %d: %w", chainSelector, err)
 	}
 	refs.CCTPVerifierResolver, err = datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:    datastore.ContractType(cctp_verifier.ResolverType),
+		Type:    datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
 		Version: cctp_verifier.Version,
 	}, chainSelector, datastore_utils.FullRef)
 	if err != nil {
