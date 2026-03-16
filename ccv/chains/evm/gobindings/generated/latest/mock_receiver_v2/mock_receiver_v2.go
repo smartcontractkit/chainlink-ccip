@@ -182,13 +182,13 @@ func (_MockReceiverV2 *MockReceiverV2TransactorRaw) Transact(opts *bind.Transact
 	return _MockReceiverV2.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_MockReceiverV2 *MockReceiverV2Caller) GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+func (_MockReceiverV2 *MockReceiverV2Caller) GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockConfirmations,
 
 	error) {
 	var out []interface{}
 	err := _MockReceiverV2.contract.Call(opts, &out, "getCCVsAndMinBlockConfirmations", arg0, arg1)
 
-	outstruct := new(GetCCVsAndMinBlockDepth)
+	outstruct := new(GetCCVsAndMinBlockConfirmations)
 	if err != nil {
 		return *outstruct, err
 	}
@@ -202,13 +202,13 @@ func (_MockReceiverV2 *MockReceiverV2Caller) GetCCVsAndMinBlockConfirmations(opt
 
 }
 
-func (_MockReceiverV2 *MockReceiverV2Session) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+func (_MockReceiverV2 *MockReceiverV2Session) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockConfirmations,
 
 	error) {
 	return _MockReceiverV2.Contract.GetCCVsAndMinBlockConfirmations(&_MockReceiverV2.CallOpts, arg0, arg1)
 }
 
-func (_MockReceiverV2 *MockReceiverV2CallerSession) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+func (_MockReceiverV2 *MockReceiverV2CallerSession) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockConfirmations,
 
 	error) {
 	return _MockReceiverV2.Contract.GetCCVsAndMinBlockConfirmations(&_MockReceiverV2.CallOpts, arg0, arg1)
@@ -260,7 +260,7 @@ func (_MockReceiverV2 *MockReceiverV2TransactorSession) SetMinBlockConfirmations
 	return _MockReceiverV2.Contract.SetMinBlockConfirmations(&_MockReceiverV2.TransactOpts, minBlockConfirmations)
 }
 
-type GetCCVsAndMinBlockDepth struct {
+type GetCCVsAndMinBlockConfirmations struct {
 	RequiredVerifier  []common.Address
 	OptionalVerifiers []common.Address
 	Threshold         uint8
@@ -272,7 +272,7 @@ func (_MockReceiverV2 *MockReceiverV2) Address() common.Address {
 }
 
 type MockReceiverV2Interface interface {
-	GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+	GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockConfirmations,
 
 		error)
 
