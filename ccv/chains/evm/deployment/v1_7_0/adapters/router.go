@@ -32,7 +32,7 @@ type RouterUpdater struct{}
 func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterConfig, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"router-updater:sequence-update-router-with-ramps",
-		semver.MustParse("1.2.0"),
+		semver.MustParse("2.0.0"),
 		"Updates the Router contract to use the existing Ramps",
 		func(b cldf_ops.Bundle, chains chain.BlockChains, input deploy.RouterUpdaterConfig) (output sequences.OnChainOutput, err error) {
 			c, ok := chains.EVMChains()[input.ChainSelector]
