@@ -1,7 +1,7 @@
 {
   "name": "Orange Test Token",
-  "symbol": "OrangeTestToken",
-  "description": "Orange Test Token is used for Solana migration testing.",
+  "symbol": "Orange",
+  "description": "Orange is a test token is used for Solana migration testing.",
   "image": "https://d2f70xi62kby8n.cloudfront.net/LINK.svg",
   "attributes": [],
   "properties": {
