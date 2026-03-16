@@ -464,7 +464,7 @@ func (a *SVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBl
 	require.NoError(t, err)
 }
 
-func (a *SVMAdapter) ValidateExecSuccess(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
+func (a *SVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
 	var startSlot uint64
 	if startBlock != nil {
 		startSlot = *startBlock

@@ -334,7 +334,7 @@ func (a *EVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBl
 	require.NoError(t, err)
 }
 
-func (a *EVMAdapter) ValidateExecSuccess(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
+func (a *EVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(

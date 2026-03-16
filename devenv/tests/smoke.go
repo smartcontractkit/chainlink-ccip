@@ -337,7 +337,7 @@ func sendMsgRequireNoError(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConf
 	seqNrUint := ccipocr3.SeqNum(seqNr)
 	seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
 	toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
-	toImpl.ValidateExecSuccess(t, fromImpl.ChainSelector(), nil, []uint64{seqNr})
+	toImpl.ValidateExecSucceeds(t, fromImpl.ChainSelector(), nil, []uint64{seqNr})
 	return seqNr, messageID
 }
 

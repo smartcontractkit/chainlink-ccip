@@ -67,7 +67,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 				seqNr, msgID, err := lane.src.SendMessage(t.Context(), lane.dest.ChainSelector(), msg)
 				t.Logf("sendMsgRequireNoError got msgID: %s", msgID)
 				require.NoError(t, err, "failed to send message")
-				seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+				seqNumRange := ccipocr3.NewSeqNumRange(ccipocr3.SeqNum(seqNr), ccipocr3.SeqNum(seqNr))
 				lane.dest.ValidateCommit(t, lane.src.ChainSelector(), nil, seqNumRange)
 				waitForUserAction(t, fmt.Sprintf("Check that message was received but is stuck in \"In Progress\". Then press ENTER\n%s", msgInfo(msgID)))
 			},
@@ -108,13 +108,13 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 			func(t *testing.T, lane chainPair) {
 				isRejectAll := false
 				setReceiverRejectAll := func(rejectAll bool) {
-					err := lane.dest.SetReceiverRejectAll(t, rejectAll)
+					err := lane.dest.SetReceiverRejectAll(t.Context(), t, rejectAll)
 					require.NoError(t, err)
 					t.Cleanup(func() {
 						if !isRejectAll {
 							return
 						}
-						err := lane.dest.SetReceiverRejectAll(t, false)
+						err := lane.dest.SetReceiverRejectAll(t.Context(), t, false)
 						require.NoError(t, err, "failed to reset receiver reject all flag, manual cleanup may be required")
 					})
 				}
@@ -144,7 +144,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 				go func() {
 					defer close(waitForExec)
 					startBlock := lane.dest.CurrentBlock(t) + 1
-					lane.dest.ValidateExec(t, lane.src.ChainSelector(), &startBlock, []ccipocr3.SeqNum{seqNr})
+					lane.dest.ValidateExecSucceeds(t, lane.src.ChainSelector(), &startBlock, []uint64{seqNr})
 				}()
 
 				waitForUserAction(t, fmt.Sprintf("Check that message was received but is on \"Manual Exec\". Execute manually and press ENTER\n%s", msgInfo(msgID)))
