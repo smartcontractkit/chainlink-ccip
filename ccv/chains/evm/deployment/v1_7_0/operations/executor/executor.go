@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -35,7 +35,7 @@ type ApplyDestChainUpdatesArgs struct {
 
 type RemoteChainConfigArgs struct {
 	DestChainSelector uint64
-	Config            adapters.ExecutorDestChainConfig
+	Config            lanes.ExecutorDestChainConfig
 }
 
 type ApplyAllowedCCVUpdatesArgs struct {

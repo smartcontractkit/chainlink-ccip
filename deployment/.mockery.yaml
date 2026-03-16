@@ -6,3 +6,10 @@ packages:
       filename: mock_jd_client.go
     interfaces:
       JDClient:
+  github.com/smartcontractkit/chainlink-deployments-framework/offchain:
+    config:
+      dir: ./v1_7_0/mocks
+      pkgname: mocks
+      filename: mock_offchain_client.go
+    interfaces:
+      Client:

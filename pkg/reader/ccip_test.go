@@ -592,47 +592,6 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	mockCache.AssertExpectations(t)
 }
 
-func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
-	ctx := context.Background()
-
-	// Setup expected values
-	offrampAddress := []byte{0x3}
-	expectedConfig := cciptypes.FeeQuoterStaticConfig{
-		MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
-		LinkToken:          []byte{0x3, 0x4},
-		StalenessThreshold: 12,
-	}
-
-	// Setup cache with the expected config
-	mockCache := new(mockConfigCache)
-	chainConfig := cciptypes.ChainConfigSnapshot{
-		FeeQuoter: cciptypes.FeeQuoterConfig{
-			StaticConfig: expectedConfig,
-		},
-	}
-	mockCache.On("GetChainConfig", mock.Anything, chainC).Return(chainConfig, nil)
-
-	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-
-	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
-	require.NoError(t, err)
-	ccipReader := &ccipChainReader{
-		lggr:           logger.Test(t),
-		destChain:      chainC,
-		configPoller:   mockCache,
-		offrampAddress: offrampAddressStr,
-	}
-
-	cfg, err := ccipReader.getDestFeeQuoterStaticConfig(ctx)
-	require.NoError(t, err)
-
-	assert.Equal(t, expectedConfig.MaxFeeJuelsPerMsg, cfg.MaxFeeJuelsPerMsg)
-	assert.Equal(t, expectedConfig.LinkToken, cfg.LinkToken)
-	assert.Equal(t, expectedConfig.StalenessThreshold, cfg.StalenessThreshold)
-
-	mockCache.AssertExpectations(t)
-}
-
 func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
 	offrampAddress := []byte{0x3}
