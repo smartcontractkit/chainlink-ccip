@@ -8,13 +8,19 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ../chains/solana/gobindings
-	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
+// github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment // TODO uncomment
 
 // local development
 // github.com/smartcontractkit/chainlink-ton => ../../../.
 // github.com/smartcontractkit/chainlink-ton/deployment => ../../../deployment
 // github.com/smartcontractkit/chainlink-ton/devenv => ../../../devenv
 // github.com/smartcontractkit/chainlink-testing-framework/framework => ../../chainlink-testing-framework/framework
+)
+
+require (
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260312130858-48d184a42678
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20260312130858-48d184a42678
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260312181937-48c0e2b83ea9
 )
 
 require (
@@ -33,11 +39,8 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260303213437-47af98c8ae82
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260304183236-7a28a8641246
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260304183236-7a28a8641246
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260303213437-47af98c8ae82
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.1-0.20260209182815-b296b7df28a6
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
