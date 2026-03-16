@@ -20,12 +20,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	executor_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/executor"
 	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 )
 
@@ -69,9 +68,9 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		}
 
 		// Apply Executor dest chain updates (only chains that need to be added/updated).
-		destChainSelectorsPerExecutor := make(map[common.Address][]executor.RemoteChainConfigArgs)
+		destChainSelectorsPerExecutor := make(map[common.Address][]ExecutorRemoteChainConfigArgs)
 		defaultExecutor := common.HexToAddress(sourceChain.DefaultExecutor.Address)
-		getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[any]{
+		getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       defaultExecutor,
 		})
@@ -79,9 +78,9 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 		}
 		if destChainSelectorsPerExecutor[getTargetReport.Output] == nil {
-			destChainSelectorsPerExecutor[getTargetReport.Output] = []executor.RemoteChainConfigArgs{}
+			destChainSelectorsPerExecutor[getTargetReport.Output] = []ExecutorRemoteChainConfigArgs{}
 		}
-		destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], executor.RemoteChainConfigArgs{
+		destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
 			DestChainSelector: remoteSelector,
 			Config:            destChain.ExecutorDestChainConfig,
 		})
@@ -93,10 +92,10 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			if len(toAdd) == 0 {
 				continue
 			}
-			executorReport, err := cldf_ops.ExecuteOperation(b, executor.ApplyDestChainUpdates, chain, contract.FunctionInput[executor.ApplyDestChainUpdatesArgs]{
+			executorReport, err := cldf_ops.ExecuteOperation(b, ExecutorApplyDestChainUpdates, chain, contract.FunctionInput[ExecutorApplyDestChainUpdatesArgs]{
 				ChainSelector: chain.Selector,
 				Address:       executorAddr,
-				Args: executor.ApplyDestChainUpdatesArgs{
+				Args: ExecutorApplyDestChainUpdatesArgs{
 					DestChainSelectorsToAdd: toAdd,
 				},
 			})
@@ -552,17 +551,17 @@ func filterOffRampAdds(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64,
 
 // filterExecutorDestChains returns a copy of destChainSelectorsPerExecutor with each executor's list
 // filtered to only dest chains that are not already configured or whose config differs.
-func filterExecutorDestChains(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, destChainSelectorsPerExecutor map[common.Address][]executor.RemoteChainConfigArgs) (map[common.Address][]executor.RemoteChainConfigArgs, error) {
-	out := make(map[common.Address][]executor.RemoteChainConfigArgs, len(destChainSelectorsPerExecutor))
+func filterExecutorDestChains(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, destChainSelectorsPerExecutor map[common.Address][]ExecutorRemoteChainConfigArgs) (map[common.Address][]ExecutorRemoteChainConfigArgs, error) {
+	out := make(map[common.Address][]ExecutorRemoteChainConfigArgs, len(destChainSelectorsPerExecutor))
 	for executorAddr, toAdd := range destChainSelectorsPerExecutor {
-		currentReport, err := cldf_ops.ExecuteOperation(b, executor.GetDestChains, chain, contract.FunctionInput[any]{
+		currentReport, err := cldf_ops.ExecuteOperation(b, executor.GetDestChains, chain, contract.FunctionInput[struct{}]{
 			ChainSelector: chainSelector,
 			Address:       executorAddr,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dest chains from Executor(%s) on chain %v: %w", executorAddr, chain, err)
 		}
-		currentMap := make(map[uint64]executor_bindings.ExecutorRemoteChainConfigArgs)
+		currentMap := make(map[uint64]executor.RemoteChainConfigArgs)
 		for _, c := range currentReport.Output {
 			currentMap[c.DestChainSelector] = c
 		}

@@ -42,7 +42,7 @@ type ClientEVMTokenAmount struct {
 }
 
 var MockReceiverV2MetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"required\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"optional\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"threshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipReceive\",\"inputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Client.Any2EVMMessage\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getCCVsAndMinBlockConfirmations\",\"inputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setMinBlockConfirmations\",\"inputs\":[{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"required\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"optional\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"threshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipReceive\",\"inputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Client.Any2EVMMessage\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getCCVsAndMinBlockConfirmations\",\"inputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"requiredVerifier\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"optionalVerifiers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"threshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"minBlockDepth\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setMinBlockConfirmations\",\"inputs\":[{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"}]",
 	Bin: "0x6080604052346101ff5761074b8038038061001981610204565b9283398101906060818303126101ff5780516001600160401b0381116101ff5782610045918301610229565b60208201519092906001600160401b0381116101ff57604091610069918401610229565b9101519160ff83168093036101ff578051906001600160401b0382116101875768010000000000000000821161018757600054826000558083106101ba575b5060200160008052602060002060005b83811061019d5784518690866001600160401b038211610187576801000000000000000082116101875760015482600155808310610141575b506020016001600052602060002060005b838110610124578460ff1960025416176002556040516104b0908161029b8239f35b82516001600160a01b031681830155602090920191600101610102565b60016000527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf69081019083015b81811061017b57506100f1565b6000815560010161016e565b634e487b7160e01b600052604160045260246000fd5b82516001600160a01b0316818301556020909201916001016100b8565b600080527f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5639081019083015b8181106101f357506100a8565b600081556001016101e6565b600080fd5b6040519190601f01601f191682016001600160401b0381118382101761018757604052565b81601f820112156101ff578051916001600160401b038311610187578260051b91602080610258818601610204565b8096815201938201019182116101ff57602001915b81831061027a5750505090565b82516001600160a01b03811681036101ff5781526020928301920161026d56fe608080604052600436101561001357600080fd5b60003560e01c90816301ffc9a71461036c5750806370709a4d1461013457806385572ffb146100c55763d4d6de231461004b57600080fd5b346100c05760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c05760043561ffff811681036100c0577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000ff62ffff006002549260081b16911617600255600080f35b600080fd5b346100c05760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c05760043567ffffffffffffffff81116100c0577ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc60a091360301126100c057005b346100c05760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c05760043567ffffffffffffffff8116036100c05760243567ffffffffffffffff81116100c057366023820112156100c057806004013567ffffffffffffffff81116100c057369101602401116100c05760025460405160008054808352818052829160208301917f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563915b81811061033d5750505003601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff8111828210176102df5760405260405191826001548082526020820190600160005260206000209060005b81811061030e5750505003601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe01683019267ffffffffffffffff8411818510176102df576102c861ffff916102ba95604052604051958695608087526080870190610459565b908582036020870152610459565b9160ff8116604085015260081c1660608301520390f35b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b825473ffffffffffffffffffffffffffffffffffffffff16845287945060209093019260019283019201610252565b825473ffffffffffffffffffffffffffffffffffffffff168452859450602090930192600192830192016101ec565b346100c05760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c057600435907fffffffff0000000000000000000000000000000000000000000000000000000082168092036100c057817f70709a4d000000000000000000000000000000000000000000000000000000006020931490811561042f575b8115610405575b5015158152f35b7f01ffc9a700000000000000000000000000000000000000000000000000000000915014836103fe565b7f85572ffb00000000000000000000000000000000000000000000000000000000811491506103f7565b906020808351928381520192019060005b8181106104775750505090565b825173ffffffffffffffffffffffffffffffffffffffff1684526020938401939092019160010161046a56fea164736f6c634300081a000a",
 }
 
@@ -182,28 +182,35 @@ func (_MockReceiverV2 *MockReceiverV2TransactorRaw) Transact(opts *bind.Transact
 	return _MockReceiverV2.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_MockReceiverV2 *MockReceiverV2Caller) GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) ([]common.Address, []common.Address, uint8, uint16, error) {
+func (_MockReceiverV2 *MockReceiverV2Caller) GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+
+	error) {
 	var out []interface{}
 	err := _MockReceiverV2.contract.Call(opts, &out, "getCCVsAndMinBlockConfirmations", arg0, arg1)
 
+	outstruct := new(GetCCVsAndMinBlockDepth)
 	if err != nil {
-		return *new([]common.Address), *new([]common.Address), *new(uint8), *new(uint16), err
+		return *outstruct, err
 	}
 
-	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
-	out1 := *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
-	out2 := *abi.ConvertType(out[2], new(uint8)).(*uint8)
-	out3 := *abi.ConvertType(out[3], new(uint16)).(*uint16)
+	outstruct.RequiredVerifier = *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+	outstruct.OptionalVerifiers = *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
+	outstruct.Threshold = *abi.ConvertType(out[2], new(uint8)).(*uint8)
+	outstruct.MinBlockDepth = *abi.ConvertType(out[3], new(uint16)).(*uint16)
 
-	return out0, out1, out2, out3, err
+	return *outstruct, err
 
 }
 
-func (_MockReceiverV2 *MockReceiverV2Session) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) ([]common.Address, []common.Address, uint8, uint16, error) {
+func (_MockReceiverV2 *MockReceiverV2Session) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+
+	error) {
 	return _MockReceiverV2.Contract.GetCCVsAndMinBlockConfirmations(&_MockReceiverV2.CallOpts, arg0, arg1)
 }
 
-func (_MockReceiverV2 *MockReceiverV2CallerSession) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) ([]common.Address, []common.Address, uint8, uint16, error) {
+func (_MockReceiverV2 *MockReceiverV2CallerSession) GetCCVsAndMinBlockConfirmations(arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+
+	error) {
 	return _MockReceiverV2.Contract.GetCCVsAndMinBlockConfirmations(&_MockReceiverV2.CallOpts, arg0, arg1)
 }
 
@@ -253,12 +260,21 @@ func (_MockReceiverV2 *MockReceiverV2TransactorSession) SetMinBlockConfirmations
 	return _MockReceiverV2.Contract.SetMinBlockConfirmations(&_MockReceiverV2.TransactOpts, minBlockConfirmations)
 }
 
+type GetCCVsAndMinBlockDepth struct {
+	RequiredVerifier  []common.Address
+	OptionalVerifiers []common.Address
+	Threshold         uint8
+	MinBlockDepth     uint16
+}
+
 func (_MockReceiverV2 *MockReceiverV2) Address() common.Address {
 	return _MockReceiverV2.address
 }
 
 type MockReceiverV2Interface interface {
-	GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) ([]common.Address, []common.Address, uint8, uint16, error)
+	GetCCVsAndMinBlockConfirmations(opts *bind.CallOpts, arg0 uint64, arg1 []byte) (GetCCVsAndMinBlockDepth,
+
+		error)
 
 	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
 

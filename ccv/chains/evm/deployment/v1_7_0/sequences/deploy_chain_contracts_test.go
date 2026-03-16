@@ -7,16 +7,21 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -34,11 +39,6 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 func TestDeployChainContracts_Idempotency(t *testing.T) {
@@ -114,8 +114,8 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				sequences.CommitteeVerifierResolverType: false,
 				rmn_proxy.ContractType:                  false,
 				token_admin_registry.ContractType:       false,
-				mock_receiver_v2.ContractType:           false,
-				executor.ProxyType:                      false,
+				mock_receiver.ContractType:              false,
+				sequences.ExecutorProxyType:             false,
 				router.TestRouterContractType:           false,
 			}
 			for _, addr := range report.Output.Addresses {
@@ -269,7 +269,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	}
 	params.MockReceivers = []sequences.MockReceiverParams{
 		{
-			Version: mock_receiver_v2.Version,
+			Version: mock_receiver.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					ChainSelector: chainSelector,
@@ -287,7 +287,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 			Qualifier: "q1",
 		},
 		{
-			Version: mock_receiver_v2.Version,
+			Version: mock_receiver.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					Type:      datastore.ContractType(committee_verifier.ContractType),
@@ -338,16 +338,16 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 
 	q1ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(mock_receiver_v2.ContractType),
-		Version:       mock_receiver_v2.Version,
+		Type:          datastore.ContractType(mock_receiver.ContractType),
+		Version:       mock_receiver.Version,
 		Qualifier:     "q1",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
 	q2ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(mock_receiver_v2.ContractType),
-		Version:       mock_receiver_v2.Version,
+		Type:          datastore.ContractType(mock_receiver.ContractType),
+		Version:       mock_receiver.Version,
 		Qualifier:     "q2",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
@@ -355,20 +355,20 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q1Receiver, err := mock_recv_bindings.NewMockReceiverV2(q1ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	required, optional, threshold, _, err := q1Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
+	q1Result, err := q1Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
-	require.Len(t, required, 2)
-	require.Len(t, optional, 0)
-	require.Equal(t, uint8(0), threshold)
+	require.Len(t, q1Result.RequiredVerifier, 2)
+	require.Len(t, q1Result.OptionalVerifiers, 0)
+	require.Equal(t, uint8(0), q1Result.Threshold)
 
 	q2Receiver, err := mock_recv_bindings.NewMockReceiverV2(q2ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	required, optional, threshold, _, err = q2Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
+	q2Result, err := q2Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
-	require.Len(t, required, 1)
-	require.Len(t, optional, 1)
-	require.Equal(t, uint8(1), threshold)
+	require.Len(t, q2Result.RequiredVerifier, 1)
+	require.Len(t, q2Result.OptionalVerifiers, 1)
+	require.Equal(t, uint8(1), q2Result.Threshold)
 }
 
 func singleSignerMCMSConfig(signer common.Address) (mcms_types.Config, error) {
@@ -567,7 +567,7 @@ func TestDeployChainContracts_DefaultOwnershipTransfer(t *testing.T) {
 
 	// Verify multi-instance executor contracts (with qualifiers) deployed and ownership transferred.
 	for _, q := range []string{"default", "custom"} {
-		for _, ct := range []deployment.ContractType{executor.ContractType, executor.ProxyType} {
+		for _, ct := range []deployment.ContractType{executor.ContractType, sequences.ExecutorProxyType} {
 			addr, err := datastore_utils.FindAndFormatRef(outputDS, datastore.AddressRef{
 				Type:      datastore.ContractType(ct),
 				Qualifier: q,
