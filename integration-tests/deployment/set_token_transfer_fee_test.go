@@ -323,11 +323,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	evmAdapter := evmseqV1_6_0.EVMAdapter{}
 
 	feesRegistry := fees.GetRegistry()
-	evmFeesAdapterV1_6 := evmadaptersV1_6_0.NewFeesAdapter(&evmAdapter)
 	evmFeesAdapterV2_0 := evmadaptersV2_0_0.NewFeesAdapter(&evmAdapter)
-
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilyEVM, v1_6_0, evmFeesAdapterV1_6)
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilyEVM, v2_0_0, evmFeesAdapterV2_0)
 
 	// Get the address of the LINK token on the source chain
 	srcLinkRef, err := out.DataStore.Addresses().Get(
