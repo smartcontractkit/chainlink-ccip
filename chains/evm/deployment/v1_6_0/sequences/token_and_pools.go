@@ -52,9 +52,6 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 			if !common.IsHexAddress(input.TokenPoolAddress) {
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address %q is not a valid hex address", input.TokenPoolAddress)
 			}
-			if !common.IsHexAddress(input.RegistryAddress) {
-				return sequences.OnChainOutput{}, fmt.Errorf("registry address %q is not a valid hex address", input.RegistryAddress)
-			}
 
 			tpAddr := common.HexToAddress(input.TokenPoolAddress)
 			if tpAddr == (common.Address{}) {
