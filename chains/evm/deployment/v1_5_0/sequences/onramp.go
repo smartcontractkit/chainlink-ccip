@@ -82,7 +82,7 @@ var (
 			var contractMeta []datastore.ContractMetadata
 			var contractMetaMu sync.Mutex
 			outerGrp, _ := errgroup.WithContext(b.GetContext())
-			outerGrp.SetLimit(3) // limit concurrency across remote chains
+			outerGrp.SetLimit(10) // limit concurrency across remote chains
 			feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
 				ChainSelector: chain.Selector,
 				Address:       input.PriceRegistry,

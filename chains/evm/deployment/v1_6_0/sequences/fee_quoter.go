@@ -186,7 +186,7 @@ var (
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
-			tokenGrp.SetLimit(2)
+			tokenGrp.SetLimit(10)
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
 				remoteChain := remoteChain
 				tokens := tokens
