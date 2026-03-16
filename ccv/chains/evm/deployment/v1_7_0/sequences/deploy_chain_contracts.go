@@ -9,11 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 
@@ -71,8 +72,8 @@ type MockReceiverParams struct {
 	// or will be deployed by the DeployChainContracts sequence.
 	OptionalVerifiers []datastore.AddressRef
 	OptionalThreshold uint8
-	// MinimumBlockDepth is the minimum block depth that the mock receiver will accept.
-	MinimumBlockDepth uint16
+	// MinimumBlockConfirmations is the minimum block depth that the mock receiver will accept.
+	MinimumBlockConfirmations uint16
 	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
 	// If only one mock receiver is deployed this can be left blank.
 	Qualifier string
@@ -663,12 +664,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, deployReceiverReport.Output)
 
 			// Set minimum block depth on the MockReceiver if diff exists
-			if mockReceiverParams.MinimumBlockDepth != 0 {
+			if mockReceiverParams.MinimumBlockConfirmations != 0 {
 				// Get the minimum block depth on the MockReceiver
-			minimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockDepth, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockDepthArgs]{
+			minimumBlockConfirmations, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockConfirmations, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-				Args: mock_receiver_v2.GetCCVsAndMinBlockDepthArgs{
+				Args: mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs{
 						Arg0: chain.Selector,
 						Arg1: []byte{},
 					},
@@ -676,17 +677,17 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
 				}
-				if minimumBlockDepthReport.Output.MinBlockDepth != mockReceiverParams.MinimumBlockDepth {
+				if minimumBlockConfirmations.Output.MinBlockDepth != mockReceiverParams.MinimumBlockConfirmations {
 					// Set the minimum block depth on the MockReceiver
-					setMinimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockDepth, chain, contract_utils.FunctionInput[uint16]{
+					setMinimumBlockConfirmationsReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockConfirmations, chain, contract_utils.FunctionInput[uint16]{
 						ChainSelector: chain.Selector,
 						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-						Args:          mockReceiverParams.MinimumBlockDepth,
+						Args:          mockReceiverParams.MinimumBlockConfirmations,
 					})
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set minimum block depth on MockReceiver: %w", err)
 					}
-					writes = append(writes, setMinimumBlockDepthReport.Output)
+					writes = append(writes, setMinimumBlockConfirmationsReport.Output)
 				}
 			}
 		}

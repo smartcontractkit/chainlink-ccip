@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
@@ -300,12 +301,12 @@ func convertMockReceivers(params []ccvadapters.MockReceiverDeployParams) []seque
 	result := make([]sequences.MockReceiverParams, 0, len(params))
 	for _, mr := range params {
 		result = append(result, sequences.MockReceiverParams{
-			Version:           mr.Version,
-			RequiredVerifiers: mr.RequiredVerifiers,
-			OptionalVerifiers: mr.OptionalVerifiers,
-			OptionalThreshold: mr.OptionalThreshold,
-			MinimumBlockDepth: mr.MinimumBlockDepth,
-			Qualifier:         mr.Qualifier,
+			Version:                   mr.Version,
+			RequiredVerifiers:         mr.RequiredVerifiers,
+			OptionalVerifiers:         mr.OptionalVerifiers,
+			OptionalThreshold:         mr.OptionalThreshold,
+			MinimumBlockConfirmations: mr.MinimumBlockConfirmations,
+			Qualifier:                 mr.Qualifier,
 		})
 	}
 	return result
