@@ -10,7 +10,7 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip => ../../../
 )
 
-replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
+// replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment // TODO: uncomment
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
@@ -20,7 +20,7 @@ require (
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260121163256-85accaf3d28d
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260312181937-48c0e2b83ea9
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.75.2-0.20260120092221-c83e6ba1e827
 	github.com/smartcontractkit/chainlink-evm v0.3.3
