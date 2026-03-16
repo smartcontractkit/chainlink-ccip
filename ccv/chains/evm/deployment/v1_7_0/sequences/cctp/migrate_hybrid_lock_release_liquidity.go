@@ -11,9 +11,9 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -311,7 +311,7 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 			continue
 		}
 
-		ownerReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.GetOwner, ctx.chain, contract_utils.FunctionInput[struct{}]{
+		ownerReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Owner, ctx.chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: ctx.input.ChainSelector,
 			Address:       lockBoxAddr,
 			Args:          struct{}{},

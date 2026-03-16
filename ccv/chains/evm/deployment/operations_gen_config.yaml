@@ -276,6 +276,10 @@ contracts:
         access: public
       - name : deposit
         access: public
+      - name : owner
+        access: public
+      - name : transferOwnership
+        access: owner
 
   - contract_name: MockReceiverV2
     version: "2.0.0"

@@ -52,15 +52,6 @@ func (c *ERC20LockBoxContract) Address() common.Address {
 	return c.address
 }
 
-func (c *ERC20LockBoxContract) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []any
-	err := c.contract.Call(opts, &out, "owner")
-	if err != nil {
-		return common.Address{}, err
-	}
-	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
-}
-
 func (c *ERC20LockBoxContract) ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "applyAuthorizedCallerUpdates", args)
 }
@@ -77,6 +68,20 @@ func (c *ERC20LockBoxContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]c
 
 func (c *ERC20LockBoxContract) Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "deposit", token, arg1, amount)
+}
+
+func (c *ERC20LockBoxContract) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "owner")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *ERC20LockBoxContract) TransferOwnership(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "transferOwnership", args)
 }
 
 type AuthorizedCallerArgs struct {
@@ -154,5 +159,34 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 		args DepositArgs,
 	) (*types.Transaction, error) {
 		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
+	},
+})
+
+var Owner = contract.NewRead(contract.ReadParams[struct{}, common.Address, *ERC20LockBoxContract]{
+	Name:         "erc20-lock-box:owner",
+	Version:      Version,
+	Description:  "Calls owner on the contract",
+	ContractType: ContractType,
+	NewContract:  NewERC20LockBoxContract,
+	CallContract: func(c *ERC20LockBoxContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.Owner(opts)
+	},
+})
+
+var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *ERC20LockBoxContract]{
+	Name:            "erc20-lock-box:transfer-ownership",
+	Version:         Version,
+	Description:     "Calls transferOwnership on the contract",
+	ContractType:    ContractType,
+	ContractABI:     ERC20LockBoxABI,
+	NewContract:     NewERC20LockBoxContract,
+	IsAllowedCaller: contract.OnlyOwner[*ERC20LockBoxContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(
+		c *ERC20LockBoxContract,
+		opts *bind.TransactOpts,
+		args common.Address,
+	) (*types.Transaction, error) {
+		return c.TransferOwnership(opts, args)
 	},
 })
