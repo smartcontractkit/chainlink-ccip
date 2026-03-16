@@ -262,9 +262,8 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	}
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
-	// TODO: EVM doesn't work with a non-zero timelock delay
-	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
-	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{cciputils.CLLQualifier})
+	EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
@@ -339,7 +338,7 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
 				chainSel: {
-					Version: version,
+					Version:                                 version,
 					TokenPrivKey:                            mint.String(),
 					TokenDecimals:                           9,
 					MaxFeeJuelsPerMsg:                       big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
