@@ -131,8 +131,8 @@ type TestAdapter interface {
 	// ValidateCommit validates that the message specified by the given send event was committed.
 	ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange)
 
-	// ValidateExecSuccess validates that the message specified by the given send event was executed.
-	ValidateExecSuccess(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
+	// ValidateExecSucceeds validates that the message specified by the given send event was executed.
+	ValidateExecSucceeds(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
 
 	// ValidateExecFails validates that the message specified by the given send event failed to execute.
 	ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64)
