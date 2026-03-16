@@ -174,9 +174,32 @@ func ExecuteMCMSTimelockProposal(t *testing.T, env cldf.Environment, timelockPro
 	timelockExecutable, err := mcmslib.NewTimelockExecutable(env.GetContext(), timelockProposal, executorsMap)
 	require.NoError(t, err)
 
+	// Collect EVM simulated backends so we can advance their block timestamps
+	// during IsReady polling. Without this, simulated chain time stays frozen
+	// and IsReady never succeeds for delay > 0.
+	type blockCommitter interface{ Commit() common.Hash }
+	var simClients []blockCommitter
+	committed := make(map[uint64]bool)
+	for _, op := range timelockProposal.Operations {
+		sel := uint64(op.ChainSelector)
+		if committed[sel] {
+			continue
+		}
+		committed[sel] = true
+		family, ferr := chainsel.GetSelectorFamily(sel)
+		if ferr != nil || family != chainsel.FamilyEVM {
+			continue
+		}
+		if c, ok := evmChains[sel].Client.(blockCommitter); ok {
+			simClients = append(simClients, c)
+		}
+	}
+
 	isReady := func() error {
-		err := timelockExecutable.IsReady(env.GetContext())
-		return err
+		for _, c := range simClients {
+			c.Commit()
+		}
+		return timelockExecutable.IsReady(env.GetContext())
 	}
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.NoErrorf(collect, isReady(), "Proposal is not ready")
