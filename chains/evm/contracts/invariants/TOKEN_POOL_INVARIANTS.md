@@ -10,8 +10,8 @@
 
 ## 2. Access Control
 
-- **INV-POOL-4**: Only the OnRamp (resolved via the router for the remote chain) may call `lockOrBurn`. The pool verifies that the caller is the OnRamp for the given remote chain.
-- **INV-POOL-5**: Only the OffRamp may call `releaseOrMint`. The pool verifies that the caller is a registered OffRamp for the given remote chain.
+- **INV-POOL-4**: Only the OnRamp (resolved via the router for the remote chain) may call `lockOrBurn`. The pool verifies the caller's identity against a protocol-provided reference (e.g., router lookup, allowlist, or ticket-based authorization). Caller identity must not rely solely on the caller's self-assertion.
+- **INV-POOL-5**: Only the OffRamp may call `releaseOrMint`. The pool verifies the caller's identity against a protocol-provided reference. If a ticket-based pattern is used, the ticket must bind the instrument/token, the pool, the amount, and the message identity — not just the caller party.
 - **INV-POOL-6**: The remote chain must be configured on the pool before any `lockOrBurn` or `releaseOrMint` call. Unconfigured chains are rejected.
 
 ---
@@ -42,6 +42,7 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 - **INV-POOL-16**: If `sourcePoolData` is present, it must be exactly 32 bytes encoding a `uint8` decimal value.
 - **INV-POOL-17**: When converting from higher to lower decimals, the amount is divided and rounds down. Dust is lost.
 - **INV-POOL-18**: When converting from lower to higher decimals, the amount is multiplied. If the multiplication overflows, the transfer reverts.
+- **INV-POOL-17a**: On inbound (`releaseOrMint`), decimal conversion from source-chain denomination to local denomination must happen **before** the rate limiter consumes capacity. The rate limiter must enforce its capacity against the local-denomination amount, not the raw source-chain amount.
 
 ---
 
@@ -73,6 +74,7 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 - **INV-RL-8**: When a bucket is enabled, `rate` must not exceed `capacity`.
 - **INV-RL-9**: When a bucket is disabled, both `rate` and `capacity` must be zero.
 - **INV-RL-10**: Rate limit configuration can be updated by the contract owner or a designated rate limit admin.
+- **INV-RL-11**: When rate limiter configuration is updated, the current token count must not increase beyond what time-based refill would naturally produce. A config update must reset the bucket to full capacity.
 
 ---
 
@@ -87,4 +89,9 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 ## 9. Source Pool Validation (Inbound)
 
 - **INV-PVAL-1**: On `releaseOrMint`, the pool validates that `sourcePoolAddress` (from the inbound message) matches one of the configured remote pool addresses for the source chain. Unrecognized source pools are rejected.
+- **INV-PVAL-2**: On inbound token release, if a ticket or voucher mechanism is used for authorization, the ticket must be validated against:
+  - The instrument/token being released (`ticket.instrumentId == pool.instrumentId`)
+  - The pool performing the release (`ticket.poolId == this pool`)
+  - The message that created the ticket (`ticket.messageId` matches)
+  Cross-instrument redemption must be impossible.
 

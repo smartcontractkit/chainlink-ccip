@@ -20,6 +20,8 @@
 - **INV-SRC-2**: `messageId` is computed after `lockOrBurn`, because the token transfer encoding (including `destPoolData` from `lockOrBurn`) is part of the encoded message.
 - **INV-SRC-3**: The computed fee must not exceed the fee token amount provided by the sender. See FEE_INVARIANTS.md for fee structure details.
 - **INV-SRC-4**: Token amount must be non-zero if a token transfer is included.
+- **INV-SRC-5**: `executionGasLimit` in the encoded message must reflect the actual gas budget required for destination-chain execution. It must be the sum of: base execution gas, CCV verification gas (from all CCV receipts), pool gas overhead (from pool receipt), and user-specified gas limit. A zero `executionGasLimit` for a message that requires execution on the destination is invalid and must not be emitted.
+- **INV-SRC-6**: The message send operation must consume or invalidate the state it reads (sequence number, configuration) such that the same state cannot be used to produce a second message. If the send operation is non-atomic, the state mutation (sequence number increment) must be committed before or atomically with the message finalization. Stale state must not be reusable.
 
 ---
 
@@ -48,6 +50,8 @@
 - **INV-EXEC-5**: A message that failed may be retried.
 - **INV-EXEC-6**: A successfully executed message cannot be re-executed.
 - **INV-EXEC-7**: A retry that still fails must not produce a redundant state transition.
+- **INV-EXEC-8**: If a cancel/abort mechanism exists for in-progress executions, it must: (a) update the execution state to prevent the cancelled message from being re-prepared without restriction, (b) not be exercisable by untrusted parties (e.g., the executor should not be able to cancel its own in-progress work to force a retry loop), and (c) track cancellation count or impose a cooldown to prevent resource exhaustion attacks on CCV verification.
+- **INV-EXEC-9**: The `SUCCESS` execution state must only be committed when all protocol-level outcomes are finalized. If the token release mechanism supports deferred/pending delivery (e.g., a two-step accept flow), the execution state must distinguish between "protocol complete" and "tokens delivered." Emitting `SUCCESS` while token delivery is still pending creates a semantic mismatch that prevents retry or recovery.
 
 ---
 

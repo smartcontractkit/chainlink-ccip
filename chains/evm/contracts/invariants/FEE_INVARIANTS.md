@@ -76,3 +76,15 @@ See CCV_INVARIANTS.md (section 2.6) for CCV fee invariants.
 - **INV-FEE-19**: The executor fee is transferred to the executor address.
 - **INV-FEE-20**: The pool fee is transferred to the pool only if it implements V2. For V1 pools (legacy), the fee stays on the OnRamp.
 - **INV-FEE-21**: The network fee stays on the OnRamp.
+
+---
+
+## 9. Fee Conversion Precision
+
+- **INV-FEE-22**: Fee token conversion must use consistent scaling across all chain implementations. The scaling factors and price units must be documented and produce equivalent results to the EVM reference for the same inputs. If the EVM reference uses `usdCents * 1e34 / feeTokenPrice`, other implementations must achieve the same precision and output.
+
+---
+
+## 10. Token Transfer Fee Granularity
+
+- **INV-FEE-23**: Token transfer fee configuration must be per-destination-chain, per-token. Different destination chains may have different transfer fee parameters (flat fees, proportional fees) for the same token.

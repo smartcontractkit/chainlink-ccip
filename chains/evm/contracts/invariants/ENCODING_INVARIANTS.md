@@ -109,7 +109,25 @@ Then:
 
 ---
 
-## 3. Token Pool Remote Configuration
+## 3. Numeric Range Safety
+
+- **INV-ENC-10**: All numeric fields in the wire format must survive a round-trip through the implementation's native type system without overflow, truncation, or precision loss. Specifically:
+  - `amount` (uint256) must be representable in the implementation's token amount type at its full range. If the native type has a smaller range than uint256, the implementation must validate the value fits before processing.
+  - `messageNumber` (uint64) must be representable without overflow.
+  - `executionGasLimit`, `ccipReceiveGasLimit` (uint32), and `finality` (uint16) must be representable without overflow.
+- **INV-ENC-11**: Encoding functions must reject values that exceed the wire format's range. `encodeUint256` must reject values > 2^256 - 1. `encodeUint64` must reject values > 2^64 - 1. Encoding must never silently produce output longer or shorter than the specified field width.
+- **INV-ENC-12**: Intermediate type conversions during encoding/decoding must not narrow the value range. If a conversion path routes a wide type through a narrower intermediate type (e.g., 256-bit → 64-bit → decimal), the narrowing must either be validated or eliminated.
+
+---
+
+## 4. Character and Byte-String Encoding
+
+- **INV-ENC-13**: All text-to-bytes encoding functions must be injective (distinct inputs produce distinct outputs). Unsupported characters must cause an error, not a silent substitution. Hash inputs must be canonical — two semantically distinct values must never produce the same hash.
+- **INV-ENC-14**: All byte-string inputs at system boundaries must be validated for well-formedness: even length, valid hex characters, and consistent case normalization. Malformed byte strings must be rejected at the point of entry, not silently accepted.
+
+---
+
+## 5. Token Pool Remote Configuration
 
 - **INV-POOL-ENC-1**: `remotePoolAddresses` and `remoteTokenAddress` are stored as raw bytes. For remote EVM chains, these are abi-encoded addresses (32 bytes). For other chain families, they use the native address representation.
 - **INV-POOL-ENC-2**: `remoteTokenAddress` must be non-empty (zero-length reverts).

@@ -148,7 +148,7 @@ On EVM, address stability is achieved via resolvers that implement `ICrossChainV
 
 ## 5. Cross-Cutting Invariants
 
-- **INV-CC-1**: Every message is verified by at least one CCV. This is guaranteed by INV-CFG-1/5 (at least one default or mandated CCV must exist) and the fallback mechanisms that ensure pools and receivers always resolve to at least the default CCVs.
+- **INV-CC-1**: Every message is verified by at least one CCV. This is guaranteed by INV-CFG-1/5 (at least one default or mandated CCV must exist) and the fallback mechanisms that ensure pools and receivers always resolve to at least the default CCVs. For token-only transfers, even when receiver CCVs and defaults are excluded (see INV-DST-14), pool-required CCVs or lane-mandated CCVs must provide at least one CCV. If no CCVs resolve for a token-only transfer, the message must revert — not proceed unverified.
 - **INV-CC-2**: The source-side CCV list (embedded in `ccvAndExecutorHash`) is informational for offchain systems. The destination side independently computes its own CCV requirements.
 - **INV-CC-3**: Source and destination CCV lists are independently configured and may differ. The source-side list determines fees; the destination-side list determines verification requirements.
 - **INV-CC-4**: The same verifier may have different addresses on different chains. CCV addresses are chain-specific identifiers.

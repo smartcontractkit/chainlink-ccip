@@ -108,3 +108,18 @@ CCVs, token pools, and the executor are external participants that the OnRamp an
 | Message sending (`ccipSend`) | Permissionless |
 | Message execution (`execute`) | Permissionless |
 | Curse / uncurse | Risk management system |
+
+---
+
+## 11. Multi-Step Transaction Safety
+
+If a chain family's send or execute flow spans multiple transactions (non-atomic), the following invariants apply:
+
+- **INV-ATOMIC-1**: If tokens are locked/burned before the message is finalized, a cancel/refund mechanism must exist to unlock/remint the tokens if finalization fails. A partially-completed send with locked tokens must never be irrecoverable.
+- **INV-ATOMIC-2**: Configuration updates must not invalidate in-progress multi-step operations in a way that causes permanent token loss. If a config update can break an in-flight send or execute, either: (a) the config update must be gated until no in-flight operations exist, or (b) a recovery mechanism must exist for orphaned operations.
+
+---
+
+## 12. Replay Protection
+
+- **INV-REPLAY-1**: On chains with upgradable contracts (in-place upgrades), replay protection state (execution state tracking) must survive contract upgrades. If replay protection is per-instance, deploying a new instance must not create a fresh replay state that allows re-execution of previously executed messages. For chains that use new instances on new offRamp addresses, the offRamp address in the message must be used to protect against re-execution.
