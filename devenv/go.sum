@@ -1231,6 +1231,8 @@ github.com/smartcontractkit/chainlink-ton v0.0.0-20260304145142-d4cf6759e50b h1:
 github.com/smartcontractkit/chainlink-ton v0.0.0-20260304145142-d4cf6759e50b/go.mod h1:FDDjLuc4vrfclu3JHkMaREg0XZz7Lw1MK47Z4jJ4U5Q=
 github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260304170252-bc133a323122 h1:ZTyy8Pf4mhOHoKEm1UfnYYiqgaCIeg1TGp3SD5w3m2Y=
 github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260304170252-bc133a323122/go.mod h1:w83O9EU6BEtAJ1FifeVAqp1mQNISnH3BY+MLbYX5PBg=
+github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260316135613-b57fc4a106af h1:7T9hmU01KQG2xq8ENDOeHG5FJ/T9CPbz2rh7pAOhGNY=
+github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260316135613-b57fc4a106af/go.mod h1:ctqxsOKZsAdUN8cIAqjRhUM1+G7S1WZNgQ5fXDi9Pys=
 github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260304170252-bc133a323122 h1:3hOkTsTpsdTnJUB1vi6By7abpHvUrf4yHqdiGFCJs1Q=
 github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260304170252-bc133a323122/go.mod h1:W4sihns3zi0UJF956bPdBI/DbP+fF9wQ5ON0RB0U2jY=
 github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 h1:XRNxgcNqagXu6e4smJuS1crRK5cUAcCVd7u+iLduHDM=
