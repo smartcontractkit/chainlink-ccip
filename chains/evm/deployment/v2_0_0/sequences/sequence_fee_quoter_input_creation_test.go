@@ -968,51 +968,72 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 	aptosSelector := uint64(743186221051783445)
 	suiSelector := uint64(9762610643973837292)
+	fallbackGasPrice := big.NewInt(15e11) // matches staticGasPriceByChainFamily in fee_quoter.go
 
-	// EVM chain is not in gasPriceMandatoryForChainFamily -> expect error
-	t.Run("EVM_chain_returns_error", func(t *testing.T) {
+	t.Run("EVM_chain_uses_user_input", func(t *testing.T) {
 		evmChainSelector := uint64(5009297550715157269)
+		gasprice := big.NewInt(1e9)
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
-				GasPricesPerRemoteChain: map[uint64]string{evmChainSelector: "1000000000"},
+				GasPricesPerRemoteChain: map[uint64]string{evmChainSelector: gasprice.String()},
 			},
 		}
 		priceUpdates, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
 		require.NoError(t, err)
-		require.Empty(t, priceUpdates, "Expected no gas price updates for EVM chain since staleness threshold is not empty")
+		require.Equal(t, gasprice.String(), priceUpdates.GasPriceUpdates[0].UsdPerUnitGas.String())
 	})
 
-	// Chain in gasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error
-	t.Run("Aptos_or_Sui_with_nil_AdditionalConfig_returns_error", func(t *testing.T) {
+	t.Run("no_input_returns_blank_price", func(t *testing.T) {
+		evmChainSelector := uint64(5009297550715157269)
+		gasprice := big.NewInt(1e9)
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GasPricesPerRemoteChain: map[uint64]string{999: gasprice.String()},
+			},
+		}
+		priceUpdates, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
+		require.NoError(t, err)
+		require.Empty(t, priceUpdates)
+	})
+
+	// Chain in staticGasPriceByChainFamily with nil AdditionalConfig uses hardcoded fallback
+	t.Run("Aptos_or_Sui_with_nil_AdditionalConfig_uses_fallback", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{ChainSelector: 1}
-		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, 0, fallbackGasPrice.Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match hardcoded fallback")
 	})
 
-	// Chain in gasPriceMandatoryForChainFamily but GasPricesPerRemoteChain is nil -> expect error
-	t.Run("Aptos_or_Sui_with_nil_GasPricesPerRemoteChain_returns_error", func(t *testing.T) {
+	// Chain in staticGasPriceByChainFamily with nil GasPricesPerRemoteChain uses hardcoded fallback
+	t.Run("Aptos_or_Sui_with_nil_GasPricesPerRemoteChain_uses_fallback", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector:    1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{},
 		}
-		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, 0, fallbackGasPrice.Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match hardcoded fallback")
 	})
 
-	// Chain in gasPriceMandatoryForChainFamily but remote chain not in map -> expect error
-	t.Run("Aptos_or_Sui_with_missing_remote_chain_in_map_returns_error", func(t *testing.T) {
+	// Chain in staticGasPriceByChainFamily with remote chain not in map uses hardcoded fallback
+	t.Run("Aptos_or_Sui_with_missing_remote_chain_in_map_uses_fallback", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
 				GasPricesPerRemoteChain: map[uint64]string{999: "1000000000"},
 			},
 		}
-		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, 0, fallbackGasPrice.Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match hardcoded fallback")
 	})
 
 	// Invalid gas price string (not a number) -> expect error
@@ -1029,15 +1050,15 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Contains(t, err.Error(), "in input additional config")
 	})
 
-	// Chain in gasPriceMandatoryForChainFamily with valid gas price string -> success
+	// Chain in staticGasPriceByChainFamily with valid gas price string -> success
 	t.Run("Aptos_and_Sui_with_gas_price_returns_updates", func(t *testing.T) {
-		gasPriceStr := "2000000000"
+		gasPrice := big.NewInt(2e9)
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
 				GasPricesPerRemoteChain: map[uint64]string{
-					aptosSelector: gasPriceStr,
-					suiSelector:   gasPriceStr,
+					aptosSelector: gasPrice.String(),
+					suiSelector:   gasPrice.String(),
 				},
 			},
 		}
@@ -1045,13 +1066,12 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, output.GasPriceUpdates, 1)
 		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
-		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
+		require.Equal(t, 0, gasPrice.Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
 		output, err = sequences.HandleEmptyGasPriceStalenessThreshold(suiSelector, input)
 		require.NoError(t, err)
 		require.Len(t, output.GasPriceUpdates, 1)
 		require.Equal(t, suiSelector, output.GasPriceUpdates[0].DestChainSelector)
-		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
-
+		require.Equal(t, 0, gasPrice.Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
 	})
 }
 
