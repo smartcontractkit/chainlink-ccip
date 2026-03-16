@@ -42,7 +42,8 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 		Address:       common.BytesToAddress(fqAddr).Hex(),
 		ChainSelector: src,
 	}
-	feecontractref, err := datastore_utils.FindAndFormatRef(
+
+	feeContractRef, err := datastore_utils.FindAndFormatRef(
 		ds,
 		filter,
 		src,
@@ -54,7 +55,7 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 
 	}
 
-	return feecontractref, nil
+	return feeContractRef, nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
@@ -168,8 +169,9 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			result, err := sequences.RunAndMergeSequence(b, chains,
 				evmseq.SequenceFeeQuoterUpdate,
 				evmseq.FeeQuoterUpdate{
-					ChainSelector:     input.Selector,
-					ExistingAddresses: []datastore.AddressRef{fqRef},
+					ChainSelector:                 input.Selector,
+					ExistingAddresses:             []datastore.AddressRef{fqRef},
+					TokenTransferFeeConfigUpdates: updatesByChain,
 				},
 				result,
 			)

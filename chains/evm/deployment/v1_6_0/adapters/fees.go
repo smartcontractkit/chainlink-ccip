@@ -113,12 +113,10 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 			}
-
 			fqAddr := common.HexToAddress(fqRef.Address)
 
 			updatesByChain := fqops.ApplyTokenTransferFeeConfigUpdatesArgs{}
 			for dst, dstCfg := range input.Settings {
-
 				var tokensToUseDefaultFeeConfigs []fqops.TokenTransferFeeConfigRemoveArgs
 				var tokenTransferFeeConfigs []fqops.TokenTransferFeeConfigSingleTokenArgs
 				for rawTokenAddress, feeCfg := range dstCfg {

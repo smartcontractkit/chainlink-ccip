@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -32,22 +33,31 @@ func NewFeesAdapter(solAdapter *solseq.SolanaAdapter) *FeesAdapter {
 }
 
 func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
-	fqAddr, err := a.sol.GetFQAddress(e.DataStore, src)
+	ds := e.DataStore
+	fqAddr, err := a.sol.GetFQAddress(ds, src)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
 
-	feecontractref := e.DataStore.Addresses().Filter(
-		datastore.AddressRefByAddress(solana.PublicKeyFromBytes(fqAddr).String()),
-		datastore.AddressRefByType(datastore.ContractType(fee_quoter_operations.ContractType)),
-		datastore.AddressRefByChainSelector(src),
-	)
-
-	if len(feecontractref) == 0 {
-		return datastore.AddressRef{}, fmt.Errorf("no address ref found for FeeQuoter contract at address %s on chain selector %d", fqAddr, src)
+	filter := datastore.AddressRef{
+		Type:          datastore.ContractType(fee_quoter_operations.ContractType),
+		Address:       solana.PublicKeyFromBytes(fqAddr).String(),
+		ChainSelector: src,
 	}
 
-	return feecontractref[0], nil
+	feeContractRef, err := datastore_utils.FindAndFormatRef(
+		ds,
+		filter,
+		src,
+		datastore_utils.FullRef,
+	)
+
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find FeeQuoter address ref for chain selector %d: %w", src, err)
+
+	}
+
+	return feeContractRef, nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {

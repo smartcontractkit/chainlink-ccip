@@ -191,7 +191,7 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint
 	)
 
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to find FeeQuoter address ref for chain selector %d: %w", src, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to find EVM2EVMOnRamp address ref for chain selector %d: %w", src, err)
 	}
 
 	return feecontractref, nil

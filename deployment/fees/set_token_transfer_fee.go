@@ -101,6 +101,12 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
+		type FeeGroup struct {
+			version  *semver.Version
+			adapter  FeeAdapter
+			settings map[uint64]map[string]*TokenTransferFeeArgs
+		}
+
 		for _, src := range cfg.Args {
 			srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
 			if err != nil {
@@ -113,18 +119,14 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			}
 
 			// Build version-grouped settings: version -> settings map
-			versionGroups := map[string]struct {
-				version  *semver.Version
-				adapter  FeeAdapter
-				settings map[uint64]map[string]*TokenTransferFeeArgs
-			}{}
+			versionGroups := map[string]FeeGroup{}
 
 			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
 
 				feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, dst.Selector)
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, src.Settings[0].Selector, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
 
 				// Normalize fee contract version to major.minor.0 for adapter lookup, as patch versions should not affect compatibility
@@ -138,7 +140,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					if args, err := inferTokenTransferFeeArgs(adapter, e, src.Selector, dst.Selector, feeCfg); err != nil {
+					if args, err := inferTokenTransferFeeArgs(updater, e, src.Selector, dst.Selector, feeCfg); err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
 					} else {
 						settings[dst.Selector][feeCfg.Address] = args
@@ -152,7 +154,6 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 						adapter  FeeAdapter
 						settings map[uint64]map[string]*TokenTransferFeeArgs
 					}{
-						version:  feeContractRef.Version,
 						adapter:  updater,
 						settings: map[uint64]map[string]*TokenTransferFeeArgs{},
 					}
