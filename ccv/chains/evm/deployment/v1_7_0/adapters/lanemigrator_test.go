@@ -58,9 +58,9 @@ func TestLaneMigrator(t *testing.T) {
 
 				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
 					Cfg: v1_7_0.DeployChainContractsCfg{
-						ChainSel:       chainSel,
-						CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-						Params:         testsetup.CreateBasicContractParams(),
+						ChainSel:         chainSel,
+						CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+						Params:           testsetup.CreateBasicContractParams(),
 						DeployerKeyOwned: true,
 					},
 				})
@@ -91,9 +91,10 @@ func TestLaneMigrator(t *testing.T) {
 			_, err = cs.Apply(*e, deploy.LaneMigratorConfig{
 				Input: map[uint64]deploy.LaneMigratorConfigPerChain{
 					chainA: {
-						RemoteChains:  []uint64{chainB},
-						RouterVersion: semver.MustParse("1.2.0"),
-						RampVersion:   semver.MustParse("2.0.0"),
+						RemoteChains:         []uint64{chainB},
+						RouterVersion:        semver.MustParse("1.2.0"),
+						RouterUpdaterVersion: semver.MustParse("2.0.0"),
+						RampVersion:          semver.MustParse("2.0.0"),
 					},
 				},
 			})

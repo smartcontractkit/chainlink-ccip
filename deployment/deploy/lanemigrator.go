@@ -30,9 +30,10 @@ type LaneMigratorConfig struct {
 }
 
 type LaneMigratorConfigPerChain struct {
-	RemoteChains  []uint64
-	RouterVersion *semver.Version
-	RampVersion   *semver.Version
+	RemoteChains         []uint64
+	RouterVersion        *semver.Version
+	RouterUpdaterVersion *semver.Version
+	RampVersion          *semver.Version
 }
 
 type RouterUpdaterConfig struct {
@@ -119,7 +120,7 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 		reports := make([]cldf_ops.Report[any, any], 0)
 		for chainSel, perChainConfig := range input.Input {
 			existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
-			routerUpdater, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			routerUpdater, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterUpdaterVersion)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
@@ -188,7 +189,7 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 func laneMigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
 	return func(e cldf.Environment, input LaneMigratorConfig) error {
 		for chainSel, perChainConfig := range input.Input {
-			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterUpdaterVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of router updater for chain selector %d: %w", chainSel, err)
 			}

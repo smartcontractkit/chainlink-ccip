@@ -103,15 +103,17 @@ func TestMigrateTo1_6_0(t *testing.T) {
 	_, err = cs.Apply(*e, deployops.LaneMigratorConfig{
 		Input: map[uint64]deployops.LaneMigratorConfigPerChain{
 			chain_selectors.ETHEREUM_MAINNET.Selector: {
-				RouterVersion: semver.MustParse("1.2.0"),
-				RampVersion:   version,
+				RouterVersion:        semver.MustParse("1.2.0"),
+				RouterUpdaterVersion: semver.MustParse("1.2.0"),
+				RampVersion:          version,
 				RemoteChains: []uint64{
 					chain_selectors.AVALANCHE_MAINNET.Selector,
 				},
 			},
 			chain_selectors.AVALANCHE_MAINNET.Selector: {
-				RouterVersion: semver.MustParse("1.2.0"),
-				RampVersion:   version,
+				RouterVersion:        semver.MustParse("1.2.0"),
+				RouterUpdaterVersion: semver.MustParse("1.2.0"),
+				RampVersion:          version,
 				RemoteChains: []uint64{
 					chain_selectors.ETHEREUM_MAINNET.Selector,
 				},

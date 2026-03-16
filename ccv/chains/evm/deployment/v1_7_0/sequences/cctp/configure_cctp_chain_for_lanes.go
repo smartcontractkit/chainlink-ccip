@@ -31,10 +31,10 @@ import (
 )
 
 const (
-	mechanismCCTPV1        = "CCTP_V1"
-	mechanismCCTPV2        = "CCTP_V2"
-	mechanismLockRelease   = "LOCK_RELEASE"
-	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
+	MechanismCCTPV1        = "CCTP_V1"
+	MechanismCCTPV2        = "CCTP_V2"
+	MechanismLockRelease   = "LOCK_RELEASE"
+	MechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 )
 
 // configureCCTPChainRefs holds resolved address refs for ConfigureCCTPChainForLanes.
@@ -66,7 +66,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		lockReleaseSelectors := make([]uint64, 0)
 		for sel, cfg := range input.RemoteChains {
-			if cfg.LockOrBurnMechanism == mechanismLockRelease {
+			if cfg.LockOrBurnMechanism == MechanismLockRelease {
 				lockReleaseSelectors = append(lockReleaseSelectors, sel)
 			}
 		}
@@ -200,7 +200,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Configure remote chains on CCTP V1 token pool (1.6.1 sequence).
 		cctpV1TokenPoolAddress := common.HexToAddress(refs.CCTPV1TokenPool.Address)
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
-			if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+			if remoteChain.LockOrBurnMechanism != MechanismCCTPV1 {
 				continue
 			}
 			if refs.CCTPV1TokenPool.Address == "" {
@@ -373,7 +373,7 @@ func buildUSDCTokenPoolProxyMechanismArgs(input adapters.ConfigureCCTPChainForLa
 	remoteChainSelectors = make([]uint64, 0, len(input.RemoteChains))
 	mechanisms = make([]uint8, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
+		mechanism, err := ConvertMechanismToUint8(remoteChain.LockOrBurnMechanism)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
 		}
@@ -472,7 +472,7 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
 			continue
 		}
-		if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+		if remoteChain.LockOrBurnMechanism != MechanismCCTPV1 {
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV1AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -578,17 +578,17 @@ func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 	return []contract_utils.WriteOutput{report.Output}, nil
 }
 
-func convertMechanismToUint8(mechanism string) (uint8, error) {
+func ConvertMechanismToUint8(mechanism string) (uint8, error) {
 	switch mechanism {
-	case mechanismCCTPV1:
+	case MechanismCCTPV1:
 		return 1, nil
-	case mechanismCCTPV2:
+	case MechanismCCTPV2:
 		return 2, nil
-	case mechanismLockRelease:
+	case MechanismLockRelease:
 		return 3, nil
-	case mechanismCCTPV2WithCCV:
+	case MechanismCCTPV2WithCCV:
 		return 4, nil
 	default:
-		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", mechanismCCTPV1, mechanismCCTPV2, mechanismLockRelease, mechanismCCTPV2WithCCV, mechanism)
+		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", MechanismCCTPV1, MechanismCCTPV2, MechanismLockRelease, MechanismCCTPV2WithCCV, mechanism)
 	}
 }

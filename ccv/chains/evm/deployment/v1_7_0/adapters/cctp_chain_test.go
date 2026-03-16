@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
+	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
@@ -95,9 +95,9 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:  chainSelector,
-			ContractParams: testsetup.CreateBasicContractParams(),
-			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ChainSelector:    chainSelector,
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			DeployerKeyOwned: true, // Set DeployerKeyOwned to true to skip ownership transfer steps since this is a test environment and we don't have MCMS or timelocks set up
 		},
 	)
