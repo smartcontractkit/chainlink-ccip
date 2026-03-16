@@ -234,21 +234,25 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			break
 		}
 	}
-	pools, err := tokenAdminRegC.GetPools(nil, allTokens)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get pools for tokens from token admin registry at %s on chain %d: %w", tokenAdminRegAddr.String(), chain.Selector, err)
-	}
+
 	tokensPerRemoteChain := make(map[uint64][]common.Address)
 	var mu sync.Mutex
 	grp, grpCtx := errgroup.WithContext(ctx)
 	grp.SetLimit(getSupportedTokensPoolConcurrency)
-	for _, poolAddr := range pools {
+	for _, tokenAddr := range allTokens {
 		// there is no supported pool for this token
-		if poolAddr == (common.Address{}) {
+		if tokenAddr == (common.Address{}) {
 			continue
 		}
-		poolAddr := poolAddr
+		tokenAddr := tokenAddr // capture loop variable
 		grp.Go(func() error {
+			poolAddr, err := tokenAdminRegC.GetPool(&bind.CallOpts{
+				Context: grpCtx,
+			}, tokenAddr)
+			if err != nil {
+				return fmt.Errorf("failed to get pool for token %s from token admin registry at %s on chain %d: %w",
+					tokenAddr.String(), tokenAdminRegAddr.String(), chain.Selector, err)
+			}
 			tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 			if err != nil {
 				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
@@ -258,16 +262,13 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			// track when certain pool methods appear to be unsupported so we
 			// can avoid repeated failed calls and warning spam.
 			var (
-				tokenAddr                  common.Address
-				tokenFetched               bool
 				isSupportedChainUnsupported bool
-				getTokenUnsupported        bool
 			)
 
 			for _, remoteChain := range remoteChains {
-				// If we've already determined that IsSupportedChain or GetToken
-				// are unsupported for this pool, stop checking further chains.
-				if isSupportedChainUnsupported || getTokenUnsupported {
+				// If we've already determined that IsSupportedChain
+				// is unsupported for this pool, stop checking further chains.
+				if isSupportedChainUnsupported {
 					break
 				}
 
@@ -285,23 +286,6 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 				}
 				if !supported {
 					continue
-				}
-
-				// Fetch the token address at most once per pool.
-				if !tokenFetched {
-					tokenAddr, err = tokenPoolC.GetToken(&bind.CallOpts{
-						Context: grpCtx,
-					})
-					if err != nil {
-						// If we fail to get the token address for a pool, assume
-						// this method isn't supported or is consistently failing
-						// for this pool. Log once and short-circuit further
-						// attempts for this pool to avoid warning spam.
-						l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
-						getTokenUnsupported = true
-						break
-					}
-					tokenFetched = true
 				}
 
 				mu.Lock()
