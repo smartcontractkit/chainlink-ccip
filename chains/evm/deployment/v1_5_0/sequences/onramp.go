@@ -82,7 +82,16 @@ var (
 			var contractMeta []datastore.ContractMetadata
 			var contractMetaMu sync.Mutex
 			outerGrp, _ := errgroup.WithContext(b.GetContext())
-			outerGrp.SetLimit(10) // limit concurrency across remote chains
+			outerGrp.SetLimit(3) // limit concurrency across remote chains
+			feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       input.PriceRegistry,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
+					"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
+			}
+			feeTokens := feetokenOut.Output
 			for remoteChainSelector, onRampAddress := range input.OnRampsPerRemoteChain {
 				remoteChainSelector := remoteChainSelector
 				onRampAddress := onRampAddress
@@ -103,15 +112,7 @@ var (
 						return fmt.Errorf("failed to execute OnRampDynamicConfigOp "+
 							"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
 					}
-					feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-						ChainSelector: chain.Selector,
-						Address:       input.PriceRegistry,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
-							"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
-					}
-					feeTokens := feetokenOut.Output
+
 					feeTokenConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig)
 					for _, token := range feeTokens {
 						feeTokenConfigOut, err := operations.ExecuteOperation(b, onramp.OnRampFeeTokenConfig, chain, contract.FunctionInput[common.Address]{

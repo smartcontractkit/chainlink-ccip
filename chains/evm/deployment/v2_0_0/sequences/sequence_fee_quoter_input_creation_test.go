@@ -981,6 +981,7 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		}
 		priceUpdates, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
 		require.NoError(t, err)
+		require.NotEmpty(t, priceUpdates.GasPriceUpdates)
 		require.Equal(t, gasprice.String(), priceUpdates.GasPriceUpdates[0].UsdPerUnitGas.String())
 	})
 
