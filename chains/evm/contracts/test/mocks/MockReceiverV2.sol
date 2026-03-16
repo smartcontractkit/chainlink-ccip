@@ -37,7 +37,16 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   function getCCVsAndMinBlockDepth(
     uint64, // sourceChainSelector
     bytes calldata // sender
-  ) external view returns (address[] memory, address[] memory, uint8, uint16) {
+  )
+    external
+    view
+    returns (
+      address[] memory requiredVerifier,
+      address[] memory optionalVerifiers,
+      uint8 threshold,
+      uint16 minBlockDepth
+    )
+  {
     return (s_required, s_optional, s_threshold, s_minBlockDepth);
   }
 
