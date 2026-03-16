@@ -7,7 +7,7 @@ import (
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	adapters1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
-	EVMAdapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmseq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
@@ -16,7 +16,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	deploy.GetRegistry().RegisterDeployer(chainsel.FamilyEVM, v, &EVMAdapter.EVMAdapter{})
+	deploy.GetRegistry().RegisterDeployer(chainsel.FamilyEVM, v, &evmseq1_6.EVMAdapter{})
 
 	fqReg := deploy.GetFQAndRampUpdaterRegistry()
 	fqReg.RegisterFeeQuoterUpdater(chainsel.FamilyEVM, semver.MustParse("2.0.0"), FeeQuoterUpdater[any]{})

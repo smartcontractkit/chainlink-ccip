@@ -409,7 +409,7 @@ func NewDefaultInputForMCMS(desc string) mcms.Input {
 	return mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           math.MaxUint32,
-		TimelockDelay:        mcms_types.MustParseDuration("1s"),
+		TimelockDelay:        mcms_types.MustParseDuration("0s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Qualifier:            common_utils.CLLQualifier,
 		Description:          desc,

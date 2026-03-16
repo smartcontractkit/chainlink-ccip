@@ -102,7 +102,6 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		type FeeGroup struct {
-			version  *semver.Version
 			adapter  FeeAdapter
 			settings map[uint64]map[string]*TokenTransferFeeArgs
 		}
@@ -149,11 +148,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 				versionKey := lookupVersion.String()
 				if _, exists := versionGroups[versionKey]; !exists {
-					versionGroups[versionKey] = struct {
-						version  *semver.Version
-						adapter  FeeAdapter
-						settings map[uint64]map[string]*TokenTransferFeeArgs
-					}{
+					versionGroups[versionKey] = FeeGroup{
 						adapter:  updater,
 						settings: map[uint64]map[string]*TokenTransferFeeArgs{},
 					}

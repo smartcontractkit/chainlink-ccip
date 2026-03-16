@@ -13,7 +13,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -101,14 +100,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
-		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            common_utils.CLLQualifier,
-			Description:          "Transfer ownership FQ2",
-		},
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)
