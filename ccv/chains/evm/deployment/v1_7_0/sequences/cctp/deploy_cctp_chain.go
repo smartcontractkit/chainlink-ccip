@@ -27,8 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
@@ -107,13 +107,13 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			Args: cctp_verifier.ConstructorArgs{
 				TokenMessenger:          tokenMessengerV2Address,
 				MessageTransmitterProxy: cctpV2MessageTransmitterProxyAddress,
-				USDCToken:               usdcTokenAddress,
+				UsdcToken:               usdcTokenAddress,
 				StorageLocations:        input.StorageLocations,
 				DynamicConfig: cctp_verifier.DynamicConfig{
 					FeeAggregator:   feeAggregatorAddress,
 					FastFinalityBps: input.FastFinalityBps,
 				},
-				RMN: rmnAddress,
+				Rmn: rmnAddress,
 			},
 		}, existingAddresses)
 		if err != nil {
@@ -389,7 +389,7 @@ func deployOrResolveCCTPVerifierResolver(
 ) (datastore.AddressRef, error) {
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chain.Selector),
-		datastore.AddressRefByType(datastore.ContractType(cctp_verifier.ResolverType)),
+		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType)),
 		datastore.AddressRefByVersion(cctp_verifier.Version),
 	)
 	if len(refs) == 0 {
@@ -398,7 +398,7 @@ func deployOrResolveCCTPVerifierResolver(
 		}
 		report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
 			ChainSelector:  chainSelector,
-			Type:           datastore.ContractType(cctp_verifier.ResolverType),
+			Type:           datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
 			Version:        cctp_verifier.Version,
 			CREATE2Factory: create2FactoryAddress,
 		})
@@ -525,7 +525,7 @@ func setCCTPVerifierResolverInbound(
 	chain evm.Chain,
 	cctpVerifierAddr, resolverAddr common.Address,
 ) ([]contract_utils.WriteOutput, error) {
-	versionTagReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetVersionTag, chain, contract_utils.FunctionInput[any]{
+	versionTagReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.VersionTag, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chain.Selector,
 		Address:       cctpVerifierAddr,
 	})

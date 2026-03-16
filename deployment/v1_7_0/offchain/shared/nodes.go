@@ -12,14 +12,18 @@ type NodeLookup struct {
 	nodesByName map[string]*nodev1.Node
 }
 
-func NewNodeLookup(nodes []*nodev1.Node) *NodeLookup {
+func NewNodeLookup(nodes []*nodev1.Node) (*NodeLookup, error) {
 	lookup := &NodeLookup{
 		nodesByName: make(map[string]*nodev1.Node),
 	}
 	for _, node := range nodes {
-		lookup.nodesByName[strings.ToLower(node.Name)] = node
+		key := strings.ToLower(node.Name)
+		if existing, ok := lookup.nodesByName[key]; ok && existing.Id != node.Id {
+			return nil, fmt.Errorf("duplicate node name %q: node IDs %s and %s both claim this name", node.Name, existing.Id, node.Id)
+		}
+		lookup.nodesByName[key] = node
 	}
-	return lookup
+	return lookup, nil
 }
 
 func (l *NodeLookup) FindByName(name string) (*nodev1.Node, bool) {
@@ -54,5 +58,9 @@ func FetchNodeLookup(ctx context.Context, jdClient JDClient, nodeIDs []string) (
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
-	return NewNodeLookup(nodesResp.Nodes), nil
+	lookup, err := NewNodeLookup(nodesResp.Nodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build node lookup: %w", err)
+	}
+	return lookup, nil
 }

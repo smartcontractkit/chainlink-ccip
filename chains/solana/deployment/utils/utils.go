@@ -49,7 +49,8 @@ func GetSolProgramSize(chain cldf_solana.Chain, programID solana.PublicKey) (int
 func GetSolProgramData(client *solrpc.Client, programID solana.PublicKey) (struct {
 	DataType uint32
 	Address  solana.PublicKey
-}, error) {
+}, error,
+) {
 	var programData struct {
 		DataType uint32
 		Address  solana.PublicKey
@@ -126,6 +127,19 @@ func GetTokenProgramID(programName cldf_deployment.ContractType) (solana.PublicK
 	return programID, nil
 }
 
+func GetTokenProgramType(programID solana.PublicKey) (cldf_deployment.ContractType, error) {
+	tokenPrograms := map[solana.PublicKey]cldf_deployment.ContractType{
+		solana.TokenProgramID:     SPLTokens,
+		solana.Token2022ProgramID: SPL2022Tokens,
+	}
+
+	programName, ok := tokenPrograms[programID]
+	if !ok {
+		return "", fmt.Errorf("invalid token program ID: %s. Must be one of: %s, %s", programID, solana.TokenProgramID, solana.Token2022ProgramID)
+	}
+	return programName, nil
+}
+
 func MintTokens(chain cldf_solana.Chain, tokenProgramID, mint solana.PublicKey, amountToAddress map[string]uint64) error {
 	for toAddress, amount := range amountToAddress {
 		toAddressBase58 := solana.MustPublicKeyFromBase58(toAddress)
@@ -182,4 +196,25 @@ func GetTokenDecimals(chain cldf_solana.Chain, tokenMint solana.PublicKey) (uint
 		return 0, fmt.Errorf("failed to get account data: %w", err)
 	}
 	return mintData.Decimals, nil
+}
+
+func FetchTokenProgramID(ctx context.Context, chain cldf_solana.Chain, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
+	tokenAcctInfo, err := chain.Client.GetAccountInfo(ctx, tokenPubKey)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("failed to get account info for token %s: %w", tokenPubKey.String(), err)
+	}
+
+	// Best-effort safeguard: if this truly is a token, then we should be able to fetch its decimals
+	_, err = GetTokenDecimals(chain, tokenPubKey)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("failed to get token decimals for token %s: %w", tokenPubKey.String(), err)
+	}
+
+	// Safeguard: make sure that the token program ID is one we actually support
+	programID := tokenAcctInfo.Value.Owner
+	if _, err = GetTokenProgramType(programID); err != nil {
+		return solana.PublicKey{}, fmt.Errorf("account %s is owned by %s, which is not a supported token program: %w", tokenPubKey.String(), programID.String(), err)
+	}
+
+	return programID, nil
 }
