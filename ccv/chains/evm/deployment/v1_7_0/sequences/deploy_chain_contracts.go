@@ -676,7 +676,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
 				}
-				if minimumBlockDepthReport.Output.Ret3 != mockReceiverParams.MinimumBlockDepth {
+				if minimumBlockDepthReport.Output.MinBlockDepth != mockReceiverParams.MinimumBlockDepth {
 					// Set the minimum block depth on the MockReceiver
 					setMinimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockDepth, chain, contract_utils.FunctionInput[uint16]{
 						ChainSelector: chain.Selector,
