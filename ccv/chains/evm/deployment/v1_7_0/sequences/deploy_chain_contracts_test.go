@@ -7,6 +7,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
@@ -35,9 +39,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDeployChainContracts_Idempotency(t *testing.T) {
@@ -354,7 +355,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q1Receiver, err := mock_recv_bindings.NewMockReceiverV2(q1ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	required, optional, threshold, _, err := q1Receiver.GetCCVsAndMinBlockDepth(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
+	required, optional, threshold, _, err := q1Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
 	require.Len(t, required, 2)
 	require.Len(t, optional, 0)
@@ -363,7 +364,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q2Receiver, err := mock_recv_bindings.NewMockReceiverV2(q2ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	required, optional, threshold, _, err = q2Receiver.GetCCVsAndMinBlockDepth(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
+	required, optional, threshold, _, err = q2Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
 	require.Len(t, required, 1)
 	require.Len(t, optional, 1)

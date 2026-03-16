@@ -138,9 +138,9 @@ contracts:
     version: "2.0.0"
     version_path: "latest"
     functions:
-      - name: getCCVsAndMinBlockDepth
+      - name: getCCVsAndMinBlockConfirmations
         access: public
-      - name: setMinBlockDepth
+      - name: setMinBlockConfirmations
         access: public # Only used in testing, not critical
 
   # Token Pool contracts (latest / v2.0.0)
