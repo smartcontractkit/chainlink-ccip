@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
-	github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers v0.0.0-20260113095857-e13e0dd04d9f
+	github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers v0.0.0-20260304234246-843d03f2badc
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/stretchr/testify v1.11.1

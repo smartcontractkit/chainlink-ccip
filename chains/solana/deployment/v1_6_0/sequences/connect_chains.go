@@ -112,26 +112,30 @@ func (a *SolanaAdapter) ConfigureLaneLegAsDest() *cldf_ops.Sequence[ccipapi.Upda
 }
 
 func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig {
+	var v1 lanes.FeeQuoterV1Params
+	if fqc.V1Params != nil {
+		v1 = *fqc.V1Params
+	}
 	return fee_quoter.DestChainConfig{
 		IsEnabled:                         fqc.IsEnabled,
-		MaxNumberOfTokensPerMsg:           fqc.MaxNumberOfTokensPerMsg,
+		MaxNumberOfTokensPerMsg:           v1.MaxNumberOfTokensPerMsg,
 		MaxDataBytes:                      fqc.MaxDataBytes,
 		MaxPerMsgGasLimit:                 fqc.MaxPerMsgGasLimit,
 		DestGasOverhead:                   fqc.DestGasOverhead,
 		DestGasPerPayloadByteBase:         uint32(fqc.DestGasPerPayloadByteBase),
-		DestGasPerPayloadByteHigh:         uint32(fqc.DestGasPerPayloadByteHigh),
-		DestGasPerPayloadByteThreshold:    uint32(fqc.DestGasPerPayloadByteThreshold),
-		DestDataAvailabilityOverheadGas:   fqc.DestDataAvailabilityOverheadGas,
-		DestGasPerDataAvailabilityByte:    fqc.DestGasPerDataAvailabilityByte,
-		DestDataAvailabilityMultiplierBps: fqc.DestDataAvailabilityMultiplierBps,
+		DestGasPerPayloadByteHigh:         uint32(v1.DestGasPerPayloadByteHigh),
+		DestGasPerPayloadByteThreshold:    uint32(v1.DestGasPerPayloadByteThreshold),
+		DestDataAvailabilityOverheadGas:   v1.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    v1.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: v1.DestDataAvailabilityMultiplierBps,
 		ChainFamilySelector:               [4]byte(binary.BigEndian.AppendUint32(nil, fqc.ChainFamilySelector)),
-		EnforceOutOfOrder:                 fqc.EnforceOutOfOrder,
+		EnforceOutOfOrder:                 v1.EnforceOutOfOrder,
 		DefaultTokenFeeUsdcents:           fqc.DefaultTokenFeeUSDCents,
 		DefaultTokenDestGasOverhead:       fqc.DefaultTokenDestGasOverhead,
 		DefaultTxGasLimit:                 fqc.DefaultTxGasLimit,
-		GasMultiplierWeiPerEth:            fqc.GasMultiplierWeiPerEth,
-		GasPriceStalenessThreshold:        fqc.GasPriceStalenessThreshold,
-		NetworkFeeUsdcents:                fqc.NetworkFeeUSDCents,
+		GasMultiplierWeiPerEth:            v1.GasMultiplierWeiPerEth,
+		GasPriceStalenessThreshold:        v1.GasPriceStalenessThreshold,
+		NetworkFeeUsdcents:                uint32(fqc.NetworkFeeUSDCents),
 	}
 }
 

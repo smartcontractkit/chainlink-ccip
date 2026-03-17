@@ -2,336 +2,200 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
-
-import {Internal} from "../../../libraries/Internal.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-
-import {Vm} from "forge-std/Vm.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
-  function test_ApplyZeroUpdates() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](0);
+  function test_applySourceChainConfigUpdates_multipleChains() public {
+    uint64 chain1 = SOURCE_CHAIN_SELECTOR + 1;
+    uint64 chain2 = SOURCE_CHAIN_SELECTOR + 2;
 
-    vm.recordLogs();
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    bytes[] memory onRamps1 = new bytes[](1);
+    onRamps1[0] = abi.encode(makeAddr("onRamp1"));
 
-    // No logs emitted
-    Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 0);
+    bytes[] memory onRamps2 = new bytes[](1);
+    onRamps2[0] = abi.encode(makeAddr("onRamp2"));
 
-    assertEq(s_offRamp.getSourceChainSelectors().length, 0);
-  }
-
-  function test_AddNewChain() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](2);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: chain1,
       isEnabled: true,
-      isRMNVerificationDisabled: false
+      onRamps: onRamps1,
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](0)
     });
+    configs[0].defaultCCVs[0] = makeAddr("ccv1");
 
-    OffRamp.SourceChainConfig memory expectedSourceChainConfig = OffRamp.SourceChainConfig({
-      router: s_destRouter, isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_1, isRMNVerificationDisabled: false
-    });
-
-    vm.expectEmit();
-    emit OffRamp.SourceChainSelectorAdded(SOURCE_CHAIN_SELECTOR_1);
-
-    vm.expectEmit();
-    emit OffRamp.SourceChainConfigSet(SOURCE_CHAIN_SELECTOR_1, expectedSourceChainConfig);
-
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig);
-  }
-
-  function test_ReplaceExistingChain() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    sourceChainConfigs[0].isEnabled = false;
-    OffRamp.SourceChainConfig memory expectedSourceChainConfig = OffRamp.SourceChainConfig({
-      router: s_destRouter, isEnabled: false, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_1, isRMNVerificationDisabled: false
-    });
-
-    vm.expectEmit();
-    emit OffRamp.SourceChainConfigSet(SOURCE_CHAIN_SELECTOR_1, expectedSourceChainConfig);
-
-    vm.recordLogs();
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    // No log emitted for chain selector added (only for setting the config)
-    Vm.Log[] memory logEntries = vm.getRecordedLogs();
-    assertEq(logEntries.length, 1);
-
-    _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig);
-
-    uint256[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
-    assertEq(resultSourceChainSelectors.length, 1);
-  }
-
-  function test_AddMultipleChains() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](3);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: abi.encode(ON_RAMP_ADDRESS_1, 0),
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-    sourceChainConfigs[1] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1 + 1,
-      onRamp: abi.encode(ON_RAMP_ADDRESS_1, 1),
+    configs[1] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: chain2,
       isEnabled: false,
-      isRMNVerificationDisabled: false
+      onRamps: onRamps2,
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](2)
     });
-    sourceChainConfigs[2] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1 + 2,
-      onRamp: abi.encode(ON_RAMP_ADDRESS_1, 2),
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-
-    OffRamp.SourceChainConfig[] memory expectedSourceChainConfigs = new OffRamp.SourceChainConfig[](3);
-    for (uint256 i = 0; i < 3; ++i) {
-      expectedSourceChainConfigs[i] = OffRamp.SourceChainConfig({
-        router: s_destRouter,
-        isEnabled: sourceChainConfigs[i].isEnabled,
-        minSeqNr: 1,
-        onRamp: abi.encode(ON_RAMP_ADDRESS_1, i),
-        isRMNVerificationDisabled: false
-      });
-
-      vm.expectEmit();
-      emit OffRamp.SourceChainSelectorAdded(sourceChainConfigs[i].sourceChainSelector);
-
-      vm.expectEmit();
-      emit OffRamp.SourceChainConfigSet(sourceChainConfigs[i].sourceChainSelector, expectedSourceChainConfigs[i]);
-    }
-
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    for (uint256 i = 0; i < 3; ++i) {
-      _assertSourceChainConfigEquality(
-        s_offRamp.getSourceChainConfig(sourceChainConfigs[i].sourceChainSelector), expectedSourceChainConfigs[i]
-      );
-    }
-  }
-
-  // Setting lower fuzz run as 256 runs was sometimes resulting in flakes.
-  /// forge-config: default.fuzz.runs = 32
-  /// forge-config: ccip.fuzz.runs = 32
-  function testFuzz_applySourceChainConfigUpdate_Success(
-    OffRamp.SourceChainConfigArgs memory sourceChainConfigArgs
-  ) public {
-    // Skip invalid inputs
-    vm.assume(sourceChainConfigArgs.sourceChainSelector != 0);
-    vm.assume(sourceChainConfigArgs.onRamp.length != 0);
-    vm.assume(address(sourceChainConfigArgs.router) != address(0));
-    vm.assume(keccak256(sourceChainConfigArgs.onRamp) != keccak256(abi.encode(address(0))));
-
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](2);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-    sourceChainConfigs[1] = sourceChainConfigArgs;
-
-    // Handle cases when an update occurs
-    bool isNewChain = sourceChainConfigs[1].sourceChainSelector != SOURCE_CHAIN_SELECTOR_1;
-    if (!isNewChain) {
-      sourceChainConfigs[1].onRamp = sourceChainConfigs[0].onRamp;
-    }
-
-    OffRamp.SourceChainConfig memory expectedSourceChainConfig = OffRamp.SourceChainConfig({
-      router: sourceChainConfigArgs.router,
-      isEnabled: sourceChainConfigArgs.isEnabled,
-      minSeqNr: 1,
-      onRamp: sourceChainConfigArgs.onRamp,
-      isRMNVerificationDisabled: sourceChainConfigArgs.isRMNVerificationDisabled
-    });
-
-    if (isNewChain) {
-      vm.expectEmit();
-      emit OffRamp.SourceChainSelectorAdded(sourceChainConfigArgs.sourceChainSelector);
-    }
+    configs[1].defaultCCVs[0] = makeAddr("ccv2");
+    configs[1].laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
+    configs[1].laneMandatedCCVs[1] = makeAddr("mandatedCCV2");
 
     vm.expectEmit();
-    emit OffRamp.SourceChainConfigSet(sourceChainConfigArgs.sourceChainSelector, expectedSourceChainConfig);
+    emit OffRamp.SourceChainConfigSet(chain1, configs[0]);
 
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
 
-    _assertSourceChainConfigEquality(
-      s_offRamp.getSourceChainConfig(sourceChainConfigArgs.sourceChainSelector), expectedSourceChainConfig
-    );
+    OffRamp.SourceChainConfig memory config1 = s_offRamp.getSourceChainConfig(chain1);
+    OffRamp.SourceChainConfig memory config2 = s_offRamp.getSourceChainConfig(chain2);
+
+    assertEq(address(config1.router), address(configs[0].router));
+    assertEq(address(config2.router), address(configs[1].router));
+
+    assertEq(config1.isEnabled, configs[0].isEnabled);
+    assertEq(config2.isEnabled, configs[1].isEnabled);
+
+    assertEq(chain1, configs[0].sourceChainSelector);
+    assertEq(chain2, configs[1].sourceChainSelector);
+    assertEq(config1.onRamps[0], configs[0].onRamps[0]);
+    assertEq(config2.onRamps[0], configs[1].onRamps[0]);
+
+    assertEq(config1.defaultCCVs[0], configs[0].defaultCCVs[0]);
+    assertEq(config2.defaultCCVs[0], configs[1].defaultCCVs[0]);
+
+    assertEq(config1.laneMandatedCCVs.length, 0);
+    assertEq(config2.laneMandatedCCVs.length, 2);
+    assertEq(config2.laneMandatedCCVs[0], configs[1].laneMandatedCCVs[0]);
+    assertEq(config2.laneMandatedCCVs[1], configs[1].laneMandatedCCVs[1]);
   }
 
-  function test_ReplaceExistingChainOnRamp() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true,
-      isRMNVerificationDisabled: false
+  function test_applySourceChainConfigUpdates_updateExistingChain() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: false,
+      onRamps: onRamps,
+      defaultCCVs: new address[](2),
+      laneMandatedCCVs: new address[](1)
     });
+    configs[0].defaultCCVs[0] = makeAddr("ccv1");
+    configs[0].defaultCCVs[1] = makeAddr("ccv2");
+    configs[0].laneMandatedCCVs[0] = makeAddr("mandatedCCV");
 
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
 
-    sourceChainConfigs[0].onRamp = ON_RAMP_ADDRESS_2;
-
-    vm.expectEmit();
-    emit OffRamp.SourceChainConfigSet(
-      SOURCE_CHAIN_SELECTOR_1,
-      OffRamp.SourceChainConfig({
-        router: s_destRouter, isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_2, isRMNVerificationDisabled: false
-      })
-    );
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    OffRamp.SourceChainConfig memory config = s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
+    assertEq(config.isEnabled, false);
+    assertEq(config.defaultCCVs.length, 2);
+    assertEq(config.laneMandatedCCVs.length, 1);
   }
 
-  function test_allowNonOnRampUpdateAfterLaneIsUsed() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
-    roots[0] = Internal.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: ON_RAMP_ADDRESS_1,
-      minSeqNr: 1,
-      maxSeqNr: 2,
-      merkleRoot: "test #2"
-    });
-
-    _commit(
-      OffRamp.CommitReport({
-        priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
-        blessedMerkleRoots: roots,
-        unblessedMerkleRoots: new Internal.MerkleRoot[](0),
-        rmnSignatures: s_rmnSignatures
-      }),
-      s_latestSequenceNumber
-    );
-
-    vm.startPrank(OWNER);
-
-    // Allow changes to the Router even after the seqNum is not 1
-    assertGt(s_offRamp.getSourceChainConfig(sourceChainConfigs[0].sourceChainSelector).minSeqNr, 1);
-
-    sourceChainConfigs[0].router = IRouter(makeAddr("newRouter"));
-
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-  }
-
-  // Reverts
-
-  function test_RevertWhen_ZeroOnRampAddress() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: new bytes(0),
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-
-    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    sourceChainConfigs[0].onRamp = abi.encode(address(0));
-    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-  }
-
-  function test_RevertWhen_RouterAddress() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: IRouter(address(0)),
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true,
-      isRMNVerificationDisabled: false
-    });
-
-    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-  }
-
-  function test_RevertWhen_ZeroSourceChainSelector() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
       sourceChainSelector: 0,
-      onRamp: ON_RAMP_ADDRESS_1,
       isEnabled: true,
-      isRMNVerificationDisabled: false
+      onRamps: new bytes[](0),
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](0)
     });
+    configs[0].defaultCCVs[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
-  function test_RevertWhen_InvalidOnRampUpdate() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_Router() public {
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: IRouter(address(0)),
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
-      isRMNVerificationDisabled: false
+      onRamps: new bytes[](0),
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](0)
+    });
+    configs[0].defaultCCVs[0] = makeAddr("ccv");
+
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    s_offRamp.applySourceChainConfigUpdates(configs);
+  }
+
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_DefaultCCV() public {
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+      isEnabled: true,
+      onRamps: new bytes[](0),
+      defaultCCVs: new address[](0),
+      laneMandatedCCVs: new address[](0)
     });
 
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    s_offRamp.applySourceChainConfigUpdates(configs);
+  }
 
-    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
-    roots[0] = Internal.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: ON_RAMP_ADDRESS_1,
-      minSeqNr: 1,
-      maxSeqNr: 2,
-      merkleRoot: "test #2"
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_ZeroAddressInDefaultCCVsArray() public {
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+      isEnabled: true,
+      onRamps: new bytes[](0),
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](0)
     });
+    configs[0].defaultCCVs[0] = address(0); // Zero address in array
 
-    _commit(
-      OffRamp.CommitReport({
-        priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
-        blessedMerkleRoots: roots,
-        unblessedMerkleRoots: new Internal.MerkleRoot[](0),
-        rmnSignatures: s_rmnSignatures
-      }),
-      s_latestSequenceNumber
-    );
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    s_offRamp.applySourceChainConfigUpdates(configs);
+  }
 
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_ZeroInLaneMandatedCCVsArray() public {
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+      isEnabled: true,
+      onRamps: new bytes[](0),
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](1)
+    });
+    configs[0].defaultCCVs[0] = makeAddr("ccv1");
+    configs[0].laneMandatedCCVs[0] = address(0); // Zero address in array
+
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    s_offRamp.applySourceChainConfigUpdates(configs);
+  }
+
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_OnRamp() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = "";
+
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+      isEnabled: true,
+      onRamps: onRamps,
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](0)
+    });
+    configs[0].defaultCCVs[0] = makeAddr("ccv");
+
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    s_offRamp.applySourceChainConfigUpdates(configs);
+  }
+
+  function test_applySourceChainConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
-    vm.startPrank(OWNER);
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
 
-    sourceChainConfigs[0].onRamp = ON_RAMP_ADDRESS_2;
-
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRampUpdate.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+    s_offRamp.applySourceChainConfigUpdates(new OffRamp.SourceChainConfigArgs[](0));
   }
 }

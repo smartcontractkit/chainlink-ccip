@@ -24,6 +24,9 @@ type LaneAdapter interface {
 	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
+	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
+	GetDefaultGasPrice() *big.Int
 }
 
 // FeeQuoterVersionProvider is an optional interface that LaneAdapters can implement

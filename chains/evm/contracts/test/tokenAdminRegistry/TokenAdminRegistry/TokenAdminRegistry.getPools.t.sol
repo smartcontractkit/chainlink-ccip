@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import {TokenAdminRegistrySetup} from "./TokenAdminRegistrySetup.t.sol";
 
@@ -14,7 +14,7 @@ contract TokenAdminRegistry_getPools is TokenAdminRegistrySetup {
 
     got = s_tokenAdminRegistry.getPools(s_sourceTokens);
     assertEq(got.length, s_sourceTokens.length);
-    for (uint256 i = 0; i < s_sourceTokens.length; i++) {
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       assertEq(got[i], s_sourcePoolByToken[s_sourceTokens[i]]);
     }
 

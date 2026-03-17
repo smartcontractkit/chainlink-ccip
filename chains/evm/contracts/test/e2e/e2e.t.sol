@@ -1,0 +1,196 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {Proxy} from "../../Proxy.sol";
+import {Router} from "../../Router.sol";
+import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
+import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
+import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
+import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
+import {OffRampHelper} from "../helpers/OffRampHelper.sol";
+import {MockVerifier} from "../mocks/MockVerifier.sol";
+import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
+contract e2e is OnRampSetup {
+  OffRampHelper internal s_offRamp;
+
+  address internal s_destVerifier;
+  address internal s_userSpecifiedCCV;
+  address internal s_feeAggregator;
+  CommitteeVerifier internal s_sourceCommitteeVerifier;
+
+  function setUp() public virtual override {
+    super.setUp();
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
+    s_sourceCommitteeVerifier = new CommitteeVerifier(
+      CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
+
+    BaseVerifier.RemoteChainConfigArgs[] memory destChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    destChainConfigs[0] = BaseVerifier.RemoteChainConfigArgs({
+      router: s_sourceRouter,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+    });
+    s_sourceCommitteeVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
+
+    VersionedVerifierResolver srcVerifierResolver = new VersionedVerifierResolver();
+    VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
+      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
+    outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCommitteeVerifier)
+    });
+    srcVerifierResolver.applyOutboundImplementationUpdates(outboundImpls);
+    s_feeAggregator = makeAddr("feeAggregator");
+    s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver), s_feeAggregator));
+
+    // OffRamp side
+    s_offRamp = new OffRampHelper(
+      OffRamp.StaticConfig({
+        localChainSelector: DEST_CHAIN_SELECTOR,
+        gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
+        rmnRemote: s_mockRMNRemote,
+        tokenAdminRegistry: address(s_tokenAdminRegistry),
+        maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
+      })
+    );
+    address[] memory defaultSourceCCVs = new address[](1);
+    defaultSourceCCVs[0] = s_defaultCCV;
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultSourceCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+    destChainConfigArgs[0].offRamp = abi.encodePacked(address(s_offRamp));
+
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    // On dest, we just use a mock verifier to bypass the signature requirement.
+    // The mock verifier is also a resolver & always resolves to itself.
+    // Eventually, we can replace with an actual committee verifier + resolver setup.
+    s_destVerifier = address(new Proxy(address(new MockVerifier("")), s_feeAggregator));
+
+    address[] memory defaultDestCCVs = new address[](1);
+    defaultDestCCVs[0] = s_destVerifier;
+
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(s_onRamp);
+
+    OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
+    updates[0] = OffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      onRamps: onRamps,
+      defaultCCVs: defaultDestCCVs,
+      laneMandatedCCVs: new address[](0)
+    });
+    s_offRamp.applySourceChainConfigUpdates(updates);
+
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
+    // Seed existing fee recipients so ERC20 transfers reflect real deployments where
+    // verifiers/executors already hold a balance (avoids the first 20k gas cold-init cost).
+    deal(s_sourceFeeToken, defaultDestCCVs[0], 1);
+    deal(s_sourceFeeToken, s_userSpecifiedCCV, 1);
+    deal(s_sourceFeeToken, s_defaultExecutor, 1);
+  }
+
+  function test_e2e() public virtual {
+    vm.pauseGasMetering();
+    uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
+
+    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
+
+    address[] memory userCCVAddresses = new address[](1);
+    userCCVAddresses[0] = s_userSpecifiedCCV;
+    bytes[] memory userCCVArgs = new bytes[](1);
+    userCCVArgs[0] = "1";
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "e2e test data",
+      tokenAmounts: new Client.EVMTokenAmount[](1),
+      feeToken: s_sourceFeeToken,
+      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: userCCVAddresses,
+          ccvArgs: userCCVArgs,
+          blockConfirmations: 0,
+          gasLimit: GAS_LIMIT,
+          executor: address(0),
+          executorArgs: "",
+          tokenReceiver: "",
+          tokenArgs: ""
+        })
+      )
+    });
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
+
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
+    });
+    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
+    // committeeVerifier will return its versionTag, which we add here.
+    verifierBlobs[0] = abi.encodePacked(s_sourceCommitteeVerifier.versionTag());
+
+    vm.expectEmit();
+    emit OnRamp.CCIPMessageSent({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      sender: OWNER,
+      messageId: messageId,
+      feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 1e18,
+      encodedMessage: encodedMessage,
+      receipts: receipts,
+      verifierBlobs: verifierBlobs
+    });
+
+    vm.resumeGasMetering();
+    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    vm.pauseGasMetering();
+
+    assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);
+
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = s_destVerifier;
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      messageNumber: expectedMsgNum,
+      messageId: messageId,
+      state: Internal.MessageExecutionState.SUCCESS,
+      returnData: ""
+    });
+
+    vm.resumeGasMetering();
+    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
+  }
+}

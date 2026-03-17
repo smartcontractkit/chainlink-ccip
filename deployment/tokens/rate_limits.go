@@ -20,30 +20,28 @@ type TPRLInput struct {
 	MCMS    mcms.Input            `yaml:"mcms,omitempty" json:"mcms"`
 }
 
+type RemoteOutbounds struct {
+	DefaultFinality RateLimiterConfigFloatInput
+	CustomFinality  RateLimiterConfigFloatInput
+}
+
 type TPRLConfig struct {
-	ChainAdapterVersion    *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
-	TokenRef               datastore.AddressRef                   `yaml:"tokenRef" json:"tokenRef"`
-	TokenPoolRef           datastore.AddressRef                   `yaml:"tokenPoolRef" json:"tokenPoolRef"`
-	EnablePermissionChecks bool                                   `yaml:"enablePermissionChecks" json:"enablePermissionChecks"`
-	RemoteOutbounds        map[uint64]RateLimiterConfigFloatInput `yaml:"remoteOutbounds" json:"remoteOutbounds"`
+	ChainAdapterVersion *semver.Version            `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
+	TokenRef            datastore.AddressRef       `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolRef        datastore.AddressRef       `yaml:"tokenPoolRef" json:"tokenPoolRef"`
+	RemoteOutbounds     map[uint64]RemoteOutbounds `yaml:"remoteOutbounds" json:"remoteOutbounds"`
 }
 
 type TPRLRemotes struct {
-	OutboundRateLimiterConfig RateLimiterConfig
-	InboundRateLimiterConfig  RateLimiterConfig
-	ChainSelector             uint64
-	RemoteChainSelector       uint64
-	TokenRef                  datastore.AddressRef
-	TokenPoolRef              datastore.AddressRef
-	ExistingDataStore         datastore.DataStore
-
-	// If true, the changeset will check if timelock or the deployer key has sufficient permissions to set rate limits
-	// on the token pool. If either account is missing permissions (i.e. not the pool owner or rate limit admin), then
-	// a warning will be logged and the changeset will NOT perform the rate limit update since it has a high chance of
-	// failure. This flag is disabled by default so that it still allows flexibility for callers to schedule both rate
-	// limit permission updates AND token pool rate limit updates in parallel / in the same batch. At the time of this
-	// writing, this flag is only applicable for EVM, but can be extended to other chains in the future if needed.
-	EnablePermissionChecks bool
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
+	DefaultFinalityInboundRateLimiterConfig  RateLimiterConfig
+	CustomFinalityOutboundRateLimiterConfig  RateLimiterConfig
+	CustomFinalityInboundRateLimiterConfig   RateLimiterConfig
+	ChainSelector                            uint64
+	RemoteChainSelector                      uint64
+	TokenRef                                 datastore.AddressRef
+	TokenPoolRef                             datastore.AddressRef
+	ExistingDataStore                        datastore.DataStore
 }
 
 // SetTokenPoolRateLimits returns a changeset that sets rate limits for token pools on multiple chains.
@@ -55,12 +53,14 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
 		for _, config := range cfg.Configs {
 			for remoteSelector, input := range config.RemoteOutbounds {
-				if input.IsEnabled {
-					if input.Capacity <= 0 || input.Rate <= 0 {
+				if input.DefaultFinality.IsEnabled {
+					if input.DefaultFinality.Capacity <= 0 || input.DefaultFinality.Rate <= 0 {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
-					if input.Rate > input.Capacity {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d has rate greater than capacity", remoteSelector)
+				}
+				if input.CustomFinality.IsEnabled {
+					if input.CustomFinality.Capacity <= 0 || input.CustomFinality.Rate <= 0 {
+						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
 				}
 			}
@@ -103,12 +103,11 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			}
 			for remoteSelector, inputs := range config.RemoteOutbounds {
 				tprlRemote := TPRLRemotes{
-					EnablePermissionChecks: config.EnablePermissionChecks,
-					ChainSelector:          selector,
-					RemoteChainSelector:    remoteSelector,
-					TokenRef:               tokenFull,
-					TokenPoolRef:           tokenPool,
-					ExistingDataStore:      e.DataStore,
+					ChainSelector:       selector,
+					RemoteChainSelector: remoteSelector,
+					TokenRef:            tokenFull,
+					TokenPoolRef:        tokenPool,
+					ExistingDataStore:   e.DataStore,
 				}
 
 				// We derive the inbound rate limiter config from counterpart's outbound config for simplicity
@@ -143,7 +142,8 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
 				}
-				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs, remoteInputs, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.DefaultFinalityOutboundRateLimiterConfig, tprlRemote.DefaultFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.DefaultFinality, remoteInputs.DefaultFinality, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.CustomFinalityOutboundRateLimiterConfig, tprlRemote.CustomFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.CustomFinality, remoteInputs.CustomFinality, decimals, remoteDecimals, family, tokenPool.Version)
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {

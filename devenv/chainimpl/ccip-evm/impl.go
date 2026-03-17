@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"

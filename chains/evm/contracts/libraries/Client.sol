@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 // End consumer library.
 library Client {
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct EVMTokenAmount {
     address token; // token address on the local chain.
     uint256 amount; // Amount of tokens.
@@ -12,7 +11,7 @@ library Client {
   struct Any2EVMMessage {
     bytes32 messageId; // MessageId corresponding to ccipSend on source.
     uint64 sourceChainSelector; // Source chain selector.
-    bytes sender; // abi.decode(sender) if coming from an EVM chain.
+    bytes sender; // abi.encode(address) on EVM source chains; abi.decode(sender, (address)) to recover.
     bytes data; // payload sent in original message.
     EVMTokenAmount[] destTokenAmounts; // Tokens and their amounts in their destination chain representation.
   }
@@ -23,8 +22,17 @@ library Client {
     bytes data; // Data payload.
     EVMTokenAmount[] tokenAmounts; // Token transfers.
     address feeToken; // Address of feeToken. address(0) means you will send msg.value.
-    bytes extraArgs; // Populate this with _argsToBytes(EVMExtraArgsV2).
+    bytes extraArgs; // Populate this with _argsToBytes(EVMExtraArgsV3).
   }
+
+  /// @notice Tag to indicate no execution on the destination chain. Execution will need to be done manually.
+  /// @dev Preimage for this tag is: keccak256("NO_EXECUTION_TAG")[:4]
+  bytes4 public constant NO_EXECUTION_TAG = 0xeba517d2;
+  address public constant NO_EXECUTION_ADDRESS = address(bytes20(NO_EXECUTION_TAG));
+
+  // ================================================================
+  // │                           Legacy                             │
+  // ================================================================
 
   // Tag to indicate only a gas limit. Only usable for EVM as destination chain.
   bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
@@ -42,7 +50,7 @@ library Client {
   // Tag to indicate a gas limit (or dest chain equivalent processing units) and Out Of Order Execution. This tag is
   // available for multiple chain families. If there is no chain family specific tag, this is the default available
   // for a chain.
-  // Note: not available for Solana VM based chains.
+  // Note: not available for Solana or Sui VM based chains.
   bytes4 public constant GENERIC_EXTRA_ARGS_V2_TAG = 0x181dcf10;
 
   /// @param gasLimit: gas limit for the callback on the destination chain.

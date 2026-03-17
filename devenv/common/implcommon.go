@@ -82,7 +82,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	// Directory needs to exist at ../contracts/build relative to chainlink-ccip/devenv for TON
 	contractVersion := os.Getenv("DEPLOY_CONTRACT_VERSION")
 	if contractVersion == "" {
-		contractVersion = "4f7b7be09c30" // https://github.com/smartcontractkit/chainlink-ton/releases/tag/ton-contracts-build-4f7b7be09c30
+		contractVersion = "a60d19e33dc8" // Jan 5, 2026 commit hash
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
@@ -288,8 +288,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 	chainA := lanesapi.ChainDefinition{
 		Selector:                 selector,
-		GasPrice:                 lanesapi.DefaultGasPrice(selector),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, selector),
 		TokenPrices:              chainATokenPrices,
 	}
 	for _, destSelector := range remoteSelectors {
@@ -298,8 +296,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
-			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
-			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, destSelector),
 			TokenPrices:              chainBTokenPrices,
 		}
 		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
@@ -695,19 +691,10 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		return nil
 	}
 
-	// Filter out adapters that don't support token transfers (e.g. TON message-passing only).
-	var tokenAdapters []testadapters.TestAdapter
-	for _, a := range adp {
-		if _, err := a.GetRegistryAddress(); errors.Is(err, errors.ErrUnsupported) {
-			continue
-		}
-		tokenAdapters = append(tokenAdapters, a)
-	}
-
 	// The deployment map defines the tokens and token pools to deploy
 	// and the configurations for their cross-chain interactions. We deploy one token and token pool per chain, and configure them to be transferable to each other.
 	dply := map[uint64]tokensapi.TokenExpansionInputPerChain{}
-	for _, srcAdapter := range tokenAdapters {
+	for _, srcAdapter := range adp {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
 		srcSel := srcAdapter.ChainSelector()
 		srcFamily := srcAdapter.Family()
@@ -715,13 +702,28 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}
 
-		for _, dstAdapter := range tokenAdapters {
+		for _, dstAdapter := range adp {
 			// dstCfg := dstAdapter.GetTokenExpansionConfig()
 			dstSel := dstAdapter.ChainSelector()
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					OutboundRateLimiterConfig: disabledRL,
+					OutboundCCVs:                             []datastore.AddressRef{}, // not needed for for 1.6
+					InboundCCVs:                              []datastore.AddressRef{}, // not needed for for 1.6
+					DefaultFinalityOutboundRateLimiterConfig: disabledRL,
+					// This is actually optional for 1.6 as the token and token pool addresses are
+					// inferred after deployment
+					// RemoteToken: &datastore.AddressRef{
+					// 	Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
+					// 	Qualifier:     dstCfg.DeployTokenInput.Symbol,
+					// 	ChainSelector: dstSel,
+					// },
+					// RemotePool: &datastore.AddressRef{
+					// 	Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
+					// 	Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
+					// 	Version:       dstCfg.TokenPoolVersion,
+					// 	ChainSelector: dstSel,
+					// },
 				}
 			}
 		}
@@ -744,7 +746,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	}
 
 	// Allow the router to withdraw a sensible amount of tokens from the account that will be transferring tokens.
-	for _, adapter := range tokenAdapters {
+	for _, adapter := range adp {
 		teConfig := adapter.GetTokenExpansionConfig()
 		selector := adapter.ChainSelector()
 
@@ -770,7 +772,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		if err != nil {
 			return nil, fmt.Errorf("failed to allow router to withdraw tokens for selector %d: %w", selector, err)
 		}
-		for _, dst := range tokenAdapters {
+		for _, dst := range adp {
 			if dst.ChainSelector() == selector {
 				continue
 			}
@@ -803,16 +805,22 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							ChainAdapterVersion: v1_6_0,
 							TokenRef:            tokenRef,
 							TokenPoolRef:        tokenPoolRef,
-							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
-								dst.ChainSelector(): rl,
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								dst.ChainSelector(): {
+									DefaultFinality: rl,
+									CustomFinality:  rl,
+								},
 							},
 						},
 						dst.ChainSelector(): {
 							ChainAdapterVersion: v1_6_0,
 							TokenRef:            dstTokenRef,
 							TokenPoolRef:        dstTokenPoolRef,
-							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
-								selector: rl,
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								selector: {
+									DefaultFinality: rl,
+									CustomFinality:  rl,
+								},
 							},
 						},
 					},

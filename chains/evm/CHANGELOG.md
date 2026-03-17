@@ -19,6 +19,22 @@ Token Pools will be migrated to this in the near future.
 - [#1134](https://github.com/smartcontractkit/chainlink-ccip/pull/1134) - **USDCTokenPoolProxy** - A versatile new dispatcher
 contract which allows USDC to be sent using different mechanisms based on the destination chain including CCTP V1, CCTP V2, and Lock/Mint.
 
+## 1.7.0 - UNRELEASED
+
+CCIP 1.7.0 is a major release that introduces various new concepts and improvements to the CCIP ecosystem.
+
+
+### New Features
+
+
+### Changes and Improvements
+
+#### Token Pools
+
+- Rate limits refresh to their full capacity when you change the rate limit configuration. [#1429](https://github.com/smartcontractkit/chainlink-ccip/pull/1429)
+  - Previously, changing the rate limit configuration only filled the pool at the normal rate. The new behavior allows for immediate use of the new rate limit.
+
+
 ## 1.6.3
 
 CCIP 1.6.3 is a minor release that adds support for Sui to the FeeQuoter. No other contracts are in scope.

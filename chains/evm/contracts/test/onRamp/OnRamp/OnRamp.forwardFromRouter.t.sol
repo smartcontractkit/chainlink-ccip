@@ -1,566 +1,370 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
-
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
+import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
 import {IPoolV1} from "../../../interfaces/IPool.sol";
-import {IRouter} from "../../../interfaces/IRouter.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
-import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {TokenPool} from "../../../pools/TokenPool.sol";
-import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
-import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract OnRamp_forwardFromRouter is OnRampSetup {
-  struct LegacyExtraArgs {
-    uint256 gasLimit;
-    bool strict;
-  }
-
-  MessageInterceptorHelper internal s_outboundMessageInterceptor;
-  FeeQuoter.DestChainConfig private s_svmDestChainConfig;
-
-  address internal s_destTokenPool = makeAddr("destTokenPool");
-  address internal s_destToken = makeAddr("destToken");
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
+    "CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])"
+  );
 
   function setUp() public virtual override {
     super.setUp();
-    // setup for SVM chain
-    s_svmDestChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-    s_svmDestChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SVM
-    s_svmDestChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
-
-    s_outboundMessageInterceptor = new MessageInterceptorHelper();
-
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceTokens[1];
-    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new address[](0));
-
-    uint64[] memory destinationChainSelectors = new uint64[](1);
-    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
-    address[] memory addAllowedList = new address[](1);
-    addAllowedList[0] = OWNER;
-    OnRamp.AllowlistConfigArgs memory allowlistConfigArgs = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: true,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: addAllowedList,
-      removedAllowlistedSenders: new address[](0)
-    });
-    OnRamp.AllowlistConfigArgs[] memory applyAllowlistConfigArgsItems = new OnRamp.AllowlistConfigArgs[](1);
-    applyAllowlistConfigArgsItems[0] = allowlistConfigArgs;
-    s_onRamp.applyAllowlistUpdates(applyAllowlistConfigArgsItems);
-
-    // Since we'll mostly be testing for valid calls from the router we'll
-    // mock all calls to be originating from the router and re-mock in
-    // tests that require failure.
-    vm.startPrank(address(s_sourceRouter));
-  }
-
-  function test_ForwardFromRouterSuccessCustomExtraArgs() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouter_ConfigurableSourceRouter() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    // Change the source router for this lane
-    IRouter newRouter = IRouter(makeAddr("NEW ROUTER"));
-    vm.stopPrank();
-    vm.prank(OWNER);
-    s_onRamp.applyDestChainConfigUpdates(_generateDestChainConfigArgs(newRouter));
-
-    // forward fails from wrong router
-    vm.prank(address(s_sourceRouter));
-    vm.expectRevert(OnRamp.MustBeCalledByRouter.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-
-    // forward succeeds from correct router
-    vm.prank(address(newRouter));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouterSuccessLegacyExtraArgs() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs =
-      abi.encodeWithSelector(Client.EVM_EXTRA_ARGS_V1_TAG, LegacyExtraArgs({gasLimit: GAS_LIMIT * 2, strict: true}));
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    // We expect the message to be emitted with strict = false.
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouterSuccessEmptyExtraArgs() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = "";
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    // We expect the message to be emitted with strict = false.
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouter() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouter_EVM_WithTokenTransfer() public {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceTokens[0], 1000);
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    vm.expectCall(
-      s_tokenAdminRegistry.getPool(s_sourceTokens[0]),
-      abi.encodeCall(
-        IPoolV1.lockOrBurn,
-        (Pool.LockOrBurnInV1({
-            receiver: message.receiver,
-            remoteChainSelector: DEST_CHAIN_SELECTOR,
-            originalSender: OWNER,
-            amount: 1000,
-            localToken: s_sourceTokens[0]
-          }))
-      )
-    );
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouter_SVM_WithTokenTransfer() public {
-    changePrank(OWNER);
-    // register SVM chain family excludeSelector
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
-    destChainConfigs[0] =
-      FeeQuoter.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, destChainConfig: s_svmDestChainConfig});
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigs);
-
-    changePrank(address(s_sourceRouter));
-    bytes32 svmTokenReceiver = bytes32("TOKEN RECEIVER");
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceTokens[0], 1000);
-    message.extraArgs = Client._svmArgsToBytes(
-      Client.SVMExtraArgsV1({
-        computeUnits: GAS_LIMIT,
-        accountIsWritableBitmap: 0,
-        allowOutOfOrderExecution: true,
-        tokenReceiver: svmTokenReceiver,
-        accounts: new bytes32[](0)
-      })
-    );
-    uint256 feeAmount = 1234567890;
-    Internal.EVM2AnyRampMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeAmount, OWNER);
-    expectedEvent.extraArgs = message.extraArgs;
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, expectedEvent);
-
-    vm.expectCall(
-      s_tokenAdminRegistry.getPool(s_sourceTokens[0]),
-      abi.encodeCall(
-        IPoolV1.lockOrBurn,
-        (Pool.LockOrBurnInV1({
-            receiver: abi.encode(svmTokenReceiver), // For SVM, the receiver is the SVMExtraArgsV1.tokenReceiver
-            remoteChainSelector: DEST_CHAIN_SELECTOR,
-            originalSender: OWNER,
-            amount: 1000,
-            localToken: s_sourceTokens[0]
-          }))
-      )
-    );
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouterExtraArgsV2() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodeWithSelector(
-      Client.GENERIC_EXTRA_ARGS_V2_TAG,
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: false})
-    );
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ForwardFromRouterExtraArgsV2AllowOutOfOrderTrue() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodeWithSelector(
-      Client.GENERIC_EXTRA_ARGS_V2_TAG,
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: true})
-    );
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-  }
-
-  function test_ShouldIncrementSeqNumAndNonce() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-
-    for (uint64 i = 1; i < 4; ++i) {
-      uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
-
-      vm.expectEmit();
-      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, i, _messageToEvent(message, i, i, 0, OWNER));
-
-      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-      uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberAfter = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
-      assertEq(nonceAfter, nonceBefore + 1);
-      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
-    }
-  }
-
-  function test_ShouldIncrementNonceOnlyOnOrdered() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodeWithSelector(
-      Client.GENERIC_EXTRA_ARGS_V2_TAG,
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: true})
-    );
-
-    for (uint64 i = 1; i < 4; ++i) {
-      uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
-
-      vm.expectEmit();
-      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, i, _messageToEvent(message, i, i, 0, OWNER));
-
-      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-      uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberAfter = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
-      assertEq(nonceAfter, nonceBefore);
-      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
-    }
-  }
-
-  function test_ShouldStoreLinkFees() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-
-    uint256 feeAmount = 1234567890;
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-
-    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), feeAmount);
-  }
-
-  // Make sure any valid sender, receiver and feeAmount can be handled.
-  function testFuzz_ForwardFromRouter_Success(
-    address originalSender,
-    address receiver,
-    uint96 feeTokenAmount
-  ) public {
-    // To avoid RouterMustSetOriginalSender
-    vm.assume(originalSender != address(0));
-    vm.assume(uint160(receiver) >= Internal.EVM_PRECOMPILE_SPACE);
-    feeTokenAmount = uint96(bound(feeTokenAmount, 0, MAX_MSG_FEES_JUELS));
-    vm.stopPrank();
-
-    vm.startPrank(OWNER);
-    uint64[] memory destinationChainSelectors = new uint64[](1);
-    destinationChainSelectors[0] = uint64(DEST_CHAIN_SELECTOR);
-    address[] memory addAllowedList = new address[](1);
-    addAllowedList[0] = originalSender;
-    OnRamp.AllowlistConfigArgs[] memory applyAllowlistConfigArgsItems = new OnRamp.AllowlistConfigArgs[](1);
-    applyAllowlistConfigArgsItems[0] = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: true,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: addAllowedList,
-      removedAllowlistedSenders: new address[](0)
-    });
-    s_onRamp.applyAllowlistUpdates(applyAllowlistConfigArgsItems);
-    vm.stopPrank();
 
     vm.startPrank(address(s_sourceRouter));
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.receiver = abi.encode(receiver);
-
-    // Make sure the tokens are in the contract
-    deal(s_sourceFeeToken, address(s_onRamp), feeTokenAmount);
-
-    Internal.EVM2AnyRampMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
-
-    // Assert the message Id is correct
-    assertEq(
-      expectedEvent.header.messageId,
-      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeTokenAmount, originalSender)
-    );
+    // Router normally forwards the fee token balance before calling the onRamp.
+    deal(s_sourceFeeToken, address(s_onRamp), type(uint96).max);
   }
 
-  function test_forwardFromRouter_WithInterception() public {
-    _enableOutboundMessageInterceptor();
-
+  function test_forwardFromRouter_oldExtraArgs() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
-    uint256 feeAmount = 1234567890;
-    message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 1e18;
-    message.tokenAmounts[0].token = s_sourceTokens[0];
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-    s_outboundMessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), false);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER
+    });
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      sender: STRANGER,
+      messageId: messageId,
+      feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 0,
+      encodedMessage: encodedMessage,
+      receipts: receipts,
+      verifierBlobs: verifierBlobs
+    });
 
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
   }
 
-  // Reverts
-
-  function test_RevertWhen_Paused() public {
-    // We pause by disabling the whitelist
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-    s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
-    vm.expectRevert(OnRamp.MustBeCalledByRouter.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
-  }
-
-  function test_RevertWhen_InvalidExtraArgsTag() public {
+  function test_forwardFromRouter_RevertWhen_TokenReceiverNotAllowed() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = bytes("bad args");
+    message.receiver = abi.encode(OWNER);
 
-    vm.expectRevert(FeeQuoter.InvalidExtraArgsTag.selector);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
 
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.TokenReceiverNotAllowed.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e18, STRANGER);
   }
 
-  function test_RevertWhen_Permissions() public {
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-    vm.expectRevert(OnRamp.MustBeCalledByRouter.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
+  function test_forwardFromRouter_messageNumberPersistsAndIncrements() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    // Use the stored msgNum as a running expected value.
+    OnRamp.DestChainConfig memory destConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    destConfig.messageNumber++;
+    // 1) Expect msgNum to increment for the first message.
+    (
+      bytes32 messageIdExpected,
+      bytes memory encodedMessage,
+      OnRamp.Receipt[] memory receipts,
+      bytes[] memory verifierBlobs
+    ) = _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      msgNum: destConfig.messageNumber,
+      originalSender: STRANGER
+    });
+
+    vm.expectEmit();
+    emit OnRamp.CCIPMessageSent({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      sender: STRANGER,
+      messageId: messageIdExpected,
+      feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 0,
+      encodedMessage: encodedMessage,
+      receipts: receipts,
+      verifierBlobs: verifierBlobs
+    });
+    bytes32 messageId1 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+
+    // 2) Expect msgNum to increment again for the next message.
+    destConfig.messageNumber++;
+    (messageIdExpected, encodedMessage, receipts, verifierBlobs) = _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      msgNum: destConfig.messageNumber,
+      originalSender: STRANGER
+    });
+
+    vm.expectEmit();
+    emit OnRamp.CCIPMessageSent({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      sender: STRANGER,
+      messageId: messageIdExpected,
+      feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 0,
+      encodedMessage: encodedMessage,
+      receipts: receipts,
+      verifierBlobs: verifierBlobs
+    });
+    bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+
+    // Verify message numbers and message id are different.
+    assertTrue(messageId1 != messageId2);
+    OnRamp.DestChainConfig memory finalConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    assertEq(finalConfig.messageNumber, destConfig.messageNumber);
   }
 
-  function test_RevertWhen_OriginalSender() public {
+  function test_getExpectedNextMessageNumber_TracksDestChainCounter() public {
+    // Before any messages are sent, the next message number should be 1.
+    assertEq(s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR), 1);
+
+    // Send a message through the router.
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+
+    // After sending one message, the next expected number should increment.
+    assertEq(s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR), 2);
+  }
+
+  function test_forwardFromRouter_UsesMessageNetworkFeeWhenNoTokens() public {
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    vm.recordLogs();
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+    OnRamp.Receipt[] memory receipts = _getReceiptsFromLogs(vm.getRecordedLogs());
+
+    uint256 expectedFee = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(receipts[receipts.length - 1].feeTokenAmount, expectedFee);
+  }
+
+  function test_forwardFromRouter_UsesTokenNetworkFeeWhenTokens() public {
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    address token = s_sourceTokens[0];
+    address pool = s_sourcePoolByToken[token];
+    uint256 amount = 1 ether;
+    Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
+      receiver: abi.encode(OWNER),
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: STRANGER,
+      amount: amount,
+      localToken: token
+    });
+    Pool.LockOrBurnOutV1 memory returnData =
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: ""});
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, expectedInput), abi.encode(returnData));
+    vm.mockCall(
+      pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
+    );
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeCall(IFeeQuoter.getTokenTransferFee, (DEST_CHAIN_SELECTOR, token)),
+      abi.encode(uint256(0), uint32(0), uint32(0))
+    );
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, amount);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    vm.recordLogs();
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+    OnRamp.Receipt[] memory receipts = _getReceiptsFromLogs(vm.getRecordedLogs());
+
+    uint256 expectedFee = (uint256(TOKEN_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(receipts[receipts.length - 1].feeTokenAmount, expectedFee);
+  }
+
+  function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {
     vm.expectRevert(OnRamp.RouterMustSetOriginalSender.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, address(0));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
   }
 
-  function test_RevertWhen_UnAllowedOriginalSender() public {
-    vm.stopPrank();
-    vm.startPrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.SenderNotAllowed.selector, STRANGER));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, STRANGER);
-  }
-
-  function test_RevertWhen_MessageInterceptionError() public {
-    _enableOutboundMessageInterceptor();
-
+  function test_forwardFromRouter_RevertWhen_DestChainNotSupportedByCCV() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
-    uint256 feeAmount = 1234567890;
-    message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 1e18;
-    message.tokenAmounts[0].token = s_sourceTokens[0];
-    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-    s_outboundMessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), true);
+
+    vm.mockCall(
+      address(s_defaultCCV),
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(address(0))
+    );
 
     vm.expectRevert(
-      abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
+      abi.encodeWithSelector(
+        OnRamp.DestinationChainNotSupportedByCCV.selector, address(s_defaultCCV), DEST_CHAIN_SELECTOR
+      )
     );
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
 
-  function test_RevertWhen_MultiCannotSendZeroTokens() public {
+  function test_forwardFromRouter_RevertWhen_CursedByRMN() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 0;
-    message.tokenAmounts[0].token = s_sourceTokens[0];
-    vm.expectRevert(OnRamp.CannotSendZeroTokens.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+
+    // Set a curse on the specific destination chain (subject-specific, not global).
+    _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
 
-  function test_RevertWhen_UnsupportedToken() public {
-    address wrongToken = address(1);
-
+  function test_forwardFromRouter_RevertWhen_InsufficientFeeTokenAmount() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].token = wrongToken;
-    message.tokenAmounts[0].amount = 1;
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    // We need to set the price of this new token to be able to reach
-    // the proper revert point. This must be called by the owner.
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-
-    Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(wrongToken, 1);
-    s_feeQuoter.updatePrices(priceUpdates);
-
-    // Change back to the router
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, wrongToken));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InsufficientFeeTokenAmount.selector));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee - 1, STRANGER);
   }
 
-  function test_RevertWhen_forwardFromRouter_UnsupportedToken() public {
+  function test_forwardFromRouter_RevertWhen_CanOnlySendOneTokenPerMessage() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    message.tokenAmounts = new Client.EVMTokenAmount[](2);
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: makeAddr("token1"), amount: 123 ether});
+    message.tokenAmounts[1] = Client.EVMTokenAmount({token: makeAddr("token2"), amount: 456 ether});
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CanOnlySendOneTokenPerMessage.selector));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_UnsupportedToken() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 1;
-    message.tokenAmounts[0].token = address(1);
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: makeAddr("unsupportedToken"), amount: 123 ether});
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, message.tokenAmounts[0].token));
-
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
 
-  function test_RevertWhen_MessageFeeTooHigh() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+  function test_forwardFromRouter_RevertWhen_SourceTokenDataTooLarge() public {
+    address token = s_sourceTokens[0];
+    uint256 amount = 1 ether;
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, amount);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(FeeQuoter.MessageFeeTooHigh.selector, MAX_MSG_FEES_JUELS + 1, MAX_MSG_FEES_JUELS)
+    uint32 paidBytesOverhead = 32;
+    uint256 actualBytes = uint256(paidBytesOverhead) + 1;
+    address pool = s_sourcePoolByToken[token];
+
+    // Make the pool quote a small destBytesOverhead in getFee (so this is what the sender "paid for").
+    vm.mockCall(
+      pool,
+      abi.encodeWithSelector(IPoolV2.getFee.selector, token, DEST_CHAIN_SELECTOR, amount, s_sourceFeeToken, 0, ""),
+      abi.encode(uint256(0), uint32(0), paidBytesOverhead, uint16(0), true)
     );
 
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, MAX_MSG_FEES_JUELS + 1, OWNER);
-  }
-
-  function test_RevertWhen_SourceTokenDataTooLarge() public {
-    address sourceETH = s_sourceTokens[1];
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-
-    MaybeRevertingBurnMintTokenPool newPool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC20(sourceETH),
-      DEFAULT_TOKEN_DECIMALS,
-      new address[](0),
-      address(s_mockRMNRemote),
-      address(s_sourceRouter)
-    );
-    BurnMintERC20(sourceETH).grantMintAndBurnRoles(address(newPool));
-    deal(address(sourceETH), address(newPool), type(uint256).max);
-
-    // Add TokenPool to OnRamp
-    s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
-
-    // Allow chain in TokenPool
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = abi.encode(s_destTokenPool);
-
-    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-    chainUpdates[0] = TokenPool.ChainUpdate({
+    // Make lockOrBurn return a larger destPoolData than was quoted.
+    Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
+      receiver: message.receiver,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddresses: remotePoolAddresses,
-      remoteTokenAddress: abi.encode(s_destToken),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      originalSender: STRANGER,
+      amount: amount,
+      localToken: token
     });
-    newPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
-
-    // No data set, should succeed
-    vm.startPrank(address(s_sourceRouter));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-    // Set max data length, should succeed
-    vm.startPrank(OWNER);
-    newPool.setSourceTokenData(new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES));
-
-    vm.startPrank(address(s_sourceRouter));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-    // Set data to max length +1, should revert
-    vm.startPrank(OWNER);
-    newPool.setSourceTokenData(new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES + 1));
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-    // Set token config to allow larger data
-    vm.startPrank(OWNER);
-    FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 0,
-      maxFeeUSDCents: 1,
-      deciBps: 0,
-      destGasOverhead: 0,
-      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
-      isEnabled: true
+    Pool.LockOrBurnOutV1 memory returnData = Pool.LockOrBurnOutV1({
+      destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: new bytes(actualBytes)
     });
-    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
+    vm.mockCall(
+      pool, abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, expectedInput, 0, ""), abi.encode(returnData, amount)
     );
 
-    vm.startPrank(address(s_sourceRouter));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-
-    // Set the token data larger than the configured token data, should revert
-    vm.startPrank(OWNER);
-    newPool.setSourceTokenData(new bytes(uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32 + 1));
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+    // Quote fee and attempt send. The send should revert due to oversized pool payload.
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.SourceTokenDataTooLarge.selector, token, actualBytes, paidBytesOverhead)
+    );
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
   }
 
-  function _enableOutboundMessageInterceptor() internal {
-    (, address msgSender,) = vm.readCallers();
+  function test_forwardFromRouter_tokenAmountBeforeTokenPoolFees_EmitsOriginalAmountWhenPoolChargesFees() public {
+    address token = s_sourceTokens[0];
+    uint256 originalAmount = 1000;
+    uint256 poolFee = 10;
+    uint256 destAmount = originalAmount - poolFee;
+    address pool = s_sourcePoolByToken[token];
 
-    bool resetPrank = false;
+    // Setup pool to support IPoolV2 interface
+    vm.mockCall(pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
-    if (msgSender != OWNER) {
-      vm.stopPrank();
-      vm.startPrank(OWNER);
-      resetPrank = true;
+    // Mock pool's getFee to return fee components with custom fee config enabled
+    vm.mockCall(
+      pool,
+      abi.encodeWithSelector(
+        IPoolV2.getFee.selector, token, DEST_CHAIN_SELECTOR, originalAmount, s_sourceFeeToken, 0, ""
+      ),
+      abi.encode(poolFee, uint32(0), uint32(0), uint16(0), true)
+    );
+
+    // Mock pool's lockOrBurn V2 call to return a reduced destination amount (after fees)
+    vm.mockCall(
+      pool,
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector),
+      abi.encode(
+        Pool.LockOrBurnOutV1({
+          destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: ""
+        }),
+        destAmount
+      )
+    );
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, originalAmount);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    // Transfer tokens to the pool (simulating Router behavior)
+    deal(token, address(pool), originalAmount);
+
+    // Record logs to capture the event
+    vm.recordLogs();
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+
+    // Extract tokenAmountBeforeTokenPoolFees from the event
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+    uint256 emittedTokenAmount = 0;
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
+        (, emittedTokenAmount,,,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
+        break;
+      }
     }
 
-    OnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
-    dynamicConfig.messageInterceptor = address(s_outboundMessageInterceptor);
-    s_onRamp.setDynamicConfig(dynamicConfig);
+    // Assert that the emitted value is the original amount before pool fees
+    assertEq(originalAmount, emittedTokenAmount, "tokenAmountBeforeTokenPoolFees should be original amount");
+    assertTrue(emittedTokenAmount > destAmount, "tokenAmountBeforeTokenPoolFees should be greater than destAmount");
+  }
 
-    if (resetPrank) {
-      vm.stopPrank();
-      vm.startPrank(msgSender);
+  function _getReceiptsFromLogs(
+    Vm.Log[] memory logs
+  ) private pure returns (OnRamp.Receipt[] memory receipts) {
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
+        (,,, receipts,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
+        break;
+      }
     }
+    return receipts;
   }
 }

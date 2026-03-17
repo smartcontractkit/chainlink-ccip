@@ -8,9 +8,13 @@ echo " └───────────────────────�
 
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
-OPTIMIZE_RUNS_OFFRAMP=800
-OPTIMIZE_RUNS_FEE_QUOTER=3000
-OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
+OPTIMIZE_RUNS_TOKEN_POOL=50000
+OPTIMIZE_RUNS_ONRAMP=1500
+OPTIMIZE_RUNS_OFFRAMP=25000
+OPTIMIZE_RUNS_FEE_QUOTER=27500
+OPTIMIZE_RUNS_CCV_POOL=17000
+
+
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -22,49 +26,72 @@ compileContract() {
   contract=$(basename "$1")
   echo "Compiling" "$contract"
   dir=$CONTRACTS_DIR/solc/$PROJECT/$contract
-  
+
   local args # base args for forge
   args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
-  
+
   if [ "$ZKSYNC" = "true" ]; then
     $(dirname "$0")/forge_zksync $args --zksync
   else
     local command
     command="forge $args \
-    $(getOptimizations "$contract") \
+    $(getOptimizations "$1" "$contract") \
     --extra-output-files bin abi metadata \
+    --sizes \
     --build-info \
     --build-info-path $dir/build \
     -o $dir"
 
     $command
+
+    # Move the build info to an expected file name
+    mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
   fi
 }
 
 # Define optimization overrides in this function. Anything that is not an override will use the default value
 # as specified in the foundry.toml.
 function getOptimizations() {
+    local contract_path=$1
+    local contract_name=$2
     local optimize_runs_override=""
 
-    case $1 in
+    if [[ $contract_path == pools/* ]]; then
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_TOKEN_POOL"
+    fi
+
+    case $contract_name in
+      "OnRamp")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
+        ;;
       "OffRamp")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
+      "LombardTokenPool")
+          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+          ;;
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
-      "BurnMintFastTransferTokenPool" | "HybridLockReleaseUSDCTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
+      "SiloedUSDCTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
         ;;
     esac
 
     echo "$optimize_runs_override"
 }
 
-# 1.6
+
+compileContract Proxy
+compileContract CREATE2Factory
+compileContract ccvs/CommitteeVerifier
+compileContract ccvs/CCTPVerifier
+compileContract ccvs/LombardVerifier
+compileContract ccvs/VersionedVerifierResolver
+compileContract onRamp/OnRamp
+compileContract executor/Executor
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
-compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
 compileContract Router
@@ -72,12 +99,8 @@ compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
 compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
 compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
-compileContract capability/CCIPHome
-compileContract NonceManager
 compileContract rmn/RMNRemote
-compileContract rmn/RMNHome
 compileContract rmn/RMNProxy
-compileContract DonIDClaimer
 
 # Pools
 compileContract pools/LockReleaseTokenPool
@@ -86,25 +109,28 @@ compileContract pools/BurnFromMintTokenPool
 compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
-compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
-compileContract pools/BurnMintFastTransferTokenPool
+compileContract pools/ERC20LockBox
+compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/USDC/SiloedUSDCTokenPool
-compileContract pools/USDC/USDCTokenPool
-compileContract pools/USDC/USDCTokenPoolCCTPV2
+compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
+compileContract pools/USDC/CCTPThroughCCVTokenPool
+compileContract pools/Lombard/LombardTokenPool
+compileContract pools/AdvancedPoolHooks
+compileContract pools/extractors/AdvancedPoolHooksExtractor
 
 # Test helpers
-compileContract test/helpers/MessageHasher
 compileContract test/helpers/USDCReaderTester
-compileContract test/helpers/ReportCodec
 compileContract test/helpers/receivers/MaybeRevertMessageReceiver
 compileContract test/helpers/receivers/LogMessageDataReceiver
-compileContract test/helpers/MultiOCR3Helper
+compileContract test/helpers/MessageHasher
+
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
+compileContract test/mocks/MockE2EUSDCTransmitterCCTPV2
 compileContract test/mocks/MockE2ELBTCTokenPool
-compileContract test/helpers/CCIPReaderTester
-# Offchain test encoding utils
-compileContract test/helpers/EncodingUtils
+compileContract test/mocks/MockReceiverV2
+compileContract test/mocks/MockLombardBridge
+
 

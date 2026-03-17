@@ -299,6 +299,40 @@ func TestBatchOperationFromWrites(t *testing.T) {
 			},
 			expected: mcms_types.BatchOperation{},
 		},
+		{
+			desc: "executed prefix then unexecuted same chain",
+			outputs: []WriteOutput{
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+					ExecInfo: &ExecInfo{
+						Hash: "0xabc123",
+					},
+				},
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+			expected: mcms_types.BatchOperation{
+				ChainSelector: 5009297550715157269,
+				Transactions: []mcms_types.Transaction{
+					{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

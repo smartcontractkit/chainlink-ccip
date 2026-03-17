@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+
+import {MockPoolV2} from "../../mocks/MockPoolV2.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
+
+contract OffRamp_getCCVsFromPool is OffRampSetup {
+  address internal s_token = makeAddr("token");
+
+  function test_getCCVsFromPool_ReturnsDefaultCCVs_WhenPoolDoesNotSupportV2() public {
+    address[] memory expectedCCVs = new address[](2);
+    expectedCCVs[0] = makeAddr("ccv1");
+    expectedCCVs[1] = makeAddr("ccv2");
+    address pool = _deployPoolV2(expectedCCVs);
+
+    // Mock pool that doesn't support V2 interface
+    vm.mockCall(
+      pool, abi.encodeWithSignature("supportsInterface(bytes4)", type(IPoolV2).interfaceId), abi.encode(false)
+    );
+
+    address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
+    assertEq(result.length, 1);
+    // address(0) is the sentinel indicating the OffRamp should expand to the configured default CCVs.
+    assertEq(result[0], address(0));
+  }
+
+  function test_getCCVsFromPool_ReturnsPoolCCVs_WhenPoolSupportsV2() public {
+    address[] memory expectedCCVs = new address[](2);
+    expectedCCVs[0] = makeAddr("ccv1");
+    expectedCCVs[1] = makeAddr("ccv2");
+
+    _deployPoolV2(expectedCCVs);
+
+    address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
+    assertEq(result.length, expectedCCVs.length);
+    assertEq(result[0], expectedCCVs[0]);
+    assertEq(result[1], expectedCCVs[1]);
+  }
+
+  function test_getCCVsFromPool_ReturnsDefaultCCVs_WhenPoolReturnsEmptyArray() public {
+    address[] memory emptyCCVs = new address[](0);
+    _deployPoolV2(emptyCCVs);
+
+    address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
+    assertEq(result.length, 1);
+    // address(0) is the sentinel indicating the OffRamp should expand to the configured default CCVs.
+    assertEq(result[0], address(0));
+  }
+
+  function _deployPoolV2(
+    address[] memory requiredCCVs
+  ) internal returns (address) {
+    address pool = address(new MockPoolV2(requiredCCVs));
+    // Mock token admin registry to return the V2 pool
+    vm.mockCall(
+      address(s_tokenAdminRegistry),
+      abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, s_token),
+      abi.encode(pool)
+    );
+    return pool;
+  }
+}
