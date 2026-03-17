@@ -21,28 +21,28 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     evmConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
     evmConfig.defaultTxGasLimit = 500_000;
     evmConfig.maxPerMsgGasLimit = 1_000_000;
-    evmConfig.enforceOutOfOrder = false;
+    evmConfig.linkFeeMultiplierPercent = 90;
 
     // 2. Configure an SVM chain
     FeeQuoter.DestChainConfig memory svmConfig;
     svmConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
     svmConfig.defaultTxGasLimit = 2_000_000;
     svmConfig.maxPerMsgGasLimit = 3_000_000;
-    svmConfig.enforceOutOfOrder = true;
+    svmConfig.linkFeeMultiplierPercent = 90;
 
     // 2. Configure an SVM chain
     FeeQuoter.DestChainConfig memory aptosConfig;
     aptosConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_APTOS;
     aptosConfig.defaultTxGasLimit = 2_000_000;
     aptosConfig.maxPerMsgGasLimit = 3_000_000;
-    aptosConfig.enforceOutOfOrder = true;
+    aptosConfig.linkFeeMultiplierPercent = 90;
 
     // 3. Configure an SUI chain
     FeeQuoter.DestChainConfig memory suiConfig;
     suiConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
     suiConfig.defaultTxGasLimit = 2_000_000;
     suiConfig.maxPerMsgGasLimit = 3_000_000;
-    suiConfig.enforceOutOfOrder = true;
+    suiConfig.linkFeeMultiplierPercent = 90;
 
     // Apply both configs
     FeeQuoter.DestChainConfigArgs[] memory configs = new FeeQuoter.DestChainConfigArgs[](4);

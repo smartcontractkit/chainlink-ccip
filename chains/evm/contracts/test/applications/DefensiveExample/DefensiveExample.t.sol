@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import {DefensiveExample} from "../../../applications/DefensiveExample.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract DefensiveExampleTest is OnRampSetup {
-  event MessageFailed(bytes32 indexed messageId, bytes reason);
-  event MessageSucceeded(bytes32 indexed messageId);
-  event MessageRecovered(bytes32 indexed messageId);
-
+contract DefensiveExampleTest is RouterSetup {
   DefensiveExample internal s_receiver;
   uint64 internal s_sourceChainSelector = 7331;
 
@@ -39,7 +35,7 @@ contract DefensiveExampleTest is OnRampSetup {
     vm.startPrank(address(s_destRouter));
 
     vm.expectEmit();
-    emit MessageFailed(messageId, abi.encodeWithSelector(DefensiveExample.ErrorCase.selector));
+    emit DefensiveExample.MessageFailed(messageId, abi.encodeWithSelector(DefensiveExample.ErrorCase.selector));
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({
@@ -59,7 +55,7 @@ contract DefensiveExampleTest is OnRampSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit MessageRecovered(messageId);
+    emit DefensiveExample.MessageRecovered(messageId);
 
     s_receiver.retryFailedMessage(messageId, tokenReceiver);
 
@@ -82,7 +78,7 @@ contract DefensiveExampleTest is OnRampSetup {
     vm.startPrank(address(s_destRouter));
 
     vm.expectEmit();
-    emit MessageSucceeded(messageId);
+    emit DefensiveExample.MessageSucceeded(messageId);
 
     s_receiver.ccipReceive(
       Client.Any2EVMMessage({

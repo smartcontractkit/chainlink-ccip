@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
+import {BaseVerifierSetup} from "./BaseVerifierSetup.t.sol";
+
+contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
+  function setUp() public override {
+    super.setUp();
+    vm.stopPrank();
+  }
+
+  function test_assertSenderIsAllowed() public {
+    // Should allow any sender when allowlist is disabled.
+    address anySender = makeAddr("anySender");
+
+    vm.prank(s_onRamp);
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, anySender);
+  }
+
+  function test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() public {
+    // Enable allowlist and add a sender.
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
+
+    vm.prank(OWNER);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
+
+    address allowedSender = makeAddr("allowedSender");
+    address[] memory sendersToAdd = new address[](1);
+    sendersToAdd[0] = allowedSender;
+
+    BaseVerifier.AllowlistConfigArgs[] memory allowlistConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
+    allowlistConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, sendersToAdd, new address[](0));
+
+    vm.prank(OWNER);
+    s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
+
+    vm.prank(s_onRamp);
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, allowedSender);
+  }
+
+  // Reverts
+
+  function test_assertSenderIsAllowed_RevertWhen_CallerIsNotARampOnRouter() public {
+    address sender = makeAddr("sender");
+
+    // Try calling from non-onRamp address
+    vm.prank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, STRANGER));
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, sender);
+  }
+
+  function test_assertSenderIsAllowed_RevertWhen_SenderNotAllowed() public {
+    // Enable allowlist and add one sender.
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
+
+    vm.prank(OWNER);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
+
+    address allowedSender = makeAddr("allowedSender");
+    address notAllowedSender = makeAddr("notAllowedSender");
+
+    address[] memory sendersToAdd = new address[](1);
+    sendersToAdd[0] = allowedSender;
+
+    BaseVerifier.AllowlistConfigArgs[] memory allowlistConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
+    allowlistConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, sendersToAdd, new address[](0));
+
+    vm.prank(OWNER);
+    s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
+
+    // Should revert for non-allowed sender.
+    vm.prank(s_onRamp);
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.SenderNotAllowed.selector, notAllowedSender));
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, notAllowedSender);
+  }
+}

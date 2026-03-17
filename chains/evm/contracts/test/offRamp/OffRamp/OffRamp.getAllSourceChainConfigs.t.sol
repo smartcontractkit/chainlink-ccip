@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
+
+contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
+  function test_getAllSourceChainConfigs_ReturnsSingleChain() public view {
+    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory configs) = s_offRamp.getAllSourceChainConfigs();
+
+    assertEq(selectors.length, 1);
+    assertEq(configs.length, 1);
+
+    assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
+    assertEq(address(configs[0].router), address(s_sourceRouter));
+    assertEq(configs[0].isEnabled, true);
+    assertEq(configs[0].defaultCCVs.length, 1);
+    assertEq(configs[0].defaultCCVs[0], s_defaultCCV);
+  }
+
+  function test_getAllSourceChainConfigs_ReturnsMultipleChains() public {
+    // Add a second source chain.
+    uint64 chain2 = SOURCE_CHAIN_SELECTOR + 1;
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp2"));
+
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: chain2,
+      isEnabled: true,
+      onRamps: onRamps,
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](0)
+    });
+    configs[0].defaultCCVs[0] = makeAddr("ccv2");
+
+    s_offRamp.applySourceChainConfigUpdates(configs);
+
+    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory chainConfigs) = s_offRamp.getAllSourceChainConfigs();
+
+    assertEq(selectors.length, 2);
+    assertEq(chainConfigs.length, 2);
+
+    // Check first chain.
+    assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
+    assertEq(chainConfigs[0].defaultCCVs[0], s_defaultCCV);
+
+    // Check second chain.
+    assertEq(selectors[1], chain2);
+    assertEq(chainConfigs[1].defaultCCVs[0], makeAddr("ccv2"));
+  }
+}
