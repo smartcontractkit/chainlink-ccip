@@ -26,6 +26,7 @@ type ManageJobProposalsInput struct {
 	AffectedScope      shared.JobScope
 	Labels             map[string]string
 	NOPs               NOPContext
+	// RevokeOrphanedJobs when true runs orphan collection, JD revoke, and datastore cleanup; default false.
 	RevokeOrphanedJobs bool
 }
 

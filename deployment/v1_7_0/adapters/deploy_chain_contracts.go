@@ -8,6 +8,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -65,11 +66,12 @@ type ExecutorDeployParams struct {
 }
 
 type MockReceiverDeployParams struct {
-	Version           *semver.Version
-	RequiredVerifiers []datastore.AddressRef
-	OptionalVerifiers []datastore.AddressRef
-	OptionalThreshold uint8
-	Qualifier         string
+	Version                   *semver.Version
+	RequiredVerifiers         []datastore.AddressRef
+	OptionalVerifiers         []datastore.AddressRef
+	OptionalThreshold         uint8
+	MinimumBlockConfirmations uint16
+	Qualifier                 string
 }
 
 type DeployContractParams struct {

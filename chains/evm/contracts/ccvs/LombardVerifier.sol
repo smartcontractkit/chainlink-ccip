@@ -81,7 +81,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   string public constant typeAndVersion = "LombardVerifier 2.0.0-dev";
   /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
-  bytes4 private constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
+  /// The preimage is bytes4(keccak256("LombardVerifier 2.0.0")).
+  bytes4 private constant VERSION_TAG_V2_0_0 = 0xeba55588;
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.
@@ -299,7 +300,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes calldata expectedToken,
     bytes calldata expectedReceiver,
     uint256 expectedAmount
-  ) internal pure {
+  ) internal view {
     bytes32 rawToToken;
     bytes32 rawSender;
     bytes32 rawRecipient;
@@ -316,6 +317,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     {
       bytes32 expected = Internal._leftPadBytesToBytes32(expectedToken);
+      // When a local adapter is configured, the bridge payload encodes the adapter address
+      // instead of the local token address.
+      address localToken = address(bytes20(expectedToken));
+      if (s_supportedTokens.contains(localToken)) {
+        address localAdapter = s_supportedTokens.get(localToken);
+        if (localAdapter != address(0)) {
+          expected = Internal._leftPadBytesToBytes32(abi.encodePacked(localAdapter));
+        }
+      }
       if (rawToToken != expected) {
         revert InvalidToken(expected, rawToToken);
       }
