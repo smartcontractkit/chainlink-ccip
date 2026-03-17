@@ -100,7 +100,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
-		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2", WithTimelockDelay(time.Duration(0))),
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)

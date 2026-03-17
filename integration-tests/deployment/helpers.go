@@ -440,7 +440,3 @@ func NewDefaultInputForMCMS(desc string, overrides ...func(*mcms.Input)) mcms.In
 	}
 	return in
 }
-
-func WithTimelockDelay(delay time.Duration) func(*mcms.Input) {
-	return func(in *mcms.Input) { in.TimelockDelay = mcms_types.MustParseDuration(delay.String()) }
-}
