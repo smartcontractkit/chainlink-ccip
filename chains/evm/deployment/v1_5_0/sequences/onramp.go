@@ -2,19 +2,22 @@ package sequences
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -77,76 +80,103 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			contractMeta := make([]datastore.ContractMetadata, 0)
+			var contractMeta []datastore.ContractMetadata
+			var contractMetaMu sync.Mutex
+			outerGrp, _ := errgroup.WithContext(b.GetContext())
+			outerGrp.SetLimit(10) // limit concurrency across remote chains
+			feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       input.PriceRegistry,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
+					"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
+			}
+			feeTokens := feetokenOut.Output
 			for remoteChainSelector, onRampAddress := range input.OnRampsPerRemoteChain {
-				sCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampStaticConfig, chain, contract.FunctionInput[any]{
-					ChainSelector: chain.Selector,
-					Address:       onRampAddress,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampStaticConfigOp "+
-						"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
-				}
-				dCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampDynamicConfig, chain, contract.FunctionInput[any]{
-					ChainSelector: chain.Selector,
-					Address:       onRampAddress,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampDynamicConfigOp "+
-						"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
-				}
-				feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-					ChainSelector: chain.Selector,
-					Address:       input.PriceRegistry,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
-						"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
-				}
-				feeTokens := feetokenOut.Output
-				feeTokenConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig)
-				for _, token := range feeTokens {
-					feeTokenConfigOut, err := operations.ExecuteOperation(b, onramp.OnRampFeeTokenConfig, chain, contract.FunctionInput[common.Address]{
+				remoteChainSelector := remoteChainSelector
+				onRampAddress := onRampAddress
+				outerGrp.Go(func() error {
+					sCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampStaticConfig, chain, contract.FunctionInput[any]{
 						ChainSelector: chain.Selector,
 						Address:       onRampAddress,
-						Args:          token,
 					})
 					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampFeeTokenConfigOp "+
-							"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
+						return fmt.Errorf("failed to execute OnRampStaticConfigOp "+
+							"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
 					}
-					if !feeTokenConfigOut.Output.Enabled {
-						continue
-					}
-					feeTokenConfig[token] = feeTokenConfigOut.Output
-				}
-				tokenTransferFeeConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig)
-				for _, token := range input.SupportedTokensPerChain[remoteChainSelector] {
-					ttfcOut, err := operations.ExecuteOperation(b, onramp.OnRampGetTokenTransferFeeConfig, chain, contract.FunctionInput[common.Address]{
+					dCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampDynamicConfig, chain, contract.FunctionInput[any]{
 						ChainSelector: chain.Selector,
 						Address:       onRampAddress,
-						Args:          token,
 					})
 					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampGetTokenTransferFeeConfigOp "+
-							"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
+						return fmt.Errorf("failed to execute OnRampDynamicConfigOp "+
+							"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
 					}
-					if !ttfcOut.Output.IsEnabled {
-						continue
+
+					feeTokenConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig)
+					for _, token := range feeTokens {
+						feeTokenConfigOut, err := operations.ExecuteOperation(b, onramp.OnRampFeeTokenConfig, chain, contract.FunctionInput[common.Address]{
+							ChainSelector: chain.Selector,
+							Address:       onRampAddress,
+							Args:          token,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to execute OnRampFeeTokenConfigOp "+
+								"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
+						}
+						if !feeTokenConfigOut.Output.Enabled {
+							continue
+						}
+						feeTokenConfig[token] = feeTokenConfigOut.Output
 					}
-					tokenTransferFeeConfig[token] = ttfcOut.Output
-				}
-				contractMeta = append(contractMeta, datastore.ContractMetadata{
-					ChainSelector: input.ChainSelector,
-					Address:       onRampAddress.Hex(),
-					Metadata: OnRampImportConfigSequenceOutput{
-						RemoteChainSelector:    remoteChainSelector,
-						StaticConfig:           sCfgOut.Output,
-						DynamicConfig:          dCfgOut.Output,
-						TokenTransferFeeConfig: tokenTransferFeeConfig,
-						FeeTokenConfig:         feeTokenConfig,
-					},
+					tokenTransferFeeConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig)
+					ttfcMu := sync.Mutex{}
+					tokenGrp, _ := errgroup.WithContext(b.GetContext())
+					tokenGrp.SetLimit(10) // limit concurrency to avoid overwhelming the node with requests
+					for _, token := range input.SupportedTokensPerChain[remoteChainSelector] {
+						token := token
+						tokenGrp.Go(func() error {
+							ttfcOut, err := operations.ExecuteOperation(
+								b, onramp.OnRampGetTokenTransferFeeConfig, chain, contract.FunctionInput[common.Address]{
+									ChainSelector: chain.Selector,
+									Address:       onRampAddress,
+									Args:          token,
+								})
+							if err != nil {
+								return fmt.Errorf("failed to execute OnRampGetTokenTransferFeeConfigOp "+
+									"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
+							}
+							if !ttfcOut.Output.IsEnabled {
+								return nil
+							}
+							ttfcMu.Lock()
+							tokenTransferFeeConfig[token] = ttfcOut.Output
+							defer ttfcMu.Unlock()
+							return nil
+						})
+					}
+					if err := tokenGrp.Wait(); err != nil {
+						return err
+					}
+					contractMetaMu.Lock()
+					contractMeta = append(contractMeta, datastore.ContractMetadata{
+						ChainSelector: input.ChainSelector,
+						Address:       onRampAddress.Hex(),
+						Metadata: OnRampImportConfigSequenceOutput{
+							RemoteChainSelector:    remoteChainSelector,
+							StaticConfig:           sCfgOut.Output,
+							DynamicConfig:          dCfgOut.Output,
+							TokenTransferFeeConfig: tokenTransferFeeConfig,
+							FeeTokenConfig:         feeTokenConfig,
+						},
+					})
+					defer contractMetaMu.Unlock()
+					return nil
 				})
+			}
+			if err := outerGrp.Wait(); err != nil {
+				return sequences.OnChainOutput{}, err
 			}
 			return sequences.OnChainOutput{
 				Metadata: sequences.Metadata{

@@ -95,13 +95,13 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Type:          datastore.ContractType(link.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Version:       link.Version,
 					Address:       common.HexToAddress("0x01").Hex(),
 				})
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Type:          datastore.ContractType(weth.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Version:       weth.Version,
 					Address:       common.HexToAddress("0x02").Hex(),
 				})
 				return ds

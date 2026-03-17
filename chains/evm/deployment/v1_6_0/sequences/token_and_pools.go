@@ -24,7 +24,6 @@ import (
 	// between these two versions.
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
-	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -51,6 +50,9 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 			}
 			if !common.IsHexAddress(input.TokenPoolAddress) {
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address %q is not a valid hex address", input.TokenPoolAddress)
+			}
+			if !common.IsHexAddress(input.RegistryAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("registry address %q is not a valid hex address", input.RegistryAddress)
 			}
 
 			tpAddr := common.HexToAddress(input.TokenPoolAddress)
@@ -225,69 +227,6 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			// NOTE: the top level changeset will fully populate `input.TokenPoolRef` BEFORE calling this sequence,
-			// so we can safely assume all its fields will be accounted for and avoid re-querying the datastore. We
-			// use `AddressRefToBytes(*)` as a shortcut to avoid writing the same `common.IsHexAddress` followed by
-			// `common.HexToAddress` boilerplate.
-			tokenPoolAddrBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
-			}
-			tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
-			if tokenPoolAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
-			}
-
-			// If desired, try to validate pool permissions up front - if there is some sort of gap in permissions, then avoid running
-			// the operation.
-			if input.EnablePermissionChecks {
-				// The remote chain needs to be supported by the token pool in order to set rate limits for that chain. If it isn't, then
-				// we fail loudly since this indicates a misconfiguration in the input data that needs to be fixed before proceeding.
-				tokenPool, err := token_pool.NewTokenPool(tokenPoolAddr, chain.Client)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
-				}
-				isSupported, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if remote chain selector %d is supported by token pool at address %q on chain %d: %w", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector, err)
-				}
-				if !isSupported {
-					return sequences.OnChainOutput{}, fmt.Errorf("remote chain selector %d is not supported by token pool at address %q on chain %d", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector)
-				}
-
-				// We need to look up the timelock address, pool owner, and rate limit admin in order to determine if we have the right
-				// permissions to proceed with setting the rate limits.
-				timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
-				timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chain.Selector, err)
-				}
-				poolOwner, err := tokenPool.Owner(&bind.CallOpts{Context: b.GetContext()})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get owner of token pool at address %q on chain %d: %w", tokenPoolAddr.Hex(), chain.Selector, err)
-				}
-				rlAdmin, err := tokenPool.GetRateLimitAdmin(&bind.CallOpts{Context: b.GetContext()})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get rate limit admin of token pool at address %q on chain %d: %w", tokenPoolAddr.Hex(), chain.Selector, err)
-				}
-
-				// NOTE: there are certain situations where we don't have access to change the rate limits (e.g. the customer is the
-				// pool owner and rate limit admin). In these cases, we should NOT attempt to set the rate limit or generate an MCMS
-				// batch since we know for certain that the transaction will fail. Instead, we log a warning and skip the rate limit
-				// configuration for that chain (which effectively turns this into a no-op).
-				isRateLimitAdmin := rlAdmin == timelockAddr || rlAdmin == chain.DeployerKey.From
-				isPoolOwner := poolOwner == timelockAddr || poolOwner == chain.DeployerKey.From
-				if !isRateLimitAdmin && !isPoolOwner {
-					b.Logger.Warnf(
-						"Timelock address %q and deployer address %q are not the owner or rate limit admin for token pool at address %q on chain selector %d. Skipping rate limiter config for this chain.",
-						timelockAddr.Hex(), chain.DeployerKey.From.Hex(), tokenPoolAddr.Hex(), chain.Selector,
-					)
-					return sequences.OnChainOutput{}, nil
-				}
-			}
-
-			// At this point, it's assumed that the transaction has a chance to succeed,
-			// so we proceed with generating the batch operation to set the rate limits.
 			var output evm_contract.WriteOutput
 			switch input.TokenPoolRef.Version.String() {
 			case tpOpsV1_5_1.Version.String():
@@ -295,17 +234,17 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 					tpOpsV1_5_1.SetChainRateLimiterConfig, chain,
 					evm_contract.FunctionInput[tpOpsV1_5_1.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
-						Address:       tokenPoolAddr,
+						Address:       common.HexToAddress(input.TokenPoolRef.Address),
 						Args: tpOpsV1_5_1.SetChainRateLimiterConfigArgs{
 							OutboundRateLimitConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.OutboundRateLimiterConfig.Capacity,
-								Rate:      input.OutboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
 							},
 							InboundRateLimitConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.InboundRateLimiterConfig.Capacity,
-								Rate:      input.InboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
 							},
 							RemoteChainSelector: input.RemoteChainSelector,
 						},
@@ -319,17 +258,17 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 					tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
 					evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
-						Address:       tokenPoolAddr,
+						Address:       common.HexToAddress(input.TokenPoolRef.Address),
 						Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
 							OutboundConfig: tpOpsV1_6_1.Config{
-								IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.OutboundRateLimiterConfig.Capacity,
-								Rate:      input.OutboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
 							},
 							InboundConfig: tpOpsV1_6_1.Config{
-								IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.InboundRateLimiterConfig.Capacity,
-								Rate:      input.InboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
 							},
 							RemoteChainSelector: input.RemoteChainSelector,
 						},
@@ -706,7 +645,7 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	// Get all matching token pool addresses
 	refs := ds.Addresses().Filter(filter...)
 
-	// Use the latest version found within the specified range
+	// Use the latest version found within the specified range.
 	var latestRef datastore.AddressRef
 	latestVer := minVersion
 	doesExist := false
@@ -798,3 +737,8 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 			return result, nil
 		})
 }
+
+func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+

@@ -489,10 +489,26 @@ func TestTokensAndTokenPools(t *testing.T) {
 									Type:          datastore.ContractType(evmTokenPoolType),
 									Version:       v1_5_1,
 								},
-								RegistryRef: datastore.AddressRef{}, // inferred
+								RegistryRef: datastore.AddressRef{
+									ChainSelector: evmA.Chain.Selector,
+									Address:       evmA.TAR.Address().Hex(),
+								},
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmB.Chain.Selector: {
-										OutboundRateLimiterConfig: defaultRL,
+										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:                             []datastore.AddressRef{},
+										InboundCCVs:                              []datastore.AddressRef{},
+										RemoteToken: &datastore.AddressRef{
+											ChainSelector: evmB.Chain.Selector,
+											Qualifier:     evmB.Token.Symbol,
+											Type:          datastore.ContractType(evmB.Token.Type),
+										},
+										RemotePool: &datastore.AddressRef{
+											ChainSelector: evmB.Chain.Selector,
+											Qualifier:     evmB.TokenPoolQualifier,
+											Type:          datastore.ContractType(evmTokenPoolType),
+											Version:       v1_5_1,
+										},
 									},
 								},
 							},
@@ -508,10 +524,26 @@ func TestTokensAndTokenPools(t *testing.T) {
 									Type:          datastore.ContractType(evmTokenPoolType),
 									Version:       v1_5_1,
 								},
-								RegistryRef: datastore.AddressRef{}, // inferred
+								RegistryRef: datastore.AddressRef{
+									ChainSelector: evmB.Chain.Selector,
+									Address:       evmB.TAR.Address().Hex(),
+								},
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmA.Chain.Selector: {
-										OutboundRateLimiterConfig: defaultRL,
+										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:                             []datastore.AddressRef{},
+										InboundCCVs:                              []datastore.AddressRef{},
+										RemoteToken: &datastore.AddressRef{
+											ChainSelector: evmA.Chain.Selector,
+											Qualifier:     evmA.Token.Symbol,
+											Type:          datastore.ContractType(evmA.Token.Type),
+										},
+										RemotePool: &datastore.AddressRef{
+											ChainSelector: evmA.Chain.Selector,
+											Qualifier:     evmA.TokenPoolQualifier,
+											Type:          datastore.ContractType(evmTokenPoolType),
+											Version:       v1_5_1,
+										},
 									},
 								},
 							},
@@ -793,18 +825,49 @@ func TestTokensAndTokenPools(t *testing.T) {
 							TokenPoolRef: datastore.AddressRef{
 								ChainSelector: solbnm.Chain.Selector,
 								Address:       tokenPool.Address,
+								Version:       v1_6_0,
 							},
 							TokenRef: datastore.AddressRef{
 								ChainSelector: solbnm.Chain.Selector,
 								Address:       tokenAddr.Address,
 							},
-							RegistryRef: datastore.AddressRef{}, // inferred
+							RegistryRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       routerProgramId.String(),
+								Version:       v1_6_0,
+							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								evmA.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: evmA.Chain.Selector,
+										Qualifier:     evmA.Token.Symbol,
+										Type:          datastore.ContractType(evmA.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: evmA.Chain.Selector,
+										Qualifier:     evmA.TokenPoolQualifier,
+										Type:          datastore.ContractType(evmTokenPoolType),
+										Version:       v1_5_1,
+									},
 								},
 								evmB.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: evmB.Chain.Selector,
+										Qualifier:     evmB.Token.Symbol,
+										Type:          datastore.ContractType(evmB.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: evmB.Chain.Selector,
+										Qualifier:     evmB.TokenPoolQualifier,
+										Type:          datastore.ContractType(evmTokenPoolType),
+										Version:       v1_5_1,
+									},
 								},
 							},
 						},
@@ -820,10 +883,26 @@ func TestTokensAndTokenPools(t *testing.T) {
 								Type:          datastore.ContractType(evmTokenPoolType),
 								Version:       v1_5_1,
 							},
-							RegistryRef: datastore.AddressRef{}, // inferred
+							RegistryRef: datastore.AddressRef{
+								ChainSelector: evmA.Chain.Selector,
+								Address:       evmA.TAR.Address().Hex(),
+							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.Token.Symbol,
+										Type:          datastore.ContractType(solbnm.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.TokenPoolQualifier,
+										Type:          datastore.ContractType(solbnm.TokenPoolType),
+										Version:       v1_6_0,
+									},
 								},
 							},
 						},
@@ -839,10 +918,26 @@ func TestTokensAndTokenPools(t *testing.T) {
 								Type:          datastore.ContractType(evmTokenPoolType),
 								Version:       v1_5_1,
 							},
-							RegistryRef: datastore.AddressRef{}, // inferred
+							RegistryRef: datastore.AddressRef{
+								ChainSelector: evmB.Chain.Selector,
+								Address:       evmB.TAR.Address().Hex(),
+							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.Token.Symbol,
+										Type:          datastore.ContractType(solbnm.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.TokenPoolQualifier,
+										Type:          datastore.ContractType(solbnm.TokenPoolType),
+										Version:       v1_6_0,
+									},
 								},
 							},
 						},

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /*
  * Copyright (c) 2022, Circle Internet Financial Limited.
  *
@@ -13,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 
@@ -35,6 +36,12 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
    * @param message Raw bytes of message
    */
   event MessageSent(bytes message);
+  /**
+   * @notice Emitted when a new message is received
+   * @param message Raw bytes of message
+   * @param attestation Raw bytes of attestation
+   */
+  event MessageReceived(bytes message, bytes attestation);
 
   constructor(
     uint32 _version,
@@ -64,7 +71,7 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
   /// messageBody                dynamic        bytes     148
   function receiveMessage(
     bytes calldata message,
-    bytes calldata
+    bytes calldata attestation
   ) external returns (bool success) {
     // The receiver of the funds is the _mintRecipient in the following encoded format
     //   function _formatMessage(
@@ -80,6 +87,8 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
     address recipient = address(bytes20(message[148 + 36 + 12:148 + 36 + 12 + 20]));
     // We always mint 1 token to not complicate the test.
     i_token.mint(recipient, 1);
+
+    emit MessageReceived(message, attestation);
 
     return s_shouldSucceed;
   }

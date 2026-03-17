@@ -5,6 +5,7 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BaseTest} from "../../../BaseTest.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract CCTPMessageTransmitterProxySetup is BaseTest {
   address internal s_tokenMessenger = makeAddr("TOKEN_MESSENGER");
@@ -20,10 +21,11 @@ contract CCTPMessageTransmitterProxySetup is BaseTest {
       abi.encode(s_cctpMessageTransmitter)
     );
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(ITokenMessenger(s_tokenMessenger));
-    CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
-    allowedCallerParams[0] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: s_usdcTokenPool, allowed: true});
-    s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+
+    address[] memory addedCallers = new address[](1);
+    addedCallers[0] = s_usdcTokenPool;
+    s_cctpMessageTransmitterProxy.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: new address[](0)})
+    );
   }
 }
