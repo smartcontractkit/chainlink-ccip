@@ -44,7 +44,6 @@ import (
 )
 
 func TestTokensAndTokenPools(t *testing.T) {
-	t.Skip("Skipping: pre-existing failure on develop - timelock address not initialized for EVM chain")
 	// Define aliases for v1.6.0 and v1.5.1
 	v1_6_0, err := semver.NewVersion("1.6.0")
 	require.NoError(t, err)
