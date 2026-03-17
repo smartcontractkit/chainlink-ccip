@@ -8,7 +8,8 @@ on:
   merge_group:
   push:
     branches:
-      - "main"
+      - 'main'
+      - 'develop'
 
 jobs:
   detect_deployments_changes:
@@ -17,6 +18,7 @@ jobs:
       run_solana_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_solana_deployment == 'true' }}
       run_evm_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_evm_deployment == 'true' }}
       run_deployment: ${{ steps.filter.outputs.run_deployment == 'true' }}
+      run_ccv_evm_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_ccv_evm_deployment == 'true' }}
       run_crosschain_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_solana_deployment == 'true' || steps.filter.outputs.run_evm_deployment == 'true' || steps.filter.outputs.run_crosschain_deployment == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +34,9 @@ jobs:
             run_evm_deployment:
               - 'chains/evm/gobindings/generated/**'
               - 'chains/evm/deployment/**'
+            run_ccv_evm_deployment:
+              - 'ccv/chains/evm/gobindings/generated/**'
+              - 'ccv/chains/evm/deployment/**'
             run_solana_deployment:
               - 'chains/solana/gobindings/generated/**'
               - 'chains/solana/deployment/**'
@@ -65,6 +70,18 @@ jobs:
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+
+  test-ccv-evm-deployments:
+    needs: [detect_deployments_changes]
+    if: ${{ needs.detect_deployments_changes.outputs.run_ccv_evm_deployment == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ccv/chains/evm/deployment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: go test ./...
 
   test-solana-deployments:
     needs: [detect_deployments_changes]

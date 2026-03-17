@@ -133,7 +133,7 @@ var GetFee = contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *route
 
 var IsChainSupported = contract.NewRead(contract.ReadParams[uint64, bool, *router.Router]{
 	Name:         "router:isChainSupported",
-	Version:      semver.MustParse("1.2.0"),
+	Version:      Version,
 	Description:  "If the router supports a given destination chain selector",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,

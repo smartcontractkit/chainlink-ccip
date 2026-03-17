@@ -94,7 +94,6 @@ type ConstructorArgs struct {
 	{{.GoName}} {{.GoType}}
 {{- end}}
 }
-{{end}}
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:        "{{.PackageNameHyphen}}:deploy",
@@ -111,6 +110,26 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
+{{- else}}
+
+type ConstructorArgs = struct{}
+
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:        "{{.PackageNameHyphen}}:deploy",
+	Version:     Version,
+	Description: "Deploys the {{.ContractType}} contract",
+	ContractMetadata: &bind.MetaData{
+		ABI: {{.ContractType}}ABI,
+		Bin: {{.ContractType}}Bin,
+	},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex({{.ContractType}}Bin),
+		},
+	},
+	Validate: func(ConstructorArgs) error { return nil },
+})
+{{- end}}
 {{- end}}
 {{range .Operations}}
 {{if .IsWrite}}

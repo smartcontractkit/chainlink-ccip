@@ -5,7 +5,7 @@ import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @title FacadeClient - A simple proxy for calling Router
 contract FacadeClient {

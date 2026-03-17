@@ -225,18 +225,26 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			}
 
 			if input.DeployTokenPoolInput != nil {
-				newTokenRef, err := datastore_utils.MergeRefs(
-					tokenRef,
-					input.DeployTokenPoolInput.TokenRef,
-				)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
+				refToConnect := tokenRef
+				providedRef := input.DeployTokenPoolInput.TokenRef
+				if refToConnect == nil && providedRef == nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot deploy token pool without token address", selector)
+				} else if refToConnect != nil && providedRef != nil {
+					// cross check the deployed token address with the provided token ref address
+					if refToConnect.Address != providedRef.Address {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, providedRef.Address)
+					}
+					if refToConnect.Qualifier != providedRef.Qualifier {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, providedRef.Qualifier)
+					}
+				} else if refToConnect == nil {
+					// if token is not deployed by this changeset but token ref is provided, use the provided token ref
+					refToConnect = input.DeployTokenPoolInput.TokenRef
 				}
-				tokenRef = &newTokenRef
 				// deploy token pool
 				tmpDatastore = datastore.NewMemoryDataStore()
 				deployTokenPoolInput := DeployTokenPoolInput{
-					TokenRef:           tokenRef,
+					TokenRef:           refToConnect,
 					TokenPoolVersion:   input.TokenPoolVersion,
 					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
 					PoolType:           input.DeployTokenPoolInput.PoolType,
@@ -325,7 +333,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		}
 
 		// we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
-		transferOps, transferReports, tokends, err := processTokenConfigForChain(e, allTokenConfigs, cfg.ChainAdapterVersion)
+		transferOps, transferReports, tokends, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, allTokenConfigs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
 		}

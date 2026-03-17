@@ -14,8 +14,8 @@ import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCC
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCSetup is BaseTest {
   struct USDCMessage {
@@ -67,12 +67,12 @@ contract USDCSetup is BaseTest {
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
 
-  IBurnMintERC20 internal s_USDCToken;
+  IERC20 internal s_USDCToken;
 
   function setUp() public virtual override {
     super.setUp();
     BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
-    s_USDCToken = usdcToken;
+    s_USDCToken = IERC20(address(usdcToken));
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
 
@@ -95,7 +95,7 @@ contract USDCSetup is BaseTest {
     // Mock the previous pool's releaseOrMint function to return the input amount
     vm.mockCall(
       s_previousPool,
-      abi.encodeWithSelector(TokenPool.releaseOrMint.selector),
+      abi.encodeWithSelector(IPoolV1.releaseOrMint.selector),
       abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
     );
 
@@ -192,6 +192,21 @@ contract USDCSetup is BaseTest {
       usdcMessage.minFinalityThreshold,
       usdcMessage.finalityThresholdExecuted,
       usdcMessage.messageBody
+    );
+  }
+
+  function _enableERC165InterfaceChecks(
+    address pool,
+    bytes4 interfaceId
+  ) internal {
+    vm.mockCall(
+      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
+    );
+
+    vm.mockCall(
+      address(pool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
+      abi.encode(true)
     );
   }
 }

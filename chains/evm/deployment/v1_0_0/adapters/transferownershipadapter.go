@@ -12,30 +12,34 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
-	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
-var timelockAddr map[uint64]common.Address
-
-type EVMTransferOwnershipAdapter struct {}
+type EVMTransferOwnershipAdapter struct {
+	timelockAddr map[uint64]common.Address
+}
 
 func (a *EVMTransferOwnershipAdapter) InitializeTimelockAddress(e deployment.Environment, input mcms.Input) error {
 	evmChains := e.BlockChains.EVMChains()
-	timelockAddr = make(map[uint64]common.Address)
+	a.timelockAddr = make(map[uint64]common.Address)
 	for sel := range evmChains {
-		reader := &EVMMCMSReader{}
-		timelockRef, err := reader.GetTimelockRef(e, sel, input)
-		if err != nil {
-			return fmt.Errorf("failed to get timelock ref for chain %d: %w", sel, err)
-		}
-		addr, err := datastore_utils.FindAndFormatRef(e.DataStore, timelockRef, sel, evm_datastore_utils.ToEVMAddress)
+		// Use GetAddressRef with qualifier and version to properly filter timelocks
+		timelockRef := datastore_utils.GetAddressRef(
+			e.DataStore.Addresses().Filter(),
+			sel,
+			utils.RBACTimelock,
+			ops.MCMSVersion,
+			input.Qualifier,
+		)
+		addr, err := evm_datastore_utils.ToEVMAddress(timelockRef)
 		if err != nil {
 			return fmt.Errorf("failed to find timelock address for chain %d: %w", sel, err)
 		}
-		timelockAddr[sel] = addr
+		a.timelockAddr[sel] = addr
 	}
 	return nil
 }
@@ -54,8 +58,9 @@ func (a *EVMTransferOwnershipAdapter) SequenceTransferOwnershipViaMCMS() *cldf_o
 				ChainSelector: in.ChainSelector,
 				Contracts:     make([]ops.OpTransferOwnershipInput, 0),
 			}
+
 			for _, contractRef := range in.ContractRef {
-				timelockAddr, ok := timelockAddr[in.ChainSelector]
+				timelockAddr, ok := a.timelockAddr[in.ChainSelector]
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("timelock address not initialized for chain %d", in.ChainSelector)
 				}
@@ -82,7 +87,7 @@ func (a *EVMTransferOwnershipAdapter) ShouldAcceptOwnershipWithTransferOwnership
 		return false, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 	}
 	// Only accept ownership if the proposed owner is either the timelock or the deployer
-	if common.HexToAddress(in.ProposedOwner) != timelockAddr[in.ChainSelector] && common.HexToAddress(in.ProposedOwner) != chain.DeployerKey.From {
+	if common.HexToAddress(in.ProposedOwner) != a.timelockAddr[in.ChainSelector] && common.HexToAddress(in.ProposedOwner) != chain.DeployerKey.From {
 		return false, nil
 	}
 	return true, nil
@@ -103,7 +108,7 @@ func (a *EVMTransferOwnershipAdapter) SequenceAcceptOwnership() *cldf_ops.Sequen
 				Contracts:     make([]ops.OpTransferOwnershipInput, 0),
 			}
 			for _, contractRef := range in.ContractRef {
-				timelockAddr, ok := timelockAddr[in.ChainSelector]
+				timelockAddr, ok := a.timelockAddr[in.ChainSelector]
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("timelock address not initialized for chain %d", in.ChainSelector)
 				}
