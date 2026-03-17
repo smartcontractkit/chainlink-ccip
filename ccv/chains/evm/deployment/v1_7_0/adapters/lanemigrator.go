@@ -5,18 +5,33 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
-	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
+	seq1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
 	offrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
@@ -30,6 +45,172 @@ const (
 )
 
 type LaneMigrator struct{}
+
+func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.LaneMigratorConfig, _ changesets.MCMSReader) error {
+	allContractRefs := []datastore.AddressRef{
+		// 2.0 contracts
+		{
+			Type:    datastore.ContractType(onrampops.ContractType),
+			Version: onrampops.Version,
+		},
+		{
+			Type:    datastore.ContractType(offrampops.ContractType),
+			Version: offrampops.Version,
+		},
+		{
+			Type:    datastore.ContractType(fqops.ContractType),
+			Version: fqops.Version,
+		},
+		{
+			Type:    datastore.ContractType(committee_verifier.ContractType),
+			Version: committee_verifier.Version,
+		},
+		{
+			Type:    datastore.ContractType(executor.ContractType),
+			Version: executor.Version,
+		},
+		{
+			Type:    datastore.ContractType(seq1_7.ExecutorProxyType),
+			Version: executor.Version,
+		},
+		// contracts from previous versions relevant to 2.0
+		{
+			Type:    datastore.ContractType(routerops.ContractType),
+			Version: routerops.Version,
+		},
+		{
+			Type:    datastore.ContractType(rmn_remote.ContractType),
+			Version: rmn_remote.Version,
+		},
+		{
+			Type:    datastore.ContractType(rmn_proxy.ContractType),
+			Version: rmn_proxy.Version,
+		},
+		{
+			Type:    datastore.ContractType(token_admin_registry.ContractType),
+			Version: token_admin_registry.Version,
+		},
+	}
+	for chainSelector, perChainCfg := range cfg.Input {
+		err := verifyOwnershipOfContracts(e, chainSelector, allContractRefs)
+		if err != nil {
+			return fmt.Errorf("ownership verification failed for chain %d: %w", chainSelector, err)
+		}
+		err = verifyExistingLaneVersion(e, e.BlockChains.EVMChains()[chainSelector], chainSelector, perChainCfg.RemoteChains)
+		if err != nil {
+			return fmt.Errorf("existing lane version verification failed for chain %d: %w", chainSelector, err)
+		}
+	}
+	return nil
+}
+
+// verifyExistingLaneVersion checks that for the given chain selector, the existing Router contract has the
+// onRamp configured for the remote chains and that the onRamp and fee quoter versions are correct.
+// This ensures that the existing lanes are using the expected versions of contracts before we attempt to update them to use the prod Router.
+func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, chainSelector uint64, remoteChains []uint64) error {
+	// fetch router address from datastore
+	routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(routerops.ContractType),
+		Version:       routerops.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return fmt.Errorf("error fetching rout"+
+			"er address ref for chain %d: %w", chainSelector, err)
+	}
+	// get onRamp for remote chains
+	for _, remoteChainSelector := range remoteChains {
+		onRampOnRouterOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.GetOnRamp,
+			evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: chainSelector,
+				Address:       routerRef,
+				Args:          remoteChainSelector,
+			})
+		if err != nil {
+			return fmt.Errorf("error fetching onRamp from router for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
+		}
+		if onRampOnRouterOut.Output == (common.Address{}) {
+			return fmt.Errorf("precondition failed for chain %d and remote chain %d: "+
+				"expected to find an onRamp configured on the Router for the remote chain, but got zero address. "+
+				"Please configure lanes with the prod Router first before migrating", chainSelector, remoteChainSelector)
+		}
+		_, onRampVerion, err := utils.TypeAndVersion(onRampOnRouterOut.Output, evmChain.Client)
+		if err != nil {
+			return fmt.Errorf("error fetching onRamp version for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
+		}
+
+		if !onRampVerion.Equal(onrampops_v160.Version) {
+			return fmt.Errorf("precondition failed for chain %d and remote chain %d:"+
+				"expected onRamp version on Router to be 1.6.0, but got version %s. ",
+				chainSelector, remoteChainSelector, onRampVerion.String())
+		}
+
+		// get the fee quoter from onRamp
+		feeQuoterOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampops_v160.GetDynamicConfig,
+			evmChain, contract.FunctionInput[struct{}]{
+				ChainSelector: chainSelector,
+				Address:       onRampOnRouterOut.Output,
+			})
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter from onRamp for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
+		}
+		if feeQuoterOut.Output.FeeQuoter == (common.Address{}) {
+			return fmt.Errorf("precondition failed for chain %d and remote chain %d: "+
+				"expected to find a fee quoter configured on the onRamp for the remote chain, but got zero address. "+
+				"Please configure lanes with the prod Router first before migrating", chainSelector, remoteChainSelector)
+		}
+		// check the fee quoter version
+		_, feeQuoterVersion, err := utils.TypeAndVersion(feeQuoterOut.Output.FeeQuoter, evmChain.Client)
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter version from feequoter %s for chain %d and remote chain %d: %w",
+				feeQuoterOut.Output.FeeQuoter.String(), chainSelector, remoteChainSelector, err)
+		}
+		if !feeQuoterVersion.Equal(fqops.Version) {
+			return fmt.Errorf("precondition failed for chain %d and remote chain %d:"+
+				"expected fee quoter version on onRamp to be %s, but got version %s. ",
+				chainSelector, remoteChainSelector, fqops.Version.String(), feeQuoterVersion.String())
+		}
+	}
+	return nil
+}
+
+func verifyOwnershipOfContracts(e deployment.Environment, chainSelector uint64, contractRefs []datastore.AddressRef) error {
+	cllCCIPTimelock, rmnTimelock, _, err := seq1_7.ResolveOwnershipDeps(e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+	), chainSelector)
+
+	if err != nil {
+		return fmt.Errorf("error resolving ownership dependencies for chain %d: %w", chainSelector, err)
+	}
+	for _, ref := range contractRefs {
+		evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+		if !ok {
+			return fmt.Errorf("chain with selector %d not found in environment", chainSelector)
+		}
+		addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: chainSelector,
+			Type:          ref.Type,
+			Version:       ref.Version,
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return fmt.Errorf("error fetching address ref for contract type %s version %s on chain %d: %w", ref.Type, ref.Version, chainSelector, err)
+		}
+		currentOwner, _, err := mcms_seq.LoadOwnableContract(addr, evmChain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
+		}
+		expectedTimelockAddr := cllCCIPTimelock
+		if ref.Type == datastore.ContractType(rmn_remote.ContractType) {
+			expectedTimelockAddr = rmnTimelock
+		}
+		if currentOwner != expectedTimelockAddr {
+			return fmt.Errorf("precondition failed for chain %d: expected owner of "+
+				"contract type %s version %s at address %s is timelock %s, but got %s",
+				chainSelector, ref.Type, ref.Version, addr, expectedTimelockAddr, currentOwner)
+		}
+	}
+	return nil
+}
 
 // UpdateVersionWithRouter is a sequence that updates Ramps to use the new Router and also updates the fee quoter dest chain config with default tx gas limit as 8M
 //
