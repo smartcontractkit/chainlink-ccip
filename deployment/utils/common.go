@@ -71,7 +71,11 @@ func GetSelectorHex(selector uint64) [4]byte {
 		panic(fmt.Sprintf("unsupported chain family: %s", destFamily))
 	}
 
-	b, _ := hex.DecodeString(hexStr)
+	return GetHexFromString(hexStr)
+}
+
+func GetHexFromString(hexstr string) [4]byte {
+	b, _ := hex.DecodeString(hexstr)
 	var out [4]byte
 	copy(out[:], b)
 	return out

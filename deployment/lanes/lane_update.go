@@ -24,9 +24,9 @@ type ChainDefinition struct {
 	// This is provided by the user
 	// 1.6 only
 	TokenPrices map[string]*big.Int
-	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
-	// This is provided by the user
-	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
+	// FeeQuoterDestChainConfigOverrides is a functional option that mutates a
+	// FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
+	FeeQuoterDestChainConfigOverrides *FeeQuoterDestChainConfigOverride
 	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
 	// This is provided by the user
 	// 1.6 only
@@ -76,6 +76,9 @@ type ChainDefinition struct {
 	// FeeQuoter is the address of the FeeQuoter contract on this chain.
 	// This is populated programmatically
 	FeeQuoter []byte
+	// FeeQuoterDestChainConfig is the configuration that should be applied to this chain's FeeQuoter for it to be a destination in the lane.
+	// This is populated programmatically and is based on the chain family, with possible overrides from the user.
+	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
 }
 
 // CantonLaneConfig holds Canton-specific configuration for lane setup.
@@ -201,6 +204,11 @@ type UpdateLanesInput struct {
 	TestRouter   bool
 	ExtraConfigs ExtraConfigs
 }
+
+// FeeQuoterDestChainConfigOverride is a functional option that mutates a
+// FeeQuoterDestChainConfig in place. Pass one or more overrides to
+// DefaultFeeQuoterDestChainConfig to selectively change default values.
+type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
 
 func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuoterDestChainConfig {
 	chainHex := utils.GetSelectorHex(selector)

@@ -44,8 +44,8 @@ func (t *protoTranslator) rmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.Signat
 	sigs := make([]*rmnpb.EcdsaSignature, len(pbSigs))
 	for i := range pbSigs {
 		sigs[i] = &rmnpb.EcdsaSignature{
-			R: pbSigs[i].R,
-			S: pbSigs[i].S,
+			R: pbSigs[i].GetR(),
+			S: pbSigs[i].GetS(),
 		}
 	}
 	return sigs
@@ -73,12 +73,12 @@ func (t *protoTranslator) ccipRmnSignaturesFromProto(
 	}
 
 	for i := range pbSigs {
-		if len(pbSigs[i].R) != 32 || len(pbSigs[i].S) != 32 {
+		if len(pbSigs[i].GetR()) != 32 || len(pbSigs[i].GetS()) != 32 {
 			return nil, fmt.Errorf("signature must be 32 bytes: %v", pbSigs[i])
 		}
 		sigs[i] = cciptypes.RMNECDSASignature{
-			R: cciptypes.Bytes32(pbSigs[i].R),
-			S: cciptypes.Bytes32(pbSigs[i].S),
+			R: cciptypes.Bytes32(pbSigs[i].GetR()),
+			S: cciptypes.Bytes32(pbSigs[i].GetS()),
 		}
 	}
 	return sigs, nil
