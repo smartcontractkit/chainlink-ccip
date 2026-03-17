@@ -194,23 +194,25 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
 	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
 	return ccipapi.FeeQuoterDestChainConfig{
-		IsEnabled:                         true,
-		MaxNumberOfTokensPerMsg:           10,
-		MaxDataBytes:                      30_000,
-		MaxPerMsgGasLimit:                 3_000_000,
-		DestGasOverhead:                   300_000,
-		DefaultTokenFeeUSDCents:           25,
-		DestGasPerPayloadByteBase:         16,
-		DestGasPerPayloadByteHigh:         40,
-		DestGasPerPayloadByteThreshold:    3000,
-		DestDataAvailabilityOverheadGas:   100,
-		DestGasPerDataAvailabilityByte:    16,
-		DestDataAvailabilityMultiplierBps: 1,
-		DefaultTokenDestGasOverhead:       90_000,
-		DefaultTxGasLimit:                 200_000,
-		GasMultiplierWeiPerEth:            11e17,
-		NetworkFeeUSDCents:                10,
-		ChainFamilySelector:               binary.BigEndian.Uint32(chainHex[:]),
+		IsEnabled:               true,
+		MaxDataBytes:            30_000,
+		MaxPerMsgGasLimit:       3_000_000,
+		DestGasOverhead:         300_000,
+		DestGasPerPayloadByteBase: 16,
+		ChainFamilySelector:     binary.BigEndian.Uint32(chainHex[:]),
+		DefaultTokenFeeUSDCents: 25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:       200_000,
+		NetworkFeeUSDCents:      10,
+		V1Params: &ccipapi.FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           10,
+			DestGasPerPayloadByteHigh:         40,
+			DestGasPerPayloadByteThreshold:    3000,
+			DestDataAvailabilityOverheadGas:   100,
+			DestGasPerDataAvailabilityByte:    16,
+			DestDataAvailabilityMultiplierBps: 1,
+			GasMultiplierWeiPerEth:            11e17,
+		},
 	}
 }
 
