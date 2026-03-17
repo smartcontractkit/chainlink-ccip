@@ -47,7 +47,21 @@ const (
 type LaneMigrator struct{}
 
 func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.LaneMigratorConfig, _ changesets.MCMSReader) error {
-	allContractRefs := []datastore.AddressRef{
+	multipleRefContract := []datastore.AddressRef{
+		{
+			Type:    datastore.ContractType(committee_verifier.ContractType),
+			Version: committee_verifier.Version,
+		},
+		{
+			Type:    datastore.ContractType(executor.ContractType),
+			Version: executor.Version,
+		},
+		{
+			Type:    datastore.ContractType(seq1_7.ExecutorProxyType),
+			Version: executor.Version,
+		},
+	}
+	singleRefContracts := []datastore.AddressRef{
 		// 2.0 contracts
 		{
 			Type:    datastore.ContractType(onrampops.ContractType),
@@ -60,18 +74,6 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 		{
 			Type:    datastore.ContractType(fqops.ContractType),
 			Version: fqops.Version,
-		},
-		{
-			Type:    datastore.ContractType(committee_verifier.ContractType),
-			Version: committee_verifier.Version,
-		},
-		{
-			Type:    datastore.ContractType(executor.ContractType),
-			Version: executor.Version,
-		},
-		{
-			Type:    datastore.ContractType(seq1_7.ExecutorProxyType),
-			Version: executor.Version,
 		},
 		// contracts from previous versions relevant to 2.0
 		{
@@ -91,8 +93,9 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 			Version: token_admin_registry.Version,
 		},
 	}
+	allContractRefs := append(multipleRefContract, singleRefContracts...)
 	for chainSelector, perChainCfg := range cfg.Input {
-		err := verifyAllContractsPresent(e, chainSelector, allContractRefs)
+		err := verifyAllContractsPresent(e, chainSelector, singleRefContracts, multipleRefContract)
 		if err != nil {
 			return fmt.Errorf("contract verification failed for chain %d: %w", chainSelector, err)
 		}
@@ -114,14 +117,22 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 
 // verifyAllContractsPresent checks that all contracts in contractRefs have a corresponding address
 // in the datastore for the given chain (i.e. all required contracts are deployed and registered).
-func verifyAllContractsPresent(e deployment.Environment, chainSelector uint64, contractRefs []datastore.AddressRef) error {
+// multipleRefContracts are contracts for which there can be multiple addresses of same type and version (e.g. CommitteeVerifier and Executor)
+// singleRefContracts are contracts for which there should be only one address for the given type and version in the datastore (e.g. OnRamp, OffRamp, FeeQuoter, Router, RMNProxy, RMNRemote, TokenAdminRegistry)
+func verifyAllContractsPresent(e deployment.Environment, chainSelector uint64, singleRefContracts []datastore.AddressRef, multipleContractsOfSameType []datastore.AddressRef) error {
 	var missing []string
-	for _, ref := range contractRefs {
-		_, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: chainSelector,
-			Type:          ref.Type,
-			Version:       ref.Version,
-		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	for _, ref := range multipleContractsOfSameType {
+		refs := e.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chainSelector),
+			datastore.AddressRefByType(ref.Type),
+			datastore.AddressRefByVersion(ref.Version),
+		)
+		if len(refs) == 0 {
+			missing = append(missing, fmt.Sprintf("%s@%s", ref.Type, ref.Version))
+		}
+	}
+	for _, ref := range singleRefContracts {
+		_, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
 			missing = append(missing, fmt.Sprintf("%s@%s", ref.Type, ref.Version))
 		}
@@ -214,26 +225,33 @@ func verifyOwnershipOfContracts(e deployment.Environment, chainSelector uint64, 
 		if !ok {
 			return fmt.Errorf("chain with selector %d not found in environment", chainSelector)
 		}
-		addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: chainSelector,
-			Type:          ref.Type,
-			Version:       ref.Version,
-		}, chainSelector, evm_datastore_utils.ToEVMAddress)
-		if err != nil {
-			return fmt.Errorf("error fetching address ref for contract type %s version %s on chain %d: %w", ref.Type, ref.Version, chainSelector, err)
+		refs := e.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chainSelector),
+			datastore.AddressRefByType(ref.Type),
+			datastore.AddressRefByVersion(ref.Version),
+		)
+		if len(refs) == 0 {
+			return fmt.Errorf("no address ref found for contract type %s version %s on chain %d", ref.Type, ref.Version, chainSelector)
 		}
-		currentOwner, _, err := mcms_seq.LoadOwnableContract(addr, evmChain.Client)
-		if err != nil {
-			return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
-		}
-		expectedTimelockAddr := cllCCIPTimelock
-		if ref.Type == datastore.ContractType(rmn_remote.ContractType) {
-			expectedTimelockAddr = rmnTimelock
-		}
-		if currentOwner != expectedTimelockAddr {
-			return fmt.Errorf("precondition failed for chain %d: expected owner of "+
-				"contract type %s version %s at address %s is timelock %s, but got %s",
-				chainSelector, ref.Type, ref.Version, addr, expectedTimelockAddr, currentOwner)
+		for _, addrRef := range refs {
+			addr, err := evm_datastore_utils.ToEVMAddress(addrRef)
+			if err != nil {
+				return fmt.Errorf("error formatting address ref %s for contract type %s version %s on chain %d: %w",
+					addrRef.Address, ref.Type, ref.Version, chainSelector, err)
+			}
+			currentOwner, _, err := mcms_seq.LoadOwnableContract(addr, evmChain.Client)
+			if err != nil {
+				return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
+			}
+			expectedTimelockAddr := cllCCIPTimelock
+			if ref.Type == datastore.ContractType(rmn_remote.ContractType) {
+				expectedTimelockAddr = rmnTimelock
+			}
+			if currentOwner != expectedTimelockAddr {
+				return fmt.Errorf("precondition failed for chain %d: expected owner of "+
+					"contract type %s version %s at address %s is timelock %s, but got %s",
+					chainSelector, ref.Type, ref.Version, addr, expectedTimelockAddr, currentOwner)
+			}
 		}
 	}
 	return nil
