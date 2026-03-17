@@ -210,11 +210,17 @@ func laneMigrateVerify(migratorReg *LaneMigratorRegistry, mcmReg *changesets.MCM
 			if !ok {
 				return fmt.Errorf("error getting MCMS reader for chain family %s: reader not found", chainFamily)
 			}
-			if err := rampUpdater.VerifyPreconditions(e, input, mcmReader); err != nil {
-				return fmt.Errorf("error verifying preconditions for ramp updater for chain selector %d: %w", chainSel, err)
-			}
 			if !e.BlockChains.Exists(chainSel) {
 				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: blockchain not found", chainSel)
+			}
+			singleChainInput := LaneMigratorConfig{
+				Input: map[uint64]LaneMigratorConfigPerChain{
+					chainSel: perChainConfig,
+				},
+				MCMS: input.MCMS,
+			}
+			if err := rampUpdater.VerifyPreconditions(e, singleChainInput, mcmReader); err != nil {
+				return fmt.Errorf("error verifying preconditions for ramp updater for chain selector %d: %w", chainSel, err)
 			}
 			for _, remoteChainSel := range perChainConfig.RemoteChains {
 				if !e.BlockChains.Exists(remoteChainSel) {
