@@ -8,20 +8,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 const (
@@ -55,9 +55,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			sequences.DeployChainContracts,
 			e.BlockChains.EVMChains()[chainSel],
 			sequences.DeployChainContractsInput{
-				ChainSelector:  chainSel,
-				ContractParams: testsetup.CreateBasicContractParams(),
-				CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+				ChainSelector:    chainSel,
+				ContractParams:   testsetup.CreateBasicContractParams(),
+				CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 				DeployerKeyOwned: true,
 			},
 		)
@@ -131,7 +131,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NotEmpty(t, configureReport.Output.BatchOps, "Expected batch operations")
 
 		// Verify token pool configuration for remote chains
-		tp, err := tp_bindings.NewTokenPool(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
+		tp, err := token_pool.NewTokenPoolContract(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
 		require.NoError(t, err, "Failed to instantiate token pool contract")
 
 		// Check supported chains
@@ -214,9 +214,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			sequences.DeployChainContracts,
 			e.BlockChains.EVMChains()[chainSel],
 			sequences.DeployChainContractsInput{
-				ChainSelector:  chainSel,
-				CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-				ContractParams: testsetup.CreateBasicContractParams(),
+				ChainSelector:    chainSel,
+				CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+				ContractParams:   testsetup.CreateBasicContractParams(),
 				DeployerKeyOwned: true,
 			},
 		)
@@ -271,7 +271,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 
-		tp, err := tp_bindings.NewTokenPool(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
+		tp, err := token_pool.NewTokenPoolContract(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
 		require.NoError(t, err, "Failed to instantiate token pool contract")
 
 		minBlockConfirmation, err := tp.GetMinBlockConfirmations(nil)
@@ -287,7 +287,7 @@ const testTokenDecimals = 18
 
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool.
 // Rate/capacity are in token units in config; on-chain values are scaled by 10^decimals (inbound also by 1.1x).
-func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
+func checkRemoteChainConfiguration(t *testing.T, tp *token_pool.TokenPoolContract, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
 	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get rate limiter state")
 
@@ -332,7 +332,7 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 
 func assertCustomBlockConfirmationBucket(
 	t *testing.T,
-	tp *tp_bindings.TokenPool,
+	tp *token_pool.TokenPoolContract,
 	remoteChainSel uint64,
 	expectedInbound *tokens_core.RateLimiterConfigFloatInput,
 	expectedOutbound *tokens_core.RateLimiterConfigFloatInput,
@@ -360,7 +360,7 @@ func requireScaledRateLimiterMatch(t *testing.T, expectedRate, expectedCapacity 
 
 // assertBucketMatchesConfig compares actual on-chain rate limiter state to expected token-unit config,
 // scaling expected by 10^decimals and (for inbound) 1.1x to match GenerateTPRLConfigs.
-func assertBucketMatchesConfig(t *testing.T, actual tp_bindings.RateLimiterTokenBucket, expected tokens_core.RateLimiterConfigFloatInput, decimals int, isInbound bool) {
+func assertBucketMatchesConfig(t *testing.T, actual token_pool.TokenBucket, expected tokens_core.RateLimiterConfigFloatInput, decimals int, isInbound bool) {
 	require.Equal(t, expected.IsEnabled, actual.IsEnabled, "Rate limiter enabled mismatch")
 
 	extraPercent := 0.0

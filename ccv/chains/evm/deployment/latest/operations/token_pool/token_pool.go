@@ -225,6 +225,16 @@ func (c *TokenPoolContract) GetTokenTransferFeeConfig(opts *bind.CallOpts, arg0 
 	return *abi.ConvertType(out[0], new(TokenTransferFeeConfig)).(*TokenTransferFeeConfig), nil
 }
 
+func (c *TokenPoolContract) GetRequiredCCVs(opts *bind.CallOpts, localToken common.Address, remoteChainSelector uint64, sourceDenominatedAmount *big.Int, blockConfirmationsRequested uint16, extraData []byte, direction uint8) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRequiredCCVs", localToken, remoteChainSelector, sourceDenominatedAmount, blockConfirmationsRequested, extraData, direction)
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 type ChainUpdate struct {
 	RemoteChainSelector       uint64
 	RemotePoolAddresses       [][]byte
@@ -321,6 +331,15 @@ type GetTokenTransferFeeConfigArgs struct {
 	DestChainSelector uint64
 	Arg2              uint16
 	Arg3              []byte
+}
+
+type GetRequiredCCVsArgs struct {
+	LocalToken                  common.Address
+	RemoteChainSelector         uint64
+	SourceDenominatedAmount     *big.Int
+	BlockConfirmationsRequested uint16
+	ExtraData                   []byte
+	Direction                   uint8
 }
 
 var SetMinBlockConfirmations = contract.NewWrite(contract.WriteParams[uint16, *TokenPoolContract]{
@@ -614,5 +633,16 @@ var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTra
 	NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args GetTokenTransferFeeConfigArgs) (TokenTransferFeeConfig, error) {
 		return c.GetTokenTransferFeeConfig(opts, args.Arg0, args.DestChainSelector, args.Arg2, args.Arg3)
+	},
+})
+
+var GetRequiredCCVs = contract.NewRead(contract.ReadParams[GetRequiredCCVsArgs, []common.Address, *TokenPoolContract]{
+	Name:         "token-pool:get-required-cc-vs",
+	Version:      Version,
+	Description:  "Calls getRequiredCCVs on the contract",
+	ContractType: ContractType,
+	NewContract:  NewTokenPoolContract,
+	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args GetRequiredCCVsArgs) ([]common.Address, error) {
+		return c.GetRequiredCCVs(opts, args.LocalToken, args.RemoteChainSelector, args.SourceDenominatedAmount, args.BlockConfirmationsRequested, args.ExtraData, args.Direction)
 	},
 })
