@@ -178,9 +178,10 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 		}
 
 		if !onRampVersion.Equal(onrampops_v160.Version) {
-			return fmt.Errorf("precondition failed for chain %d and remote chain %d:"+
-				"expected onRamp version on Router to be 1.6.0, but got version %s. ",
-				chainSelector, remoteChainSelector, onRampVersion.String())
+			return fmt.Errorf(
+				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s, but got version %s. ",
+				chainSelector, remoteChainSelector, onrampops_v160.Version.String(), onRampVersion.String(),
+			)
 		}
 
 		// get the fee quoter from onRamp
@@ -204,7 +205,7 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 				feeQuoterOut.Output.FeeQuoter.String(), chainSelector, remoteChainSelector, err)
 		}
 		if !feeQuoterVersion.Equal(fqops.Version) {
-			return fmt.Errorf("precondition failed for chain %d and remote chain %d:"+
+			return fmt.Errorf("precondition failed for chain %d and remote chain %d: "+
 				"expected fee quoter version on onRamp to be %s, but got version %s. ",
 				chainSelector, remoteChainSelector, fqops.Version.String(), feeQuoterVersion.String())
 		}
@@ -220,11 +221,11 @@ func verifyOwnershipOfContracts(e deployment.Environment, chainSelector uint64, 
 	if err != nil {
 		return fmt.Errorf("error resolving ownership dependencies for chain %d: %w", chainSelector, err)
 	}
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return fmt.Errorf("chain with selector %d not found in environment", chainSelector)
+	}
 	for _, ref := range contractRefs {
-		evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-		if !ok {
-			return fmt.Errorf("chain with selector %d not found in environment", chainSelector)
-		}
 		refs := e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chainSelector),
 			datastore.AddressRefByType(ref.Type),
