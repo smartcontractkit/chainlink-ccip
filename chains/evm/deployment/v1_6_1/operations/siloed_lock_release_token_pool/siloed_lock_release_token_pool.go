@@ -3,12 +3,16 @@
 package siloed_lock_release_token_pool
 
 import (
+	"math/big"
+
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -57,6 +61,102 @@ func (c *SiloedLockReleaseTokenPoolContract) Owner(opts *bind.CallOpts) (common.
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *SiloedLockReleaseTokenPoolContract) GetRebalancer(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRebalancer")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) GetChainRebalancer(opts *bind.CallOpts, args uint64) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getChainRebalancer", args)
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) GetSupportedChains(opts *bind.CallOpts) ([]uint64, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getSupportedChains")
+	if err != nil {
+		var zero []uint64
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]uint64)).(*[]uint64), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) IsSiloed(opts *bind.CallOpts, args uint64) (bool, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "isSiloed", args)
+	if err != nil {
+		var zero bool
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(bool)).(*bool), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) GetAvailableTokens(opts *bind.CallOpts, args uint64) (*big.Int, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAvailableTokens", args)
+	if err != nil {
+		var zero *big.Int
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(*big.Int)).(**big.Int), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) GetUnsiloedLiquidity(opts *bind.CallOpts) (*big.Int, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getUnsiloedLiquidity")
+	if err != nil {
+		var zero *big.Int
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(*big.Int)).(**big.Int), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) SetRebalancer(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setRebalancer", args)
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) SetSiloRebalancer(opts *bind.TransactOpts, remoteChainSelector uint64, newRebalancer common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setSiloRebalancer", remoteChainSelector, newRebalancer)
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) WithdrawLiquidity(opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "withdrawLiquidity", args)
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) WithdrawSiloedLiquidity(opts *bind.TransactOpts, remoteChainSelector uint64, amount *big.Int) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "withdrawSiloedLiquidity", remoteChainSelector, amount)
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) GetToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getToken")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+type SetSiloRebalancerArgs struct {
+	RemoteChainSelector uint64
+	NewRebalancer       common.Address
+}
+
+type WithdrawSiloedLiquidityArgs struct {
+	RemoteChainSelector uint64
+	Amount              *big.Int
+}
+
 type ConstructorArgs struct {
 	Token              common.Address
 	LocalTokenDecimals uint8
@@ -79,4 +179,153 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var GetRebalancer = contract.NewRead(contract.ReadParams[struct{}, common.Address, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-rebalancer",
+	Version:      Version,
+	Description:  "Calls getRebalancer on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRebalancer(opts)
+	},
+})
+
+var GetChainRebalancer = contract.NewRead(contract.ReadParams[uint64, common.Address, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-chain-rebalancer",
+	Version:      Version,
+	Description:  "Calls getChainRebalancer on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (common.Address, error) {
+		return c.GetChainRebalancer(opts, args)
+	},
+})
+
+var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-supported-chains",
+	Version:      Version,
+	Description:  "Calls getSupportedChains on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
+		return c.GetSupportedChains(opts)
+	},
+})
+
+var IsSiloed = contract.NewRead(contract.ReadParams[uint64, bool, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:is-siloed",
+	Version:      Version,
+	Description:  "Calls isSiloed on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (bool, error) {
+		return c.IsSiloed(opts, args)
+	},
+})
+
+var GetAvailableTokens = contract.NewRead(contract.ReadParams[uint64, *big.Int, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-available-tokens",
+	Version:      Version,
+	Description:  "Calls getAvailableTokens on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (*big.Int, error) {
+		return c.GetAvailableTokens(opts, args)
+	},
+})
+
+var GetUnsiloedLiquidity = contract.NewRead(contract.ReadParams[struct{}, *big.Int, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-unsiloed-liquidity",
+	Version:      Version,
+	Description:  "Calls getUnsiloedLiquidity on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (*big.Int, error) {
+		return c.GetUnsiloedLiquidity(opts)
+	},
+})
+
+var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *SiloedLockReleaseTokenPoolContract]{
+	Name:            "siloed-lock-release-token-pool:set-rebalancer",
+	Version:         Version,
+	Description:     "Calls setRebalancer on the contract",
+	ContractType:    ContractType,
+	ContractABI:     SiloedLockReleaseTokenPoolABI,
+	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(
+		c *SiloedLockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args common.Address,
+	) (*types.Transaction, error) {
+		return c.SetRebalancer(opts, args)
+	},
+})
+
+var SetSiloRebalancer = contract.NewWrite(contract.WriteParams[SetSiloRebalancerArgs, *SiloedLockReleaseTokenPoolContract]{
+	Name:            "siloed-lock-release-token-pool:set-silo-rebalancer",
+	Version:         Version,
+	Description:     "Calls setSiloRebalancer on the contract",
+	ContractType:    ContractType,
+	ContractABI:     SiloedLockReleaseTokenPoolABI,
+	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, SetSiloRebalancerArgs],
+	Validate:        func(SetSiloRebalancerArgs) error { return nil },
+	CallContract: func(
+		c *SiloedLockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args SetSiloRebalancerArgs,
+	) (*types.Transaction, error) {
+		return c.SetSiloRebalancer(opts, args.RemoteChainSelector, args.NewRebalancer)
+	},
+})
+
+var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *SiloedLockReleaseTokenPoolContract]{
+	Name:            "siloed-lock-release-token-pool:withdraw-liquidity",
+	Version:         Version,
+	Description:     "Calls withdrawLiquidity on the contract",
+	ContractType:    ContractType,
+	ContractABI:     SiloedLockReleaseTokenPoolABI,
+	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, *big.Int],
+	Validate:        func(*big.Int) error { return nil },
+	CallContract: func(
+		c *SiloedLockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args *big.Int,
+	) (*types.Transaction, error) {
+		return c.WithdrawLiquidity(opts, args)
+	},
+})
+
+var WithdrawSiloedLiquidity = contract.NewWrite(contract.WriteParams[WithdrawSiloedLiquidityArgs, *SiloedLockReleaseTokenPoolContract]{
+	Name:            "siloed-lock-release-token-pool:withdraw-siloed-liquidity",
+	Version:         Version,
+	Description:     "Calls withdrawSiloedLiquidity on the contract",
+	ContractType:    ContractType,
+	ContractABI:     SiloedLockReleaseTokenPoolABI,
+	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, WithdrawSiloedLiquidityArgs],
+	Validate:        func(WithdrawSiloedLiquidityArgs) error { return nil },
+	CallContract: func(
+		c *SiloedLockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args WithdrawSiloedLiquidityArgs,
+	) (*types.Transaction, error) {
+		return c.WithdrawSiloedLiquidity(opts, args.RemoteChainSelector, args.Amount)
+	},
+})
+
+var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-token",
+	Version:      Version,
+	Description:  "Calls getToken on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetToken(opts)
+	},
 })

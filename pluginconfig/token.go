@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -281,9 +282,15 @@ func (p *USDCCCTPObserverConfig) Validate() error {
 	if len(p.Tokens) == 0 {
 		return errors.New("Tokens not set")
 	}
-	for _, token := range p.Tokens {
+	for chainSelector, token := range p.Tokens {
 		if err := token.Validate(); err != nil {
-			return err
+			return fmt.Errorf(
+				"invalid usdc token config for chain selector %d, source pool %q, and source message transmitter %q: %w",
+				chainSelector,
+				token.SourcePoolAddress,
+				token.SourceMessageTransmitterAddr,
+				err,
+			)
 		}
 	}
 	return nil
@@ -298,12 +305,27 @@ type USDCCCTPTokenConfig struct {
 	SourceMessageTransmitterAddr string `json:"sourceMessageTransmitterAddress"`
 }
 
-func (t USDCCCTPTokenConfig) Validate() error {
-	if t.SourcePoolAddress == "" {
-		return errors.New("SourcePoolAddress not set")
+// validAddress performs strict validation on hex based addresses, and allows unknown stuff for AltVM addresses.
+func invalidAddress(addr string) bool {
+	if strings.HasPrefix(addr, "0x") {
+		return cciptypes.IsZeroOrEmptyOrInvalidHexAddress(addr)
 	}
-	if t.SourceMessageTransmitterAddr == "" {
-		return errors.New("SourceMessageTransmitterAddress not set")
+	// If it is not hex, just ensure that there is some non-zero content in the address.
+	addr = strings.Replace(addr, "0", "", -1)
+	addr = strings.Replace(addr, " ", "", -1)
+	return len(addr) == 0
+}
+
+func (t USDCCCTPTokenConfig) Validate() error {
+	if invalidAddress(t.SourcePoolAddress) {
+		return fmt.Errorf("SourcePoolAddress not set (source pool %q)", t.SourcePoolAddress)
+	}
+	if invalidAddress(t.SourceMessageTransmitterAddr) {
+		return fmt.Errorf(
+			"SourceMessageTransmitterAddress not set (source pool %q, source message transmitter %q)",
+			t.SourcePoolAddress,
+			t.SourceMessageTransmitterAddr,
+		)
 	}
 	return nil
 }
@@ -330,7 +352,7 @@ func (c *LBTCObserverConfig) Validate() error {
 		return errors.New("SourcePoolAddressByChain is not set")
 	}
 	for _, sourcePoolAddress := range c.SourcePoolAddressByChain {
-		if sourcePoolAddress == "" {
+		if invalidAddress(sourcePoolAddress) {
 			return errors.New("SourcePoolAddressByChain is empty")
 		}
 	}

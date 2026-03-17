@@ -737,3 +737,8 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 			return result, nil
 		})
 }
+
+func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+

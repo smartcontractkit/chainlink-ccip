@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -201,10 +202,46 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			tokenRef, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
+
+			// NOTE: we only need token metadata if we're creating a token multisig. If we
+			// don't need to create one, then we can avoid sending extraneous RPC calls to
+			// the chain.
+			needTokenMultisig := input.SVMExtraArgs != nil && len(input.SVMExtraArgs.CustomerMintAuthorities) > 0
+			tokenSymb := input.TokenRef.Qualifier
+
+			// NOTE: we attempt to resolve the token from the datastore first to avoid RPC calls.
+			// If the token does not exist there, then we will try to infer all the info from the
+			// chain *if* the token ref includes an address. Otherwise, we don't have enough info
+			// to proceed.
+			var tokenProg solana.PublicKey
+			var tokenMint solana.PublicKey
+			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
+				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
+				if input.TokenRef.Address == "" {
+					return sequences.OnChainOutput{}, errors.New("token information could not be resolved from datastore and token reference does not include an address to attempt on-chain resolution")
+				}
+
+				tokenAddr := solana.MustPublicKeyFromBase58(input.TokenRef.Address)
+				tokProgramID, err := utils.FetchTokenProgramID(b.GetContext(), chain, tokenAddr)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program ID for token mint '%s': %w", tokenAddr.String(), err)
+				}
+
+				tokenProg = tokProgramID
+				tokenMint = tokenAddr
+				if needTokenMultisig && tokenSymb == "" {
+					if tokenMeta, _, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenAddr); err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token metadata for token mint '%s': %w", tokenAddr.String(), err)
+					} else {
+						tokenSymb = tokenMeta.Data.Symbol
+					}
+				}
+			} else {
+				tokenMint = solana.MustPublicKeyFromBase58(tokRef.Address)
+				tokenSymb = tokRef.Qualifier
+				tokenProg = tokProgramID
 			}
+
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, chain.Selector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get router address: %w", err)
@@ -222,7 +259,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 
 			rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
 				Router:            solana.PublicKeyFromBytes(routerAddr),
-				TokenMint:         solana.MustPublicKeyFromBase58(tokenRef.Address),
+				TokenMint:         tokenMint,
 				Admin:             tokenAdmin,
 				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
 			})
@@ -240,9 +277,8 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
 			}
-			tokenMint := solana.MustPublicKeyFromBase58(tokenRef.Address)
-			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
 
+			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
 			if input.SVMExtraArgs == nil || !input.SVMExtraArgs.SkipTokenPoolInit {
 				initTPOp := tokenpoolops.InitializeBurnMint
 				transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
@@ -263,7 +299,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				initTPOut, err := operations.ExecuteOperation(b, initTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.Params{
 					TokenPool:      tokenPool,
 					TokenMint:      tokenMint,
-					TokenProgramID: tokenProgramId,
+					TokenProgramID: tokenProg,
 					Router:         solana.PublicKeyFromBytes(routerAddr),
 					RMNRemote:      solana.PublicKeyFromBytes(rmnRemoteAddr),
 				})
@@ -288,7 +324,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			/// Create Token Multisig ///
 			/////////////////////////////
 
-			if input.SVMExtraArgs != nil && len(input.SVMExtraArgs.CustomerMintAuthorities) > 0 {
+			if needTokenMultisig {
 				// The multisig will be used as the mint authority (or owner) depending on the pool flow.
 				// We include the TokenPoolSigner PDA as one of the multisig signers so the Token Pool Program
 				// can "sign" via PDA seeds when it needs to act (PDA signing).
@@ -304,16 +340,51 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				}
 
 				createTokenMultisigOutput, err := operations.ExecuteOperation(b, tokensops.CreateTokenMultisig, chains.SolanaChains()[chain.Selector], tokensops.TokenMultisigParams{
-					TokenProgram: tokenProgramId,
+					TokenProgram: tokenProg,
 					Signers:      signers,
 					TokenMint:    tokenMint,
-					TokenSymbol:  tokenRef.Qualifier,
+					TokenSymbol:  tokenSymb,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create token multisig on-chain: %w", err)
 				}
 				result.Addresses = append(result.Addresses, createTokenMultisigOutput.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, createTokenMultisigOutput.Output.BatchOps...)
+			}
+
+			// Manual registration can be used on tokens that aren't in the datastore
+			// (e.g. a customer deployed the token themselves). If we come across one
+			// of these tokens, then it will only be added to the datastore if (1) we
+			// have enough info to rebuild the full ref, and (2) it truly is the case
+			// that the ref does not already exist in the datastore.
+			if tokenSymb != "" && !tokenMint.IsZero() && !tokenProg.IsZero() {
+				tokenType, err := utils.GetTokenProgramType(tokenProg)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program type: %w", err)
+				}
+
+				tokenRef := datastore.AddressRef{
+					ChainSelector: input.ChainSelector,
+					Qualifier:     tokenSymb,
+					Address:       tokenMint.String(),
+					Version:       tokensops.Version,
+					Labels:        datastore.NewLabelSet(),
+					Type:          datastore.ContractType(tokenType.String()),
+				}
+
+				results := input.ExistingDataStore.Addresses().Filter(
+					datastore.AddressRefByChainSelector(tokenRef.ChainSelector),
+					datastore.AddressRefByQualifier(tokenRef.Qualifier),
+					datastore.AddressRefByVersion(tokenRef.Version),
+					datastore.AddressRefByAddress(tokenRef.Address),
+					datastore.AddressRefByType(tokenRef.Type),
+				)
+				if len(results) == 0 {
+					b.Logger.Infof("No existing datastore entry found for ref (%s). Adding to results.", datastore_utils.SprintRef(tokenRef))
+					result.Addresses = append(result.Addresses, tokenRef)
+				} else {
+					b.Logger.Infof("Datastore entry already exists for ref (%s). Not adding to results.", datastore_utils.SprintRef(tokenRef))
+				}
 			}
 
 			return result, nil
@@ -550,18 +621,9 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 }
 
 func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.AddressRef, chain cldf_solana.Chain) (datastore.AddressRef, solana.PublicKey, error) {
-	ref := datastore.AddressRef{
-		ChainSelector: chain.Selector,
-	}
-	if tokenRef.Address != "" {
-		ref.Address = tokenRef.Address
-	}
-	if tokenRef.Qualifier != "" {
-		ref.Qualifier = tokenRef.Qualifier
-	}
-	tokenAddr, err := datastore_utils.FindAndFormatRef(store, ref, chain.Selector, datastore_utils.FullRef)
+	tokenAddr, err := datastore_utils.FindAndFormatRef(store, tokenRef, chain.Selector, datastore_utils.FullRef)
 	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", ref, err)
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", tokenRef, err)
 	}
 	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
 	if err != nil {
@@ -652,3 +714,8 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 			return result, nil
 		})
 }
+
+func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokenapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+

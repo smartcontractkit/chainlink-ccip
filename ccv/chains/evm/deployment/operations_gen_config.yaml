@@ -33,6 +33,17 @@ contracts:
       - name: getAllAuthorizedCallers
         access: public
 
+  - contract_name: FactoryBurnMintERC20
+    version: "1.7.0"
+    version_path: "latest"
+    package_name: erc20
+    abi_file: factory_burn_mint_erc20.json
+    no_deployment: true
+    functions:
+      - name: approve
+        access: public
+      - name: balanceOf
+        access: public
   - contract_name: AdvancedPoolHooks
     version: "2.0.0"
     version_path: "latest"
@@ -97,6 +108,15 @@ contracts:
         access: public
       - name: getAllSourceChainConfigs
         access: public
+
+  - contract_name: MockReceiverV2
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: getCCVsAndMinBlockConfirmations
+        access: public
+      - name: setMinBlockConfirmations
+        access: public # Only used in testing, not critical
 
   # Token Pool contracts (latest / v2.0.0)
 
@@ -177,12 +197,18 @@ contracts:
   - contract_name: LockReleaseTokenPool
     version: "2.0.0"
     version_path: "latest"
-    functions: []
+    functions:
+      - name: getLockBox
+        access: public
 
   - contract_name: SiloedLockReleaseTokenPool
     version: "2.0.0"
     version_path: "latest"
-    functions: []
+    functions:
+      - name: getLockBox
+        access: public
+      - name: getAllLockBoxConfigs
+        access: public
 
   - contract_name: SiloedUSDCTokenPool
     version: "2.0.0"
@@ -249,6 +275,119 @@ contracts:
       - name: getAllAuthorizedCallers
         access: public
       - name : deposit
+        access: public
+
+  - contract_name: MockReceiverV2
+    version: "2.0.0"
+    version_path: "latest"
+    package_name: mock_receiver
+    abi_file: mock_receiver_v2.json
+    functions: []
+
+  - contract_name: Executor
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getDynamicConfig
+        access: public
+      - name: getDestChains
+        access: public
+      - name: getAllowedCCVs
+        access: public
+      - name: getMaxCCVsPerMessage
+        access: public
+      - name: getMinBlockConfirmations
+        access: public
+
+  - contract_name: Proxy
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setTarget
+        access: owner
+      - name: setFeeAggregator
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getTarget
+        access: public
+      - name: getFeeAggregator
+        access: public
+
+  - contract_name: LombardVerifier
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setPath
+        access: owner
+      - name: updateSupportedTokens
+        access: owner
+      - name: setRemoteAdapters
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: removePaths
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getPath
+        access: public
+      - name: getRemoteAdapter
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getSupportedTokens
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getFee
+        access: public
+
+  - contract_name: CCTPVerifier
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setDomains
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: updateStorageLocations
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getDomain
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getFee
         access: public
 
   - contract_name: CommitteeVerifier

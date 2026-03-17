@@ -50,19 +50,18 @@ var FetchNodeChainSupport = operations.NewOperation(
 
 		nodeIDs := make([]string, 0, len(input.NOPAliases))
 		nodeIDToAlias := make(map[string]string)
+		seenNodeIDs := make(map[string]string)
 		for _, nopAlias := range input.NOPAliases {
 			node, ok := lookup.FindByName(nopAlias)
 			if !ok {
-				lggr.Warnw("Node not found for NOP alias",
-					"nopAlias", nopAlias)
-				continue
+				return output, fmt.Errorf("NOP alias %q not found in node lookup (node IDs: %v)", nopAlias, deps.NodeIDs)
 			}
+			if existing, ok := seenNodeIDs[node.Id]; ok && existing != nopAlias {
+				return output, fmt.Errorf("duplicate node ID %q: NOP aliases %q and %q both resolve to the same node", node.Id, existing, nopAlias)
+			}
+			seenNodeIDs[node.Id] = nopAlias
 			nodeIDs = append(nodeIDs, node.Id)
 			nodeIDToAlias[node.Id] = nopAlias
-		}
-
-		if len(nodeIDs) == 0 {
-			return output, nil
 		}
 
 		chainConfigsResp, err := deps.JDClient.ListNodeChainConfigs(ctx, &nodev1.ListNodeChainConfigsRequest{

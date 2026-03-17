@@ -831,21 +831,6 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 	return r.donAddressBook.GetContractAddress(addressbook.ContractName(contractName), chain)
 }
 
-// getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
-func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (cciptypes.FeeQuoterStaticConfig, error) {
-	// Get from cache
-	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
-	if err != nil {
-		return cciptypes.FeeQuoterStaticConfig{}, fmt.Errorf("get chain config: %w", err)
-	}
-
-	if len(config.FeeQuoter.StaticConfig.LinkToken) == 0 {
-		return cciptypes.FeeQuoterStaticConfig{}, fmt.Errorf("link token address is empty")
-	}
-
-	return config.FeeQuoter.StaticConfig, nil
-}
-
 // getFeeQuoterTokenPriceUSD gets the token price in USD of the given token address from the FeeQuoter contract on the
 // destination chain.
 func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAddr []byte) (cciptypes.BigInt, error) {

@@ -8,99 +8,66 @@ import (
 	"github.com/stretchr/testify/require"
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
-
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
-func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_changesets.ChainConfig {
-	return v1_7_0_changesets.ChainConfig{
-		ChainSelector: chainSelector,
-		Router: datastore.AddressRef{
-			Type:    datastore.ContractType(router.ContractType),
-			Version: router.Version,
-		},
-		OnRamp: datastore.AddressRef{
-			Type:    datastore.ContractType(onramp.ContractType),
-			Version: onramp.Version,
-		},
-		CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) lanes.ChainDefinition {
+	return lanes.ChainDefinition{
+		Selector: chainSelector,
+		CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
 				CommitteeVerifier: []datastore.AddressRef{
 					{
-						Type:    datastore.ContractType(committee_verifier.ContractType),
-						Version: committee_verifier.Version,
+						ChainSelector: chainSelector,
+						Type:          datastore.ContractType(committee_verifier.ContractType),
+						Version:       committee_verifier.Version,
 					},
 					{
-						Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-						Version: semver.MustParse("1.7.0"),
+						ChainSelector: chainSelector,
+						Type:          datastore.ContractType(sequences.CommitteeVerifierResolverType),
+						Version:       semver.MustParse("1.7.0"),
 					},
 				},
-				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+				RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 					remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 				},
 			},
 		},
-		FeeQuoter: datastore.AddressRef{
-			Type:    datastore.ContractType(fee_quoter.ContractType),
-			Version: fee_quoter.Version,
-		},
-		OffRamp: datastore.AddressRef{
-			Type:    datastore.ContractType(offramp.ContractType),
-			Version: offramp.Version,
-		},
-		RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
-			remoteChainSelector: {
-				AllowTrafficFrom: true,
-				OnRamps: []datastore.AddressRef{
-					{
-						Type:    datastore.ContractType(onramp.ContractType),
-						Version: onramp.Version,
-					},
-				},
-				OffRamp: datastore.AddressRef{
-					Type:    datastore.ContractType(offramp.ContractType),
-					Version: offramp.Version,
-				},
-				DefaultInboundCCVs: []datastore.AddressRef{
-					{
-						Type:    datastore.ContractType(committee_verifier.ContractType),
-						Version: committee_verifier.Version,
-					},
-				},
-				DefaultOutboundCCVs: []datastore.AddressRef{
-					{
-						Type:    datastore.ContractType(committee_verifier.ContractType),
-						Version: committee_verifier.Version,
-					},
-				},
-				DefaultExecutor: datastore.AddressRef{
-					Type:      datastore.ContractType(executor.ProxyType),
-					Version:   executor.Version,
-					Qualifier: "default",
-				},
-				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
-				ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
-				AddressBytesLength:       20,
-				BaseExecutionGasCost:     80_000,
+		DefaultInboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: chainSelector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
 			},
 		},
+		DefaultOutboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: chainSelector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+			},
+		},
+		DefaultExecutor: datastore.AddressRef{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(sequences.ExecutorProxyType),
+			Version:       executor.Version,
+			Qualifier:     "default",
+		},
+		FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+		ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+		AddressBytesLength:       20,
+		BaseExecutionGasCost:     80_000,
 	}
 }
 
@@ -122,8 +89,7 @@ func TestChainFamilyAdapter(t *testing.T) {
 			require.NoError(t, err, "Failed to create test environment")
 			require.NotNil(t, e, "Environment should be created")
 
-			chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-			chainFamilyRegistry.RegisterChainFamily("evm", &evm_adapters.ChainFamilyAdapter{})
+			chainFamilyRegistry := lanes.GetLaneAdapterRegistry()
 			mcmsRegistry := changesets.GetRegistry()
 
 			// On each chain, deploy chain contracts
@@ -143,6 +109,7 @@ func TestChainFamilyAdapter(t *testing.T) {
 						ChainSel:       chainSel,
 						CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 						Params:         testsetup.CreateBasicContractParams(),
+						DeployerKeyOwned: true,
 					},
 				})
 				require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
@@ -155,13 +122,16 @@ func TestChainFamilyAdapter(t *testing.T) {
 
 			// Configure chains for lanes
 			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-			_, err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).Apply(*e, v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					makeChainConfig(chainA, chainB),
-					makeChainConfig(chainB, chainA),
+			_, err = lanes.ConnectChains(chainFamilyRegistry, mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+				Lanes: []lanes.LaneConfig{
+					{
+						ChainA:  makeChainConfig(chainA, chainB),
+						ChainB:  makeChainConfig(chainB, chainA),
+						Version: semver.MustParse("2.0.0"),
+					},
 				},
 			})
-			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
+			require.NoError(t, err, "Failed to apply ConnectChains changeset")
 		})
 	}
 }

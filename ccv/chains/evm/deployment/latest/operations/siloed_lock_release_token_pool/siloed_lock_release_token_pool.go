@@ -57,6 +57,31 @@ func (c *SiloedLockReleaseTokenPoolContract) Owner(opts *bind.CallOpts) (common.
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *SiloedLockReleaseTokenPoolContract) GetLockBox(opts *bind.CallOpts, args uint64) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getLockBox", args)
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) GetAllLockBoxConfigs(opts *bind.CallOpts) ([]LockBoxConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllLockBoxConfigs")
+	if err != nil {
+		var zero []LockBoxConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]LockBoxConfig)).(*[]LockBoxConfig), nil
+}
+
+type LockBoxConfig struct {
+	RemoteChainSelector uint64
+	LockBox             common.Address
+}
+
 type ConstructorArgs struct {
 	Token              common.Address
 	LocalTokenDecimals uint8
@@ -79,4 +104,26 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var GetLockBox = contract.NewRead(contract.ReadParams[uint64, common.Address, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-lock-box",
+	Version:      Version,
+	Description:  "Calls getLockBox on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (common.Address, error) {
+		return c.GetLockBox(opts, args)
+	},
+})
+
+var GetAllLockBoxConfigs = contract.NewRead(contract.ReadParams[struct{}, []LockBoxConfig, *SiloedLockReleaseTokenPoolContract]{
+	Name:         "siloed-lock-release-token-pool:get-all-lock-box-configs",
+	Version:      Version,
+	Description:  "Calls getAllLockBoxConfigs on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]LockBoxConfig, error) {
+		return c.GetAllLockBoxConfigs(opts)
+	},
 })
