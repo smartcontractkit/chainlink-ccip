@@ -3,6 +3,7 @@ package changesets_test
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strconv"
 	"testing"
 
@@ -131,6 +132,14 @@ func (m *mockLaneAdapter) GetRouterAddress(_ datastore.DataStore, _ uint64) ([]b
 
 func (m *mockLaneAdapter) GetFQAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
 	return []byte("0xFeeQuoter"), nil
+}
+
+func (m *mockLaneAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
+	return lanes.DefaultFeeQuoterDestChainConfig(false, chainsel.ETHEREUM_MAINNET.Selector)
+}
+
+func (m *mockLaneAdapter) GetDefaultGasPrice() *big.Int {
+	return big.NewInt(2e12)
 }
 
 func (m *mockLaneAdapter) DisableRemoteChain() *cldf_ops.Sequence[lanes.DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
