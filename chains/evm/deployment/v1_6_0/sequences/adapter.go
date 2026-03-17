@@ -66,16 +66,29 @@ func (a *EVMAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uin
 }
 
 func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	// might be multiple fee quoters on a chain, just return the latest one
-	refs := ds.Addresses().Filter(
-		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
-		datastore.AddressRefByChainSelector(chainSelector),
-	)
-	ref, err := GetFeeQuoterAddress(refs, chainSelector)
+	ref, err := a.getFeeQuoterRef(ds, chainSelector)
 	if err != nil {
 		return nil, err
 	}
 	return evm_datastore_utils.ToEVMAddressBytes(ref)
+}
+
+// GetFQVersion implements the optional FeeQuoterVersionProvider interface so that
+// update_lanes can choose 1.6 vs 2.0 FeeQuoter operations based on the deployed contract version.
+func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, chainSelector uint64) (*semver.Version, error) {
+	ref, err := a.getFeeQuoterRef(ds, chainSelector)
+	if err != nil {
+		return nil, err
+	}
+	return ref.Version, nil
+}
+
+func (a *EVMAdapter) getFeeQuoterRef(ds datastore.DataStore, chainSelector uint64) (datastore.AddressRef, error) {
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
+		datastore.AddressRefByChainSelector(chainSelector),
+	)
+	return GetFeeQuoterAddress(refs, chainSelector)
 }
 
 func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {

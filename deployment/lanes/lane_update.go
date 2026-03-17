@@ -45,6 +45,9 @@ type ChainDefinition struct {
 	// FeeQuoter is the address of the FeeQuoter contract on this chain.
 	// This is populated programmatically
 	FeeQuoter []byte
+	// FeeQuoterVersion is the contract version of the FeeQuoter (e.g. 1.6.0 or 2.0.0).
+	// Populated when the adapter implements FeeQuoterVersionProvider; used to select 1.6 vs 2.0 operations.
+	FeeQuoterVersion *semver.Version
 }
 
 type FeeQuoterDestChainConfig struct {

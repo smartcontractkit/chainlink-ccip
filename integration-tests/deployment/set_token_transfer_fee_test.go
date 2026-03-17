@@ -305,7 +305,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	fqUpdateChangeset := deploy.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deploy.UpdateFeeQuoterInput{
 		Chains: fqInput,
-		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2", WithTimelockDelay(time.Duration(0))),
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)
@@ -353,7 +353,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 		SetTokenTransferFee(feesRegistry, mcmsRegistry).
 		Apply(*e, fees.SetTokenTransferFeeInput{
 			Version: v2_0_0,
-			MCMS:    NewDefaultInputForMCMS("Set token transfer fee", WithTimelockDelay(time.Duration(0))),
+			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
 			Args: []fees.TokenTransferFeeForSrc{
 				{
 					Selector: src,
@@ -424,7 +424,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 		SetTokenTransferFee(feesRegistry, mcmsRegistry).
 		Apply(*e, fees.SetTokenTransferFeeInput{
 			Version: v2_0_0,
-			MCMS:    NewDefaultInputForMCMS("Set token transfer fee", WithTimelockDelay(time.Duration(0))),
+			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
 			Args: []fees.TokenTransferFeeForSrc{
 				{
 					Selector: src,
