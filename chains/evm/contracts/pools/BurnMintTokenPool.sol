@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
@@ -14,18 +14,21 @@ import {TokenPool} from "./TokenPool.sol";
 /// If that is expected, please make sure the token's burner/minter roles are adjustable.
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(amount)`.
 contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
-  string public constant override typeAndVersion = "BurnMintTokenPool 1.6.x-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "BurnMintTokenPool 2.0.0-dev";
+  }
 
   constructor(
     IBurnMintERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
-  /// @inheritdoc TokenPool
+  /// @notice Burns tokens held by the pool.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(amount);

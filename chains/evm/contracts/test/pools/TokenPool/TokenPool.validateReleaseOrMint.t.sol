@@ -2,48 +2,68 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
+import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPool_validateReleaseOrMint is TokenPoolSetup {
-  uint256 internal constant AMOUNT = 100;
+contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
+  uint256 internal constant AMOUNT = 100e18;
 
-  function setUp() public override {
-    super.setUp();
+  function test_validateReleaseOrMint() public {
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+
+    assertEq(localAmount, AMOUNT);
   }
 
-  function test_validateReleaseOrMint_Success() public {
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      localToken: address(s_token),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourceDenominatedAmount: AMOUNT,
-      sourcePoolData: abi.encode(DEFAULT_TOKEN_DECIMALS),
-      receiver: address(0x123),
-      originalSender: abi.encode(address(0x456)),
-      offchainTokenData: ""
-    });
+  /// @notice When custom block confirmations are requested but no custom bucket is configured,
+  /// the fallback consumes from the default inbound bucket.
+  function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
-    // Should not revert
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT);
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+
+    vm.startPrank(s_allowedOffRamp);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+
+    assertEq(localAmount, AMOUNT);
+  }
+
+  /// @notice When a custom inbound bucket IS configured, the custom event is emitted instead.
+  function test_validateReleaseOrMint_NonZeroFinality_UsesCustomBucketWhenConfigured() public {
+    RateLimiter.Config memory customInbound = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
+    args[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmations: true,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
+      inboundRateLimiterConfig: customInbound
+    });
+    s_tokenPool.setRateLimitConfig(args);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+
+    vm.expectEmit();
+    emit TokenPool.CustomBlockConfirmationsInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+
+    vm.startPrank(s_allowedOffRamp);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+
+    assertEq(localAmount, AMOUNT);
   }
 
   function test_validateReleaseOrMint_RateLimitLocalAmount() public {
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      localToken: address(s_token),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourceDenominatedAmount: AMOUNT,
-      sourcePoolData: abi.encode(DEFAULT_TOKEN_DECIMALS),
-      receiver: address(0x123),
-      originalSender: abi.encode(address(0x456)),
-      offchainTokenData: ""
-    });
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
-    // Pretend the local amount is 10x the source amount and assert the rate limit is applied on the local amount
+    // Pretend the local amount is 10x the source amount and assert the rate limit is applied on the local amount.
     uint256 localAmount = AMOUNT * 10;
 
     vm.expectEmit();
@@ -51,38 +71,22 @@ contract TokenPool_validateReleaseOrMint is TokenPoolSetup {
       remoteChainSelector: releaseOrMintIn.remoteChainSelector, token: releaseOrMintIn.localToken, amount: localAmount
     });
 
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount);
+    vm.startPrank(s_allowedOffRamp);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
   }
 
   function test_validateReleaseOrMint_InvalidToken() public {
     address wrongToken = address(0x456);
 
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      localToken: wrongToken, // Invalid token address
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourceDenominatedAmount: AMOUNT,
-      sourcePoolData: abi.encode(DEFAULT_TOKEN_DECIMALS),
-      receiver: address(0x123),
-      originalSender: abi.encode(address(0x456)),
-      offchainTokenData: ""
-    });
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+    releaseOrMintIn.localToken = wrongToken; // Invalid token address.
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
   function test_validateReleaseOrMint_CursedByRMN() public {
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      localToken: address(s_token),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourceDenominatedAmount: AMOUNT,
-      sourcePoolData: abi.encode(DEFAULT_TOKEN_DECIMALS),
-      receiver: address(0x123),
-      originalSender: abi.encode(0x456),
-      offchainTokenData: ""
-    });
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     // Mock RMN to be cursed
     vm.mockCall(
@@ -92,20 +96,11 @@ contract TokenPool_validateReleaseOrMint is TokenPoolSetup {
     );
 
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
   function test_validateReleaseOrMint_InvalidOffRamp() public {
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      localToken: address(s_token),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourceDenominatedAmount: AMOUNT,
-      sourcePoolData: abi.encode(DEFAULT_TOKEN_DECIMALS),
-      receiver: address(0x123),
-      originalSender: abi.encode(address(0x456)),
-      offchainTokenData: ""
-    });
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     // Mock router to return false for isOffRamp
     vm.mockCall(
@@ -115,24 +110,33 @@ contract TokenPool_validateReleaseOrMint is TokenPoolSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, s_allowedOffRamp));
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT);
+    vm.startPrank(s_allowedOffRamp);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
   function test_validateReleaseOrMint_InvalidSourcePool() public {
     address invalidPool = address(0x789);
 
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      localToken: address(s_token),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      sourcePoolAddress: abi.encode(invalidPool),
-      sourceDenominatedAmount: AMOUNT,
-      sourcePoolData: abi.encode(DEFAULT_TOKEN_DECIMALS),
-      receiver: address(0x123),
-      originalSender: abi.encode(address(0x456)),
-      offchainTokenData: ""
-    });
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+    releaseOrMintIn.sourcePoolAddress = abi.encode(invalidPool);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidSourcePoolAddress.selector, abi.encode(invalidPool)));
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT);
+    vm.startPrank(s_allowedOffRamp);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+  }
+
+  function _buildReleaseOrMintIn(
+    uint256 amount
+  ) internal view returns (Pool.ReleaseOrMintInV1 memory) {
+    return Pool.ReleaseOrMintInV1({
+      originalSender: abi.encode(OWNER),
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      receiver: OWNER,
+      sourceDenominatedAmount: amount,
+      localToken: address(s_token),
+      sourcePoolAddress: abi.encode(s_initialRemotePool),
+      sourcePoolData: abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)),
+      offchainTokenData: ""
+    });
   }
 }

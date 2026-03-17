@@ -46,7 +46,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Description:      "Deploys the TokenAdminRegistry contract",
 	ContractMetadata: token_admin_registry.TokenAdminRegistryMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.5.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(token_admin_registry.TokenAdminRegistryBin),
 		},
 	},
@@ -134,6 +134,31 @@ var SetPool = contract.NewWrite(contract.WriteParams[SetPoolArgs, *token_admin_r
 	Validate: func(SetPoolArgs) error { return nil },
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args SetPoolArgs) (*types.Transaction, error) {
 		return tokenAdminRegistry.SetPool(opts, args.TokenAddress, args.TokenPoolAddress)
+	},
+})
+
+var AddRegistryModule = contract.NewWrite(contract.WriteParams[common.Address, *token_admin_registry.TokenAdminRegistry]{
+	Name:            "token-admin-registry:add-registry-module",
+	Version:         Version,
+	Description:     "Adds a registry module to the TokenAdminRegistry contract",
+	ContractType:    ContractType,
+	ContractABI:     token_admin_registry.TokenAdminRegistryABI,
+	NewContract:     token_admin_registry.NewTokenAdminRegistry,
+	IsAllowedCaller: contract.OnlyOwner[*token_admin_registry.TokenAdminRegistry, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return tokenAdminRegistry.AddRegistryModule(opts, args)
+	},
+})
+
+var IsRegistryModule = contract.NewRead(contract.ReadParams[common.Address, bool, *token_admin_registry.TokenAdminRegistry]{
+	Name:         "token-admin-registry:is-registry-module",
+	Version:      Version,
+	Description:  "Checks if an address is a registry module in the TokenAdminRegistry contract",
+	ContractType: ContractType,
+	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args common.Address) (bool, error) {
+		return tokenAdminRegistry.IsRegistryModule(opts, args)
 	},
 })
 

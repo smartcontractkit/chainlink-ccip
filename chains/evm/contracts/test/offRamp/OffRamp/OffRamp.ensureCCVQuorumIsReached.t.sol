@@ -1,0 +1,330 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+
+import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
+import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
+
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+
+using ERC165CheckerReverting for address;
+
+contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
+  address internal s_receiver;
+  address internal s_requiredCCV;
+  address internal s_optionalCCV1;
+  address internal s_optionalCCV2;
+  address internal s_laneMandatedCCV;
+  address internal s_poolRequiredCCV;
+  address internal s_destToken;
+  address internal s_destTokenPool;
+  bytes internal s_sender;
+
+  uint16 internal constant FINALITY = 0;
+
+  function setUp() public override {
+    super.setUp();
+
+    s_receiver = address(new MockReceiverV2(new address[](0), new address[](0), 0));
+    s_sender = abi.encodePacked(makeAddr("sender"));
+
+    s_requiredCCV = makeAddr("requiredCCV");
+    s_optionalCCV1 = makeAddr("optionalCCV1");
+    s_optionalCCV2 = makeAddr("optionalCCV2");
+    s_laneMandatedCCV = makeAddr("laneMandatedCCV");
+    s_poolRequiredCCV = makeAddr("poolRequiredCCV");
+    s_destToken = makeAddr("destToken");
+    s_destTokenPool = makeAddr("destTokenPool");
+
+    // Configure source chain with lane mandated CCVs.
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      onRamps: onRamps,
+      defaultCCVs: new address[](1),
+      laneMandatedCCVs: new address[](1)
+    });
+    configs[0].laneMandatedCCVs[0] = s_laneMandatedCCV;
+    configs[0].defaultCCVs[0] = s_defaultCCV;
+
+    s_offRamp.applySourceChainConfigUpdates(configs);
+
+    // Mock the token admin registry to return our pool.
+    vm.mockCall(
+      s_tokenAdminRegistry,
+      abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, s_destToken),
+      abi.encode(s_destTokenPool)
+    );
+
+    // Mock the pool to support IERC165, but not IPoolV2 by default - tests can override this.
+    vm.mockCall(
+      s_destTokenPool,
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
+      abi.encode(true)
+    );
+  }
+
+  function _createTokenTransferWithPool() internal view returns (MessageV1Codec.TokenTransferV1[] memory) {
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
+    tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
+      amount: 100,
+      sourcePoolAddress: abi.encode(s_destTokenPool),
+      sourceTokenAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
+      destTokenAddress: abi.encodePacked(s_destToken),
+      tokenReceiver: abi.encodePacked(address(21321)),
+      extraData: ""
+    });
+    return tokenTransfers;
+  }
+
+  function _buildMessage(
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers,
+    bool isTokenOnlyTransfer
+  ) internal view returns (MessageV1Codec.MessageV1 memory) {
+    return MessageV1Codec.MessageV1({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      messageNumber: 1,
+      executionGasLimit: 200_000,
+      ccipReceiveGasLimit: isTokenOnlyTransfer ? 0 : 200_000,
+      finality: FINALITY,
+      ccvAndExecutorHash: bytes32(0),
+      onRampAddress: s_onRamp,
+      offRampAddress: abi.encodePacked(s_offRamp),
+      sender: s_sender,
+      receiver: abi.encodePacked(s_receiver),
+      destBlob: "",
+      tokenTransfer: tokenTransfers,
+      data: isTokenOnlyTransfer ? bytes("") : bytes("some data")
+    });
+  }
+
+  function test_ensureCCVQuorumIsReached_AllCCVsFound() public {
+    address[] memory ccvs = new address[](5);
+    ccvs[0] = s_requiredCCV;
+    ccvs[1] = s_optionalCCV1;
+    ccvs[2] = s_laneMandatedCCV;
+    ccvs[3] = s_poolRequiredCCV;
+    ccvs[4] = s_defaultCCV;
+
+    // Mock receiver to return no required CCVs (so it falls back to defaults via address(0)).
+    vm.mockCall(
+      s_receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(
+        new address[](0), // no required CCVs - will fall back to defaults.
+        new address[](0), // no optional CCVs.
+        uint8(0) // no optional threshold.
+      )
+    );
+
+    // Create token transfers that will trigger pool requirements.
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = _createTokenTransferWithPool();
+
+    // Mock the pool to support IPoolV2 and return required CCVs.
+    vm.mockCall(
+      s_destTokenPool,
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId),
+      abi.encode(true)
+    );
+    address[] memory poolRequiredCCVs = new address[](1);
+    poolRequiredCCVs[0] = s_poolRequiredCCV;
+    vm.mockCall(
+      s_destTokenPool,
+      abi.encodeWithSelector(
+        IPoolV2.getRequiredCCVs.selector,
+        s_destToken,
+        SOURCE_CHAIN_SELECTOR,
+        100,
+        FINALITY,
+        "",
+        IPoolV2.MessageDirection.Inbound
+      ),
+      abi.encode(poolRequiredCCVs)
+    );
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
+
+    (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
+      s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+
+    // Since we have 1 default, 1 lane mandated, and 1 pool required.
+    assertEq(ccvsToQuery.length, 3);
+    // Order matches OffRamp's required CCV construction: receiver (sentinel) + pool + lane + defaults (appended).
+    assertEq(ccvsToQuery[0], s_poolRequiredCCV);
+    assertEq(ccvsToQuery[1], s_laneMandatedCCV);
+    assertEq(ccvsToQuery[2], s_defaultCCV);
+
+    assertEq(dataIndexes.length, 3, "right number of data indexes");
+    assertEq(dataIndexes[0], 3);
+    assertEq(dataIndexes[1], 2);
+    assertEq(dataIndexes[2], 4);
+  }
+
+  function test_ensureCCVQuorumIsReached_OptionalIsAlsoRequired() public {
+    address[] memory ccvs = new address[](2);
+    ccvs[0] = s_optionalCCV1;
+    ccvs[1] = s_laneMandatedCCV;
+
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
+
+    address[] memory receiverOptional = new address[](3);
+    receiverOptional[0] = s_laneMandatedCCV;
+    receiverOptional[1] = s_optionalCCV1;
+    receiverOptional[2] = s_optionalCCV2;
+
+    vm.mockCall(
+      s_receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(2))
+    );
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
+
+    (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
+      s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+
+    assertEq(ccvsToQuery.length, 2);
+    assertEq(ccvsToQuery[0], s_laneMandatedCCV);
+    assertEq(ccvsToQuery[1], s_optionalCCV1);
+
+    assertEq(dataIndexes.length, 2);
+    assertEq(dataIndexes[0], 1);
+    assertEq(dataIndexes[1], 0);
+  }
+
+  function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_Receiver() public {
+    address[] memory ccvs = new address[](2);
+    ccvs[0] = s_optionalCCV1;
+    ccvs[1] = s_laneMandatedCCV;
+
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
+
+    // Mock receiver to return a required CCV that's not in the provided CCVs.
+    address[] memory receiverRequired = new address[](1);
+    receiverRequired[0] = s_requiredCCV;
+    vm.mockCall(
+      s_receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(receiverRequired, new address[](0), uint8(0))
+    );
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_requiredCCV));
+    s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+  }
+
+  function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_Pool() public {
+    address[] memory ccvs = new address[](3);
+    ccvs[0] = s_requiredCCV;
+    ccvs[1] = s_laneMandatedCCV;
+    ccvs[2] = s_defaultCCV;
+
+    // Create token transfers that will require pool CCVs but with missing CCV
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = _createTokenTransferWithPool();
+
+    // Mock the pool to support IPoolV2 and return required CCVs (but CCV is missing from ccvs array).
+    vm.mockCall(
+      s_destTokenPool,
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId),
+      abi.encode(true)
+    );
+    address[] memory poolRequiredCCVs = new address[](1);
+    poolRequiredCCVs[0] = s_poolRequiredCCV;
+    vm.mockCall(s_destTokenPool, abi.encodeWithSelector(IPoolV2.getRequiredCCVs.selector), abi.encode(poolRequiredCCVs));
+
+    // Mock receiver to return required CCVs that are found.
+    address[] memory receiverRequired = new address[](1);
+    receiverRequired[0] = s_requiredCCV;
+    vm.mockCall(
+      s_receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(receiverRequired, new address[](0), uint8(0))
+    );
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_poolRequiredCCV));
+    s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+  }
+
+  function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_LaneMandated() public {
+    address[] memory ccvs = new address[](3);
+    ccvs[0] = s_requiredCCV;
+    ccvs[1] = s_optionalCCV1;
+    ccvs[2] = s_defaultCCV;
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_laneMandatedCCV));
+    s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+  }
+
+  function test_ensureCCVQuorumIsReached_RevertWhen_OptionalCCVQuorumNotReached() public {
+    address[] memory ccvs = new address[](4);
+    ccvs[0] = s_requiredCCV;
+    ccvs[1] = s_optionalCCV1;
+    ccvs[2] = s_laneMandatedCCV;
+
+    // Mock receiver to return optional CCVs with threshold 2.
+    address[] memory receiverOptional = new address[](2);
+    receiverOptional[0] = s_optionalCCV1;
+    receiverOptional[1] = s_optionalCCV2;
+
+    vm.mockCall(
+      s_receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(2))
+    );
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(new MessageV1Codec.TokenTransferV1[](0), false);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1));
+    s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+  }
+
+  function test_ensureCCVQuorumIsReached_Success_OptionalCCVsFound() public {
+    address[] memory ccvs = new address[](2);
+    ccvs[0] = s_optionalCCV1;
+    ccvs[1] = s_laneMandatedCCV;
+
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
+
+    // Mock receiver to return optional CCVs with threshold 1.
+    address[] memory receiverOptional = new address[](2);
+    receiverOptional[0] = s_optionalCCV1;
+    receiverOptional[1] = s_optionalCCV2;
+
+    vm.mockCall(
+      s_receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(1))
+    );
+
+    MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
+
+    (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
+      s_offRamp.ensureCCVQuorumIsReached(message, s_receiver, ccvs, false);
+
+    assertEq(ccvsToQuery.length, 2);
+    assertEq(ccvsToQuery[0], s_laneMandatedCCV);
+    assertEq(ccvsToQuery[1], s_optionalCCV1);
+
+    assertEq(dataIndexes.length, 2);
+    assertEq(dataIndexes[0], 1);
+    assertEq(dataIndexes[1], 0);
+  }
+}

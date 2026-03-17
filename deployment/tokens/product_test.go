@@ -60,6 +60,10 @@ func (ma *productTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[t
 	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]{}
 }
 
+func (ma *productTest_MockTokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
 func TestRegisterTokenAdapter(t *testing.T) {
 	tests := []struct {
 		desc         string

@@ -65,7 +65,9 @@ func convertOpsConfigToGobinding(cfg evmfqops.DestChainConfig) evmfq.FeeQuoterDe
 func getFQOverrides() lanesapi.FeeQuoterDestChainConfigOverride {
 	override := lanesapi.FeeQuoterDestChainConfigOverride(func(c *lanesapi.FeeQuoterDestChainConfig) {
 		c.MaxDataBytes = 60_000
-		c.EnforceOutOfOrder = true
+		if c.V1Params != nil {
+			c.V1Params.EnforceOutOfOrder = true
+		}
 	})
 	return override
 }

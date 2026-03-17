@@ -8,7 +8,7 @@ import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract TokenPool_applyChainUpdates is BaseTest {
   IERC20 internal s_token;
@@ -16,11 +16,11 @@ contract TokenPool_applyChainUpdates is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
+    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
   }
 
@@ -34,16 +34,15 @@ contract TokenPool_applyChainUpdates is BaseTest {
 
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].remoteChainSelector));
-      RateLimiter.TokenBucket memory bkt =
-        s_tokenPool.getCurrentOutboundRateLimiterState(chainUpdates[i].remoteChainSelector);
-      assertEq(bkt.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
-      assertEq(bkt.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
-      assertEq(bkt.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
+      (RateLimiter.TokenBucket memory outboundState, RateLimiter.TokenBucket memory inboundState) =
+        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector, false);
+      assertEq(outboundState.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
+      assertEq(outboundState.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
+      assertEq(outboundState.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
 
-      bkt = s_tokenPool.getCurrentInboundRateLimiterState(chainUpdates[i].remoteChainSelector);
-      assertEq(bkt.capacity, chainUpdates[i].inboundRateLimiterConfig.capacity);
-      assertEq(bkt.rate, chainUpdates[i].inboundRateLimiterConfig.rate);
-      assertEq(bkt.isEnabled, chainUpdates[i].inboundRateLimiterConfig.isEnabled);
+      assertEq(inboundState.capacity, chainUpdates[i].inboundRateLimiterConfig.capacity);
+      assertEq(inboundState.rate, chainUpdates[i].inboundRateLimiterConfig.rate);
+      assertEq(inboundState.isEnabled, chainUpdates[i].inboundRateLimiterConfig.isEnabled);
     }
   }
 
@@ -115,6 +114,23 @@ contract TokenPool_applyChainUpdates is BaseTest {
     // State remains
     assertState(chainUpdates);
 
+    // Configure custom block confirmation rate limiters on the chain we're about to remove.
+    {
+      TokenPool.RateLimitConfigArgs[] memory customRLArgs = new TokenPool.RateLimitConfigArgs[](1);
+      customRLArgs[0] = TokenPool.RateLimitConfigArgs({
+        remoteChainSelector: evmChainSelector,
+        customBlockConfirmations: true,
+        outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18}),
+        inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18})
+      });
+      s_tokenPool.setRateLimitConfig(customRLArgs);
+
+      (RateLimiter.TokenBucket memory outPre, RateLimiter.TokenBucket memory inPre) =
+        s_tokenPool.getCurrentRateLimiterState(evmChainSelector, true);
+      assertTrue(outPre.isEnabled);
+      assertTrue(inPre.isEnabled);
+    }
+
     // Can remove a chain
     chainRemoves[0] = evmChainSelector;
 
@@ -122,6 +138,16 @@ contract TokenPool_applyChainUpdates is BaseTest {
     emit TokenPool.ChainRemoved(chainRemoves[0]);
 
     s_tokenPool.applyChainUpdates(chainRemoves, new TokenPool.ChainUpdate[](0));
+
+    // Custom block confirmation buckets should be deleted along with the chain.
+    {
+      (RateLimiter.TokenBucket memory outPost, RateLimiter.TokenBucket memory inPost) =
+        s_tokenPool.getCurrentRateLimiterState(evmChainSelector, true);
+      assertFalse(outPost.isEnabled);
+      assertEq(outPost.capacity, 0);
+      assertFalse(inPost.isEnabled);
+      assertEq(inPost.capacity, 0);
+    }
 
     // State updated, only chain 2 remains
     TokenPool.ChainUpdate[] memory singleChainConfigured = new TokenPool.ChainUpdate[](1);
