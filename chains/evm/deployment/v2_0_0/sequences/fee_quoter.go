@@ -38,9 +38,9 @@ const (
 )
 
 var (
-	gasPriceMandatoryForChainFamily = map[string]struct{}{
-		chain_selectors.FamilyAptos: {},
-		chain_selectors.FamilySui:   {},
+	staticGasPriceByChainFamily = map[string]*big.Int{
+		chain_selectors.FamilyAptos: big.NewInt(15e11),
+		chain_selectors.FamilySui:   big.NewInt(15e11),
 	}
 )
 
@@ -531,7 +531,7 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	if empty16 && empty15 {
 		return FeeQuoterUpdate{}, nil
 	}
-	
+
 	// if output16 is empty, we can just return output15
 	if empty16 {
 		return output15, nil
@@ -675,44 +675,40 @@ func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
 }
 
 // HandleEmptyGasPriceStalenessThreshold handles the case when GasPriceStalenessThreshold is zero for a remote chain.
-// It checks if gas price needs to be set manually for the chain family ( mainly for aptos and sui),
-// if yes it -
-//
-//   - looks for gas price for that remote chain in the input additional config and adds it to the price updates output;
-//   - throws an error if gas price for that remote chain is not provided in the input additional config
-//     because gas price staleness threshold cannot be zero without providing gas price for chains that need manual gas price.
-//
-// if not, it returns empty price updates output because gas price does not need to be manually set for that remote chain.
+// It first looks for gas price for that remote chain in the input additional config (GasPricesPerRemoteChain).
+// If found and valid, it adds that price to the output. If not found, it checks whether the chain family
+// has a hardcoded static price (e.g. Aptos and Sui in staticGasPriceByChainFamily); if so, it uses that
+// and adds it to the output. If the chain family has no hardcoded price, it returns empty price updates.
+// Returns an error only for an invalid gas price string in config or failure to resolve the chain family.
 // It is exported for testing.
 func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
-	// check if gasprice can be set manually for the chain family,
-	// if not, we return an error because gas price staleness threshold cannot be zero
-	// for chains that do not have manual gas price
-	chainFamily, err := chain_selectors.GetSelectorFamily(remoteChain)
-	if err != nil {
-		return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
-	}
-	_, exists := gasPriceMandatoryForChainFamily[chainFamily]
-	// if manual gas price is not mandatory for the chain family but gas price staleness threshold is zero,
-	// we can skip setting gas price for that remote chain and return empty price updates
-	if !exists {
-		return fqops.PriceUpdates{}, nil
-	}
-	if input.AdditionalConfig == nil || input.AdditionalConfig.GasPricesPerRemoteChain == nil {
-		return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
-			"please provide gas price for this remote chain in the input additional config", remoteChain)
-	}
-	if gaspriceStr, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]; ok {
-		gasprice, success := new(big.Int).SetString(gaspriceStr, 10)
-		if !success {
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
+	var staticPrice *big.Int
+	if input.AdditionalConfig != nil && input.AdditionalConfig.GasPricesPerRemoteChain != nil {
+		gaspriceStr, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]
+		if ok {
+			var success bool
+			staticPrice, success = new(big.Int).SetString(gaspriceStr, 10)
+			if !success {
+				return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
+			}
 		}
-		output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
-			DestChainSelector: remoteChain,
-			UsdPerUnitGas:     gasprice,
-		})
-		return output, nil
 	}
-	return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
-		"please provide gas price for this remote chain in the input additional config", remoteChain)
+	if staticPrice == nil {
+		// check if static gas price is already hard coded for the chain family
+		chainFamily, err := chain_selectors.GetSelectorFamily(remoteChain)
+		if err != nil {
+			return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
+		}
+		var exists bool
+		staticPrice, exists = staticGasPriceByChainFamily[chainFamily]
+		if !exists || staticPrice == nil {
+			return fqops.PriceUpdates{}, nil
+		}
+	}
+
+	output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
+		DestChainSelector: remoteChain,
+		UsdPerUnitGas:     staticPrice,
+	})
+	return output, nil
 }
