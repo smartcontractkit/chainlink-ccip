@@ -39,14 +39,11 @@ vendor/
 *.log
 
 # misc
-.DS_Store
 .envrc
 .env*
 .dbenv
 .direnv
-.idea
 .vscode/
-*.iml
 debug.env
 operator_ui/install
 .devenv
@@ -63,3 +60,5 @@ gcr_creds.env
 devenv/tests/e2e/blockscout
 devenv/env-out.toml
 .cursorrules
+.claude/
+operations-gen

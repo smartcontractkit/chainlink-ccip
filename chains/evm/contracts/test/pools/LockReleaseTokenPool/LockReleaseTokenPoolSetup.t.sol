@@ -2,12 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -21,18 +24,43 @@ contract LockReleaseTokenPoolSetup is BaseTest {
   address internal s_destPoolAddress = address(2736782345);
   address internal s_sourcePoolAddress = address(53852352095);
 
+  ERC20LockBox internal s_lockBox;
+
   function setUp() public virtual override {
     super.setUp();
-    s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
+    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
+
+    s_lockBox = new ERC20LockBox(address(s_token));
+
     s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
     s_allowedList.push(vm.randomAddress());
     s_allowedList.push(OWNER);
+    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0, address(0), new address[](0));
     s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, s_allowedList, address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      address(advancedHooks),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      address(s_lockBox)
+    );
+
+    address[] memory hooksCallers = new address[](1);
+    hooksCallers[0] = address(s_lockReleaseTokenPoolWithAllowList);
+    advancedHooks.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: hooksCallers, removedCallers: new address[](0)})
+    );
+
+    // Configure allowed callers for the lockBox - both pools.
+    address[] memory allowedCallers = new address[](2);
+    allowedCallers[0] = address(s_lockReleaseTokenPool);
+    allowedCallers[1] = address(s_lockReleaseTokenPoolWithAllowList);
+    s_lockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);
@@ -49,7 +77,8 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
     s_lockReleaseTokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
     s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(new uint64[](0), chainUpdate);
-    s_lockReleaseTokenPool.setRebalancer(OWNER);
+
+    s_token.approve(address(s_lockReleaseTokenPool), type(uint256).max);
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);

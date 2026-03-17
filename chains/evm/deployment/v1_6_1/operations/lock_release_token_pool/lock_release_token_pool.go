@@ -3,12 +3,16 @@
 package lock_release_token_pool
 
 import (
+	"math/big"
+
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -57,6 +61,34 @@ func (c *LockReleaseTokenPoolContract) Owner(opts *bind.CallOpts) (common.Addres
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *LockReleaseTokenPoolContract) GetRebalancer(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRebalancer")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *LockReleaseTokenPoolContract) SetRebalancer(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setRebalancer", args)
+}
+
+func (c *LockReleaseTokenPoolContract) WithdrawLiquidity(opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "withdrawLiquidity", args)
+}
+
+func (c *LockReleaseTokenPoolContract) GetToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getToken")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
 type ConstructorArgs struct {
 	Token              common.Address
 	LocalTokenDecimals uint8
@@ -79,4 +111,62 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var GetRebalancer = contract.NewRead(contract.ReadParams[struct{}, common.Address, *LockReleaseTokenPoolContract]{
+	Name:         "lock-release-token-pool:get-rebalancer",
+	Version:      Version,
+	Description:  "Calls getRebalancer on the contract",
+	ContractType: ContractType,
+	NewContract:  NewLockReleaseTokenPoolContract,
+	CallContract: func(c *LockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRebalancer(opts)
+	},
+})
+
+var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *LockReleaseTokenPoolContract]{
+	Name:            "lock-release-token-pool:set-rebalancer",
+	Version:         Version,
+	Description:     "Calls setRebalancer on the contract",
+	ContractType:    ContractType,
+	ContractABI:     LockReleaseTokenPoolABI,
+	NewContract:     NewLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*LockReleaseTokenPoolContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(
+		c *LockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args common.Address,
+	) (*types.Transaction, error) {
+		return c.SetRebalancer(opts, args)
+	},
+})
+
+var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *LockReleaseTokenPoolContract]{
+	Name:            "lock-release-token-pool:withdraw-liquidity",
+	Version:         Version,
+	Description:     "Calls withdrawLiquidity on the contract",
+	ContractType:    ContractType,
+	ContractABI:     LockReleaseTokenPoolABI,
+	NewContract:     NewLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*LockReleaseTokenPoolContract, *big.Int],
+	Validate:        func(*big.Int) error { return nil },
+	CallContract: func(
+		c *LockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args *big.Int,
+	) (*types.Transaction, error) {
+		return c.WithdrawLiquidity(opts, args)
+	},
+})
+
+var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *LockReleaseTokenPoolContract]{
+	Name:         "lock-release-token-pool:get-token",
+	Version:      Version,
+	Description:  "Calls getToken on the contract",
+	ContractType: ContractType,
+	NewContract:  NewLockReleaseTokenPoolContract,
+	CallContract: func(c *LockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetToken(opts)
+	},
 })

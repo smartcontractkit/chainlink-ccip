@@ -1,0 +1,152 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
+import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
+import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
+import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
+import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
+contract CCTPVerifierSetup is BaseVerifierSetup {
+  CCTPVerifier internal s_cctpVerifier;
+  MockUSDCTokenMessenger internal s_mockTokenMessenger;
+  MockE2EUSDCTransmitterCCTPV2 internal s_mockMessageTransmitter;
+  CCTPMessageTransmitterProxy internal s_messageTransmitterProxy;
+  IERC20 internal s_USDCToken;
+
+  bytes internal s_tokenReceiver;
+  address internal s_tokenReceiverAddress;
+
+  uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
+  uint16 internal constant BPS_DIVIDER = 10_000;
+  uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
+
+  uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
+  uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
+
+  uint16 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = 0;
+  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
+
+  uint32 internal constant REMOTE_DOMAIN_IDENTIFIER = 9999;
+  uint32 internal constant LOCAL_DOMAIN_IDENTIFIER = 8888;
+  bytes32 internal constant ALLOWED_CALLER_ON_DEST = keccak256("allowedCallerOnDest");
+  bytes32 internal constant ALLOWED_CALLER_ON_SOURCE = keccak256("allowedCallerOnSource");
+
+  function setUp() public virtual override {
+    super.setUp();
+
+    s_tokenReceiverAddress = makeAddr("tokenReceiver");
+    s_tokenReceiver = abi.encode(s_tokenReceiverAddress);
+
+    BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
+    s_USDCToken = IERC20(address(usdcToken));
+
+    s_mockMessageTransmitter = new MockE2EUSDCTransmitterCCTPV2(1, LOCAL_DOMAIN_IDENTIFIER, address(s_USDCToken));
+    s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));
+    s_messageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockTokenMessenger);
+
+    s_cctpVerifier = new CCTPVerifier(
+      s_mockTokenMessenger,
+      s_messageTransmitterProxy,
+      s_USDCToken,
+      s_storageLocations,
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      }),
+      address(s_mockRMNRemote)
+    );
+
+    // Apply remote chain config updates.
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
+      router: s_router,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+    });
+    s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
+
+    // Set the domains.
+    CCTPVerifier.SetDomainArgs[] memory domains = new CCTPVerifier.SetDomainArgs[](1);
+    domains[0] = CCTPVerifier.SetDomainArgs({
+      allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
+      allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
+      mintRecipientOnDest: bytes32(0),
+      domainIdentifier: REMOTE_DOMAIN_IDENTIFIER,
+      chainSelector: DEST_CHAIN_SELECTOR,
+      enabled: true
+    });
+    s_cctpVerifier.setDomains(domains);
+
+    // Grant mint and burn roles to the token messenger and the message transmitter.
+    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockTokenMessenger));
+    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockMessageTransmitter));
+
+    // Ensure that the verifier is allowed to call the message transmitter proxy.
+    address[] memory addedCallers = new address[](1);
+    addedCallers[0] = address(s_cctpVerifier);
+    s_messageTransmitterProxy.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: new address[](0)})
+    );
+  }
+
+  function _createVerifierResults(
+    bytes4 verifierVersion,
+    CCTPHelper.CCTPMessage memory cctpMessage
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+      verifierVersion, // Prefix for routing.
+      CCTPHelper._encodeCCTPMessage(cctpMessage),
+      new bytes(65) // Signature.
+    );
+  }
+
+  function _createCCIPMessage(
+    uint64 sourceChainSelector,
+    uint64 destChainSelector,
+    uint16 finality,
+    address sourceTokenAddress,
+    uint256 amount,
+    bytes memory tokenReceiver
+  ) internal returns (MessageV1Codec.MessageV1 memory, bytes32) {
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
+    tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
+      amount: amount,
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(sourceTokenAddress),
+      destTokenAddress: abi.encodePacked(sourceTokenAddress),
+      tokenReceiver: tokenReceiver,
+      extraData: "extra data"
+    });
+
+    MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
+      sourceChainSelector: sourceChainSelector,
+      destChainSelector: destChainSelector,
+      messageNumber: 1,
+      executionGasLimit: 400_000,
+      ccipReceiveGasLimit: 200_000,
+      finality: finality,
+      ccvAndExecutorHash: bytes32(0),
+      onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
+      offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
+      sender: abi.encode(address(0x3333333333333333333333333333333333333333)),
+      receiver: tokenReceiver,
+      destBlob: "",
+      tokenTransfer: tokenTransfer,
+      data: ""
+    });
+
+    bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+
+    return (message, messageId);
+  }
+}

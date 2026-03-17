@@ -31,6 +31,7 @@ const (
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
 	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
+	FeeQuoter                  cldf.ContractType = "FeeQuoter"
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
@@ -51,28 +52,41 @@ const (
 	SuiFamilySelector   = "c4e05953"
 )
 
-func GetSelectorHex(selector uint64) []byte {
+func GetSelectorHex(selector uint64) [4]byte {
 	destFamily, _ := chain_selectors.GetSelectorFamily(selector)
-	var familySelector []byte
+
+	var hexStr string
 	switch destFamily {
 	case chain_selectors.FamilyEVM:
-		familySelector, _ = hex.DecodeString(EVMFamilySelector)
+		hexStr = EVMFamilySelector
 	case chain_selectors.FamilySolana:
-		familySelector, _ = hex.DecodeString(SVMFamilySelector)
+		hexStr = SVMFamilySelector
 	case chain_selectors.FamilyAptos:
-		familySelector, _ = hex.DecodeString(AptosFamilySelector)
+		hexStr = AptosFamilySelector
 	case chain_selectors.FamilyTon:
-		familySelector, _ = hex.DecodeString(TVMFamilySelector)
+		hexStr = TVMFamilySelector
 	case chain_selectors.FamilySui:
-		familySelector, _ = hex.DecodeString(SuiFamilySelector)
+		hexStr = SuiFamilySelector
+	default:
+		panic(fmt.Sprintf("unsupported chain family: %s", destFamily))
 	}
-	return familySelector
+
+	b, _ := hex.DecodeString(hexStr)
+	var out [4]byte
+	copy(out[:], b)
+	return out
 }
 
 var (
 	ErrZeroAddress         = errors.New("address cannot be zero address")
 	ErrNoAdapterRegistered = func(family string, version *semver.Version) error {
 		return fmt.Errorf("no adapter registered for chain family %s and version %s", family, version.String())
+	}
+	ErrNoAdapterForSelectorRegistered = func(adapetrName string, selector uint64, version *semver.Version) error {
+		if version != nil {
+			return fmt.Errorf("no %s adapter registered for chain selector %d and version %s", adapetrName, selector, version.String())
+		}
+		return fmt.Errorf("no %s adapter registered for chain selector %d", adapetrName, selector)
 	}
 )
 
@@ -82,10 +96,19 @@ var (
 	Version_1_5_1 = semver.MustParse("1.5.1")
 	Version_1_6_0 = semver.MustParse("1.6.0")
 	Version_1_6_1 = semver.MustParse("1.6.1")
+	Version_2_0_0 = semver.MustParse("2.0.0")
 )
 
 func NewRegistererID(chainFamily string, version *semver.Version) string {
 	return fmt.Sprintf("%s-%s", chainFamily, version.String())
+}
+
+func NewIDFromSelector(chainSelector uint64, version *semver.Version) string {
+	chainFamily, err := chain_selectors.GetSelectorFamily(chainSelector)
+	if err != nil {
+		panic(fmt.Sprintf("invalid chain selector: %d", chainSelector))
+	}
+	return NewRegistererID(chainFamily, version)
 }
 
 const (

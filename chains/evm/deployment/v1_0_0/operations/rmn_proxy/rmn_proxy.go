@@ -13,6 +13,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "ARMProxy"
 
+var Version *semver.Version = semver.MustParse("1.0.0")
+
 type ConstructorArgs struct {
 	RMN common.Address
 }
@@ -23,11 +25,11 @@ type SetRMNArgs = struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "rmn_proxy:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          Version,
 	Description:      "Deploys the RMNProxy contract",
 	ContractMetadata: rmn_proxy_contract.RMNProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(rmn_proxy_contract.RMNProxyBin),
 		},
 	},
@@ -36,7 +38,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contract.RMNProxy]{
 	Name:            "rmn_proxy:set-rmn",
-	Version:         semver.MustParse("1.0.0"),
+	Version:         Version,
 	Description:     "Sets the RMN address on the RMNProxy",
 	ContractType:    ContractType,
 	ContractABI:     rmn_proxy_contract.RMNProxyABI,
@@ -45,5 +47,16 @@ var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contr
 	Validate:        func(SetRMNArgs) error { return nil },
 	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
 		return rmnProxy.SetARM(opts, args.RMN)
+	},
+})
+
+var GetRMN = contract.NewRead(contract.ReadParams[struct{}, common.Address, *rmn_proxy_contract.RMNProxy]{
+	Name:         "rmn_proxy:get-rmn",
+	Version:      semver.MustParse("1.0.0"),
+	Description:  "Gets the RMN address set on the RMNProxy",
+	ContractType: ContractType,
+	NewContract:  rmn_proxy_contract.NewRMNProxy,
+	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return rmnProxy.GetARM(opts)
 	},
 })

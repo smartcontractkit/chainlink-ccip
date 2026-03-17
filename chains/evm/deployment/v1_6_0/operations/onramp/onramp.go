@@ -63,14 +63,19 @@ func (c *OnRampContract) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, ar
 	return c.contract.Transact(opts, "applyDestChainConfigUpdates", args)
 }
 
-func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (any, error) {
+func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (GetDestChainConfigResult, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getDestChainConfig", args)
+	outstruct := new(GetDestChainConfigResult)
 	if err != nil {
-		var zero any
-		return zero, err
+		return *outstruct, err
 	}
-	return *abi.ConvertType(out[0], new(any)).(*any), nil
+
+	outstruct.SequenceNumber = *abi.ConvertType(out[0], new(uint64)).(*uint64)
+	outstruct.AllowlistEnabled = *abi.ConvertType(out[1], new(bool)).(*bool)
+	outstruct.Router = *abi.ConvertType(out[2], new(common.Address)).(*common.Address)
+
+	return *outstruct, nil
 }
 
 func (c *OnRampContract) GetStaticConfig(opts *bind.CallOpts) (StaticConfig, error) {
@@ -109,6 +114,12 @@ type DynamicConfig struct {
 	MessageInterceptor     common.Address
 	FeeAggregator          common.Address
 	AllowlistAdmin         common.Address
+}
+
+type GetDestChainConfigResult struct {
+	SequenceNumber   uint64
+	AllowlistEnabled bool
+	Router           common.Address
 }
 
 type StaticConfig struct {
@@ -158,13 +169,13 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	},
 })
 
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, any, *OnRampContract]{
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, GetDestChainConfigResult, *OnRampContract]{
 	Name:         "onramp:get-dest-chain-config",
 	Version:      Version,
 	Description:  "Calls getDestChainConfig on the contract",
 	ContractType: ContractType,
 	NewContract:  NewOnRampContract,
-	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (any, error) {
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (GetDestChainConfigResult, error) {
 		return c.GetDestChainConfig(opts, args)
 	},
 })

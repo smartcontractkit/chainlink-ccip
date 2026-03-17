@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IGetCCIPAdmin} from "../../interfaces/IGetCCIPAdmin.sol";
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
-
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
@@ -12,8 +11,8 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 import {ERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/ERC20Burnable.sol";
-import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The constructor has been modified to support the deployment pattern used by a factory contract.
@@ -74,7 +73,7 @@ contract FactoryBurnMintERC20 is
   }
 
   /// @inheritdoc ITypeAndVersion
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "FactoryBurnMintERC20 1.6.2";
   }

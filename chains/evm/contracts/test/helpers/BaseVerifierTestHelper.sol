@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
+import {FeeTokenHandler} from "../../libraries/FeeTokenHandler.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
+
+/// @notice Test helper contract to expose BaseVerifier's internal functions for testing
+contract BaseVerifierTestHelper is BaseVerifier {
+  constructor(
+    string[] memory storageLocations,
+    address rmn
+  ) BaseVerifier(storageLocations, rmn) {}
+
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata destChainConfigArgs
+  ) external {
+    _applyRemoteChainConfigUpdates(destChainConfigArgs);
+  }
+
+  function applyAllowlistUpdates(
+    AllowlistConfigArgs[] calldata allowlistConfigArgsItems
+  ) external {
+    _applyAllowlistUpdates(allowlistConfigArgsItems);
+  }
+
+  function assertSenderIsAllowed(
+    uint64 destChainSelector,
+    address sender
+  ) external view {
+    _assertSenderIsAllowed(destChainSelector, sender);
+  }
+
+  function forwardToVerifier(
+    MessageV1Codec.MessageV1 calldata,
+    bytes32,
+    address,
+    uint256,
+    bytes calldata
+  ) external pure returns (bytes memory) {
+    return "";
+  }
+
+  function verifyMessage(
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    bytes memory verifierResults
+  ) external {}
+
+  function typeAndVersion() external pure override returns (string memory) {
+    return "BaseVerifierTestHelper 1.0.0";
+  }
+
+  function versionTag() public pure override returns (bytes4) {
+    return bytes4(keccak256("BaseVerifierTestHelper"));
+  }
+
+  /// @notice Exposes the internal storage location setter for testing.
+  function setStorageLocations(
+    string[] memory storageLocations
+  ) external {
+    _setStorageLocations(storageLocations);
+  }
+
+  /// @notice Exposes FeeTokenHandler withdraw helper for tests.
+  /// @dev This mirrors the legacy `withdrawFeeTokens` API that used to live on contracts.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens,
+    address feeAggregator
+  ) external {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, feeAggregator);
+  }
+}

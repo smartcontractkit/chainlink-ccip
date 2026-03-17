@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 contract USDCReaderTester {
   event MessageSent(bytes);
 
-  // emitMessageSent reflects the logic from Circle's MessageTransmitter emitting MeseageSent(bytes) events
+  // emitMessageSent reflects the logic from Circle's MessageTransmitter emitting MessageSent(bytes) events
   // https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/MessageTransmitter.sol#L41
   // https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/MessageTransmitter.sol#L365
   function emitMessageSent(
@@ -17,28 +17,24 @@ contract USDCReaderTester {
     uint64 nonce,
     bytes calldata messageBody
   ) external {
-    bytes memory _message = _formatMessage(
-      version, sourceDomain, destinationDomain, nonce, sender, recipient, destinationCaller, messageBody
-    );
-    emit MessageSent(_message);
+    emit MessageSent(_formatMessage(
+        version, sourceDomain, destinationDomain, nonce, sender, recipient, destinationCaller, messageBody
+      ));
   }
 
-  /**
-   * @notice Returns formatted (packed) message with provided fields
-   * It's a copy paste of the Message._formatMessage() call in MessageTransmitter.sol
-   * https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/messages/Message.sol#L54C1-L65C9
-   * Check the chainlink-ccip repo for the offchain implementation of matching this format
-   * @param _msgVersion the version of the message format
-   * @param _msgSourceDomain Domain of home chain
-   * @param _msgDestinationDomain Domain of destination chain
-   * @param _msgNonce Destination-specific nonce
-   * @param _msgSender Address of sender on source chain as bytes32
-   * @param _msgRecipient Address of recipient on destination chain as bytes32
-   * @param _msgDestinationCaller Address of caller on destination chain as bytes32
-   * @param _msgRawBody Raw bytes of message body
-   * @return Formatted message
-   *
-   */
+  /// @notice Returns formatted (packed) message with provided fields
+  /// It's a copy paste of the Message._formatMessage() call in MessageTransmitter.sol
+  /// https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/messages/Message.sol#L54C1-L65C9
+  /// Check the chainlink-ccip repo for the offchain implementation of matching this format
+  /// @param _msgVersion the version of the message format
+  /// @param _msgSourceDomain Domain of home chain
+  /// @param _msgDestinationDomain Domain of destination chain
+  /// @param _msgNonce Destination-specific nonce
+  /// @param _msgSender Address of sender on source chain as bytes32
+  /// @param _msgRecipient Address of recipient on destination chain as bytes32
+  /// @param _msgDestinationCaller Address of caller on destination chain as bytes32
+  /// @param _msgRawBody Raw bytes of message body
+  /// @return Formatted message
   function _formatMessage(
     uint32 _msgVersion,
     uint32 _msgSourceDomain,

@@ -103,7 +103,7 @@ var ConnectChains = operations.NewOperation(
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		routerDestChainPDA, _ := state.FindDestChainStatePDA(input.RemoteChainSelector, input.Router)
 		var destChainAccount ccip_router.DestChain
-		err := chain.GetAccountDataBorshInto(context.Background(), routerDestChainPDA, &destChainAccount)
+		err := chain.GetAccountDataBorshInto(b.GetContext(), routerDestChainPDA, &destChainAccount)
 		if err == nil {
 			b.Logger.Infof("Remote chain state account found: %+v", destChainAccount)
 			isUpdate = true
@@ -184,7 +184,7 @@ var AddOffRamp = operations.NewOperation(
 		authority := GetAuthority(chain, input.Router)
 		var sourceChainAccount ccip_offramp.SourceChain
 		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.RemoteChainSelector, input.OffRamp)
-		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
+		err := chain.GetAccountDataBorshInto(b.GetContext(), offRampSourceChainPDA, &sourceChainAccount)
 		if err == nil {
 			b.Logger.Infof("Remote chain state account found: %+v", sourceChainAccount)
 			return sequences.OnChainOutput{}, nil
@@ -305,61 +305,61 @@ var SetPool = operations.NewOperation(
 	func(b operations.Bundle, chain cldf_solana.Chain, input PoolParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		addresses := make([]datastore.AddressRef, 0)
-		// Only works for BnM and LnR pools for now
-		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
-		if input.TokenPoolLookupTable.IsZero() {
-			tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
-			tokenPoolSigner, _ := tokens.TokenPoolSignerAddress(input.TokenMint, input.TokenPool)
-			poolTokenAccount, _, _ := tokens.FindAssociatedTokenAddress(input.TokenProgramID, input.TokenMint, tokenPoolSigner)
-			feeTokenConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(input.TokenMint, input.FeeQuoter)
-			routerPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(input.TokenPool, input.Router)
-			table, err := common.CreateLookupTable(b.GetContext(), chain.Client, *chain.DeployerKey)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create lookup table: %w", err)
-			}
-			// link the token + token pool lookup table + token mint
-			labels := datastore.NewLabelSet(input.TokenPool.String())
-			labels.Add(input.TokenPoolType)
-			addresses = append(addresses, datastore.AddressRef{
-				Address:       table.String(),
-				ChainSelector: chain.Selector,
-				Labels:        labels,
-				Type:          datastore.ContractType(TokenPoolLookupTableType),
-				Version:       Version,
-				Qualifier:     input.TokenMint.String(),
-			})
-			list := solana.PublicKeySlice{
-				table,                 // 0
-				tokenAdminRegistryPDA, // 1
-				input.TokenPool,       // 2
-				tokenPoolConfigPDA,    // 3 - writable
-				poolTokenAccount,      // 4 - writable
-				tokenPoolSigner,       // 5
-				input.TokenProgramID,  // 6
-				input.TokenMint,       // 7 - writable
-				feeTokenConfigPDA,     // 8
-				routerPoolSignerPDA,   // 9
-			}
-			if err = common.ExtendLookupTable(b.GetContext(), chain.Client, table, *chain.DeployerKey, list); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", input.TokenMint.String(), err)
-			}
-			if err := common.AwaitSlotChange(b.GetContext(), chain.Client); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
-			}
-			input.TokenPoolLookupTable = table
-		}
-		writableIndexes := []uint8{3, 4, 7}
 		// we can only sign as either the deployer or the token admin
 		// if there is no admin set, we assume the router authority is timelock
+		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		currentAdmin := GetAuthority(chain, input.Router)
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if !tokenAdminRegistryAccount.LookupTable.IsZero() {
 				b.Logger.Info("Token pool lookup table already set for this mint with the given admin:", tokenAdminRegistryAccount)
 				return sequences.OnChainOutput{}, nil
 			}
-			currentAdmin = tokenAdminRegistryAccount.Administrator
+			// If the admin is zero, it means we're performing a propose + accept + set sequence,
+			// so we should sign with the timelock (current authority)
+			if !tokenAdminRegistryAccount.Administrator.IsZero() {
+				currentAdmin = tokenAdminRegistryAccount.Administrator
+			}
 		}
+		// Only works for BnM and LnR pools for now
+		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
+		tokenPoolSigner, _ := tokens.TokenPoolSignerAddress(input.TokenMint, input.TokenPool)
+		poolTokenAccount, _, _ := tokens.FindAssociatedTokenAddress(input.TokenProgramID, input.TokenMint, tokenPoolSigner)
+		feeTokenConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(input.TokenMint, input.FeeQuoter)
+		routerPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(input.TokenPool, input.Router)
+		table, err := common.CreateLookupTable(b.GetContext(), chain.Client, *chain.DeployerKey)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create lookup table: %w", err)
+		}
+		// link the token + token pool lookup table + token mint
+		labels := datastore.NewLabelSet(input.TokenPool.String())
+		addresses = append(addresses, datastore.AddressRef{
+			Address:       table.String(),
+			ChainSelector: chain.Selector,
+			Labels:        labels,
+			Type:          datastore.ContractType(TokenPoolLookupTableType),
+			Version:       Version,
+			Qualifier:     input.TokenMint.String(),
+		})
+		list := solana.PublicKeySlice{
+			table,                 // 0
+			tokenAdminRegistryPDA, // 1
+			input.TokenPool,       // 2
+			tokenPoolConfigPDA,    // 3 - writable
+			poolTokenAccount,      // 4 - writable
+			tokenPoolSigner,       // 5
+			input.TokenProgramID,  // 6
+			input.TokenMint,       // 7 - writable
+			feeTokenConfigPDA,     // 8
+			routerPoolSignerPDA,   // 9
+		}
+		if err = common.ExtendLookupTable(b.GetContext(), chain.Client, table, *chain.DeployerKey, list); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", input.TokenMint.String(), err)
+		}
+		if err := common.AwaitSlotChange(b.GetContext(), chain.Client); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
+		}
+		writableIndexes := []uint8{3, 4, 7}
 
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		base := ccip_router.NewSetPoolInstruction(
@@ -367,10 +367,10 @@ var SetPool = operations.NewOperation(
 			routerConfigPDA,
 			tokenAdminRegistryPDA,
 			input.TokenMint,
-			input.TokenPoolLookupTable,
+			table,
 			currentAdmin,
 		)
-		base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(input.TokenPoolLookupTable))
+		base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(table))
 		tempIx, err := base.ValidateAndBuild()
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build router set pool instruction: %w", err)
@@ -424,12 +424,21 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		}
 		var pendingAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
 				return TokenAdminRegistryOut{}, nil
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
+			// there is already an admin registered, we need to transfer
+			if !tokenAdminRegistryAccount.Administrator.IsZero() {
+				out, err := operations.ExecuteOperation(b, TransferTokenAdminRegistry, chain, input)
+				if err != nil {
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to transfer token admin registry: %w", err)
+				}
+				b.Logger.Infof("Token admin registry transfer initiated. Pending admin: %s", out.Output.PendingSigner.String())
+				return out.Output, nil
+			}
 		}
 		// this is the key that will need to accept the admin registration
 		pendingSigner := input.Admin
@@ -563,10 +572,12 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var pendingAdmin solana.PublicKey
+		var currentAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			// NOTE: only set pendingAdmin if the account exists / fetch succeeds
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
+			currentAdmin = tokenAdminRegistryAccount.Administrator
 		}
 		timelockSigner := utils.GetTimelockSignerPDA(
 			input.ExistingAddresses,
@@ -576,9 +587,14 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		if pendingAdmin.IsZero() {
 			// if there is no pending admin, we assume the authority is timelock
 			// but we need to confirm that timelock is indeed the authority
+			if currentAdmin == timelockSigner {
+				b.Logger.Info("No pending admin found, but timelock is already the current admin, skipping accept admin role for token admin registry")
+				return sequences.OnChainOutput{}, nil
+			}
 			if input.Admin != timelockSigner {
 				return sequences.OnChainOutput{}, fmt.Errorf("no pending admin found for token admin registry, expected timelock signer %s but got %s", timelockSigner.String(), input.Admin.String())
 			}
+			pendingAdmin = input.Admin
 		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
 			// we can only sign as either the deployer or timelock
 			return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
@@ -628,14 +644,20 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 	"router:transfer-token-admin-registry",
 	Version,
 	"Transfers a Token Admin Registry with the Router 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (TokenAdminRegistryOut, error) {
 		ccip_router.SetProgramID(input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var currentAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			currentAdmin = tokenAdminRegistryAccount.Administrator
+			if currentAdmin.IsZero() {
+				return TokenAdminRegistryOut{}, fmt.Errorf("no admin found for token admin registry")
+			}
+			b.Logger.Infof("Current token admin registry account: %+v", tokenAdminRegistryAccount)
+		} else {
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to fetch token admin registry account: %w", err)
 		}
 		// we can only sign as either the deployer or timelock
 		// ccip admin should be timelock
@@ -643,6 +665,10 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		// if no admin provided, use ccip admin
 		if input.Admin.IsZero() {
 			input.Admin = ccipAdmin
+		}
+		if currentAdmin == input.Admin {
+			b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
+			return TokenAdminRegistryOut{}, nil
 		}
 		// sign as the current admin to transfer
 		tempIx, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
@@ -653,11 +679,11 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 			currentAdmin,
 		).ValidateAndBuild()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to generate instructions: %w", err)
 		}
 		ixData, err := tempIx.Data()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload router accept admin role token admin registry instruction: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to extract data payload router accept admin role token admin registry instruction: %w", err)
 		}
 		ixn := solana.NewInstruction(input.Router, tempIx.Accounts(), ixData)
 		// now we need a proposal if the admin is not the deployer
@@ -669,19 +695,24 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 				ContractType.String(),
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+				return TokenAdminRegistryOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
-			return sequences.OnChainOutput{
-				BatchOps: []types.BatchOperation{batches},
+			return TokenAdminRegistryOut{
+				PendingSigner: input.Admin,
+				OnChainOutput: sequences.OnChainOutput{
+					BatchOps: []types.BatchOperation{batches},
+				},
 			}, nil
 		}
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
 		}
 
-		return sequences.OnChainOutput{}, nil
+		return TokenAdminRegistryOut{
+			PendingSigner: input.Admin,
+		}, nil
 	},
 )
 
@@ -703,13 +734,12 @@ type Params struct {
 }
 
 type PoolParams struct {
-	Router               solana.PublicKey
-	FeeQuoter            solana.PublicKey
-	TokenMint            solana.PublicKey
-	TokenProgramID       solana.PublicKey
-	TokenPool            solana.PublicKey
-	TokenPoolLookupTable solana.PublicKey
-	TokenPoolType        string
+	Router         solana.PublicKey
+	FeeQuoter      solana.PublicKey
+	TokenMint      solana.PublicKey
+	TokenProgramID solana.PublicKey
+	TokenPool      solana.PublicKey
+	TokenPoolType  string
 }
 
 type TokenAdminRegistryParams struct {

@@ -1,0 +1,368 @@
+package adapters_test
+
+import (
+	"math/big"
+	"testing"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
+	burn_mint_token_pool_v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+)
+
+const (
+	outbound = 0
+	inbound  = 1
+)
+
+// requireRateLimiterScaled asserts that on-chain rate limiter state matches the expected token amounts
+// after scaling by decimals and (for inbound) the 1.1x factor used in GenerateTPRLConfigs.
+func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, actualCapacity *big.Int, decimals int, isInbound bool) {
+	extraPercent := 0.0
+	if isInbound {
+		extraPercent = 0.10
+	}
+	expectedRate := tokens.ScaleFloatToBigInt(rate, decimals, extraPercent)
+	expectedCapacity := tokens.ScaleFloatToBigInt(capacity, decimals, extraPercent)
+	if actualRate == nil {
+		actualRate = big.NewInt(0)
+	}
+	if actualCapacity == nil {
+		actualCapacity = big.NewInt(0)
+	}
+	require.Zero(t, expectedRate.Cmp(actualRate), "Rate limiter rate should match (scaled)")
+	require.Zero(t, expectedCapacity.Cmp(actualCapacity), "Rate limiter capacity should match (scaled)")
+}
+
+func TestTokenAdapter(t *testing.T) {
+	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", burn_mint_token_pool.Version, &adapters.TokenAdapter{})
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
+
+	tests := []struct {
+		desc               string
+		deriveTokenAddress bool
+	}{
+		{
+			desc:               "derive remote token address",
+			deriveTokenAddress: true,
+		},
+		{
+			desc: "input remote token address",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+
+			chainA := uint64(5009297550715157269)
+			chainB := uint64(4949039107694359620)
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainA, chainB}),
+			)
+			require.NoError(t, err, "Failed to create test environment")
+			require.NotNil(t, e, "Environment should be created")
+
+			mcmsRegistry := changesets.GetRegistry()
+
+			// On each chain, deploy chain contracts & a token + token pool
+			create2FactoryRefs := make(map[uint64]datastore.AddressRef)
+			ds := datastore.NewMemoryDataStore()
+			for _, chainSel := range []uint64{chainA, chainB} {
+				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+					ChainSelector:  chainSel,
+					Args: create2_factory.ConstructorArgs{
+						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+					},
+				}, nil)
+				require.NoError(t, err, "Failed to deploy CREATE2Factory")
+				create2FactoryRefs[chainSel] = create2FactoryRef
+
+				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
+					Cfg: v1_7_0.DeployChainContractsCfg{
+						ChainSel:       chainSel,
+						CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+						Params:         testsetup.CreateBasicContractParams(),
+						DeployerKeyOwned: true,
+					},
+				})
+				require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+				err = ds.Merge(deployChainOut.DataStore.Seal())
+				require.NoError(t, err, "Failed to merge datastore from DeployChainContracts changeset")
+
+				e.DataStore = ds.Seal()
+
+				// Deploy a 1.7.0 on chain A and a legacy 1.6.1 on chain B
+				if chainSel == chainA {
+					deployTokenAndPoolOut, err := v1_7_0.DeployTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployTokenAndPoolCfg]{
+						Cfg: v1_7_0.DeployTokenAndPoolCfg{
+							Accounts: map[common.Address]*big.Int{
+								e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
+							},
+							ChainSel:                         chainSel,
+							TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.ContractType),
+							TokenPoolVersion:                 burn_mint_token_pool.Version,
+							TokenSymbol:                      "TEST",
+							Decimals:                         18,
+							ThresholdAmountForAdditionalCCVs: big.NewInt(0),
+							Router: datastore.AddressRef{
+								ChainSelector: chainSel,
+								Type:          datastore.ContractType(router.ContractType),
+								Version:       semver.MustParse("1.2.0"),
+							},
+							TokenAdminRegistryRef: datastore.AddressRef{
+								ChainSelector: chainSel,
+								Type:          datastore.ContractType(token_admin_registry.ContractType),
+								Version:       token_admin_registry.Version,
+							},
+						},
+					})
+					require.NoError(t, err, "Failed to apply DeployTokenAndPool changeset")
+					err = ds.Merge(deployTokenAndPoolOut.DataStore.Seal())
+					e.DataStore = ds.Seal()
+				} else {
+					deployTokenAndPoolOut, err := v1_6_1.DeployTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_6_1.DeployTokenAndPoolCfg]{
+						Cfg: v1_6_1.DeployTokenAndPoolCfg{
+							Accounts: map[common.Address]*big.Int{
+								e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
+							},
+							ChainSel:         chainSel,
+							TokenPoolType:    datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType),
+							TokenPoolVersion: burn_mint_token_pool_v1_6_1.Version,
+							TokenSymbol:      "TEST",
+							Decimals:         18,
+							Router: datastore.AddressRef{
+								ChainSelector: chainSel,
+								Type:          datastore.ContractType(router.ContractType),
+								Version:       semver.MustParse("1.2.0"),
+							},
+						},
+					})
+					require.NoError(t, err, "Failed to apply DeployTokenAndPool changeset")
+					err = ds.Merge(deployTokenAndPoolOut.DataStore.Seal())
+					e.DataStore = ds.Seal()
+				}
+			}
+
+			// Overwrite datastore in the environment
+			e.DataStore = ds.Seal()
+
+			var remoteToken *datastore.AddressRef
+			if test.deriveTokenAddress {
+				remoteToken = &datastore.AddressRef{
+					Type:      datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+					Version:   burn_mint_erc20_with_drip.Version,
+					Qualifier: "TEST",
+				}
+			}
+
+			getRemoteChainConfig := func(
+				remotePoolVersion *semver.Version,
+				ccvs []datastore.AddressRef,
+			) tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] {
+				return tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					RemoteToken: remoteToken,
+					RemotePool: &datastore.AddressRef{
+						Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+						Version:   remotePoolVersion,
+						Qualifier: "TEST",
+					},
+					DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+						IsEnabled: true,
+						Rate:      10,
+						Capacity:  100,
+					},
+					DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+						IsEnabled: true,
+						Rate:      10,
+						Capacity:  100,
+					},
+					CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+						IsEnabled: true,
+						Rate:      10,
+						Capacity:  100,
+					},
+					CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+						IsEnabled: true,
+						Rate:      10,
+						Capacity:  100,
+					},
+					OutboundCCVs: ccvs,
+					InboundCCVs:  ccvs,
+				}
+			}
+
+			_, err = tokens.ConfigureTokensForTransfers(tokenAdapterRegistry, mcmsRegistry).Apply(*e, tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: chainA,
+						TokenPoolRef: datastore.AddressRef{
+							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							Version:   burn_mint_token_pool.Version,
+							Qualifier: "TEST",
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:    datastore.ContractType(token_admin_registry.ContractType),
+							Version: semver.MustParse("1.5.0"),
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							chainB: getRemoteChainConfig(burn_mint_token_pool_v1_6_1.Version, []datastore.AddressRef{
+								{
+									Type:    datastore.ContractType(committee_verifier.ContractType),
+									Version: committee_verifier.Version,
+								},
+							}),
+						},
+					},
+					{
+						ChainSelector: chainB,
+						TokenPoolRef: datastore.AddressRef{
+							Type:      datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType),
+							Version:   burn_mint_token_pool_v1_6_1.Version,
+							Qualifier: "TEST",
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:    datastore.ContractType(token_admin_registry.ContractType),
+							Version: semver.MustParse("1.5.0"),
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							chainA: getRemoteChainConfig(burn_mint_token_pool.Version, nil),
+						},
+					},
+				},
+			})
+			require.NoError(t, err, "Failed to apply ConfigureTokensForTransfers changeset")
+
+			// Clear bundle for checks, otherwise the operations framework will skip duplicate calls
+			e.OperationsBundle = operations.NewBundle(
+				e.GetContext,
+				e.Logger,
+				operations.NewMemoryReporter(),
+			)
+			for _, chainSel := range []uint64{chainA, chainB} {
+				evmChain := e.BlockChains.EVMChains()[chainSel]
+
+				var tokenPoolType datastore.ContractType
+				var version *semver.Version
+				if chainSel == chainA {
+					tokenPoolType = datastore.ContractType(burn_mint_token_pool.ContractType)
+					version = burn_mint_token_pool.Version
+				} else {
+					tokenPoolType = datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType)
+					version = burn_mint_token_pool_v1_6_1.Version
+				}
+
+				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+					ChainSelector: chainSel,
+					Type:          tokenPoolType,
+					Version:       version,
+					Qualifier:     "TEST",
+				}, chainSel, evm_datastore_utils.ToEVMAddress)
+				require.NoError(t, err, "Failed to find deployed token pool ref in datastore")
+				tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+					ChainSelector: chainSel,
+					Type:          datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+					Version:       burn_mint_erc20_with_drip.Version,
+					Qualifier:     "TEST",
+				}, chainSel, evm_datastore_utils.ToEVMAddress)
+				require.NoError(t, err, "Failed to find deployed token ref in datastore")
+				registryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+					ChainSelector: chainSel,
+					Type:          datastore.ContractType(token_admin_registry.ContractType),
+					Version:       semver.MustParse("1.5.0"),
+				}, chainSel, evm_datastore_utils.ToEVMAddress)
+				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
+				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+					ChainSelector: chainSel,
+					Type:          datastore.ContractType(committee_verifier.ContractType),
+					Version:       committee_verifier.Version,
+				}, chainSel, evm_datastore_utils.ToEVMAddress)
+				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
+
+				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
+					ChainSelector: chainSel,
+					Address:       registryAddr,
+					Args:          tokenAddr,
+				})
+				require.NoError(t, err, "Failed to get token config from token admin registry")
+				require.Equal(t, tokenPoolAddr, tokenConfigReport.Output.TokenPool, "Token pool address in registry should match deployed token pool address")
+				require.Equal(t, evmChain.DeployerKey.From, tokenConfigReport.Output.Administrator, "Deployer should be the admin of the token in the registry")
+
+				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[struct{}]{
+					ChainSelector: chainSel,
+					Address:       tokenPoolAddr,
+				})
+				require.NoError(t, err, "Failed to get supported chains from token pool")
+				require.Len(t, chainSupportReport.Output, 1, "There should be 1 supported remote chain in the token pool")
+				var remoteChainSel uint64
+				if chainSel == chainA {
+					remoteChainSel = chainB
+				} else {
+					remoteChainSel = chainA
+				}
+				require.Equal(t, remoteChainSel, chainSupportReport.Output[0], "Remote chain in token pool should match expected")
+
+				// GetCurrentRateLimiterState is only available in version 2.0.0+
+				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
+					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+						ChainSelector: chainSel,
+						Address:       tokenPoolAddr,
+						Args: token_pool.GetCurrentRateLimiterStateArgs{
+							RemoteChainSelector: remoteChainSel,
+						},
+					})
+					require.NoError(t, err, "Failed to get rate limiter config from token pool")
+					currentStates := rateLimiterStateReport.Output
+					cfg := getRemoteChainConfig(nil, nil)
+					const decimals = 18
+					require.Equal(t, cfg.DefaultFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+					requireRateLimiterScaled(t, cfg.DefaultFinalityInboundRateLimiterConfig.Rate, cfg.DefaultFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Rate, currentStates.InboundRateLimiterState.Capacity, decimals, true)
+					require.Equal(t, cfg.DefaultFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+					requireRateLimiterScaled(t, cfg.DefaultFinalityOutboundRateLimiterConfig.Rate, cfg.DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
+				}
+
+				// Chain A has a 1.7.0 token pool so should have set CCVs
+				if chainSel == chainA {
+					boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
+					require.NoError(t, err, "Failed to instantiate token pool contract")
+					inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
+					require.NoError(t, err, "Failed to get inbound CCVs from token pool")
+					require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
+					require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
+
+					outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
+					require.NoError(t, err, "Failed to get outbound CCVs from token pool")
+					require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
+					require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
+				}
+			}
+		})
+	}
+}

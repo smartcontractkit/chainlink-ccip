@@ -133,11 +133,36 @@ var GetFee = contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *route
 
 var IsChainSupported = contract.NewRead(contract.ReadParams[uint64, bool, *router.Router]{
 	Name:         "router:isChainSupported",
-	Version:      semver.MustParse("1.2.0"),
+	Version:      Version,
 	Description:  "If the router supports a given destination chain selector",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,
 	CallContract: func(router *router.Router, opts *bind.CallOpts, args uint64) (bool, error) {
 		return router.IsChainSupported(opts, args)
+	},
+})
+
+var GetWrappedNative = contract.NewRead(contract.ReadParams[struct{}, common.Address, *router.Router]{
+	Name:         "router:get-wrapped-native",
+	Version:      Version,
+	Description:  "Gets the wrapped native address",
+	ContractType: ContractType,
+	NewContract:  router.NewRouter,
+	CallContract: func(router *router.Router, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return router.GetWrappedNative(opts)
+	},
+})
+
+var SetWrappedNative = contract.NewWrite(contract.WriteParams[common.Address, *router.Router]{
+	Name:            "router:set-wrapped-native",
+	Version:         Version,
+	Description:     "Sets the wrapped native address",
+	ContractType:    ContractType,
+	ContractABI:     router.RouterABI,
+	NewContract:     router.NewRouter,
+	IsAllowedCaller: contract.OnlyOwner[*router.Router, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(router *router.Router, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return router.SetWrappedNative(opts, args)
 	},
 })

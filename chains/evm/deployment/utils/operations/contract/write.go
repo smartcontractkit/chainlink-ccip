@@ -181,6 +181,13 @@ func AllCallersAllowed[C any, ARGS any](contract C, opts *bind.CallOpts, caller 
 	return true, nil
 }
 
+// NoCallersAllowed always returns false, forcing the write to be collected for a proposal
+// rather than executed directly. Use this for operations that must execute atomically
+// within an MCMS proposal alongside other owner-gated operations.
+func NoCallersAllowed[C any, ARGS any](contract C, opts *bind.CallOpts, caller common.Address, args ARGS) (bool, error) {
+	return false, nil
+}
+
 // NewBatchOperation constructs an MCMS BatchOperation from a slice of WriteOutputs.
 // It filters out any WriteOutputs that have already been executed.
 // Returns an error if the WriteOutputs target multiple chains.
@@ -190,31 +197,32 @@ func NewBatchOperationFromWrites(outs []WriteOutput) (mcms_types.BatchOperation,
 		return mcms_types.BatchOperation{}, nil
 	}
 
-	batchOps := make(map[uint64]mcms_types.BatchOperation)
-	var chainSelector uint64
-	for i, out := range outs {
+	var (
+		chainSelector uint64
+		txs           []mcms_types.Transaction
+	)
+	for _, out := range outs {
 		if out.Executed() {
 			continue // Skip executed transactions, they should not be included.
 		}
-		if batchOp, exists := batchOps[out.ChainSelector]; !exists {
-			if i != 0 {
-				return mcms_types.BatchOperation{}, errors.New("failed to make batch operation: writes target multiple chains")
-			}
-			batchOps[out.ChainSelector] = mcms_types.BatchOperation{
-				ChainSelector: mcms_types.ChainSelector(out.ChainSelector),
-				Transactions:  []mcms_types.Transaction{out.Tx},
-			}
+		if len(txs) == 0 {
 			chainSelector = out.ChainSelector
-		} else {
-			batchOp.Transactions = append(batchOp.Transactions, out.Tx)
-			batchOps[out.ChainSelector] = batchOp
+			txs = append(txs, out.Tx)
+			continue
 		}
+		if out.ChainSelector != chainSelector {
+			return mcms_types.BatchOperation{}, errors.New("failed to make batch operation: writes target multiple chains")
+		}
+		txs = append(txs, out.Tx)
 	}
 
 	// If there are no unexecuted writes, return an empty BatchOperation.
-	if len(batchOps) == 0 {
+	if len(txs) == 0 {
 		return mcms_types.BatchOperation{}, nil
 	}
 
-	return batchOps[chainSelector], nil
+	return mcms_types.BatchOperation{
+		ChainSelector: mcms_types.ChainSelector(chainSelector),
+		Transactions:  txs,
+	}, nil
 }

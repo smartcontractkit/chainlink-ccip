@@ -7,6 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -29,11 +35,6 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 var DeployTokenPool = cldf_ops.NewSequence(
@@ -67,10 +68,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		// but will error if the provided address is incorrect or not provided at all
 		if input.TokenRef != nil && input.TokenRef.Qualifier != "" {
 			// find token address from the data store
-			storedAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: input.ChainSelector,
-				Qualifier:     input.TokenRef.Qualifier,
-			}, input.ChainSelector, datastore_utils.FullRef)
+			storedAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, *input.TokenRef, input.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
 			}
