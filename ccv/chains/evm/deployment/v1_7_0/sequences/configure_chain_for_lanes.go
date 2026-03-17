@@ -15,17 +15,15 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
@@ -106,7 +104,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		}
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
-		feeQContract, err := fqc.NewFeeQuoter(common.HexToAddress(sourceFeeQuoter), chain.Client)
+		feeQContract, err := fee_quoter.NewFeeQuoterContract(common.HexToAddress(sourceFeeQuoter), chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to bind fee quoter contract at address %s on chain %s: %w",
 				sourceFeeQuoter, chain.String(), err)
@@ -452,7 +450,7 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input 
 }
 
 // feeQuoterDestChainConfigEqual reports whether the on-chain config matches the desired adapter config (binding struct has no USDPerUnitGas; that is updated via UpdatePrices).
-func feeQuoterDestChainConfigEqual(cur fqc.FeeQuoterDestChainConfig, desired lanes.FeeQuoterDestChainConfig) bool {
+func feeQuoterDestChainConfigEqual(cur fee_quoter.DestChainConfig, desired lanes.FeeQuoterDestChainConfig) bool {
 	var linkFeeMultiplierPercent uint8
 	if desired.V2Params != nil {
 		linkFeeMultiplierPercent = desired.V2Params.LinkFeeMultiplierPercent
@@ -473,7 +471,7 @@ func feeQuoterDestChainConfigEqual(cur fqc.FeeQuoterDestChainConfig, desired lan
 // maybeAddFeeQuoterDestChainConfigArg fetches current FeeQuoter dest chain config and appends to feeQuoterArgs
 // only when the config differs from desired (idempotent). Call only when OverrideExistingConfig is false.
 // When a desired field is zero, the on-chain value is used so we do not overwrite with zero.
-func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fqc.FeeQuoter, b cldf_ops.Bundle, feeQuoterAddr string, chain evm.Chain, remoteSelector uint64, remoteConfig *lanes.ChainDefinition, feeQuoterArgs []fee_quoter.DestChainConfigArgs) ([]fee_quoter.DestChainConfigArgs, error) {
+func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fee_quoter.FeeQuoterContract, b cldf_ops.Bundle, feeQuoterAddr string, chain evm.Chain, remoteSelector uint64, remoteConfig *lanes.ChainDefinition, feeQuoterArgs []fee_quoter.DestChainConfigArgs) ([]fee_quoter.DestChainConfigArgs, error) {
 	cur, err := feeQContract.GetDestChainConfig(&bind.CallOpts{
 		Context: b.GetContext(),
 	}, remoteSelector)

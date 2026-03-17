@@ -2,14 +2,16 @@ package changesets_test
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	router_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -316,15 +318,17 @@ func TestDiscoverTokens_FallsBackToFeeQuoterForLINK(t *testing.T) {
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
 
-	fqAddr, tx, _, err := fee_quoter.DeployFeeQuoter(
-		chain.DeployerKey, chain.Client,
-		fee_quoter.FeeQuoterStaticConfig{
+	fqParsedABI, err := abi.JSON(strings.NewReader(fee_quoter_ops.FeeQuoterABI))
+	require.NoError(t, err)
+	fqAddr, tx, _, err := bind.DeployContract(
+		chain.DeployerKey, fqParsedABI, common.FromHex(fee_quoter_ops.FeeQuoterBin), chain.Client,
+		fee_quoter_ops.StaticConfig{
 			MaxFeeJuelsPerMsg: big.NewInt(1e18),
 			LinkToken:         expectedLINK,
 		},
 		[]common.Address{},
-		[]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		[]fee_quoter.FeeQuoterDestChainConfigArgs{},
+		[]fee_quoter_ops.TokenTransferFeeConfigArgs{},
+		[]fee_quoter_ops.DestChainConfigArgs{},
 	)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)

@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	router_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -195,7 +194,7 @@ func discoverLINKFromFeeQuoter(e cldf_deployment.Environment, sel uint64, client
 		}
 
 		fqAddr := common.HexToAddress(ref.Address)
-		fqContract, err := fee_quoter.NewFeeQuoter(fqAddr, client)
+		fqContract, err := fee_quoter_ops.NewFeeQuoterContract(fqAddr, client)
 		if err != nil {
 			e.Logger.Warnf("Failed to bind FeeQuoter at %s: %v, trying next", fqAddr.Hex(), err)
 			continue
