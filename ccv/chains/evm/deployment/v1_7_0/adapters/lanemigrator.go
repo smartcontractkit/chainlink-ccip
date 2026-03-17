@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -39,9 +40,10 @@ import (
 )
 
 const (
-	DefaultTxGasLimit        uint32 = 200_000
-	DefaultMaxPerMsgGasLimit        = 8_000_000
-	DefaultMaxDataBytes             = 32_000
+	DefaultTxGasLimit         uint32        = 200_000
+	DefaultMaxPerMsgGasLimit                = 8_000_000
+	DefaultMaxDataBytes                     = 32_000
+	defaultExplorerAPITimeout time.Duration = 15 * time.Second
 )
 
 type LaneMigrator struct{}
@@ -92,7 +94,11 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 		},
 	}
 	for chainSelector, perChainCfg := range cfg.Input {
-		err := verifyOwnershipOfContracts(e, chainSelector, allContractRefs)
+		err := verifyAllContractsPresent(e, chainSelector, allContractRefs)
+		if err != nil {
+			return fmt.Errorf("contract verification failed for chain %d: %w", chainSelector, err)
+		}
+		err = verifyOwnershipOfContracts(e, chainSelector, allContractRefs)
 		if err != nil {
 			return fmt.Errorf("ownership verification failed for chain %d: %w", chainSelector, err)
 		}
@@ -100,6 +106,26 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 		if err != nil {
 			return fmt.Errorf("existing lane version verification failed for chain %d: %w", chainSelector, err)
 		}
+	}
+	return nil
+}
+
+// verifyAllContractsPresent checks that all contracts in contractRefs have a corresponding address
+// in the datastore for the given chain (i.e. all required contracts are deployed and registered).
+func verifyAllContractsPresent(e deployment.Environment, chainSelector uint64, contractRefs []datastore.AddressRef) error {
+	var missing []string
+	for _, ref := range contractRefs {
+		_, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: chainSelector,
+			Type:          ref.Type,
+			Version:       ref.Version,
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			missing = append(missing, fmt.Sprintf("%s@%s", ref.Type, ref.Version))
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("not all required contracts are present in datastore for chain %d: missing %v", chainSelector, missing)
 	}
 	return nil
 }
