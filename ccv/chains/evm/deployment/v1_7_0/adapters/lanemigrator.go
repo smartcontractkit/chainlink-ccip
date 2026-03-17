@@ -100,7 +100,11 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 		if err != nil {
 			return fmt.Errorf("ownership verification failed for chain %d: %w", chainSelector, err)
 		}
-		err = verifyExistingLaneVersion(e, e.BlockChains.EVMChains()[chainSelector], chainSelector, perChainCfg.RemoteChains)
+		evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+		if !ok {
+			return fmt.Errorf("evm chain not found for selector %d", chainSelector)
+		}
+		err = verifyExistingLaneVersion(e, evmChain, chainSelector, perChainCfg.RemoteChains)
 		if err != nil {
 			return fmt.Errorf("existing lane version verification failed for chain %d: %w", chainSelector, err)
 		}
@@ -139,8 +143,7 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 		Version:       routerops.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
-		return fmt.Errorf("error fetching rout"+
-			"er address ref for chain %d: %w", chainSelector, err)
+		return fmt.Errorf("error fetching router address ref for chain %d: %w", chainSelector, err)
 	}
 	// get onRamp for remote chains
 	for _, remoteChainSelector := range remoteChains {
@@ -158,15 +161,15 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 				"expected to find an onRamp configured on the Router for the remote chain, but got zero address. "+
 				"Please configure lanes with the prod Router first before migrating", chainSelector, remoteChainSelector)
 		}
-		_, onRampVerion, err := utils.TypeAndVersion(onRampOnRouterOut.Output, evmChain.Client)
+		_, onRampVersion, err := utils.TypeAndVersion(onRampOnRouterOut.Output, evmChain.Client)
 		if err != nil {
 			return fmt.Errorf("error fetching onRamp version for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
 		}
 
-		if !onRampVerion.Equal(onrampops_v160.Version) {
+		if !onRampVersion.Equal(onrampops_v160.Version) {
 			return fmt.Errorf("precondition failed for chain %d and remote chain %d:"+
 				"expected onRamp version on Router to be 1.6.0, but got version %s. ",
-				chainSelector, remoteChainSelector, onRampVerion.String())
+				chainSelector, remoteChainSelector, onRampVersion.String())
 		}
 
 		// get the fee quoter from onRamp
