@@ -58,6 +58,10 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
+			// to allow for type serialization, we apply fee quoter dest chain config overrides
+			// at the lane level and then set them to nil before passing to the adapters
+			chainA.FeeQuoterDestChainConfigOverrides = nil
+			chainB.FeeQuoterDestChainConfigOverrides = nil
 			type lanePair struct {
 				src         *ChainDefinition
 				dest        *ChainDefinition
@@ -141,6 +145,13 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
+	}
+	chainDef.FeeQuoterDestChainConfig = adapter.GetFeeQuoterDestChainConfig()
+	if chainDef.FeeQuoterDestChainConfigOverrides != nil {
+		(*chainDef.FeeQuoterDestChainConfigOverrides)(&chainDef.FeeQuoterDestChainConfig)
+	}
+	if chainDef.GasPrice == nil {
+		chainDef.GasPrice = adapter.GetDefaultGasPrice()
 	}
 	// handle v2 separately
 	return populateAddressesV2(ds, chainDef, adapter, version)
