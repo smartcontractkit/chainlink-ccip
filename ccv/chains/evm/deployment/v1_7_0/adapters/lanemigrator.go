@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -40,10 +39,9 @@ import (
 )
 
 const (
-	DefaultTxGasLimit         uint32        = 200_000
-	DefaultMaxPerMsgGasLimit                = 8_000_000
-	DefaultMaxDataBytes                     = 32_000
-	defaultExplorerAPITimeout time.Duration = 15 * time.Second
+	DefaultTxGasLimit        uint32 = 200_000
+	DefaultMaxPerMsgGasLimit uint32 = 8_000_000
+	DefaultMaxDataBytes      uint32 = 32_000
 )
 
 type LaneMigrator struct{}
