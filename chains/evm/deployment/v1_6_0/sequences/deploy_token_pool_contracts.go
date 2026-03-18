@@ -385,6 +385,10 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type and version: %s", typeAndVersion)
 		}
 
+		if poolRef.Qualifier == "" {
+			poolRef.Qualifier = poolRef.Address + "-" + poolRef.Type.String()
+		}
+
 		addresses = append(addresses, poolRef)
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
