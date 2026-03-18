@@ -242,21 +242,12 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/chainlink
           go build -o ccip.test .
-      # TEMP: workaround issues with db schema pinning (https://github.com/smartcontractkit/capabilities/pull/234)
-      # - name: Setup DB
-      #  run: |
-      #    cd $GITHUB_WORKSPACE/chainlink
-      #    ./ccip.test local db preparetest
-      #  env:
-      #    CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Setup DB
-        shell: bash
         run: |
-          go get github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest@5b5d3f204863e43445685cb2f569f37514bb84f5
-          go run github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest
+          cd $GITHUB_WORKSPACE/chainlink
+          ./ccip.test local db preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@latest
       - name: ${{ matrix.type.name }}
