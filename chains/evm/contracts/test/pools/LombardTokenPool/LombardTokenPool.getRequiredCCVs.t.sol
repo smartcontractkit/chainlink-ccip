@@ -49,13 +49,13 @@ contract LombardTokenPool_getRequiredCCVs is LombardTokenPoolSetup {
   }
 
   /// @notice Pool has no advancedPoolHooks (address(0)) → super returns [] → revert.
-  function test_getRequiredCCVs_RevertWhen_ZeroCCVs_NoHooksConfigured() public  {
+  function test_getRequiredCCVs_RevertWhen_ZeroCCVs_NoHooksConfigured() public {
     vm.expectRevert(LombardTokenPool.LombardMustUseCCVConfigForV2Flow.selector);
     s_pool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound);
   }
 
   /// @notice Hooks present but returns an empty array → revert.
-  function test_getRequiredCCVs_RevertWhen_ZeroCCVs_HooksReturnEmpty() public {
+  function test_getRequiredCCVs_RevertWhen_LombardMustUseCCVConfigForV2Flow_ZeroCCVs_HooksReturnEmpty() public {
     _mockHooksReturning(new address[](0));
     vm.expectRevert(LombardTokenPool.LombardMustUseCCVConfigForV2Flow.selector);
     s_poolWithHooks.getRequiredCCVs(
@@ -64,7 +64,7 @@ contract LombardTokenPool_getRequiredCCVs is LombardTokenPoolSetup {
   }
 
   /// @notice Exactly one CCV is insufficient for the V2 flow → revert.
-  function test_getRequiredCCVs_RevertWhen_OneCCV() public {
+  function test_getRequiredCCVs_RevertWhen_LombardMustUseCCVConfigForV2Flow_OneCCV() public {
     address[] memory ccvs = new address[](1);
     ccvs[0] = makeAddr("ccv1");
     _mockHooksReturning(ccvs);
@@ -74,8 +74,7 @@ contract LombardTokenPool_getRequiredCCVs is LombardTokenPoolSetup {
     );
   }
 
-  /// @notice Two CCVs satisfies the minimum → succeeds and returns both addresses.
-  function test_getRequiredCCVs_TwoCCVs_Succeeds() public {
+  function test_getRequiredCCVs_ValidConfig_TwoCCVs() public {
     address[] memory ccvs = new address[](2);
     ccvs[0] = makeAddr("ccv1");
     ccvs[1] = makeAddr("ccv2");

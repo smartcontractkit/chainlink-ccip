@@ -307,7 +307,8 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       localToken, remoteChainSelector, sourceDenominatedAmount, blockConfirmationsRequested, extraData, direction
     );
 
-    if (requiredCCVs.length == 0 || requiredCCVs.length == 1) {
+    // Lombard will always be configured with (at least) the Lombard verifier and the committeeVerifier.
+    if (requiredCCVs.length < 2) {
       revert LombardMustUseCCVConfigForV2Flow();
     }
 
