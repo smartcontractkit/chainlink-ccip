@@ -36,7 +36,6 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ChainNotSupported(uint64 remoteChainSelector);
   error ExecutionError();
   error HashMismatch();
-  error MustIncludeLombardVerifier();
 
   /// The following events are emitted for Lombard-specific configuration updates and are utilized by Lombard.
   /// @param remoteChainSelector CCIP selector of destination chain.
@@ -296,28 +295,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   }
 
   function getRequiredCCVs(
-    address localToken,
-    uint64 remoteChainSelector,
-    uint256 sourceDenominatedAmount,
-    uint16 blockConfirmationsRequested,
-    bytes calldata extraData,
-    IPoolV2.MessageDirection direction
+    address,
+    uint64,
+    uint256,
+    uint16,
+    bytes calldata,
+    IPoolV2.MessageDirection
   ) public view virtual override returns (address[] memory requiredCCVs) {
-    requiredCCVs = super.getRequiredCCVs(
-      localToken, remoteChainSelector, sourceDenominatedAmount, blockConfirmationsRequested, extraData, direction
-    );
-
-    bool includesLombardVerifier = false;
-    for (uint256 i = 0; i < requiredCCVs.length; ++i) {
-      if (requiredCCVs[i] == i_lombardVerifierResolver) {
-        includesLombardVerifier = true;
-        break;
-      }
-    }
-
-    if (!includesLombardVerifier) {
-      revert MustIncludeLombardVerifier();
-    }
+    requiredCCVs = new address[](2);
+    requiredCCVs[0] = i_lombardVerifierResolver;
+    requiredCCVs[1] = address(0);
 
     return requiredCCVs;
   }

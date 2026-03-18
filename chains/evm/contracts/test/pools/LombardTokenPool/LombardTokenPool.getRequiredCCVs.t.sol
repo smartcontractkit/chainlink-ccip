@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
-import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
 import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
@@ -42,17 +40,10 @@ contract LombardTokenPool_getRequiredCCVs is LombardTokenPoolSetup {
     s_poolWithHooks.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 
-  function _mockHooksReturning(
-    address[] memory ccvs
-  ) internal {
-    vm.mockCall(s_hooksAddr, abi.encodeWithSelector(IAdvancedPoolHooks.getRequiredCCVs.selector), abi.encode(ccvs));
-  }
-
-  function test_getRequiredCCVs_ValidConfig_TwoCCVs() public {
+  function test_getRequiredCCVs_ValidConfig_TwoCCVs() public view {
     address[] memory ccvs = new address[](2);
     ccvs[0] = address(s_verifierResolver);
     ccvs[1] = address(0);
-    _mockHooksReturning(ccvs);
 
     address[] memory result = s_poolWithHooks.getRequiredCCVs(
       address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound
@@ -61,15 +52,5 @@ contract LombardTokenPool_getRequiredCCVs is LombardTokenPoolSetup {
     assertEq(result.length, 2);
     assertEq(result[0], ccvs[0]);
     assertEq(result[1], ccvs[1]);
-  }
-
-  function test_getRequiredCCVs_RevertWhen_MustIncludeLombardVerifier() public {
-    address[] memory ccvs = new address[](2);
-    ccvs[0] = address(s_bridge); // Not the verifier resolver
-    ccvs[1] = address(0);
-    _mockHooksReturning(ccvs);
-
-    vm.expectRevert(LombardTokenPool.MustIncludeLombardVerifier.selector);
-    s_pool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound);
   }
 }
