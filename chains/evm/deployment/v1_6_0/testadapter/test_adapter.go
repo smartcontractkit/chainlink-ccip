@@ -225,14 +225,16 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 }
 
 func (a *EVMAdapter) CCIPReceiver() []byte {
-	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
+	receiverAddr, err := a.getAddress("CCIPReceiver")
+	if err != nil {
+		panic(err)
+	}
+	return common.LeftPadBytes(receiverAddr.Bytes(), 32)
 }
 
 func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
 	// Return the deployer's wallet address as the EOA receiver for testing purposes.
-	// return common.LeftPadBytes(a.DeployerKey.From.Bytes(), 32)
-	t.Skip("not implemented")
-	return nil
+	return common.LeftPadBytes(a.DeployerKey.From.Bytes(), 32)
 }
 
 func (a *EVMAdapter) InvalidAddresses() [][]byte {
