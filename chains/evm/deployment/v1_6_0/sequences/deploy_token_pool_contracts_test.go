@@ -197,10 +197,9 @@ func TestDeployTokenPool(t *testing.T) {
 			e.DataStore = ds.Seal()
 
 			// Build input for DeployTokenPool sequence
-			poolQualifier := tc.poolType.String() + "-" + tc.poolVersion.String()
 			input := tokenapi.DeployTokenPoolInput{
 				TokenRef:           &ref,
-				TokenPoolQualifier: poolQualifier,
+				TokenPoolQualifier: "", // generate a sensible default
 				PoolType:           string(tc.poolType),
 				TokenPoolVersion:   tc.poolVersion,
 				Allowlist:          tc.allowlist,
@@ -219,19 +218,10 @@ func TestDeployTokenPool(t *testing.T) {
 			require.GreaterOrEqual(t, len(report.Output.Addresses), 1, "Should have at least one deployed address")
 
 			// Find the pool address in the output
-			var poolRef datastore.AddressRef
-			poolFound := false
-			for _, addr := range report.Output.Addresses {
-				if addr.Type == datastore.ContractType(tc.poolType) &&
-					addr.ChainSelector == chainSelector &&
-					addr.Qualifier == poolQualifier {
-					poolRef = addr
-					poolFound = true
-					break
-				}
-			}
-			require.True(t, poolFound, "Pool %s should be found in deployed addresses", tc.name)
+			poolRef := report.Output.Addresses[0]
+			require.NotEmpty(t, poolRef.Type.String(), "Pool type should not be empty")
 			require.NotEmpty(t, poolRef.Address, "Pool address should not be empty")
+			require.Equal(t, poolRef.Address+"-"+poolRef.Type.String(), poolRef.Qualifier)
 			t.Logf("Deployed %s at address: %s", tc.name, poolRef.Address)
 
 			// Make on-chain calls to verify the pool was deployed correctly
@@ -342,22 +332,24 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 
 	// Add an existing pool to the datastore (simulating already deployed)
 	existingPoolAddress := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+	existingPoolQualifier := existingPoolAddress.Hex() + "-" + string(poolType)
 	err = ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType(poolType),
 		Version:       utils.Version_1_6_1,
 		Address:       existingPoolAddress.Hex(),
 		ChainSelector: chainSelector,
-		Qualifier:     tokenSymbol,
+		Qualifier:     existingPoolQualifier,
 	})
 	require.NoError(t, err, "Failed to add existing pool address to datastore")
 
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		PoolType:          string(poolType),
-		TokenPoolVersion:  utils.Version_1_6_1,
-		ChainSelector:     chainSelector,
-		ExistingDataStore: e.DataStore,
+		PoolType:           string(poolType),
+		TokenPoolVersion:   utils.Version_1_6_1,
+		ChainSelector:      chainSelector,
+		TokenPoolQualifier: existingPoolQualifier,
+		ExistingDataStore:  e.DataStore,
 	}
 
 	// Execute the sequence - it should return early without deploying
