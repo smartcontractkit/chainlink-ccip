@@ -612,8 +612,13 @@ func ConfirmCommitWithExpectedSeqNumRange(
 
 			// Need to do this because the subscription sometimes fails to get the event.
 			t.Logf("Creating FilterCommitReportAccepted iterator for offramp %s", offRamp.Address().String())
+			filterStart := uint64(0)
+			if startBlock != nil {
+				filterStart = *startBlock
+			}
 			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
 				Context: t.Context(),
+				Start:   filterStart,
 			})
 			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
 			if err != nil {
