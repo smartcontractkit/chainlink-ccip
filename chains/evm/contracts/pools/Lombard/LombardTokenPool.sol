@@ -36,7 +36,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ChainNotSupported(uint64 remoteChainSelector);
   error ExecutionError();
   error HashMismatch();
-  error LombardMustUseCCVConfigForV2Flow();
+  error MustIncludeLombardVerifier();
 
   /// The following events are emitted for Lombard-specific configuration updates and are utilized by Lombard.
   /// @param remoteChainSelector CCIP selector of destination chain.
@@ -307,9 +307,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       localToken, remoteChainSelector, sourceDenominatedAmount, blockConfirmationsRequested, extraData, direction
     );
 
-    // Lombard will always be configured with (at least) the Lombard verifier and the committeeVerifier.
-    if (requiredCCVs.length < 2) {
-      revert LombardMustUseCCVConfigForV2Flow();
+    bool includesLombardVerifier = false;
+    for (uint256 i = 0; i < requiredCCVs.length; ++i) {
+      if (requiredCCVs[i] == i_lombardVerifierResolver) {
+        includesLombardVerifier = true;
+        break;
+      }
+    }
+
+    if (!includesLombardVerifier) {
+      revert MustIncludeLombardVerifier();
     }
 
     return requiredCCVs;
