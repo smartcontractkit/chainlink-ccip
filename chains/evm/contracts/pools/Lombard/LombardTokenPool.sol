@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
+import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -35,6 +36,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ChainNotSupported(uint64 remoteChainSelector);
   error ExecutionError();
   error HashMismatch();
+  error LombardMustUseCCVConfigForV2Flow();
 
   /// The following events are emitted for Lombard-specific configuration updates and are utilized by Lombard.
   /// @param remoteChainSelector CCIP selector of destination chain.
@@ -291,6 +293,25 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     delete s_chainSelectorToPath[remoteChainSelector];
 
     emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteAdapter);
+  }
+
+  function getRequiredCCVs(
+    address localToken,
+    uint64 remoteChainSelector,
+    uint256 sourceDenominatedAmount,
+    uint16 blockConfirmationsRequested,
+    bytes calldata extraData,
+    IPoolV2.MessageDirection direction
+  ) public view virtual override returns (address[] memory requiredCCVs) {
+    requiredCCVs = super.getRequiredCCVs(
+      localToken, remoteChainSelector, sourceDenominatedAmount, blockConfirmationsRequested, extraData, direction
+    );
+
+    if (requiredCCVs.length == 0 || requiredCCVs.length == 1) {
+      revert LombardMustUseCCVConfigForV2Flow();
+    }
+
+    return requiredCCVs;
   }
 
   // ================================================================

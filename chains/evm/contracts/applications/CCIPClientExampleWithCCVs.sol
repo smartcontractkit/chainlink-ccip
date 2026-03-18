@@ -125,7 +125,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
     // If allowFasterThanFinality is true, minBlockConfirmations = 1 (allow any FTF level) - WARNING only use a finality of 1 when
-    //    // you use a trusted sender on the source chain that manages the finality risk when sending messages.
+    // you use a trusted sender on the source chain that manages the finality risk when sending messages.
     // If allowFasterThanFinality is false, minBlockConfirmations = 0 (require finality).
     minBlockConfirmations = config.allowFasterThanFinality ? 1 : 0;
     return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, minBlockConfirmations);
