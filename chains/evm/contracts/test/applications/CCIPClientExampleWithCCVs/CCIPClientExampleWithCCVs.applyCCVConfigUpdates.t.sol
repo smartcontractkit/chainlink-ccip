@@ -29,12 +29,12 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectEmit();
     emit CCIPClientExampleWithCCVs.CCVConfigSet(
-      SOURCE_CHAIN_SELECTOR, requiredCCVs, optionalCCVs, optionalThreshold, false
+      SOURCE_CHAIN_SELECTOR, requiredCCVs, optionalCCVs, optionalThreshold, args[0].allowFasterThanFinality
     );
     s_client.applyCCVConfigUpdates(args);
 
@@ -72,7 +72,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(
@@ -100,7 +100,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: new address[](1),
       optionalCCVs: new address[](0),
       optionalThreshold: 1,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(
@@ -123,7 +123,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCIPClientExampleWithCCVs.ZeroAddressNotAllowedAsOptional.selector));
@@ -144,7 +144,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(
@@ -163,7 +163,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: new address[](0),
       optionalThreshold: 0,
-      requireFinality: true
+      allowFasterThanFinality: false
     });
 
     s_client.applyCCVConfigUpdates(args);
@@ -187,7 +187,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: new address[](0),
       optionalThreshold: 0,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     s_client.applyCCVConfigUpdates(args);
