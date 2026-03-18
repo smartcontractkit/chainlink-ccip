@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.4",
+  "version": "2.0.0",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
   "repository": "github:smartcontractkit/chainlink-ccip",
@@ -17,7 +17,7 @@
     "foundry.toml",
     "contracts/**/*.sol",
     "contracts/LICENSE.md",
-    "contracts/v1.5-CCIP-License-grants.md",
+    "contracts/v2.0-CCIP-License-grants.md",
     "!contracts/test/**/*",
     "contracts/test/mocks/**/*",
     "contracts/test/helpers/**/*",
