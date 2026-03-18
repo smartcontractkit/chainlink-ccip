@@ -2299,3 +2299,71 @@ func (c *configurableCommitReportCache) DeduplicateReports(
 	}
 	return reports // Or panic, or handle error, if lggr is essential but not provided
 }
+
+func sameSourceDisjointReports(
+	source cciptypes.ChainSelector,
+) []cciptypes.ExecutePluginReportSingleChain {
+	msg := func(seq cciptypes.SeqNum) cciptypes.Message {
+		return cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				SequenceNumber:      seq,
+				SourceChainSelector: source,
+			},
+		}
+	}
+
+	return []cciptypes.ExecutePluginReportSingleChain{
+		{
+			SourceChainSelector: source,
+			Messages:            []cciptypes.Message{msg(1), msg(2)},
+		},
+		{
+			SourceChainSelector: source,
+			Messages:            []cciptypes.Message{msg(10), msg(11)},
+		},
+	}
+}
+
+func Test_getSeqNrRangesBySource_DisjointReportRanges(t *testing.T) {
+	source := cciptypes.ChainSelector(1)
+	reports := sameSourceDisjointReports(source)
+
+	rangesBySource := getSeqNrRangesBySource(reports)
+	require.Len(t, rangesBySource, 1)
+	require.Contains(t, rangesBySource, source)
+
+	t.Logf("observed ranges for source %d: %+v", source, rangesBySource[source])
+	require.Len(t, rangesBySource[source], 2)
+	require.Equal(t, cciptypes.SeqNum(1), rangesBySource[source][0].Start())
+	require.Equal(t, cciptypes.SeqNum(2), rangesBySource[source][0].End())
+	require.Equal(t, cciptypes.SeqNum(10), rangesBySource[source][1].Start())
+	require.Equal(t, cciptypes.SeqNum(11), rangesBySource[source][1].End())
+}
+
+func Test_checkAlreadyExecuted_DisjointRanges(t *testing.T) {
+	source := cciptypes.ChainSelector(1)
+	reports := sameSourceDisjointReports(source)
+
+	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+	ccipReader.EXPECT().
+		ExecutedMessages(
+			mock.Anything,
+			map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				source: {
+					cciptypes.NewSeqNumRange(1, 2),
+					cciptypes.NewSeqNumRange(10, 11),
+				},
+			},
+			primitives.Unconfirmed,
+		).
+		Return(
+			map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				source: {10, 11},
+			},
+			nil,
+		)
+
+	p := &Plugin{ccipReader: ccipReader}
+	err := p.checkAlreadyExecuted(context.Background(), logger.Test(t), reports)
+	require.NoError(t, err)
+}

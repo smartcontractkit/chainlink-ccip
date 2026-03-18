@@ -150,7 +150,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		var cllccipTimelockAddr, rmnTimelockAddr common.Address
 		if !input.DeployerKeyOwned {
 			var mcmContracts []ownableContract
-			cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, err = resolveOwnershipDeps(
+			cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, err = ResolveOwnershipDeps(
 				input.ExistingAddresses, chain.Selector,
 			)
 			if err != nil {
@@ -666,10 +666,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			// Set minimum block depth on the MockReceiver if diff exists
 			if mockReceiverParams.MinimumBlockConfirmations != 0 {
 				// Get the minimum block depth on the MockReceiver
-			minimumBlockConfirmations, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockConfirmations, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-				Args: mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs{
+				minimumBlockConfirmations, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockConfirmations, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+					Args: mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs{
 						Arg0: chain.Selector,
 						Arg1: []byte{},
 					},
@@ -745,12 +745,12 @@ type ownableContract struct {
 	AcceptableOwners []common.Address
 }
 
-// resolveOwnershipDeps looks up the MCMS contracts required for ownership
+// ResolveOwnershipDeps looks up the MCMS contracts required for ownership
 // transfer from existingAddresses. It returns the CLL and RMN timelock
 // addresses together with the MCM contracts (Proposer, Bypasser, Canceller)
 // wrapped as ownableContracts so the caller can include them in the
 // transfer-ownership pass.
-func resolveOwnershipDeps(
+func ResolveOwnershipDeps(
 	existingAddresses []datastore.AddressRef,
 	chainSelector uint64,
 ) (cllccipTimelockAddr, rmnTimelockAddr common.Address, mcmContracts []ownableContract, err error) {

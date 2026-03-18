@@ -802,10 +802,12 @@ func getSeqNrRangesBySource(
 		}
 		minMsg := slices.MinFunc(chainReport.Messages, cmpr)
 		maxMsg := slices.MaxFunc(chainReport.Messages, cmpr)
-		seqNrRangesBySource[chainReport.SourceChainSelector] = []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(
-			minMsg.Header.SequenceNumber,
-			maxMsg.Header.SequenceNumber,
-		)}
+		seqNrRangesBySource[chainReport.SourceChainSelector] = append(
+			seqNrRangesBySource[chainReport.SourceChainSelector],
+			cciptypes.NewSeqNumRange(
+				minMsg.Header.SequenceNumber,
+				maxMsg.Header.SequenceNumber,
+			))
 	}
 	return seqNrRangesBySource
 }
