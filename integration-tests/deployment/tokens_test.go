@@ -73,15 +73,14 @@ func TestTokenExpansion(t *testing.T) {
 	}
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
-	// TODO: EVM doesn't work with a non-zero timelock delay
-	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
-	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{cciputils.CLLQualifier})
+	EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 
 	sender, _ := solana.NewRandomPrivateKey()
 	out, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		ChainAdapterVersion: version,
 		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
-			chain_selectors.SOLANA_MAINNET.Selector: tokensapi.TokenExpansionInputPerChain{
+			chain_selectors.SOLANA_MAINNET.Selector: {
 				DeployTokenInput: &tokensapi.DeployTokenInput{
 					Name:     "Test Token",
 					Symbol:   "TEST",

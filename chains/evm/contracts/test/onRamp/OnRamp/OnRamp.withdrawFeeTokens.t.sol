@@ -1,69 +1,77 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Client} from "../../../libraries/Client.sol";
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract OnRamp_withdrawFeeTokens is OnRampSetup {
-  mapping(address => uint256) internal s_nopFees;
-
-  function setUp() public virtual override {
+  function setUp() public override {
     super.setUp();
-
-    // Since we'll mostly be testing for valid calls from the router we'll
-    // mock all calls to be originating from the router and re-mock in
-    // tests that require failure.
-    vm.startPrank(address(s_sourceRouter));
-
-    uint256 feeAmount = 1234567890;
-
-    // Send a bunch of messages, increasing the juels in the contract
-    for (uint256 i = 0; i < s_sourceFeeTokens.length; ++i) {
-      Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-      message.feeToken = s_sourceFeeTokens[i % s_sourceFeeTokens.length];
-      uint256 newFeeTokenBalance = IERC20(message.feeToken).balanceOf(address(s_onRamp)) + feeAmount;
-      deal(message.feeToken, address(s_onRamp), newFeeTokenBalance);
-      s_nopFees[message.feeToken] = newFeeTokenBalance;
-      s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
-    }
+    vm.stopPrank();
   }
 
-  function testFuzz_WithdrawFeeTokens_Success(
-    uint256[5] memory amounts
-  ) public {
-    vm.startPrank(OWNER);
-    address[] memory feeTokens = new address[](amounts.length);
-    for (uint256 i = 0; i < amounts.length; ++i) {
-      vm.assume(amounts[i] > 0);
-      feeTokens[i] = _deploySourceToken("", amounts[i], 18);
-      IERC20(feeTokens[i]).transfer(address(s_onRamp), amounts[i]);
-    }
+  function test_withdrawFeeTokens() public {
+    uint256 feeAmount = 1000 ether;
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+    // Give the onRamp some fee tokens.
+    deal(s_sourceFeeToken, address(s_onRamp), feeAmount);
 
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      vm.expectEmit();
-      emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, feeTokens[i], amounts[i]);
-    }
+    uint256 initialAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 initialOnRampBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
+
+    assertEq(feeAmount, initialOnRampBalance);
+
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceFeeToken;
+
+    vm.expectEmit();
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
+
+    // Anyone can call withdrawFeeTokens since it's permissionless.
+    vm.stopPrank();
+    vm.prank(STRANGER);
+    s_onRamp.withdrawFeeTokens(feeTokens);
+
+    uint256 finalAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 finalOnRampBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
+
+    assertEq(0, finalOnRampBalance);
+    assertEq(initialAggregatorBalance + feeAmount, finalAggregatorBalance);
+  }
+
+  function test_withdrawFeeTokens_MultipleTokens() public {
+    uint256 feeAmount1 = 1000 ether;
+    uint256 feeAmount2 = 500 ether;
+
+    address token2 = address(new BurnMintERC20("Token2", "TK2", 18, 0, 0));
+
+    // Give the onRamp some fee tokens.
+    deal(s_sourceFeeToken, address(s_onRamp), feeAmount1);
+    deal(token2, address(s_onRamp), feeAmount2);
+
+    uint256 initialAggregatorBalance1 = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 initialAggregatorBalance2 = IERC20(token2).balanceOf(FEE_AGGREGATOR);
+
+    address[] memory feeTokens = new address[](2);
+    feeTokens[0] = s_sourceFeeToken;
+    feeTokens[1] = token2;
+
+    vm.expectEmit();
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
+    vm.expectEmit();
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
 
     s_onRamp.withdrawFeeTokens(feeTokens);
 
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      assertEq(IERC20(feeTokens[i]).balanceOf(FEE_AGGREGATOR), amounts[i]);
-      assertEq(IERC20(feeTokens[i]).balanceOf(address(s_onRamp)), 0);
-    }
-  }
+    uint256 finalAggregatorBalance1 = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 finalAggregatorBalance2 = IERC20(token2).balanceOf(FEE_AGGREGATOR);
 
-  function test_WithdrawFeeTokens() public {
-    vm.expectEmit();
-    emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, s_nopFees[s_sourceFeeToken]);
-
-    s_onRamp.withdrawFeeTokens(s_sourceFeeTokens);
-
-    assertEq(IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeToken]);
-    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), 0);
+    assertEq(0, IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)));
+    assertEq(0, IERC20(token2).balanceOf(address(s_onRamp)));
+    assertEq(initialAggregatorBalance1 + feeAmount1, finalAggregatorBalance1);
+    assertEq(initialAggregatorBalance2 + feeAmount2, finalAggregatorBalance2);
   }
 }

@@ -85,8 +85,8 @@ You’ll now be inside the container:
 apt update && apt install -y build-essential wget vim
 
 # Install Go
-wget https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
-tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz
+wget https://go.dev/dl/go1.25.3.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.25.3.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 
 # Install PostgreSQL

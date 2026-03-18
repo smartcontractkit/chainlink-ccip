@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns a 3rd-party token by sending tokens to an address which is unrecoverable.
 /// @dev The pool is designed to have an immutable burn address. If the tokens at the burn address become recoverable,
@@ -17,7 +17,9 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnToAddressTokenPool 1.6.x-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "BurnToAddressTokenPool 2.0.0-dev";
+  }
 
   /// @notice The address where tokens are sent during a call to lockOrBurn, functionally burning but without decreasing
   /// total supply. This address is expected to have no ability to recover the tokens sent to it, and will thus be locked forever.
@@ -29,18 +31,18 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   constructor(
     IBurnMintERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address burnAddress
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     i_burnAddress = burnAddress;
   }
 
-  /// @inheritdoc TokenPool
   /// @notice Tokens are burned by sending to an address which can never transfer them,
   /// making the tokens unrecoverable without reducing the total supply.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     i_token.safeTransfer(i_burnAddress, amount);

@@ -43,7 +43,7 @@ func TestDeployMCMS(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 	cs := deployops.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
-		AdapterVersion: semver.MustParse("1.0.0"),
+		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -276,7 +276,7 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 	// deploy two timelocks on each chain so we can set one as the admin of the other
 	deployMCMS := deployops.DeployMCMS(dReg, nil)
 	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
-		AdapterVersion: semver.MustParse("1.0.0"),
+		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -301,7 +301,7 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 	ds := output.DataStore
 
 	output, err = deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
-		AdapterVersion: semver.MustParse("1.0.0"),
+		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),

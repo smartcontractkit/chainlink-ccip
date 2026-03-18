@@ -71,7 +71,11 @@ func GetSelectorHex(selector uint64) [4]byte {
 		panic(fmt.Sprintf("unsupported chain family: %s", destFamily))
 	}
 
-	b, _ := hex.DecodeString(hexStr)
+	return GetHexFromString(hexStr)
+}
+
+func GetHexFromString(hexstr string) [4]byte {
+	b, _ := hex.DecodeString(hexstr)
 	var out [4]byte
 	copy(out[:], b)
 	return out
@@ -96,6 +100,7 @@ var (
 	Version_1_5_1 = semver.MustParse("1.5.1")
 	Version_1_6_0 = semver.MustParse("1.6.0")
 	Version_1_6_1 = semver.MustParse("1.6.1")
+	Version_2_0_0 = semver.MustParse("2.0.0")
 )
 
 func NewRegistererID(chainFamily string, version *semver.Version) string {

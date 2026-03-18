@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
@@ -71,18 +71,38 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
     );
   }
 
+  function depositForBurnWithHook(
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    address burnToken,
+    bytes32 destinationCaller,
+    uint256 maxFee,
+    uint32 minFinalityThreshold,
+    bytes calldata hookData
+  ) external {
+    IBurnMintERC20(burnToken).transferFrom(msg.sender, address(this), amount);
+    IBurnMintERC20(burnToken).burn(amount);
+
+    emit DepositForBurn(
+      burnToken,
+      amount,
+      msg.sender,
+      mintRecipient,
+      destinationDomain,
+      DESTINATION_TOKEN_MESSENGER,
+      destinationCaller,
+      maxFee,
+      minFinalityThreshold,
+      hookData
+    );
+  }
+
   function messageBodyVersion() external view returns (uint32) {
     return i_messageBodyVersion;
   }
 
   function localMessageTransmitter() external view returns (address) {
     return i_transmitter;
-  }
-
-  /// @dev This function is only available for CCTP V2
-  function getMinFeeAmount(
-    uint256
-  ) external pure returns (uint256) {
-    return 0;
   }
 }

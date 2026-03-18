@@ -1,98 +1,299 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {FeeQuoter} from "../../../FeeQuoter.sol";
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
+import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IExecutor} from "../../../interfaces/IExecutor.sol";
+import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Client} from "../../../libraries/Client.sol";
-import {USDPriceWith18Decimals} from "../../../libraries/USDPriceWith18Decimals.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+
 contract OnRamp_getFee is OnRampSetup {
-  using USDPriceWith18Decimals for uint224;
+  uint16 internal constant MOCKED_DEFAULT_CCV_FEE_USD_CENTS = 5_00;
+  uint16 internal constant MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS = 4_25;
 
-  function test_EmptyMessage() public view {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+  function setUp() public virtual override {
+    super.setUp();
 
-    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
-      Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-      message.feeToken = testTokens[i];
-
-      uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-      uint256 expectedFeeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
-
-      assertEq(expectedFeeAmount, feeAmount);
-    }
+    _mockVerifierFee(s_defaultCCV, MOCKED_DEFAULT_CCV_FEE_USD_CENTS, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
+    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS);
   }
 
-  function test_SingleTokenMessage() public view {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
-
-    uint256 tokenAmount = 10000e18;
-    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
-      Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
-      message.feeToken = testTokens[i];
-
-      uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-      uint256 expectedFeeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
-
-      assertEq(expectedFeeAmount, feeAmount);
-    }
+  function _mockVerifierFee(
+    address verifier,
+    uint16 feeUSDCents,
+    uint64 gasForVerification,
+    uint32 payloadSizeBytes
+  ) internal {
+    vm.mockCall(
+      verifier,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(verifier)
+    );
+    vm.mockCall(
+      verifier,
+      abi.encodeWithSelector(ICrossChainVerifierV1.getFee.selector),
+      abi.encode(feeUSDCents, gasForVerification, payloadSizeBytes)
+    );
   }
 
-  function test_GetFeeOfZeroForTokenMessage() public {
+  function _mockExecutorFee(
+    address executor,
+    uint16 feeUSDCents
+  ) internal {
+    vm.mockCall(executor, abi.encodeWithSelector(IExecutor.getFee.selector), abi.encode(feeUSDCents));
+  }
+
+  function test_getFee_WithV3ExtraArgs_CustomCCV_SkipsDefaults() public {
+    address newVerifier = makeAddr("custom_verifier");
+    uint16 differentFee = 3_45;
+    _mockVerifierFee(newVerifier, differentFee, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
+
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = newVerifier;
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
+
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvAddresses, ccvArgs));
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-    assertTrue(feeAmount > 0);
 
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory tokenMults = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
-    tokenMults[0] = FeeQuoter.PremiumMultiplierWeiPerEthArgs({token: message.feeToken, premiumMultiplierWeiPerEth: 0});
-    s_feeQuoter.applyPremiumMultiplierWeiPerEthUpdates(tokenMults);
+    // Assert the fee is in a reasonable range.
+    assertLt(feeAmount, 1e19);
+    assertGt(feeAmount, 5e17);
+  }
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
-    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = 0;
-    destChainConfigArgs[0].destChainConfig.gasMultiplierWeiPerEth = 0;
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+  function test_getFee_WithLaneMandatedCCVs() public {
+    address mandatedVerifier = makeAddr("mandated_verifier");
+    uint16 mandatedFee = 1_50;
 
-    feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+    _mockVerifierFee(mandatedVerifier, mandatedFee, 0, 0);
 
-    assertEq(0, feeAmount);
+    address[] memory laneMandatedCCVs = new address[](1);
+    laneMandatedCCVs[0] = mandatedVerifier;
+
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: laneMandatedCCVs,
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    assertLt(feeAmount, 1e19);
+    assertGt(feeAmount, 5e17);
+  }
+
+  function test_getFee_WithCustomExecutorAndCCVs() public {
+    address customExecutor = makeAddr("custom_executor_2");
+    address verifier = makeAddr("verifier_with_executor");
+
+    uint16 differentExecutorFee = 300;
+    uint16 differentVerifierFee = 200;
+
+    _mockExecutorFee(customExecutor, differentExecutorFee);
+    _mockVerifierFee(verifier, differentVerifierFee, 0, 0);
+
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = verifier;
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvAddresses,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 12,
+      gasLimit: GAS_LIMIT,
+      executor: customExecutor,
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgsV3);
+
+    uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    assertLt(feeAmount, 1e19);
+    assertGt(feeAmount, 5e17);
+  }
+
+  function test_getFee_RevertWhen_ExceedsMaxFeePerMessage() public {
+    // Make verifier + executor fees to 0 so the test only targets the execution-cost component.
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 premiumPercentMultiplier = 100;
+
+    // Make the call return the max amount for the gas cost. Then assert the protocol fee is more than 0, which causes
+    // the total fee to exceed the max allowed.
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), MAX_USD_CENTS_PER_MESSAGE, uint256(1e18), premiumPercentMultiplier)
+    );
+
+    uint256 protocolFeeUsdCents = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * premiumPercentMultiplier) / 100;
+    assertGt(protocolFeeUsdCents, 0);
+
+    uint256 expectedFeeTokenAmount = MAX_USD_CENTS_PER_MESSAGE + protocolFeeUsdCents;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.FeeExceedsMaxAllowed.selector, expectedFeeTokenAmount, MAX_USD_CENTS_PER_MESSAGE)
+    );
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
+  }
+
+  function test_getFee_RevertWhen_TokenReceiverNotAllowed() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(OWNER);
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.TokenReceiverNotAllowed.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getFee_AllowsTokenReceiverWhenEnabled() public {
+    // Enable tokenReceiver on lane config.
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfig memory existing = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: existing.router,
+      addressBytesLength: existing.addressBytesLength,
+      messageNetworkFeeUSDCents: existing.messageNetworkFeeUSDCents,
+      tokenNetworkFeeUSDCents: existing.tokenNetworkFeeUSDCents,
+      tokenReceiverAllowed: true,
+      baseExecutionGasCost: existing.baseExecutionGasCost,
+      laneMandatedCCVs: existing.laneMandatedCCVs,
+      defaultCCVs: existing.defaultCCVs,
+      defaultExecutor: existing.defaultExecutor,
+      offRamp: existing.offRamp
+    });
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(OWNER);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    // Should not revert.
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getFee_UsesMessageNetworkFeeWhenNoTokens() public {
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    uint256 expectedFee = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(fee, expectedFee);
+  }
+
+  function test_getFee_UsesTokenNetworkFeeWhenTokens() public {
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    address token = s_sourceTokens[0];
+    address pool = s_sourcePoolByToken[token];
+    vm.mockCall(
+      pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
+    );
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeCall(IFeeQuoter.getTokenTransferFee, (DEST_CHAIN_SELECTOR, token)),
+      abi.encode(uint256(0), uint32(0), uint32(0))
+    );
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, 1 ether);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    uint256 expectedFee = (uint256(TOKEN_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(fee, expectedFee);
   }
 
   // Reverts
 
-  function test_RevertWhen_Unhealthy() public {
-    _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
-    s_onRamp.getFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
+  function test_getFee_RevertWhen_InvalidDestChainSelector() public {
+    uint64 invalidChainSelector = 999999;
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.DestinationChainNotSupported.selector, invalidChainSelector));
+    s_onRamp.getFee(invalidChainSelector, _generateEmptyMessage());
   }
 
-  function test_RevertWhen_EnforceOutOfOrder() public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = true.
-    vm.stopPrank();
-    vm.startPrank(OWNER);
+  function test_getFee_RevertWhen_DestinationChainNotSupportedByCCV() public {
+    address verifier = makeAddr("verifier_no_support");
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
-    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
-    vm.stopPrank();
+    _mockVerifierFee(verifier, 100, 0, 0);
+    // Mock to return address(0) to simulate no support.
+    vm.mockCall(
+      verifier,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(address(0))
+    );
+
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = verifier;
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    // Empty extraArgs to should revert since it enforceOutOfOrder is true.
-    message.extraArgs = "";
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvs, new bytes[](1)));
 
-    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.DestinationChainNotSupportedByCCV.selector, verifier, DEST_CHAIN_SELECTOR)
+    );
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_RevertWhen_NotAFeeTokenButPricedToken() public {
+  function test_getFee_RevertWhen_CanOnlySendOneTokenPerMessage() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.feeToken = s_sourceTokens[1];
+    message.tokenAmounts = new Client.EVMTokenAmount[](2);
 
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.FeeTokenNotSupported.selector, message.feeToken));
-
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CanOnlySendOneTokenPerMessage.selector));
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 }

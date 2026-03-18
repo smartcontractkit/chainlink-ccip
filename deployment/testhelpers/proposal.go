@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -174,9 +175,36 @@ func ExecuteMCMSTimelockProposal(t *testing.T, env cldf.Environment, timelockPro
 	timelockExecutable, err := mcmslib.NewTimelockExecutable(env.GetContext(), timelockProposal, executorsMap)
 	require.NoError(t, err)
 
+	// On EVM simulated backends, block.timestamp only advances when new blocks
+	// are committed. When delay > 0, advance the simulated clock and commit a
+	// block so the timelock operations become ready.
+	type simBackendProvider interface {
+		Backend() *simulated.Backend
+	}
+	if delay := timelockProposal.Delay.Duration; delay > 0 {
+		adjusted := make(map[uint64]bool)
+		for _, op := range timelockProposal.Operations {
+			sel := uint64(op.ChainSelector)
+			if adjusted[sel] {
+				continue
+			}
+			adjusted[sel] = true
+			family, ferr := chainsel.GetSelectorFamily(sel)
+			if ferr != nil || family != chainsel.FamilyEVM {
+				continue
+			}
+			if bg, ok := evmChains[sel].Client.(simBackendProvider); ok {
+				require.NoError(t, bg.Backend().AdjustTime(delay))
+				bg.Backend().Commit()
+				t.Logf("[ExecuteMCMSTimelockProposal] AdjustTime(%v) + Commit on EVM chain %d", delay, sel)
+			}
+		}
+		// Allow real time to pass so non-EVM chains (e.g. Solana) become ready.
+		time.Sleep(delay)
+	}
+
 	isReady := func() error {
-		err := timelockExecutable.IsReady(env.GetContext())
-		return err
+		return timelockExecutable.IsReady(env.GetContext())
 	}
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.NoErrorf(collect, isReady(), "Proposal is not ready")

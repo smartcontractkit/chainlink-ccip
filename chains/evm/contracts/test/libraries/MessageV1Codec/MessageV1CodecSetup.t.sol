@@ -17,11 +17,14 @@ contract MessageV1CodecSetup is Test {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: 1,
       destChainSelector: 2,
-      sequenceNumber: 100,
-      onRampAddress: abi.encodePacked(address(0x1234567890123456789012345678901234567890)),
-      offRampAddress: abi.encodePacked(address(0x0987654321098765432109876543210987654321)),
+      messageNumber: 100,
+      executionGasLimit: 150000,
+      ccipReceiveGasLimit: 50000,
       finality: 1000,
-      sender: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      ccvAndExecutorHash: bytes32(0),
+      onRampAddress: abi.encode(address(0x1234567890123456789012345678901234567890)),
+      offRampAddress: abi.encodePacked(address(0x0987654321098765432109876543210987654321)),
+      sender: abi.encode(address(0x1111111111111111111111111111111111111111)),
       receiver: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
       destBlob: "test blob",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
@@ -35,6 +38,7 @@ contract MessageV1CodecSetup is Test {
       sourcePoolAddress: hex"1234567890abcdef",
       sourceTokenAddress: hex"abcdef1234567890",
       destTokenAddress: hex"fedcba0987654321",
+      tokenReceiver: hex"aabbccddeeff",
       extraData: hex"deadbeef"
     });
   }
@@ -46,10 +50,13 @@ contract MessageV1CodecSetup is Test {
   ) internal pure {
     assertEq(expected.sourceChainSelector, actual.sourceChainSelector, "sourceChainSelector mismatch");
     assertEq(expected.destChainSelector, actual.destChainSelector, "destChainSelector mismatch");
-    assertEq(expected.sequenceNumber, actual.sequenceNumber, "sequenceNumber mismatch");
+    assertEq(expected.messageNumber, actual.messageNumber, "messageNumber mismatch");
+    assertEq(expected.executionGasLimit, actual.executionGasLimit, "executionGasLimit mismatch");
+    assertEq(expected.ccipReceiveGasLimit, actual.ccipReceiveGasLimit, "ccipReceiveGasLimit mismatch");
+    assertEq(expected.finality, actual.finality, "finality mismatch");
+    assertEq(expected.ccvAndExecutorHash, actual.ccvAndExecutorHash, "ccvAndExecutorHash mismatch");
     assertEq(expected.onRampAddress, actual.onRampAddress, "onRampAddress mismatch");
     assertEq(expected.offRampAddress, actual.offRampAddress, "offRampAddress mismatch");
-    assertEq(expected.finality, actual.finality, "finality mismatch");
     assertEq(expected.sender, actual.sender, "sender mismatch");
     assertEq(expected.receiver, actual.receiver, "receiver mismatch");
     assertEq(expected.destBlob, actual.destBlob, "destBlob mismatch");
@@ -82,6 +89,11 @@ contract MessageV1CodecSetup is Test {
       expected.destTokenAddress,
       actual.destTokenAddress,
       string(abi.encodePacked("tokenTransfer[", indexStr, "].destTokenAddress mismatch"))
+    );
+    assertEq(
+      expected.tokenReceiver,
+      actual.tokenReceiver,
+      string(abi.encodePacked("tokenTransfer[", indexStr, "].tokenReceiver mismatch"))
     );
     assertEq(
       expected.extraData, actual.extraData, string(abi.encodePacked("tokenTransfer[", indexStr, "].extraData mismatch"))

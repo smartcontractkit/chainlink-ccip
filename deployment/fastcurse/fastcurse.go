@@ -22,7 +22,8 @@ type GlobalCurseOnNetworkInput struct {
 type RMNCurseConfig struct {
 	CurseActions []CurseActionInput
 	// Use this if you want to include curse subject even when they are already cursed (CurseChangeset) or already uncursed (UncurseChangeset)
-	Force bool
+	Force  bool
+	Reason string
 	// MCMS configures the resulting proposal.
 	MCMS mcms.Input
 }

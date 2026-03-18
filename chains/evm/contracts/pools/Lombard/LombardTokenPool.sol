@@ -1,0 +1,318 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
+import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
+import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+
+import {Internal} from "../../libraries/Internal.sol";
+import {Pool} from "../../libraries/Pool.sol";
+import {TokenPool} from "../TokenPool.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+
+/// @notice Lombard CCIP token pool.
+/// For v2 flows, token movement (burn/mint) is handled by the Lombard verifier,
+/// the pool performs validation, rate limiting, accounting and event emission.
+/// IPoolV2.lockOrBurn forwards tokens to the verifier.
+/// IPoolV2.releaseOrMint does not move tokens, _releaseOrMint is a no-op.
+/// IPoolV1.lockOrBurn and IPoolV1.releaseOrMint make this pool backwards compatible with old lanes.
+contract LombardTokenPool is TokenPool, ITypeAndVersion {
+  using SafeERC20 for IERC20;
+  using SafeERC20 for IERC20Metadata;
+
+  error ZeroVerifierNotAllowed();
+  error OutboundImplementationNotFoundForVerifier();
+  error ZeroBridge();
+  error ZeroLombardChainId();
+  error PathNotExist(uint64 remoteChainSelector);
+  error InvalidMessageVersion(uint8 expected, uint8 received);
+  error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
+  error InvalidReceiver(bytes receiver);
+  error ChainNotSupported(uint64 remoteChainSelector);
+  error ExecutionError();
+  error HashMismatch();
+
+  /// The following events are emitted for Lombard-specific configuration updates and are utilized by Lombard.
+  /// @param remoteChainSelector CCIP selector of destination chain.
+  /// @param lChainId The chain ID according to Lombard Multi Chain ID convention.
+  /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
+  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
+  event PathSet(
+    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteAdapter
+  );
+  /// @param remoteChainSelector CCIP selector of destination chain.
+  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
+  /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
+  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
+  event PathRemoved(
+    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteAdapter
+  );
+  event LombardConfigurationSet(address indexed verifier, address indexed bridge, address indexed tokenAdapter);
+
+  struct Path {
+    /// @notice The address that's allowed to call the bridge on the destination chain.
+    bytes32 allowedCaller;
+    /// @notice Lombard chain id of destination chain.
+    bytes32 lChainId;
+    /// @notice Optional destination adapter token identifier accepted by the bridge.
+    bytes32 remoteAdapter;
+  }
+
+  string public constant override typeAndVersion = "LombardTokenPool 2.0.0-dev";
+
+  /// @notice Supported bridge message version.
+  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
+  /// @notice The address of bridge contract.
+  IBridgeV2 public immutable i_bridge;
+  /// @notice Lombard verifier resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
+  address internal immutable i_lombardVerifierResolver;
+  /// @notice Optional token adapter used for chains like Avalanche BTC.b. Since each pool manages a single token,
+  /// and the adapter is a source-chain-level replacement for that token, there can only be one adapter per pool.
+  address internal immutable i_tokenAdapter;
+
+  /// @notice Mapping of CCIP chain selector to chain specific config.
+  mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
+
+  /// @param verifier The address of Lombard verifier resolver. Used in V2 flows to fetch the outbound
+  /// implementation that handles token burns and cross-chain attestations.
+  /// @param bridge The Lombard Bridge contract that handles cross-chain token transfers.
+  /// @param adapter Optional source-chain token address override. Used for non-upgradeable tokens like BTC.b
+  /// on Avalanche where an adapter contract performs mint/burn on behalf of the actual token. When set, this
+  /// address is passed to bridge.deposit() instead of the pool's token address. Set to address(0) if not needed.
+  /// @param token The token managed by this pool.
+  /// @param advancedPoolHooks Optional advanced pool hooks contract (can be address(0)).
+  /// @param rmnProxy The RMN proxy address.
+  /// @param router The router address.
+  /// @param fallbackDecimals Fallback decimals used if the token does not implement `decimals()`.
+  constructor(
+    IERC20Metadata token,
+    address verifier,
+    IBridgeV2 bridge,
+    address adapter,
+    address advancedPoolHooks,
+    address rmnProxy,
+    address router,
+    uint8 fallbackDecimals
+  ) TokenPool(token, _getTokenDecimals(token, fallbackDecimals), advancedPoolHooks, rmnProxy, router) {
+    if (address(bridge) == address(0)) {
+      revert ZeroBridge();
+    }
+    uint8 bridgeMsgVersion = bridge.MSG_VERSION();
+    if (bridgeMsgVersion != SUPPORTED_BRIDGE_MSG_VERSION) {
+      revert InvalidMessageVersion(SUPPORTED_BRIDGE_MSG_VERSION, bridgeMsgVersion);
+    }
+    if (verifier == address(0)) {
+      revert ZeroVerifierNotAllowed();
+    }
+    i_bridge = bridge;
+    i_lombardVerifierResolver = verifier;
+    i_tokenAdapter = adapter;
+
+    if (adapter != address(0)) {
+      token.forceApprove(adapter, type(uint256).max);
+    } else {
+      token.forceApprove(address(bridge), type(uint256).max);
+    }
+
+    emit LombardConfigurationSet(verifier, address(bridge), adapter);
+  }
+
+  // ================================================================
+  // │                        Lock or Burn                          │
+  // ================================================================
+
+  /// @notice For IPoolV2.lockOrBurn call, this contract only forwards tokens to the verifier.
+  /// @dev Forward the net amount to the verifier; actual burn/bridge is done there.
+  /// @param lockOrBurnIn The lock or burn input parameters.
+  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param tokenArgs Additional token arguments.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationsRequested,
+    bytes calldata tokenArgs
+  ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
+    address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver)
+      .getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
+    if (verifierImpl == address(0)) {
+      revert OutboundImplementationNotFoundForVerifier();
+    }
+
+    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee
+    // destTokenAmount.
+    i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
+
+    return super.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+  }
+
+  /// @notice Backwards compatible lockOrBurn for lanes using the V1 flow.
+  /// @dev Token minting is performed by the Lombard bridge's mailbox during deliverAndHandle.
+  /// This pool only validates the proof and emits events; no _lockOrBurn call is needed.
+  /// @param lockOrBurnIn The lock or burn input parameters.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public override(TokenPool) returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
+
+    Path memory path = s_chainSelectorToPath[lockOrBurnIn.remoteChainSelector];
+    if (path.allowedCaller == bytes32(0)) {
+      revert PathNotExist(lockOrBurnIn.remoteChainSelector);
+    }
+
+    // For some tokens we need to override the source token with an adapter
+    address sourceTokenOrAdapter = i_tokenAdapter != address(0) ? i_tokenAdapter : address(i_token);
+    // verify bridge destination token equal to pool
+    bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceTokenOrAdapter);
+    bytes memory remoteTokenBytes = getRemoteToken(lockOrBurnIn.remoteChainSelector);
+    bytes32 poolDestToken = abi.decode(remoteTokenBytes, (bytes32));
+    if (remoteToken != poolDestToken) {
+      if (path.remoteAdapter == bytes32(0) || remoteToken != path.remoteAdapter) {
+        revert RemoteTokenOrAdapterMismatch(remoteToken, poolDestToken, path.remoteAdapter);
+      }
+    }
+
+    if (lockOrBurnIn.receiver.length != 32) {
+      revert InvalidReceiver(lockOrBurnIn.receiver);
+    }
+
+    (, bytes32 payloadHash) = i_bridge.deposit({
+      destinationChain: path.lChainId,
+      token: sourceTokenOrAdapter,
+      sender: lockOrBurnIn.originalSender,
+      recipient: abi.decode(lockOrBurnIn.receiver, (bytes32)),
+      amount: lockOrBurnIn.amount,
+      destinationCaller: path.allowedCaller
+    });
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: lockOrBurnIn.originalSender,
+      amount: lockOrBurnIn.amount
+    });
+
+    return Pool.LockOrBurnOutV1({destTokenAddress: remoteTokenBytes, destPoolData: abi.encode(payloadHash)});
+  }
+
+  // ================================================================
+  // │                      Release or Mint                         │
+  // ================================================================
+
+  // The IPoolV2.releaseOrMint does various checks, but is a no-op by default. That's exactly the behaviour we need here
+  // because the minting is performed through the CCV. Therefore, we don't override at all.
+
+  /// @notice Backwards compatible releaseOrMint for CCIP 1.5/1.6 lanes. Verifies the bridge payload proof.
+  /// @param releaseOrMintIn The release or mint input parameters.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, WAIT_FOR_FINALITY);
+
+    (bytes memory rawPayload, bytes memory proof) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
+
+    (bytes32 payloadHash, bool executed,) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
+    if (!executed) {
+      revert ExecutionError();
+    }
+    // we know payload hash returned on source chain.
+    if (payloadHash != abi.decode(releaseOrMintIn.sourcePoolData, (bytes32))) {
+      revert HashMismatch();
+    }
+
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: releaseOrMintIn.sourceDenominatedAmount
+    });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
+  }
+
+  // ================================================================
+  // │                         Path config                          │
+  // ================================================================
+
+  /// @notice Gets the path for a given CCIP chain selector.
+  /// @param remoteChainSelector CCIP chain selector of remote chain.
+  /// @return Path struct containing lChainId, allowedCaller, and remoteAdapter.
+  function getPath(
+    uint64 remoteChainSelector
+  ) external view returns (Path memory) {
+    return s_chainSelectorToPath[remoteChainSelector];
+  }
+
+  /// @notice Sets the Lombard chain id and allowed caller for a CCIP chain selector.
+  /// @param remoteChainSelector CCIP chain selector of remote chain.
+  /// @param lChainId Lombard chain id of remote chain.
+  /// @param allowedCaller The address of TokenPool on destination chain.
+  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
+  function setPath(
+    uint64 remoteChainSelector,
+    bytes32 lChainId,
+    bytes calldata allowedCaller,
+    bytes32 remoteAdapter
+  ) external onlyOwner {
+    if (!isSupportedChain(remoteChainSelector)) {
+      revert ChainNotSupported(remoteChainSelector);
+    }
+
+    if (lChainId == bytes32(0)) {
+      revert ZeroLombardChainId();
+    }
+
+    // Only the remote pool is expected to be the allowed caller.
+    if (!isRemotePool(remoteChainSelector, allowedCaller)) {
+      revert InvalidRemotePoolForChain(remoteChainSelector, allowedCaller);
+    }
+
+    bytes32 leftPaddedAllowedCaller = Internal._leftPadBytesToBytes32(allowedCaller);
+    s_chainSelectorToPath[remoteChainSelector] =
+      Path({lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller, remoteAdapter: remoteAdapter});
+
+    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller, remoteAdapter);
+  }
+
+  /// @notice Removes path mapping for a destination chain.
+  /// @param remoteChainSelector CCIP chain selector of destination chain.
+  function removePath(
+    uint64 remoteChainSelector
+  ) external onlyOwner {
+    Path memory path = s_chainSelectorToPath[remoteChainSelector];
+
+    if (path.allowedCaller == bytes32(0)) {
+      revert PathNotExist(remoteChainSelector);
+    }
+
+    delete s_chainSelectorToPath[remoteChainSelector];
+
+    emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteAdapter);
+  }
+
+  // ================================================================
+  // │                        Internal utils                        │
+  // ================================================================
+
+  function _getTokenDecimals(
+    IERC20Metadata token,
+    uint8 fallbackDecimals
+  ) internal view returns (uint8) {
+    try token.decimals() returns (uint8 dec) {
+      return dec;
+    } catch {
+      return fallbackDecimals;
+    }
+  }
+
+  /// @notice Returns the Lombard-specific configuration for this pool.
+  /// @return verifierResolver The address of the Lombard verifier resolver.
+  /// @return bridge The address of the Lombard bridge contract.
+  /// @return tokenAdapter The optional token adapter address (address(0) if not used).
+  function getLombardConfig() external view returns (address verifierResolver, address bridge, address tokenAdapter) {
+    return (i_lombardVerifierResolver, address(i_bridge), i_tokenAdapter);
+  }
+}

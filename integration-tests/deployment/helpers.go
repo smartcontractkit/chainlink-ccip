@@ -311,6 +311,27 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
 		}
 	}
+
+	// Add the timelock as an authorized caller (price updater) on the FeeQuoter.
+	// This must happen while the deployer is still the owner (before ownership transfer).
+	// The FeeQuoter's updatePrices requires msg.sender to be in the authorizedCallers set.
+	if timelockAddr, ok := timelockAddrs[selector]; ok {
+		for _, addrRef := range e.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(selector),
+			datastore.AddressRefByType(datastore.ContractType(fq163ops.ContractType)),
+		) {
+			fq, err := fq163ops.NewFeeQuoterContract(common.HexToAddress(addrRef.Address), chain.Client)
+			require.NoError(t, err, "failed to create FeeQuoter contract instance")
+			tx, err := fq.ApplyAuthorizedCallerUpdates(chain.DeployerKey, fq163ops.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{common.HexToAddress(timelockAddr)},
+			})
+			require.NoError(t, err, "failed to add timelock as FeeQuoter price updater")
+			_, err = chain.Confirm(tx)
+			require.NoError(t, err, "failed to confirm FeeQuoter authorized caller update")
+			t.Logf("Added timelock %s as authorized caller on FeeQuoter %s", timelockAddr, addrRef.Address)
+		}
+	}
+
 	mcmsInput := mcmsapi.TransferOwnershipInput{
 		ChainInputs: []mcmsapi.TransferOwnershipPerChainInput{
 			{
@@ -405,8 +426,8 @@ func NewDefaultDeploymentConfigForEVM(version *semver.Version) deploy.ContractDe
 	}
 }
 
-func NewDefaultInputForMCMS(desc string) mcms.Input {
-	return mcms.Input{
+func NewDefaultInputForMCMS(desc string, overrides ...func(*mcms.Input)) mcms.Input {
+	in := mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           math.MaxUint32,
 		TimelockDelay:        mcms_types.MustParseDuration("1s"),
@@ -414,4 +435,8 @@ func NewDefaultInputForMCMS(desc string) mcms.Input {
 		Qualifier:            common_utils.CLLQualifier,
 		Description:          desc,
 	}
+	for _, override := range overrides {
+		override(&in)
+	}
+	return in
 }

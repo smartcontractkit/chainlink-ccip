@@ -2,219 +2,255 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
-
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
-  function test_ApplyDestChainConfigUpdates() external {
-    OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](1);
-    configArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+  uint64 internal constant NEW_DEST_SELECTOR = uint64(uint256(keccak256("NEW_DEST_SELECTOR")));
 
-    // supports disabling a lane by setting a router to zero
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, IRouter(address(0)), false);
+  function test_applyDestChainConfigUpdates_SetsConfigAndEmitsEvent() public {
+    IRouter router = s_sourceRouter;
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV1");
+    address[] memory laneMandated = new address[](1);
+    laneMandated[0] = makeAddr("laneCCV1");
+    address defaultExecutor = makeAddr("defaultExecutor");
 
-    s_onRamp.applyDestChainConfigUpdates(configArgs);
-
-    (,, address router) = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(address(0), router);
-
-    // supports updating and adding lanes simultaneously
-    configArgs = new OnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: false
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: NEW_DEST_SELECTOR,
+      router: router,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: laneMandated,
+      defaultExecutor: defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
-    uint64 newDestChainSelector = 99999;
-    address newRouter = makeAddr("newRouter");
-
-    configArgs[1] = OnRamp.DestChainConfigArgs({
-      destChainSelector: newDestChainSelector, router: IRouter(newRouter), allowlistEnabled: false
-    });
 
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(newDestChainSelector, 0, IRouter(newRouter), false);
+    emit OnRamp.DestChainConfigSet(NEW_DEST_SELECTOR, 0, args[0]);
+    s_onRamp.applyDestChainConfigUpdates(args);
 
-    s_onRamp.applyDestChainConfigUpdates(configArgs);
-
-    (,, address newGotRouter) = s_onRamp.getDestChainConfig(newDestChainSelector);
-    assertEq(newRouter, newGotRouter);
-
-    // handles empty list
-    uint256 numLogs = vm.getRecordedLogs().length;
-    configArgs = new OnRamp.DestChainConfigArgs[](0);
-    s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(numLogs, vm.getRecordedLogs().length); // indicates no changes made
+    OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
+    assertEq(address(cfg.router), address(router));
+    assertEq(cfg.defaultExecutor, args[0].defaultExecutor);
+    assertEq(cfg.messageNumber, 0);
+    assertEq(cfg.addressBytesLength, args[0].addressBytesLength);
+    assertEq(cfg.baseExecutionGasCost, args[0].baseExecutionGasCost);
+    assertEq(cfg.messageNetworkFeeUSDCents, args[0].messageNetworkFeeUSDCents);
+    assertEq(cfg.tokenNetworkFeeUSDCents, args[0].tokenNetworkFeeUSDCents);
+    assertEq(cfg.defaultCCVs, defaultCCVs);
+    assertEq(cfg.laneMandatedCCVs, laneMandated);
   }
 
-  function test_RevertWhen_ApplyDestChainConfigUpdates_WithInvalidChainSelector() external {
-    OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](1);
-    configArgs[0].destChainSelector = 0; // invalid
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, 0));
-    s_onRamp.applyDestChainConfigUpdates(configArgs);
-  }
-}
+  function test_applyDestChainConfigUpdates_NonEvmAddressLength() public {
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
 
-contract OnRamp_applyAllowlistUpdates is OnRampSetup {
-  function test_applyAllowlistUpdates() public {
-    OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: false
-    });
-    configArgs[1] =
-      OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowlistEnabled: false});
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
-    s_onRamp.applyDestChainConfigUpdates(configArgs);
-
-    (uint64 sequenceNumber, bool allowlistEnabled, address router) = s_onRamp.getDestChainConfig(9999);
-    assertEq(sequenceNumber, 0);
-    assertEq(allowlistEnabled, false);
-    assertEq(router, address(9999));
-
-    uint64[] memory destinationChainSelectors = new uint64[](2);
-    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
-    destinationChainSelectors[1] = uint64(99999);
-
-    address[] memory addedAllowlistedSenders = new address[](4);
-    addedAllowlistedSenders[0] = vm.addr(1);
-    addedAllowlistedSenders[1] = vm.addr(2);
-    addedAllowlistedSenders[2] = vm.addr(3);
-    addedAllowlistedSenders[3] = vm.addr(4);
-
-    vm.expectEmit();
-    emit OnRamp.AllowListSendersAdded(DEST_CHAIN_SELECTOR, addedAllowlistedSenders);
-
-    OnRamp.AllowlistConfigArgs memory allowlistConfigArgs = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: true,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: addedAllowlistedSenders,
-      removedAllowlistedSenders: new address[](0)
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: NEW_DEST_SELECTOR + 99,
+      router: s_sourceRouter,
+      addressBytesLength: NON_EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(bytes32(uint256(1234)))
     });
 
-    OnRamp.AllowlistConfigArgs[] memory applyAllowlistConfigArgsItems = new OnRamp.AllowlistConfigArgs[](1);
-    applyAllowlistConfigArgsItems[0] = allowlistConfigArgs;
-
-    s_onRamp.applyAllowlistUpdates(applyAllowlistConfigArgsItems);
-
-    (bool isActive, address[] memory gotAllowList) = s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR);
-    assertEq(4, gotAllowList.length);
-    assertEq(addedAllowlistedSenders, gotAllowList);
-    assertEq(true, isActive);
-
-    address[] memory removedAllowlistedSenders = new address[](1);
-    removedAllowlistedSenders[0] = vm.addr(2);
-
-    vm.expectEmit();
-    emit OnRamp.AllowListSendersRemoved(DEST_CHAIN_SELECTOR, removedAllowlistedSenders);
-
-    allowlistConfigArgs = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: false,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: new address[](0),
-      removedAllowlistedSenders: removedAllowlistedSenders
-    });
-
-    OnRamp.AllowlistConfigArgs[] memory allowlistConfigArgsItems_2 = new OnRamp.AllowlistConfigArgs[](1);
-    allowlistConfigArgsItems_2[0] = allowlistConfigArgs;
-
-    s_onRamp.applyAllowlistUpdates(allowlistConfigArgsItems_2);
-    (isActive, gotAllowList) = s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR);
-    assertEq(3, gotAllowList.length);
-    assertFalse(isActive);
-
-    addedAllowlistedSenders = new address[](2);
-    addedAllowlistedSenders[0] = vm.addr(5);
-    addedAllowlistedSenders[1] = vm.addr(6);
-
-    removedAllowlistedSenders = new address[](2);
-    removedAllowlistedSenders[0] = vm.addr(1);
-    removedAllowlistedSenders[1] = vm.addr(3);
-
-    vm.expectEmit();
-    emit OnRamp.AllowListSendersAdded(DEST_CHAIN_SELECTOR, addedAllowlistedSenders);
-    emit OnRamp.AllowListSendersRemoved(DEST_CHAIN_SELECTOR, removedAllowlistedSenders);
-
-    allowlistConfigArgs = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: true,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: addedAllowlistedSenders,
-      removedAllowlistedSenders: removedAllowlistedSenders
-    });
-
-    OnRamp.AllowlistConfigArgs[] memory allowlistConfigArgsItems_3 = new OnRamp.AllowlistConfigArgs[](1);
-    allowlistConfigArgsItems_3[0] = allowlistConfigArgs;
-
-    s_onRamp.applyAllowlistUpdates(allowlistConfigArgsItems_3);
-    (isActive, gotAllowList) = s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR);
-
-    assertEq(3, gotAllowList.length);
-    assertTrue(isActive);
+    s_onRamp.applyDestChainConfigUpdates(args);
+    OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR + 99);
+    assertEq(NON_EVM_ADDRESS_LENGTH, cfg.addressBytesLength);
   }
 
-  function test_RevertWhen_applyAllowlistUpdates() public {
-    OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: false
-    });
-    configArgs[1] =
-      OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowlistEnabled: false});
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
-    s_onRamp.applyDestChainConfigUpdates(configArgs);
-
-    uint64[] memory destinationChainSelectors = new uint64[](2);
-    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
-    destinationChainSelectors[1] = uint64(99999);
-
-    address[] memory addedAllowlistedSenders = new address[](4);
-    addedAllowlistedSenders[0] = vm.addr(1);
-    addedAllowlistedSenders[1] = vm.addr(2);
-    addedAllowlistedSenders[2] = vm.addr(3);
-    addedAllowlistedSenders[3] = vm.addr(4);
-
-    OnRamp.AllowlistConfigArgs memory allowlistConfigArgs = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: true,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: addedAllowlistedSenders,
-      removedAllowlistedSenders: new address[](0)
+  function test_applyDestChainConfigUpdates_AllowsZeroRouterToPause() public {
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: NEW_DEST_SELECTOR + 1,
+      router: IRouter(address(0)),
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    OnRamp.AllowlistConfigArgs[] memory applyAllowlistConfigArgsItems = new OnRamp.AllowlistConfigArgs[](1);
-    applyAllowlistConfigArgsItems[0] = allowlistConfigArgs;
-
-    vm.startPrank(STRANGER);
-    vm.expectRevert(OnRamp.OnlyCallableByOwnerOrAllowlistAdmin.selector);
-    s_onRamp.applyAllowlistUpdates(applyAllowlistConfigArgsItems);
-    vm.stopPrank();
-
-    applyAllowlistConfigArgsItems[0].addedAllowlistedSenders[0] = address(0);
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidAllowListRequest.selector, DEST_CHAIN_SELECTOR));
-    vm.startPrank(OWNER);
-    s_onRamp.applyAllowlistUpdates(applyAllowlistConfigArgsItems);
-    vm.stopPrank();
+    // Should not revert, router can be zero.
+    s_onRamp.applyDestChainConfigUpdates(args);
+    OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR + 1);
+    assertEq(address(cfg.router), address(0));
+    assertEq(EVM_ADDRESS_LENGTH, cfg.addressBytesLength);
   }
 
-  function test_applyAllowlistUpdates_InvalidAllowListRequestDisabledAllowListWithAdds() public {
-    address[] memory addedAllowlistedSenders = new address[](1);
-    addedAllowlistedSenders[0] = vm.addr(1);
+  function test_getAllDestChainConfigs_ReturnsMultipleChains() public {
+    // Add a second destination chain.
+    uint64 chain2 = NEW_DEST_SELECTOR + 100;
+    address[] memory defaultCCVs2 = new address[](1);
+    defaultCCVs2[0] = makeAddr("defaultCCV2");
+    address[] memory laneMandated2 = new address[](1);
+    laneMandated2[0] = makeAddr("laneCCV2");
+    address defaultExecutor2 = makeAddr("defaultExecutor2");
 
-    OnRamp.AllowlistConfigArgs memory allowlistConfigArgs = OnRamp.AllowlistConfigArgs({
-      allowlistEnabled: false,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      addedAllowlistedSenders: addedAllowlistedSenders,
-      removedAllowlistedSenders: new address[](0)
+    OnRamp.DestChainConfigArgs[] memory configs = new OnRamp.DestChainConfigArgs[](1);
+    configs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: chain2,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS + 1,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS + 1,
+      tokenReceiverAllowed: true,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST + 1000,
+      defaultCCVs: defaultCCVs2,
+      laneMandatedCCVs: laneMandated2,
+      defaultExecutor: defaultExecutor2,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
-    OnRamp.AllowlistConfigArgs[] memory applyAllowlistConfigArgsItems = new OnRamp.AllowlistConfigArgs[](1);
-    applyAllowlistConfigArgsItems[0] = allowlistConfigArgs;
 
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidAllowListRequest.selector, DEST_CHAIN_SELECTOR));
-    s_onRamp.applyAllowlistUpdates(applyAllowlistConfigArgsItems);
+    s_onRamp.applyDestChainConfigUpdates(configs);
+
+    (uint64[] memory selectors, OnRamp.DestChainConfig[] memory chainConfigs) = s_onRamp.getAllDestChainConfigs();
+
+    assertEq(selectors.length, 2);
+    assertEq(chainConfigs.length, 2);
+
+    // Check first chain (from setup).
+    assertEq(selectors[0], DEST_CHAIN_SELECTOR);
+    assertEq(chainConfigs[0].defaultCCVs[0], s_defaultCCV);
+    assertEq(chainConfigs[0].defaultExecutor, s_defaultExecutor);
+
+    // Check second chain.
+    assertEq(selectors[1], chain2);
+    assertEq(chainConfigs[1].defaultCCVs[0], defaultCCVs2[0]);
+    assertEq(chainConfigs[1].laneMandatedCCVs[0], laneMandated2[0]);
+    assertEq(chainConfigs[1].defaultExecutor, defaultExecutor2);
+    assertEq(chainConfigs[1].messageNetworkFeeUSDCents, MESSAGE_NETWORK_FEE_USD_CENTS + 1);
+    assertEq(chainConfigs[1].tokenNetworkFeeUSDCents, TOKEN_NETWORK_FEE_USD_CENTS + 1);
+    assertEq(chainConfigs[1].baseExecutionGasCost, BASE_EXEC_GAS_COST + 1000);
+    assertEq(chainConfigs[1].tokenReceiverAllowed, true);
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ZeroAddressBytesLength() public {
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: NEW_DEST_SELECTOR + 5,
+      router: s_sourceRouter,
+      addressBytesLength: 0,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, NEW_DEST_SELECTOR + 5));
+    s_onRamp.applyDestChainConfigUpdates(args);
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ZeroSelector() public {
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: 0,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, uint64(0)));
+    s_onRamp.applyDestChainConfigUpdates(args);
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_DefaultExecutorZero() public {
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: NEW_DEST_SELECTOR + 8,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: address(0),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    s_onRamp.applyDestChainConfigUpdates(args);
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_DestIsLocalChain() public {
+    // Using SOURCE_CHAIN_SELECTOR as local chain selector from setup.
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: SOURCE_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));
+    s_onRamp.applyDestChainConfigUpdates(args);
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ZeroBaseExecutionGasCost() public {
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV");
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: SOURCE_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: 0,
+      defaultCCVs: defaultCCVs,
+      laneMandatedCCVs: new address[](0),
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));
+    s_onRamp.applyDestChainConfigUpdates(args);
   }
 }

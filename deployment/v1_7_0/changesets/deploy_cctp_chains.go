@@ -1,0 +1,221 @@
+package changesets
+
+import (
+	"fmt"
+
+	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+)
+
+// CCTPChainConfig specifies configuration required for a chain to deploy CCTP.
+type CCTPChainConfig struct {
+	// TokenMessengerV1 is the address of the CCTP v1 TokenMessenger contract.
+	TokenMessengerV1 string
+	// TokenMessengerV2 is the address of the CCTP v2 TokenMessenger contract.
+	TokenMessengerV2 string
+	// USDCToken is the address of the USDCToken contract.
+	USDCToken string
+	// DeployerContract is a contract that can be used to deploy other contracts.
+	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
+	DeployerContract string
+	// FastFinalityBps are the basis points charged for fast finality.
+	FastFinalityBps uint16
+	// StorageLocations is the set of storage locations for the CCTPVerifier contract.
+	StorageLocations []string
+	// FeeAggregator is the address to which fees are withdrawn.
+	FeeAggregator string
+	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
+	RegisteredPoolRef datastore.AddressRef
+	// RemoteChains is the set of remote chains to configure.
+	RemoteChains map[uint64]adapters.RemoteCCTPChainConfig
+	// USDCType specifies the type of the USDC on the chain.
+	USDCType adapters.USDCType
+	// TokenDecimals is the number of decimals of the USDC on the chain.
+	TokenDecimals uint8
+}
+
+// DeployCCTPChainsConfig is the configuration for the DeployCCTPChains changeset.
+type DeployCCTPChainsConfig struct {
+	// Chains specifies the chains to deploy CCTP to.
+	Chains map[uint64]CCTPChainConfig
+	// MCMS configures the resulting proposal.
+	MCMS *mcms.Input
+}
+
+// DeployCCTPChains returns a changeset that deploys CCTP contracts on chains.
+func DeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[DeployCCTPChainsConfig] {
+	return cldf.CreateChangeSet(makeApplyDeployCCTPChains(cctpChainRegistry, mcmsRegistry), makeVerifyDeployCCTPChains(cctpChainRegistry, mcmsRegistry))
+}
+
+func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) error {
+	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) error {
+		if cfg.MCMS != nil {
+			err := cfg.MCMS.Validate()
+			if err != nil {
+				return fmt.Errorf("failed to validate MCMS input: %w", err)
+			}
+		}
+
+		for chainSel, chainCfg := range cfg.Chains {
+			if !chainCfg.USDCType.IsValid() {
+				return fmt.Errorf("invalid CCTP type for chain %d: %s", chainSel, chainCfg.USDCType)
+			}
+			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
+				return err
+			}
+			if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
+				return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
+			}
+			if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
+				return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
+			}
+			for remoteChainSelector := range chainCfg.RemoteChains {
+				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
+					return err
+				}
+				remoteChainCfg, ok := cfg.Chains[remoteChainSelector]
+				if !ok {
+					return fmt.Errorf("remote chain selector %d not found in chains", remoteChainSelector)
+				}
+				if _, ok := remoteChainCfg.RemoteChains[chainSel]; !ok {
+					return fmt.Errorf("chain %d has remote %d but chain %d does not define a remote chain config for %d (each remote must point back to the current chain)", chainSel, remoteChainSelector, remoteChainSelector, chainSel)
+				}
+			}
+		}
+
+		return nil
+	}
+}
+
+func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
+		batchOps := make([]mcms_types.BatchOperation, 0)
+		reports := make([]cldf_ops.Report[any, any], 0)
+
+		adaptersByChain := make(map[uint64]adapters.CCTPChain)
+		for chainSel, chainCfg := range cfg.Chains {
+			family, err := chain_selectors.GetSelectorFamily(chainSel)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSel, err)
+			}
+			adapter, ok := cctpChainRegistry.GetCCTPChain(family, chainCfg.USDCType)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", family, chainCfg.USDCType)
+			}
+			adaptersByChain[chainSel] = adapter
+		}
+
+		// Deploy across all chains.
+		newDS := datastore.NewMemoryDataStore()
+		for chainSel, chainCfg := range cfg.Chains {
+			dep := adapters.DeployCCTPChainDeps{
+				BlockChains: e.BlockChains,
+				DataStore:   e.DataStore,
+			}
+			in := adapters.DeployCCTPInput{
+				ChainSelector:    chainSel,
+				TokenMessengerV1: chainCfg.TokenMessengerV1,
+				TokenMessengerV2: chainCfg.TokenMessengerV2,
+				USDCToken:        chainCfg.USDCToken,
+				DeployerContract: chainCfg.DeployerContract,
+				FastFinalityBps:  chainCfg.FastFinalityBps,
+				StorageLocations: chainCfg.StorageLocations,
+				FeeAggregator:    chainCfg.FeeAggregator,
+				TokenDecimals:    chainCfg.TokenDecimals,
+			}
+			deployCCTPChainReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].DeployCCTPChain(), dep, in)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCTP on chain with selector %d: %w", chainSel, err)
+			}
+
+			batchOps = append(batchOps, deployCCTPChainReport.Output.BatchOps...)
+			reports = append(reports, deployCCTPChainReport.ExecutionReports...)
+			for _, r := range deployCCTPChainReport.Output.Addresses {
+				if err := newDS.Addresses().Add(r); err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
+				}
+			}
+		}
+
+		// Configure across all chains.
+		// Create a new datastore that merges the existing datastore with the new datastore.
+		// Enables the configuration sequence to have all existing and new addresses.
+		combinedDS := datastore.NewMemoryDataStore()
+		err := combinedDS.Merge(e.DataStore)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+		}
+		err = combinedDS.Merge(newDS.Seal())
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+		}
+		for chainSel, chainCfg := range cfg.Chains {
+			remoteChains := make(map[uint64]adapters.RemoteCCTPChain)
+			remoteRegisteredPoolRefs := make(map[uint64]datastore.AddressRef)
+			// Build remote chain configs with inbound rate limits derived from the counterpart's outbound
+			// (same as configure_tokens_for_transfers: a chain's inbound from remote = remote's outbound to this chain).
+			remoteChainConfigs := make(map[uint64]adapters.RemoteCCTPChainConfig, len(chainCfg.RemoteChains))
+			for remoteChainSelector, remoteCfg := range chainCfg.RemoteChains {
+				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
+				}
+				remoteUSDCType := cfg.Chains[remoteChainSelector].USDCType
+				remoteAdapter, ok := cctpChainRegistry.GetCCTPChain(remoteFamily, remoteUSDCType)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", remoteFamily, remoteUSDCType)
+				}
+				remoteChains[remoteChainSelector] = remoteAdapter
+				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
+
+				// Derive the inbound rate limiter configs from the counterpart's outbound rate limiter configs.
+				derived := remoteCfg
+				counterpartCfg := cfg.Chains[remoteChainSelector].RemoteChains[chainSel]
+				derived.DefaultFinalityInboundRateLimiterConfig = counterpartCfg.DefaultFinalityOutboundRateLimiterConfig
+				derived.CustomFinalityInboundRateLimiterConfig = counterpartCfg.CustomFinalityOutboundRateLimiterConfig
+				remoteChainConfigs[remoteChainSelector] = derived
+			}
+			dep := adapters.ConfigureCCTPChainForLanesDeps{
+				BlockChains:  e.BlockChains,
+				DataStore:    combinedDS.Seal(),
+				RemoteChains: remoteChains,
+			}
+			in := adapters.ConfigureCCTPChainForLanesInput{
+				ChainSelector:            chainSel,
+				USDCToken:                chainCfg.USDCToken,
+				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
+				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
+				RemoteChains:             remoteChainConfigs,
+			}
+			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure CCTP on chain with selector %d: %w", chainSel, err)
+			}
+			batchOps = append(batchOps, configureCCTPChainForLanesReport.Output.BatchOps...)
+			reports = append(reports, configureCCTPChainForLanesReport.ExecutionReports...)
+		}
+
+		// Return the output.
+		var mcmsInput mcms.Input
+		if cfg.MCMS != nil {
+			mcmsInput = *cfg.MCMS
+		}
+
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithReports(reports).
+			WithBatchOps(batchOps).
+			WithDataStore(newDS). // We still only want to return the new addresses.
+			Build(mcmsInput)
+	}
+}
