@@ -29,6 +29,13 @@ type LaneAdapter interface {
 	GetDefaultGasPrice() *big.Int
 }
 
+// FeeQuoterVersionProvider is an optional interface that LaneAdapters can implement
+// to report the FeeQuoter contract version for a chain (e.g. 1.6.x vs 2.0.x).
+// When set, it is used to choose the correct FeeQuoter operations in update_lanes.
+type FeeQuoterVersionProvider interface {
+	GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64) (*semver.Version, error)
+}
+
 // TokenPriceProvider is an optional interface that LaneAdapters can implement
 // to provide default fee token prices for a chain.
 // This is primarily used by EVM chains; other chains can skip this.

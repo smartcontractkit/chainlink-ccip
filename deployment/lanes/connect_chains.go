@@ -142,6 +142,12 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
 	}
+	if vp, ok := adapter.(FeeQuoterVersionProvider); ok {
+		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector)
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter version for chain %d: %w", chainDef.Selector, err)
+		}
+	}
 	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
