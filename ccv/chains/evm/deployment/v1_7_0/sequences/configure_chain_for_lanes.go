@@ -375,6 +375,10 @@ func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, inpu
 	remoteSelector := input.Dest.Selector
 	sourceRouter := common.BytesToAddress(input.Source.Router).Hex()
 	sourceOnRamp := common.BytesToAddress(input.Source.OnRamp).Hex()
+	srcOnRampAddr := common.HexToAddress(sourceOnRamp)
+	if srcOnRampAddr == (common.Address{}) {
+		return nil, fmt.Errorf("source on ramp address is empty, cannot add on ramp config to router")
+	}
 	// Apply Router ramp updates (only when there are changes).
 	onRampAdds := make([]router.OnRamp, 0, 1)
 	onRampAddrReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
@@ -394,9 +398,8 @@ func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, inpu
 	// contracts like LBTC/USDC pools are not compatible with this new onramp,
 	// so we should not automatically add the new onramp to prod routers
 	// To add the new onramp , use migration related changeset to ensure all other dependent contracts are also updated to compatible versions
-	srcOnRampAddr := common.HexToAddress(sourceOnRamp)
 	if input.TestRouter {
-		if onRampAddrReport.Output != srcOnRampAddr && srcOnRampAddr != (common.Address{}) {
+		if onRampAddrReport.Output != srcOnRampAddr {
 			onRampAdds = append(onRampAdds, router.OnRamp{
 				DestChainSelector: remoteSelector,
 				OnRamp:            srcOnRampAddr,
@@ -415,11 +418,13 @@ func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, inpu
 					fmt.Errorf("failed to get version of existing onRamp at address %s "+
 						"for dest %d from Router(%s) on chain %s: %w", onRampAddrReport.Output.Hex(), remoteSelector, sourceRouter, chain, err)
 			}
-			if version.GreaterThanEqual(onramp.Version) {
-				onRampAdds = append(onRampAdds, router.OnRamp{
-					DestChainSelector: remoteSelector,
-					OnRamp:            common.HexToAddress(sourceOnRamp),
-				})
+			if version.GreaterThanEqual(onramp.Version) || (onramp.Version.Major() == version.Major()) {
+				if onRampAddrReport.Output != srcOnRampAddr {
+					onRampAdds = append(onRampAdds, router.OnRamp{
+						DestChainSelector: remoteSelector,
+						OnRamp:            srcOnRampAddr,
+					})
+				}
 			} else {
 				b.Logger.Warnf("Existing onRamp at address %s for dest %d from Router(%s) on "+
 					"chain %s has version %s, which is lower than the version of the onRamp we want to add: %s. "+
