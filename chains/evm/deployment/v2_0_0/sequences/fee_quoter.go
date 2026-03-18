@@ -54,12 +54,6 @@ type FeeQuoterUpdate struct {
 	AuthorizedCallerUpdates       fqops.AuthorizedCallerArgs
 }
 
-type FeeQuoterApplyDestChainConfigUpdates struct {
-	Address          common.Address
-	ChainSelector    uint64
-	DestChainConfigs []fqops.DestChainConfigArgs
-}
-
 func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
 	empty := FeeQuoterUpdate{}
 	// marshal into JSON
@@ -75,7 +69,6 @@ func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
 }
 
 var (
-
 	// SequenceFeeQuoterUpdate is a sequence that deploys or fetches existing FeeQuoter contract
 	// and does the following if the corresponding input is provided -
 	// 1. applies destination chain config updates
