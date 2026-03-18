@@ -454,24 +454,15 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 			isToknTypeBnM := toknRef.Type.String() == bnmERC20ops.ContractType.String()
 			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
 			if isPoolTypeBnM && isToknTypeBnM {
-				// NOTE: the pool ref isn't in the datastore yet so
-				// we locate it from the sequence output addresses.
-				poolRef, foundIt := datastore.AddressRef{}, false
-				for _, addrRef := range out.Output.Addresses {
-					isPoolRef := addrRef.ChainSelector == input.ChainSelector &&
-						addrRef.Qualifier == input.TokenPoolQualifier &&
-						addrRef.Type.String() == input.PoolType &&
-						addrRef.Address != ""
-
-					if isPoolRef {
-						poolRef = addrRef
-						foundIt = true
-						break
-					}
-				}
-
-				if !foundIt {
-					return sequences.OnChainOutput{}, fmt.Errorf("deployed token pool address for qualifier %q on chain %d not found in output addresses", input.TokenPoolQualifier, input.ChainSelector)
+				// NOTE: the pool ref isn't in the datastore yet so we need to fetch it from
+				// the DeployTokenPool sequence output. It is assumed that the sequence will
+				// only return exactly one AddressRef which is the deployed pool address. If
+				// this is not the case, then we'll raise an error.
+				var poolRef datastore.AddressRef
+				if addresses := out.Output.Addresses; len(addresses) != 1 {
+					return sequences.OnChainOutput{}, fmt.Errorf("expected exactly 1 address from token pool deployment sequence output, got %d", len(addresses))
+				} else {
+					poolRef = addresses[0]
 				}
 
 				poolAddrBytes, err := a.AddressRefToBytes(poolRef)
@@ -741,4 +732,3 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
-
