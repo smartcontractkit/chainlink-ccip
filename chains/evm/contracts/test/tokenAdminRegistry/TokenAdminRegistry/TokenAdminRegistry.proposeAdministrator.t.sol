@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenAdminRegistrySetup} from "./TokenAdminRegistrySetup.t.sol";
@@ -74,7 +74,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     address[50] memory admins
   ) public {
     TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < tokens.length; ++i) {
       if (admins[i] == address(0)) {
         continue;
       }
@@ -85,7 +85,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
       s_AdminByToken[tokens[i]] = admins[i];
     }
 
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < tokens.length; ++i) {
       assertEq(cleanTokenAdminRegistry.getTokenConfig(tokens[i]).pendingAdministrator, s_AdminByToken[tokens[i]]);
     }
   }

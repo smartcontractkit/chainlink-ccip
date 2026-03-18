@@ -1,0 +1,239 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {IExecutor} from "../interfaces/IExecutor.sol";
+
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
+
+/// @notice The Executor configures the supported destination chains and CCV limits for an executor.
+contract Executor is IExecutor, Ownable2StepMsgSender {
+  using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
+  using SafeERC20 for IERC20;
+
+  error ExceedsMaxCCVs(uint256 provided, uint256 max);
+  error InvalidCCV(address ccv);
+  error InvalidDestChain(uint64 destChainSelector);
+  error Executor__RequestedBlockDepthTooLow(uint16 blockConfirmationsRequested, uint16 minBlockConfirmations);
+  error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
+
+  event CCVAllowlistUpdated(bool enabled);
+  event CCVAdded(address indexed ccv);
+  event CCVRemoved(address indexed ccv);
+  event DestChainAdded(uint64 indexed destChainSelector, RemoteChainConfig config);
+  event DestChainRemoved(uint64 indexed destChainSelector);
+  event ConfigSet(DynamicConfig dynamicConfig);
+
+  struct RemoteChainConfig {
+    uint16 usdCentsFee; // ─╮ The fee charged by the executor for processing messages to this chain, USD cents.
+    bool enabled; // ───────╯ Whether or not this destination chain is enabled.
+  }
+
+  struct RemoteChainConfigArgs {
+    uint64 destChainSelector;
+    RemoteChainConfig config;
+  }
+
+  struct DynamicConfig {
+    address feeAggregator; // ───────╮ Address to send withdrawn fees to.
+    uint16 minBlockConfirmations; // │ Minimum number of block confirmations allowed (0 = finality).
+    bool ccvAllowlistEnabled; // ────╯ Whether the CCV allowlist is enabled.
+  }
+
+  string public constant typeAndVersion = "Executor 2.0.0-dev";
+
+  /// @notice Limits the number of CCVs that the executor needs to search for results from.
+  /// @dev Max(required CCVs + optional CCVs).
+  uint8 internal immutable i_maxCCVsPerMsg;
+  /// @notice Dynamic configuration.
+  DynamicConfig internal s_dynamicConfig;
+  /// @notice The set of CCVs that the executor supports.
+  EnumerableSet.AddressSet internal s_allowedCCVs;
+  /// @notice The set of destination chains that the executor supports.
+  EnumerableSet.UintSet internal s_allowedDestChains;
+  /// @notice The remote chain configurations for supported destination chains.
+  mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
+
+  constructor(
+    uint8 maxCCVsPerMsg,
+    DynamicConfig memory dynamicConfig
+  ) {
+    if (maxCCVsPerMsg == 0) {
+      revert InvalidMaxPossibleCCVsPerMsg(maxCCVsPerMsg);
+    }
+    i_maxCCVsPerMsg = maxCCVsPerMsg;
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  // ================================================================
+  // │                           Config                             │
+  // ================================================================
+
+  /// @notice Gets the maximum number of CCVs that can be used in a single message.
+  /// @return maxCCVsPerMsg The maximum number of CCVs.
+  function getMaxCCVsPerMessage() external view virtual returns (uint8 maxCCVsPerMsg) {
+    return i_maxCCVsPerMsg;
+  }
+
+  /// @notice Returns the list of destination chains that the executor supports.
+  /// @return destChains The list of destination chain selectors.
+  function getDestChains() external view virtual returns (RemoteChainConfigArgs[] memory) {
+    uint256 numberOfChains = s_allowedDestChains.length();
+    RemoteChainConfigArgs[] memory destChains = new RemoteChainConfigArgs[](numberOfChains);
+    for (uint256 i = 0; i < numberOfChains; ++i) {
+      destChains[i].destChainSelector = uint64(s_allowedDestChains.at(i));
+      destChains[i].config = s_remoteChainConfigs[destChains[i].destChainSelector];
+    }
+    return destChains;
+  }
+
+  /// @notice Updates the destination chains that the executor supports.
+  /// @param destChainSelectorsToRemove The destination chain selectors to remove.
+  /// @param destChainSelectorsToAdd The destination chain selectors to add.
+  function applyDestChainUpdates(
+    uint64[] calldata destChainSelectorsToRemove,
+    RemoteChainConfigArgs[] calldata destChainSelectorsToAdd
+  ) external virtual onlyOwner {
+    for (uint256 i = 0; i < destChainSelectorsToRemove.length; ++i) {
+      uint64 destChainSelector = destChainSelectorsToRemove[i];
+      if (s_allowedDestChains.remove(destChainSelector)) {
+        delete s_remoteChainConfigs[destChainSelector];
+        emit DestChainRemoved(destChainSelector);
+      }
+    }
+
+    for (uint256 i = 0; i < destChainSelectorsToAdd.length; ++i) {
+      RemoteChainConfigArgs calldata args = destChainSelectorsToAdd[i];
+      if (args.destChainSelector == 0) {
+        revert InvalidDestChain(args.destChainSelector);
+      }
+
+      s_allowedDestChains.add(args.destChainSelector);
+      s_remoteChainConfigs[args.destChainSelector] = args.config;
+      emit DestChainAdded(args.destChainSelector, args.config);
+    }
+  }
+
+  /// @notice Returns the dynamic configuration.
+  /// @return dynamicConfig The dynamic configuration.
+  function getDynamicConfig() external view virtual returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @notice Sets the dynamic configuration.
+  /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
+  function setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) external virtual onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Internal function to set the dynamic configuration.
+  /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
+  function _setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) internal {
+    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
+    s_dynamicConfig = dynamicConfig;
+
+    emit ConfigSet(dynamicConfig);
+  }
+
+  /// @inheritdoc IExecutor
+  function getMinBlockConfirmations() external view virtual returns (uint16) {
+    return s_dynamicConfig.minBlockConfirmations;
+  }
+
+  /// @notice Returns the list of CCVs that the executor supports.
+  /// @return ccvs The list of CCV addresses.
+  function getAllowedCCVs() external view virtual returns (address[] memory) {
+    return s_allowedCCVs.values();
+  }
+
+  /// @notice Updates CCV allowlist contents and enablement status.
+  /// @param ccvsToRemove The CCV addresses to remove.
+  /// @param ccvsToAdd The CCV addresses to add.
+  /// @param ccvAllowlistEnabled Whether or not the allowlist should be enabled.
+  function applyAllowedCCVUpdates(
+    address[] calldata ccvsToRemove,
+    address[] calldata ccvsToAdd,
+    bool ccvAllowlistEnabled
+  ) external virtual onlyOwner {
+    for (uint256 i = 0; i < ccvsToRemove.length; ++i) {
+      if (s_allowedCCVs.remove(ccvsToRemove[i])) {
+        emit CCVRemoved(ccvsToRemove[i]);
+      }
+    }
+
+    for (uint256 i = 0; i < ccvsToAdd.length; ++i) {
+      address ccv = ccvsToAdd[i];
+      if (ccv == address(0)) {
+        revert InvalidCCV(ccv);
+      }
+      if (s_allowedCCVs.add(ccv)) {
+        emit CCVAdded(ccv);
+      }
+    }
+
+    if (s_dynamicConfig.ccvAllowlistEnabled != ccvAllowlistEnabled) {
+      s_dynamicConfig.ccvAllowlistEnabled = ccvAllowlistEnabled;
+      emit CCVAllowlistUpdated(ccvAllowlistEnabled);
+    }
+  }
+
+  // ================================================================
+  // │                             Fees                             │
+  // ================================================================
+
+  /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
+  /// @param destChainSelector The destination chain selector.
+  /// @param blockConfirmationsRequested The requested block confirmations for the message. `0` indicates waiting for finality.
+  /// @param ccvs The CCVs that are requested on source.
+  /// @return usdCentsFee The USD denominated fee for the executor.
+  function getFee(
+    uint64 destChainSelector,
+    uint16 blockConfirmationsRequested,
+    address[] calldata ccvs,
+    bytes calldata, // extraArgs
+    address // feeToken
+  ) external view virtual returns (uint16 usdCentsFee) {
+    RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
+    if (!remoteChainConfig.enabled) {
+      revert InvalidDestChain(destChainSelector);
+    }
+    if (blockConfirmationsRequested != 0 && blockConfirmationsRequested < s_dynamicConfig.minBlockConfirmations) {
+      revert Executor__RequestedBlockDepthTooLow(blockConfirmationsRequested, s_dynamicConfig.minBlockConfirmations);
+    }
+
+    if (s_dynamicConfig.ccvAllowlistEnabled) {
+      for (uint256 i = 0; i < ccvs.length; ++i) {
+        if (!s_allowedCCVs.contains(ccvs[i])) {
+          revert InvalidCCV(ccvs[i]);
+        }
+      }
+    }
+
+    if (ccvs.length > i_maxCCVsPerMsg) {
+      revert ExceedsMaxCCVs(ccvs.length, i_maxCCVsPerMsg);
+    }
+
+    return remoteChainConfig.usdCentsFee;
+  }
+
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  /// @param feeTokens The fee tokens to withdraw.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens
+  ) external virtual {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+  }
+}

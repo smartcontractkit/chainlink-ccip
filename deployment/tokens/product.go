@@ -39,9 +39,36 @@ type TokenAdapter interface {
 	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
 	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	DeployTokenVerify(e deployment.Environment, in any) error
+	DeployTokenVerify(e deployment.Environment, in DeployTokenInput) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
+	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a legacy
+	// LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool. Returns nil if not supported.
+	// Used by the standalone MigrateLockReleasePoolLiquidity changeset.
+	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// MigrateLockReleasePoolLiquidityInput is the input for the liquidity migration sequence.
+type MigrateLockReleasePoolLiquidityInput struct {
+	ChainSelector  uint64
+	OldPoolAddress string
+	NewPoolAddress string
+	// TimelockAddress is the MCMS timelock address that will execute the migration operations.
+	// Required because the timelock must be set as the rebalancer and authorized caller.
+	TimelockAddress string
+	// Amount specifies an exact token amount to migrate. Mutually exclusive with BasisPoints.
+	Amount *big.Int
+	// BasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with Amount. For siloed pools, only BasisPoints is supported.
+	BasisPoints *uint16
+	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
+	SetPoolConfig *MigrationSetPoolConfig
+}
+
+// MigrationSetPoolConfig configures the optional setPool call during migration.
+type MigrationSetPoolConfig struct {
+	RegistryAddress string
+	TokenAddress    string
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -54,11 +81,32 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
-// RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts 
+// TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
+type TokenTransferFeeConfig struct {
+	// DestGasOverhead is the gas overhead for the token transfer.
+	DestGasOverhead uint32
+	// DestBytesOverhead is the bytes overhead for the token transfer.
+	DestBytesOverhead uint32
+	// DefaultFinalityFeeUSDCents is the flat fee for a default finality transfer.
+	DefaultFinalityFeeUSDCents uint32
+	// CustomFinalityFeeUSDCents is the flat fee for a custom finality transfer.
+	CustomFinalityFeeUSDCents uint32
+	// DefaultFinalityTransferFeeBps is the bps fee for a default finality transfer.
+	DefaultFinalityTransferFeeBps uint16
+	// CustomFinalityTransferFeeBps is the bps fee for a custom finality transfer.
+	CustomFinalityTransferFeeBps uint16
+	// IsEnabled is whether the token transfer fee config is enabled.
+	IsEnabled bool
+}
+
+// RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts
 // float inputs for capacity and rate, which are then converted to big.Int internally after scaling by token decimals.
 type RateLimiterConfigFloatInput struct {
+	// IsEnabled specifies whether the rate limiter should be enabled.
 	IsEnabled bool
+	// Capacity is the maximum number of tokens that can be in a rate limiter bucket.
 	Capacity float64
+	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
 	Rate float64
 }
 
@@ -69,33 +117,63 @@ type RemoteChainConfig[R any, CCV any] struct {
 	RemoteToken R
 	// The token pool on the remote chain.
 	RemotePool R
+	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	DefaultFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
+	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
+	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	CustomFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
+	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
+	CustomFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8
-	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
-	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS
-	// This value is derived from the configuration specified for outbound traffic to the remote chain,
-	// as the same limits should apply in both directions.
-	InboundRateLimiterConfig RateLimiterConfigFloatInput
-	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
-	OutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
+	// OutboundCCVsToAddAboveThreshold specifies the verifiers to apply to outbound traffic above the threshold.
+	OutboundCCVsToAddAboveThreshold []CCV
+	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
+	InboundCCVsToAddAboveThreshold []CCV
+	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
+	TokenTransferFeeConfig TokenTransferFeeConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
 type ConfigureTokenForTransfersInput struct {
 	// ChainSelector is the chain selector for the chain being configured.
 	ChainSelector uint64
+	// TokenAddress is the address of the token being registered and configured.
+	TokenAddress string
 	// TokenPoolAddress is the address of the token pool to be configured.
 	TokenPoolAddress string
+	// RegistryTokenPoolAddress overrides the pool address to register in the token admin registry.
+	// If empty, TokenPoolAddress is used.
+	RegistryTokenPoolAddress string
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[[]byte, string]
 	// ExternalAdmin is specified when we want to propose an admin that we don't control.
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
+	// MinFinalityValue is the minimum finality value required by the token pool.
+	// This can be interpreted as # of block confirmations, an ID, or otherwise.
+	// Interpretation is left to each chain family.
+	MinFinalityValue uint16
+	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool
+	// to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
+	// The old pool is derived from the TokenAdminRegistry. Only used by EVM adapters.
+	LiquidityMigrationAmount *big.Int
+	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with LiquidityMigrationAmount. Only used by EVM adapters.
+	LiquidityMigrationBasisPoints *uint16
+	// TimelockAddress is the MCMS timelock address, resolved by the changeset from MCMS config.
+	// Required when a liquidity migration is triggered.
+	TimelockAddress string
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore
@@ -134,7 +212,11 @@ func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version 
 
 // GetTokenAdapter retrieves a registered TokenAdapter for the given chain family and version.
 // The boolean return value indicates whether an adapter was found.
+// Returns (nil, false) if version is nil to avoid panics when token config has no version set.
 func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semver.Version) (TokenAdapter, bool) {
+	if version == nil {
+		return nil, false
+	}
 	id := newTokenAdapterID(chainFamily, version)
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {IExecutor} from "../../interfaces/IExecutor.sol";
+
+contract MockExecutor is IExecutor {
+  function getMinBlockConfirmations() external view virtual returns (uint16) {
+    return 0;
+  }
+
+  function getFee(
+    uint64, // destChainSelector,
+    uint16, // blockConfirmationsRequested,
+    address[] memory, // ccvs,
+    bytes memory, // extraArgs
+    address // feeToken
+  ) external pure returns (uint16 usdCents) {
+    return 0;
+  }
+}

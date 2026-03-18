@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
@@ -59,6 +60,7 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	ccip_router.SetProgramID(referenceAddresses.Router)
 	fee_quoter.SetProgramID(referenceAddresses.FeeQuoter)
+	rmn_remote.SetProgramID(referenceAddresses.RmnRemote)
 
 	cctpTpProgram := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.TokenPool)
 	cctpMtProgram := solana.MustPublicKeyFromBase58(devnetInfo.CCTP.MessageTransmitter)
@@ -120,6 +122,42 @@ func TestCctpTpDevnet(t *testing.T) {
 		semverRegex := "(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?"
 		require.Regexp(t, fmt.Sprintf("^%s %s$", "cctp-token-pool", semverRegex), output)
 		fmt.Printf("Type Version: %s\n", output)
+	})
+
+	t.Run("Migrate RMNRemote config", func(t *testing.T) {
+		t.Skip()
+
+		rmnConfig, _, err := state.FindRMNRemoteConfigPDA(referenceAddresses.RmnRemote)
+		require.NoError(t, err)
+
+		ix, err := rmn_remote.NewMigrateConfigV1ToV2Instruction(
+			rmnConfig,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		require.NotNil(t, result)
+	})
+
+	t.Run("Set RMNRemote event authorities", func(t *testing.T) {
+		t.Skip()
+
+		rmnConfig, _, err := state.FindRMNRemoteConfigPDA(referenceAddresses.RmnRemote)
+		require.NoError(t, err)
+
+		routerBillingSigner, _, err := state.FindFeeBillingSignerPDA(referenceAddresses.Router)
+		require.NoError(t, err)
+
+		ix, err := rmn_remote.NewSetEventAuthoritiesInstruction(
+			[]solana.PublicKey{routerBillingSigner},
+			rmnConfig,
+			deployer.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, deployer, config.DefaultCommitment)
+		require.NotNil(t, result)
 	})
 
 	routerConfig, _, err := state.FindConfigPDA(referenceAddresses.Router)
@@ -339,7 +377,7 @@ func TestCctpTpDevnet(t *testing.T) {
 	})
 
 	t.Run("Router interaction (setup + onramp)", func(t *testing.T) {
-		// t.Skip()
+		t.Skip()
 
 		fqUsdcBillingTokenConfig, _, err := state.FindFqBillingTokenConfigPDA(usdcMint, referenceAddresses.FeeQuoter)
 		require.NoError(t, err)

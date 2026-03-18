@@ -1,236 +1,225 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IRouter} from "../../../interfaces/IRouter.sol";
-
-import {NonceManager} from "../../../NonceManager.sol";
-import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {MockExecutor} from "../../mocks/MockExecutor.sol";
+import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
+  uint16 internal constant MESSAGE_NETWORK_FEE_USD_CENTS = 1_00; // $1.00
+  uint16 internal constant TOKEN_NETWORK_FEE_USD_CENTS = 2_00; // $2.00
+  uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
+  uint32 internal constant POOL_GAS_OVERHEAD = 50000;
+  uint32 internal constant POOL_BYTES_OVERHEAD = 128;
+  uint32 internal constant MAX_USD_CENTS_PER_MESSAGE = 10_000; // $100.00
 
-  bytes32 internal s_metadataHash;
+  uint32 internal constant FEE_QUOTER_FEE_USD_CENTS = 50; // $0.50
+  uint32 internal constant FEE_QUOTER_GAS_OVERHEAD = 30000;
+  uint32 internal constant FEE_QUOTER_BYTES_OVERHEAD = 64;
+
+  uint32 internal constant VERIFIER_FEE_USD_CENTS = 200; // $2.00
+  uint32 internal constant VERIFIER_GAS = 100000;
+  uint32 internal constant VERIFIER_BYTES = 256;
 
   OnRampHelper internal s_onRamp;
-  NonceManager internal s_outboundNonceManager;
+  OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
+
+  address internal s_defaultCCV;
+  address internal s_defaultExecutor;
+
+  mapping(address token => bytes extraData) internal s_extraDataByToken;
+
+  struct EventData {
+    ExtraArgsCodec.GenericExtraArgsV3 resolvedExtraArgs;
+    OnRamp.Receipt[] receipts;
+    uint32 executionGasLimit;
+  }
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_outboundNonceManager = new NonceManager(new address[](0));
-    (s_onRamp, s_metadataHash) = _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry)
+    s_onRamp = new OnRampHelper(
+      OnRamp.StaticConfig({
+        chainSelector: SOURCE_CHAIN_SELECTOR,
+        rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      }),
+      OnRamp.DynamicConfig({
+        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
+      })
     );
+    s_defaultCCV = address(new MockVerifier(""));
+    s_defaultExecutor = address(new MockExecutor());
 
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
 
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp0")});
-    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp1")});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
 
-    // Pre approve the first token so the gas estimates of the tests
-    // only cover actual gas usage from the ramps
-    IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2 ** 128);
-    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 128);
-  }
-
-  /// @dev a helper function to compose EVM2AnyRampMessage messages
-  /// @dev it is assumed that LINK is the payment token because feeTokenAmount == feeValueJuels
-  function _messageToEvent(
-    Client.EVM2AnyMessage memory message,
-    uint64 seqNum,
-    uint64 nonce,
-    uint256 feeTokenAmount,
-    address originalSender
-  ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    return _messageToEvent(
-      message,
-      seqNum,
-      nonce,
-      feeTokenAmount, // fee paid
-      feeTokenAmount, // conversion to jules is the same
-      originalSender
-    );
-  }
-
-  function _messageToEvent(
-    Client.EVM2AnyMessage memory message,
-    uint64 seqNum,
-    uint64 nonce,
-    uint256 feeTokenAmount,
-    uint256 feeValueJuels,
-    address originalSender
-  ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    bytes4 chainFamilySelector = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR).chainFamilySelector;
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
-      return _evmMessageToEvent(
-        message,
-        SOURCE_CHAIN_SELECTOR,
-        seqNum,
-        nonce,
-        feeTokenAmount,
-        feeValueJuels,
-        originalSender,
-        s_metadataHash,
-        s_tokenAdminRegistry
-      );
-    } else {
-      return _svmMessageToEvent(
-        message,
-        SOURCE_CHAIN_SELECTOR,
-        seqNum,
-        nonce,
-        feeTokenAmount,
-        feeValueJuels,
-        originalSender,
-        s_metadataHash,
-        s_tokenAdminRegistry
-      );
-    }
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   function _evmMessageToEvent(
     Client.EVM2AnyMessage memory message,
-    uint64 sourceChainSelector,
-    uint64 seqNum,
-    uint64 nonce,
-    uint256 feeTokenAmount,
-    uint256 feeValueJuels,
-    address originalSender,
-    bytes32 metadataHash,
-    TokenAdminRegistry tokenAdminRegistry
-  ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    Client.GenericExtraArgsV2 memory extraArgs =
-      s_feeQuoter.parseEVMExtraArgsFromBytes(message.extraArgs, DEST_CHAIN_SELECTOR);
+    uint64 destChainSelector,
+    uint64 msgNum,
+    address originalSender
+  )
+    internal
+    view
+    returns (
+      bytes32 messageId,
+      bytes memory encodedMessage,
+      OnRamp.Receipt[] memory receipts,
+      bytes[] memory verifierBlobs
+    )
+  {
+    OnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
-    Internal.EVM2AnyRampMessage memory messageEvent = Internal.EVM2AnyRampMessage({
-      header: Internal.RampMessageHeader({
-        messageId: "",
-        sourceChainSelector: sourceChainSelector,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: seqNum,
-        nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce
-      }),
-      sender: originalSender,
-      data: message.data,
-      receiver: message.receiver,
-      extraArgs: Client._argsToBytes(extraArgs),
-      feeToken: message.feeToken,
-      feeTokenAmount: feeTokenAmount,
-      feeValueJuels: feeValueJuels,
-      tokenAmounts: new Internal.EVM2AnyTokenTransfer[](message.tokenAmounts.length)
-    });
-
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      messageEvent.tokenAmounts[i] =
-        _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry, DEST_CHAIN_SELECTOR);
-    }
-
-    messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
-    return messageEvent;
-  }
-
-  function _svmMessageToEvent(
-    Client.EVM2AnyMessage memory message,
-    uint64 sourceChainSelector,
-    uint64 seqNum,
-    uint64 nonce,
-    uint256 feeTokenAmount,
-    uint256 feeValueJuels,
-    address originalSender,
-    bytes32 metadataHash,
-    TokenAdminRegistry tokenAdminRegistry
-  ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    Client.SVMExtraArgsV1 memory extraArgs =
-      s_feeQuoter.parseSVMExtraArgsFromBytes(message.extraArgs, s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR));
-
-    Internal.EVM2AnyRampMessage memory messageEvent = Internal.EVM2AnyRampMessage({
-      header: Internal.RampMessageHeader({
-        messageId: "",
-        sourceChainSelector: sourceChainSelector,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: seqNum,
-        nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce
-      }),
-      sender: originalSender,
-      data: message.data,
-      receiver: message.receiver,
-      extraArgs: Client._svmArgsToBytes(extraArgs),
-      feeToken: message.feeToken,
-      feeTokenAmount: feeTokenAmount,
-      feeValueJuels: feeValueJuels,
-      tokenAmounts: new Internal.EVM2AnyTokenTransfer[](message.tokenAmounts.length)
-    });
-
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      messageEvent.tokenAmounts[i] =
-        _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry, DEST_CHAIN_SELECTOR);
-    }
-
-    messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
-    return messageEvent;
-  }
-
-  function _generateDynamicOnRampConfig(
-    address feeQuoter
-  ) internal pure returns (OnRamp.DynamicConfig memory) {
-    return OnRamp.DynamicConfig({
-      feeQuoter: feeQuoter,
-      reentrancyGuardEntered: false,
-      messageInterceptor: address(0),
-      feeAggregator: FEE_AGGREGATOR,
-      allowlistAdmin: address(0)
-    });
-  }
-
-  function _generateDestChainConfigArgs(
-    IRouter router
-  ) internal pure returns (OnRamp.DestChainConfigArgs[] memory) {
-    OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] =
-      OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: router, allowlistEnabled: false});
-    return destChainConfigs;
-  }
-
-  function _deployOnRamp(
-    uint64 sourceChainSelector,
-    IRouter router,
-    address nonceManager,
-    address tokenAdminRegistry
-  ) internal returns (OnRampHelper, bytes32 metadataHash) {
-    OnRampHelper onRamp = new OnRampHelper(
-      OnRamp.StaticConfig({
-        chainSelector: sourceChainSelector,
-        rmnRemote: s_mockRMNRemote,
-        nonceManager: nonceManager,
-        tokenAdminRegistry: tokenAdminRegistry
-      }),
-      _generateDynamicOnRampConfig(address(s_feeQuoter)),
-      _generateDestChainConfigArgs(router)
+    EventData memory eventData;
+    eventData.resolvedExtraArgs = s_onRamp.parseExtraArgsWithDefaults(
+      destChainSelector,
+      destChainConfig,
+      message.extraArgs,
+      (message.data.length == 0 && message.tokenAmounts.length > 0)
     );
 
-    address[] memory authorizedCallers = new address[](1);
-    authorizedCallers[0] = address(onRamp);
-
-    NonceManager(nonceManager)
-      .applyAuthorizedCallerUpdates(
-        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    address[] memory poolRequiredCCVs = new address[](0);
+    if (message.tokenAmounts.length != 0) {
+      poolRequiredCCVs = s_onRamp.getCCVsForPool(
+        destChainSelector,
+        message.tokenAmounts[0].token,
+        message.tokenAmounts[0].amount,
+        eventData.resolvedExtraArgs.blockConfirmations,
+        eventData.resolvedExtraArgs.tokenArgs
       );
+    }
+    (eventData.resolvedExtraArgs.ccvs, eventData.resolvedExtraArgs.ccvArgs) = s_onRamp.mergeCCVLists(
+      eventData.resolvedExtraArgs.ccvs,
+      eventData.resolvedExtraArgs.ccvArgs,
+      destChainConfig.laneMandatedCCVs,
+      poolRequiredCCVs
+    );
+
+    uint16 networkFeeUSDCents = message.tokenAmounts.length == 0
+      ? destChainConfig.messageNetworkFeeUSDCents
+      : destChainConfig.tokenNetworkFeeUSDCents;
+    (eventData.receipts, eventData.executionGasLimit,) =
+      s_onRamp.getReceipts(destChainSelector, networkFeeUSDCents, message, eventData.resolvedExtraArgs);
+
+    MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      destChainSelector: destChainSelector,
+      messageNumber: msgNum,
+      executionGasLimit: eventData.executionGasLimit,
+      ccipReceiveGasLimit: GAS_LIMIT,
+      finality: 0,
+      ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(
+        eventData.resolvedExtraArgs.ccvs, eventData.resolvedExtraArgs.executor
+      ),
+      onRampAddress: abi.encode(address(s_onRamp)),
+      offRampAddress: destChainConfig.offRamp,
+      sender: abi.encode(originalSender),
+      receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
+      destBlob: "",
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length),
+      data: message.data
+    });
+
+    // Populate token transfers
+
+    _populateTokenTransfers(messageV1, message);
+
+    // `getReceipts` uses `msg.sender` as the issuer for the network-fee receipt.
+    // Since this helper calls it directly (not through the router), override the issuer to reflect the router address.
+    eventData.receipts[eventData.receipts.length - 1].issuer = address(s_sourceRouter);
+
+    receipts = eventData.receipts;
 
     return (
-      onRamp,
-      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, sourceChainSelector, DEST_CHAIN_SELECTOR, address(onRamp)))
+      keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
+      MessageV1Codec._encodeMessageV1(messageV1),
+      receipts,
+      new bytes[](eventData.resolvedExtraArgs.ccvs.length)
     );
+  }
+
+  // Helper function to create GenericExtraArgsV3 struct.
+  function _createV3ExtraArgs(
+    address[] memory ccvAddresses,
+    bytes[] memory ccvArgs
+  ) internal pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
+    return ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvAddresses,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 12,
+      gasLimit: GAS_LIMIT,
+      executor: address(0), // No executor specified.
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
+  }
+
+  // Helper function to assert that two CCV arrays are equal (using parallel address and bytes arrays).
+  function _assertCCVArraysEqual(
+    address[] memory actualAddresses,
+    bytes[] memory actualArgs,
+    address[] memory expectedAddresses,
+    bytes[] memory expectedArgs
+  ) internal pure {
+    assertEq(actualAddresses.length, expectedAddresses.length, "CCV address arrays have different lengths");
+    assertEq(actualArgs.length, expectedArgs.length, "CCV args arrays have different lengths");
+    assertEq(actualAddresses.length, actualArgs.length, "CCV addresses and args have different lengths");
+
+    for (uint256 i = 0; i < actualAddresses.length; ++i) {
+      assertEq(
+        actualAddresses[i], expectedAddresses[i], string.concat("CCV address mismatch at index ", vm.toString(i))
+      );
+      assertEq(actualArgs[i], expectedArgs[i], string.concat("CCV args mismatch at index ", vm.toString(i)));
+    }
+  }
+
+  // Helper to populate token transfers.
+  function _populateTokenTransfers(
+    MessageV1Codec.MessageV1 memory messageV1,
+    Client.EVM2AnyMessage memory message
+  ) internal view {
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address token = message.tokenAmounts[i].token;
+      messageV1.tokenTransfer[i] = MessageV1Codec.TokenTransferV1({
+        amount: message.tokenAmounts[i].amount,
+        sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+        sourceTokenAddress: abi.encode(token),
+        destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
+        tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
+        extraData: s_extraDataByToken[token].length != 0
+          ? s_extraDataByToken[token]
+          : abi.encode(IERC20Metadata(token).decimals())
+      });
+    }
   }
 }

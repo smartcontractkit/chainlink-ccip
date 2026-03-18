@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Router} from "../../../Router.sol";
 import {PingPongDemo} from "../../../applications/PingPongDemo.sol";
-import {Internal} from "../../../libraries/Internal.sol";
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
 
 import {PingPongDappSetup} from "./PingPongDappSetup.t.sol";
 
@@ -24,10 +23,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
     vm.expectEmit();
     emit PingPongDemo.Ping(s_pingPongNumber);
 
-    Internal.EVM2AnyRampMessage memory message;
-
-    vm.expectEmit(false, false, false, false);
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, message);
+    vm.expectCall(address(s_sourceRouter), abi.encodeWithSelector(Router.ccipSend.selector));
 
     s_pingPong.startPingPong();
   }

@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
 
 	"github.com/stretchr/testify/require"
@@ -223,5 +224,34 @@ func TestEdgeCases(t *testing.T) {
 		require.Equal(t, outcome.State, decoded.State)
 		require.Empty(t, decoded.Reports)
 		require.Nil(t, decoded.Report.ChainReports)
+	})
+}
+
+func TestDecodeObservationHandlesMalformedProto(t *testing.T) {
+	commitCodec := v1.NewCommitCodecProto()
+	t.Run("ShortMerkleRoot", func(t *testing.T) {
+
+		pb := &ocrtypecodecpb.CommitObservation{
+			MerkleRootObs: &ocrtypecodecpb.MerkleRootObservation{
+				MerkleRoots: []*ocrtypecodecpb.MerkleRootChain{
+					{
+						ChainSel: 1,
+						SeqNumsRange: &ocrtypecodecpb.SeqNumRange{
+							MinMsgNr: 1,
+							MaxMsgNr: 10,
+						},
+						MerkleRoot: []byte{0x01},
+					},
+				},
+			},
+		}
+
+		data, err := proto.Marshal(pb)
+		require.NoError(t, err)
+
+		res, err := commitCodec.DecodeObservation(data)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "merkle root must be 32 bytes")
+		require.Equal(t, committypes.Observation{}, res)
 	})
 }

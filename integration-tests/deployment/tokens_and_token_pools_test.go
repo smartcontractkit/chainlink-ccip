@@ -479,7 +479,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 					TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 						evmA.Chain.Selector: {
-							TokenPoolVersion: v1_6_0,
+							SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+							TokenPoolVersion:      v1_6_0,
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmA.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
@@ -494,9 +495,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 								},
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmB.Chain.Selector: {
-										OutboundRateLimiterConfig: defaultRL,
-										OutboundCCVs:              []datastore.AddressRef{},
-										InboundCCVs:               []datastore.AddressRef{},
+										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:                             []datastore.AddressRef{},
+										InboundCCVs:                              []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
 											ChainSelector: evmB.Chain.Selector,
 											Qualifier:     evmB.Token.Symbol,
@@ -506,13 +507,15 @@ func TestTokensAndTokenPools(t *testing.T) {
 											ChainSelector: evmB.Chain.Selector,
 											Qualifier:     evmB.TokenPoolQualifier,
 											Type:          datastore.ContractType(evmTokenPoolType),
+											Version:       v1_5_1,
 										},
 									},
 								},
 							},
 						},
 						evmB.Chain.Selector: {
-							TokenPoolVersion: v1_6_0,
+							SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+							TokenPoolVersion:      v1_6_0,
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmB.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
@@ -527,9 +530,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 								},
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmA.Chain.Selector: {
-										OutboundRateLimiterConfig: defaultRL,
-										OutboundCCVs:              []datastore.AddressRef{},
-										InboundCCVs:               []datastore.AddressRef{},
+										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:                             []datastore.AddressRef{},
+										InboundCCVs:                              []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
 											ChainSelector: evmA.Chain.Selector,
 											Qualifier:     evmA.Token.Symbol,
@@ -539,6 +542,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 											ChainSelector: evmA.Chain.Selector,
 											Qualifier:     evmA.TokenPoolQualifier,
 											Type:          datastore.ContractType(evmTokenPoolType),
+											Version:       v1_5_1,
 										},
 									},
 								},
@@ -821,6 +825,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 							TokenPoolRef: datastore.AddressRef{
 								ChainSelector: solbnm.Chain.Selector,
 								Address:       tokenPool.Address,
+								Version:       v1_6_0,
 							},
 							TokenRef: datastore.AddressRef{
 								ChainSelector: solbnm.Chain.Selector,
@@ -833,9 +838,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								evmA.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:              []datastore.AddressRef{},
-									InboundCCVs:               []datastore.AddressRef{},
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: evmA.Chain.Selector,
 										Qualifier:     evmA.Token.Symbol,
@@ -845,12 +850,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: evmA.Chain.Selector,
 										Qualifier:     evmA.TokenPoolQualifier,
 										Type:          datastore.ContractType(evmTokenPoolType),
+										Version:       v1_5_1,
 									},
 								},
 								evmB.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:              []datastore.AddressRef{},
-									InboundCCVs:               []datastore.AddressRef{},
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: evmB.Chain.Selector,
 										Qualifier:     evmB.Token.Symbol,
@@ -860,13 +866,15 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: evmB.Chain.Selector,
 										Qualifier:     evmB.TokenPoolQualifier,
 										Type:          datastore.ContractType(evmTokenPoolType),
+										Version:       v1_5_1,
 									},
 								},
 							},
 						},
 					},
 					evmA.Chain.Selector: {
-						TokenPoolVersion: v1_6_0,
+						SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+						TokenPoolVersion:      v1_6_0,
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							ChainSelector: evmA.Chain.Selector,
 							TokenPoolRef: datastore.AddressRef{
@@ -881,9 +889,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:              []datastore.AddressRef{},
-									InboundCCVs:               []datastore.AddressRef{},
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: solbnm.Chain.Selector,
 										Qualifier:     solbnm.Token.Symbol,
@@ -893,13 +901,15 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: solbnm.Chain.Selector,
 										Qualifier:     solbnm.TokenPoolQualifier,
 										Type:          datastore.ContractType(solbnm.TokenPoolType),
+										Version:       v1_6_0,
 									},
 								},
 							},
 						},
 					},
 					evmB.Chain.Selector: {
-						TokenPoolVersion: v1_6_0,
+						SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+						TokenPoolVersion:      v1_6_0,
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							ChainSelector: evmB.Chain.Selector,
 							TokenPoolRef: datastore.AddressRef{
@@ -914,9 +924,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
-									OutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:              []datastore.AddressRef{},
-									InboundCCVs:               []datastore.AddressRef{},
+									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:                             []datastore.AddressRef{},
+									InboundCCVs:                              []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: solbnm.Chain.Selector,
 										Qualifier:     solbnm.Token.Symbol,
@@ -926,6 +936,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: solbnm.Chain.Selector,
 										Qualifier:     solbnm.TokenPoolQualifier,
 										Type:          datastore.ContractType(solbnm.TokenPoolType),
+										Version:       v1_6_0,
 									},
 								},
 							},
@@ -957,7 +968,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, stateErr)
 			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
-			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 	})
 }

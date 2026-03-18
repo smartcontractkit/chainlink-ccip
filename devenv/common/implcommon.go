@@ -288,8 +288,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 	chainA := lanesapi.ChainDefinition{
 		Selector:                 selector,
-		GasPrice:                 lanesapi.DefaultGasPrice(selector),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, selector),
 		TokenPrices:              chainATokenPrices,
 	}
 	for _, destSelector := range remoteSelectors {
@@ -298,8 +296,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
-			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
-			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, destSelector),
 			TokenPrices:              chainBTokenPrices,
 		}
 		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
@@ -712,9 +708,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					OutboundCCVs:              []datastore.AddressRef{}, // not needed for for 1.6
-					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
-					OutboundRateLimiterConfig: disabledRL,
+					OutboundCCVs:                             []datastore.AddressRef{}, // not needed for for 1.6
+					InboundCCVs:                              []datastore.AddressRef{}, // not needed for for 1.6
+					DefaultFinalityOutboundRateLimiterConfig: disabledRL,
 					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
@@ -809,16 +805,22 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							ChainAdapterVersion: v1_6_0,
 							TokenRef:            tokenRef,
 							TokenPoolRef:        tokenPoolRef,
-							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
-								dst.ChainSelector(): rl,
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								dst.ChainSelector(): {
+									DefaultFinality: rl,
+									CustomFinality:  rl,
+								},
 							},
 						},
 						dst.ChainSelector(): {
 							ChainAdapterVersion: v1_6_0,
 							TokenRef:            dstTokenRef,
 							TokenPoolRef:        dstTokenPoolRef,
-							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
-								selector: rl,
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								selector: {
+									DefaultFinality: rl,
+									CustomFinality:  rl,
+								},
 							},
 						},
 					},

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 
 import {BurnMintERC20Setup} from "./BurnMintERC20Setup.t.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract FactoryBurnMintERC20_mint is BurnMintERC20Setup {
   function test_BasicMint() public {

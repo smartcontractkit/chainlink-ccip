@@ -158,7 +158,6 @@ func prepareDestChainRequest(
 		rmnRemoteAddress      []byte
 		rmnDigestHeader       cciptypes.RMNDigestHeader
 		rmnVersionConfig      cciptypes.VersionedConfig
-		feeQuoterStaticConfig cciptypes.FeeQuoterStaticConfig
 		cursedSubjects        cciptypes.RMNCurseResponse
 	)
 
@@ -212,11 +211,6 @@ func prepareDestChainRequest(
 				ReturnVal: &cursedSubjects,
 			},
 		},
-		consts.ContractNameFeeQuoter: {{
-			ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
-			Params:    map[string]any{},
-			ReturnVal: &feeQuoterStaticConfig,
-		}},
 	}
 
 	// Get source chain config requests and append them to requests

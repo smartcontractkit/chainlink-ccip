@@ -2,129 +2,100 @@
 pragma solidity ^0.8.24;
 
 import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
-import {IRouter} from "../../../interfaces/IRouter.sol";
-
-import {Client} from "../../../libraries/Client.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_constructor is OnRampSetup {
-  function test_Constructor() public {
+  function test_constructor() public {
     OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: s_mockRMNRemote,
-      nonceManager: address(s_outboundNonceManager),
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
-    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicOnRampConfig(address(s_feeQuoter));
 
-    vm.expectEmit();
-    emit OnRamp.ConfigSet(staticConfig, dynamicConfig);
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
+    OnRamp.DynamicConfig memory dynamicConfig = OnRamp.DynamicConfig({
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
+    });
 
-    _deployOnRamp(SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry));
+    OnRamp proxy = new OnRamp(staticConfig, dynamicConfig);
 
-    OnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
+    OnRamp.StaticConfig memory gotStaticConfig = proxy.getStaticConfig();
+    assertEq(gotStaticConfig.chainSelector, staticConfig.chainSelector);
+    assertEq(address(gotStaticConfig.rmnRemote), address(staticConfig.rmnRemote));
+    assertEq(gotStaticConfig.maxUSDCentsPerMessage, staticConfig.maxUSDCentsPerMessage);
+    assertEq(gotStaticConfig.tokenAdminRegistry, staticConfig.tokenAdminRegistry);
 
-    assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
-    assertEq(address(staticConfig.rmnRemote), address(gotStaticConfig.rmnRemote));
-    assertEq(staticConfig.tokenAdminRegistry, gotStaticConfig.tokenAdminRegistry);
-
-    OnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-    assertEq(dynamicConfig.feeQuoter, gotDynamicConfig.feeQuoter);
-
-    // Initial values
-    assertEq("OnRamp 1.6.2-dev", s_onRamp.typeAndVersion());
-    assertEq(OWNER, s_onRamp.owner());
-    assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
+    OnRamp.DynamicConfig memory gotDynamicConfig = proxy.getDynamicConfig();
+    assertEq(gotDynamicConfig.feeQuoter, dynamicConfig.feeQuoter);
+    assertEq(gotDynamicConfig.feeAggregator, dynamicConfig.feeAggregator);
+    assertFalse(gotDynamicConfig.reentrancyGuardEntered);
   }
 
-  function test_RevertWhen_Constructor_EnableAllowList_ForwardFromRouter() public {
+  function test_constructor_RevertWhen_StaticConfigInvalid() public {
+    // Zero chainSelector.
+    OnRamp.StaticConfig memory staticConfigZeroChainSelector = OnRamp.StaticConfig({
+      chainSelector: 0,
+      rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
+    });
+    OnRamp.DynamicConfig memory dynamicConfigValid = OnRamp.DynamicConfig({
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
+    });
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    new OnRamp(staticConfigZeroChainSelector, dynamicConfigValid);
+
+    // Zero rmnRemote.
+    OnRamp.StaticConfig memory staticConfigZeroRMNRemote = OnRamp.StaticConfig({
+      chainSelector: SOURCE_CHAIN_SELECTOR,
+      rmnRemote: IRMNRemote(address(0)),
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
+    });
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    new OnRamp(staticConfigZeroRMNRemote, dynamicConfigValid);
+
+    // Zero tokenAdminRegistry.
+    OnRamp.StaticConfig memory staticConfigZeroTokenAdminRegistry = OnRamp.StaticConfig({
+      chainSelector: SOURCE_CHAIN_SELECTOR,
+      rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
+      tokenAdminRegistry: address(0)
+    });
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    new OnRamp(staticConfigZeroTokenAdminRegistry, dynamicConfigValid);
+
+    // Zero maxUSDCentsPerMessage.
+    OnRamp.StaticConfig memory staticConfigZeroMaxUSDCentsPerMessage = OnRamp.StaticConfig({
+      chainSelector: SOURCE_CHAIN_SELECTOR,
+      rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: 0,
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
+    });
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    new OnRamp(staticConfigZeroMaxUSDCentsPerMessage, dynamicConfigValid);
+  }
+
+  function test_constructor_RevertWhen_DynamicConfigInvalid() public {
     OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: s_mockRMNRemote,
-      nonceManager: address(s_outboundNonceManager),
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
 
-    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicOnRampConfig(address(s_feeQuoter));
+    // feeQuoter == address(0)
+    OnRamp.DynamicConfig memory dynamicConfig0 =
+      OnRamp.DynamicConfig({feeQuoter: address(0), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR});
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    new OnRamp(staticConfig, dynamicConfig0);
 
-    // Creating a DestChainConfig and setting allowlistEnabled : true
-    OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: true
+    // reentrancyGuardEntered == true
+    OnRamp.DynamicConfig memory dynamicConfig2 = OnRamp.DynamicConfig({
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: true, feeAggregator: FEE_AGGREGATOR
     });
-
-    vm.expectEmit();
-    emit OnRamp.ConfigSet(staticConfig, dynamicConfig);
-
-    vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, true);
-
-    OnRampHelper tempOnRamp = new OnRampHelper(staticConfig, dynamicConfig, destChainConfigs);
-
-    // Sending a message and expecting revert as allowlist is enabled with no address in allowlist
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.SenderNotAllowed.selector, OWNER));
-    tempOnRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-  }
-
-  function test_RevertWhen_Constructor_InvalidConfigChainSelectorEqZero() public {
     vm.expectRevert(OnRamp.InvalidConfig.selector);
-    new OnRampHelper(
-      OnRamp.StaticConfig({
-        chainSelector: 0,
-        rmnRemote: s_mockRMNRemote,
-        nonceManager: address(s_outboundNonceManager),
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
-      }),
-      _generateDynamicOnRampConfig(address(s_feeQuoter)),
-      _generateDestChainConfigArgs(IRouter(address(0)))
-    );
-  }
-
-  function test_RevertWhen_Constructor_InvalidConfigRMNProxyEqAddressZero() public {
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    s_onRamp = new OnRampHelper(
-      OnRamp.StaticConfig({
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnRemote: IRMNRemote(address(0)),
-        nonceManager: address(s_outboundNonceManager),
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
-      }),
-      _generateDynamicOnRampConfig(address(s_feeQuoter)),
-      _generateDestChainConfigArgs(IRouter(address(0)))
-    );
-  }
-
-  function test_RevertWhen_Constructor_InvalidConfigNonceManagerEqAddressZero() public {
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    new OnRampHelper(
-      OnRamp.StaticConfig({
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnRemote: s_mockRMNRemote,
-        nonceManager: address(0),
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
-      }),
-      _generateDynamicOnRampConfig(address(s_feeQuoter)),
-      _generateDestChainConfigArgs(IRouter(address(0)))
-    );
-  }
-
-  function test_RevertWhen_Constructor_InvalidConfigTokenAdminRegistryEqAddressZero() public {
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    new OnRampHelper(
-      OnRamp.StaticConfig({
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnRemote: s_mockRMNRemote,
-        nonceManager: address(s_outboundNonceManager),
-        tokenAdminRegistry: address(0)
-      }),
-      _generateDynamicOnRampConfig(address(s_feeQuoter)),
-      _generateDestChainConfigArgs(IRouter(address(0)))
-    );
+    new OnRamp(staticConfig, dynamicConfig2);
   }
 }

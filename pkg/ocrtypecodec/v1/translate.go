@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"maps"
 	"math/big"
 
@@ -43,8 +44,8 @@ func (t *protoTranslator) rmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.Signat
 	sigs := make([]*rmnpb.EcdsaSignature, len(pbSigs))
 	for i := range pbSigs {
 		sigs[i] = &rmnpb.EcdsaSignature{
-			R: pbSigs[i].R,
-			S: pbSigs[i].S,
+			R: pbSigs[i].GetR(),
+			S: pbSigs[i].GetS(),
 		}
 	}
 	return sigs
@@ -65,19 +66,22 @@ func (t *protoTranslator) ccipRmnSignaturesToProto(
 
 func (t *protoTranslator) ccipRmnSignaturesFromProto(
 	pbSigs []*ocrtypecodecpb.SignatureEcdsa,
-) []cciptypes.RMNECDSASignature {
+) ([]cciptypes.RMNECDSASignature, error) {
 	var sigs []cciptypes.RMNECDSASignature
 	if len(pbSigs) > 0 {
 		sigs = make([]cciptypes.RMNECDSASignature, len(pbSigs))
 	}
 
 	for i := range pbSigs {
+		if len(pbSigs[i].GetR()) != 32 || len(pbSigs[i].GetS()) != 32 {
+			return nil, fmt.Errorf("signature must be 32 bytes: %v", pbSigs[i])
+		}
 		sigs[i] = cciptypes.RMNECDSASignature{
-			R: cciptypes.Bytes32(pbSigs[i].R),
-			S: cciptypes.Bytes32(pbSigs[i].S),
+			R: cciptypes.Bytes32(pbSigs[i].GetR()),
+			S: cciptypes.Bytes32(pbSigs[i].GetS()),
 		}
 	}
-	return sigs
+	return sigs, nil
 }
 
 func (t *protoTranslator) laneUpdatesToProto(
@@ -145,13 +149,16 @@ func (t *protoTranslator) merkleRootsToProto(
 
 func (t *protoTranslator) merkleRootsFromProto(
 	pbMerkleRoots []*ocrtypecodecpb.MerkleRootChain,
-) []cciptypes.MerkleRootChain {
+) ([]cciptypes.MerkleRootChain, error) {
 	var merkleRoots []cciptypes.MerkleRootChain
 	if len(pbMerkleRoots) > 0 {
 		merkleRoots = make([]cciptypes.MerkleRootChain, len(pbMerkleRoots))
 	}
 
 	for i, mr := range pbMerkleRoots {
+		if len(mr.MerkleRoot) != 32 {
+			return nil, fmt.Errorf("merkle root must be 32 bytes: %v", mr.MerkleRoot)
+		}
 		merkleRoots[i] = cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(mr.ChainSel),
 			OnRampAddress: mr.OnRampAddress,
@@ -163,7 +170,7 @@ func (t *protoTranslator) merkleRootsFromProto(
 		}
 	}
 
-	return merkleRoots
+	return merkleRoots, nil
 }
 
 func (t *protoTranslator) rmnEnabledChainsToProto(rmnEnabled map[cciptypes.ChainSelector]bool) map[uint64]bool {
@@ -241,7 +248,7 @@ func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg cciptypes.RemoteCo
 
 func (t *protoTranslator) rmnRemoteConfigFromProto(
 	pbRmnRemoteCfg *ocrtypecodecpb.RmnRemoteConfig,
-) cciptypes.RemoteConfig {
+) (cciptypes.RemoteConfig, error) {
 	var rmnSigners []cciptypes.RemoteSignerInfo
 	if len(pbRmnRemoteCfg.Signers) > 0 {
 		rmnSigners = make([]cciptypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
@@ -252,6 +259,13 @@ func (t *protoTranslator) rmnRemoteConfigFromProto(
 			NodeIndex:        s.NodeIndex,
 		}
 	}
+	if len(pbRmnRemoteCfg.ConfigDigest) != 32 {
+		return cciptypes.RemoteConfig{}, fmt.Errorf("config digest must be 32 bytes: %v", pbRmnRemoteCfg.ConfigDigest)
+	}
+	if len(pbRmnRemoteCfg.RmnReportVersion) != 32 {
+		return cciptypes.RemoteConfig{}, fmt.Errorf(
+			"rmn report version must be 32 bytes: %v", pbRmnRemoteCfg.RmnReportVersion)
+	}
 
 	return cciptypes.RemoteConfig{
 		ContractAddress:  pbRmnRemoteCfg.ContractAddress,
@@ -260,7 +274,7 @@ func (t *protoTranslator) rmnRemoteConfigFromProto(
 		FSign:            pbRmnRemoteCfg.FSign,
 		ConfigVersion:    pbRmnRemoteCfg.ConfigVersion,
 		RmnReportVersion: cciptypes.Bytes32(pbRmnRemoteCfg.RmnReportVersion),
-	}
+	}, nil
 }
 
 func (t *protoTranslator) fChainToProto(fChain map[cciptypes.ChainSelector]int) map[uint64]int32 {
@@ -569,23 +583,39 @@ func (t *protoTranslator) commitDataSliceToProto(commits []exectypes.CommitData)
 
 func (t *protoTranslator) commitReportsFromProto(
 	pbObservations map[uint64]*ocrtypecodecpb.CommitObservations,
-) exectypes.CommitObservations {
+) (exectypes.CommitObservations, error) {
 	var commitReports exectypes.CommitObservations
 	if len(pbObservations) > 0 {
 		commitReports = make(exectypes.CommitObservations, len(pbObservations))
 	}
 
 	for chainSel, commitObs := range pbObservations {
-		commitReports[cciptypes.ChainSelector(chainSel)] = t.commitDataSliceFromProto(commitObs.CommitData)
+		commitDataSlice, err := t.commitDataSliceFromProto(commitObs.CommitData)
+		if err != nil {
+			return nil, err
+		}
+		commitReports[cciptypes.ChainSelector(chainSel)] = commitDataSlice
 	}
 
-	return commitReports
+	return commitReports, nil
 }
 
-func (t *protoTranslator) commitDataSliceFromProto(pbCommits []*ocrtypecodecpb.CommitData) []exectypes.CommitData {
+func (t *protoTranslator) commitDataSliceFromProto(
+	pbCommits []*ocrtypecodecpb.CommitData) ([]exectypes.CommitData, error) {
 	commitData := make([]exectypes.CommitData, len(pbCommits))
 
 	for i, commit := range pbCommits {
+		if len(commit.MerkleRoot) != 32 {
+			return nil, fmt.Errorf("merkle root length is not 32: %d", len(commit.MerkleRoot))
+		}
+		hashes, err := t.bytes32SliceFromProto(commit.Hashes)
+		if err != nil {
+			return nil, err
+		}
+		messages, err := t.decodeMessages(commit.Messages)
+		if err != nil {
+			return nil, err
+		}
 		commitData[i] = exectypes.CommitData{
 			SourceChain:   cciptypes.ChainSelector(commit.SourceChain),
 			OnRampAddress: commit.OnRampAddress,
@@ -597,13 +627,13 @@ func (t *protoTranslator) commitDataSliceFromProto(pbCommits []*ocrtypecodecpb.C
 				cciptypes.SeqNum(commit.SequenceNumberRange.MaxMsgNr),
 			),
 			ExecutedMessages: t.decodeSeqNums(commit.ExecutedMessages),
-			Messages:         t.decodeMessages(commit.Messages),
-			Hashes:           t.bytes32SliceFromProto(commit.Hashes),
+			Messages:         messages,
+			Hashes:           hashes,
 			MessageTokenData: t.decodeMessageTokenData(commit.MessageTokenData),
 		}
 	}
 
-	return commitData
+	return commitData, nil
 }
 
 func (t *protoTranslator) messagesToProto(messages []cciptypes.Message) []*ocrtypecodecpb.Message {
@@ -685,17 +715,20 @@ func (t *protoTranslator) bytes32SliceToProto(slice []cciptypes.Bytes32) [][]byt
 	return result
 }
 
-func (t *protoTranslator) bytes32SliceFromProto(pbSlice [][]byte) []cciptypes.Bytes32 {
+func (t *protoTranslator) bytes32SliceFromProto(pbSlice [][]byte) ([]cciptypes.Bytes32, error) {
 	var result []cciptypes.Bytes32
 	if len(pbSlice) > 0 {
 		result = make([]cciptypes.Bytes32, len(pbSlice))
 	}
 
 	for i, val := range pbSlice {
+		if len(val) != 32 {
+			return nil, fmt.Errorf("bytes32 length is not 32: %d", len(val))
+		}
 		result[i] = cciptypes.Bytes32(val)
 	}
 
-	return result
+	return result, nil
 }
 
 func (t *protoTranslator) messageTokenDataSliceToProto(
@@ -749,7 +782,7 @@ func (t *protoTranslator) messageObservationsToProto(
 
 func (t *protoTranslator) messageObservationsFromProto(
 	pbMsgs map[uint64]*ocrtypecodecpb.SeqNumToMessage,
-) exectypes.MessageObservations {
+) (exectypes.MessageObservations, error) {
 	var messages exectypes.MessageObservations
 	if len(pbMsgs) > 0 {
 		messages = make(exectypes.MessageObservations, len(pbMsgs))
@@ -758,12 +791,16 @@ func (t *protoTranslator) messageObservationsFromProto(
 	for chainSel, msgMap := range pbMsgs {
 		innerMap := make(map[cciptypes.SeqNum]cciptypes.Message, len(msgMap.Messages))
 		for seqNum, msg := range msgMap.Messages {
-			innerMap[cciptypes.SeqNum(seqNum)] = t.decodeMessage(msg)
+			decodedMsg, err := t.decodeMessage(msg)
+			if err != nil {
+				return nil, err
+			}
+			innerMap[cciptypes.SeqNum(seqNum)] = decodedMsg
 		}
 		messages[cciptypes.ChainSelector(chainSel)] = innerMap
 	}
 
-	return messages
+	return messages, nil
 }
 
 func (t *protoTranslator) messageHashesToProto(
@@ -787,7 +824,7 @@ func (t *protoTranslator) messageHashesToProto(
 
 func (t *protoTranslator) messageHashesFromProto(
 	pbHashes map[uint64]*ocrtypecodecpb.SeqNumToBytes,
-) exectypes.MessageHashes {
+) (exectypes.MessageHashes, error) {
 	var hashes exectypes.MessageHashes
 	if len(pbHashes) > 0 {
 		hashes = make(exectypes.MessageHashes, len(pbHashes))
@@ -796,12 +833,15 @@ func (t *protoTranslator) messageHashesFromProto(
 	for chainSel, hashMap := range pbHashes {
 		innerMap := make(map[cciptypes.SeqNum]cciptypes.Bytes32, len(hashMap.SeqNumToBytes))
 		for seqNum, hash := range hashMap.SeqNumToBytes {
+			if len(hash) != 32 {
+				return nil, fmt.Errorf("bytes32 length is not 32: %d", len(hash))
+			}
 			innerMap[cciptypes.SeqNum(seqNum)] = cciptypes.Bytes32(hash)
 		}
 		hashes[cciptypes.ChainSelector(chainSel)] = innerMap
 	}
 
-	return hashes
+	return hashes, nil
 }
 
 func (t *protoTranslator) tokenDataObservationsToProto(
@@ -907,7 +947,7 @@ func (t *protoTranslator) execPluginReportsToProto(
 
 func (t *protoTranslator) execPluginReportsFromProto(
 	pbReports []*ocrtypecodecpb.ExecutePluginReport,
-) []cciptypes.ExecutePluginReport {
+) ([]cciptypes.ExecutePluginReport, error) {
 	reports := make([]cciptypes.ExecutePluginReport, len(pbReports))
 
 	for i, r := range pbReports {
@@ -920,17 +960,26 @@ func (t *protoTranslator) execPluginReportsFromProto(
 				offchainTokenData = append(offchainTokenData, data.Items)
 			}
 
+			proofs, err := t.bytes32SliceFromProto(cr.Proofs)
+			if err != nil {
+				return nil, err
+			}
+
+			messages, err := t.decodeMessages(cr.Messages)
+			if err != nil {
+				return nil, err
+			}
 			reports[i].ChainReports[j] = cciptypes.ExecutePluginReportSingleChain{
 				SourceChainSelector: cciptypes.ChainSelector(cr.SourceChainSelector),
-				Messages:            t.decodeMessages(cr.Messages),
+				Messages:            messages,
 				OffchainTokenData:   offchainTokenData,
-				Proofs:              t.bytes32SliceFromProto(cr.Proofs),
+				Proofs:              proofs,
 				ProofFlagBits:       cciptypes.NewBigInt(big.NewInt(0).SetBytes(cr.ProofFlagBits)),
 			}
 		}
 	}
 
-	return reports
+	return reports, nil
 }
 
 func (t *protoTranslator) decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {
@@ -957,21 +1006,29 @@ func (t *protoTranslator) decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
 	return result
 }
 
-func (t *protoTranslator) decodeMessages(messages []*ocrtypecodecpb.Message) []cciptypes.Message {
+func (t *protoTranslator) decodeMessages(messages []*ocrtypecodecpb.Message) ([]cciptypes.Message, error) {
 	var result []cciptypes.Message
 	if len(messages) > 0 {
 		result = make([]cciptypes.Message, len(messages))
 	}
 
 	for i, msg := range messages {
-		result[i] = t.decodeMessage(msg)
+		decodedMsg, err := t.decodeMessage(msg)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = decodedMsg
 	}
-	return result
+	return result, nil
 }
 
-func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.Message {
+func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) (cciptypes.Message, error) {
+	header, err := t.decodeMessageHeader(msg.Header)
+	if err != nil {
+		return cciptypes.Message{}, err
+	}
 	return cciptypes.Message{
-		Header:         t.decodeMessageHeader(msg.Header),
+		Header:         header,
 		Sender:         msg.Sender,
 		Data:           msg.Data,
 		Receiver:       msg.Receiver,
@@ -980,10 +1037,17 @@ func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.M
 		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeTokenAmount)),
 		FeeValueJuels:  cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeValueJuels)),
 		TokenAmounts:   t.decodeRampTokenAmounts(msg.TokenAmounts),
-	}
+	}, nil
 }
 
-func (t *protoTranslator) decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.RampMessageHeader {
+func (t *protoTranslator) decodeMessageHeader(
+	header *ocrtypecodecpb.RampMessageHeader) (cciptypes.RampMessageHeader, error) {
+	if len(header.MessageId) != 32 {
+		return cciptypes.RampMessageHeader{}, fmt.Errorf("message id length is not 32: %d", len(header.MessageId))
+	}
+	if len(header.MsgHash) != 32 {
+		return cciptypes.RampMessageHeader{}, fmt.Errorf("msg hash length is not 32: %d", len(header.MsgHash))
+	}
 	return cciptypes.RampMessageHeader{
 		MessageID:           cciptypes.Bytes32(header.MessageId),
 		SourceChainSelector: cciptypes.ChainSelector(header.SourceChainSelector),
@@ -993,7 +1057,7 @@ func (t *protoTranslator) decodeMessageHeader(header *ocrtypecodecpb.RampMessage
 		MsgHash:             cciptypes.Bytes32(header.MsgHash),
 		OnRamp:              header.OnRamp,
 		TxHash:              header.TxHash,
-	}
+	}, nil
 }
 
 func (t *protoTranslator) decodeRampTokenAmounts(

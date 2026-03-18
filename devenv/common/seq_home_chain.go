@@ -89,7 +89,7 @@ var AddDONAndSetCandidateSequence = operations.NewSequence(
 					},
 				})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AddDON for chain with selector %d and plugin type %s: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AddDON for chain with selector %d and plugin type %d: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
 			writes = append(writes, out.Output)
 		}
@@ -156,7 +156,7 @@ var SetCandidateSequence = operations.NewSequence(
 				},
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDON for chain with selector %d and plugin type %s: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDON for chain with selector %d and plugin type %d: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
 			writes = append(writes, out.Output)
 		}
@@ -225,7 +225,7 @@ var PromoteCandidateSequence = operations.NewSequence(
 				},
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDONOp for chain with selector %d and plugin type %s: %w", don.ChainSelector, don.PluginType, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDONOp for chain with selector %d and plugin type %d: %w", don.ChainSelector, don.PluginType, err)
 			}
 			writes = append(writes, out.Output)
 		}

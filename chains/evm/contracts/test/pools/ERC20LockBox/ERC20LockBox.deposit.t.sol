@@ -3,9 +3,11 @@ pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract ERC20LockBox_deposit is ERC20LockBoxSetup {
-  function testFuzz_Deposit_Success(
+  function testFuzz_deposit_Success(
     uint256 amount
   ) public {
     amount = bound(amount, 1, type(uint256).max / 2);
@@ -19,7 +21,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount);
 
-    s_erc20LockBox.deposit(address(s_token), amount);
+    s_erc20LockBox.deposit(address(s_token), 0, amount);
 
     vm.stopPrank();
 
@@ -28,7 +30,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(s_allowedCaller), callerBalanceBefore - amount);
   }
 
-  function test_Deposit_MultipleDeposits() public {
+  function test_deposit_MultipleDeposits() public {
     uint256 amount1 = 1000e18;
     uint256 amount2 = 2000e18;
 
@@ -38,13 +40,13 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     // First deposit
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount1);
-    s_erc20LockBox.deposit(address(s_token), amount1);
+    s_erc20LockBox.deposit(address(s_token), 0, amount1);
 
     // Second deposit
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount2);
 
-    s_erc20LockBox.deposit(address(s_token), amount2);
+    s_erc20LockBox.deposit(address(s_token), 0, amount2);
 
     vm.stopPrank();
 
@@ -52,7 +54,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount1 + amount2);
   }
 
-  function test_Deposit_FromDifferentCallers() public {
+  function test_deposit_FromDifferentCallers() public {
     uint256 amount = 1000e18;
     address caller1 = makeAddr("caller1");
     address caller2 = makeAddr("caller2");
@@ -62,10 +64,12 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     deal(address(s_token), caller2, amount);
 
     // Configure both callers as allowed
-    ERC20LockBox.AllowedCallerConfigArgs[] memory configArgs = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: caller1, allowed: true});
-    configArgs[1] = ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: caller2, allowed: true});
-    s_erc20LockBox.configureAllowedCallers(configArgs);
+    address[] memory callers = new address[](2);
+    callers[0] = caller1;
+    callers[1] = caller2;
+    s_erc20LockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: callers, removedCallers: new address[](0)})
+    );
 
     // First caller deposits
     vm.startPrank(caller1);
@@ -74,7 +78,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), caller1, amount);
 
-    s_erc20LockBox.deposit(address(s_token), amount);
+    s_erc20LockBox.deposit(address(s_token), 0, amount);
     vm.stopPrank();
 
     // Second caller deposits
@@ -84,7 +88,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), caller2, amount);
 
-    s_erc20LockBox.deposit(address(s_token), amount);
+    s_erc20LockBox.deposit(address(s_token), 0, amount);
     vm.stopPrank();
 
     // Verify balances
@@ -92,31 +96,33 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
   }
 
   // Reverts
-  function test_RevertWhen_Unauthorized() public {
+  function test_deposit_RevertWhen_Unauthorized() public {
     uint256 amount = 1000e18;
 
     vm.startPrank(STRANGER);
     s_token.approve(address(s_erc20LockBox), amount);
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
 
-    s_erc20LockBox.deposit(address(s_token), amount);
+    s_erc20LockBox.deposit(address(s_token), 0, amount);
   }
 
-  function test_RevertWhen_AmountIsZero() public {
+  function test_deposit_RevertWhen_TokenAmountCannotBeZero() public {
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), 1);
     vm.expectRevert(ERC20LockBox.TokenAmountCannotBeZero.selector);
 
-    s_erc20LockBox.deposit(address(s_token), 0);
+    s_erc20LockBox.deposit(address(s_token), 0, 0);
   }
 
-  function test_RevertWhen_TokenIsZeroAddress() public {
+  function test_deposit_RevertWhen_UnsupportedToken() public {
     uint256 amount = 1000e18;
+    BurnMintERC20 unsupportedToken = new BurnMintERC20("BAD", "BAD", 18, 0, 0);
 
     vm.startPrank(s_allowedCaller);
-    s_token.approve(address(s_erc20LockBox), amount);
-    vm.expectRevert(ERC20LockBox.TokenAddressCannotBeZero.selector);
+    deal(address(unsupportedToken), s_allowedCaller, amount);
+    unsupportedToken.approve(address(s_erc20LockBox), amount);
 
-    s_erc20LockBox.deposit(address(0), amount);
+    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.UnsupportedToken.selector, address(unsupportedToken)));
+    s_erc20LockBox.deposit(address(unsupportedToken), 0, amount);
   }
 }

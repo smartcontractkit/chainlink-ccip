@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -55,6 +56,7 @@ type RampUpdaterConfig struct {
 }
 
 type RouterUpdateInRamp interface {
+	VerifyPreconditions(e cldf.Environment, cfg LaneMigratorConfig, mcmReader changesets.MCMSReader) error
 	UpdateVersionWithRouter() *cldf_ops.Sequence[RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains]
 }
 
@@ -110,7 +112,7 @@ func (r *LaneMigratorRegistry) GetRampUpdater(chainsel uint64, version *semver.V
 }
 
 func LaneMigrateToNewVersionChangeset(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[LaneMigratorConfig] {
-	return cldf.CreateChangeSet(laneMigrateApply(migratorReg, mcmsRegistry), laneMigrateVerify(migratorReg))
+	return cldf.CreateChangeSet(laneMigrateApply(migratorReg, mcmsRegistry), laneMigrateVerify(migratorReg, mcmsRegistry))
 }
 
 func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigratorConfig) (cldf.ChangesetOutput, error) {
@@ -180,12 +182,12 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 		}
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
-			WithBatchOps(batchOps).
+			WithSingleBatchOpPerChain(batchOps).
 			Build(input.MCMS)
 	}
 }
 
-func laneMigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
+func laneMigrateVerify(migratorReg *LaneMigratorRegistry, mcmReg *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigratorConfig) error {
 	return func(e cldf.Environment, input LaneMigratorConfig) error {
 		for chainSel, perChainConfig := range input.Input {
 			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
@@ -196,12 +198,29 @@ func laneMigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment,
 			if perChainConfig.RampVersion.LessThan(semver.MustParse("1.6.0")) {
 				return errors.New("cannot upgrade to a version less than 1.6.0 with this changeset")
 			}
-			_, err = migratorReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
+			rampUpdater, err := migratorReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of ramp updater for chain selector %d: %w", chainSel, err)
 			}
+			chainFamily, err := chain_selectors.GetSelectorFamily(chainSel)
+			if err != nil {
+				return fmt.Errorf("error getting chain family for chain selector %d: %w", chainSel, err)
+			}
+			mcmReader, ok := mcmReg.GetMCMSReader(chainFamily)
+			if !ok {
+				return fmt.Errorf("error getting MCMS reader for chain family %s: reader not found", chainFamily)
+			}
 			if !e.BlockChains.Exists(chainSel) {
 				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: blockchain not found", chainSel)
+			}
+			singleChainInput := LaneMigratorConfig{
+				Input: map[uint64]LaneMigratorConfigPerChain{
+					chainSel: perChainConfig,
+				},
+				MCMS: input.MCMS,
+			}
+			if err := rampUpdater.VerifyPreconditions(e, singleChainInput, mcmReader); err != nil {
+				return fmt.Errorf("error verifying preconditions for ramp updater for chain selector %d: %w", chainSel, err)
 			}
 			for _, remoteChainSel := range perChainConfig.RemoteChains {
 				if !e.BlockChains.Exists(remoteChainSel) {

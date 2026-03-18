@@ -5,7 +5,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/stretchr/testify/require"
+
+	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -16,9 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
@@ -48,7 +49,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 
 	// Configure deployment registry
 	deployRegistry := deploy.GetRegistry()
-	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, &adapters.EVMDeployer{})
+	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, &evmadaptersV1_0_0.EVMDeployer{})
 	deployRegistry.RegisterDeployer(chainsel.FamilySolana, deploy.MCMSVersion, &solAdapter)
 
 	// Configure fees registry
@@ -60,7 +61,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 
 	// Configure MCMS registry
 	mcmsRegistry := changesets.GetRegistry()
-	mcmsAdapter := &adapters.EVMMCMSReader{}
+	mcmsAdapter := &evmadaptersV1_0_0.EVMMCMSReader{}
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, mcmsAdapter)
 
 	// Deploy FeeQuoter + other contracts
@@ -87,7 +88,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	dstLinkRef, err := output.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(dst,
 			datastore.ContractType(link.ContractType),
-			semver.MustParse("1.0.0"),
+			link.Version,
 			"", // no qualifier is needed for EVM LINK token
 		),
 	)

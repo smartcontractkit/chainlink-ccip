@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -20,11 +21,13 @@ import (
 
 type ConfigureTokenPoolForRemoteChainsInput struct {
 	TokenPoolAddress common.Address
+	TokenPoolVersion *semver.Version
 	RemoteChains     map[uint64]tokensapi.RemoteChainConfig[[]byte, string]
 }
 
 type ConfigureTokenPoolForRemoteChainInput struct {
 	TokenPoolAddress    common.Address
+	TokenPoolVersion    *semver.Version
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
@@ -66,6 +69,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
 					TokenPoolAddress:    tokenPool.Address(),
+					TokenPoolVersion:    input.TokenPoolVersion,
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
 				},
@@ -107,12 +111,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 
 		inputORL, inputIRL := tokensapi.GenerateTPRLConfigs(
-			input.RemoteChainConfig.OutboundRateLimiterConfig,
-			input.RemoteChainConfig.InboundRateLimiterConfig,
+			input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
+			input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
 			localDecimals,
 			input.RemoteChainConfig.RemoteDecimals,
 			chain.Family(),
-			tpops.Version,
+			input.TokenPoolVersion,
 		)
 
 		// Token pool remote chain configuration can vary depending on whether the remote

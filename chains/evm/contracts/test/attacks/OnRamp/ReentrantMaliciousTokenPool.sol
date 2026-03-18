@@ -5,7 +5,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract ReentrantMaliciousTokenPool is TokenPool {
   address private immutable i_facade;
@@ -17,17 +17,21 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     IERC20 token,
     address rmnProxy,
     address router
-  ) TokenPool(token, 18, new address[](0), rmnProxy, router) {
+  ) TokenPool(token, 18, address(0), rmnProxy, router) {
     i_facade = facade;
   }
 
   /// @dev Calls into Facade to reenter Router exactly 1 time
   function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public override returns (Pool.LockOrBurnOutV1 memory) {
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16, // finality
+    bytes calldata // tokenArgs
+  ) public override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
     if (s_attacked) {
-      return
-        Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+      return (
+        Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""}),
+        lockOrBurnIn.amount
+      );
     }
 
     s_attacked = true;
@@ -40,11 +44,15 @@ contract ReentrantMaliciousTokenPool is TokenPool {
       sender: msg.sender,
       amount: lockOrBurnIn.amount
     });
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return (
+      Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""}),
+      lockOrBurnIn.amount
+    );
   }
 
   function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 // finalty
   ) public pure override returns (Pool.ReleaseOrMintOutV1 memory) {
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
