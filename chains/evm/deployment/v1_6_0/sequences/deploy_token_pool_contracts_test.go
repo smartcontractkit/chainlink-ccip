@@ -332,13 +332,12 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 
 	// Add an existing pool to the datastore (simulating already deployed)
 	existingPoolAddress := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
-	existingPoolQualifier := existingPoolAddress.Hex() + "-" + string(poolType)
 	err = ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType(poolType),
 		Version:       utils.Version_1_6_1,
 		Address:       existingPoolAddress.Hex(),
 		ChainSelector: chainSelector,
-		Qualifier:     existingPoolQualifier,
+		Qualifier:     tokenSymbol,
 	})
 	require.NoError(t, err, "Failed to add existing pool address to datastore")
 
@@ -348,7 +347,7 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 		PoolType:           string(poolType),
 		TokenPoolVersion:   utils.Version_1_6_1,
 		ChainSelector:      chainSelector,
-		TokenPoolQualifier: existingPoolQualifier,
+		TokenPoolQualifier: tokenSymbol,
 		ExistingDataStore:  e.DataStore,
 	}
 
