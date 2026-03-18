@@ -506,8 +506,13 @@ func (a *SVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, star
 		startSlot,
 		seqNrsMaped,
 	)
-	require.Error(t, err)
-	require.Nil(t, executionStates)
+	require.NoError(t, err)
+	for _, seqNr := range seqNrs {
+		state, ok := executionStates[seqNr]
+		require.True(t, ok, "no execution state found for seqNr %d", seqNr)
+		require.Equal(t, int(ccip_offramp.Failure_MessageExecutionState), state,
+			"expected execution state FAILURE for seqNr %d, got state %d", seqNr, state)
+	}
 }
 
 func (a *SVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {

@@ -370,7 +370,7 @@ func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, star
 	for i, seqNr := range seqNrs {
 		seqNrsMaped[i] = uint64(seqNr)
 	}
-	_, err = ConfirmExecWithSeqNrs(
+	executionStates, err := ConfirmExecWithSeqNrs(
 		t,
 		sourceSelector,
 		a.Chain,
@@ -378,7 +378,13 @@ func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, star
 		startBlock,
 		seqNrsMaped,
 	)
-	require.Error(t, err)
+	require.NoError(t, err)
+	for _, seqNr := range seqNrs {
+		state, ok := executionStates[seqNr]
+		require.True(t, ok, "no execution state found for seqNr %d", seqNr)
+		require.Equal(t, int(commonutils.EXECUTION_STATE_FAILURE), state,
+			"expected execution state FAILURE for seqNr %d, got %s", seqNr, commonutils.ExecutionStateToString(uint8(state)))
+	}
 }
 
 func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {
