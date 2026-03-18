@@ -205,6 +205,10 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
 }
 
 func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fqops2.DestChainConfig {
+	var v2 lanes.FeeQuoterV2Params
+	if fqc.V2Params != nil {
+		v2 = *fqc.V2Params
+	}
 	return fqops2.DestChainConfig{
 		IsEnabled:                   fqc.IsEnabled,
 		MaxDataBytes:                fqc.MaxDataBytes,
@@ -216,7 +220,7 @@ func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fqops2.DestChainConfig 
 		DefaultTokenDestGasOverhead: fqc.DefaultTokenDestGasOverhead,
 		DefaultTxGasLimit:           fqc.DefaultTxGasLimit,
 		NetworkFeeUSDCents:          fqc.NetworkFeeUSDCents,
-		LinkFeeMultiplierPercent:    fqc.V2Params.LinkFeeMultiplierPercent,
+		LinkFeeMultiplierPercent:    v2.LinkFeeMultiplierPercent,
 	}
 }
 
