@@ -40,7 +40,7 @@ type SolanaAdapter struct {
 }
 
 func (a *SolanaAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	return a.GetRouterAddress(ds, chainSelector)
+	return a.GetRouterAddress(ds, chainSelector, false)
 }
 
 func (a *SolanaAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -67,7 +67,7 @@ func (a *SolanaAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint6
 	return addr, nil
 }
 
-func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, _ bool) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
@@ -94,16 +94,16 @@ func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelecto
 func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChainConfig {
 	chainHex := common_utils.GetHexFromString(common_utils.SVMFamilySelector)
 	return laneapi.FeeQuoterDestChainConfig{
-		IsEnabled:               true,
-		MaxDataBytes:             30_000,
-		MaxPerMsgGasLimit:        3_000_000,
-		DestGasOverhead:          300_000,
-		DestGasPerPayloadByteBase: 16,
-		ChainFamilySelector:      binary.BigEndian.Uint32(chainHex[:]),
-		DefaultTokenFeeUSDCents:  25,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:        200_000,
-		NetworkFeeUSDCents:       10,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
 		V1Params: &laneapi.FeeQuoterV1Params{
 			MaxNumberOfTokensPerMsg:           10,
 			DestGasPerPayloadByteHigh:         40,

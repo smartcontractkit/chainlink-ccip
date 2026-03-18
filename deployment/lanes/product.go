@@ -6,10 +6,11 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type LaneAdapter interface {
@@ -22,7 +23,7 @@ type LaneAdapter interface {
 	// needed for populating values in chain specific configs
 	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
 	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.

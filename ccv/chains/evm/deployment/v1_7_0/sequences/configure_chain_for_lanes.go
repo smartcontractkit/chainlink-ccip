@@ -179,7 +179,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		}
 
 		// Apply Router ramp updates (only when there are changes).
-		onRampAdds, err := maybeAddRouterOnRampsAddsConfigArg(b, chain, input)
+		onRampAdds, err := MaybeAddRouterOnRampsAddsConfigArg(b, chain, input)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to determine if Router(%s) on chain %s needs on ramp updates: %w", sourceRouter, chain.String(), err)
 		}
@@ -371,7 +371,7 @@ func maybeAddSourceChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lane
 	return offRampArgs, nil
 }
 
-func maybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput) ([]router.OnRamp, error) {
+func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput) ([]router.OnRamp, error) {
 	remoteSelector := input.Dest.Selector
 	sourceRouter := common.BytesToAddress(input.Source.Router).Hex()
 	sourceOnRamp := common.BytesToAddress(input.Source.OnRamp).Hex()

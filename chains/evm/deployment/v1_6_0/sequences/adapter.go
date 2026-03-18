@@ -13,9 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -88,10 +88,14 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 	return evm_datastore_utils.ToEVMAddressBytes(ref)
 }
 
-func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error) {
+	contractType := router.ContractType
+	if isTestRouter {
+		contractType = router.TestRouterContractType
+	}
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(router.ContractType),
+		Type:          datastore.ContractType(contractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
@@ -194,16 +198,16 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
 	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
 	return ccipapi.FeeQuoterDestChainConfig{
-		IsEnabled:               true,
-		MaxDataBytes:            30_000,
-		MaxPerMsgGasLimit:       3_000_000,
-		DestGasOverhead:         300_000,
-		DestGasPerPayloadByteBase: 16,
-		ChainFamilySelector:     binary.BigEndian.Uint32(chainHex[:]),
-		DefaultTokenFeeUSDCents: 25,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:       200_000,
-		NetworkFeeUSDCents:      10,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
 		V1Params: &ccipapi.FeeQuoterV1Params{
 			MaxNumberOfTokensPerMsg:           10,
 			DestGasPerPayloadByteHigh:         40,

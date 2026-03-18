@@ -8,6 +8,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -15,12 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/stretchr/testify/require"
+
+	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
@@ -97,12 +99,12 @@ func checkBidirectionalLaneConnectivity(
 		feeQuoterOnSrc, err := fee_quoter.NewFeeQuoter(common.BytesToAddress(feeQuoterOnSrcAddr), e.BlockChains.EVMChains()[lane.Source.Selector].Client)
 		require.NoError(t, err, "must instantiate feeQuoter")
 
-		routerOnSrcAddr, err := srcAdapter.GetRouterAddress(e.DataStore, lane.Source.Selector)
+		routerOnSrcAddr, err := srcAdapter.GetRouterAddress(e.DataStore, lane.Source.Selector, false)
 		require.NoError(t, err, "must get router from srcAdapter")
 		routerOnSrc, err := router.NewRouter(common.BytesToAddress(routerOnSrcAddr), e.BlockChains.EVMChains()[lane.Source.Selector].Client)
 		require.NoError(t, err, "must instantiate router")
 
-		routerOnDestAddr, err := destAdapter.GetRouterAddress(e.DataStore, lane.Dest.Selector)
+		routerOnDestAddr, err := destAdapter.GetRouterAddress(e.DataStore, lane.Dest.Selector, false)
 		require.NoError(t, err, "must get router from destAdapter")
 		routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[lane.Dest.Selector].Client)
 		require.NoError(t, err, "must instantiate router")

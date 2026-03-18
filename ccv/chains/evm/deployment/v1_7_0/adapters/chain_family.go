@@ -13,8 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -73,10 +73,14 @@ func (c *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.Dis
 	return evm_sequences.DisableRemoteChainSequence
 }
 
-func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error) {
+	contractType := router.ContractType
+	if isTestRouter {
+		contractType = router.TestRouterContractType
+	}
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(router.ContractType),
+		Type:          datastore.ContractType(contractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {

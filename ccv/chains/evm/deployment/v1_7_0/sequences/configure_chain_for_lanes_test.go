@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	onramp2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 )
 
@@ -395,7 +397,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 	}
 }
 
-// TestMaybeAddRouterOnRampsAddsConfigArg verifies the expected output of maybeAddRouterOnRampsAddsConfigArg
+// TestMaybeAddRouterOnRampsAddsConfigArg verifies the expected output of MaybeAddRouterOnRampsAddsConfigArg
 // for TestRouter true and TestRouter false when the router has no onRamp for dest, and after ConfigureLaneLegAsSource.
 func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
@@ -425,15 +427,18 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			ContractParams:   testsetup.CreateBasicContractParams(),
 			DeployerKeyOwned: true,
+			DeployTestRouter: true,
 		},
 	)
 	require.NoError(t, err)
 
-	var routerAddress, onRampAddr, feeQuoterAddr, offRampAddr, committeeVerifierAddr, committeeVerifierResolverAddr, executorAddr string
+	var testRouterAddress, routerAddress, onRampAddr, feeQuoterAddr, offRampAddr, committeeVerifierAddr, committeeVerifierResolverAddr, executorAddr string
 	for _, addr := range deploymentReport.Output.Addresses {
 		switch addr.Type {
 		case datastore.ContractType(router.ContractType):
 			routerAddress = addr.Address
+		case datastore.ContractType(router.TestRouterContractType):
+			testRouterAddress = addr.Address
 		case datastore.ContractType(onramp.ContractType):
 			onRampAddr = addr.Address
 		case datastore.ContractType(fee_quoter.ContractType):
@@ -467,15 +472,18 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			ContractParams:   testsetup.CreateBasicContractParams(),
 			DeployerKeyOwned: true,
+			DeployTestRouter: true,
 		},
 	)
 	require.NoError(t, err)
 
-	var remoteRouterAddress, remoteOnRampAddr, remoteFeeQuoterAddr, remoteOffRampAddr, remoteCommitteeVerifierAddr, remoteCommitteeVerifierResolverAddr, remoteExecutorAddr string
+	var remoteTestRouterAddr, remoteRouterAddress, remoteOnRampAddr, remoteFeeQuoterAddr, remoteOffRampAddr, remoteCommitteeVerifierAddr, remoteCommitteeVerifierResolverAddr, remoteExecutorAddr string
 	for _, addr := range deploymentReport.Output.Addresses {
 		switch addr.Type {
 		case datastore.ContractType(router.ContractType):
 			remoteRouterAddress = addr.Address
+		case datastore.ContractType(router.TestRouterContractType):
+			remoteTestRouterAddr = addr.Address
 		case datastore.ContractType(onramp.ContractType):
 			remoteOnRampAddr = addr.Address
 		case datastore.ContractType(fee_quoter.ContractType):
@@ -545,11 +553,12 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		Source: localChainDef,
 		Dest:   remoteChainDef,
 	}
-	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-
 	t.Run("TestRouter_true_router_has_no_onRamp", func(t *testing.T) {
 		input.TestRouter = true
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArgForTest(b, evmChain, input)
+		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
+		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
+		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
 		require.NoError(t, err)
 		require.Len(t, onRampAdds, 1, "when router has no onRamp for dest, TestRouter true should return one OnRamp to add")
 		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
@@ -557,41 +566,121 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 	})
 
 	t.Run("TestRouter_false_router_has_no_onRamp", func(t *testing.T) {
+		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
 		input.TestRouter = false
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArgForTest(b, evmChain, input)
+		localChainDef.Router = common.HexToAddress(routerAddress).Bytes()
+		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
+		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
 		require.NoError(t, err)
 		require.Len(t, onRampAdds, 1, "when router has no onRamp for dest, TestRouter false should return one OnRamp to add")
 		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
 		require.Equal(t, common.HexToAddress(onRampAddr), onRampAdds[0].OnRamp)
 	})
 
-	_, err = operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureLaneLegAsSource,
-		e.BlockChains,
-		lanes.UpdateLanesInput{
-			Source:     localChainDef,
-			Dest:       remoteChainDef,
-			TestRouter: false,
-		},
-	)
-	require.NoError(t, err)
+	t.Run("router_has_1.6_onRamp", func(t *testing.T) {
+		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+		input.TestRouter = false
+		localChainDef.Router = common.HexToAddress(routerAddress).Bytes()
+		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
+		// add an onramp with version 1.6.0
+		// deploy onramp 1.6.0
+		out, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), onramp2.Deploy, evmChain, contract_utils.DeployInput[onramp2.ConstructorArgs]{
+			ChainSelector:  chainSelector,
+			TypeAndVersion: onramp2.TypeAndVersion,
+			Args: onramp2.ConstructorArgs{
+				StaticConfig: onramp2.StaticConfig{
+					ChainSelector:      chainSelector,
+					RmnRemote:          utils.RandomAddress(),
+					NonceManager:       utils.RandomAddress(),
+					TokenAdminRegistry: utils.RandomAddress(),
+				},
+				DynamicConfig: onramp2.DynamicConfig{
+					FeeQuoter:     utils.RandomAddress(),
+					FeeAggregator: utils.RandomAddress(),
+				},
+			},
+		})
+		require.NoError(t, err)
+		deployedOnRampAddr := common.HexToAddress(out.Output.Address)
+		// add this onramp to the router
+		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(routerAddress),
+			Args: router.ApplyRampsUpdatesArgs{
+				OnRampUpdates: []router.OnRamp{
+					{
+						DestChainSelector: remoteChainSelector,
+						OnRamp:            deployedOnRampAddr,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
+		require.NoError(t, err)
+		require.Empty(t, onRampAdds, "when router has prev version onRamp for dest, TestRouter false should return no adds")
+		input.TestRouter = true
+		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
+		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
 
-	freshBundle := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(testRouterAddress),
+			Args: router.ApplyRampsUpdatesArgs{
+				OnRampUpdates: []router.OnRamp{
+					{
+						DestChainSelector: remoteChainSelector,
+						OnRamp:            deployedOnRampAddr,
+					},
+				},
+			},
+		})
+		onRampAdds, err = sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
+		require.NoError(t, err)
+		require.Len(t, onRampAdds, 1, "when router has prev version onRamp for dest, TestRouter false should return one OnRamp to add")
+		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
+		require.Equal(t, common.HexToAddress(onRampAddr), onRampAdds[0].OnRamp)
+	})
 
 	t.Run("TestRouter_true_router_already_has_onRamp", func(t *testing.T) {
+		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
 		input.TestRouter = true
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArgForTest(freshBundle, evmChain, input)
+		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
+		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
+		_, err = operations.ExecuteSequence(
+			testsetup.BundleWithFreshReporter(e.OperationsBundle),
+			sequences.ConfigureLaneLegAsSource,
+			e.BlockChains,
+			lanes.UpdateLanesInput{
+				Source:     localChainDef,
+				Dest:       remoteChainDef,
+				TestRouter: true,
+			},
+		)
+		require.NoError(t, err)
+		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
 		require.NoError(t, err)
 		require.Empty(t, onRampAdds, "when router already has same onRamp for dest, TestRouter true should return no adds")
 	})
 
 	t.Run("TestRouter_false_router_already_has_onRamp", func(t *testing.T) {
+		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
 		input.TestRouter = false
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArgForTest(freshBundle, evmChain, input)
+		localChainDef.Router = common.HexToAddress(routerAddress).Bytes()
+		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
+		_, err = operations.ExecuteSequence(
+			testsetup.BundleWithFreshReporter(e.OperationsBundle),
+			sequences.ConfigureLaneLegAsSource,
+			e.BlockChains,
+			lanes.UpdateLanesInput{
+				Source: localChainDef,
+				Dest:   remoteChainDef,
+			},
+		)
 		require.NoError(t, err)
-		require.Len(t, onRampAdds, 1, "when router already has onRamp with version >= current, TestRouter false should return one OnRamp (idempotent)")
-		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
-		require.Equal(t, common.HexToAddress(onRampAddr), onRampAdds[0].OnRamp)
+		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
+		require.NoError(t, err)
+		require.Empty(t, onRampAdds, "when router already has same onRamp for dest, TestRouter false should return no adds")
 	})
 }

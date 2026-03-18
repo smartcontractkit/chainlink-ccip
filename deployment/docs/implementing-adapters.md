@@ -129,7 +129,7 @@ func (a *MyChainAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector 
 }
 
 func (a *MyChainAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) { ... }
-func (a *MyChainAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) { ... }
+func (a *MyChainAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error) { ... }
 func (a *MyChainAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) { ... }
 
 func (a *MyChainAdapter) ConfigureLaneLegAsSource() *Sequence[UpdateLanesInput, OnChainOutput, BlockChains] {
