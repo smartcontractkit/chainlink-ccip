@@ -107,7 +107,7 @@ type LaneAdapter interface {
     GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 
     // GetRouterAddress returns the Router contract address (as bytes) for the given chain.
-    GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error)
+    GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 
     // GetFQAddress returns the FeeQuoter contract address (as bytes) for the given chain.
     GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)

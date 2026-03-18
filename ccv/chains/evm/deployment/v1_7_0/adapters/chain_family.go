@@ -73,14 +73,22 @@ func (c *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.Dis
 	return evm_sequences.DisableRemoteChainSequence
 }
 
-func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error) {
-	contractType := router.ContractType
-	if isTestRouter {
-		contractType = router.TestRouterContractType
-	}
+func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(contractType),
+		Type:          datastore.ContractType(router.ContractType),
+		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {

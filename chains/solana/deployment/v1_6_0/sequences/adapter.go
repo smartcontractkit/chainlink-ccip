@@ -40,7 +40,7 @@ type SolanaAdapter struct {
 }
 
 func (a *SolanaAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	return a.GetRouterAddress(ds, chainSelector, false)
+	return a.GetRouterAddress(ds, chainSelector)
 }
 
 func (a *SolanaAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -67,7 +67,7 @@ func (a *SolanaAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint6
 	return addr, nil
 }
 
-func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, _ bool) ([]byte, error) {
+func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),

@@ -88,14 +88,22 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 	return evm_datastore_utils.ToEVMAddressBytes(ref)
 }
 
-func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64, isTestRouter bool) ([]byte, error) {
-	contractType := router.ContractType
-	if isTestRouter {
-		contractType = router.TestRouterContractType
-	}
+func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(contractType),
+		Type:          datastore.ContractType(router.ContractType),
+		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *EVMAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.TestRouterContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
