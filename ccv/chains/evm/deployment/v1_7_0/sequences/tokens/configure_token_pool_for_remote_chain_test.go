@@ -6,33 +6,33 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/stretchr/testify/require"
 
-	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	chains_v161_burn_mint "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
-	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	chains_v161_burn_mint "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
+	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
+	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
 func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
 	return tokens.ConfigureTokenPoolForRemoteChainInput{
-		ChainSelector:                chainSel,
-		TokenPoolAddress:             tokenPoolAddress,
-		AdvancedPoolHooks:            advancedPoolHooksAddress,
+		ChainSelector:               chainSel,
+		TokenPoolAddress:            tokenPoolAddress,
+		AdvancedPoolHooks:           advancedPoolHooksAddress,
 		RemoteChainSelector:         remoteChainSel,
 		RemoteChainAlreadySupported: false,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
@@ -52,7 +52,7 @@ func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress
 }
 
 func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment, chainSel uint64, remoteChainSel uint64, input tokens.ConfigureTokenPoolForRemoteChainInput) {
-	tp, err := tp_bindings.NewTokenPool(input.TokenPoolAddress, e.BlockChains.EVMChains()[chainSel].Client)
+	tp, err := token_pool.NewTokenPoolContract(input.TokenPoolAddress, e.BlockChains.EVMChains()[chainSel].Client)
 	require.NoError(t, err, "Failed to instantiate token pool contract")
 	supportedChains, err := tp.GetSupportedChains(nil)
 	require.NoError(t, err, "Failed to get supported chains from token pool")
@@ -111,8 +111,8 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 
 func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 	tests := []struct {
-		desc                              string
-		makeSecondPassInput               func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
+		desc                               string
+		makeSecondPassInput                func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
 		checkWithFirstPassInputAfterSecond bool // when true, assert on-chain state matches first pass (for empty-input fallback tests)
 	}{
 		{
@@ -214,9 +214,9 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSel,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					ContractParams: testsetup.CreateBasicContractParams(),
+					ChainSelector:    chainSel,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:   testsetup.CreateBasicContractParams(),
 					DeployerKeyOwned: true,
 				},
 			)
@@ -296,9 +296,9 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 		sequences.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployChainContractsInput{
-			ChainSelector:  chainSel,
-			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-			ContractParams: testsetup.CreateBasicContractParams(),
+			ChainSelector:    chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:   testsetup.CreateBasicContractParams(),
 			DeployerKeyOwned: true,
 		},
 	)
@@ -417,13 +417,13 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 
 	// Configure pool A (1.7.0) for remote with RegistryAddress and TokenAddress set but rate limits NOT provided (disabled) — should import from pool B
 	upgradeInput := tokens.ConfigureTokenPoolForRemoteChainInput{
-		ChainSelector:                chainSel,
-		TokenPoolAddress:             poolAAddress,
-		AdvancedPoolHooks:            advancedPoolHooksA,
-		RemoteChainSelector:          remoteChainSel,
-		RegistryAddress:              registryAddress,
-		TokenAddress:                 tokenBAddress,
-		RemoteChainAlreadySupported:  false,
+		ChainSelector:               chainSel,
+		TokenPoolAddress:            poolAAddress,
+		AdvancedPoolHooks:           advancedPoolHooksA,
+		RemoteChainSelector:         remoteChainSel,
+		RegistryAddress:             registryAddress,
+		TokenAddress:                tokenBAddress,
+		RemoteChainAlreadySupported: false,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken:                              common.LeftPadBytes(common.FromHex("0x123"), 32),
 			RemotePool:                               common.LeftPadBytes(common.FromHex("0x456"), 32),
@@ -447,7 +447,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain (upgrade import) should not error")
 
 	// Assert pool A has imported rate limits (enabled and non-zero) and the active pool's remote pool
-	tpA, err := tp_bindings.NewTokenPool(poolAAddress, e.BlockChains.EVMChains()[chainSel].Client)
+	tpA, err := token_pool.NewTokenPoolContract(poolAAddress, e.BlockChains.EVMChains()[chainSel].Client)
 	require.NoError(t, err, "Failed to instantiate pool A token pool contract")
 	supportedChains, err := tpA.GetSupportedChains(nil)
 	require.NoError(t, err, "Failed to get supported chains from token pool")

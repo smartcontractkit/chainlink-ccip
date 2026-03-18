@@ -168,6 +168,8 @@ contracts:
         access: public
       - name: getTokenTransferFeeConfig
         access: public
+      - name: getRequiredCCVs
+        access: public
 
   - contract_name: BurnMintTokenPool
     version: "2.0.0"

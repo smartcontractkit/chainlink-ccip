@@ -36,6 +36,11 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 const (
@@ -322,7 +327,7 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error finding feequoter address ref: %w", err)
 			}
-			feeQuoterContract, err := fee_quoter.NewFeeQuoter(feequoterAddr, c.Client)
+			feeQuoterContract, err := fqops.NewFeeQuoterContract(feequoterAddr, c.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error creating fee quoter contract instance: %w", err)
 			}
