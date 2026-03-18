@@ -453,17 +453,13 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 			// For a BnM token + BnM token pool, we need to grant the pool mint and burn roles on the token
 			isToknTypeBnM := toknRef.Type.String() == bnmERC20ops.ContractType.String()
 			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
-			if isPoolTypeBnM && isToknTypeBnM {
+			if isPoolTypeBnM && isToknTypeBnM && len(out.Output.Addresses) == 1 {
 				// NOTE: the pool ref isn't in the datastore yet so we need to fetch it from
 				// the DeployTokenPool sequence output. It is assumed that the sequence will
-				// only return exactly one AddressRef which is the deployed pool address. If
-				// this is not the case, then we'll raise an error.
-				var poolRef datastore.AddressRef
-				if addresses := out.Output.Addresses; len(addresses) != 1 {
-					return sequences.OnChainOutput{}, fmt.Errorf("expected exactly 1 address from token pool deployment sequence output, got %d", len(addresses))
-				} else {
-					poolRef = addresses[0]
-				}
+				// return exactly one AddressRef if the pool was deployed. If the token pool
+				// was already in the DS (i.e. no addresses were returned from the seq) then
+				// we skip this step and assume that permissions were already setup.
+				poolRef := out.Output.Addresses[0]
 
 				poolAddrBytes, err := a.AddressRefToBytes(poolRef)
 				if err != nil {
