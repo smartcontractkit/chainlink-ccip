@@ -91,7 +91,7 @@ func checkBidirectionalLaneConnectivity(
 	var fqEvmDestChainPDA solana.PublicKey
 	feeQuoterOnSrcAddr, err := solanaAdapter.GetFQAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get feeQuoter from srcAdapter")
-	routerOnSrcAddr, err := solanaAdapter.GetRouterAddress(e.DataStore, solanaChain.Selector, false)
+	routerOnSrcAddr, err := solanaAdapter.GetRouterAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get router from srcAdapter")
 	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get offRamp from srcAdapter")
@@ -112,7 +112,7 @@ func checkBidirectionalLaneConnectivity(
 	offRampDest, err := offramp.NewOffRamp(common.BytesToAddress(offRampDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate offRamp")
 
-	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e.DataStore, evmChain.Selector, false)
+	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get router from destAdapter")
 	routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate router")
@@ -189,7 +189,7 @@ func checkLaneDisabled(
 	t.Helper()
 
 	// EVM Router: OnRamp must be zeroed for the remote chain
-	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e.DataStore, evmChain.Selector, false)
+	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get router from evmAdapter")
 	routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate router")

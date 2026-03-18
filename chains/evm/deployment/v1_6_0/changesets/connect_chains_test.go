@@ -99,12 +99,12 @@ func checkBidirectionalLaneConnectivity(
 		feeQuoterOnSrc, err := fee_quoter.NewFeeQuoter(common.BytesToAddress(feeQuoterOnSrcAddr), e.BlockChains.EVMChains()[lane.Source.Selector].Client)
 		require.NoError(t, err, "must instantiate feeQuoter")
 
-		routerOnSrcAddr, err := srcAdapter.GetRouterAddress(e.DataStore, lane.Source.Selector, false)
+		routerOnSrcAddr, err := srcAdapter.GetRouterAddress(e.DataStore, lane.Source.Selector)
 		require.NoError(t, err, "must get router from srcAdapter")
 		routerOnSrc, err := router.NewRouter(common.BytesToAddress(routerOnSrcAddr), e.BlockChains.EVMChains()[lane.Source.Selector].Client)
 		require.NoError(t, err, "must instantiate router")
 
-		routerOnDestAddr, err := destAdapter.GetRouterAddress(e.DataStore, lane.Dest.Selector, false)
+		routerOnDestAddr, err := destAdapter.GetRouterAddress(e.DataStore, lane.Dest.Selector)
 		require.NoError(t, err, "must get router from destAdapter")
 		routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[lane.Dest.Selector].Client)
 		require.NoError(t, err, "must instantiate router")
