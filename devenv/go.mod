@@ -20,9 +20,9 @@ replace (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260312130858-48d184a42678
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20260312130858-48d184a42678
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260318122157-2016166973e4
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260318142809-6d01aa31fbff
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20260318142809-6d01aa31fbff
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260318142809-6d01aa31fbff
 )
 
 require (
@@ -42,7 +42,7 @@ require (
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260318122157-2016166973e4
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260318142809-6d01aa31fbff
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260116092715-df6a64d4bf00
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
