@@ -40,7 +40,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			}
 
 		} else {
-			result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+			result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
 				Address:       common.BytesToAddress(input.Source.FeeQuoter),
 				ChainSelector: input.Source.Selector,
 				UpdatesByChain: []fqops.DestChainConfigArgs{
