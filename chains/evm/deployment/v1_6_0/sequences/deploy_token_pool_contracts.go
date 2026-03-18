@@ -50,14 +50,16 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		writes := make([]contract.WriteOutput, 0)
 		chain := chains.EVMChains()[input.ChainSelector]
 
-		tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-			ChainSelector: input.ChainSelector,
-			Type:          datastore.ContractType(input.PoolType),
-			Qualifier:     input.TokenPoolQualifier,
-		}, input.ChainSelector, datastore_utils.FullRef)
-		if err == nil {
-			b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
-			return sequences.OnChainOutput{}, nil
+		if input.TokenPoolQualifier != "" {
+			tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: input.ChainSelector,
+				Type:          datastore.ContractType(input.PoolType),
+				Qualifier:     input.TokenPoolQualifier,
+			}, input.ChainSelector, datastore_utils.FullRef)
+			if err == nil {
+				b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
+				return sequences.OnChainOutput{}, nil
+			}
 		}
 		var tokenAddr string
 		if input.TokenRef != nil && input.TokenRef.Address != "" {
