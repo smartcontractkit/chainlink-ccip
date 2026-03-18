@@ -56,11 +56,12 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 				require.NoError(t, err)
 
 				msg, err := lane.src.BuildMessage(testadapters.MessageComponents{
-					Receiver:     receiver,
-					Data:         []byte("hello eoa"),
-					FeeToken:     "",
-					ExtraArgs:    extraArgs,
-					TokenAmounts: nil,
+					Receiver:          receiver,
+					Data:              []byte("hello eoa"),
+					FeeToken:          "",
+					ExtraArgs:         extraArgs,
+					TokenAmounts:      nil,
+					DestChainSelector: lane.dest.ChainSelector(),
 				})
 				require.NoError(t, err)
 
@@ -73,29 +74,26 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 			},
 		},
 		{
-			// WIP: message with not enough gas
-			// then manual re-exec with higher limit
 			"not enough gas; manual re-exec",
 			[]chainPair{
-				{evmAdapter, tonAdapter},
+				{tonAdapter, evmAdapter},
+				// {evmAdapter, tonAdapter}, // faulty receiver implmenetation
 			},
 			func(t *testing.T, lane chainPair) {
-				t.Skip("faulty receiver implmenetation")
 				receiver := lane.dest.CCIPReceiver()
 
 				extraArgs, err := lane.dest.GetExtraArgs(receiver, lane.src.Family(), testadapters.NewGasLimitExtraArg(lane.dest.LowGasLimit()))
 				require.NoError(t, err)
 
 				msg, err := lane.src.BuildMessage(testadapters.MessageComponents{
-					Receiver:  receiver,
-					Data:      []byte("hello world"),
-					ExtraArgs: extraArgs,
+					Receiver:          receiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+					DestChainSelector: lane.dest.ChainSelector(),
 				})
 				require.NoError(t, err)
 
-				_, msgID := sendMsgRequireError(t, lane.src, lane.dest, msg)
-
-				// I am not sure if we can grab seq when SendMessage fails.
+				_, msgID := sendMsgRequireErrorOnDestChain(t, lane.src, lane.dest, msg)
 
 				waitForUserAction(t, fmt.Sprintf("Check that message was received but is on \"Manual Exec\". Execute manually with higher gas limit TODO and press ENTER\n%s", msgInfo(msgID)))
 			},
@@ -126,15 +124,14 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 				require.NoError(t, err)
 
 				msg, err := lane.src.BuildMessage(testadapters.MessageComponents{
-					Receiver:  receiver,
-					Data:      []byte("hello world"),
-					ExtraArgs: extraArgs,
+					Receiver:          receiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+					DestChainSelector: lane.dest.ChainSelector(),
 				})
 				require.NoError(t, err)
 
-				seqNr, msgID := sendMsgRequireError(t, lane.src, lane.dest, msg)
-
-				// I am not sure if we can grab seq when SendMessage fails.
+				seqNr, msgID := sendMsgRequireErrorOnDestChain(t, lane.src, lane.dest, msg)
 
 				setReceiverRejectAll(false)
 
@@ -157,7 +154,6 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 	for _, tc := range testCases {
 		for _, lane := range tc.lanes {
 			laneTag := fmt.Sprintf("%s->%s", lane.src.Family(), lane.dest.Family())
-			t.Logf("RUNNING TEST: %s", laneTag)
 			t.Run(fmt.Sprintf("%s:%s", laneTag, tc.name), func(t *testing.T) {
 				tc.testFunc(t, lane)
 			})
@@ -194,4 +190,20 @@ func ccipExplorer(msgID string) string {
 func urlFmt(format string, a ...any) string {
 	url := fmt.Sprintf(format, a...)
 	return fmt.Sprintf("%s%s%s", BLUE, url, RESET)
+}
+
+func sendMsgRequireErrorOnDestChain(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) (uint64, string) {
+	t.Helper()
+	startBlock := toImpl.CurrentBlock(t) + 1
+	seqNr, messageID, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+	require.NoError(t, err, "sendMsgRequireErrorOnDestChain failed to send message")
+	t.Logf("sendMsgRequireErrorOnDestChain got messageID: %s", messageID)
+	if err == nil {
+		require.NoError(t, err)
+		seqNrUint := ccipocr3.SeqNum(seqNr)
+		seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
+		toImpl.ValidateCommit(t, fromImpl.ChainSelector(), &startBlock, seqNumRange)
+		toImpl.ValidateExecFails(t, fromImpl.ChainSelector(), &startBlock, []uint64{seqNr})
+	}
+	return seqNr, messageID
 }
