@@ -21,7 +21,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] requiredCCVs,
     address[] optionalCCVs,
     uint8 optionalThreshold,
-    bool requireFinality
+    bool allowFasterThanFinality
   );
 
   /// @notice CCV configuration for a source chain.
@@ -31,7 +31,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] requiredCCVs;
     address[] optionalCCVs;
     uint8 optionalThreshold;
-    bool requireFinality;
+    bool allowFasterThanFinality;
   }
 
   /// @notice Arguments required to add a CCV configuration for a source chain.
@@ -40,7 +40,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] optionalCCVs;
     uint64 sourceChainSelector;
     uint8 optionalThreshold;
-    bool requireFinality;
+    bool allowFasterThanFinality;
   }
 
   /// @notice CCV configurations by source chain selector.
@@ -92,10 +92,14 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
         requiredCCVs: args.requiredCCVs,
         optionalCCVs: args.optionalCCVs,
         optionalThreshold: args.optionalThreshold,
-        requireFinality: args.requireFinality
+        allowFasterThanFinality: args.allowFasterThanFinality
       });
       emit CCVConfigSet(
-        args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold, args.requireFinality
+        args.sourceChainSelector,
+        args.requiredCCVs,
+        args.optionalCCVs,
+        args.optionalThreshold,
+        args.allowFasterThanFinality
       );
     }
   }
@@ -120,10 +124,10 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
-    // If requireFinality is true, minBlockConfirmations = 0 (require finality).
-    // If requireFinality is false, minBlockConfirmations = 1 (allow any FTF level) - WARNING only use a finality of 1 when
+    // If allowFasterThanFinality is true, minBlockConfirmations = 1 (allow any FTF level) - WARNING only use a finality of 1 when
     // you use a trusted sender on the source chain that manages the finality risk when sending messages.
-    minBlockConfirmations = config.requireFinality ? 0 : 1;
+    // If allowFasterThanFinality is false, minBlockConfirmations = 0 (require finality).
+    minBlockConfirmations = config.allowFasterThanFinality ? 1 : 0;
     return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, minBlockConfirmations);
   }
 }
