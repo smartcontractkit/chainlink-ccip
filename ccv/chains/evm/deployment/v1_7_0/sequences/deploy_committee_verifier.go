@@ -6,8 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -87,14 +87,14 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			desiredAllowlistAdmin = input.Params.AllowlistAdmin
 		}
 		if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator || desiredAllowlistAdmin != dynamicConfigReport.Output.AllowlistAdmin {
-		setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.DynamicConfig]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
-			Args: committee_verifier.DynamicConfig{
-				AllowlistAdmin: desiredAllowlistAdmin,
-				FeeAggregator:  desiredFeeAggregator,
-			},
-		})
+			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.DynamicConfig]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(committeeVerifierRef.Address),
+				Args: committee_verifier.DynamicConfig{
+					AllowlistAdmin: desiredAllowlistAdmin,
+					FeeAggregator:  desiredFeeAggregator,
+				},
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on CommitteeVerifier: %w", err)
 			}

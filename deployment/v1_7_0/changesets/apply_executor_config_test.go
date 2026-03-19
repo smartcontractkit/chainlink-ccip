@@ -408,7 +408,7 @@ func extractExecutorConfig(t *testing.T, jobSpec string) string {
 	return jobSpec[start:end]
 }
 
-func TestApplyExecutorConfig_PerChainNOPsOnlyIncludesAssignedChains(t *testing.T) {
+func TestApplyExecutorConfig_PerChainNOPsIncludesAllChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 	sel3 := chainsel.TEST_90000003.Selector
@@ -450,12 +450,12 @@ func TestApplyExecutorConfig_PerChainNOPsOnlyIncludesAssignedChains(t *testing.T
 	require.NoError(t, err)
 
 	exec1Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec1", "pool1")
-	assert.ElementsMatch(t, []string{sel1Str, sel2Str}, exec1Chains,
-		"exec1 should only have chains where it is in the pool")
+	assert.ElementsMatch(t, []string{sel1Str, sel2Str, sel3Str}, exec1Chains,
+		"exec1 should have all chains when listed on all chain configs")
 
 	exec2Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec2", "pool1")
-	assert.ElementsMatch(t, []string{sel2Str, sel3Str}, exec2Chains,
-		"exec2 should only have chains where it is in the pool")
+	assert.ElementsMatch(t, []string{sel2Str, sel3Str, sel1Str}, exec2Chains,
+		"exec2 should have all chains when listed on all chain configs")
 }
 
 func TestApplyExecutorConfig_AllChainsNOPsGetAllChains(t *testing.T) {
