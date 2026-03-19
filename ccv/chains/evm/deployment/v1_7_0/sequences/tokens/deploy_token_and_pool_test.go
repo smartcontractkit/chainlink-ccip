@@ -20,12 +20,12 @@ import (
 	token_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 )
 
 var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
@@ -128,9 +128,9 @@ func TestDeployTokenAndPool(t *testing.T) {
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSel,
-					ContractParams: testsetup.CreateBasicContractParams(),
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					ChainSelector:    chainSel,
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 					DeployerKeyOwned: true,
 				},
 			)

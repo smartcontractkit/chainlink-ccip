@@ -18,6 +18,6 @@ func init() {
 		CurseSubjectAdapter: NewCurseAdapter(),
 	})
 	laneMigratorRegistry := deploy.GetLaneMigratorRegistry()
-	laneMigratorRegistry.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &LaneMigrater{})
+	laneMigratorRegistry.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &LaneMigrator{})
 	laneMigratorRegistry.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2_0.RouterUpdater{})
 }

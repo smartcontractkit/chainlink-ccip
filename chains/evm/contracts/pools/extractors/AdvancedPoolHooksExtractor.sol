@@ -10,7 +10,7 @@ import {Pool} from "../../libraries/Pool.sol";
 /// @notice Extracts named parameters from AdvancedPoolHooks preflightCheck and postflightCheck calldata
 /// for ACE policy evaluation.
 contract AdvancedPoolHooksExtractor is IExtractor {
-  string public constant override typeAndVersion = "AdvancedPoolHooksExtractor 2.0.0-dev";
+  string public constant override typeAndVersion = "AdvancedPoolHooksExtractor 2.0.0";
 
   /// @notice Parameter key for the sender address initiating the transfer.
   bytes32 public constant PARAM_FROM = keccak256("from");
