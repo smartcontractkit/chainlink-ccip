@@ -33,9 +33,10 @@ import (
 )
 
 const (
-	LinkFeeMultiplierPercent      uint8  = 90
-	NetworkFeeUSDCents            uint16 = 10
-	destChainConfigUpdateBatchLen        = 8
+	LinkFeeMultiplierPercent             uint8  = 90
+	NetworkFeeUSDCents                   uint16 = 10
+	destChainConfigUpdateBatchLen               = 8
+	tokenTransferFeeConfigUpdateBatchLen        = 5
 )
 
 var (
@@ -85,21 +86,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-			var destChainConfigBatches [][]fqops.DestChainConfigArgs
-			// check the destchain configs in constructor args, if it needs batching, we send batch 1
-			// in constructor args, and then rest of the batches in ApplyDestChainConfigUpdates,
-			// this is to make sure that if there are a lot of dest chain configs to be updated, we don't run into block gas limit issue
-			if len(input.ConstructorArgs.DestChainConfigArgs) > 0 {
-				destChainConfigBatches = batchedDestChainConfigArgs(input.ConstructorArgs.DestChainConfigArgs)
-				if len(destChainConfigBatches) > 1 {
-					input.ConstructorArgs.DestChainConfigArgs = destChainConfigBatches[0]
-					destChainConfigBatches = destChainConfigBatches[1:]
-				}
-			}
-			if len(input.DestChainConfigs) > 0 {
-				batches := batchedDestChainConfigArgs(input.DestChainConfigs)
-				destChainConfigBatches = append(destChainConfigBatches, batches...)
-			}
+			destChainConfigBatches, tokenTransferFeeConfigBatches := batchedInputForSequenceFeeQuoterUpdate(&input)
 			// deploy fee quoter or fetch existing fee quoter address
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
@@ -150,15 +137,41 @@ var (
 				}
 				writes = append(writes, feeQuoterUpdatePricesReport.Output)
 			}
-			// TokenTransferFeeConfigUpdates on FeeQuoter
-			if len(input.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs) > 0 ||
-				len(input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs) > 0 {
+			defaultFeeConfigApplied := false
+			for _, batch := range tokenTransferFeeConfigBatches {
+				// we consider that TokensToUseDefaultFeeConfigs will not have a lot of entries, so we can apply them in the first batch
+				defaultFeeConfig := make([]fqops.TokenTransferFeeConfigRemoveArgs, 0)
+				if !defaultFeeConfigApplied {
+					defaultFeeConfig = input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs
+					defaultFeeConfigApplied = true
+				}
 				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
 					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
 						ChainSelector: chain.Selector,
 						Address:       fqAddr,
-						Args:          input.TokenTransferFeeConfigUpdates,
+						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+							TokenTransferFeeConfigArgs:   batch,
+							TokensToUseDefaultFeeConfigs: defaultFeeConfig,
+						},
+					})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee "+
+						"config updates to FeeQuoter(%s) on chain %s: %w", fqAddr.Hex(), chain, err)
+				}
+				writes = append(writes, feeQuoterTokenTransferFeeConfigReport.Output)
+			}
+
+			// in case there are still TokensToUseDefaultFeeConfigs that are not applied because they are not included in the batches, we apply them here
+			if len(input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs) > 0 && !defaultFeeConfigApplied {
+				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
+					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
+					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
+						ChainSelector: chain.Selector,
+						Address:       fqAddr,
+						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+							TokensToUseDefaultFeeConfigs: input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
+						},
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee "+
@@ -739,4 +752,51 @@ func batchedDestChainConfigArgs(destChainConfigs []fqops.DestChainConfigArgs) []
 		batches = append(batches, destChainConfigs[i:end])
 	}
 	return batches
+}
+
+func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigArgs) [][]fqops.TokenTransferFeeConfigArgs {
+	var batches [][]fqops.TokenTransferFeeConfigArgs
+	if len(tokenTransferFeeConfigArgs) <= tokenTransferFeeConfigUpdateBatchLen {
+		return append(batches, tokenTransferFeeConfigArgs)
+	}
+	for i := 0; i < len(tokenTransferFeeConfigArgs); i += tokenTransferFeeConfigUpdateBatchLen {
+		end := i + tokenTransferFeeConfigUpdateBatchLen
+		if end > len(tokenTransferFeeConfigArgs) {
+			end = len(tokenTransferFeeConfigArgs)
+		}
+		batches = append(batches, tokenTransferFeeConfigArgs[i:end])
+	}
+	return batches
+}
+
+func batchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
+	destChainConfigBatches [][]fqops.DestChainConfigArgs,
+	tokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs,
+) {
+	// check the destchain configs in constructor args, if it needs batching, we send batch 1
+	// in constructor args, and then rest of the batches in ApplyDestChainConfigUpdates,
+	// this is to make sure that if there are a lot of dest chain configs to be updated, we don't run into block gas limit issue
+	if len(input.ConstructorArgs.DestChainConfigArgs) > 0 {
+		destChainConfigBatches = batchedDestChainConfigArgs(input.ConstructorArgs.DestChainConfigArgs)
+		if len(destChainConfigBatches) > 1 {
+			input.ConstructorArgs.DestChainConfigArgs = destChainConfigBatches[0]
+			destChainConfigBatches = destChainConfigBatches[1:]
+		}
+	}
+	if len(input.DestChainConfigs) > 0 {
+		batches := batchedDestChainConfigArgs(input.DestChainConfigs)
+		destChainConfigBatches = append(destChainConfigBatches, batches...)
+	}
+	if len(input.ConstructorArgs.TokenTransferFeeConfigArgs) > 0 {
+		tokenTransferFeeConfigBatches = batchedTokenTransferFeeConfigArgs(input.ConstructorArgs.TokenTransferFeeConfigArgs)
+		if len(tokenTransferFeeConfigBatches) > 1 {
+			input.ConstructorArgs.TokenTransferFeeConfigArgs = tokenTransferFeeConfigBatches[0]
+			tokenTransferFeeConfigBatches = tokenTransferFeeConfigBatches[1:]
+		}
+	}
+	if len(input.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs) > 0 {
+		newBatches := batchedTokenTransferFeeConfigArgs(input.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs)
+		tokenTransferFeeConfigBatches = append(tokenTransferFeeConfigBatches, newBatches...)
+	}
+	return destChainConfigBatches, tokenTransferFeeConfigBatches
 }
