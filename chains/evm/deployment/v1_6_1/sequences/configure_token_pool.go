@@ -33,7 +33,7 @@ type ConfigureTokenPoolInput struct {
 
 var ConfigureTokenPool = cldf_ops.NewSequence(
 	"configure-token-pool",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a token pool on an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]evm_contract.WriteOutput, 0)

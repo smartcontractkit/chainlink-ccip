@@ -197,7 +197,7 @@ func newTokenAdapterRegistry() *TokenAdapterRegistry {
 
 // RegisterTokenAdapter allows chains to register their changeset logic.
 // Configuration logic not only differs by chain family, but also by version.
-// For example, 1.7.0 token pools require CCV configuration, while earlier versions do not.
+// For example, 2.0.0 token pools require CCV configuration, while earlier versions do not.
 // 1.5.0 pools require remote pool addresses to be set, while earlier versions do not.
 // Thus each version of a token pool on a chain family should have its own adapter implementation.
 func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version *semver.Version, adapter TokenAdapter) {

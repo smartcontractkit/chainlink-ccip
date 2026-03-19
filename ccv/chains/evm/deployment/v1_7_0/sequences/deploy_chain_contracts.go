@@ -140,8 +140,8 @@ type DeployChainContractsInput struct {
 
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
-	semver.MustParse("1.7.0"),
-	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
+	semver.MustParse("2.0.0"),
+	"Deploys all required contracts for CCIP 2.0.0 to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
@@ -357,7 +357,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				},
 				PriceUpdaters: priceUpdaters,
 				// Skipped fields:
-				// - TokenPriceFeeds (will not be used in 1.7.0)
+				// - TokenPriceFeeds (will not be used in 2.0.0)
 				// - TokenTransferFeeConfigArgs (token+lane-specific config, set elsewhere)
 				// - DestChainConfigArgs (lane-specific config, set elsewhere)
 			},

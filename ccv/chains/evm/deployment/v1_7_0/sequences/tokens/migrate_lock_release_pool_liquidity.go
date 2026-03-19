@@ -28,7 +28,7 @@ import (
 
 var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 	"migrate-lock-release-pool-liquidity",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Migrates liquidity from a legacy LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
 		evmChain, ok := chains.EVMChains()[input.ChainSelector]

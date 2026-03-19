@@ -44,7 +44,7 @@ var (
 
 var DeployCCTPChain = cldf_ops.NewSequence(
 	"deploy-cctp-chain",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys & configures the CCTP contracts on a chain",
 	func(b cldf_ops.Bundle, dep adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
@@ -86,7 +86,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			addresses = append(addresses, cctpV1ProxyAddressRef)
 		}
 
-		// Deploy/resolve CCTPMessageTransmitterProxy (v1.7.0 op) for CCTPVerifier + CCTP V2 pool wiring.
+		// Deploy/resolve CCTPMessageTransmitterProxy (v2.0.0 op) for CCTPVerifier + CCTP V2 pool wiring.
 		cctpV2MessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
 			ChainSelector:  chain.Selector,
@@ -95,7 +95,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			},
 		}, existingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy v1.7.0: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy v2.0.0: %w", err)
 		}
 		addresses = append(addresses, cctpV2MessageTransmitterProxyRef)
 		cctpV2MessageTransmitterProxyAddress := common.HexToAddress(cctpV2MessageTransmitterProxyRef.Address)
@@ -475,7 +475,7 @@ func applyCCTPAuthorizedCallerWrites(
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPMessageTransmitterProxy v1.7.0: %w", err)
+		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPMessageTransmitterProxy v2.0.0: %w", err)
 	}
 	writes = append(writes, v2MsgTxReport.Output)
 

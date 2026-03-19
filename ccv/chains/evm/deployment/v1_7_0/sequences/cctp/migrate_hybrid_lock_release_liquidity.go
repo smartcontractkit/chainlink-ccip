@@ -23,7 +23,7 @@ import (
 
 var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
 	"migrate-hybrid-lock-release-liquidity",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Migrates a share of liquidity from HybridLockReleaseUSDCTokenPool into per-chain Siloed lockboxes",
 	func(b cldf_ops.Bundle, deps adapters.MigrateHybridLockReleaseLiquidityDeps, input adapters.MigrateHybridLockReleaseLiquidityInput) (output sequences.OnChainOutput, err error) {
 		chain, ok := deps.BlockChains.EVMChains()[input.ChainSelector]

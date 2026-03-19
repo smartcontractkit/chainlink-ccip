@@ -468,7 +468,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected := make(map[uint64]sequences.FeeQuoterUpdate)
 
 	// Chain 5009297550715157269: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
-	// Since no FeeQuoter v1.7.0 exists, it's a new deployment (ConstructorArgs populated)
+	// Since no FeeQuoter v2.0.0 exists, it's a new deployment (ConstructorArgs populated)
 	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
