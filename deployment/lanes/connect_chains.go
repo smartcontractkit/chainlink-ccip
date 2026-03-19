@@ -2,6 +2,7 @@ package lanes
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -153,6 +154,10 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if chainDef.GasPrice == nil {
 		chainDef.GasPrice = adapter.GetDefaultGasPrice()
 	}
+	if chainDef.TokenPrices == nil {
+		populateTokenPrices(ds, chainDef, adapter)
+	}
+
 	// handle v2 separately
 	return populateAddressesV2(ds, chainDef, adapter, version)
 }
@@ -225,4 +230,29 @@ func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adap
 	}
 	chainDef.DefaultOutboundCCVs = defaultOutboundCCVs
 	return nil
+}
+
+func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) {
+	var tokenPrices map[datastore.ContractType]*big.Int
+	// Check if adapter implements TokenPriceProvider (optional interface)
+	priceProvider, ok := adapter.(TokenPriceProvider)
+	if !ok {
+		return
+	}
+
+	// Get prices keyed by contract type
+	tokenPrices = priceProvider.GetDefaultTokenPrices()
+	if chainDef.TokenPrices == nil {
+		// Resolve contract types to addresses
+		addressPrices := make(map[string]*big.Int)
+		for contractType, price := range tokenPrices {
+			refs := ds.Addresses().Filter(
+				datastore.AddressRefByType(contractType),
+				datastore.AddressRefByChainSelector(chainDef.Selector),
+			)
+			for _, ref := range refs {
+				addressPrices[ref.Address] = price
+			}
+		}
+	}
 }
