@@ -270,19 +270,15 @@ var (
 						LinkToken:         fqOutput.StaticCfg.LinkToken,
 						MaxFeeJuelsPerMsg: fqOutput.StaticCfg.MaxFeeJuelsPerMsg,
 					},
-					PriceUpdaters:              fqOutput.PriceUpdaters,
-					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
-					DestChainConfigArgs:        allDestChainConfigs,
 				}
-			} else {
-				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
-					AddedCallers: fqOutput.PriceUpdaters,
-				}
-				output.TokenTransferFeeConfigUpdates = fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
-				}
-				output.DestChainConfigs = allDestChainConfigs
 			}
+			output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
+				AddedCallers: fqOutput.PriceUpdaters,
+			}
+			output.TokenTransferFeeConfigUpdates = fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+				TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
+			}
+			output.DestChainConfigs = allDestChainConfigs
 			return output, nil
 		})
 
@@ -409,16 +405,12 @@ var (
 						LinkToken:         staticCfg.LinkToken,
 						MaxFeeJuelsPerMsg: staticCfg.MaxFeeJuelsPerMsg,
 					},
-					DestChainConfigArgs:        destChainCfgs,
-					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgsForAll,
-					PriceUpdaters:              priceUpdaters,
 				}
-			} else {
-				output.DestChainConfigs = destChainCfgs
-				output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs = tokenTransferFeeConfigArgsForAll
-				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
-					AddedCallers: priceUpdaters,
-				}
+			}
+			output.DestChainConfigs = destChainCfgs
+			output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs = tokenTransferFeeConfigArgsForAll
+			output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
+				AddedCallers: priceUpdaters,
 			}
 			return output, nil
 		})
@@ -538,6 +530,9 @@ func mergePriceUpdaters(updaters1, updaters2 fqops.AuthorizedCallerArgs) fqops.A
 }
 
 func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.DestChainConfigArgs {
+	if len(cfgs1) == 0 {
+		return cfgs2
+	}
 	// Create a map of dest chain selectors from cfgs1
 	destChainMap := make(map[uint64]fqops.DestChainConfigArgs)
 	for _, cfg := range cfgs1 {
@@ -550,9 +545,6 @@ func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.Des
 			result = append(result, cfg)
 		}
 		// If it exists in both, cfgs1's value is already used (takes precedence)
-	}
-	if len(destChainMap) == 0 {
-		return nil
 	}
 	return result
 }

@@ -468,7 +468,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected := make(map[uint64]sequences.FeeQuoterUpdate)
 
 	// Chain 5009297550715157269: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
-	// Since no FeeQuoter v1.7.0 exists, it's a new deployment (ConstructorArgs populated)
+	// Since no FeeQuoter v2.0.0 exists, it's a new deployment (ConstructorArgs has StaticConfig only)
 	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
@@ -476,45 +476,49 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
-			PriceUpdaters: []common.Address{
+		},
+		AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AddedCallers: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
 				common.HexToAddress("0x2222222222222222222222222222222222222221"),
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
-				{
-					DestChainSelector: 15971525489660198786,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                8000,
-						MaxPerMsgGasLimit:           4000000,
-						DestGasOverhead:             80000,
-						DestGasPerPayloadByteBase:   14,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
-						DefaultTokenFeeUSDCents:     8,
-						DefaultTokenDestGasOverhead: 40000,
-						DefaultTxGasLimit:           180000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
-				},
-				{
-					DestChainSelector: 4949039107694359620,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                10000,
-						MaxPerMsgGasLimit:           5000000,
-						DestGasOverhead:             100000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
-						DefaultTokenFeeUSDCents:     0,
-						DefaultTokenDestGasOverhead: 0,
-						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
+		},
+		DestChainConfigs: []fqops.DestChainConfigArgs{
+			{
+				DestChainSelector: 15971525489660198786,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                8000,
+					MaxPerMsgGasLimit:           4000000,
+					DestGasOverhead:             80000,
+					DestGasPerPayloadByteBase:   14,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
+					DefaultTokenFeeUSDCents:     8,
+					DefaultTokenDestGasOverhead: 40000,
+					DefaultTxGasLimit:           180000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
 				},
 			},
+			{
+				DestChainSelector: 4949039107694359620,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                10000,
+					MaxPerMsgGasLimit:           5000000,
+					DestGasOverhead:             100000,
+					DestGasPerPayloadByteBase:   16,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
+					DefaultTokenFeeUSDCents:     0,
+					DefaultTokenDestGasOverhead: 0,
+					DefaultTxGasLimit:           200000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
+				},
+			},
+		},
+		TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
@@ -565,46 +569,50 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
-			PriceUpdaters: []common.Address{
+		},
+		AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AddedCallers: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
 				common.HexToAddress("0x3333333333333333333333333333333333333333"),
 				common.HexToAddress("0x9999999999999999999999999999999999999999"),
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
-				{
-					DestChainSelector: 15971525489660198786,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                8000,
-						MaxPerMsgGasLimit:           4000000,
-						DestGasOverhead:             80000,
-						DestGasPerPayloadByteBase:   14,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
-						DefaultTokenFeeUSDCents:     8,
-						DefaultTokenDestGasOverhead: 40000,
-						DefaultTxGasLimit:           180000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
-				},
-				{
-					DestChainSelector: 5009297550715157269,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                10000,
-						MaxPerMsgGasLimit:           5000000,
-						DestGasOverhead:             100000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
-						DefaultTokenFeeUSDCents:     0,
-						DefaultTokenDestGasOverhead: 0,
-						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
+		},
+		DestChainConfigs: []fqops.DestChainConfigArgs{
+			{
+				DestChainSelector: 15971525489660198786,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                8000,
+					MaxPerMsgGasLimit:           4000000,
+					DestGasOverhead:             80000,
+					DestGasPerPayloadByteBase:   14,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
+					DefaultTokenFeeUSDCents:     8,
+					DefaultTokenDestGasOverhead: 40000,
+					DefaultTxGasLimit:           180000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
 				},
 			},
+			{
+				DestChainSelector: 5009297550715157269,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                10000,
+					MaxPerMsgGasLimit:           5000000,
+					DestGasOverhead:             100000,
+					DestGasPerPayloadByteBase:   16,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
+					DefaultTokenFeeUSDCents:     0,
+					DefaultTokenDestGasOverhead: 0,
+					DefaultTxGasLimit:           200000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
+				},
+			},
+		},
+		TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
@@ -647,24 +655,26 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels159,
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
-				{
-					DestChainSelector: 5009297550715157269,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                10000,
-						MaxPerMsgGasLimit:           5000000,
-						DestGasOverhead:             100000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
-						DefaultTokenFeeUSDCents:     0,
-						DefaultTokenDestGasOverhead: 0,
-						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
+		},
+		DestChainConfigs: []fqops.DestChainConfigArgs{
+			{
+				DestChainSelector: 5009297550715157269,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                10000,
+					MaxPerMsgGasLimit:           5000000,
+					DestGasOverhead:             100000,
+					DestGasPerPayloadByteBase:   16,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
+					DefaultTokenFeeUSDCents:     0,
+					DefaultTokenDestGasOverhead: 0,
+					DefaultTxGasLimit:           200000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
 				},
 			},
+		},
+		TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 				{
 					DestChainSelector: 5009297550715157269,
@@ -690,7 +700,9 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 					},
 				},
 			},
-			PriceUpdaters: []common.Address{
+		},
+		AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AddedCallers: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 			},
 		},
@@ -704,61 +716,65 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
-			PriceUpdaters: []common.Address{
+		},
+		AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AddedCallers: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
 				common.HexToAddress("0x5555555555555555555555555555555555555551"),
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
-				{
-					DestChainSelector: 5009297550715157269,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                10000,
-						MaxPerMsgGasLimit:           5000000,
-						DestGasOverhead:             100000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
-						DefaultTokenFeeUSDCents:     10,
-						DefaultTokenDestGasOverhead: 50000,
-						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
-				},
-				{
-					DestChainSelector: 4949039107694359620,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                9000,
-						MaxPerMsgGasLimit:           4500000,
-						DestGasOverhead:             90000,
-						DestGasPerPayloadByteBase:   15,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
-						DefaultTokenFeeUSDCents:     9,
-						DefaultTokenDestGasOverhead: 45000,
-						DefaultTxGasLimit:           190000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
-				},
-				{
-					DestChainSelector: 15971525489660198786,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                8000,
-						MaxPerMsgGasLimit:           4000000,
-						DestGasOverhead:             80000,
-						DestGasPerPayloadByteBase:   14,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
-						DefaultTokenFeeUSDCents:     0,
-						DefaultTokenDestGasOverhead: 0,
-						DefaultTxGasLimit:           180000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
+		},
+		DestChainConfigs: []fqops.DestChainConfigArgs{
+			{
+				DestChainSelector: 5009297550715157269,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                10000,
+					MaxPerMsgGasLimit:           5000000,
+					DestGasOverhead:             100000,
+					DestGasPerPayloadByteBase:   16,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
+					DefaultTokenFeeUSDCents:     10,
+					DefaultTokenDestGasOverhead: 50000,
+					DefaultTxGasLimit:           200000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
 				},
 			},
+			{
+				DestChainSelector: 4949039107694359620,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                9000,
+					MaxPerMsgGasLimit:           4500000,
+					DestGasOverhead:             90000,
+					DestGasPerPayloadByteBase:   15,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
+					DefaultTokenFeeUSDCents:     9,
+					DefaultTokenDestGasOverhead: 45000,
+					DefaultTxGasLimit:           190000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
+				},
+			},
+			{
+				DestChainSelector: 15971525489660198786,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                8000,
+					MaxPerMsgGasLimit:           4000000,
+					DestGasOverhead:             80000,
+					DestGasPerPayloadByteBase:   14,
+					ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
+					DefaultTokenFeeUSDCents:     0,
+					DefaultTokenDestGasOverhead: 0,
+					DefaultTxGasLimit:           180000,
+					NetworkFeeUSDCents:          10,
+					LinkFeeMultiplierPercent:    90,
+				},
+			},
+		},
+		TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 				{
 					DestChainSelector:       5009297550715157269,
@@ -933,10 +949,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 					"DestChainSelector %d on chain %d", destChainCfg.DestChainSelector, chainSelector)
 			}
 		}
-		for _, cfg := range expected.ConstructorArgs.DestChainConfigArgs {
-			expectedDestChainConfigsMap[cfg.DestChainSelector] = cfg
-		}
-		require.Len(t, output.ConstructorArgs.DestChainConfigArgs, len(expectedDestChainConfigsMap),
+		require.Len(t, output.ConstructorArgs.DestChainConfigArgs, len(expected.ConstructorArgs.DestChainConfigArgs),
 			"Number of Constructor DestChainConfigArgs should match expected value for chain %d", chainSelector)
 
 		for _, destChainCfg := range output.ConstructorArgs.DestChainConfigArgs {
