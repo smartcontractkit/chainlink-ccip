@@ -19,13 +19,13 @@ import (
 	old_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	old_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
 
-	new_lrtp "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	new_lrtp "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 	latest_siloed "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/siloed_lock_release_token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -173,7 +173,7 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 	deployer := chain.DeployerKey.From
 
 	create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, evm_contract.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{deployer},
@@ -186,9 +186,9 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:  chainSel,
-			ContractParams: testsetup.CreateBasicContractParams(),
-			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ChainSelector:    chainSel,
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			DeployerKeyOwned: true,
 		},
 	)
@@ -601,7 +601,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	deployer := chain.DeployerKey.From
 
 	create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, evm_contract.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSel,
 		Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
 	}, nil)
@@ -610,9 +610,9 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	chainReport, err := operations.ExecuteSequence(
 		e.OperationsBundle, sequences.DeployChainContracts, chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:  chainSel,
-			ContractParams: testsetup.CreateBasicContractParams(),
-			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ChainSelector:    chainSel,
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			DeployerKeyOwned: true,
 		},
 	)

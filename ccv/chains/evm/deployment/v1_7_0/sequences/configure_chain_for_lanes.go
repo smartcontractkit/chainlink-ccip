@@ -15,16 +15,17 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/proxy"
 	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 )
 
@@ -178,20 +179,9 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		}
 
 		// Apply Router ramp updates (only when there are changes).
-		onRampAdds := make([]router.OnRamp, 0, 1)
-		onRampAddrReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(sourceRouter),
-			Args:          remoteSelector,
-		})
+		onRampAdds, err := MaybeAddRouterOnRampsAddsConfigArg(b, chain, input)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get on ramp for dest %d from Router(%s) on chain %s: %w", remoteSelector, sourceRouter, chain, err)
-		}
-		if onRampAddrReport.Output != common.HexToAddress(sourceOnRamp) {
-			onRampAdds = append(onRampAdds, router.OnRamp{
-				DestChainSelector: remoteSelector,
-				OnRamp:            common.HexToAddress(sourceOnRamp),
-			})
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to determine if Router(%s) on chain %s needs on ramp updates: %w", sourceRouter, chain.String(), err)
 		}
 		if len(onRampAdds) > 0 {
 			routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
@@ -379,6 +369,72 @@ func maybeAddSourceChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lane
 		offRampArgs = append(offRampArgs, desiredOffRampArg)
 	}
 	return offRampArgs, nil
+}
+
+func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput) ([]router.OnRamp, error) {
+	remoteSelector := input.Dest.Selector
+	sourceRouter := common.BytesToAddress(input.Source.Router).Hex()
+	sourceOnRamp := common.BytesToAddress(input.Source.OnRamp).Hex()
+	srcOnRampAddr := common.HexToAddress(sourceOnRamp)
+	if srcOnRampAddr == (common.Address{}) {
+		return nil, fmt.Errorf("source on ramp address is empty, cannot add on ramp config to router")
+	}
+	// Apply Router ramp updates (only when there are changes).
+	onRampAdds := make([]router.OnRamp, 0, 1)
+	onRampAddrReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
+		ChainSelector: chain.Selector,
+		Address:       common.HexToAddress(sourceRouter),
+		Args:          remoteSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get on ramp for dest %d from Router(%s) on chain %s: %w", remoteSelector, sourceRouter, chain, err)
+	}
+	// if the router is test Router and is not already set with the onRamp provided in input, we add it to router
+	// in case of prod router we will only add the onRamp if there is no existing onRamp present or
+	// the existing onRamp has an equal or greater version than the onRamp we want to add
+	// this is to avoid accidentally overwriting existing onRamp configs on prod routers,
+	// while allowing test routers to be easily configured with the desired onRamp.
+	// if there is a previous-versioned onramp already existing in router, it could imply that other deployed
+	// contracts like LBTC/USDC pools are not compatible with this new onramp,
+	// so we should not automatically add the new onramp to prod routers
+	// To add the new onramp , use migration related changeset to ensure all other dependent contracts are also updated to compatible versions
+	if input.TestRouter {
+		if onRampAddrReport.Output != srcOnRampAddr {
+			onRampAdds = append(onRampAdds, router.OnRamp{
+				DestChainSelector: remoteSelector,
+				OnRamp:            srcOnRampAddr,
+			})
+		}
+	} else {
+		if onRampAddrReport.Output == (common.Address{}) {
+			onRampAdds = append(onRampAdds, router.OnRamp{
+				DestChainSelector: remoteSelector,
+				OnRamp:            srcOnRampAddr,
+			})
+		} else {
+			_, version, err := utils.TypeAndVersion(onRampAddrReport.Output, chain.Client)
+			if err != nil {
+				return nil,
+					fmt.Errorf("failed to get version of existing onRamp at address %s "+
+						"for dest %d from Router(%s) on chain %s: %w", onRampAddrReport.Output.Hex(), remoteSelector, sourceRouter, chain, err)
+			}
+			if version.GreaterThanEqual(onramp.Version) || (onramp.Version.Major() == version.Major()) {
+				if onRampAddrReport.Output != srcOnRampAddr {
+					onRampAdds = append(onRampAdds, router.OnRamp{
+						DestChainSelector: remoteSelector,
+						OnRamp:            srcOnRampAddr,
+					})
+				}
+			} else {
+				b.Logger.Warnf("Existing onRamp at address %s for dest %d from Router(%s) on "+
+					"chain %s has version %s, which is lower than the version of the onRamp we want to add: %s. "+
+					"Skipping adding onRamp to router to avoid potential compatibility issues. "+
+					"If you want to add this onRamp, please run migration changeset.",
+					onRampAddrReport.Output.Hex(), remoteSelector, sourceRouter, chain.String(), version, onramp.Version)
+			}
+		}
+	}
+	return onRampAdds, nil
 }
 
 // maybeAddOnRampDestChainConfigArg fetches current OnRamp dest chain config, builds desired arg from input,

@@ -183,7 +183,7 @@ func discoverLINKFromFeeQuoter(e cldf_deployment.Environment, sel uint64, client
 	fqType := datastore.ContractType(fee_quoter_ops.ContractType)
 
 	// Search any FeeQuoter on this chain regardless of version.
-	// The v1.7.0 gobinding is ABI-compatible with v1.6.x for getStaticConfig().LinkToken.
+	// The v2.0.0 gobinding is ABI-compatible with v1.6.x for getStaticConfig().LinkToken.
 	fqRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(sel),
 		datastore.AddressRefByType(fqType),

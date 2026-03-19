@@ -86,7 +86,7 @@ EVM delegates MCMS deployment to the v1.0.0 implementation since MCMS contracts 
 | `GetOnRampAddress()` | Looks up OnRamp v1.6.0 from DataStore |
 | `GetOffRampAddress()` | Looks up OffRamp v1.6.0 from DataStore |
 | `GetRouterAddress()` | Looks up Router from DataStore |
-| `GetFQAddress()` | Looks up latest FeeQuoter (v1.6.0 -- v1.7.0 range) |
+| `GetFQAddress()` | Looks up latest FeeQuoter (v1.6.0 -- v2.0.0 range) |
 | `ConfigureLaneLegAsSource()` | OnRamp dest config + FeeQuoter dest config + price updates |
 | `ConfigureLaneLegAsDest()` | OffRamp source config + Router ramp updates |
 

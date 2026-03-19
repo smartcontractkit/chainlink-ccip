@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
-import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
 import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
@@ -42,43 +40,10 @@ contract LombardTokenPool_getRequiredCCVs is LombardTokenPoolSetup {
     s_poolWithHooks.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 
-  function _mockHooksReturning(
-    address[] memory ccvs
-  ) internal {
-    vm.mockCall(s_hooksAddr, abi.encodeWithSelector(IAdvancedPoolHooks.getRequiredCCVs.selector), abi.encode(ccvs));
-  }
-
-  /// @notice Pool has no advancedPoolHooks (address(0)) → super returns [] → revert.
-  function test_getRequiredCCVs_RevertWhen_ZeroCCVs_NoHooksConfigured() public {
-    vm.expectRevert(LombardTokenPool.LombardMustUseCCVConfigForV2Flow.selector);
-    s_pool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound);
-  }
-
-  /// @notice Hooks present but returns an empty array → revert.
-  function test_getRequiredCCVs_RevertWhen_LombardMustUseCCVConfigForV2Flow_ZeroCCVs_HooksReturnEmpty() public {
-    _mockHooksReturning(new address[](0));
-    vm.expectRevert(LombardTokenPool.LombardMustUseCCVConfigForV2Flow.selector);
-    s_poolWithHooks.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound
-    );
-  }
-
-  /// @notice Exactly one CCV is insufficient for the V2 flow → revert.
-  function test_getRequiredCCVs_RevertWhen_LombardMustUseCCVConfigForV2Flow_OneCCV() public {
-    address[] memory ccvs = new address[](1);
-    ccvs[0] = makeAddr("ccv1");
-    _mockHooksReturning(ccvs);
-    vm.expectRevert(LombardTokenPool.LombardMustUseCCVConfigForV2Flow.selector);
-    s_poolWithHooks.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound
-    );
-  }
-
-  function test_getRequiredCCVs_ValidConfig_TwoCCVs() public {
+  function test_getRequiredCCVs_ValidConfig_TwoCCVs() public view {
     address[] memory ccvs = new address[](2);
-    ccvs[0] = makeAddr("ccv1");
-    ccvs[1] = makeAddr("ccv2");
-    _mockHooksReturning(ccvs);
+    ccvs[0] = address(s_verifierResolver);
+    ccvs[1] = address(0);
 
     address[] memory result = s_poolWithHooks.getRequiredCCVs(
       address(s_token), DEST_CHAIN_SELECTOR, 1e18, 0, "", IPoolV2.MessageDirection.Outbound

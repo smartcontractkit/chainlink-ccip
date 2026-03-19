@@ -23,7 +23,7 @@ deployment/
 │   └── operations/      # Utilities for building operations
 │       ├── call/
 │       └── deployment/
-├── v1_7_0/              # CCIP 1.7.0 operations, sequences, & changesets
+├── v1_7_0/              # CCIP 2.0.0 operations, sequences, & changesets
 │   ├── changesets/
 │   ├── sequences/
 │   └── operations/
@@ -44,7 +44,7 @@ Gethwrapper methods map 1:1 with operations. Operations yield reports that enabl
 ```golang
 var ApplySourceChainConfigUpdates = contract.NewWrite(
 	"off-ramp:apply-source-chain-config-updates", // Operation name - contract:method
-	semver.MustParse("1.7.0"), // The contract version
+	semver.MustParse("2.0.0"), // The contract version
 	"Applies updates to source chain configurations on the OffRamp", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
 	offramp.OffRampABI, // Contract ABI - used to decode errors
@@ -62,7 +62,7 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(
 ```golang
 var GetStaticConfig = contract.NewRead(
 	"off-ramp:get-static-config", // Operation name - contract:method
-	semver.MustParse("1.7.0"), // The contract version
+	semver.MustParse("2.0.0"), // The contract version
 	"Reads the static config of the OffRamp", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
 	offramp.NewOffRamp, // Contract constructor from gethwrappers
@@ -77,7 +77,7 @@ var GetStaticConfig = contract.NewRead(
 ```golang
 var Deploy = contract.NewDeploy(
 	"off-ramp:deploy", // Operation name - contract:method
-	semver.MustParse("1.7.0"), // The contract version
+	semver.MustParse("2.0.0"), // The contract version
 	"Deploys the OffRamp contract", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
 	offramp.OffRampABI, // Contract ABI - used to decode errors

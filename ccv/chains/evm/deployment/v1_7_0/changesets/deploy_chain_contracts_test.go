@@ -117,7 +117,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 			mcmsRegistry := cs_core.GetRegistry()
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  5009297550715157269,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
@@ -128,9 +128,9 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel:       5009297550715157269,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					Params:         testsetup.CreateBasicContractParams(),
+					ChainSel:         5009297550715157269,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					Params:           testsetup.CreateBasicContractParams(),
 					DeployerKeyOwned: true,
 				},
 			})
@@ -159,7 +159,7 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  5009297550715157269,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
@@ -173,7 +173,7 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			Params:           testsetup.CreateBasicContractParams(),
 			DeployTestRouter: true,
-			DeployerKeyOwned:  true,
+			DeployerKeyOwned: true,
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")

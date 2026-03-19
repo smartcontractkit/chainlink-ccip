@@ -100,6 +100,18 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 	return addr, nil
 }
 
+func (a *EVMAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.TestRouterContractType),
+		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
 // GetDefaultTokenPrices returns default fee token prices for EVM chains.
 // Returns a map of contract type to USD price (18 decimals).
 // The caller resolves contract types to addresses using the datastore.
@@ -174,7 +186,7 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	// tooHighVersion := semver.MustParse("1.7.0") -- to unblock prod-testnet, skip the upper bound of the check
+	// tooHighVersion := semver.MustParse("2.0.0") -- to unblock prod-testnet, skip the upper bound of the check
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version

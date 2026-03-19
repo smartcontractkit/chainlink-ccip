@@ -5,8 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -19,10 +19,10 @@ import (
 
 var _ tokens.TokenAdapter = &TokenAdapter{}
 
-// TokenAdapter is the adapter for EVM tokens using 1.7.0 token pools.
+// TokenAdapter is the adapter for EVM tokens using 2.0.0 token pools.
 type TokenAdapter struct{}
 
-// ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 1.7.0 token pool.
+// ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 2.0.0 token pool.
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *operations.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.ConfigureTokenForTransfers
 }
