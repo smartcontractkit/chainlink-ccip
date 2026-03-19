@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {Executor} from "../../../executor/Executor.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract ExecutorSetup is BaseTest {
   address internal constant INITIAL_CCV = address(121212);

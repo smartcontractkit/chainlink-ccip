@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BaseERC20} from "../tmp/BaseERC20.sol";
+import {BaseERC20} from "../tokens/BaseERC20.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";

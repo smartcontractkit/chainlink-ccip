@@ -8,8 +8,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {ERC20LockBox} from "./pools/ERC20LockBox.sol";
 import {TokenPool} from "./pools/TokenPool.sol";
-import {CrossChainToken} from "./tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "./tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {CrossChainToken} from "./tokens/CrossChainToken.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";

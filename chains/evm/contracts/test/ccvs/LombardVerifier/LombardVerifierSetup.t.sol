@@ -12,8 +12,8 @@ import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract LombardVerifierSetup is BaseVerifierSetup {
   bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));

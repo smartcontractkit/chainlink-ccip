@@ -6,8 +6,8 @@ import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_AddToken() public {

@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
-import {BaseERC20} from "../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {BaseERC20} from "../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../tokens/CrossChainToken.sol";
 import {TokenAdminRegistrySetup} from "../tokenAdminRegistry/TokenAdminRegistry/TokenAdminRegistrySetup.t.sol";
 
 contract TokenPoolFactorySetup is TokenAdminRegistrySetup {

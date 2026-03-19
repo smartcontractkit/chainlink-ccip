@@ -11,9 +11,9 @@ import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {BaseERC20} from "../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {BaseERC20} from "../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../tokens/CrossChainToken.sol";
 import {e2e} from "./e2e.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 

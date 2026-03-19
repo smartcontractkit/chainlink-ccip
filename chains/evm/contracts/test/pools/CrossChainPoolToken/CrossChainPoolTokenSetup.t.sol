@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CrossChainPoolToken} from "../../../pools/CrossChainPoolToken.sol";
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 
 contract CrossChainPoolTokenSetup is TokenPoolSetup {

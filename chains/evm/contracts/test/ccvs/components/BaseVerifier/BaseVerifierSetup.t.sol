@@ -5,8 +5,8 @@ import {IRouter} from "../../../../interfaces/IRouter.sol";
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../../libraries/MessageV1Codec.sol";
-import {BaseERC20} from "../../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../../tokens/CrossChainToken.sol";
 import {FeeQuoterSetup} from "../../../feeQuoter/FeeQuoterSetup.t.sol";
 import {BaseVerifierTestHelper} from "../../../helpers/BaseVerifierTestHelper.sol";
 

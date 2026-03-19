@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
 import {BaseERC20Setup} from "./BaseERC20Setup.t.sol";
 
 contract BaseERC20_transfer is BaseERC20Setup {

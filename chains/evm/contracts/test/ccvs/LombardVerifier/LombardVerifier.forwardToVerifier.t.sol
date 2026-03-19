@@ -10,8 +10,8 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   bytes32 internal constant REMOTE_ADAPTER = bytes32("REMOTE_ADAPTER");

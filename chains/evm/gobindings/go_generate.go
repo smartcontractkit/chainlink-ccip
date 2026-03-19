@@ -9,7 +9,6 @@ package ccip
 //go:generate go run ./wrap ccip LombardVerifier lombard_verifier
 //go:generate go run ./wrap ccip VersionedVerifierResolver versioned_verifier_resolver
 //go:generate go run ./wrap ccip Executor executor
-
 //go:generate go run ./wrap ccip Router router
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
@@ -18,17 +17,17 @@ package ccip
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
+//go:generate go run ./wrap ccip CrossChainToken cross_chain_token
+//go:generate go run ./wrap ccip BaseERC20 base_erc20
 
 // Pools
 //go:generate go run ./wrap ccip TokenPool token_pool
 //go:generate go run ./wrap ccip AdvancedPoolHooks advanced_pool_hooks
 //go:generate go run ./wrap ccip AdvancedPoolHooksExtractor advanced_pool_hooks_extractor
-
 //go:generate go run ./wrap ccip BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ./wrap ccip BurnFromMintTokenPool burn_from_mint_token_pool
 //go:generate go run ./wrap ccip BurnWithFromMintTokenPool burn_with_from_mint_token_pool
 //go:generate go run ./wrap ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool
-
 //go:generate go run ./wrap ccip LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./wrap ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool
 //go:generate go run ./wrap ccip ERC20LockBox erc20_lock_box
@@ -38,6 +37,7 @@ package ccip
 //go:generate go run ./wrap ccip SiloedUSDCTokenPool siloed_usdc_token_pool
 //go:generate go run ./wrap ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool
 //go:generate go run ./wrap ccip LombardTokenPool lombard_token_pool
+//go:generate go run ./wrap ccip CrossChainPoolToken cross_chain_pool_token
 
 // Helpers
 //go:generate go run ./wrap ccip MaybeRevertMessageReceiver maybe_revert_message_receiver

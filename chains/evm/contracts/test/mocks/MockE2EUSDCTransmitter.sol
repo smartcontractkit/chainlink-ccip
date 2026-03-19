@@ -18,7 +18,7 @@ pragma solidity ^0.8.24;
 
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 
-import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
+import {CrossChainToken} from "../../tokens/CrossChainToken.sol";
 
 // solhint-disable
 contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {

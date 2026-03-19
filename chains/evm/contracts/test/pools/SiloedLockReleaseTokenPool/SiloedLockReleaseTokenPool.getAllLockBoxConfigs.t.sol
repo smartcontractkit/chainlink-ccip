@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
