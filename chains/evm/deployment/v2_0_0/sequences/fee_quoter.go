@@ -33,8 +33,9 @@ import (
 )
 
 const (
-	LinkFeeMultiplierPercent uint8  = 90
-	NetworkFeeUSDCents       uint16 = 10
+	LinkFeeMultiplierPercent      uint8  = 90
+	NetworkFeeUSDCents            uint16 = 10
+	destChainConfigUpdateBatchLen        = 8
 )
 
 var (
@@ -84,7 +85,21 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-
+			var destChainConfigBatches [][]fqops.DestChainConfigArgs
+			// check the destchain configs in constructor args, if it needs batching, we send batch 1
+			// in constructor args, and then rest of the batches in ApplyDestChainConfigUpdates,
+			// this is to make sure that if there are a lot of dest chain configs to be updated, we don't run into block gas limit issue
+			if len(input.ConstructorArgs.DestChainConfigArgs) > 0 {
+				destChainConfigBatches = batchedDestChainConfigArgs(input.ConstructorArgs.DestChainConfigArgs)
+				if len(destChainConfigBatches) > 1 {
+					input.ConstructorArgs.DestChainConfigArgs = destChainConfigBatches[0]
+					destChainConfigBatches = destChainConfigBatches[1:]
+				}
+			}
+			if len(input.DestChainConfigs) > 0 {
+				batches := batchedDestChainConfigArgs(input.DestChainConfigs)
+				destChainConfigBatches = append(destChainConfigBatches, batches...)
+			}
 			// deploy fee quoter or fetch existing fee quoter address
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
@@ -103,13 +118,13 @@ var (
 			output.Addresses = append(output.Addresses, feeQuoterRef)
 			fqAddr := common.HexToAddress(feeQuoterRef.Address)
 			// ApplyDestChainConfigUpdates on FeeQuoter
-			if len(input.DestChainConfigs) > 0 {
+			for _, batch := range destChainConfigBatches {
 				feeQuoterReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyDestChainConfigUpdates, chain,
 					contract.FunctionInput[[]fqops.DestChainConfigArgs]{
 						ChainSelector: chain.Selector,
 						Address:       fqAddr,
-						Args:          input.DestChainConfigs,
+						Args:          batch,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain "+
@@ -117,6 +132,7 @@ var (
 				}
 				writes = append(writes, feeQuoterReport.Output)
 			}
+
 			// update price
 			if len(input.PriceUpdates.GasPriceUpdates) > 0 || len(input.PriceUpdates.TokenPriceUpdates) > 0 {
 				feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(
@@ -142,10 +158,7 @@ var (
 					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
 						ChainSelector: chain.Selector,
 						Address:       fqAddr,
-						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-							TokenTransferFeeConfigArgs:   input.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs,
-							TokensToUseDefaultFeeConfigs: input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
-						},
+						Args:          input.TokenTransferFeeConfigUpdates,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee "+
@@ -711,4 +724,19 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 		UsdPerUnitGas:     staticPrice,
 	})
 	return output, nil
+}
+
+func batchedDestChainConfigArgs(destChainConfigs []fqops.DestChainConfigArgs) [][]fqops.DestChainConfigArgs {
+	var batches [][]fqops.DestChainConfigArgs
+	if len(destChainConfigs) <= destChainConfigUpdateBatchLen {
+		return append(batches, destChainConfigs)
+	}
+	for i := 0; i < len(destChainConfigs); i += destChainConfigUpdateBatchLen {
+		end := i + destChainConfigUpdateBatchLen
+		if end > len(destChainConfigs) {
+			end = len(destChainConfigs)
+		}
+		batches = append(batches, destChainConfigs[i:end])
+	}
+	return batches
 }
