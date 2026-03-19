@@ -683,6 +683,15 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 	)
 	e.OperationsBundle = bundle
 
+	c1Ov := lanesapi.FeeQuoterDestChainConfigOverride(func(cfg *lanesapi.FeeQuoterDestChainConfig) {
+		cfg.V2Params = lanesapi.DefaultFeeQuoterDestChainConfig(true, chain2.Selector).V2Params
+	})
+	c2Ov := lanesapi.FeeQuoterDestChainConfigOverride(func(cfg *lanesapi.FeeQuoterDestChainConfig) {
+		cfg.V2Params = lanesapi.DefaultFeeQuoterDestChainConfig(true, chain1.Selector).V2Params
+	})
+	chain1.FeeQuoterDestChainConfigOverrides = &c1Ov
+	chain2.FeeQuoterDestChainConfigOverrides = &c2Ov
+
 	// Run ConnectChains again (lane expansion / configure-as-source with 2.0 FeeQuoter).
 	connectOut2, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
