@@ -144,6 +144,8 @@ var (
 				if !defaultFeeConfigApplied {
 					defaultFeeConfig = input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs
 					defaultFeeConfigApplied = true
+				} else {
+					defaultFeeConfig = make([]fqops.TokenTransferFeeConfigRemoveArgs, 0)
 				}
 				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
