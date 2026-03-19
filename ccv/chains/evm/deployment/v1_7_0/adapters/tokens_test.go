@@ -63,7 +63,6 @@ func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, 
 func TestTokenAdapter(t *testing.T) {
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("2.0.0"), &adapters.TokenAdapter{})
-	tokenAdapterRegistry.RegisterTokenAdapter("evm", burn_mint_token_pool.Version, &adapters.TokenAdapter{})
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
 
 	tests := []struct {
