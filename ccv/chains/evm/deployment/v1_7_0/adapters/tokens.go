@@ -19,10 +19,10 @@ import (
 
 var _ tokens.TokenAdapter = &TokenAdapter{}
 
-// TokenAdapter is the adapter for EVM tokens using 1.7.0 token pools.
+// TokenAdapter is the adapter for EVM tokens using 2.0.0 token pools.
 type TokenAdapter struct{}
 
-// ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 1.7.0 token pool.
+// ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 2.0.0 token pool.
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *operations.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.ConfigureTokenForTransfers
 }

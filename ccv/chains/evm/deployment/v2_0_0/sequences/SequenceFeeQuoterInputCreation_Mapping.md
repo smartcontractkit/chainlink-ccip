@@ -3,10 +3,10 @@
 ## From v1.6.0 (`CreateFeeQuoterUpdateInputFromV160`)
 
 **Source Contract**: FeeQuoter v1.6.3  
-**Target Contract**: FeeQuoter v1.7.0
+**Target Contract**: FeeQuoter v2.0.0
 
 ### Field Mapping
-| Target Field (FeeQuoter v1.7.0) | Source Field (FeeQuoter v1.6.3) | Notes |
+| Target Field (FeeQuoter v2.0.0) | Source Field (FeeQuoter v1.6.3) | Notes |
 |----------------------------------|----------------------------------|-------|
 | `ConstructorArgs.StaticConfig.LinkToken` | `StaticCfg.LinkToken` | Direct copy |
 | `ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg` | `StaticCfg.MaxFeeJuelsPerMsg` | Direct copy |
@@ -30,10 +30,10 @@
 ## From v1.5.0 (`CreateFeeQuoterUpdateInputFromV150`)
 
 **Source Contract**: EVM2EVMOnRamp v1.5.0  
-**Target Contract**: FeeQuoter v1.7.0
+**Target Contract**: FeeQuoter v2.0.0
 
 ### Field Mapping
-| Target Field (FeeQuoter v1.7.0) | Source Field (EVM2EVMOnRamp v1.5.0) | Notes |
+| Target Field (FeeQuoter v2.0.0) | Source Field (EVM2EVMOnRamp v1.5.0) | Notes |
 |----------------------------------|--------------------------------------|-------|
 | `ConstructorArgs.StaticConfig.LinkToken` | `OnRampCfg.StaticConfig.LinkToken` | From first OnRamp (if empty) |
 | `ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg` | `OnRampCfg.StaticConfig.MaxNopFeesJuels` | From first OnRamp (if empty) |

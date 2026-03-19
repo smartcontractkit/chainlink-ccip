@@ -19,9 +19,9 @@ Token Pools will be migrated to this in the near future.
 - [#1134](https://github.com/smartcontractkit/chainlink-ccip/pull/1134) - **USDCTokenPoolProxy** - A versatile new dispatcher
 contract which allows USDC to be sent using different mechanisms based on the destination chain including CCTP V1, CCTP V2, and Lock/Mint.
 
-## 1.7.0 - UNRELEASED
+## 2.0.0 - UNRELEASED
 
-CCIP 1.7.0 is a major release that introduces various new concepts and improvements to the CCIP ecosystem.
+CCIP 2.0.0 is a major release that introduces various new concepts and improvements to the CCIP ecosystem.
 
 
 ### New Features

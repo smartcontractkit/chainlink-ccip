@@ -73,7 +73,7 @@ type activePoolImportedConfig struct {
 
 var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	"configure-token-pool-for-remote-chain",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {
@@ -396,8 +396,8 @@ func importConfigFromActivePool(
 		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
 	}
 	tav := typeAndVersionReport.Output
-	if tav.Version.GreaterThanEqual(semver.MustParse("1.7.0")) {
-		// Configuration import from another 1.7.0 pool is not currently supported
+	if tav.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+		// Configuration import from another 2.0.0 pool is not currently supported
 		return nil, nil
 	}
 	if tav.Version.LessThan(semver.MustParse("1.5.1")) {
@@ -681,7 +681,7 @@ func v163FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops_v163.TokenTransferFee
 	}
 }
 
-// v2FeeQuoterConfigToTokenTransferFeeConfig converts FeeQuoter 2.0 (1.7.0 onRamp path) token transfer fee config to tokens.TokenTransferFeeConfig.
+// v2FeeQuoterConfigToTokenTransferFeeConfig converts FeeQuoter 2.0 (2.0.0 onRamp path) token transfer fee config to tokens.TokenTransferFeeConfig.
 func v2FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
 	return &tokens.TokenTransferFeeConfig{
 		DestGasOverhead:               cfg.DestGasOverhead,

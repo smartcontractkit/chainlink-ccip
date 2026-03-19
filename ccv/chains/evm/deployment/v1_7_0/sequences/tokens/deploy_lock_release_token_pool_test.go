@@ -224,7 +224,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 
 			// Deploy CREATE2Factory first
 			create2FactoryRef, err := contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},

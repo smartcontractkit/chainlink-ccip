@@ -37,7 +37,7 @@ var (
 
 var DeployLombardChain = cldf_ops.NewSequence(
 	"deploy-lombard-chain",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the Lombard chain with all required contracts and configurations",
 	func(b cldf_ops.Bundle, dep adapters.DeployLombardChainDeps, input adapters.DeployLombardInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)

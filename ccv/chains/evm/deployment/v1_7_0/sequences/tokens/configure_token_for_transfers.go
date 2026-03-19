@@ -19,7 +19,7 @@ import (
 
 var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 	"configure-token-for-transfers",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a token on an EVM chain for usage with CCIP",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.ConfigureTokenForTransfersInput) (output sequences.OnChainOutput, err error) {
 		ops := make([]mcms_types.BatchOperation, 0)
