@@ -344,6 +344,7 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	input := tokenapi.DeployTokenPoolInput{
 		PoolType:           string(poolType),
 		TokenPoolVersion:   utils.Version_1_6_1,
+		TokenRef:           &ref,
 		ChainSelector:      chainSelector,
 		TokenPoolQualifier: tokenSymbol,
 		ExistingDataStore:  e.DataStore,
