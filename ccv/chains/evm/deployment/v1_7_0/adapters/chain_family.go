@@ -88,7 +88,7 @@ func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelec
 func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(router.ContractType),
+		Type:          datastore.ContractType(router.TestRouterContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {

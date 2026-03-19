@@ -153,8 +153,6 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 			if err != nil {
 				return fmt.Errorf("error fetching test router address for chain %d: %w", chainDef.Selector, err)
 			}
-		} else {
-			return fmt.Errorf("adapter for chain selector %d does not implement TestRouterProvider, cannot fetch test router address", chainDef.Selector)
 		}
 	}
 	chainDef.FeeQuoterDestChainConfig = adapter.GetFeeQuoterDestChainConfig()
