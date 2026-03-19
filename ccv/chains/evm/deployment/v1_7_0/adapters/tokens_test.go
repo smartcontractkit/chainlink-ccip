@@ -62,7 +62,7 @@ func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, 
 
 func TestTokenAdapter(t *testing.T) {
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
-	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("2.0.0"), &adapters.TokenAdapter{})
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", burn_mint_token_pool.Version, &adapters.TokenAdapter{})
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
 
@@ -96,7 +96,7 @@ func TestTokenAdapter(t *testing.T) {
 			ds := datastore.NewMemoryDataStore()
 			for _, chainSel := range []uint64{chainA, chainB} {
 				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 					ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
@@ -119,7 +119,7 @@ func TestTokenAdapter(t *testing.T) {
 
 				e.DataStore = ds.Seal()
 
-				// Deploy a 1.7.0 on chain A and a legacy 1.6.1 on chain B
+				// Deploy a 2.0.0 on chain A and a legacy 1.6.1 on chain B
 				if chainSel == chainA {
 					deployTokenAndPoolOut, err := v1_7_0.DeployTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployTokenAndPoolCfg]{
 						Cfg: v1_7_0.DeployTokenAndPoolCfg{
@@ -348,7 +348,7 @@ func TestTokenAdapter(t *testing.T) {
 					requireRateLimiterScaled(t, cfg.DefaultFinalityOutboundRateLimiterConfig.Rate, cfg.DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
 				}
 
-				// Chain A has a 1.7.0 token pool so should have set CCVs
+				// Chain A has a 2.0.0 token pool so should have set CCVs
 				if chainSel == chainA {
 					boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 					require.NoError(t, err, "Failed to instantiate token pool contract")

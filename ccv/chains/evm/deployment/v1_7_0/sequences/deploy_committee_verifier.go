@@ -38,7 +38,7 @@ type DeployCommitteeVerifierInput struct {
 
 var DeployCommitteeVerifier = cldf_ops.NewSequence(
 	"deploy-committee-verifier",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the CommitteeVerifier contract",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployCommitteeVerifierInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
@@ -109,7 +109,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		var resolverRef *datastore.AddressRef
 		for _, ref := range input.ExistingAddresses {
 			if ref.Type == datastore.ContractType(CommitteeVerifierResolverType) &&
-				ref.Version.String() == semver.MustParse("1.7.0").String() &&
+				ref.Version.String() == semver.MustParse("2.0.0").String() &&
 				ref.Qualifier == input.Params.Qualifier {
 				resolverRef = &ref
 			}
@@ -121,7 +121,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 				ChainSelector:  input.ChainSelector,
 				Qualifier:      input.Params.Qualifier,
 				Type:           datastore.ContractType(CommitteeVerifierResolverType),
-				Version:        semver.MustParse("1.7.0"),
+				Version:        semver.MustParse("2.0.0"),
 				CREATE2Factory: input.CREATE2Factory,
 			})
 			if err != nil {

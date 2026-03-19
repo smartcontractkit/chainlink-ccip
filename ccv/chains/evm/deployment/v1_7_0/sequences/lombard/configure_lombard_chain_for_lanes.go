@@ -31,7 +31,7 @@ import (
 
 var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 	"configure-lombard-chain-for-lanes",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures the Lombard chain to support CCIP lanes",
 	func(b cldf_ops.Bundle, dep adapters.ConfigureLombardChainForLanesDeps, input adapters.ConfigureLombardChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)

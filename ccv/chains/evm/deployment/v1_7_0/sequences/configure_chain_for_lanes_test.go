@@ -49,7 +49,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			evmChain2 := e.BlockChains.EVMChains()[remoteChainSelector]
 
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
@@ -97,7 +97,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			}
 
 			create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  remoteChainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain2.DeployerKey.From},

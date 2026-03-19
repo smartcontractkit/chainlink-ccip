@@ -20,7 +20,7 @@ type DeployAdvancedPoolHooksExtractorInput struct {
 
 var DeployAdvancedPoolHooksExtractor = cldf_ops.NewSequence(
 	"deploy-advanced-pool-hooks-extractor",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the AdvancedPoolHooksExtractor contract",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployAdvancedPoolHooksExtractorInput) (sequences.OnChainOutput, error) {
 		ref, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks_extractor.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks_extractor.ConstructorArgs]{

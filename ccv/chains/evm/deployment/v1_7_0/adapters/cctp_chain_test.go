@@ -83,7 +83,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 
 	// Deploy chain contracts
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
@@ -378,7 +378,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 
 	// Get CREATE2Factory addresses for both chains
 	homeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, homeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  homeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{homeChain.DeployerKey.From},
@@ -387,7 +387,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.NoError(t, err, "Failed to deploy CREATE2Factory on home chain")
 
 	nonHomeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, nonHomeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  nonHomeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{nonHomeChain.DeployerKey.From},
@@ -830,7 +830,7 @@ func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
 	}
 }
 
-// TestCCTPChainAdapter_CanonicalToNonCanonicalChain connects a canonical 1.7.0 chain with a non-canonical 1.6.1 chain
+// TestCCTPChainAdapter_CanonicalToNonCanonicalChain connects a canonical 2.0.0 chain with a non-canonical 1.6.1 chain
 // via the DeployCCTPChains changeset: canonical chain gets proxy + CCTP verifier/pools; non-canonical gets
 // BurnMintWithLockReleaseFlagTokenPool; both sides see each other as remotes (LOCK_RELEASE on canonical side).
 func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
@@ -877,12 +877,12 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	canonicalCreate2FactoryRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(canonicalChainSelector),
 		datastore.AddressRefByType(datastore.ContractType(create2_factory.ContractType)),
-		datastore.AddressRefByVersion(semver.MustParse("1.7.0")),
+		datastore.AddressRefByVersion(semver.MustParse("2.0.0")),
 	)
 	require.Len(t, canonicalCreate2FactoryRefs, 1, "Expected exactly one CREATE2Factory for canonical chain")
 	canonicalCreate2FactoryRef := canonicalCreate2FactoryRefs[0]
 
-	// Register both adapters: canonical (1.7.0) and non-canonical (1.6.1)
+	// Register both adapters: canonical (2.0.0) and non-canonical (1.6.1)
 	cctpChainRegistry := adapters.NewCCTPChainRegistry()
 	cctpChainRegistry.RegisterCCTPChain("evm", &evm_adapters.CCTPChainAdapter{})
 	cctpChainRegistry.RegisterCCTPChain("evm", &non_canonical_adapters.NonCanonicalUSDCChainAdapter{})
@@ -1023,7 +1023,7 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	require.NoError(t, err, "Failed to get remote pools from non-canonical pool")
 	require.Contains(t, remotePools, common.LeftPadBytes(canonicalProxyAddr.Bytes(), 32), "Non-canonical pool should have canonical proxy as remote pool")
 
-	// Adapter methods: canonical chain uses 1.7.0 adapter
+	// Adapter methods: canonical chain uses 2.0.0 adapter
 	canonicalAdapter, _ := cctpChainRegistry.GetCCTPChain("evm", adapters.Canonical)
 	poolAddr, err := canonicalAdapter.PoolAddress(e.DataStore, e.BlockChains, canonicalChainSelector, datastore.AddressRef{
 		Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),

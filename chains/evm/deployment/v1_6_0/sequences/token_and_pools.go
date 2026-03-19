@@ -620,7 +620,7 @@ func (a *EVMAdapter) GetTokenAddressFromFullTokenPoolRef(b cldf_ops.Bundle, chai
 func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.AddressRef) (common.Address, error) {
 	// Define the version range
 	minVersion := semver.MustParse("1.5.0") // inclusive
-	maxVersion := semver.MustParse("1.7.0") // exclusive
+	maxVersion := semver.MustParse("2.0.0") // exclusive
 
 	// Build the filter
 	filter := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
@@ -741,4 +741,3 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
-
