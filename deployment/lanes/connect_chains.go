@@ -233,10 +233,6 @@ func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adap
 }
 
 func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) {
-	if chainDef.TokenPrices != nil {
-		return
-	}
-
 	var tokenPrices map[datastore.ContractType]*big.Int
 	// Check if adapter implements TokenPriceProvider (optional interface)
 	priceProvider, ok := adapter.(TokenPriceProvider)
