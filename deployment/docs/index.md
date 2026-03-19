@@ -28,7 +28,7 @@ flowchart LR
                 cllb1_6[ConfigureLaneLegBidirectionally]
                 ctft1_6[ConfigureTokenForTransfers]
             end
-            subgraph v1.7.0
+            subgraph v2.0.0
                 clls1_7[ConfigureChainForLanes]
                 ctft1_7[ConfigureTokenForTransfers]
             end

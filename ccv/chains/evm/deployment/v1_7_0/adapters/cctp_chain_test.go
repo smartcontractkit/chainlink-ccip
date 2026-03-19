@@ -10,8 +10,8 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
@@ -40,12 +40,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
 )
 
 const (
@@ -83,7 +83,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 
 	// Deploy chain contracts
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
@@ -95,9 +95,9 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:  chainSelector,
-			ContractParams: testsetup.CreateBasicContractParams(),
-			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ChainSelector:    chainSelector,
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			DeployerKeyOwned: true, // Set DeployerKeyOwned to true to skip ownership transfer steps since this is a test environment and we don't have MCMS or timelocks set up
 		},
 	)
@@ -378,7 +378,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 
 	// Get CREATE2Factory addresses for both chains
 	homeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, homeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  homeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{homeChain.DeployerKey.From},
@@ -387,7 +387,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.NoError(t, err, "Failed to deploy CREATE2Factory on home chain")
 
 	nonHomeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, nonHomeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  nonHomeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{nonHomeChain.DeployerKey.From},
@@ -830,7 +830,7 @@ func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
 	}
 }
 
-// TestCCTPChainAdapter_CanonicalToNonCanonicalChain connects a canonical 1.7.0 chain with a non-canonical 1.6.1 chain
+// TestCCTPChainAdapter_CanonicalToNonCanonicalChain connects a canonical 2.0.0 chain with a non-canonical 1.6.1 chain
 // via the DeployCCTPChains changeset: canonical chain gets proxy + CCTP verifier/pools; non-canonical gets
 // BurnMintWithLockReleaseFlagTokenPool; both sides see each other as remotes (LOCK_RELEASE on canonical side).
 func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
@@ -877,12 +877,12 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	canonicalCreate2FactoryRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(canonicalChainSelector),
 		datastore.AddressRefByType(datastore.ContractType(create2_factory.ContractType)),
-		datastore.AddressRefByVersion(semver.MustParse("1.7.0")),
+		datastore.AddressRefByVersion(semver.MustParse("2.0.0")),
 	)
 	require.Len(t, canonicalCreate2FactoryRefs, 1, "Expected exactly one CREATE2Factory for canonical chain")
 	canonicalCreate2FactoryRef := canonicalCreate2FactoryRefs[0]
 
-	// Register both adapters: canonical (1.7.0) and non-canonical (1.6.1)
+	// Register both adapters: canonical (2.0.0) and non-canonical (1.6.1)
 	cctpChainRegistry := adapters.NewCCTPChainRegistry()
 	cctpChainRegistry.RegisterCCTPChain("evm", &evm_adapters.CCTPChainAdapter{})
 	cctpChainRegistry.RegisterCCTPChain("evm", &non_canonical_adapters.NonCanonicalUSDCChainAdapter{})
@@ -1023,7 +1023,7 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	require.NoError(t, err, "Failed to get remote pools from non-canonical pool")
 	require.Contains(t, remotePools, common.LeftPadBytes(canonicalProxyAddr.Bytes(), 32), "Non-canonical pool should have canonical proxy as remote pool")
 
-	// Adapter methods: canonical chain uses 1.7.0 adapter
+	// Adapter methods: canonical chain uses 2.0.0 adapter
 	canonicalAdapter, _ := cctpChainRegistry.GetCCTPChain("evm", adapters.Canonical)
 	poolAddr, err := canonicalAdapter.PoolAddress(e.DataStore, e.BlockChains, canonicalChainSelector, datastore.AddressRef{
 		Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),

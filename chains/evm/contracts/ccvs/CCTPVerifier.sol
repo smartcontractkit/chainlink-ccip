@@ -78,7 +78,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint16 fastFinalityBps; // ─╯ Basis points charged for fast finality on destination.
   }
 
-  string public constant override typeAndVersion = "CCTPVerifier 2.0.0-dev";
+  string public constant override typeAndVersion = "CCTPVerifier 2.0.0";
   /// @notice The preimage is bytes4(keccak256("CCTPVerifier 2.0.0")).
   bytes4 private constant VERSION_TAG_V2_0_0 = 0x35a25838;
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.

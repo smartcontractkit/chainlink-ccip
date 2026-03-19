@@ -7,7 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -31,7 +31,7 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 // ConfigureTokenPoolForRemoteChain for each remote chain.
 var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	"configure-token-pool-for-remote-chains",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a token pool for all configured remote chains; validates active pool supported chains when upgrading.",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
 		// Active-pool validation: when RegistryAddress and TokenAddress are set, the registry's

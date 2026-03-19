@@ -63,7 +63,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     bytes32 remoteAdapter;
   }
 
-  string public constant override typeAndVersion = "LombardTokenPool 2.0.0-dev";
+  string public constant override typeAndVersion = "LombardTokenPool 2.0.0";
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;

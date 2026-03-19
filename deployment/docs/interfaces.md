@@ -131,7 +131,7 @@ Handles token pool configuration, deployment, and cross-chain token transfer set
 **Registry:** `TokenAdapterRegistry` via `tokens.GetTokenAdapterRegistry()`
 **Key:** `chainFamily-version`
 
-Each chain-family-version combination registers separately, because configuration differs by token pool version (e.g., 1.7.0 pools require CCV config, 1.5.0 pools require remote pool addresses).
+Each chain-family-version combination registers separately, because configuration differs by token pool version (e.g., 2.0.0 pools require CCV config, 1.5.0 pools require remote pool addresses).
 
 ```go
 type TokenAdapter interface {
