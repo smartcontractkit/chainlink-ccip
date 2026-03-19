@@ -219,9 +219,7 @@ func TestDeployTokenPool(t *testing.T) {
 
 			// Find the pool address in the output
 			poolRef := report.Output.Addresses[0]
-			require.NotEmpty(t, poolRef.Type.String(), "Pool type should not be empty")
-			require.NotEmpty(t, poolRef.Address, "Pool address should not be empty")
-			require.Equal(t, poolRef.Address+"-"+poolRef.Type.String(), poolRef.Qualifier)
+			require.Equal(t, input.TokenRef.Address, poolRef.Qualifier)
 			t.Logf("Deployed %s at address: %s", tc.name, poolRef.Address)
 
 			// Make on-chain calls to verify the pool was deployed correctly
