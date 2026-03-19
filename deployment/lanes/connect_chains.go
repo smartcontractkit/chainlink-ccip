@@ -233,6 +233,10 @@ func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adap
 }
 
 func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) {
+	if chainDef.TokenPrices != nil {
+		return
+	}
+
 	var tokenPrices map[datastore.ContractType]*big.Int
 	// Check if adapter implements TokenPriceProvider (optional interface)
 	priceProvider, ok := adapter.(TokenPriceProvider)
@@ -242,17 +246,18 @@ func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adap
 
 	// Get prices keyed by contract type
 	tokenPrices = priceProvider.GetDefaultTokenPrices()
-	if chainDef.TokenPrices == nil {
-		// Resolve contract types to addresses
-		addressPrices := make(map[string]*big.Int)
-		for contractType, price := range tokenPrices {
-			refs := ds.Addresses().Filter(
-				datastore.AddressRefByType(contractType),
-				datastore.AddressRefByChainSelector(chainDef.Selector),
-			)
-			for _, ref := range refs {
-				addressPrices[ref.Address] = price
-			}
+
+	// Resolve contract types to addresses
+	addressPrices := make(map[string]*big.Int)
+	for contractType, price := range tokenPrices {
+		refs := ds.Addresses().Filter(
+			datastore.AddressRefByType(contractType),
+			datastore.AddressRefByChainSelector(chainDef.Selector),
+		)
+		for _, ref := range refs {
+			addressPrices[ref.Address] = price
 		}
 	}
+
+	chainDef.TokenPrices = addressPrices
 }
