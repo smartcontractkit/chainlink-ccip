@@ -19,7 +19,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   using EnumerableSet for EnumerableSet.UintSet;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "AdvancedPoolHooks 2.0.0-dev";
+    return "AdvancedPoolHooks 2.0.0";
   }
 
   error AllowListNotEnabled();

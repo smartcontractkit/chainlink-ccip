@@ -45,7 +45,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     bool ccvAllowlistEnabled; // ────╯ Whether the CCV allowlist is enabled.
   }
 
-  string public constant typeAndVersion = "Executor 2.0.0-dev";
+  string public constant typeAndVersion = "Executor 2.0.0";
 
   /// @notice Limits the number of CCVs that the executor needs to search for results from.
   /// @dev Max(required CCVs + optional CCVs).
