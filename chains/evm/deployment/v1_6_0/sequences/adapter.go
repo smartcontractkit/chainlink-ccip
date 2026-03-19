@@ -186,7 +186,7 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	// tooHighVersion := semver.MustParse("1.7.0") -- to unblock prod-testnet, skip the upper bound of the check
+	// tooHighVersion := semver.MustParse("2.0.0") -- to unblock prod-testnet, skip the upper bound of the check
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version

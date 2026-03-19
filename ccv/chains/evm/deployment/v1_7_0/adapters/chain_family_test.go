@@ -36,7 +36,7 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) lanes.Cha
 					{
 						ChainSelector: chainSelector,
 						Type:          datastore.ContractType(sequences.CommitteeVerifierResolverType),
-						Version:       semver.MustParse("1.7.0"),
+						Version:       semver.MustParse("2.0.0"),
 					},
 				},
 				RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -96,7 +96,7 @@ func TestChainFamilyAdapter(t *testing.T) {
 			ds := datastore.NewMemoryDataStore()
 			for _, chainSel := range []uint64{chainA, chainB} {
 				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 					ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},

@@ -267,7 +267,7 @@ func verifyOwnershipOfContracts(e deployment.Environment, chainSelector uint64, 
 func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"ramp-updater:sequence-update-ramps-with-router",
-		semver.MustParse("1.7.0"),
+		semver.MustParse("2.0.0"),
 		"Updates Ramps contracts to use the updated Router contract",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deploy.RampUpdaterConfig) (output sequences.OnChainOutput, err error) {
 			var writes []contract.WriteOutput
@@ -433,7 +433,7 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying sourceChainConfig update to offRamp: %w", err)
 			}
 			writes = append(writes, writeOutputOffRamp.Output)
-			// update fq 1.7 to have defaultTxLimit set to 8M
+			// update fq 2.0 to have defaultTxLimit set to 8M
 			fqDestChainUpdateRep, err := cldf_ops.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, c, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       feequoterAddr,

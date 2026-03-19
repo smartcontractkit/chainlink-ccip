@@ -223,11 +223,11 @@ func newCommitteeVerifierTestEnvWithContracts(t *testing.T, selectors []uint64, 
 		}))
 		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 			ChainSelector: sel, Address: verifierAddr, Qualifier: "default",
-			Type: "CommitteeVerifier", Version: semver.MustParse("1.7.0"),
+			Type: "CommitteeVerifier", Version: semver.MustParse("2.0.0"),
 		}))
 		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 			ChainSelector: sel, Address: resolverAddr, Qualifier: "default",
-			Type: "CommitteeVerifierResolver", Version: semver.MustParse("1.7.0"),
+			Type: "CommitteeVerifierResolver", Version: semver.MustParse("2.0.0"),
 		}))
 		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 			ChainSelector: sel, Address: "0xExec",
@@ -461,8 +461,8 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
 		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
 			fmt.Sprintf("%d:default", sel1): {
-				{Address: verifierAddr, ChainSelector: sel1, Qualifier: "default", Type: "CommitteeVerifier", Version: semver.MustParse("1.7.0")},
-				{Address: resolverAddr, ChainSelector: sel1, Qualifier: "default", Type: "CommitteeVerifierResolver", Version: semver.MustParse("1.7.0")},
+				{Address: verifierAddr, ChainSelector: sel1, Qualifier: "default", Type: "CommitteeVerifier", Version: semver.MustParse("2.0.0")},
+				{Address: resolverAddr, ChainSelector: sel1, Qualifier: "default", Type: "CommitteeVerifierResolver", Version: semver.MustParse("2.0.0")},
 			},
 		},
 	})
