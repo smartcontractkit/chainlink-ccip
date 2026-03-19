@@ -35,8 +35,8 @@ import (
 const (
 	LinkFeeMultiplierPercent             uint8  = 90
 	NetworkFeeUSDCents                   uint16 = 10
-	destChainConfigUpdateBatchLen               = 8
-	tokenTransferFeeConfigUpdateBatchLen        = 5
+	DestChainConfigUpdateBatchLen               = 8
+	TokenTransferFeeConfigUpdateBatchLen        = 5
 )
 
 var (
@@ -86,7 +86,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-			destChainConfigBatches, tokenTransferFeeConfigBatches := batchedInputForSequenceFeeQuoterUpdate(&input)
+			destChainConfigBatches, tokenTransferFeeConfigBatches := BatchedInputForSequenceFeeQuoterUpdate(&input)
 			// deploy fee quoter or fetch existing fee quoter address
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
@@ -741,11 +741,11 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 
 func batchedDestChainConfigArgs(destChainConfigs []fqops.DestChainConfigArgs) [][]fqops.DestChainConfigArgs {
 	var batches [][]fqops.DestChainConfigArgs
-	if len(destChainConfigs) <= destChainConfigUpdateBatchLen {
+	if len(destChainConfigs) <= DestChainConfigUpdateBatchLen {
 		return append(batches, destChainConfigs)
 	}
-	for i := 0; i < len(destChainConfigs); i += destChainConfigUpdateBatchLen {
-		end := i + destChainConfigUpdateBatchLen
+	for i := 0; i < len(destChainConfigs); i += DestChainConfigUpdateBatchLen {
+		end := i + DestChainConfigUpdateBatchLen
 		if end > len(destChainConfigs) {
 			end = len(destChainConfigs)
 		}
@@ -756,11 +756,11 @@ func batchedDestChainConfigArgs(destChainConfigs []fqops.DestChainConfigArgs) []
 
 func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigArgs) [][]fqops.TokenTransferFeeConfigArgs {
 	var batches [][]fqops.TokenTransferFeeConfigArgs
-	if len(tokenTransferFeeConfigArgs) <= tokenTransferFeeConfigUpdateBatchLen {
+	if len(tokenTransferFeeConfigArgs) <= TokenTransferFeeConfigUpdateBatchLen {
 		return append(batches, tokenTransferFeeConfigArgs)
 	}
-	for i := 0; i < len(tokenTransferFeeConfigArgs); i += tokenTransferFeeConfigUpdateBatchLen {
-		end := i + tokenTransferFeeConfigUpdateBatchLen
+	for i := 0; i < len(tokenTransferFeeConfigArgs); i += TokenTransferFeeConfigUpdateBatchLen {
+		end := i + TokenTransferFeeConfigUpdateBatchLen
 		if end > len(tokenTransferFeeConfigArgs) {
 			end = len(tokenTransferFeeConfigArgs)
 		}
@@ -769,7 +769,11 @@ func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fqops.TokenT
 	return batches
 }
 
-func batchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
+// BatchedInputForSequenceFeeQuoterUpdate takes the FeeQuoterUpdate output from the import sequences and checks if the number of dest chain configs or token transfer fee configs exceed the batch length limit for on-chain update.
+// If it does, it splits them into batches and returns the batches separately for constructor args and update args, so that they can be applied in batches on-chain in the ApplyDestChainConfigUpdates and ApplyTokenTransferFeeConfigUpdates sequences.
+// This is to avoid hitting block gas limit when there are too many dest chain configs or token transfer fee configs to be updated on-chain.
+// Exported for testing.
+func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
 	destChainConfigBatches [][]fqops.DestChainConfigArgs,
 	tokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs,
 ) {

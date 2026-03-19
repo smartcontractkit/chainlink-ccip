@@ -412,3 +412,164 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		require.Contains(t, result.AuthorizedCallerUpdates.AddedCallers, addr3)
 	})
 }
+
+func destChainConfigsFromSelectors(selectors ...uint64) []fqops.DestChainConfigArgs {
+	out := make([]fqops.DestChainConfigArgs, len(selectors))
+	for i, s := range selectors {
+		out[i] = fqops.DestChainConfigArgs{
+			DestChainSelector: s,
+			DestChainConfig:   fqops.DestChainConfig{IsEnabled: true},
+		}
+	}
+	return out
+}
+
+func tokenTransferFeeConfigArgsFromSelectors(selectors ...uint64) []fqops.TokenTransferFeeConfigArgs {
+	out := make([]fqops.TokenTransferFeeConfigArgs, len(selectors))
+	for i, s := range selectors {
+		out[i] = fqops.TokenTransferFeeConfigArgs{DestChainSelector: s}
+	}
+	return out
+}
+
+func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
+	t.Run("empty input returns nil batches", func(t *testing.T) {
+		input := sequences.FeeQuoterUpdate{}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, destBatches)
+		require.Nil(t, tokenBatches)
+	})
+
+	t.Run("constructor dest chain configs within batch size stay in constructor and one apply batch", func(t *testing.T) {
+		cfgs := destChainConfigsFromSelectors(1, 2, 3)
+		input := sequences.FeeQuoterUpdate{
+			ConstructorArgs: fqops.ConstructorArgs{
+				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
+			},
+		}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, input.ConstructorArgs.DestChainConfigArgs, 3)
+		require.Equal(t, cfgs, input.ConstructorArgs.DestChainConfigArgs)
+		require.Len(t, destBatches, 1)
+		require.Equal(t, cfgs, destBatches[0])
+		require.Nil(t, tokenBatches)
+	})
+
+	t.Run("constructor dest chain configs over batch size keeps first batch in constructor rest in dest batches", func(t *testing.T) {
+		selectors := make([]uint64, 9)
+		for i := range selectors {
+			selectors[i] = uint64(i + 1)
+		}
+		cfgs := destChainConfigsFromSelectors(selectors...)
+		input := sequences.FeeQuoterUpdate{
+			ConstructorArgs: fqops.ConstructorArgs{
+				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
+			},
+		}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, input.ConstructorArgs.DestChainConfigArgs, 8)
+		require.Equal(t, cfgs[:8], input.ConstructorArgs.DestChainConfigArgs)
+		require.Len(t, destBatches, 1)
+		require.Equal(t, []fqops.DestChainConfigArgs{cfgs[8]}, destBatches[0])
+		require.Nil(t, tokenBatches)
+	})
+
+	t.Run("update DestChainConfigs only are batched by size 8", func(t *testing.T) {
+		selectors := make([]uint64, 10)
+		for i := range selectors {
+			selectors[i] = uint64(100 + i)
+		}
+		cfgs := destChainConfigsFromSelectors(selectors...)
+		input := sequences.FeeQuoterUpdate{
+			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
+		}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, destBatches, 2)
+		require.Equal(t, cfgs[:sequences.DestChainConfigUpdateBatchLen], destBatches[0])
+		require.Equal(t, cfgs[sequences.DestChainConfigUpdateBatchLen:], destBatches[1])
+		require.Nil(t, tokenBatches)
+	})
+
+	t.Run("constructor remainder and update DestChainConfigs are concatenated", func(t *testing.T) {
+		// 9 constructor dest configs -> 8 in constructor, 1 in first dest batch
+		cons := destChainConfigsFromSelectors(1, 2, 3, 4, 5, 6, 7, 8, 9)
+		updates := destChainConfigsFromSelectors(10, 11, 12)
+		input := sequences.FeeQuoterUpdate{
+			ConstructorArgs: fqops.ConstructorArgs{
+				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cons...),
+			},
+			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), updates...),
+		}
+		destBatches, _ := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, destBatches, 2)
+		require.Equal(t, []fqops.DestChainConfigArgs{cons[sequences.DestChainConfigUpdateBatchLen]}, destBatches[0])
+		require.Equal(t, updates, destBatches[1])
+	})
+
+	t.Run("constructor token transfer fee configs over batch size splits first batch into constructor", func(t *testing.T) {
+		selectors := make([]uint64, 6)
+		for i := range selectors {
+			selectors[i] = uint64(i + 1)
+		}
+		args := tokenTransferFeeConfigArgsFromSelectors(selectors...)
+		input := sequences.FeeQuoterUpdate{
+			ConstructorArgs: fqops.ConstructorArgs{
+				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), args...),
+			},
+		}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, destBatches)
+		require.Len(t, input.ConstructorArgs.TokenTransferFeeConfigArgs, sequences.TokenTransferFeeConfigUpdateBatchLen)
+		require.Equal(t, args[:sequences.TokenTransferFeeConfigUpdateBatchLen], input.ConstructorArgs.TokenTransferFeeConfigArgs)
+		require.Len(t, tokenBatches, 1)
+		require.Equal(t, []fqops.TokenTransferFeeConfigArgs{args[sequences.TokenTransferFeeConfigUpdateBatchLen]}, tokenBatches[0])
+	})
+
+	t.Run("TokenTransferFeeConfigUpdates only are batched by size 5", func(t *testing.T) {
+		selectors := make([]uint64, 7)
+		for i := range selectors {
+			selectors[i] = uint64(200 + i)
+		}
+		args := tokenTransferFeeConfigArgsFromSelectors(selectors...)
+		input := sequences.FeeQuoterUpdate{
+			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), args...),
+			},
+		}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, destBatches)
+		require.Len(t, tokenBatches, 2)
+		require.Equal(t, args[:5], tokenBatches[0])
+		require.Equal(t, args[5:], tokenBatches[1])
+	})
+
+	t.Run("DestChainConfigs and TokenTransferFeeConfigUpdates batched together", func(t *testing.T) {
+		destSelectors := make([]uint64, 10)
+		for i := range destSelectors {
+			destSelectors[i] = uint64(300 + i)
+		}
+		destCfgs := destChainConfigsFromSelectors(destSelectors...)
+
+		tokenSelectors := make([]uint64, 7)
+		for i := range tokenSelectors {
+			tokenSelectors[i] = uint64(400 + i)
+		}
+		tokenArgs := tokenTransferFeeConfigArgsFromSelectors(tokenSelectors...)
+
+		input := sequences.FeeQuoterUpdate{
+			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), destCfgs...),
+			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), tokenArgs...),
+			},
+		}
+		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+
+		require.Len(t, destBatches, 2)
+		require.Equal(t, destCfgs[:sequences.DestChainConfigUpdateBatchLen], destBatches[0])
+		require.Equal(t, destCfgs[sequences.DestChainConfigUpdateBatchLen:], destBatches[1])
+
+		require.Len(t, tokenBatches, 2)
+		require.Equal(t, tokenArgs[:sequences.TokenTransferFeeConfigUpdateBatchLen], tokenBatches[0])
+		require.Equal(t, tokenArgs[sequences.TokenTransferFeeConfigUpdateBatchLen:], tokenBatches[1])
+	})
+}
