@@ -219,7 +219,7 @@ var (
 				fqops.Version,
 				"",
 			)
-			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
+			isNewFQ20Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
 			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
@@ -264,7 +264,7 @@ var (
 				})
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
-			if isNewFQ17Deployment {
+			if isNewFQ20Deployment {
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         fqOutput.StaticCfg.LinkToken,
@@ -342,7 +342,7 @@ var (
 				fqops.Version,
 				"",
 			)
-			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoter17Ref)
+			isNewFQ20Deployment := datastore_utils.IsAddressRefEmpty(feeQuoter17Ref)
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
 			var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
@@ -399,7 +399,7 @@ var (
 					TokenTransferFeeConfigs: tokenTransferFeeConfigArgs,
 				})
 			}
-			if isNewFQ17Deployment {
+			if isNewFQ20Deployment {
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         staticCfg.LinkToken,
