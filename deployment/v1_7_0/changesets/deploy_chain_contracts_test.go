@@ -117,7 +117,7 @@ func newDeployTestTopology(chainSelectors ...uint64) *offchain.EnvironmentTopolo
 	committees := map[string]offchain.CommitteeConfig{
 		"default": {
 			Qualifier:        "default",
-			VerifierVersion:  semver.MustParse("1.7.0"),
+			VerifierVersion:  semver.MustParse("2.0.0"),
 			StorageLocations: []string{"https://store.test"},
 			ChainConfigs:     make(map[string]offchain.ChainCommitteeConfig),
 			Aggregators: []offchain.AggregatorConfig{
@@ -292,7 +292,7 @@ func TestDeployChainContracts_With_MissingAdapterForConfigImport(t *testing.T) {
 	expectedAddr := datastore.AddressRef{
 		ChainSelector: sel1,
 		Type:          "TestContract",
-		Version:       semver.MustParse("1.7.0"),
+		Version:       semver.MustParse("2.0.0"),
 		Address:       "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 	}
 
@@ -327,7 +327,7 @@ func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
 		outputByChain: map[uint64]sequences.OnChainOutput{
 			sel1: {
 				Addresses: []datastore.AddressRef{
-					{ChainSelector: sel1, Type: "TestContract", Version: semver.MustParse("1.7.0"), Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+					{ChainSelector: sel1, Type: "TestContract", Version: semver.MustParse("2.0.0"), Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
 				},
 			},
 		},
@@ -355,7 +355,7 @@ func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
 	expectedAddr := datastore.AddressRef{
 		ChainSelector: sel1,
 		Type:          "TestContract",
-		Version:       semver.MustParse("1.7.0"),
+		Version:       semver.MustParse("2.0.0"),
 		Address:       "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 	}
 
@@ -399,12 +399,12 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 		outputByChain: map[uint64]sequences.OnChainOutput{
 			sel1: {
 				Addresses: []datastore.AddressRef{
-					{ChainSelector: sel1, Type: "Contract1", Version: semver.MustParse("1.7.0"), Address: "0xAAAA"},
+					{ChainSelector: sel1, Type: "Contract1", Version: semver.MustParse("2.0.0"), Address: "0xAAAA"},
 				},
 			},
 			sel2: {
 				Addresses: []datastore.AddressRef{
-					{ChainSelector: sel2, Type: "Contract2", Version: semver.MustParse("1.7.0"), Address: "0xBBBB"},
+					{ChainSelector: sel2, Type: "Contract2", Version: semver.MustParse("2.0.0"), Address: "0xBBBB"},
 				},
 			},
 		},
@@ -574,7 +574,7 @@ func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {
 			Committees: map[string]offchain.CommitteeConfig{
 				"alpha": {
 					Qualifier:        "alpha",
-					VerifierVersion:  semver.MustParse("1.7.0"),
+					VerifierVersion:  semver.MustParse("2.0.0"),
 					StorageLocations: []string{"https://store1.test"},
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
@@ -588,7 +588,7 @@ func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {
 				},
 				"beta": {
 					Qualifier:        "beta",
-					VerifierVersion:  semver.MustParse("1.7.0"),
+					VerifierVersion:  semver.MustParse("2.0.0"),
 					StorageLocations: []string{"https://store2.test"},
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
@@ -637,7 +637,7 @@ func TestBuildCommitteeVerifierParams_SkipsCommitteesWithoutChainConfig(t *testi
 			Committees: map[string]offchain.CommitteeConfig{
 				"present": {
 					Qualifier:       "present",
-					VerifierVersion: semver.MustParse("1.7.0"),
+					VerifierVersion: semver.MustParse("2.0.0"),
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
 							NOPAliases:    []string{"nop-1"},
@@ -649,7 +649,7 @@ func TestBuildCommitteeVerifierParams_SkipsCommitteesWithoutChainConfig(t *testi
 				},
 				"absent": {
 					Qualifier:       "absent",
-					VerifierVersion: semver.MustParse("1.7.0"),
+					VerifierVersion: semver.MustParse("2.0.0"),
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						strconv.FormatUint(otherSel, 10): {
 							NOPAliases:    []string{"nop-1"},
@@ -733,7 +733,7 @@ func TestBuildCommitteeVerifierParams_RejectsEmptyFeeAggregator(t *testing.T) {
 			Committees: map[string]offchain.CommitteeConfig{
 				"test": {
 					Qualifier:       "test",
-					VerifierVersion: semver.MustParse("1.7.0"),
+					VerifierVersion: semver.MustParse("2.0.0"),
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
 							NOPAliases:    []string{"nop-1"},

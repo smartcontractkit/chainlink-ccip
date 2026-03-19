@@ -13,7 +13,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -77,12 +76,10 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.AVALANCHE_MAINNET.Selector),
 	}
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
@@ -101,14 +98,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
-		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            common_utils.CLLQualifier,
-			Description:          "Transfer ownership FQ2",
-		},
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)

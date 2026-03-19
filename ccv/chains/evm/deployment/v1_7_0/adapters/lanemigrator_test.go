@@ -5,11 +5,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -18,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 
+	adapters1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -48,7 +52,7 @@ func TestLaneMigrator(t *testing.T) {
 			ds := datastore.NewMemoryDataStore()
 			for _, chainSel := range []uint64{chainA, chainB} {
 				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 					ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
@@ -58,9 +62,9 @@ func TestLaneMigrator(t *testing.T) {
 
 				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
 					Cfg: v1_7_0.DeployChainContractsCfg{
-						ChainSel:       chainSel,
-						CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-						Params:         testsetup.CreateBasicContractParams(),
+						ChainSel:         chainSel,
+						CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+						Params:           testsetup.CreateBasicContractParams(),
 						DeployerKeyOwned: true,
 					},
 				})
@@ -132,6 +136,22 @@ func TestLaneMigrator(t *testing.T) {
 				SourceChainSelector: chainB,
 				OffRamp:             offRampAddr,
 			})
+			feeQuoterAddr, err := datastore_utils.FindAndFormatRef(
+				e.DataStore,
+				datastore.AddressRef{
+					Type:    datastore.ContractType(fee_quoter.ContractType),
+					Version: fee_quoter.Version,
+				}, chainA, evm_datastore_utils.ToEVMAddress)
+			require.NoError(t, err)
+			opOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fee_quoter.GetDestChainConfig, evmChain1, contract_utils.FunctionInput[uint64]{
+				ChainSelector: chainA,
+				Address:       feeQuoterAddr,
+				Args:          chainB,
+			})
+			require.NoError(t, err)
+			destConfig := opOut.Output
+			require.Equal(t, adapters1_7.DefaultMaxPerMsgGasLimit, destConfig.MaxPerMsgGasLimit)
+			require.Equal(t, adapters1_7.DefaultMaxDataBytes, destConfig.MaxDataBytes)
 		})
 	}
 }

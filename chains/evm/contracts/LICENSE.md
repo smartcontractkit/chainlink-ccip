@@ -9,12 +9,12 @@ Parameters
 
 Licensor:             SmartContract Chainlink Limited SEZC
 
-Licensed Work:     	  Cross-Chain Interoperability Protocol v1.6
-The Licensed Work is (c) 2023 SmartContract Chainlink Limited SEZC
+Licensed Work:     	  Cross-Chain Interoperability Protocol v2.0
+The Licensed Work is (c) 2026 SmartContract Chainlink Limited SEZC
 
-Additional Use Grant: Any uses listed and defined at [v1.6-CCIP-License-grants](./v1.6-CCIP-License-grants.md)
+Additional Use Grant: Any uses listed and defined at [v2.0-CCIP-License-grants](./v2.0-CCIP-License-grants.md)
 
-Change Date:       	  Nov 1, 2028
+Change Date:       	  April 1, 2030
 
 Change License:       MIT
 

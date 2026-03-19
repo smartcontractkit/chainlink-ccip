@@ -537,11 +537,13 @@ library ExtraArgsCodec {
       }
 
       uint256 accountsLength;
-      bytes1 useATA;
+      // uint8, not bytes1: byte(0,...) returns a right-aligned value (low 8 bits set).
+      uint8 useATA;
 
       // Read static-length fields.
       assembly ("memory-safe") {
         // Read useATA (1 byte) - enum value.
+        // byte(0, x) extracts the MSB of x and places it right-aligned, matching uint8 layout.
         useATA := byte(0, calldataload(add(encoded.offset, 4)))
         mstore(executorArgs, useATA)
 
@@ -553,7 +555,7 @@ library ExtraArgsCodec {
         accountsLength := byte(0, calldataload(add(encoded.offset, 13)))
       }
 
-      if (useATA > bytes1(uint8(SVMTokenReceiverUsage.USE_AS_IS))) {
+      if (useATA > uint8(SVMTokenReceiverUsage.USE_AS_IS)) {
         revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, 4);
       }
 

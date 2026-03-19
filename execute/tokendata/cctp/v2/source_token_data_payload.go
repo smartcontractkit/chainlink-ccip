@@ -16,7 +16,7 @@ const (
 	// Preimage: keccak256("CCTP_V2")
 	CCTPVersion2Tag = 0xb148ea5f
 
-	// CCTPVersion2CCVTag identifies CCTP V2 transfers with CCIP v1.7 fast transfer support.
+	// CCTPVersion2CCVTag identifies CCTP V2 transfers with CCIP v2.0 fast transfer support.
 	// CCV = Cross-Chain Verification. Enables fast transfers with verification infrastructure.
 	// Preimage: keccak256("CCTP_V2_CCV")
 	CCTPVersion2CCVTag = 0x3047587c

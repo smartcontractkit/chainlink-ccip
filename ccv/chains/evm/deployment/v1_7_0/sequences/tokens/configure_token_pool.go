@@ -12,8 +12,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 )
 
 // ConfigureTokenPoolInput is the input for the ConfigureTokenPool sequence.
@@ -39,7 +39,7 @@ type ConfigureTokenPoolInput struct {
 
 var ConfigureTokenPool = cldf_ops.NewSequence(
 	"configure-token-pool",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a token pool on an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]evm_contract.WriteOutput, 0)

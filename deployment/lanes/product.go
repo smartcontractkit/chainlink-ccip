@@ -6,24 +6,31 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
+
+type TestRouterProvider interface {
+	GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+}
 
 type LaneAdapter interface {
 	// high level API
 	ConfigureLaneLegAsSource() *cldf_ops.Sequence[UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	ConfigureLaneLegAsDest() *cldf_ops.Sequence[UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DisableRemoteChain() *cldf_ops.Sequence[DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
 	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
+	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
+	GetDefaultGasPrice() *big.Int
 }
 
 // TokenPriceProvider is an optional interface that LaneAdapters can implement

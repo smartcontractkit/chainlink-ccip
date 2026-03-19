@@ -27,22 +27,17 @@ require (
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260312195246-5144b4f20afb
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.1.1-solana.0.20251125153543-0b618525aa03
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260312195246-5144b4f20afb
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/mcms v0.36.0
 	github.com/stretchr/testify v1.11.1
-)
-
-require (
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260312182032-b2b38700f19b
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260116092715-df6a64d4bf00
 )
 
 require (
@@ -307,7 +302,7 @@ require (
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/term v0.40.0 // indirect
@@ -316,7 +311,7 @@ require (
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
-	google.golang.org/grpc v1.78.0 // indirect
+	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

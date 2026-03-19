@@ -18,10 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 )
 
 func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
@@ -59,7 +59,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: semver.MustParse("2.0.0"),
 							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -100,7 +100,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: semver.MustParse("2.0.0"),
 							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -144,7 +144,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: semver.MustParse("2.0.0"),
 							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -168,7 +168,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 
 			// Deploy chain contracts
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
@@ -180,10 +180,10 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSelector,
-					ContractParams: testsetup.CreateBasicContractParams(),
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					DeployerKeyOwned:  true,
+					ChainSelector:    chainSelector,
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -263,7 +263,7 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: semver.MustParse("2.0.0"),
 							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -300,7 +300,7 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: semver.MustParse("2.0.0"),
 							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -325,7 +325,7 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 
 			// Deploy chain contracts
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
@@ -337,10 +337,10 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSelector,
-					ContractParams: testsetup.CreateBasicContractParams(),
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					DeployerKeyOwned:  true,
+					ChainSelector:    chainSelector,
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -493,7 +493,7 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 
 			// Deploy chain contracts
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
@@ -506,10 +506,10 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSelector,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					ContractParams: testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned:  true,
+					ChainSelector:    chainSelector,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -613,7 +613,7 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 
 			// Deploy chain contracts
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
@@ -626,10 +626,10 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSelector,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					ContractParams: testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned:  true,
+					ChainSelector:    chainSelector,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")

@@ -18,7 +18,7 @@ import (
 
 var ContractType cldf_deployment.ContractType = "CREATE2Factory"
 
-var Version = semver.MustParse("1.7.0")
+var Version = semver.MustParse("2.0.0")
 
 type ConstructorArgs struct {
 	AllowList []common.Address

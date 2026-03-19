@@ -12,8 +12,8 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -24,7 +24,7 @@ import (
 
 var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
 	"migrate-hybrid-lock-release-liquidity",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Migrates absolute amounts of liquidity from HybridLockReleaseUSDCTokenPool into per-chain Siloed lockboxes",
 	migrateHybridLockReleaseLiquidity,
 )
@@ -273,11 +273,11 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		depositReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Deposit, ctx.chain, contract_utils.FunctionInput[erc20_lock_box.DepositArgs]{
 			ChainSelector: ctx.input.ChainSelector,
 			Address:       lockBoxAddr,
-			Args: erc20_lock_box.DepositArgs{
-				Token:  ctx.tokenAddr,
-				Arg1:   sel,
-				Amount: withdrawAmount,
-			},
+				Args: erc20_lock_box.DepositArgs{
+					Token:  ctx.tokenAddr,
+					Arg1:   sel,
+					Amount: withdrawAmount,
+				},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("migrateLiquidityToLockboxes: chain %d lockbox %s amount %s: deposit: %w", sel, lockBoxAddr.Hex(), withdrawAmount.String(), err)
