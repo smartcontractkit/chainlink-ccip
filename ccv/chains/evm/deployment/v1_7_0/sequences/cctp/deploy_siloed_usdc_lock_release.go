@@ -15,9 +15,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 )
 
 type DeploySiloedUSDCLockReleaseInput struct {
@@ -29,7 +29,7 @@ type DeploySiloedUSDCLockReleaseInput struct {
 	// Existing siloed pool address; optional.
 	SiloedUSDCTokenPool       string
 	LockReleaseChainSelectors []uint64
-	// Remote chain configs for lock-release chains; used to run ConfigureTokenPoolForRemoteChain (1.7.0) on the siloed pool.
+	// Remote chain configs for lock-release chains; used to run ConfigureTokenPoolForRemoteChain (2.0.0) on the siloed pool.
 	RemoteChainConfigs map[uint64]tokens.RemoteChainConfig[[]byte, string]
 }
 
@@ -42,7 +42,7 @@ type DeploySiloedUSDCLockReleaseOutput struct {
 
 var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 	"deploy-siloed-usdc-lock-release",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys SiloedUSDCTokenPool and per-chain ERC20LockBox contracts",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input DeploySiloedUSDCLockReleaseInput) (output DeploySiloedUSDCLockReleaseOutput, err error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]
@@ -148,7 +148,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			batchOps = append(batchOps, batchOp)
 		}
 
-		// Configure remote chains on the siloed pool (1.7.0 sequence)
+		// Configure remote chains on the siloed pool (2.0.0 sequence)
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChainConfigs {
 			report, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPoolForRemoteChain, chain, tokens_sequences.ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,

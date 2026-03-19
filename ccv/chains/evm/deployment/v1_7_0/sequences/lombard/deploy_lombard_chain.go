@@ -19,12 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lombard_verifier"
 )
 
 const (
@@ -37,7 +37,7 @@ var (
 
 var DeployLombardChain = cldf_ops.NewSequence(
 	"deploy-lombard-chain",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the Lombard chain with all required contracts and configurations",
 	func(b cldf_ops.Bundle, dep adapters.DeployLombardChainDeps, input adapters.DeployLombardInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
@@ -85,7 +85,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSelector,
 			Qualifier:      &ContractQualifier,
 			Args: lombard_verifier.ConstructorArgs{
-				Bridge:           lombardBridgeAddress,
+				Bridge:          lombardBridgeAddress,
 				StorageLocation: input.StorageLocations,
 				DynamicConfig: lombard_verifier.DynamicConfig{
 					FeeAggregator: feeAggregatorAddress,

@@ -75,6 +75,22 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     assertEq(uint8(decoded.useATA), uint8(args.useATA));
   }
 
+  function test__decodeSVMExecutorArgsV1_RevertWhen_InvalidUseATA() public {
+    // useATA = 3 is one past the last valid SVMTokenReceiverUsage enum value (USE_AS_IS = 2).
+    bytes memory invalidData = abi.encodePacked(
+      ExtraArgsCodec.SVM_EXECUTOR_ARGS_V1_TAG,
+      uint8(3), // out-of-range enum value
+      uint64(0), // accountIsWritableBitmap
+      uint8(0) // accountsLength
+    );
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 4
+      )
+    );
+    s_helper._decodeSVMExecutorArgsV1(invalidData);
+  }
+
   function test__decodeSVMExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(

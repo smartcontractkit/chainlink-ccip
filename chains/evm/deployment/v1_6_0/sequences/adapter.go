@@ -13,9 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -100,6 +100,18 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 	return addr, nil
 }
 
+func (a *EVMAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.TestRouterContractType),
+		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
 // GetDefaultTokenPrices returns default fee token prices for EVM chains.
 // Returns a map of contract type to USD price (18 decimals).
 // The caller resolves contract types to addresses using the datastore.
@@ -163,7 +175,7 @@ var ConfigurePingPongSequence = operations.NewSequence(
 )
 
 // GetFeeQuoterAddress returns the address of the fee quoter contract for a given chain selector.
-// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version below 1.7.0
+// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version
 // (the next major version on or after 1.6.0).
 func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64) (datastore.AddressRef, error) {
 	var refs []datastore.AddressRef
@@ -174,13 +186,11 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	tooHighVersion := semver.MustParse("1.7.0")
+	// tooHighVersion := semver.MustParse("2.0.0") -- to unblock prod-testnet, skip the upper bound of the check
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version
-		// we want the latest version below 1.7.0
-		if v.GreaterThanEqual(latestVersion) &&
-			v.LessThan(tooHighVersion) {
+		if v.GreaterThanEqual(latestVersion) {
 			latestVersion = v
 			feeQRef = ref
 		}
@@ -194,16 +204,16 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
 	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
 	return ccipapi.FeeQuoterDestChainConfig{
-		IsEnabled:               true,
-		MaxDataBytes:            30_000,
-		MaxPerMsgGasLimit:       3_000_000,
-		DestGasOverhead:         300_000,
-		DestGasPerPayloadByteBase: 16,
-		ChainFamilySelector:     binary.BigEndian.Uint32(chainHex[:]),
-		DefaultTokenFeeUSDCents: 25,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:       200_000,
-		NetworkFeeUSDCents:      10,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
 		V1Params: &ccipapi.FeeQuoterV1Params{
 			MaxNumberOfTokensPerMsg:           10,
 			DestGasPerPayloadByteHigh:         40,

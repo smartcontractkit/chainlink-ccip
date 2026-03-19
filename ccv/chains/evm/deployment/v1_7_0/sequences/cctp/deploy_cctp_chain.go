@@ -23,13 +23,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 )
 
 const (
@@ -44,7 +44,7 @@ var (
 
 var DeployCCTPChain = cldf_ops.NewSequence(
 	"deploy-cctp-chain",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys & configures the CCTP contracts on a chain",
 	func(b cldf_ops.Bundle, dep adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
@@ -86,7 +86,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			addresses = append(addresses, cctpV1ProxyAddressRef)
 		}
 
-		// Deploy/resolve CCTPMessageTransmitterProxy (v1.7.0 op) for CCTPVerifier + CCTP V2 pool wiring.
+		// Deploy/resolve CCTPMessageTransmitterProxy (v2.0.0 op) for CCTPVerifier + CCTP V2 pool wiring.
 		cctpV2MessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
 			ChainSelector:  chain.Selector,
@@ -95,7 +95,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			},
 		}, existingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy v1.7.0: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy v2.0.0: %w", err)
 		}
 		addresses = append(addresses, cctpV2MessageTransmitterProxyRef)
 		cctpV2MessageTransmitterProxyAddress := common.HexToAddress(cctpV2MessageTransmitterProxyRef.Address)
@@ -475,7 +475,7 @@ func applyCCTPAuthorizedCallerWrites(
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPMessageTransmitterProxy v1.7.0: %w", err)
+		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPMessageTransmitterProxy v2.0.0: %w", err)
 	}
 	writes = append(writes, v2MsgTxReport.Output)
 

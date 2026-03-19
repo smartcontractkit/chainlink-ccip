@@ -32,7 +32,7 @@ func (c DeployTokenAndPoolInput) ChainSelector() uint64 {
 
 var DeployTokenAndPool = cldf_ops.NewSequence(
 	"deploy-token-and-pool",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys a token and its associated token pool to an EVM chain, granting rights to the token pool and minting initial supply",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployTokenAndPoolInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)

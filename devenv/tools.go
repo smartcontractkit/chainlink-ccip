@@ -13,7 +13,7 @@ import (
 )
 
 /*
-This code should be generalized and moved to devenv library after we finish CCIPv1.7 environment!
+This code should be generalized and moved to devenv library after we finish CCIPv2.0 environment!
 */
 
 type TimeTracker struct {

@@ -5,11 +5,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // DisableRemoteChainInput provides the local and remote chain info
@@ -83,11 +84,11 @@ func makeDisableApply(
 			chainADef := &ChainDefinition{Selector: lane.ChainA}
 			chainBDef := &ChainDefinition{Selector: lane.ChainB}
 
-			err = populateAddresses(e.DataStore, chainADef, chainAAdapter, lane.Version)
+			err = populateAddresses(e.DataStore, chainADef, chainAAdapter, lane.Version, false)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching addresses for chain %d: %w", lane.ChainA, err)
 			}
-			err = populateAddresses(e.DataStore, chainBDef, chainBAdapter, lane.Version)
+			err = populateAddresses(e.DataStore, chainBDef, chainBAdapter, lane.Version, false)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching addresses for chain %d: %w", lane.ChainB, err)
 			}

@@ -16,7 +16,7 @@ import (
 
 var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 	"deploy-burn-mint-token-pool",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys a burn mint token pool to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {

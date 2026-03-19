@@ -426,8 +426,8 @@ func NewDefaultDeploymentConfigForEVM(version *semver.Version) deploy.ContractDe
 	}
 }
 
-func NewDefaultInputForMCMS(desc string) mcms.Input {
-	return mcms.Input{
+func NewDefaultInputForMCMS(desc string, overrides ...func(*mcms.Input)) mcms.Input {
+	in := mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           math.MaxUint32,
 		TimelockDelay:        mcms_types.MustParseDuration("1s"),
@@ -435,4 +435,8 @@ func NewDefaultInputForMCMS(desc string) mcms.Input {
 		Qualifier:            common_utils.CLLQualifier,
 		Description:          desc,
 	}
+	for _, override := range overrides {
+		override(&in)
+	}
+	return in
 }
