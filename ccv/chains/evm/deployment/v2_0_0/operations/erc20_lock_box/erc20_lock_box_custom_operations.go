@@ -21,6 +21,17 @@ func (c *ERC20LockBoxContract) Deposit(opts *bind.TransactOpts, token common.Add
 	return c.contract.Transact(opts, "deposit", token, arg1, amount)
 }
 
+var Owner = contract.NewRead(contract.ReadParams[struct{}, common.Address, *ERC20LockBoxContract]{
+	Name:         "erc20-lock-box:owner",
+	Version:      Version,
+	Description:  "Calls owner on the contract",
+	ContractType: ContractType,
+	NewContract:  NewERC20LockBoxContract,
+	CallContract: func(c *ERC20LockBoxContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.Owner(opts)
+	},
+})
+
 var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
 	Name:         "erc20-lock-box:deposit",
 	Version:      Version,
