@@ -3,8 +3,6 @@
 package erc20_lock_box
 
 import (
-	"math/big"
-
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -75,10 +73,6 @@ func (c *ERC20LockBoxContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]c
 	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
 }
 
-func (c *ERC20LockBoxContract) Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
-	return c.contract.Transact(opts, "deposit", token, arg1, amount)
-}
-
 func (c *ERC20LockBoxContract) TransferOwnership(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "transferOwnership", args)
 }
@@ -86,12 +80,6 @@ func (c *ERC20LockBoxContract) TransferOwnership(opts *bind.TransactOpts, args c
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
-}
-
-type DepositArgs struct {
-	Token  common.Address
-	Arg1   uint64
-	Amount *big.Int
 }
 
 type ConstructorArgs struct {
@@ -140,24 +128,6 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	NewContract:  NewERC20LockBoxContract,
 	CallContract: func(c *ERC20LockBoxContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
-	},
-})
-
-var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
-	Name:            "erc20-lock-box:deposit",
-	Version:         Version,
-	Description:     "Calls deposit on the contract",
-	ContractType:    ContractType,
-	ContractABI:     ERC20LockBoxABI,
-	NewContract:     NewERC20LockBoxContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*ERC20LockBoxContract, DepositArgs],
-	Validate:        func(DepositArgs) error { return nil },
-	CallContract: func(
-		c *ERC20LockBoxContract,
-		opts *bind.TransactOpts,
-		args DepositArgs,
-	) (*types.Transaction, error) {
-		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
 	},
 })
 
