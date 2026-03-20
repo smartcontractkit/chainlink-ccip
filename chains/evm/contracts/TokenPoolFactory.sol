@@ -124,6 +124,9 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended.
   /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address.
+  /// @param futureOwner The address that will own the token and pool after the transaction. If set to address(0), the
+  /// sender will be the future owner. If the token mints any funds to the factory, the factory will forward these to
+  /// the futureOwner.
   /// @return token The address of the token that was deployed.
   /// @return pool The address of the token pool that was deployed.
   function deployTokenAndTokenPool(
@@ -179,6 +182,8 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param tokenPoolInitCode The creation code for the token pool.
   /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token pool.
+  /// @param futureOwner The address that will own the pool after the transaction. If set to address(0), the sender will
+  /// be the future owner.
   /// @return poolAddress The address of the token pool that was deployed.
   function deployTokenPoolWithExistingToken(
     address token,

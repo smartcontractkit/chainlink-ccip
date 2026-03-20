@@ -16,8 +16,11 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     return "CrossChainToken 2.0.0-dev";
   }
 
+  /// @notice The holder of this role can mint tokens.
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  /// @notice The holder of this role can burn tokens.
   bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+  /// @notice The holder of this role can grant/revoke both the MINTER_ROLE and the BURNER_ROLE.
   bytes32 public constant BURN_MINT_ADMIN_ROLE = keccak256("BURN_MINT_ADMIN_ROLE");
 
   /// @param args The parameters for the ERC20 token, including name, symbol, decimals, max supply, and pre-mint amount.
@@ -49,8 +52,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   // │                      Burning & minting                       │
   // ================================================================
 
+  /// @inheritdoc IBurnMintERC20
   /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
-  /// @dev Decreases the total supply.
   function burn(
     uint256 amount
   ) public virtual override onlyRole(BURNER_ROLE) {
@@ -67,8 +70,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     burnFrom(account, amount);
   }
 
+  /// @inheritdoc IBurnMintERC20
   /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
-  /// @dev Decreases the total supply.
   function burnFrom(
     address account,
     uint256 amount
@@ -80,7 +83,6 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   /// @inheritdoc IBurnMintERC20
   /// @dev Uses OZ ERC20 _mint to disallow minting to address(0).
   /// @dev Disallows minting to address(this)
-  /// @dev Increases the total supply.
   function mint(
     address account,
     uint256 amount
@@ -96,6 +98,7 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   // ================================================================
 
   /// @notice grants both mint and burn roles to `burnAndMinter`.
+  /// @param burnAndMinter The address to be granted both the MINTER_ROLE and BURNER_ROLE.
   /// @dev calls public functions so this function does not require
   /// access controls. This is handled in the inner functions.
   function grantMintAndBurnRoles(
@@ -105,7 +108,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     grantRole(BURNER_ROLE, burnAndMinter);
   }
 
-  /// @notice Overrides the default CCIP admin role setter to require the caller to have the DEFAULT_ADMIN_ROLE.
+  /// @notice Sets the CCIP admin role to `newAdmin`.
+  /// @dev Overrides the default CCIP admin role setter to require the caller to have the DEFAULT_ADMIN_ROLE.
   /// @param newAdmin The address of the new CCIP admin.
   function setCCIPAdmin(
     address newAdmin

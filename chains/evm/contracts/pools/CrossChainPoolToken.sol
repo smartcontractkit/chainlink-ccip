@@ -7,6 +7,8 @@ import {TokenPool} from "./TokenPool.sol";
 import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
+/// @notice A CCIP token pool that is also an ERC20 token. This allows the pool to burn/mint without needing to manage
+/// roles for a separate token contract.
 contract CrossChainPoolToken is TokenPool, BaseERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "CrossChainPoolToken 2.0.0-dev";
@@ -54,6 +56,7 @@ contract CrossChainPoolToken is TokenPool, BaseERC20 {
 
   /// @notice Signals which version of the pool interface is supported.
   /// @param interfaceId The interface identifier, as specified in ERC-165.
+  /// @return True if the contract implements the requested interface, false otherwise.
   function supportsInterface(
     bytes4 interfaceId
   ) public view virtual override(BaseERC20, TokenPool) returns (bool) {
