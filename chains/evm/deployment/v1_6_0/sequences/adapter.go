@@ -81,8 +81,7 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
 	)
-	tooHighVersion := semver.MustParse("3.0.0")
-	ref, err := GetFeeQuoterAddress(refs, chainSelector, tooHighVersion)
+	ref, err := GetFeeQuoterAddress(refs, chainSelector, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +243,7 @@ func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainS
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
 	)
-	tooHighVersion := semver.MustParse("3.0.0")
-	ref, err := GetFeeQuoterAddress(refs, chainSelector, tooHighVersion)
+	ref, err := GetFeeQuoterAddress(refs, chainSelector, nil)
 	if err != nil {
 		return nil, err
 	}
