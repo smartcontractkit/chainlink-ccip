@@ -142,10 +142,9 @@ type MigrateHybridLockReleaseLiquidityInput struct {
 	SiloedUSDCTokenPool string
 	// USDCToken is the address of the USDC token contract.
 	USDCToken string
-	// LockReleaseChainSelectors specifies which remote chains' locked liquidity to migrate.
-	LockReleaseChainSelectors []uint64
-	// LiquidityWithdrawPercent is the percent of locked liquidity to migrate (1-100).
-	LiquidityWithdrawPercent uint8
+	// WithdrawAmounts maps each remote chain selector to the absolute amount of USDC to migrate (raw units, e.g. 6 decimals for USDC).
+	// Each chain must be configured for lock-release on the hybrid pool and have a lockbox on the siloed pool.
+	WithdrawAmounts map[uint64]uint64
 	// MCMSTimelockAddress is the address of the MCMS timelock that will execute the proposal.
 	// Required because the timelock must be authorized on each lockbox to call deposit().
 	MCMSTimelockAddress string

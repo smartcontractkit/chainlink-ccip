@@ -81,7 +81,7 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
 	)
-	ref, err := GetFeeQuoterAddress(refs, chainSelector)
+	ref, err := GetFeeQuoterAddress(refs, chainSelector, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ var ConfigurePingPongSequence = operations.NewSequence(
 // GetFeeQuoterAddress returns the address of the fee quoter contract for a given chain selector.
 // there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version
 // (the next major version on or after 1.6.0).
-func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64) (datastore.AddressRef, error) {
+func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64, tooHighVersion *semver.Version) (datastore.AddressRef, error) {
 	var refs []datastore.AddressRef
 	for _, ref := range addresses {
 		if ref.ChainSelector == chainSelector &&
@@ -186,10 +186,12 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	// tooHighVersion := semver.MustParse("2.0.0") -- to unblock prod-testnet, skip the upper bound of the check
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version
+		if tooHighVersion != nil && v.GreaterThanEqual(tooHighVersion) {
+			continue
+		}
 		if v.GreaterThanEqual(latestVersion) {
 			latestVersion = v
 			feeQRef = ref
