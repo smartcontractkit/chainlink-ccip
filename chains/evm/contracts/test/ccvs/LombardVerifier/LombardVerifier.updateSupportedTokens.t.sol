@@ -130,6 +130,101 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     assertEq(allowanceAfter, 0, "Allowance should be reset to 0 after removal");
   }
 
+  function test_updateSupportedTokens_RotateAdapter_RevokesOldAdapterAllowance() public {
+    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    MockLombardAdapter adapterA = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
+    MockLombardAdapter adapterB = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
+
+    // Add token with adapter A.
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] =
+      LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapterA)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(newToken.allowance(address(s_lombardVerifier), address(adapterA)), type(uint256).max);
+
+    // Rotate to adapter B.
+    tokensToAdd[0] =
+      LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapterB)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(newToken.allowance(address(s_lombardVerifier), address(adapterA)), 0, "Old adapter allowance should be 0");
+    assertEq(
+      newToken.allowance(address(s_lombardVerifier), address(adapterB)),
+      type(uint256).max,
+      "New adapter allowance should be max"
+    );
+  }
+
+  function test_updateSupportedTokens_SwitchFromNoAdapterToAdapter_RevokesBridgeAllowance() public {
+    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
+
+    // Add token without adapter (approved to bridge).
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(0)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(newToken.allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge())), type(uint256).max);
+
+    // Switch to adapter.
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(
+      newToken.allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge())),
+      0,
+      "Bridge allowance should be 0"
+    );
+    assertEq(
+      newToken.allowance(address(s_lombardVerifier), address(adapter)),
+      type(uint256).max,
+      "Adapter allowance should be max"
+    );
+  }
+
+  function test_updateSupportedTokens_SwitchFromAdapterToNoAdapter_RevokesAdapterAllowance() public {
+    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
+
+    // Add token with adapter.
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(newToken.allowance(address(s_lombardVerifier), address(adapter)), type(uint256).max);
+
+    // Switch to no adapter (approved to bridge).
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(0)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(newToken.allowance(address(s_lombardVerifier), address(adapter)), 0, "Adapter allowance should be 0");
+    assertEq(
+      newToken.allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge())),
+      type(uint256).max,
+      "Bridge allowance should be max"
+    );
+  }
+
+  function test_updateSupportedTokens_SameAdapter_NoRedundantRevoke() public {
+    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
+
+    // Add token with adapter.
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    // Re-set the same adapter. Allowance should remain max (no revoke).
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    assertEq(
+      newToken.allowance(address(s_lombardVerifier), address(adapter)),
+      type(uint256).max,
+      "Allowance should remain max when adapter is unchanged"
+    );
+  }
+
   function test_updateSupportedTokens_RevertWhen_NotOwner() public {
     vm.startPrank(STRANGER);
 

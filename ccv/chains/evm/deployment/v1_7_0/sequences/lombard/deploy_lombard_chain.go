@@ -19,12 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lombard_verifier"
 )
 
 const (
@@ -37,7 +37,7 @@ var (
 
 var DeployLombardChain = cldf_ops.NewSequence(
 	"deploy-lombard-chain",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the Lombard chain with all required contracts and configurations",
 	func(b cldf_ops.Bundle, dep adapters.DeployLombardChainDeps, input adapters.DeployLombardInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
@@ -85,12 +85,12 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSelector,
 			Qualifier:      &ContractQualifier,
 			Args: lombard_verifier.ConstructorArgs{
-				Bridge:           lombardBridgeAddress,
-				StorageLocations: input.StorageLocations,
+				Bridge:          lombardBridgeAddress,
+				StorageLocation: input.StorageLocations,
 				DynamicConfig: lombard_verifier.DynamicConfig{
 					FeeAggregator: feeAggregatorAddress,
 				},
-				RMN: rmnAddress,
+				Rmn: rmnAddress,
 			},
 		}, existingAddressesOnChain)
 		if err != nil {
@@ -99,11 +99,11 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		addresses = append(addresses, lombardVerifierRef)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierRef.Address)
 
-		_, err = cldf_ops.ExecuteOperation(b, lombard_verifier.UpdateSupportedTokens, chain, contract_utils.FunctionInput[lombard_verifier.SupportedTokenArgs]{
+		_, err = cldf_ops.ExecuteOperation(b, lombard_verifier.UpdateSupportedTokens, chain, contract_utils.FunctionInput[lombard_verifier.UpdateSupportedTokensArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       lombardVerifierAddress,
-			Args: lombard_verifier.SupportedTokenArgs{
-				TokensToSet: []lombard_verifier.SupportedTokensArgs{
+			Args: lombard_verifier.UpdateSupportedTokensArgs{
+				TokensToSet: []lombard_verifier.SupportedTokenArgs{
 					{
 						LocalToken:   tokenAddress,
 						LocalAdapter: localAdapterAddress,
@@ -118,7 +118,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		// Deploy LombardVerifierResolver if needed
 		lombardVerifierResolverRefs := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chain.Selector),
-			datastore.AddressRefByType(datastore.ContractType(lombard_verifier.ResolverType)),
+			datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType)),
 			datastore.AddressRefByVersion(lombard_verifier.Version),
 			datastore.AddressRefByQualifier(ContractQualifier),
 		)
@@ -131,7 +131,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
 				ChainSelector:  input.ChainSelector,
 				Qualifier:      ContractQualifier,
-				Type:           datastore.ContractType(lombard_verifier.ResolverType),
+				Type:           datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
 				Version:        lombard_verifier.Version,
 				CREATE2Factory: common.HexToAddress(input.DeployerContract),
 			})
@@ -151,7 +151,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			addresses = append(addresses, lombardVerifierResolverRef)
 		}
 
-		versionTagReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.GetVersionTag, chain, contract_utils.FunctionInput[any]{
+		versionTagReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.VersionTag, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       lombardVerifierAddress,
 		})

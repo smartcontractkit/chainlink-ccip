@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -14,6 +15,7 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -24,22 +26,30 @@ import (
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func init() {
-	v, err := semver.NewVersion("1.6.0")
-	if err != nil {
-		panic(err)
-	}
-	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
-	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
-	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
-	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	v := semver.MustParse("1.6.0")
+	// Use a single EVMAdapter instance so the shared transferOwnershipAdapter state is used by
+	// both InitializeTimelockAddress and SequenceTransferOwnershipViaMCMS.
+	evmAdapter := &EVMAdapter{transferOwnershipAdapter: &evm1_0_0.EVMTransferOwnershipAdapter{}}
+	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
+	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
+	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, evmAdapter)
+	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
+	// 1.5.1 token pools use the same abstract TokenPool; use the 1.6.0 adapter for config/transfers.
+	v151 := semver.MustParse("1.5.1")
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v151, evmAdapter)
 }
 
-type EVMAdapter struct{}
+type EVMAdapter struct {
+	// transferOwnershipAdapter is shared so InitializeTimelockAddress populates the same instance
+	// used by SequenceTransferOwnershipViaMCMS / SequenceAcceptOwnership.
+	transferOwnershipAdapter *evm1_0_0.EVMTransferOwnershipAdapter
+}
 
 func (a *EVMAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
@@ -82,6 +92,18 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
+		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *EVMAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.TestRouterContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
@@ -153,7 +175,7 @@ var ConfigurePingPongSequence = operations.NewSequence(
 )
 
 // GetFeeQuoterAddress returns the address of the fee quoter contract for a given chain selector.
-// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version below 1.7.0
+// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version
 // (the next major version on or after 1.6.0).
 func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64) (datastore.AddressRef, error) {
 	var refs []datastore.AddressRef
@@ -164,13 +186,11 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	tooHighVersion := semver.MustParse("1.7.0")
+	// tooHighVersion := semver.MustParse("2.0.0") -- to unblock prod-testnet, skip the upper bound of the check
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version
-		// we want the latest version below 1.7.0
-		if v.GreaterThanEqual(latestVersion) &&
-			v.LessThan(tooHighVersion) {
+		if v.GreaterThanEqual(latestVersion) {
 			latestVersion = v
 			feeQRef = ref
 		}
@@ -179,4 +199,33 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		return datastore.AddressRef{}, fmt.Errorf("no fee quoter address found for chain selector %d", chainSelector)
 	}
 	return feeQRef, nil
+}
+
+func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
+	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
+	return ccipapi.FeeQuoterDestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		V1Params: &ccipapi.FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           10,
+			DestGasPerPayloadByteHigh:         40,
+			DestGasPerPayloadByteThreshold:    3000,
+			DestDataAvailabilityOverheadGas:   100,
+			DestGasPerDataAvailabilityByte:    16,
+			DestDataAvailabilityMultiplierBps: 1,
+			GasMultiplierWeiPerEth:            11e17,
+		},
+	}
+}
+
+func (a *EVMAdapter) GetDefaultGasPrice() *big.Int {
+	return big.NewInt(2e12)
 }

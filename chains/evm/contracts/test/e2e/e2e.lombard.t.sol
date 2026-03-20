@@ -381,6 +381,7 @@ contract e2e_lombard is OnRampSetup {
     // Generate a valid Lombard payload that matches the token transfer data in the message.
     bytes memory fakePayload = _generateValidLombardPayload(
       messageV1.tokenTransfer[0].destTokenAddress,
+      messageV1.sender,
       messageV1.tokenTransfer[0].tokenReceiver,
       messageV1.tokenTransfer[0].amount
     );
@@ -425,18 +426,19 @@ contract e2e_lombard is OnRampSetup {
   /// where msgBody layout (read by assembly in _validatePayload):
   ///   byte 0:       version (1 byte)
   ///   bytes 1..32:  token (32 bytes)
-  ///   bytes 33..64: unused (32 bytes)
+  ///   bytes 33..64: sender (32 bytes)
   ///   bytes 65..96: recipient (32 bytes)
   ///   bytes 97..128: amount (32 bytes)
   function _generateValidLombardPayload(
     bytes memory destToken,
+    bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount
   ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
       Internal._leftPadBytesToBytes32(destToken),
-      bytes32(0),
+      Internal._leftPadBytesToBytes32(sender),
       Internal._leftPadBytesToBytes32(tokenReceiver),
       bytes32(amount)
     );

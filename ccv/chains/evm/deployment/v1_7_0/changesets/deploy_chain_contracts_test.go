@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -87,7 +87,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link_token.ContractType),
+					Type:          datastore.ContractType(link.ContractType),
 					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x01").Hex(),
 				})
@@ -117,7 +117,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 			mcmsRegistry := cs_core.GetRegistry()
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  5009297550715157269,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
@@ -128,9 +128,10 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel:       5009297550715157269,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					Params:         testsetup.CreateBasicContractParams(),
+					ChainSel:         5009297550715157269,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					Params:           testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			})
 			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
@@ -158,7 +159,7 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  5009297550715157269,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
@@ -172,6 +173,7 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			Params:           testsetup.CreateBasicContractParams(),
 			DeployTestRouter: true,
+			DeployerKeyOwned: true,
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")

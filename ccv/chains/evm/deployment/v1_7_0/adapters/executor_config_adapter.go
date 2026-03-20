@@ -3,8 +3,9 @@ package adapters
 import (
 	"fmt"
 
-	offrampoperations "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	execcontract "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	execcontract "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
+	offrampoperations "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	dsutil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -21,7 +22,7 @@ func (a *EVMExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qua
 	}
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByQualifier(qualifier),
-		datastore.AddressRefByType(datastore.ContractType(execcontract.ProxyType)),
+		datastore.AddressRefByType(datastore.ContractType(sequences.ExecutorProxyType)),
 	)
 	seen := make(map[uint64]struct{}, len(refs))
 	chains := make([]uint64, 0, len(refs))
@@ -54,7 +55,7 @@ func (a *EVMExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, chai
 	}
 
 	executorAddr, err := dsutil.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:      datastore.ContractType(execcontract.ProxyType),
+		Type:      datastore.ContractType(sequences.ExecutorProxyType),
 		Qualifier: qualifier,
 		Version:   execcontract.Version,
 	}, chainSelector, toAddress)

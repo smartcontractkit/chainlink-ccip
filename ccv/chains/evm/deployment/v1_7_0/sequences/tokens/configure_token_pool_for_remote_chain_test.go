@@ -6,21 +6,21 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/stretchr/testify/require"
 
-	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	chains_v161_burn_mint "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
-	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	chains_v161_burn_mint "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
+	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -30,9 +30,9 @@ import (
 
 func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
 	return tokens.ConfigureTokenPoolForRemoteChainInput{
-		ChainSelector:                chainSel,
-		TokenPoolAddress:             tokenPoolAddress,
-		AdvancedPoolHooks:            advancedPoolHooksAddress,
+		ChainSelector:               chainSel,
+		TokenPoolAddress:            tokenPoolAddress,
+		AdvancedPoolHooks:           advancedPoolHooksAddress,
 		RemoteChainSelector:         remoteChainSel,
 		RemoteChainAlreadySupported: false,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
@@ -111,8 +111,8 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 
 func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 	tests := []struct {
-		desc                              string
-		makeSecondPassInput               func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
+		desc                               string
+		makeSecondPassInput                func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
 		checkWithFirstPassInputAfterSecond bool // when true, assert on-chain state matches first pass (for empty-input fallback tests)
 	}{
 		{
@@ -202,7 +202,7 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 
 			// Deploy chain
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 				ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
@@ -214,9 +214,10 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
-					ChainSelector:  chainSel,
-					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-					ContractParams: testsetup.CreateBasicContractParams(),
+					ChainSelector:    chainSel,
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:   testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -283,7 +284,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 
 	// Deploy chain (includes TokenAdminRegistry)
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
@@ -295,9 +296,10 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 		sequences.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployChainContractsInput{
-			ChainSelector:  chainSel,
-			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-			ContractParams: testsetup.CreateBasicContractParams(),
+			ChainSelector:    chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")
@@ -317,7 +319,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	require.NotEqual(t, common.Address{}, rmnProxyAddress, "RMN proxy address should be set")
 	require.NotEqual(t, common.Address{}, routerAddress, "Router address should be set")
 
-	// Deploy 1.7.0 token A + pool A (new pool we will configure with import)
+	// Deploy 2.0.0 token A + pool A (new pool we will configure with import)
 	tokenAndPoolReportA, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		tokens.DeployTokenAndPool,
@@ -413,15 +415,15 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	)
 	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain (1.6.1) should not error")
 
-	// Configure pool A (1.7.0) for remote with RegistryAddress and TokenAddress set but rate limits NOT provided (disabled) — should import from pool B
+	// Configure pool A (2.0.0) for remote with RegistryAddress and TokenAddress set but rate limits NOT provided (disabled) — should import from pool B
 	upgradeInput := tokens.ConfigureTokenPoolForRemoteChainInput{
-		ChainSelector:                chainSel,
-		TokenPoolAddress:             poolAAddress,
-		AdvancedPoolHooks:            advancedPoolHooksA,
-		RemoteChainSelector:          remoteChainSel,
-		RegistryAddress:              registryAddress,
-		TokenAddress:                 tokenBAddress,
-		RemoteChainAlreadySupported:  false,
+		ChainSelector:               chainSel,
+		TokenPoolAddress:            poolAAddress,
+		AdvancedPoolHooks:           advancedPoolHooksA,
+		RemoteChainSelector:         remoteChainSel,
+		RegistryAddress:             registryAddress,
+		TokenAddress:                tokenBAddress,
+		RemoteChainAlreadySupported: false,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken:                              common.LeftPadBytes(common.FromHex("0x123"), 32),
 			RemotePool:                               common.LeftPadBytes(common.FromHex("0x456"), 32),

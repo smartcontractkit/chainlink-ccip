@@ -5,7 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
@@ -22,7 +22,7 @@ import (
 
 type ConfigureCREATE2FactoryInput[CONTRACT any] struct {
 	ChainSel         uint64
-	CREATE2Factory  CONTRACT
+	CREATE2Factory   CONTRACT
 	AllowListAdds    []common.Address
 	AllowListRemoves []common.Address
 }
@@ -44,7 +44,7 @@ var ConfigureCREATE2Factory = changesets.NewFromOnChainSequence(changesets.NewFr
 		}
 		return ConfigureCREATE2FactoryInput[common.Address]{
 			ChainSel:         cfg.ChainSel,
-			CREATE2Factory:  create2FactoryAddress,
+			CREATE2Factory:   create2FactoryAddress,
 			AllowListAdds:    cfg.AllowListAdds,
 			AllowListRemoves: cfg.AllowListRemoves,
 		}, nil
@@ -54,7 +54,7 @@ var ConfigureCREATE2Factory = changesets.NewFromOnChainSequence(changesets.NewFr
 
 var configureCREATE2Factory = cldf_ops.NewSequence(
 	"configure-create2-factory",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures the CREATE2Factory contract",
 	func(b operations.Bundle, chain evm.Chain, input ConfigureCREATE2FactoryInput[common.Address]) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)

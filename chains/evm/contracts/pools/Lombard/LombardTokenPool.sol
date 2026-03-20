@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
+import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -62,7 +63,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     bytes32 remoteAdapter;
   }
 
-  string public constant override typeAndVersion = "LombardTokenPool 2.0.0-dev";
+  string public constant override typeAndVersion = "LombardTokenPool 2.0.0";
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
@@ -79,7 +80,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
 
   /// @param verifier The address of Lombard verifier resolver. Used in V2 flows to fetch the outbound
   /// implementation that handles token burns and cross-chain attestations.
-  /// @param bridge The Lombard BridgeV1 contract that handles cross-chain token transfers.
+  /// @param bridge The Lombard Bridge contract that handles cross-chain token transfers.
   /// @param adapter Optional source-chain token address override. Used for non-upgradeable tokens like BTC.b
   /// on Avalanche where an adapter contract performs mint/burn on behalf of the actual token. When set, this
   /// address is passed to bridge.deposit() instead of the pool's token address. Set to address(0) if not needed.
@@ -291,6 +292,21 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     delete s_chainSelectorToPath[remoteChainSelector];
 
     emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteAdapter);
+  }
+
+  function getRequiredCCVs(
+    address,
+    uint64,
+    uint256,
+    uint16,
+    bytes calldata,
+    IPoolV2.MessageDirection
+  ) public view virtual override returns (address[] memory requiredCCVs) {
+    requiredCCVs = new address[](2);
+    requiredCCVs[0] = i_lombardVerifierResolver;
+    requiredCCVs[1] = address(0);
+
+    return requiredCCVs;
   }
 
   // ================================================================

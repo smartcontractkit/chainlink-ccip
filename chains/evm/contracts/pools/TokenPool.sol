@@ -970,7 +970,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint16 blockConfirmationsRequested,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
-  ) external view virtual returns (address[] memory requiredCCVs) {
+  ) public view virtual returns (address[] memory requiredCCVs) {
     if (address(s_advancedPoolHooks) == address(0)) {
       return new address[](0);
     }

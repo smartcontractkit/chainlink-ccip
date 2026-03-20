@@ -5,8 +5,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -29,7 +29,7 @@ type DeployVerifierResolverViaCREATE2Output struct {
 
 var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 	"deploy-verifier-resolver-via-create2",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the VerifierResolver contract via CREATE2Factory",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployVerifierResolverViaCREATE2Input) (output DeployVerifierResolverViaCREATE2Output, err error) {
 		addresses := make([]datastore.AddressRef, 0)

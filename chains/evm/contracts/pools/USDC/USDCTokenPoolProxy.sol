@@ -55,7 +55,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     CCV
   }
 
-  string public constant override typeAndVersion = "USDCTokenPoolProxy 2.0.0-dev";
+  string public constant override typeAndVersion = "USDCTokenPoolProxy 2.0.0";
 
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;

@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -75,7 +75,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 
 			// Expect both contract types to be present
 			exists := map[deployment.ContractType]bool{
-				deployment.ContractType(committee_verifier.ContractType): false,
+				deployment.ContractType(committee_verifier.ContractType):         false,
 				deployment.ContractType(sequences.CommitteeVerifierResolverType): false,
 			}
 			for _, addr := range report.Output.Addresses {
@@ -152,7 +152,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 
 	// Expect all contract types to be present
 	exists := map[deployment.ContractType]bool{
-		deployment.ContractType(committee_verifier.ContractType): false,
+		deployment.ContractType(committee_verifier.ContractType):         false,
 		deployment.ContractType(sequences.CommitteeVerifierResolverType): false,
 	}
 	for _, addr := range redundantReport.Output.Addresses {

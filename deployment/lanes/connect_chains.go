@@ -2,18 +2,24 @@ package lanes
 
 import (
 	"fmt"
+	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-// ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
-func ConnectChains(tokenRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConnectChainsConfig] {
-	return cldf.CreateChangeSet(makeApply(tokenRegistry, mcmsRegistry), makeVerify(tokenRegistry, mcmsRegistry))
+// ConnectChains returns a changeset that configures CCIP lanes between chains using the provided lane and MCMS registries.
+func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConnectChainsConfig] {
+	return cldf.CreateChangeSet(makeApply(laneRegistry, mcmsRegistry), makeVerify(laneRegistry, mcmsRegistry))
 }
 
 func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
@@ -46,14 +52,18 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(e.DataStore, chainA, chainAAdapter)
+			err = populateAddresses(e.DataStore, chainA, chainAAdapter, lane.Version, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(e.DataStore, chainB, chainBAdapter)
+			err = populateAddresses(e.DataStore, chainB, chainBAdapter, lane.Version, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
+			// to allow for type serialization, we apply fee quoter dest chain config overrides
+			// at the lane level and then set them to nil before passing to the adapters
+			chainA.FeeQuoterDestChainConfigOverrides = nil
+			chainB.FeeQuoterDestChainConfigOverrides = nil
 			type lanePair struct {
 				src         *ChainDefinition
 				dest        *ChainDefinition
@@ -81,6 +91,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 					}
 				}
+				// Write metadata to datastore
+				err = sequences.WriteMetadataToDatastore(ds, configureLaneReport.Output.Metadata)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to write metadata to datastore: %w", err)
+				}
 
 				configureLaneReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, pair.destAdapter.ConfigureLaneLegAsDest(), e.BlockChains, UpdateLanesInput{
 					Source:       pair.src,
@@ -99,6 +114,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 					}
 				}
+				// Write metadata to datastore
+				err = sequences.WriteMetadataToDatastore(ds, configureLaneReport.Output.Metadata)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to write metadata to datastore: %w", err)
+				}
 			}
 		}
 
@@ -110,7 +130,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) error {
+func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool) error {
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
 	if err != nil {
@@ -128,5 +148,121 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
 	}
+	if isTestRouter {
+		if tp, ok := adapter.(TestRouterProvider); ok {
+			chainDef.Router, err = tp.GetTestRouter(ds, chainDef.Selector)
+			if err != nil {
+				return fmt.Errorf("error fetching test router address for chain %d: %w", chainDef.Selector, err)
+			}
+		}
+	}
+	chainDef.FeeQuoterDestChainConfig = adapter.GetFeeQuoterDestChainConfig()
+	if chainDef.FeeQuoterDestChainConfigOverrides != nil {
+		(*chainDef.FeeQuoterDestChainConfigOverrides)(&chainDef.FeeQuoterDestChainConfig)
+	}
+	if chainDef.GasPrice == nil {
+		chainDef.GasPrice = adapter.GetDefaultGasPrice()
+	}
+	if chainDef.TokenPrices == nil {
+		populateTokenPrices(ds, chainDef, adapter)
+	}
+
+	// handle v2 separately
+	return populateAddressesV2(ds, chainDef, adapter, version)
+}
+
+// This function is V2 fields only
+func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version) error {
+	if version.LessThan(common_utils.Version_2_0_0) {
+		return nil
+	}
+	committeeVerifiers := make([]CommitteeVerifierConfig[datastore.AddressRef], len(chainDef.CommitteeVerifiers))
+	for i, verifier := range chainDef.CommitteeVerifiers {
+		contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))
+		for _, contract := range verifier.CommitteeVerifier {
+			contract, err := datastore_utils.FindAndFormatRef(ds, contract, contract.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return fmt.Errorf("failed to resolve CommitteeVerifier contract ref on chain with selector %d: %w", chainDef.Selector, err)
+			}
+			contracts = append(contracts, contract)
+		}
+		committeeVerifiers[i] = CommitteeVerifierConfig[datastore.AddressRef]{
+			CommitteeVerifier: contracts,
+			RemoteChains:      verifier.RemoteChains,
+		}
+	}
+	chainDef.CommitteeVerifiers = committeeVerifiers
+
+	executor, err := datastore_utils.FindAndFormatRef(ds, chainDef.DefaultExecutor, chainDef.DefaultExecutor.ChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return fmt.Errorf("failed to resolve executor ref on chain with selector %d: %w", chainDef.Selector, err)
+	}
+	chainDef.DefaultExecutor = executor
+
+	laneMandatedInboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.LaneMandatedInboundCCVs))
+	for _, ccv := range chainDef.LaneMandatedInboundCCVs {
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
+		}
+		laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, resolvedCCV)
+	}
+	chainDef.LaneMandatedInboundCCVs = laneMandatedInboundCCVs
+
+	laneMandatedOutboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.LaneMandatedOutboundCCVs))
+	for _, ccv := range chainDef.LaneMandatedOutboundCCVs {
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
+		}
+		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, resolvedCCV)
+	}
+	chainDef.LaneMandatedOutboundCCVs = laneMandatedOutboundCCVs
+
+	defaultInboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.DefaultInboundCCVs))
+	for _, ccv := range chainDef.DefaultInboundCCVs {
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
+		}
+		defaultInboundCCVs = append(defaultInboundCCVs, resolvedCCV)
+	}
+	chainDef.DefaultInboundCCVs = defaultInboundCCVs
+
+	defaultOutboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.DefaultOutboundCCVs))
+	for _, ccv := range chainDef.DefaultOutboundCCVs {
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
+		}
+		defaultOutboundCCVs = append(defaultOutboundCCVs, resolvedCCV)
+	}
+	chainDef.DefaultOutboundCCVs = defaultOutboundCCVs
 	return nil
+}
+
+func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) {
+	var tokenPrices map[datastore.ContractType]*big.Int
+	// Check if adapter implements TokenPriceProvider (optional interface)
+	priceProvider, ok := adapter.(TokenPriceProvider)
+	if !ok {
+		return
+	}
+
+	// Get prices keyed by contract type
+	tokenPrices = priceProvider.GetDefaultTokenPrices()
+
+	// Resolve contract types to addresses
+	addressPrices := make(map[string]*big.Int)
+	for contractType, price := range tokenPrices {
+		refs := ds.Addresses().Filter(
+			datastore.AddressRefByType(contractType),
+			datastore.AddressRefByChainSelector(chainDef.Selector),
+		)
+		for _, ref := range refs {
+			addressPrices[ref.Address] = price
+		}
+	}
+
+	chainDef.TokenPrices = addressPrices
 }

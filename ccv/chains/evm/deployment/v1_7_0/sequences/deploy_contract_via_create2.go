@@ -5,7 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -34,7 +34,7 @@ type DeployContractViaCREATE2Output struct {
 // The contract is deployed and ownership is transferred to the chain deployer key.
 var DeployContractViaCREATE2 = cldf_ops.NewSequence(
 	"deploy-contract-via-create2",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys a contract via CREATE2Factory with deterministic address",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployContractViaCREATE2Input) (output DeployContractViaCREATE2Output, err error) {
 		addresses := make([]datastore.AddressRef, 0)

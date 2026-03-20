@@ -6,33 +6,60 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/mock_receiver_v2"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/proxy"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 )
+
+type proxyAcceptOwnershipArgs struct {
+	IsProposedOwner bool
+}
+
+var proxyAcceptOwnership = contract_utils.NewWrite(contract_utils.WriteParams[proxyAcceptOwnershipArgs, *proxy_bindings.Proxy]{
+	Name:         "proxy:accept-ownership",
+	Version:      proxy.Version,
+	Description:  "Accept ownership of the proxy",
+	ContractType: proxy.ContractType,
+	ContractABI:  proxy.ProxyABI,
+	NewContract:  proxy_bindings.NewProxy,
+	IsAllowedCaller: func(_ *proxy_bindings.Proxy, _ *bind.CallOpts, _ common.Address, args proxyAcceptOwnershipArgs) (bool, error) {
+		return args.IsProposedOwner, nil
+	},
+	Validate: func(proxyAcceptOwnershipArgs) error { return nil },
+	CallContract: func(p *proxy_bindings.Proxy, opts *bind.TransactOpts, _ proxyAcceptOwnershipArgs) (*types.Transaction, error) {
+		return p.AcceptOwnership(opts)
+	},
+})
 
 type MockReceiverParams struct {
 	Version *semver.Version
@@ -45,6 +72,8 @@ type MockReceiverParams struct {
 	// or will be deployed by the DeployChainContracts sequence.
 	OptionalVerifiers []datastore.AddressRef
 	OptionalThreshold uint8
+	// MinimumBlockConfirmations is the minimum block depth that the mock receiver will accept.
+	MinimumBlockConfirmations uint16
 	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
 	// If only one mock receiver is deployed this can be left blank.
 	Qualifier string
@@ -81,7 +110,7 @@ type FeeQuoterParams struct {
 type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
-	DynamicConfig executor.SetDynamicConfigArgs
+	DynamicConfig executor.DynamicConfig
 	Qualifier     string
 }
 
@@ -101,17 +130,34 @@ type DeployChainContractsInput struct {
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 	DeployTestRouter  bool
+	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
+	// contracts remain owned by the deployer key. By default (false) the
+	// sequence looks up the existing CLLCCIP RBACTimelock in ExistingAddresses
+	// and transfers ownership of product contracts to it, failing fast if the
+	// required MCMS instances are not found.
+	DeployerKeyOwned bool
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
-	semver.MustParse("1.7.0"),
-	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
+	semver.MustParse("2.0.0"),
+	"Deploys all required contracts for CCIP 2.0.0 to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
+		ownableContracts := make([]ownableContract, 0)
 
-		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
+		var cllccipTimelockAddr, rmnTimelockAddr common.Address
+		if !input.DeployerKeyOwned {
+			var mcmContracts []ownableContract
+			cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, err = ResolveOwnershipDeps(
+				input.ExistingAddresses, chain.Selector,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve ownership dependencies: %w", err)
+			}
+			ownableContracts = append(ownableContracts, mcmContracts...)
+		}
 
 		// Deploy WETH
 		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
@@ -124,13 +170,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract_utils.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
+		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract_utils.DeployInput[link.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *link.Version),
 			ChainSelector:  chain.Selector,
-			Args: burn_mint_erc20_with_drip.ConstructorArgs{
-				Name:   "LINK",
-				Symbol: "LINK",
-			},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -301,6 +343,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy FeeQuoter
+		priceUpdaters := []common.Address{chain.DeployerKey.From}
+		if cllccipTimelockAddr != (common.Address{}) {
+			priceUpdaters = append(priceUpdaters, cllccipTimelockAddr)
+		}
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
 			ChainSelector:  chain.Selector,
@@ -309,13 +355,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
-				PriceUpdaters: []common.Address{
-					// Price updates via protocol are out of scope for initial launch.
-					// TODO: Add Timelock here when MCMS support is needed.
-					chain.DeployerKey.From,
-				},
+				PriceUpdaters: priceUpdaters,
 				// Skipped fields:
-				// - TokenPriceFeeds (will not be used in 1.7.0)
+				// - TokenPriceFeeds (will not be used in 2.0.0)
 				// - TokenTransferFeeConfigArgs (token+lane-specific config, set elsewhere)
 				// - DestChainConfigArgs (lane-specific config, set elsewhere)
 			},
@@ -461,6 +503,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w, params: %+v", err, executorParam)
 			}
 			addresses = append(addresses, executorRef)
+			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorRef.Address), executor.ContractType, []common.Address{cllccipTimelockAddr}})
 
 			// Fetch the dynamic config on the Executor
 			dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
@@ -480,10 +523,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
 				dynamicConfigReport.Output.MinBlockConfirmations != executorParam.DynamicConfig.MinBlockConfirmations ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.SetDynamicConfigArgs]{
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.DynamicConfig]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorRef.Address),
-					Args: executor.SetDynamicConfigArgs{
+					Args: executor.DynamicConfig{
 						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
 						MinBlockConfirmations: executorParam.DynamicConfig.MinBlockConfirmations,
 						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
@@ -498,7 +541,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			// Deploy ExecutorProxy via CREATE2
 			var executorProxyRef *datastore.AddressRef
 			for _, ref := range input.ExistingAddresses {
-				if ref.Type == datastore.ContractType(executor.ProxyType) &&
+				if ref.Type == datastore.ContractType(ExecutorProxyType) &&
 					ref.Version.String() == executor.Version.String() &&
 					(qualifierPtr == nil || ref.Qualifier == *qualifierPtr) {
 					executorProxyRef = &ref
@@ -513,11 +556,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				deployExecutorProxyViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployContractViaCREATE2, chain, DeployContractViaCREATE2Input{
 					ChainSelector:  chain.Selector,
 					Qualifier:      *qualifierPtr,
-					Type:           datastore.ContractType(executor.ProxyType),
+					Type:           datastore.ContractType(ExecutorProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
-					ABI:            proxy.ABI,
-					BIN:            proxy.Bin,
+					ABI:            proxy.ProxyABI,
+					BIN:            proxy.ProxyBin,
 					ConstructorArgs: []any{
 						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
 						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.
@@ -537,10 +580,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				executorProxyRef = &deployExecutorProxyViaCREATE2Report.Output.Addresses[0]
 
 				// Accept ownership of the ExecutorProxy
-				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract_utils.FunctionInput[proxy.AcceptOwnershipArgs]{
+				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxyAcceptOwnership, chain, contract_utils.FunctionInput[proxyAcceptOwnershipArgs]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args: proxy.AcceptOwnershipArgs{
+					Args: proxyAcceptOwnershipArgs{
 						IsProposedOwner: true,
 					},
 				})
@@ -549,9 +592,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				}
 				writes = append(writes, acceptOwnershipReport.Output)
 			}
+			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorProxyRef.Address), ExecutorProxyType, []common.Address{cllccipTimelockAddr}})
 
 			// Fetch the target on the ExecutorProxy
-			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[any]{
+			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
 			})
@@ -573,7 +617,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 
 			// Fetch the fee aggregator on the ExecutorProxy
-			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[any]{
+			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
 			})
@@ -608,9 +652,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
 				ChainSelector:  chain.Selector,
 				Args: mock_receiver.ConstructorArgs{
-					RequiredVerifiers: requiredVerifiers,
-					OptionalVerifiers: optionalVerifiers,
-					OptionalThreshold: mockReceiverParams.OptionalThreshold,
+					Required:  requiredVerifiers,
+					Optional:  optionalVerifiers,
+					Threshold: mockReceiverParams.OptionalThreshold,
 				},
 				Qualifier: qualifierPtr,
 			})
@@ -618,6 +662,62 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
 			}
 			addresses = append(addresses, deployReceiverReport.Output)
+
+			// Set minimum block depth on the MockReceiver if diff exists
+			if mockReceiverParams.MinimumBlockConfirmations != 0 {
+				// Get the minimum block depth on the MockReceiver
+				minimumBlockConfirmations, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockConfirmations, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+					Args: mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs{
+						Arg0: chain.Selector,
+						Arg1: []byte{},
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
+				}
+				if minimumBlockConfirmations.Output.MinBlockDepth != mockReceiverParams.MinimumBlockConfirmations {
+					// Set the minimum block depth on the MockReceiver
+					setMinimumBlockConfirmationsReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockConfirmations, chain, contract_utils.FunctionInput[uint16]{
+						ChainSelector: chain.Selector,
+						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+						Args:          mockReceiverParams.MinimumBlockConfirmations,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set minimum block depth on MockReceiver: %w", err)
+					}
+					writes = append(writes, setMinimumBlockConfirmationsReport.Output)
+				}
+			}
+		}
+
+		// Transfer ownership of MCM and product contracts to the CLLCCIP timelock.
+		// MCM contracts (Proposer, Bypasser, Canceller) were added to ownableContracts
+		// during the MCMS validation above; product contracts are added here.
+		if cllccipTimelockAddr != (common.Address{}) {
+			ownableContracts = append(ownableContracts,
+				ownableContract{common.HexToAddress(rmnRemoteRef.Address), rmn_remote.ContractType, []common.Address{cllccipTimelockAddr, rmnTimelockAddr}},
+				ownableContract{common.HexToAddress(routerRef.Address), router.ContractType, []common.Address{cllccipTimelockAddr}},
+				ownableContract{common.HexToAddress(tokenAdminRegistryRef.Address), token_admin_registry.ContractType, []common.Address{cllccipTimelockAddr}},
+				// ownableContract{common.HexToAddress(registryModuleOwnerCustomRef.Address), registry_module_owner_custom.ContractType},
+				ownableContract{common.HexToAddress(feeQuoterRef.Address), fee_quoter.ContractType, []common.Address{cllccipTimelockAddr}},
+				ownableContract{common.HexToAddress(offRampRef.Address), offramp.ContractType, []common.Address{cllccipTimelockAddr}},
+				ownableContract{common.HexToAddress(onRampRef.Address), onramp.ContractType, []common.Address{cllccipTimelockAddr}},
+			)
+			if err := transferContractsOwnership(b, chain, ownableContracts, cllccipTimelockAddr); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership to CLLCCIP timelock: %w", err)
+			}
+
+			// Ensure both timelocks are self-governed: the CLLCCIP timelock should be
+			// admin of both itself and the RMNMCMS timelock. If the deployer still holds
+			// the admin role on either, fix it now so incomplete earlier setups are healed.
+			if err := ensureTimelockSelfGoverned(b, chain, cllccipTimelockAddr, cllccipTimelockAddr, []common.Address{cllccipTimelockAddr}); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure CLLCCIP timelock is self-governed: %w", err)
+			}
+			if err := ensureTimelockSelfGoverned(b, chain, rmnTimelockAddr, cllccipTimelockAddr, []common.Address{cllccipTimelockAddr, rmnTimelockAddr}); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure RMNMCMS timelock is governed by CLLCCIP timelock: %w", err)
+			}
 		}
 
 		var batchOps []mcms_types.BatchOperation
@@ -634,6 +734,218 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+type ownableContract struct {
+	Address      common.Address
+	ContractType deployment.ContractType
+	// AcceptableOwners lists addresses that are considered valid owners besides
+	// the target newOwner. If the contract is already owned by any of these, no
+	// transfer is performed. For example, RMN MCM contracts may be acceptably
+	// owned by either the CLL timelock or the RMN timelock.
+	AcceptableOwners []common.Address
+}
+
+// ResolveOwnershipDeps looks up the MCMS contracts required for ownership
+// transfer from existingAddresses. It returns the CLL and RMN timelock
+// addresses together with the MCM contracts (Proposer, Bypasser, Canceller)
+// wrapped as ownableContracts so the caller can include them in the
+// transfer-ownership pass.
+func ResolveOwnershipDeps(
+	existingAddresses []datastore.AddressRef,
+	chainSelector uint64,
+) (cllccipTimelockAddr, rmnTimelockAddr common.Address, mcmContracts []ownableContract, err error) {
+	existingDS := datastore.NewMemoryDataStore()
+	for _, ref := range existingAddresses {
+		if addErr := existingDS.Addresses().Add(ref); addErr != nil && !errors.Is(addErr, datastore.ErrAddressRefExists) {
+			return common.Address{}, common.Address{}, nil,
+				fmt.Errorf("failed to add existing address to datastore (%+v): %w", ref, addErr)
+		}
+	}
+	mcmsDS := existingDS.Seal()
+
+	cllccipTimelockAddr, err = datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+		Type:      datastore.ContractType(common_utils.RBACTimelock),
+		Qualifier: common_utils.CLLQualifier,
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return common.Address{}, common.Address{}, nil,
+			fmt.Errorf("ownership transfer requires CLLCCIP RBACTimelock in ExistingAddresses: %w", err)
+	}
+
+	rmnTimelockAddr, err = datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+		Type:      datastore.ContractType(common_utils.RBACTimelock),
+		Qualifier: common_utils.RMNTimelockQualifier,
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return common.Address{}, common.Address{}, nil,
+			fmt.Errorf("ownership transfer requires RMNMCMS RBACTimelock in ExistingAddresses: %w", err)
+	}
+
+	// Look up MCM contracts (Proposer, Bypasser, Canceller) for both qualifiers
+	// so we can transfer their ownership to the CLL timelock.
+	// RMN MCM contracts are also acceptably owned by the RMN timelock (since
+	// proposals target a single MCMS instance); CLL MCMs must be owned by the
+	// CLL timelock exclusively.
+	mcmTypes := []deployment.ContractType{
+		common_utils.ProposerManyChainMultisig,
+		common_utils.BypasserManyChainMultisig,
+		common_utils.CancellerManyChainMultisig,
+	}
+	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
+		acceptableOwners := []common.Address{cllccipTimelockAddr}
+		if qualifier == common_utils.RMNTimelockQualifier {
+			acceptableOwners = append(acceptableOwners, rmnTimelockAddr)
+		}
+		for _, ct := range mcmTypes {
+			addr, err := datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+				Type:      datastore.ContractType(ct),
+				Qualifier: qualifier,
+			}, chainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return common.Address{}, common.Address{}, nil,
+					fmt.Errorf("ownership transfer requires MCM contract (type=%s, qualifier=%s) in ExistingAddresses: %w",
+						ct, qualifier, err)
+			}
+			mcmContracts = append(mcmContracts, ownableContract{
+				Address:          addr,
+				ContractType:     ct,
+				AcceptableOwners: acceptableOwners,
+			})
+		}
+	}
+
+	return cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, nil
+}
+
+// transferContractsOwnership transfers ownership of the given contracts to newOwner.
+// For each contract:
+//   - If already owned by newOwner or any of the contract's AcceptableOwners, skip.
+//   - If owned by the deployer, transfer to newOwner.
+//   - Otherwise, error (unexpected owner).
+func transferContractsOwnership(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	contracts []ownableContract,
+	newOwner common.Address,
+) error {
+	for _, c := range contracts {
+		currentOwner, ownable, err := mcms_seq.LoadOwnableContract(c.Address, chain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to load ownable contract %s (%s): %w", c.Address, c.ContractType, err)
+		}
+		if currentOwner == newOwner {
+			b.Logger.Infof("Contract %s (%s) already owned by %s, skipping transfer", c.Address, c.ContractType, newOwner)
+			continue
+		}
+		acceptable := false
+		for _, ao := range c.AcceptableOwners {
+			if currentOwner == ao {
+				acceptable = true
+				break
+			}
+		}
+		if acceptable {
+			b.Logger.Infof("Contract %s (%s) owned by acceptable owner %s, skipping transfer", c.Address, c.ContractType, currentOwner)
+			continue
+		}
+		if currentOwner != chain.DeployerKey.From {
+			return fmt.Errorf(
+				"contract %s (%s) is owned by %s, which is neither the deployer %s nor the target owner %s; cannot transfer",
+				c.Address, c.ContractType, currentOwner, chain.DeployerKey.From, newOwner,
+			)
+		}
+		deps := mcms_ops.OpEVMOwnershipDeps{
+			Chain:    chain,
+			OwnableC: ownable,
+		}
+		_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpTransferOwnership, deps, mcms_ops.OpTransferOwnershipInput{
+			ChainSelector:   chain.Selector,
+			Address:         c.Address,
+			ProposedOwner:   newOwner,
+			ContractType:    c.ContractType,
+			TimelockAddress: newOwner,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to transfer ownership of %s (%s) to %s: %w", c.Address, c.ContractType, newOwner, err)
+		}
+	}
+	return nil
+}
+
+// ensureTimelockSelfGoverned checks that newAdmin holds ADMIN_ROLE on the given
+// timelock. If the deployer still has admin, the function grants the role to newAdmin
+// and renounces the deployer's admin. This is idempotent: if newAdmin is already admin
+// and the deployer is not, the function is a no-op.
+func ensureTimelockSelfGoverned(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	timelockAddr common.Address,
+	newAdmin common.Address,
+	acceptableAdmins []common.Address,
+) error {
+	timelock, err := mcms_seq.LoadTimelockContract(timelockAddr, chain.Client)
+	if err != nil {
+		return fmt.Errorf("failed to load timelock contract %s: %w", timelockAddr, err)
+	}
+
+	var adminHasRole bool
+	for _, acceptableAdmin := range acceptableAdmins {
+		adminHasRole, err = timelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, acceptableAdmin)
+		if err != nil {
+			return fmt.Errorf("failed to check admin role for acceptable admin %s on timelock %s: %w", acceptableAdmin, timelockAddr, err)
+		}
+		if adminHasRole {
+			b.Logger.Infof("Timelock %s is already governed by acceptable admin %s", timelockAddr, acceptableAdmin)
+			break
+		}
+	}
+
+	deployerHasRole, err := timelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, chain.DeployerKey.From)
+	if err != nil {
+		return fmt.Errorf("failed to check admin role for deployer %s on timelock %s: %w", chain.DeployerKey.From, timelockAddr, err)
+	}
+
+	if adminHasRole && !deployerHasRole {
+		b.Logger.Infof("Timelock %s is already governed by %s, deployer is not admin — no action needed", timelockAddr, newAdmin)
+		return nil
+	}
+
+	if !deployerHasRole {
+		return fmt.Errorf(
+			"timelock %s: new admin %s does not have ADMIN_ROLE and deployer %s does not have ADMIN_ROLE; cannot fix governance",
+			timelockAddr, newAdmin, chain.DeployerKey.From,
+		)
+	}
+
+	if !adminHasRole {
+		_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpGrantRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpGrantRoleTimelockInput]{
+			ChainSelector: chain.Selector,
+			Address:       timelockAddr,
+			Args: mcms_ops.OpGrantRoleTimelockInput{
+				RoleID:  mcms_ops.ADMIN_ROLE.ID,
+				Account: newAdmin,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to grant ADMIN_ROLE to %s on timelock %s: %w", newAdmin, timelockAddr, err)
+		}
+		b.Logger.Infof("Granted ADMIN_ROLE on timelock %s to %s", timelockAddr, newAdmin)
+	}
+
+	_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpRenounceRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpRenounceRoleTimelockInput]{
+		ChainSelector: chain.Selector,
+		Address:       timelockAddr,
+		Args: mcms_ops.OpRenounceRoleTimelockInput{
+			RoleID: mcms_ops.ADMIN_ROLE.ID,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to renounce deployer ADMIN_ROLE on timelock %s: %w", timelockAddr, err)
+	}
+	b.Logger.Infof("Renounced deployer ADMIN_ROLE on timelock %s", timelockAddr)
+
+	return nil
+}
 
 // getMockReceiverVerifiers finds the required and optional verifier addresses given the mock receiver
 // params, the addresses of the newly deployed contracts, and the addresses of the existing contracts.

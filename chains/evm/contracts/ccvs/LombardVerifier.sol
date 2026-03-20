@@ -35,6 +35,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error MustTransferTokens();
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
+  error InvalidSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
 
@@ -78,9 +79,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     address localAdapter;
   }
 
-  string public constant typeAndVersion = "LombardVerifier 2.0.0-dev";
+  string public constant typeAndVersion = "LombardVerifier 2.0.0";
   /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
-  bytes4 private constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
+  /// The preimage is bytes4(keccak256("LombardVerifier 2.0.0")).
+  bytes4 private constant VERSION_TAG_V2_0_0 = 0xeba55588;
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.
@@ -192,25 +194,23 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     // For some tokens we need to override the source token with an adapter.
-    address localAdapter = s_supportedTokens.get(sourceToken);
-    if (localAdapter != address(0)) {
-      sourceToken = localAdapter;
-    }
-
+    address bridgeTokenOrAdapter;
     {
-      bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
+      address localAdapter = s_supportedTokens.get(sourceToken);
+      bridgeTokenOrAdapter = localAdapter != address(0) ? localAdapter : sourceToken;
+      bytes32 remoteTokenOrAdapter = i_bridge.getAllowedDestinationToken(path.lChainId, bridgeTokenOrAdapter);
       bytes32 expectedDestToken = Internal._leftPadBytesToBytes32(tokenTransfer.destTokenAddress);
-      if (remoteToken != expectedDestToken) {
+      if (remoteTokenOrAdapter != expectedDestToken) {
         bytes32 remoteAdapter = s_remoteAdapters[destChainSelector][sourceToken];
-        if (remoteAdapter == bytes32(0) || remoteToken != remoteAdapter) {
-          revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, remoteAdapter);
+        if (remoteAdapter == bytes32(0) || remoteTokenOrAdapter != remoteAdapter) {
+          revert RemoteTokenOrAdapterMismatch(remoteTokenOrAdapter, expectedDestToken, remoteAdapter);
         }
       }
     }
 
     (, bytes32 payloadHash) = i_bridge.deposit({
       destinationChain: path.lChainId,
-      token: sourceToken,
+      token: bridgeTokenOrAdapter,
       sender: abi.decode(sender, (address)),
       // Left pad receiver to 32 bytes if not already 32 bytes.
       recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
@@ -234,9 +234,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
-    bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
-    if (versionPrefix != VERSION_TAG_V2_0_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
+    {
+      bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
+      if (versionPrefix != VERSION_TAG_V2_0_0) {
+        revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
+      }
     }
 
     if (ccvData.length < PAYLOAD_START_INDEX) {
@@ -249,67 +251,90 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
-    bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:proofDataStartIndex];
 
     _validatePayload(
-      rawPayload,
+      ccvData[PAYLOAD_START_INDEX:proofDataStartIndex], // rawPayload
+      message.sender,
       message.tokenTransfer[0].destTokenAddress,
       message.tokenTransfer[0].tokenReceiver,
       message.tokenTransfer[0].amount
     );
 
-    uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
-    uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
+    {
+      uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
+      uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
 
-    if (ccvData.length < proofStartIndex + proofLength) {
-      revert InvalidVerifierResults();
-    }
-    bytes calldata proof = ccvData[proofStartIndex:proofStartIndex + proofLength];
+      if (ccvData.length < proofStartIndex + proofLength) {
+        revert InvalidVerifierResults();
+      }
 
-    (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
-    if (!executed) {
-      revert ExecutionError();
-    }
-    // The bridged message is expected to be the version tag and message id.
-    if (bridgedMessage.length != BRIDGED_MESSAGE_SIZE) {
-      revert InvalidMessageLength(BRIDGED_MESSAGE_SIZE, bridgedMessage.length);
-    }
-    bytes4 version;
-    bytes32 returnedMessageId;
-    assembly {
-      // Load version from first 4 bytes.
-      version := mload(add(bridgedMessage, 0x20))
-      // Load messageId from bytes 4-36.
-      returnedMessageId := mload(add(bridgedMessage, 0x24))
-    }
-    if (version != VERSION_TAG_V2_0_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
-    }
-    if (returnedMessageId != messageId) {
-      revert InvalidMessageId(messageId, returnedMessageId);
+      (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox())
+        .deliverAndHandle(
+          ccvData[PAYLOAD_START_INDEX:proofDataStartIndex], // rawPayload
+          ccvData[proofStartIndex:proofStartIndex + proofLength] // proof
+        );
+      if (!executed) {
+        revert ExecutionError();
+      }
+      if (bridgedMessage.length != BRIDGED_MESSAGE_SIZE) {
+        revert InvalidMessageLength(BRIDGED_MESSAGE_SIZE, bridgedMessage.length);
+      }
+      bytes4 version;
+      bytes32 returnedMessageId;
+      assembly {
+        version := mload(add(bridgedMessage, 0x20))
+        returnedMessageId := mload(add(bridgedMessage, 0x24))
+      }
+      if (version != VERSION_TAG_V2_0_0) {
+        revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
+      }
+      if (returnedMessageId != messageId) {
+        revert InvalidMessageId(messageId, returnedMessageId);
+      }
     }
   }
 
   function _validatePayload(
     bytes calldata rawPayload,
+    bytes calldata expectedSender,
     bytes calldata expectedToken,
     bytes calldata expectedReceiver,
     uint256 expectedAmount
-  ) internal pure {
-    (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
-
+  ) internal view {
     bytes32 rawToToken;
+    bytes32 rawSender;
     bytes32 rawRecipient;
     uint256 amount;
-    assembly {
-      rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
-      rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
-      amount := mload(add(msgBody, 0x81)) // bytes 97..128
+    {
+      (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+      assembly {
+        rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
+        rawSender := mload(add(msgBody, 0x41)) // bytes 33..64
+        rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
+        amount := mload(add(msgBody, 0x81)) // bytes 97..128
+      }
     }
 
-    bytes32 expectedTokenLeftPadded = Internal._leftPadBytesToBytes32(expectedToken);
-    if (rawToToken != expectedTokenLeftPadded) {
-      revert InvalidToken(expectedTokenLeftPadded, rawToToken);
+    {
+      bytes32 expected = Internal._leftPadBytesToBytes32(expectedToken);
+      // When a local adapter is configured, the bridge payload encodes the adapter address
+      // instead of the local token address.
+      address localToken = address(bytes20(expectedToken));
+      if (s_supportedTokens.contains(localToken)) {
+        address localAdapter = s_supportedTokens.get(localToken);
+        if (localAdapter != address(0)) {
+          expected = Internal._leftPadBytesToBytes32(abi.encodePacked(localAdapter));
+        }
+      }
+      if (rawToToken != expected) {
+        revert InvalidToken(expected, rawToToken);
+      }
+    }
+    {
+      bytes32 expected = Internal._leftPadBytesToBytes32(expectedSender);
+      if (rawSender != expected) {
+        revert InvalidSender(expected, rawSender);
+      }
     }
     if (rawRecipient != Internal._leftPadBytesToBytes32(expectedReceiver)) {
       revert InvalidReceiver(expectedReceiver);
@@ -359,7 +384,19 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < tokensToSet.length; ++i) {
       SupportedTokenArgs memory tokenToAdd = tokensToSet[i];
-      // No-op if the token is already supported.
+
+      // If the token already exists and the adapter is changing, revoke the old approval.
+      if (s_supportedTokens.contains(tokenToAdd.localToken)) {
+        address oldAdapter = s_supportedTokens.get(tokenToAdd.localToken);
+        if (oldAdapter != tokenToAdd.localAdapter) {
+          if (oldAdapter != address(0)) {
+            IERC20(tokenToAdd.localToken).forceApprove(oldAdapter, 0);
+          } else {
+            IERC20(tokenToAdd.localToken).forceApprove(address(i_bridge), 0);
+          }
+        }
+      }
+
       s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
       // If adapter exists, approve token->adapter for adapter-mediated burn/bridge flow.
@@ -471,6 +508,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     AllowlistConfigArgs[] calldata allowlistConfigArgsItems
   ) external onlyOwner {
     _applyAllowlistUpdates(allowlistConfigArgsItems);
+  }
+
+  /// @notice Updates the storage location identifiers.
+  /// @param newLocations The new storage location identifiers.
+  function updateStorageLocations(
+    string[] memory newLocations
+  ) external onlyOwner {
+    _setStorageLocations(newLocations);
   }
 
   /// @notice Exposes the version tag.

@@ -15,14 +15,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
+	rmn161 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-var ContractType cldf_deployment.ContractType = "RMNRemote"
-var ProgramName = "rmn_remote"
-var Version *semver.Version = semver.MustParse("1.6.0")
+var (
+	ContractType cldf_deployment.ContractType = "RMNRemote"
+	ProgramName                               = "rmn_remote"
+	Version      *semver.Version              = semver.MustParse("1.6.0")
+)
 
 type CurseInput struct {
 	Subjects           []api.Subject
@@ -250,6 +253,53 @@ var Uncurse = operations.NewOperation(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm uncurse instruction: %w", err)
 				}
+			}
+		}
+		return sequences.OnChainOutput{BatchOps: batches}, nil
+	},
+)
+
+type EventAuthoritiesInput struct {
+	EventAuthorities   []solana.PublicKey
+	RMNRemote          solana.PublicKey
+	RMNRemoteConfigPDA solana.PublicKey
+}
+
+var SetEventAuthorities = operations.NewOperation(
+	"rmn-remote:set-event-authorities",
+	Version,
+	"Sets the event authorities list on the RMNRemote contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input EventAuthoritiesInput) (sequences.OnChainOutput, error) {
+		rmn161.SetProgramID(input.RMNRemote)
+
+		authority := GetAuthority(chain, input.RMNRemote)
+
+		ixn, err := rmn161.NewSetEventAuthoritiesInstruction(
+			input.EventAuthorities,
+			input.RMNRemoteConfigPDA,
+			authority,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set event authorities instruction: %w", err)
+		}
+
+		batches := make([]types.BatchOperation, 0)
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.RMNRemote.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			err := chain.Confirm([]solana.Instruction{ixn})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set-event-authorities instruction: %w", err)
 			}
 		}
 		return sequences.OnChainOutput{BatchOps: batches}, nil

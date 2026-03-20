@@ -29,12 +29,12 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectEmit();
     emit CCIPClientExampleWithCCVs.CCVConfigSet(
-      SOURCE_CHAIN_SELECTOR, requiredCCVs, optionalCCVs, optionalThreshold, false
+      SOURCE_CHAIN_SELECTOR, requiredCCVs, optionalCCVs, optionalThreshold, args[0].allowFasterThanFinality
     );
     s_client.applyCCVConfigUpdates(args);
 
@@ -44,12 +44,12 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       address[] memory retRequiredCCVs,
       address[] memory retOptionalCCVs,
       uint8 retOptionalThreshold,
-      uint16 minBlockDepth
-    ) = s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR, sender);
+      uint16 minBlockConfirmations
+    ) = s_client.getCCVsAndMinBlockConfirmations(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
-    assertEq(minBlockDepth, 1);
+    assertEq(minBlockConfirmations, 1);
     for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertEq(retRequiredCCVs[i], requiredCCVs[i]);
     }
@@ -72,7 +72,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(
@@ -100,7 +100,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: new address[](1),
       optionalCCVs: new address[](0),
       optionalThreshold: 1,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(
@@ -123,7 +123,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCIPClientExampleWithCCVs.ZeroAddressNotAllowedAsOptional.selector));
@@ -144,7 +144,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
       optionalThreshold: optionalThreshold,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     vm.expectRevert(
@@ -153,7 +153,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     s_client.applyCCVConfigUpdates(args);
   }
 
-  function test_getCCVsAndMinBlockDepth_RequireFinality_ReturnsZeroMinBlockDepth() public {
+  function test_getCCVsAndMinBlockConfirmations_RequireFinality_ReturnsZeroMinBlockConfirmations() public {
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);
 
@@ -163,21 +163,21 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: new address[](0),
       optionalThreshold: 0,
-      requireFinality: true
+      allowFasterThanFinality: false
     });
 
     s_client.applyCCVConfigUpdates(args);
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
 
-    (address[] memory retRequired,,, uint16 minBlockDepth) =
-      s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR, sender);
+    (address[] memory retRequired,,, uint16 minBlockConfirmations) =
+      s_client.getCCVsAndMinBlockConfirmations(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    assertEq(minBlockDepth, 0);
+    assertEq(minBlockConfirmations, 0);
   }
 
-  function test_getCCVsAndMinBlockDepth_NoRequireFinality_ReturnsNonZeroMinBlockDepth() public {
+  function test_getCCVsAndMinBlockConfirmations_NoRequireFinality_ReturnsNonZeroMinBlockConfirmations() public {
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);
 
@@ -187,17 +187,17 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       requiredCCVs: requiredCCVs,
       optionalCCVs: new address[](0),
       optionalThreshold: 0,
-      requireFinality: false
+      allowFasterThanFinality: true
     });
 
     s_client.applyCCVConfigUpdates(args);
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
 
-    (address[] memory retRequired,,, uint16 minBlockDepth) =
-      s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR, sender);
+    (address[] memory retRequired,,, uint16 minBlockConfirmations) =
+      s_client.getCCVsAndMinBlockConfirmations(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    assertEq(minBlockDepth, 1);
+    assertEq(minBlockConfirmations, 1);
   }
 }

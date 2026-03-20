@@ -453,26 +453,14 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 			// For a BnM token + BnM token pool, we need to grant the pool mint and burn roles on the token
 			isToknTypeBnM := toknRef.Type.String() == bnmERC20ops.ContractType.String()
 			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
-			if isPoolTypeBnM && isToknTypeBnM {
-				// NOTE: the pool ref isn't in the datastore yet so
-				// we locate it from the sequence output addresses.
-				poolRef, foundIt := datastore.AddressRef{}, false
-				for _, addrRef := range out.Output.Addresses {
-					isPoolRef := addrRef.ChainSelector == input.ChainSelector &&
-						addrRef.Qualifier == input.TokenPoolQualifier &&
-						addrRef.Type.String() == input.PoolType &&
-						addrRef.Address != ""
-
-					if isPoolRef {
-						poolRef = addrRef
-						foundIt = true
-						break
-					}
-				}
-
-				if !foundIt {
-					return sequences.OnChainOutput{}, fmt.Errorf("deployed token pool address for qualifier %q on chain %d not found in output addresses", input.TokenPoolQualifier, input.ChainSelector)
-				}
+			if isPoolTypeBnM && isToknTypeBnM && len(out.Output.Addresses) >= 1 {
+				// NOTE: the pool ref isn't in the datastore yet so we need to fetch it from
+				// the DeployTokenPool sequence output. It is assumed that the sequence will
+				// return at least one AddressRef{} if the pool was deployed. The 1st ref is
+				// assumed to be the token pool ref. If the token pool was already in the DS
+				// (i.e. no addresses were returned from the seq) then we skip this step and
+				// assume that permissions were already setup.
+				poolRef := out.Output.Addresses[0]
 
 				poolAddrBytes, err := a.AddressRefToBytes(poolRef)
 				if err != nil {
@@ -620,7 +608,7 @@ func (a *EVMAdapter) GetTokenAddressFromFullTokenPoolRef(b cldf_ops.Bundle, chai
 func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.AddressRef) (common.Address, error) {
 	// Define the version range
 	minVersion := semver.MustParse("1.5.0") // inclusive
-	maxVersion := semver.MustParse("1.7.0") // exclusive
+	maxVersion := semver.MustParse("2.0.0") // exclusive
 
 	// Build the filter
 	filter := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
@@ -645,7 +633,7 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	// Get all matching token pool addresses
 	refs := ds.Addresses().Filter(filter...)
 
-	// Use the latest version found within the specified range
+	// Use the latest version found within the specified range.
 	var latestRef datastore.AddressRef
 	latestVer := minVersion
 	doesExist := false
@@ -736,4 +724,8 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 			}
 			return result, nil
 		})
+}
+
+func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
 }

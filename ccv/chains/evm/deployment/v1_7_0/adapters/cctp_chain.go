@@ -13,10 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/cctp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
 )
 
 var _ adapters.CCTPChain = &CCTPChainAdapter{}
@@ -32,6 +32,12 @@ func (c *CCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.Deplo
 // ConfigureCCTPChainForLanes returns the sequence for configuring a CCTP chain for lanes.
 func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[adapters.ConfigureCCTPChainForLanesInput, seq_core.OnChainOutput, adapters.ConfigureCCTPChainForLanesDeps] {
 	return cctp.ConfigureCCTPChainForLanes
+}
+
+// MigrateHybridLockReleaseLiquidity returns the sequence for migrating liquidity from a HybridLockReleaseUSDCTokenPool
+// into per-chain siloed lockboxes on the home chain.
+func (c *CCTPChainAdapter) MigrateHybridLockReleaseLiquidity() *operations.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, seq_core.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
+	return cctp.MigrateHybridLockReleaseLiquidity
 }
 
 // CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.

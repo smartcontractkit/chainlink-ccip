@@ -2,10 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
+import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
@@ -39,7 +41,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
           bytes32(uint256(uint160(receiver))),
           TRANSFER_AMOUNT,
           ALLOWED_CALLER,
-          abi.encodePacked(bytes4(keccak256("LombardVerifier 2.0.0")), messageId)
+          abi.encodePacked(VERSION_TAG_V2_0_0, messageId)
         )
       )
     );
@@ -66,7 +68,6 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
 
-    vm.stopPrank();
     vm.startPrank(OWNER);
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
@@ -76,10 +77,9 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     address receiver = makeAddr("receiver");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(tokenWithAdapter, receiver);
     s_mockBridge.setAllowedDestinationToken(
-      LOMBARD_CHAIN_ID, adapter, bytes32(message.tokenTransfer[0].destTokenAddress)
+      LOMBARD_CHAIN_ID, adapter, Internal._leftPadBytesToBytes32(message.tokenTransfer[0].destTokenAddress)
     );
 
-    vm.stopPrank();
     vm.startPrank(s_onRamp);
 
     // Should succeed - the adapter is used for the bridge deposit.
@@ -102,7 +102,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
       abi.encodeWithSelector(
         LombardVerifier.RemoteTokenOrAdapterMismatch.selector,
         remoteToken,
-        bytes32(message.tokenTransfer[0].destTokenAddress),
+        Internal._leftPadBytesToBytes32(message.tokenTransfer[0].destTokenAddress),
         bytes32(0)
       )
     );
@@ -124,12 +124,64 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), REMOTE_ADAPTER);
 
-    vm.stopPrank();
     vm.startPrank(s_onRamp);
-
     bytes memory verifierData = s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
     bytes32 payloadHash = abi.decode(verifierData, (bytes32));
     assertEq(payloadHash, s_mockBridge.s_lastPayloadHash());
+  }
+
+  /// @notice Verifies that bridge calls use the local adapter address while s_remoteAdapters is keyed by the
+  /// original token. Asserts exact arguments via expectCall on getAllowedDestinationToken and deposit.
+  function test_forwardToVerifier_WithLocalAdapterAndRemoteAdapter() public {
+    address tokenWithAdapter = address(new BurnMintERC20("Token With Adapter", "TWA", 18, 0, 0));
+    address localAdapter = address(new MockLombardAdapter(address(s_mockBridge), tokenWithAdapter));
+
+    deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
+
+    vm.startPrank(OWNER);
+
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: tokenWithAdapter, localAdapter: localAdapter});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    // Remote adapter is keyed by the original token, not the local adapter.
+    LombardVerifier.RemoteAdapterArgs[] memory adapterArgs = new LombardVerifier.RemoteAdapterArgs[](1);
+    adapterArgs[0] = LombardVerifier.RemoteAdapterArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: tokenWithAdapter, remoteAdapter: REMOTE_ADAPTER
+    });
+    s_lombardVerifier.setRemoteAdapters(adapterArgs);
+
+    // Bridge maps the local adapter (not the original token) to the remote adapter.
+    s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, localAdapter, REMOTE_ADAPTER);
+
+    address receiver = makeAddr("receiver");
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(tokenWithAdapter, receiver);
+
+    vm.startPrank(s_onRamp);
+
+    // Assert getAllowedDestinationToken is called with the local adapter address, not the original token.
+    vm.expectCall(
+      address(s_mockBridge), abi.encodeCall(IBridgeV2.getAllowedDestinationToken, (LOMBARD_CHAIN_ID, localAdapter))
+    );
+
+    // Assert deposit is called with the local adapter as the token argument.
+    vm.expectCall(
+      address(s_mockBridge),
+      abi.encodeCall(
+        IBridgeV3.deposit,
+        (
+          LOMBARD_CHAIN_ID,
+          localAdapter,
+          OWNER,
+          bytes32(uint256(uint160(receiver))),
+          TRANSFER_AMOUNT,
+          ALLOWED_CALLER,
+          abi.encodePacked(VERSION_TAG_V2_0_0, messageId)
+        )
+      )
+    );
+
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
   }
 
   function test_forwardToVerifier_RevertWhen_MustTransferTokens() public {
@@ -200,9 +252,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     address randomCaller = makeAddr("randomCaller");
 
-    vm.stopPrank();
-    vm.startPrank(randomCaller);
-
+    changePrank(randomCaller);
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, randomCaller));
     s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
   }

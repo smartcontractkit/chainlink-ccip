@@ -78,7 +78,7 @@ func (m *cctpTest_MockCCTPChain) DeployCCTPChain() *cldf_ops.Sequence[adapters.D
 						ChainSelector: input.ChainSelector,
 						Address:       "0x6666666666666666666666666666666666666666",
 						Type:          datastore.ContractType("USDCTokenPoolProxy"),
-						Version:       semver.MustParse("1.7.0"),
+						Version:       semver.MustParse("2.0.0"),
 					},
 				},
 				BatchOps: []mcms_types.BatchOperation{},
@@ -98,6 +98,21 @@ func (m *cctpTest_MockCCTPChain) ConfigureCCTPChainForLanes() *cldf_ops.Sequence
 				Addresses: []datastore.AddressRef{},
 				BatchOps:  []mcms_types.BatchOperation{},
 			}, nil
+		},
+	)
+}
+
+// MigrateHybridLockReleaseLiquidity returns a mock sequence for migrating liquidity.
+func (m *cctpTest_MockCCTPChain) MigrateHybridLockReleaseLiquidity() *cldf_ops.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, sequences.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
+	return cldf_ops.NewSequence(
+		"mock-migrate-hybrid-lock-release-liquidity-sequence",
+		semver.MustParse("1.0.0"),
+		"Mock sequence for testing hybrid lock-release liquidity migration",
+		func(bundle cldf_ops.Bundle, deps adapters.MigrateHybridLockReleaseLiquidityDeps, input adapters.MigrateHybridLockReleaseLiquidityInput) (sequences.OnChainOutput, error) {
+			if m.sequenceErrorMsg != "" {
+				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
+			}
+			return sequences.OnChainOutput{}, nil
 		},
 	)
 }
@@ -198,21 +213,21 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 					ChainSelector: chainSelector,
 					Address:       "0x6666666666666666666666666666666666666666",
 					Type:          datastore.ContractType("USDCTokenPoolProxy"),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       semver.MustParse("2.0.0"),
 				})
 				require.NoError(t, err)
 				err = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chainSelector,
 					Address:       "0x7777777777777777777777777777777777777777",
 					Type:          datastore.ContractType("CCTPVerifier"),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       semver.MustParse("2.0.0"),
 				})
 				require.NoError(t, err)
 				err = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chainSelector,
 					Address:       "0x8888888888888888888888888888888888888888",
 					Type:          datastore.ContractType("MessageTransmitterProxy"),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       semver.MustParse("2.0.0"),
 				})
 				require.NoError(t, err)
 				return ds

@@ -17,7 +17,7 @@ import {BurnMintTokenPool} from "../BurnMintTokenPool.sol";
 contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure override returns (string memory) {
-    return "BurnMintWithLockReleaseFlagTokenPool 2.0.0-dev";
+    return "BurnMintWithLockReleaseFlagTokenPool 2.0.0";
   }
 
   constructor(

@@ -8,6 +8,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -15,12 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/stretchr/testify/require"
+
+	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
@@ -145,7 +147,8 @@ func checkBidirectionalLaneConnectivity(
 
 		feeQuoterDestConfig, err := feeQuoterOnSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 		require.NoError(t, err, "must get dest chain config from feeQuoter")
-		expectedConfig := convertOpsConfigToGobinding(sequences.TranslateFQ(lane.Dest.FeeQuoterDestChainConfig))
+		a := &sequences.EVMAdapter{}
+		expectedConfig := convertOpsConfigToGobinding(sequences.TranslateFQ(a.GetFeeQuoterDestChainConfig()))
 		require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 		price, err := feeQuoterOnSrc.GetDestinationChainGasPrice(nil, lane.Dest.Selector)
@@ -191,14 +194,12 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 		e.DataStore = out.DataStore.Seal()
 	}
 	chain1 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e17),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e17),
 	}
 	chain2 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.POLYGON_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.POLYGON_MAINNET.Selector),
+		Selector: chain_selectors.POLYGON_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{

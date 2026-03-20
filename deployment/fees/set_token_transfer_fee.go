@@ -101,6 +101,11 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
+		type FeeGroup struct {
+			adapter  FeeAdapter
+			settings map[uint64]map[string]*TokenTransferFeeArgs
+		}
+
 		for _, src := range cfg.Args {
 			srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
 			if err != nil {
@@ -112,33 +117,66 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
 			}
 
+			// Build version-grouped settings: version -> settings map
+			versionGroups := map[string]FeeGroup{}
+
 			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
+
+				feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, dst.Selector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
+				}
+
+				// Normalize fee contract version to major.minor.0 for adapter lookup, as patch versions should not affect compatibility
+				v := feeContractRef.Version
+				lookupVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()))
+
+				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
+				if !exists {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, feeContractRef.Version.String())
+				}
+
 				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					if args, err := inferTokenTransferFeeArgs(adapter, e, src.Selector, dst.Selector, feeCfg); err != nil {
+					if args, err := inferTokenTransferFeeArgs(updater, e, src.Selector, dst.Selector, feeCfg); err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
 					} else {
 						settings[dst.Selector][feeCfg.Address] = args
 					}
 				}
+
+				versionKey := lookupVersion.String()
+				if _, exists := versionGroups[versionKey]; !exists {
+					versionGroups[versionKey] = FeeGroup{
+						adapter:  updater,
+						settings: map[uint64]map[string]*TokenTransferFeeArgs{},
+					}
+				}
+
+				// Process settings for this dst with its version's adapter
+				versionGroups[versionKey].settings[dst.Selector] = settings[dst.Selector]
 			}
 
-			report, err := cldf_ops.ExecuteSequence(
-				e.OperationsBundle,
-				adapter.SetTokenTransferFee(e),
-				e.BlockChains,
-				SetTokenTransferFeeSequenceInput{
-					Selector: src.Selector,
-					Settings: settings,
-				},
-			)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to set token transfer fee config for selector %d: %w", src.Selector, err)
+			// Execute updates grouped by adapter version
+			for _, group := range versionGroups {
+				report, err := cldf_ops.ExecuteSequence(
+					e.OperationsBundle,
+					group.adapter.SetTokenTransferFee(e),
+					e.BlockChains,
+					SetTokenTransferFeeSequenceInput{
+						Selector: src.Selector,
+						Settings: group.settings,
+					},
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to set token transfer fee config for selector %d: %w", src.Selector, err)
+				}
+
+				batchOps = append(batchOps, report.Output.BatchOps...)
+				reports = append(reports, report.ExecutionReports...)
 			}
 
-			batchOps = append(batchOps, report.Output.BatchOps...)
-			reports = append(reports, report.ExecutionReports...)
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
