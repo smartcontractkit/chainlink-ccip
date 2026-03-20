@@ -24,7 +24,7 @@ flowchart LR
                 cllb1_6[ConfigureLaneLegBidirectionally]
                 ctft1_6[ConfigureTokenForTransfers]
             end
-            subgraph v1.7.0
+            subgraph v2.0.0
                 clls1_7[ConfigureChainForLanes]
                 ctft1_7[ConfigureTokenForTransfers]
             end
@@ -94,7 +94,7 @@ mcmsReg.RegisterMCMSReader("evm", evm.MCMSReader{})
 mcmsReg.RegisterMCMSReader("solana", solana.MCMSReader{})
 
 tokenAdapterReg := tokens.NewTokenAdapterRegistry()
-tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), evm1_7_0.TokenAdapter{})
+tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("2.0.0"), evm1_7_0.TokenAdapter{})
 tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), evm1_5_1.TokenAdapter{})
 tokenAdapterReg.RegisterTokenAdapter("solana", semver.MustParse("1.6.2"), solana1_6_2.TokenAdapter{})
 

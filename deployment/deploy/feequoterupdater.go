@@ -340,14 +340,14 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 				}
 				feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
 
-			if isNewFeeQuoterDeployment && timelockAddr != "" {
-				fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, &e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
+				if isNewFeeQuoterDeployment && timelockAddr != "" {
+					fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, &e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
+					}
+					batchOps = append(batchOps, fqTransferBatches...)
+					reports = append(reports, fqTransferReports...)
 				}
-				batchOps = append(batchOps, fqTransferBatches...)
-				reports = append(reports, fqTransferReports...)
-			}
 			}
 			if perChainInput.RampsVersion != nil {
 				if feeQuoterAddrRef.Address == "" {
@@ -388,7 +388,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithDataStore(ds).
-			WithSingleBatchOpPerChain(batchOps).
+			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }

@@ -253,6 +253,10 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 				return fmt.Errorf("failed to get pool for token %s from token admin registry at %s on chain %d: %w",
 					tokenAddr.String(), tokenAdminRegAddr.String(), chain.Selector, err)
 			}
+			if poolAddr == (common.Address{}) {
+				// no pool configured for this token, skip
+				return nil
+			}
 			tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 			if err != nil {
 				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)

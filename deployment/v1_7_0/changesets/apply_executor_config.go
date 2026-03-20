@@ -19,9 +19,9 @@ import (
 )
 
 type ApplyExecutorConfigInput struct {
-	Topology           *offchain.EnvironmentTopology
-	ExecutorQualifier  string
-	TargetNOPs         []shared.NOPAlias
+	Topology          *offchain.EnvironmentTopology
+	ExecutorQualifier string
+	TargetNOPs        []shared.NOPAlias
 	// RevokeOrphanedJobs when true revokes and cleans up orphaned jobs; default false.
 	RevokeOrphanedJobs bool
 }
@@ -108,7 +108,6 @@ func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry) deployment.C
 			}
 			return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports, DataStore: manageReport.Output.DataStore}, nil
 		}
-
 
 		nopsToValidate := cfg.TargetNOPs
 		if len(nopsToValidate) == 0 {
@@ -319,7 +318,7 @@ func buildExecutorJobSpecs(
 		chainCfgs := make(map[string]offchain.ExecutorChainCfg)
 		for chainSelectorStr, genCfg := range chainConfigs {
 			chainCfg, ok := pool.ChainConfigs[chainSelectorStr]
-			if !ok || !slices.Contains(chainCfg.NOPAliases, string(nopAlias)) {
+			if !ok {
 				continue
 			}
 			chainCfgs[chainSelectorStr] = offchain.ExecutorChainCfg{

@@ -29,7 +29,7 @@ type DeployVerifierResolverViaCREATE2Output struct {
 
 var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 	"deploy-verifier-resolver-via-create2",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys the VerifierResolver contract via CREATE2Factory",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployVerifierResolverViaCREATE2Input) (output DeployVerifierResolverViaCREATE2Output, err error) {
 		addresses := make([]datastore.AddressRef, 0)

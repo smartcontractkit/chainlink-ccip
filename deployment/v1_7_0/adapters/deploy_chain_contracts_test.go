@@ -11,7 +11,7 @@ import (
 )
 
 func TestMergeIfNotEmpty(t *testing.T) {
-	v170 := semver.MustParse("1.7.0")
+	v170 := semver.MustParse("2.0.0")
 
 	t.Run("empty source returns base unchanged", func(t *testing.T) {
 		base := DeployContractParams{
