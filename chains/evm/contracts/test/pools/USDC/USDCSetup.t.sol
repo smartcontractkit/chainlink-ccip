@@ -13,8 +13,8 @@ import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 

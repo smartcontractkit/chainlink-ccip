@@ -6,8 +6,8 @@ import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_AddToken() public {
@@ -131,7 +131,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   }
 
   function test_updateSupportedTokens_RotateAdapter_RevokesOldAdapterAllowance() public {
-    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    CrossChainToken newToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     MockLombardAdapter adapterA = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
     MockLombardAdapter adapterB = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
@@ -157,7 +163,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   }
 
   function test_updateSupportedTokens_SwitchFromNoAdapterToAdapter_RevokesBridgeAllowance() public {
-    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    CrossChainToken newToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
     // Add token without adapter (approved to bridge).
@@ -184,7 +196,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   }
 
   function test_updateSupportedTokens_SwitchFromAdapterToNoAdapter_RevokesAdapterAllowance() public {
-    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    CrossChainToken newToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
     // Add token with adapter.
@@ -207,7 +225,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   }
 
   function test_updateSupportedTokens_SameAdapter_NoRedundantRevoke() public {
-    BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
+    CrossChainToken newToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
     // Add token with adapter.

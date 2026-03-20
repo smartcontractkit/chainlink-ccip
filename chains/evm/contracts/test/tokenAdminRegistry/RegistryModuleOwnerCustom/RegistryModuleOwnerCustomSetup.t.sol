@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 import {Test} from "forge-std/Test.sol";
 

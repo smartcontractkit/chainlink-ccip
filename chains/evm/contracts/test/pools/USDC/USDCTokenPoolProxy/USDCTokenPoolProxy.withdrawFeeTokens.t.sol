@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {FeeTokenHandler} from "../../../../libraries/FeeTokenHandler.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {BaseERC20} from "../../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../../tokens/CrossChainToken.sol";
 
 contract USDCTokenPoolProxy_withdrawFeeTokens is USDCTokenPoolProxySetup {
   address internal s_feeAggregator = makeAddr("feeAggregator");
