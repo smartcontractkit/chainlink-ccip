@@ -160,6 +160,12 @@ contract TokenPoolFactory is ITypeAndVersion {
       crossChainToken.renounceRole(crossChainToken.BURN_MINT_ADMIN_ROLE(), address(this));
     }
 
+    // If the token was pre-minted to this contract, transfer it to the future owner.
+    uint256 factoryTokenBalance = crossChainToken.balanceOf(address(this));
+    if (factoryTokenBalance > 0) {
+      crossChainToken.transfer(futureOwner, factoryTokenBalance);
+    }
+
     // Set the token pool for token in the token admin registry since this contract is the ccipAdmin.
     _setTokenPoolInTokenAdminRegistry(token, pool, futureOwner);
 

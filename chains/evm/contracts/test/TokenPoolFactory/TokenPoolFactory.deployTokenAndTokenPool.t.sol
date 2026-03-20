@@ -263,6 +263,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       address(0)
     );
 
+    assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).totalSupply(), "Total supply should match premint amount");
+    assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).balanceOf(OWNER), "The OWNER should have the tokens");
+
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
 
     assertEq(
@@ -721,7 +724,12 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       type(CrossChainToken).creationCode,
       abi.encode(
         BaseERC20.ConstructorParams({
-          name: "TestToken", symbol: "TT", decimals: LOCAL_TOKEN_DECIMALS, maxSupply: 0, preMint: 0, ccipAdmin: factory
+          name: "TestToken",
+          symbol: "TT",
+          decimals: LOCAL_TOKEN_DECIMALS,
+          maxSupply: 0,
+          preMint: PREMINT_AMOUNT,
+          ccipAdmin: factory
         }),
         factory,
         futureOwner
@@ -739,6 +747,11 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       address(0),
       FAKE_SALT,
       futureOwner
+    );
+
+    assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).totalSupply(), "Total supply should match premint amount");
+    assertEq(
+      PREMINT_AMOUNT, IERC20Metadata(tokenAddress).balanceOf(futureOwner), "All tokens should be minted to futureOwner"
     );
 
     // futureOwner accepts the 2-step transfers

@@ -52,7 +52,12 @@ contract e2e_factoryDeployedPool is e2e {
       type(CrossChainToken).creationCode,
       abi.encode(
         BaseERC20.ConstructorParams({
-          name: "FactoryToken", symbol: "FTK", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: address(s_factory)
+          name: "FactoryToken",
+          symbol: "FTK",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: PREMINT,
+          ccipAdmin: address(s_factory)
         }),
         address(s_factory),
         OWNER
@@ -89,7 +94,7 @@ contract e2e_factoryDeployedPool is e2e {
 
     CrossChainToken destToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "FactoryToken", symbol: "FTK", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "FactoryToken", symbol: "FTK", decimals: 18, maxSupply: 0, preMint: PREMINT, ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -159,12 +164,15 @@ contract e2e_factoryDeployedPool is e2e {
     uint256 destSupplyBefore = IERC20(s_destToken).totalSupply();
     uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
 
-    assertEq(PREMINT, senderBalanceBefore);
-    assertEq(PREMINT, sourceSupplyBefore);
-    assertEq(0, destBalanceBefore);
-    assertEq(0, destSupplyBefore);
+    // We both minted in the constructor and minted more after claiming admin, so total supply and balance should be 2x
+    // PREMINT.
+    assertEq(PREMINT * 2, senderBalanceBefore);
+    assertEq(PREMINT * 2, sourceSupplyBefore);
+    // Destination token was pre-minted but not minted after, so should be exactly PREMINT.
+    assertEq(PREMINT, destBalanceBefore);
+    assertEq(PREMINT, destSupplyBefore);
 
-    // Approve Router to spend tokens
+    // Approve Router to spend tokens.
     IERC20(s_factoryToken).approve(address(s_sourceRouter), TOKEN_TRANSFER_AMOUNT);
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
 
@@ -177,17 +185,17 @@ contract e2e_factoryDeployedPool is e2e {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_factoryToken, amount: TOKEN_TRANSFER_AMOUNT});
 
-    // Source: send via Router, tokens get burned
+    // Source: send via Router, tokens get burned.
     vm.recordLogs();
     bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
 
     assertEq(senderBalanceBefore - TOKEN_TRANSFER_AMOUNT, IERC20(s_factoryToken).balanceOf(OWNER));
     assertEq(sourceSupplyBefore - TOKEN_TRANSFER_AMOUNT, IERC20(s_factoryToken).totalSupply());
 
-    // Extract encodedMessage from the CCIPMessageSent event
+    // Extract encodedMessage from the CCIPMessageSent event.
     bytes memory encodedMessage = _getEncodedMessageFromLogs(vm.getRecordedLogs());
 
-    // Dest: execute on OffRamp, tokens get minted
+    // Dest: execute on OffRamp, tokens get minted.
     address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = s_destVerifier;
 
@@ -202,8 +210,8 @@ contract e2e_factoryDeployedPool is e2e {
 
     s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
 
-    assertEq(TOKEN_TRANSFER_AMOUNT, IERC20(s_destToken).balanceOf(OWNER));
-    assertEq(TOKEN_TRANSFER_AMOUNT, IERC20(s_destToken).totalSupply());
+    assertEq(destBalanceBefore + TOKEN_TRANSFER_AMOUNT, IERC20(s_destToken).balanceOf(OWNER));
+    assertEq(destSupplyBefore + TOKEN_TRANSFER_AMOUNT, IERC20(s_destToken).totalSupply());
   }
 
   /// @notice End-to-end test: a sender/receiver pair enables cross-chain factory deployments via CCIP.
@@ -276,7 +284,7 @@ contract e2e_factoryDeployedPool is e2e {
 
     CrossChainToken token = CrossChainToken(deployedToken);
 
-    // Verify: neither deployer contracts nor factory retain any permissions
+    // Verify: neither deployer contracts nor factory retain any permissions.
     assertFalse(token.hasRole(token.DEFAULT_ADMIN_ROLE(), address(sourceDeployer)));
     assertFalse(token.hasRole(token.DEFAULT_ADMIN_ROLE(), address(destDeployer)));
     assertFalse(token.hasRole(token.DEFAULT_ADMIN_ROLE(), address(destFactory)));
@@ -285,13 +293,13 @@ contract e2e_factoryDeployedPool is e2e {
     assertNotEq(BurnMintTokenPool(deployedPool).owner(), address(destDeployer));
     assertNotEq(BurnMintTokenPool(deployedPool).owner(), address(destFactory));
 
-    // Verify: alice has full control
+    // Verify: alice has full control.
     assertTrue(token.hasRole(token.DEFAULT_ADMIN_ROLE(), alice));
     assertEq(token.owner(), alice);
     assertEq(BurnMintTokenPool(deployedPool).owner(), alice);
     assertEq(s_tokenAdminRegistry.getTokenConfig(deployedToken).administrator, alice);
 
-    // Verify: pool has mint and burn roles
+    // Verify: pool has mint and burn roles.
     assertTrue(token.hasRole(token.MINTER_ROLE(), deployedPool));
     assertTrue(token.hasRole(token.BURNER_ROLE(), deployedPool));
   }
