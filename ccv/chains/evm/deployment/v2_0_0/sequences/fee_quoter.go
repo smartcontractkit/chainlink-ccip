@@ -186,7 +186,7 @@ var (
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
 			// check if FeeQuoter v1.6.x is present in existing addresses, if not, we return empty output
 			// it means there is no existing fee quoter deployed from v1.6.x deployment, and we can skip the config import from v1.6.x
-			fq16AddressRef, err := seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
+			fq16AddressRef, err := seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector, fqops.Version)
 			if err != nil {
 				if strings.Contains(err.Error(), "no fee quoter address found") {
 					return FeeQuoterUpdate{}, nil
