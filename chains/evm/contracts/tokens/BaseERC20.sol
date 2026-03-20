@@ -8,8 +8,7 @@ import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
-/// @notice A basic ERC20 compatible token contract with burn and minting roles.
-/// @dev The total supply can be limited during deployment.
+/// @notice A basic ERC20 that has no burn/mint functions.
 contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "BaseERC20 2.0.0-dev";
