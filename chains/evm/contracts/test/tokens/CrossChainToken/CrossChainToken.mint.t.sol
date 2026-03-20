@@ -5,6 +5,7 @@ import {BaseERC20} from "../../../tokens/BaseERC20.sol";
 import {CrossChainTokenSetup} from "./CrossChainTokenSetup.t.sol";
 
 import {IAccessControl} from "@openzeppelin/contracts@5.3.0/access/IAccessControl.sol";
+import {IERC20Errors} from "@openzeppelin/contracts@5.3.0/interfaces/draft-IERC6093.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CrossChainToken_mint is CrossChainTokenSetup {
@@ -51,7 +52,7 @@ contract CrossChainToken_mint is CrossChainTokenSetup {
   function test_mint_RevertWhen_InvalidRecipient() public {
     vm.startPrank(s_minter);
 
-    vm.expectRevert(abi.encodeWithSelector(BaseERC20.InvalidRecipient.selector, address(s_crossChainToken)));
+    vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InvalidReceiver.selector, address(s_crossChainToken)));
     s_crossChainToken.mint(address(s_crossChainToken), 1e18);
   }
 

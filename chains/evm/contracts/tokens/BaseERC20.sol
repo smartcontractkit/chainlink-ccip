@@ -18,7 +18,6 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     return "BaseERC20 2.0.0-dev";
   }
 
-  error InvalidRecipient(address recipient);
   error CannotRenounceCCIPAdmin();
   error MaxSupplyExceeded(uint256 supplyAfterMint, uint256 maxSupply);
   error OnlyCCIPAdmin();
@@ -102,7 +101,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     uint256 value,
     bool emitEvent
   ) internal virtual override {
-    if (spender == address(this)) revert InvalidRecipient(spender);
+    if (spender == address(this)) revert ERC20InvalidSpender(spender);
 
     super._approve(owner, spender, value, emitEvent);
   }
@@ -115,7 +114,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     address to,
     uint256 value
   ) internal virtual override {
-    if (to == address(this)) revert InvalidRecipient(to);
+    if (to == address(this)) revert ERC20InvalidReceiver(to);
 
     // Update first, then check the total supply.
     super._update(from, to, value);
