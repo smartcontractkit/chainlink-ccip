@@ -223,6 +223,10 @@ func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainCon
 			DestDataAvailabilityMultiplierBps: 1,
 			GasMultiplierWeiPerEth:            11e17,
 		},
+		V2Params: &ccipapi.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
 	}
 }
 

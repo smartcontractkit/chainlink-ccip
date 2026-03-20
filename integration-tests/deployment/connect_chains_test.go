@@ -39,18 +39,6 @@ import (
 	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
 
-// defaultConnectChainsMCMS returns the standard MCMS input used for ConnectChains in these tests.
-func defaultConnectChainsMCMS(description string) mcms.Input {
-	return mcms.Input{
-		OverridePreviousRoot: false,
-		ValidUntil:           3759765795,
-		TimelockDelay:        mcms_types.MustParseDuration("1s"),
-		TimelockAction:       mcms_types.TimelockActionSchedule,
-		Qualifier:            cciputils.CLLQualifier,
-		Description:          description,
-	}
-}
-
 // convertOpsConfigToGobinding converts operations type to gobinding type for test assertions.
 // This helper keeps gobinding imports in tests, not production code.
 func convertOpsConfigToGobinding(cfg evmfqops.DestChainConfig) evmfq.FeeQuoterDestChainConfig {
@@ -313,7 +301,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 				ChainB:  chain2,
 			},
 		},
-		MCMS: defaultConnectChainsMCMS("Connect Chains"),
+		MCMS: NewDefaultInputForMCMS("Connect Chains"),
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
@@ -398,7 +386,7 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 				ChainB:  chain2,
 			},
 		},
-		MCMS: defaultConnectChainsMCMS("Connect Chains"),
+		MCMS: NewDefaultInputForMCMS("Connect Chains"),
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
@@ -644,7 +632,7 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 		Lanes: []lanesapi.LaneConfig{
 			{Version: version, ChainA: chain1, ChainB: chain2},
 		},
-		MCMS: defaultConnectChainsMCMS("Connect Chains"),
+		MCMS: NewDefaultInputForMCMS("Connect Chains"),
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 
@@ -683,21 +671,12 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 	)
 	e.OperationsBundle = bundle
 
-	c1Ov := lanesapi.FeeQuoterDestChainConfigOverride(func(cfg *lanesapi.FeeQuoterDestChainConfig) {
-		cfg.V2Params = lanesapi.DefaultFeeQuoterDestChainConfig(true, chain2.Selector).V2Params
-	})
-	c2Ov := lanesapi.FeeQuoterDestChainConfigOverride(func(cfg *lanesapi.FeeQuoterDestChainConfig) {
-		cfg.V2Params = lanesapi.DefaultFeeQuoterDestChainConfig(true, chain1.Selector).V2Params
-	})
-	chain1.FeeQuoterDestChainConfigOverrides = &c1Ov
-	chain2.FeeQuoterDestChainConfigOverrides = &c2Ov
-
 	// Run ConnectChains again (lane expansion / configure-as-source with 2.0 FeeQuoter).
 	connectOut2, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{Version: version, ChainA: chain1, ChainB: chain2},
 		},
-		MCMS: defaultConnectChainsMCMS("Connect Chains after FQ upgrade"),
+		MCMS: NewDefaultInputForMCMS("Connect Chains after FQ upgrade"),
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset after FQ upgrade")
 	testhelpers.ProcessTimelockProposals(t, *e, connectOut2.MCMSTimelockProposals, false)
