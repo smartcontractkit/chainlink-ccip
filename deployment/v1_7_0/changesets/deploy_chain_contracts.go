@@ -280,8 +280,9 @@ func shouldImportConfigFromPreviousVersion(e deployment.Environment, registry *a
 	if err != nil {
 		return false, fmt.Errorf("failed to derive lane versions for chain %d: %w", sel, err)
 	}
+	reqVersion := semver.MustParse("1.6.0")
 	for _, v := range versions {
-		if v.Equal(semver.MustParse("1.6.0")) {
+		if v.Equal(reqVersion) {
 			return true, nil
 		}
 	}
