@@ -83,7 +83,6 @@ function getOptimizations() {
 
 
 compileContract Proxy
-compileContract CREATE2Factory
 compileContract ccvs/CommitteeVerifier
 compileContract ccvs/CCTPVerifier
 compileContract ccvs/LombardVerifier
@@ -97,10 +96,14 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
-compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
 compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
 compileContract rmn/RMNRemote
 compileContract rmn/RMNProxy
+
+if [ "$ZKSYNC" != "true" ]; then
+  compileContract CREATE2Factory
+  compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
+fi
 
 # Pools
 compileContract pools/LockReleaseTokenPool

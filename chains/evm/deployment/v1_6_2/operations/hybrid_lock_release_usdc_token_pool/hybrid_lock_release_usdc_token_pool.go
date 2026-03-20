@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -30,6 +31,17 @@ var GetLockedTokensForChain = contract.NewRead(contract.ReadParams[uint64, *big.
 	NewContract:  hybrid_lock_release_usdc_token_pool.NewHybridLockReleaseUSDCTokenPool,
 	CallContract: func(pool *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, opts *bind.CallOpts, remoteChainSelector uint64) (*big.Int, error) {
 		return pool.GetLockedTokensForChain(opts, remoteChainSelector)
+	},
+})
+
+var GetLiquidityProvider = contract.NewRead(contract.ReadParams[uint64, common.Address, *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool]{
+	Name:         "hybrid-lock-release-usdc-token-pool:get-liquidity-provider",
+	Version:      Version,
+	Description:  "Gets the liquidity provider for a remote chain selector",
+	ContractType: ContractType,
+	NewContract:  hybrid_lock_release_usdc_token_pool.NewHybridLockReleaseUSDCTokenPool,
+	CallContract: func(pool *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, opts *bind.CallOpts, remoteChainSelector uint64) (common.Address, error) {
+		return pool.GetLiquidityProvider(opts, remoteChainSelector)
 	},
 })
 

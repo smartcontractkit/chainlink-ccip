@@ -8,27 +8,28 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	erc20_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
+	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
+	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
+	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	type_and_version "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	lrtp_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	siloed_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
-	erc20_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
-	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
-	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
-	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_lock_release_token_pool"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 	"migrate-lock-release-pool-liquidity",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Migrates liquidity from a legacy LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
 		evmChain, ok := chains.EVMChains()[input.ChainSelector]
@@ -268,10 +269,10 @@ func migrateSiloedPool(
 			setSiloReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.SetSiloRebalancer, evmChain, evm_contract.FunctionInput[siloed_ops_v161.SetSiloRebalancerArgs]{
 				ChainSelector: chainSel,
 				Address:       oldPoolAddr,
-			Args: siloed_ops_v161.SetSiloRebalancerArgs{
-				RemoteChainSelector: remoteChain,
-				NewRebalancer:       timelockAddr,
-			},
+				Args: siloed_ops_v161.SetSiloRebalancerArgs{
+					RemoteChainSelector: remoteChain,
+					NewRebalancer:       timelockAddr,
+				},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set silo rebalancer for chain %d: %w", remoteChain, err)
@@ -385,10 +386,10 @@ func migrateSiloedPool(
 			restoreReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.SetSiloRebalancer, evmChain, evm_contract.FunctionInput[siloed_ops_v161.SetSiloRebalancerArgs]{
 				ChainSelector: chainSel,
 				Address:       oldPoolAddr,
-			Args: siloed_ops_v161.SetSiloRebalancerArgs{
-				RemoteChainSelector: info.chainSelector,
-				NewRebalancer:       info.originalRebalancer,
-			},
+				Args: siloed_ops_v161.SetSiloRebalancerArgs{
+					RemoteChainSelector: info.chainSelector,
+					NewRebalancer:       info.originalRebalancer,
+				},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to restore silo rebalancer for chain %d: %w", info.chainSelector, err)
@@ -509,9 +510,9 @@ func appendAuthApproveDeposit(
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.DepositArgs{
-			Token:  tokenAddr,
-			Arg1: remoteChainSelector,
-			Amount: amount,
+			Token:               tokenAddr,
+			RemoteChainSelector: remoteChainSelector,
+			Amount:              amount,
 		},
 	})
 	if err != nil {

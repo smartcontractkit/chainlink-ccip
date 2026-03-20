@@ -49,16 +49,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract.WriteOutput, 0)
 		chain := chains.EVMChains()[input.ChainSelector]
+		qualifier := input.TokenPoolQualifier
 
-		tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-			ChainSelector: input.ChainSelector,
-			Type:          datastore.ContractType(input.PoolType),
-			Qualifier:     input.TokenPoolQualifier,
-		}, input.ChainSelector, datastore_utils.FullRef)
-		if err == nil {
-			b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
-			return sequences.OnChainOutput{}, nil
-		}
 		var tokenAddr string
 		if input.TokenRef != nil && input.TokenRef.Address != "" {
 			tokenAddr = input.TokenRef.Address
@@ -82,6 +74,31 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 		if tokenAddr == "" {
 			return sequences.OnChainOutput{}, fmt.Errorf("token address must be provided either directly or via a datastore reference")
+		}
+		if qualifier == "" {
+			qualifier = tokenAddr
+		}
+
+		// NOTE: the datastore uses the type, selector, qualifier, and version of an address
+		// ref to uniquely identify records, so the query below should only match one record
+		// at most. If multiple records are returned, then this would indicate an issue with
+		// the datastore's data integrity. If no matches are returned, then the ref does not
+		// exist and we proceed with the deployment.
+		matches := input.ExistingDataStore.Addresses().Filter(
+			datastore.AddressRefByType(datastore.ContractType(input.PoolType)),
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+			datastore.AddressRefByQualifier(qualifier),
+			datastore.AddressRefByVersion(input.TokenPoolVersion),
+		)
+		if len(matches) > 1 {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"multiple token pools found in datastore with type '%s', version '%s', qualifier '%s' on chain with selector %d",
+				input.PoolType, input.TokenPoolVersion.String(), qualifier, input.ChainSelector,
+			)
+		}
+		if len(matches) == 1 {
+			b.Logger.Info("Token pool already deployed at address:", matches[0].Address)
+			return sequences.OnChainOutput{}, nil
 		}
 
 		// get token decimals
@@ -124,7 +141,6 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		var poolRef datastore.AddressRef
 
 		typeAndVersion := deployment.NewTypeAndVersion(deployment.ContractType(input.PoolType), *input.TokenPoolVersion).String()
-		qualifier := input.TokenPoolQualifier
 
 		switch typeAndVersion {
 		// v1.6.1 pools

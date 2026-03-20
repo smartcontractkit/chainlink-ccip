@@ -80,7 +80,7 @@ var (
 // populated with dummy values. OnRamp/OffRamp use zero/empty so that when merged as source into
 // generated config they do not overwrite the imported OnRamp/OffRamp/RMN (per MergeWithOverrideIfNotEmpty behavior).
 func dummyDeployContractParams() ccvadapters.DeployContractParams {
-	v170 := semver.MustParse("1.7.0")
+	v170 := semver.MustParse("2.0.0")
 	return ccvadapters.DeployContractParams{
 		OnRamp: ccvadapters.OnRampDeployParams{
 			Version:       v170,
