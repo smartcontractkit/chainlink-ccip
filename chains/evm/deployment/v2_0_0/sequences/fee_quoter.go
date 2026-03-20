@@ -140,7 +140,7 @@ var (
 			defaultFeeConfigApplied := false
 			for _, batch := range tokenTransferFeeConfigBatches {
 				// we consider that TokensToUseDefaultFeeConfigs will not have a lot of entries, so we can apply them in the first batch
-				defaultFeeConfig := make([]fqops.TokenTransferFeeConfigRemoveArgs, 0)
+				var defaultFeeConfig []fqops.TokenTransferFeeConfigRemoveArgs
 				if !defaultFeeConfigApplied {
 					defaultFeeConfig = input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs
 					defaultFeeConfigApplied = true
