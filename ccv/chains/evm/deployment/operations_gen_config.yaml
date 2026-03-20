@@ -256,8 +256,6 @@ contracts:
         access: owner
       - name: getAllAuthorizedCallers
         access: public
-      - name : deposit
-        access: public
       - name : transferOwnership
         access: owner
 

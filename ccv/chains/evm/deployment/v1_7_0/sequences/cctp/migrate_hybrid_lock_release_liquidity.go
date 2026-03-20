@@ -11,7 +11,8 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20"
+	erc20 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -257,7 +258,7 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		}
 		writes = append(writes, withdrawReport.Output)
 
-		approveReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20.Approve, ctx.chain, contract_utils.FunctionInput[erc20.ApproveArgs]{
+		approveReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20.ApproveProposalOnly, ctx.chain, contract_utils.FunctionInput[erc20.ApproveArgs]{
 			ChainSelector: ctx.input.ChainSelector,
 			Address:       ctx.tokenAddr,
 			Args: erc20.ApproveArgs{
@@ -273,11 +274,11 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		depositReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Deposit, ctx.chain, contract_utils.FunctionInput[erc20_lock_box.DepositArgs]{
 			ChainSelector: ctx.input.ChainSelector,
 			Address:       lockBoxAddr,
-				Args: erc20_lock_box.DepositArgs{
-					Token:  ctx.tokenAddr,
-					Arg1:   sel,
-					Amount: withdrawAmount,
-				},
+			Args: erc20_lock_box.DepositArgs{
+				Token:               ctx.tokenAddr,
+				RemoteChainSelector: sel,
+				Amount:              withdrawAmount,
+			},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("migrateLiquidityToLockboxes: chain %d lockbox %s amount %s: deposit: %w", sel, lockBoxAddr.Hex(), withdrawAmount.String(), err)
