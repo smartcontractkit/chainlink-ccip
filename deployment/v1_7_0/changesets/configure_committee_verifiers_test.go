@@ -84,6 +84,7 @@ var _ lanes.LaneAdapter = (*mockLaneAdapter)(nil)
 
 type mockLaneAdapter struct {
 	sequenceErr error
+	routerCalls []bool
 }
 
 func (m *mockLaneAdapter) ConfigureLaneLegAsSource() *cldf_ops.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -126,7 +127,11 @@ func (m *mockLaneAdapter) GetOffRampAddress(_ datastore.DataStore, _ uint64) ([]
 	return []byte("0xOffRamp"), nil
 }
 
-func (m *mockLaneAdapter) GetRouterAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+func (m *mockLaneAdapter) GetRouterAddress(_ datastore.DataStore, _ uint64, testRouter bool) ([]byte, error) {
+	m.routerCalls = append(m.routerCalls, testRouter)
+	if testRouter {
+		return []byte("0xTestRouter"), nil
+	}
 	return []byte("0xRouter"), nil
 }
 
@@ -468,8 +473,15 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 	})
 
 	laneRegistry := lanes.GetLaneAdapterRegistry()
-	if _, ok := laneRegistry.GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0")); !ok {
-		laneRegistry.RegisterLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockLaneAdapter{})
+	mockAdapter := &mockLaneAdapter{}
+	if registeredAdapter, ok := laneRegistry.GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0")); ok {
+		var typeOK bool
+		mockAdapter, typeOK = registeredAdapter.(*mockLaneAdapter)
+		require.True(t, typeOK, "expected mock lane adapter in test registry")
+		mockAdapter.routerCalls = nil
+		mockAdapter.sequenceErr = nil
+	} else {
+		laneRegistry.RegisterLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), mockAdapter)
 	}
 
 	mcmsReg := cs_core.GetRegistry()
@@ -526,23 +538,26 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 				},
 				AddressBytesLength:   20,
 				BaseExecutionGasCost: 80000,
-				RemoteChains: map[uint64]lanes.ChainDefinition{
+				RemoteChains: map[uint64]changesets.RemoteLaneConfig{
 					sel2: {
-						Selector: sel2,
-						DefaultExecutor: datastore.AddressRef{
-							ChainSelector: sel2,
-							Type:          "Executor",
-							Version:       semver.MustParse("1.0.0"),
+						TestRouter: true,
+						Chain: lanes.ChainDefinition{
+							Selector: sel2,
+							DefaultExecutor: datastore.AddressRef{
+								ChainSelector: sel2,
+								Type:          "Executor",
+								Version:       semver.MustParse("1.0.0"),
+							},
+							FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
+								IsEnabled:    true,
+								MaxDataBytes: 50000,
+							},
+							ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+								Enabled: true,
+							},
+							AddressBytesLength:   20,
+							BaseExecutionGasCost: 80000,
 						},
-						FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-							IsEnabled:    true,
-							MaxDataBytes: 50000,
-						},
-						ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-							Enabled: true,
-						},
-						AddressBytesLength:   20,
-						BaseExecutionGasCost: 80000,
 					},
 				},
 			},
@@ -551,6 +566,7 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, output.DataStore)
+	assert.Equal(t, []bool{true, true}, mockAdapter.routerCalls)
 }
 
 func TestConfigureChainsForLanesFromTopology_CommitteeNotFound(t *testing.T) {

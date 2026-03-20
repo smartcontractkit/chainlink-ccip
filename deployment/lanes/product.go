@@ -22,7 +22,7 @@ type LaneAdapter interface {
 	// needed for populating values in chain specific configs
 	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetRouterAddress(ds datastore.DataStore, chainSelector uint64, testRouter bool) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
 	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.

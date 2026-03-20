@@ -50,11 +50,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(e.DataStore, chainA, chainAAdapter, lane.Version)
+			err = populateAddresses(e.DataStore, chainA, chainAAdapter, lane.Version, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(e.DataStore, chainB, chainBAdapter, lane.Version)
+			err = populateAddresses(e.DataStore, chainB, chainBAdapter, lane.Version, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
@@ -128,7 +128,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version) error {
+func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, testRouter bool) error {
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
 	if err != nil {
@@ -142,7 +142,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
 	}
-	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
+	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector, testRouter)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
 	}

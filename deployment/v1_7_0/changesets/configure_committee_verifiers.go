@@ -44,7 +44,12 @@ type PartialChainConfig struct {
 	ExecutorDestChainConfig  lanes.ExecutorDestChainConfig
 	AddressBytesLength       uint8
 	BaseExecutionGasCost     uint32
-	RemoteChains             map[uint64]lanes.ChainDefinition
+	RemoteChains             map[uint64]RemoteLaneConfig
+}
+
+type RemoteLaneConfig struct {
+	Chain      lanes.ChainDefinition
+	TestRouter bool
 }
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
@@ -120,7 +125,8 @@ func ConfigureChainsForLanesFromTopology(
 				})
 			}
 
-			for remoteChainSelector, remoteChainDef := range chain.RemoteChains {
+			for remoteChainSelector, remoteLaneConfig := range chain.RemoteChains {
+				remoteChainDef := remoteLaneConfig.Chain
 				remoteChainDef.Selector = remoteChainSelector
 				laneConfigs = append(laneConfigs, lanes.LaneConfig{
 					ChainA: lanes.ChainDefinition{
@@ -136,8 +142,9 @@ func ConfigureChainsForLanesFromTopology(
 						AddressBytesLength:       chain.AddressBytesLength,
 						BaseExecutionGasCost:     chain.BaseExecutionGasCost,
 					},
-					ChainB:  remoteChainDef,
-					Version: semver.MustParse("2.0.0"),
+					ChainB:     remoteChainDef,
+					Version:    semver.MustParse("2.0.0"),
+					TestRouter: remoteLaneConfig.TestRouter,
 				})
 			}
 		}
