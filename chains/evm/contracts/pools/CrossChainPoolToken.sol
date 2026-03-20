@@ -9,6 +9,10 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice A CCIP token pool that is also an ERC20 token. This allows the pool to burn/mint without needing to manage
 /// roles for a separate token contract.
+/// @dev This contract inherits its access control from TokenPool, meaning it uses an `owner` role with 2-step ownership
+/// transfers. There's also a separate `ccipAdmin` role which can be used to register with the CCIP token admin registry
+/// but has no other special powers, and can only be transferred by the owner. The owner role can also be used to
+/// register the token in the token admin registry.
 contract CrossChainPoolToken is TokenPool, BaseERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "CrossChainPoolToken 2.0.0-dev";
