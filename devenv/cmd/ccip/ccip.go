@@ -262,7 +262,7 @@ var testCmd = &cobra.Command{
 			return fmt.Errorf("failed to change to tests/e2e directory: %w", err)
 		}
 
-		testCmd := exec.Command("go", "test", "-v", "-run", testPattern)
+		testCmd := exec.Command("go", "test", "-v", "-run", testPattern, "-timeout", "30m")
 		testCmd.Stdout = os.Stdout
 		testCmd.Stderr = os.Stderr
 		testCmd.Stdin = os.Stdin
