@@ -115,6 +115,9 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// remote token pools. The token pool is then set in the token admin registry. Ownership of the everything is transferred
   /// to the futureOwner (or msg.sender if no futureOwner is given), but must be accepted in a separate transaction due
   /// to 2-step ownership transfer.
+  /// @dev Not all tokens are supported. This factory is designed to work with the CrossChainToken, and while other
+  /// tokens may be compatible, no guarantees are given. The factory does not verify compatibility, so using an
+  /// incompatible token may result in a broken deployment.
   /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
   /// or to be predicted if the pool has not been deployed yet on the remote chain.
   /// @param localTokenDecimals The amount of decimals to be used in the new token. Since decimals() is not part of the
