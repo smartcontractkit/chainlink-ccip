@@ -787,6 +787,8 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
 		if len(destChainConfigBatches) > 1 {
 			input.ConstructorArgs.DestChainConfigArgs = destChainConfigBatches[0]
 			destChainConfigBatches = destChainConfigBatches[1:]
+		} else {
+			destChainConfigBatches = nil
 		}
 	}
 	if len(input.DestChainConfigs) > 0 {
@@ -798,6 +800,8 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
 		if len(tokenTransferFeeConfigBatches) > 1 {
 			input.ConstructorArgs.TokenTransferFeeConfigArgs = tokenTransferFeeConfigBatches[0]
 			tokenTransferFeeConfigBatches = tokenTransferFeeConfigBatches[1:]
+		} else {
+			tokenTransferFeeConfigBatches = nil
 		}
 	}
 	if len(input.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs) > 0 {

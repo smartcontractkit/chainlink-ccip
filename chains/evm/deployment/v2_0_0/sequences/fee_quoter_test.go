@@ -450,8 +450,7 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Len(t, input.ConstructorArgs.DestChainConfigArgs, 3)
 		require.Equal(t, cfgs, input.ConstructorArgs.DestChainConfigArgs)
-		require.Len(t, destBatches, 1)
-		require.Equal(t, cfgs, destBatches[0])
+		require.Empty(t, destBatches)
 		require.Nil(t, tokenBatches)
 	})
 
