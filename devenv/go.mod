@@ -22,7 +22,7 @@ replace (
 require (
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260318142809-6d01aa31fbff
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20260318142809-6d01aa31fbff
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260320173405-6792325c5a25
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260320214544-301aa035f327
 )
 
 require (
@@ -52,7 +52,7 @@ require (
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.1-0.20260212100725-fbd6b3bca4d1
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.2
-	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260317201611-293aa05f988a
+	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260320223452-1c70e26884a6
 	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260317201611-293aa05f988a
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/smartcontractkit/mcms v0.36.0
