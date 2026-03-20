@@ -178,13 +178,16 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     i_token = token;
     i_rmnProxy = rmnProxy;
 
-    try IERC20Metadata(address(token)).decimals() returns (uint8 actualTokenDecimals) {
-      if (localTokenDecimals != actualTokenDecimals) {
-        revert InvalidDecimalArgs(localTokenDecimals, actualTokenDecimals);
+    // In the case the token is also the pool, it won't exist yet so we skip this check.
+    if (address(token) != address(this)) {
+      try IERC20Metadata(address(token)).decimals() returns (uint8 actualTokenDecimals) {
+        if (localTokenDecimals != actualTokenDecimals) {
+          revert InvalidDecimalArgs(localTokenDecimals, actualTokenDecimals);
+        }
+      } catch {
+        // The decimals function doesn't exist, which is possible since it's optional in the ERC20 spec. We skip the check and
+        // assume the supplied token decimals are correct.
       }
-    } catch {
-      // The decimals function doesn't exist, which is possible since it's optional in the ERC20 spec. We skip the check and
-      // assume the supplied token decimals are correct.
     }
     i_tokenDecimals = localTokenDecimals;
     s_advancedPoolHooks = IAdvancedPoolHooks(advancedPoolHooks);
@@ -268,7 +271,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param interfaceId The interface identifier, as specified in ERC-165.
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override returns (bool) {
+  ) public view virtual override returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV2).interfaceId
       || interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }

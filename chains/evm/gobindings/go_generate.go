@@ -3,7 +3,6 @@ package ccip
 //go:generate go run ./wrap ccip OnRamp onramp
 //go:generate go run ./wrap ccip OffRamp offramp
 //go:generate go run ./wrap ccip Proxy proxy
-//go:generate go run ./wrap ccip CREATE2Factory create2_factory
 //go:generate go run ./wrap ccip CommitteeVerifier committee_verifier
 //go:generate go run ./wrap ccip CCTPVerifier cctp_verifier
 //go:generate go run ./wrap ccip LombardVerifier lombard_verifier
@@ -13,12 +12,15 @@ package ccip
 //go:generate go run ./wrap ccip Router router
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
-//go:generate go run ./wrap ccip TokenPoolFactory token_pool_factory
 //go:generate go run ./wrap ccip FactoryBurnMintERC20 factory_burn_mint_erc20
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
+
+// Skip these for ZKSync as it doesn't support the create2 opcode
+//go:generate go run ./wrap ccip CREATE2Factory create2_factory
+//go:generate go run ./wrap ccip TokenPoolFactory token_pool_factory
 
 // Pools
 //go:generate go run ./wrap ccip TokenPool token_pool
