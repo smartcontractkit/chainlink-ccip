@@ -45,7 +45,7 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelect
 			datastore.AddressRefByChainSelector(chainSelector),
 			datastore.AddressRefByType(datastore.ContractType(fqops.ContractType)),
 		),
-		chainSelector)
+		chainSelector, semver.MustParse("2.0.0"))
 	if err != nil {
 		return fmt.Errorf("failed to find fee quoter contract ref for chain %d: %w", chainSelector, err)
 	}
