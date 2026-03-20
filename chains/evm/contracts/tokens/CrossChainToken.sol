@@ -82,15 +82,12 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   }
 
   /// @inheritdoc IBurnMintERC20
-  /// @dev Uses OZ ERC20 _mint to disallow minting to address(0).
-  /// @dev Disallows minting to address(this)
+  /// @dev Uses OZ ERC20 _mint to disallow minting to address(0), and BaseERC20 to disallow minting to address(this).
+  /// @dev Uses BaseERC20's max supply logic.
   function mint(
     address account,
     uint256 amount
   ) public virtual override onlyRole(MINTER_ROLE) {
-    if (account == address(this)) revert InvalidRecipient(account);
-    if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
-
     _mint(account, amount);
   }
 

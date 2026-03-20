@@ -26,6 +26,7 @@ contract CrossChainPoolToken is TokenPool, BaseERC20 {
 
   /// @notice Burns tokens held by the pool. The Router transfers tokens to
   /// this contract before the OnRamp calls lockOrBurn, so the burn is from self.
+  /// @param amount The amount of tokens to burn.
   function _lockOrBurn(
     uint64, // remoteChainSelector
     uint256 amount
@@ -33,13 +34,14 @@ contract CrossChainPoolToken is TokenPool, BaseERC20 {
     _burn(address(this), amount);
   }
 
+  /// @notice Mints tokens to the receiver.
+  /// @param receiver The address to mint tokens to.
+  /// @param amount The amount of tokens to mint.
   function _releaseOrMint(
     address receiver,
     uint256 amount,
     uint64 // remoteChainSelector
   ) internal virtual override {
-    if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
-
     _mint(receiver, amount);
   }
 
@@ -51,7 +53,13 @@ contract CrossChainPoolToken is TokenPool, BaseERC20 {
     address to,
     uint256 value
   ) internal virtual override {
+    // Update first, then check the total supply.
     ERC20._update(from, to, value);
+
+    // If `from` is address(0), this is a mint, so we need to check the total supply against the max supply.
+    if (from == address(0)) {
+      _assertMaxSupply();
+    }
   }
 
   /// @notice Signals which version of the pool interface is supported.

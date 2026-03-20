@@ -60,8 +60,8 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
 
     // Mint the initial supply to the ccipAdmin, saving gas by not calling if the mint amount is zero.
     if (args.preMint != 0) {
-      if (args.maxSupply != 0 && args.preMint > args.maxSupply) revert MaxSupplyExceeded(args.preMint);
       _mint(ccipAdmin, args.preMint);
+      _assertMaxSupply();
     }
 
     _setCCIPAdmin(ccipAdmin);
@@ -115,7 +115,23 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   ) internal virtual override {
     if (to == address(this)) revert InvalidRecipient(to);
 
+    // Update first, then check the total supply.
     super._update(from, to, value);
+
+    // If `from` is address(0), this is a mint, so we need to check the total supply against the max supply.
+    if (from == address(0)) {
+      _assertMaxSupply();
+    }
+  }
+
+  /// @notice Asserts that the total supply does not exceed the max supply. Reverts if it does.
+  function _assertMaxSupply() internal view virtual {
+    if (i_maxSupply != 0) {
+      uint256 supply = totalSupply();
+      if (supply > i_maxSupply) {
+        revert MaxSupplyExceeded(supply);
+      }
+    }
   }
 
   // ================================================================
