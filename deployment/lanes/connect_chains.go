@@ -166,12 +166,17 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if chainDef.FeeQuoterDestChainConfigOverrides != nil {
 		(*chainDef.FeeQuoterDestChainConfigOverrides)(&chainDef.FeeQuoterDestChainConfig)
 	}
+	// TODO: should we also not populate gas price default as it will be used on updates? (see below)
 	if chainDef.GasPrice == nil {
 		chainDef.GasPrice = adapter.GetDefaultGasPrice()
 	}
-	if chainDef.TokenPrices == nil {
-		populateTokenPrices(ds, chainDef, adapter)
-	}
+	// TODO: as this changeset is also used for updates, we should only populate token prices if they are not already set
+	// (to avoid overwriting any on-chain live changes). This would need to only happen on the first run of the changeset
+	// for a given lane, as currently the underlying adapter implementations always update with whats provided to them.
+	//
+	// if chainDef.TokenPrices == nil {
+	// 	populateTokenPrices(ds, chainDef, adapter)
+	// }
 
 	// handle v2 separately
 	return populateAddressesV2(ds, chainDef, adapter, version)
