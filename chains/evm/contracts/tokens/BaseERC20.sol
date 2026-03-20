@@ -67,7 +67,8 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   function supportsInterface(
     bytes4 interfaceId
   ) public view virtual returns (bool) {
-    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId;
+    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId
+      || interfaceId == type(IERC20Metadata).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
