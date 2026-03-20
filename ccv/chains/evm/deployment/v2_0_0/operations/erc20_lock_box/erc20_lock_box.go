@@ -3,8 +3,6 @@
 package erc20_lock_box
 
 import (
-	"math/big"
-
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -75,19 +73,13 @@ func (c *ERC20LockBoxContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]c
 	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
 }
 
-func (c *ERC20LockBoxContract) Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
-	return c.contract.Transact(opts, "deposit", token, arg1, amount)
+func (c *ERC20LockBoxContract) TransferOwnership(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "transferOwnership", args)
 }
 
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
-}
-
-type DepositArgs struct {
-	Token  common.Address
-	Arg1   uint64
-	Amount *big.Int
 }
 
 type ConstructorArgs struct {
@@ -139,20 +131,20 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	},
 })
 
-var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
-	Name:            "erc20-lock-box:deposit",
+var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *ERC20LockBoxContract]{
+	Name:            "erc20-lock-box:transfer-ownership",
 	Version:         Version,
-	Description:     "Calls deposit on the contract",
+	Description:     "Calls transferOwnership on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ERC20LockBoxABI,
 	NewContract:     NewERC20LockBoxContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*ERC20LockBoxContract, DepositArgs],
-	Validate:        func(DepositArgs) error { return nil },
+	IsAllowedCaller: contract.OnlyOwner[*ERC20LockBoxContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
 		c *ERC20LockBoxContract,
 		opts *bind.TransactOpts,
-		args DepositArgs,
+		args common.Address,
 	) (*types.Transaction, error) {
-		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
+		return c.TransferOwnership(opts, args)
 	},
 })

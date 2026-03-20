@@ -28,10 +28,9 @@ type MigrateHybridLockReleaseLiquidityConfig struct {
 	SiloedUSDCTokenPool string
 	// USDCToken is the address of the USDC token contract.
 	USDCToken string
-	// LockReleaseChainSelectors specifies which remote chains' locked liquidity to migrate.
-	LockReleaseChainSelectors []uint64
-	// LiquidityWithdrawPercent is the percent of locked liquidity to migrate (1-100).
-	LiquidityWithdrawPercent uint8
+	// WithdrawAmounts maps each remote chain selector to the absolute amount of USDC to migrate (raw units, e.g. 6 decimals for USDC).
+	// Each chain must be configured for lock-release on the hybrid pool and have a lockbox on the siloed pool.
+	WithdrawAmounts map[uint64]uint64
 	// MCMS configures the resulting proposal. Required because this migration
 	// operates on timelock-owned contracts and all operations must execute
 	// atomically within a single MCMS proposal batch.
@@ -55,7 +54,6 @@ func makeVerifyMigrateHybridLockReleaseLiquidity() func(cldf_deployment.Environm
 		if _, err := chain_selectors.GetSelectorFamily(cfg.ChainSelector); err != nil {
 			return fmt.Errorf("invalid chain selector %d: %w", cfg.ChainSelector, err)
 		}
-		// Liquidity migration is only supported on Ethereum home chains.
 		if cfg.ChainSelector != chain_selectors.ETHEREUM_MAINNET.Selector && cfg.ChainSelector != chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector {
 			return fmt.Errorf("liquidity migration is only supported on Ethereum mainnet or Sepolia, got chain selector %d", cfg.ChainSelector)
 		}
@@ -68,15 +66,15 @@ func makeVerifyMigrateHybridLockReleaseLiquidity() func(cldf_deployment.Environm
 		if !common.IsHexAddress(cfg.USDCToken) {
 			return fmt.Errorf("invalid USDCToken address for chain %d", cfg.ChainSelector)
 		}
-		if len(cfg.LockReleaseChainSelectors) == 0 {
-			return fmt.Errorf("at least one lock release chain selector must be provided")
+		if len(cfg.WithdrawAmounts) == 0 {
+			return fmt.Errorf("at least one withdraw amount must be provided")
 		}
-		if cfg.LiquidityWithdrawPercent == 0 || cfg.LiquidityWithdrawPercent > 100 {
-			return fmt.Errorf("liquidity withdraw percent must be between 1 and 100")
-		}
-		for _, sel := range cfg.LockReleaseChainSelectors {
+		for sel, amt := range cfg.WithdrawAmounts {
 			if _, err := chain_selectors.GetSelectorFamily(sel); err != nil {
-				return fmt.Errorf("invalid lock release chain selector %d: %w", sel, err)
+				return fmt.Errorf("invalid chain selector %d in withdraw amounts: %w", sel, err)
+			}
+			if amt == 0 {
+				return fmt.Errorf("withdraw amount for chain %d must be greater than zero", sel)
 			}
 		}
 		return nil
@@ -104,8 +102,7 @@ func makeApplyMigrateHybridLockReleaseLiquidity(
 			HybridLockReleaseTokenPool: cfg.HybridLockReleaseTokenPool,
 			SiloedUSDCTokenPool:        cfg.SiloedUSDCTokenPool,
 			USDCToken:                  cfg.USDCToken,
-			LockReleaseChainSelectors:  cfg.LockReleaseChainSelectors,
-			LiquidityWithdrawPercent:   cfg.LiquidityWithdrawPercent,
+			WithdrawAmounts:            cfg.WithdrawAmounts,
 			MCMSTimelockAddress:        timelockRef.Address,
 		}
 
