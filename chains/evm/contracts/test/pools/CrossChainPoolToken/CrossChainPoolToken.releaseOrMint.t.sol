@@ -42,7 +42,9 @@ contract CrossChainPoolToken_releaseOrMint is CrossChainPoolTokenSetup {
     vm.startPrank(s_allowedOffRamp);
 
     vm.expectRevert(
-      abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, IERC20(address(s_cctPool)).totalSupply() + tooMuch)
+      abi.encodeWithSelector(
+        BaseERC20.MaxSupplyExceeded.selector, IERC20(address(s_cctPool)).totalSupply() + tooMuch, MAX_SUPPLY
+      )
     );
     s_cctPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({

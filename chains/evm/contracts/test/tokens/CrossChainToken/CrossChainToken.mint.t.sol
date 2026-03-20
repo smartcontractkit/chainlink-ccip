@@ -41,7 +41,9 @@ contract CrossChainToken_mint is CrossChainTokenSetup {
     vm.startPrank(s_minter);
 
     vm.expectRevert(
-      abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, s_crossChainToken.totalSupply() + remaining + 1)
+      abi.encodeWithSelector(
+        BaseERC20.MaxSupplyExceeded.selector, s_crossChainToken.totalSupply() + remaining + 1, MAX_SUPPLY
+      )
     );
     s_crossChainToken.mint(makeAddr("receiver"), remaining + 1);
   }

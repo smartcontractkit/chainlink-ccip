@@ -20,7 +20,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
 
   error InvalidRecipient(address recipient);
   error CannotRenounceCCIPAdmin();
-  error MaxSupplyExceeded(uint256 supplyAfterMint);
+  error MaxSupplyExceeded(uint256 supplyAfterMint, uint256 maxSupply);
   error OnlyCCIPAdmin();
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
@@ -131,7 +131,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     if (i_maxSupply != 0) {
       uint256 supply = totalSupply();
       if (supply > i_maxSupply) {
-        revert MaxSupplyExceeded(supply);
+        revert MaxSupplyExceeded(supply, i_maxSupply);
       }
     }
   }
