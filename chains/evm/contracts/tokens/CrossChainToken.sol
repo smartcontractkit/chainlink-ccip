@@ -24,7 +24,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   bytes32 public constant BURN_MINT_ADMIN_ROLE = keccak256("BURN_MINT_ADMIN_ROLE");
 
   /// @param args The parameters for the ERC20 token, including name, symbol, decimals, max supply, and pre-mint amount.
-  /// @param burnMintRoleAdmin The address to grant the BURN_MINT_ADMIN_ROLE.
+  /// @param burnMintRoleAdmin The address to grant the BURN_MINT_ADMIN_ROLE. If set to address(0), no address will be
+  /// granted the role.
   /// @param owner The address to set as the owner of the contract, which has the default admin role. If set to
   /// address(0), the deployer will be set as the owner.
   constructor(

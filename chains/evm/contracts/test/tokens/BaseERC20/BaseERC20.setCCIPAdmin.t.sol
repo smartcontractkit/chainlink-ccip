@@ -36,4 +36,9 @@ contract BaseERC20_setCCIPAdmin is BaseERC20Setup {
     vm.expectRevert(BaseERC20.OnlyCCIPAdmin.selector);
     s_baseERC20.setCCIPAdmin(STRANGER);
   }
+
+  function test_setCCIPAdmin_RevertWhen_CannotRenounceCCIPAdmin() public {
+    vm.expectRevert(BaseERC20.CannotRenounceCCIPAdmin.selector);
+    s_baseERC20.setCCIPAdmin(address(0));
+  }
 }

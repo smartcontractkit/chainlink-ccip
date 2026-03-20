@@ -6,6 +6,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
@@ -16,6 +17,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   error InvalidRecipient(address recipient);
+  error CannotRenounceCCIPAdmin();
   error MaxSupplyExceeded(uint256 supplyAfterMint);
   error OnlyCCIPAdmin();
 
@@ -27,6 +29,8 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   /// @param maxSupply_ The maximum supply of the token, 0 if unlimited
   /// @param preMint The amount of tokens to mint to the deployer upon construction. NOTE: the base version of this
   /// contract does not support minting additional tokens after deployment, so this should be set to the full supply.
+  /// @param ccipAdmin The CCIP admin for the token. This address also receives the pre-mint supply. If set to
+  /// address(0), the deployer will be set as the CCIP admin.
   struct ConstructorParams {
     string name;
     string symbol;
@@ -125,7 +129,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address.
-  /// @param newAdmin The address of the new CCIPAdmin.
+  /// @param newAdmin The address of the new CCIPAdmin. Setting this to address(0) is now allowed.
   /// @dev The BaseERC20 has no notion of ownership, so this function can be called by the CCIP admin. Tokens expanding
   /// from this base contract can choose to restrict this function to other roles instead.
   function setCCIPAdmin(
@@ -134,6 +138,9 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     if (msg.sender != s_ccipAdmin) {
       revert OnlyCCIPAdmin();
     }
+
+    if (newAdmin == address(0)) revert CannotRenounceCCIPAdmin();
+
     _setCCIPAdmin(newAdmin);
   }
 
