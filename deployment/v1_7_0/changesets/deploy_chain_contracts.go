@@ -139,8 +139,9 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 			if !cfg.Cfg.IgnoreImportedConfigFromPreviousVersion {
 				importNeeded, err := shouldImportConfigFromPreviousVersion(e, registry, sel)
 				if err != nil {
-					e.Logger.Warnw("Failed to determine whether to import config from previous version, defaulting to no import", "chain", sel, "error", err)
-				} else if importNeeded {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to check if config import from previous version is needed for chain %d: %w", sel, err)
+				}
+				if importNeeded {
 					// so far we do not need any config from 1.5.0 , so only importing config from 1.6.0
 					// if in the future we need to import some config from 1.5.0,
 					// we should leverage lane version resolver to get the right adapter to import config
@@ -275,6 +276,9 @@ func shouldImportConfigFromPreviousVersion(e deployment.Environment, registry *a
 	res, exists := registry.GetLaneVersionResolver(sel)
 	if !exists {
 		return false, fmt.Errorf("no lane version resolver registered for chain %d", sel)
+	}
+	if !res.IsSupportedChain(e, sel) {
+		return false, nil
 	}
 	_, versions, err := res.DeriveLaneVersionsForChain(e, sel)
 	if err != nil {
