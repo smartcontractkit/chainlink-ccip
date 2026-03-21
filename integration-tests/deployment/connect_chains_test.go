@@ -223,112 +223,22 @@ func checkLaneDisabled(
 	require.False(t, offRampSourceChain.Config.IsEnabled, "Solana OffRamp source chain must be disabled")
 }
 
-func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
-	t.Parallel()
+// setupEVM2SVMForConnectChains deploys contracts on one EVM and one Solana chain and returns env, chain defs, and adapters.
+func setupEVM2SVMForConnectChains(t *testing.T) (
+	e *fdeployment.Environment,
+	chain1, chain2 lanesapi.ChainDefinition,
+	srcAdapter, destAdapter lanesapi.LaneAdapter,
+	version *semver.Version,
+) {
+	t.Helper()
 	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, ds, "Datastore should be created")
 
-	evmChains := []uint64{
-		chain_selectors.ETHEREUM_MAINNET.Selector,
-	}
-	solanaChains := []uint64{
-		chain_selectors.SOLANA_MAINNET.Selector,
-	}
+	evmChains := []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}
+	solanaChains := []uint64{chain_selectors.SOLANA_MAINNET.Selector}
 	allChains := append(evmChains, solanaChains...)
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, evmChains),
-		environment.WithSolanaContainer(t, solanaChains, programsPath, solanaProgramIDs),
-	)
-	require.NoError(t, err, "Failed to create test environment")
-	require.NotNil(t, e, "Environment should be created")
-	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
-
-	mcmsRegistry := cs_core.GetRegistry()
-	dReg := deployops.GetRegistry()
-	version := semver.MustParse("1.6.0")
-	for _, chainSel := range allChains {
-		mint, _ := solana.NewRandomPrivateKey()
-		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
-			MCMS: mcms.Input{},
-			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
-				chainSel: {
-					Version: version,
-					// LINK TOKEN CONFIG
-					// token private key used to deploy the LINK token. Solana: base58 encoded private key
-					TokenPrivKey: mint.String(),
-					// token decimals used to deploy the LINK token
-					TokenDecimals: 9,
-					// FEE QUOTER CONFIG
-					MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-					TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
-					LinkPremiumMultiplier:        9e17, // 0.9 ETH
-					NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
-					// OFFRAMP CONFIG
-					PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
-					GasForCallExactCheck:                    uint16(5000),
-				},
-			},
-		})
-		require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
-		out.DataStore.Merge(e.DataStore)
-		e.DataStore = out.DataStore.Seal()
-	}
-	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
-	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
-	// TODO: EVM doesn't work with a non-zero timelock delay
-	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
-	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
-	override := getFQOverrides()
-	chain1 := lanesapi.ChainDefinition{
-		Selector:                          chain_selectors.SOLANA_MAINNET.Selector,
-		GasPrice:                          big.NewInt(1e17),
-		FeeQuoterDestChainConfigOverrides: &override,
-	}
-	chain2 := lanesapi.ChainDefinition{
-		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
-	}
-
-	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
-		Lanes: []lanesapi.LaneConfig{
-			{
-				Version: version,
-				ChainA:  chain1,
-				ChainB:  chain2,
-			},
-		},
-		MCMS: NewDefaultInputForMCMS("Connect Chains"),
-	})
-	require.NoError(t, err, "Failed to apply ConnectChains changeset")
-	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
-	laneRegistry := lanesapi.GetLaneAdapterRegistry()
-	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
-	require.NoError(t, err, "must get selector family for src")
-	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
-	require.True(t, exists, "must have ChainAdapter registered for src chain family")
-	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
-	require.NoError(t, err, "must get selector family for dest")
-	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
-	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
-	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
-	// should add a new entry for remote source and remote dest in solana
-	require.Equal(t, 2, len(connectOut.DataStore.Addresses().Filter()))
-}
-
-func TestDisableLane_EVM2SVM(t *testing.T) {
-	t.Parallel()
-	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
-	require.NoError(t, err, "Failed to set up Solana environment")
-	require.NotNil(t, ds, "Datastore should be created")
-
-	evmChains := []uint64{
-		chain_selectors.ETHEREUM_MAINNET.Selector,
-	}
-	solanaChains := []uint64{
-		chain_selectors.SOLANA_MAINNET.Selector,
-	}
-	allChains := append(evmChains, solanaChains...)
-	e, err := environment.New(t.Context(),
+	e, err = environment.New(t.Context(),
 		environment.WithEVMSimulated(t, evmChains),
 		environment.WithSolanaContainer(t, solanaChains, programsPath, solanaProgramIDs),
 	)
@@ -336,9 +246,8 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 	e.DataStore = ds.Seal()
 
-	mcmsRegistry := cs_core.GetRegistry()
 	dReg := deployops.GetRegistry()
-	version := semver.MustParse("1.6.0")
+	version = semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {
 		mint, _ := solana.NewRandomPrivateKey()
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
@@ -365,15 +274,37 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 
 	override := getFQOverrides()
-	chain1 := lanesapi.ChainDefinition{
+	chain1 = lanesapi.ChainDefinition{
 		Selector:                          chain_selectors.SOLANA_MAINNET.Selector,
 		GasPrice:                          big.NewInt(1e17),
 		FeeQuoterDestChainConfigOverrides: &override,
 	}
-	chain2 := lanesapi.ChainDefinition{
+	chain2 = lanesapi.ChainDefinition{
 		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
 	}
 
+	laneRegistry := lanesapi.GetLaneAdapterRegistry()
+	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+	require.NoError(t, err, "must get selector family for src")
+	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
+	require.True(t, exists, "must have ChainAdapter registered for src chain family")
+	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
+	require.NoError(t, err, "must get selector family for dest")
+	destAdapter, exists = laneRegistry.GetLaneAdapter(destFamily, version)
+	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
+
+	return e, chain1, chain2, srcAdapter, destAdapter, version
+}
+
+// TestConnectChains_EVM2SVM_Lifecycle exercises the full lifecycle of a bidirectional
+// EVM↔Solana lane: connect → verify connectivity → disable → verify disabled state.
+// A single Solana container setup covers all code paths efficiently.
+func TestConnectChains_EVM2SVM_Lifecycle(t *testing.T) {
+	t.Parallel()
+	e, chain1, chain2, srcAdapter, destAdapter, version := setupEVM2SVMForConnectChains(t)
+	mcmsRegistry := cs_core.GetRegistry()
+
+	// ── Phase 1: Connect ─────────────────────────────────────────────────
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
@@ -386,18 +317,10 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
-
-	laneRegistry := lanesapi.GetLaneAdapterRegistry()
-	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
-	require.NoError(t, err, "must get selector family for src")
-	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
-	require.True(t, exists, "must have ChainAdapter registered for src chain family")
-	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
-	require.NoError(t, err, "must get selector family for dest")
-	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
-	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
+	require.Equal(t, 2, len(connectOut.DataStore.Addresses().Filter()))
 
+	// ── Phase 2: Disable ─────────────────────────────────────────────────
 	disableOut, err := lanesapi.DisableLane(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.DisableLaneConfig{
 		Lanes: []lanesapi.DisableLanePair{
 			{
@@ -417,7 +340,6 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply DisableLane changeset")
 	testhelpers.ProcessTimelockProposals(t, *e, disableOut.MCMSTimelockProposals, false)
-
 	checkLaneDisabled(t, e, chain1, chain2, srcAdapter, destAdapter)
 }
 
