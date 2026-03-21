@@ -40,7 +40,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		}
 
 		if isFQ2 {
-			result, err = configureFeeQuoterV2(b, chains, input, fqAddr, evmChain, result)
+			result, err = configureFeeQuoterV2(b, input, fqAddr, evmChain, result)
 			if err != nil {
 				return result, err
 			}
@@ -340,7 +340,7 @@ func TranslateTokenPricesV2(prices map[string]*big.Int) []fqops2.TokenPriceUpdat
 	return result
 }
 
-func configureFeeQuoterV2(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput, fqAddr common.Address, evmChain cldf_evm.Chain, result sequences.OnChainOutput) (sequences.OnChainOutput, error) {
+func configureFeeQuoterV2(b operations.Bundle, input lanes.UpdateLanesInput, fqAddr common.Address, evmChain cldf_evm.Chain, result sequences.OnChainOutput) (sequences.OnChainOutput, error) {
 	destChainCfgReport, err := operations.ExecuteOperation(
 		b, fqops2.ApplyDestChainConfigUpdates, evmChain,
 		contract.FunctionInput[[]fqops2.DestChainConfigArgs]{

@@ -43,13 +43,13 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		result.BatchOps = append(result.BatchOps, fqOut.Output.BatchOps...)
 
 		// Add Router
-		// Allowlist applies to senders of messages TO the remote chain (dest); mirror EVM OnRamp dest config.
+		// Allowlist controls who on this chain can send outbound messages.
 		routerOut, err := operations.ExecuteOperation(b, routerops.ConnectChains, chains.SolanaChains()[input.Source.Selector], routerops.ConnectChainsParams{
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
 			RemoteChainSelector: input.Dest.Selector,
-		AllowlistEnabled:    input.Source.AllowListEnabled,
-		AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
+			AllowlistEnabled:    input.Source.AllowListEnabled,
+			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize OffRamp: %w", err)
@@ -85,10 +85,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Source.Selector,
-			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OnRamp,
-			EnabledAsSource:     !input.IsDisabled,
+			RemoteChainSelector:       input.Source.Selector,
+			OffRamp:                   offRampAddress,
+			SourceOnRamp:              input.Source.OnRamp,
+			EnabledAsSource:           !input.IsDisabled,
 			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {
