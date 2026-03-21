@@ -70,7 +70,44 @@ func getAnvilBlockchainsMapBySelector(bcs []*blockchain.Input) (map[uint64]*bloc
 	return result, nil
 }
 
+func anvilRPCCall(rpcURL string, method string, params []any) error {
+	body := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+		"id":      1,
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal %s request: %w", method, err)
+	}
+	resp, err := http.Post(rpcURL, "application/json", bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("%s rpc post: %w", method, err)
+	}
+	defer resp.Body.Close()
+	var rpcResp struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		return fmt.Errorf("decode %s response: %w", method, err)
+	}
+	if rpcResp.Error != nil {
+		return fmt.Errorf("%s rpc error: %s", method, rpcResp.Error)
+	}
+	return nil
+}
+
+// anvilImpersonateAccount must be called before eth_sendTransaction with from=addr on Foundry Anvil;
+// otherwise the node returns "No Signer available" (-32602).
+func anvilImpersonateAccount(rpcURL, addr string) error {
+	return anvilRPCCall(rpcURL, "anvil_impersonateAccount", []any{addr})
+}
+
 func sendImpersonatedTx(ec *ethclient.Client, rpcURL string, from, to string, data []byte) error {
+	if err := anvilImpersonateAccount(rpcURL, from); err != nil {
+		return fmt.Errorf("anvil impersonate %s: %w", from, err)
+	}
 	fromAddr := common.HexToAddress(from)
 	toAddr := common.HexToAddress(to)
 	msg := ethereum.CallMsg{
