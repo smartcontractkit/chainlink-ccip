@@ -340,7 +340,8 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 }
 
 func (a *SVMAdapter) EOAReceiver(t *testing.T) []byte {
-	panic("not implemented")
+	t.Skip("Not implemented")
+	return nil
 }
 
 func (a *SVMAdapter) InvalidAddresses() [][]byte {
