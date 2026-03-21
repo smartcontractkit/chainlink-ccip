@@ -52,7 +52,7 @@ type configureCCTPChainRefs struct {
 
 var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 	"configure-cctp-chain-for-lanes",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures the CCTP contracts on a chain for multiple remote chains",
 	func(b cldf_ops.Bundle, dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)

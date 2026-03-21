@@ -22,7 +22,7 @@ import (
 
 var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 	"deploy-lock-release-token-pool",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys a lock release token pool to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {

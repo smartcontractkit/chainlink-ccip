@@ -2,17 +2,19 @@ package lanes
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 // ConnectChains returns a changeset that configures CCIP lanes between chains using the provided lane and MCMS registries.
@@ -128,7 +130,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, testRouter bool) error {
+func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool) error {
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
 	if err != nil {
@@ -142,17 +144,40 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
 	}
-	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector, testRouter)
+	if vp, ok := adapter.(FeeQuoterVersionProvider); ok {
+		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector)
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter version for chain %d: %w", chainDef.Selector, err)
+		}
+	}
+	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
+	}
+	if isTestRouter {
+		if tp, ok := adapter.(TestRouterProvider); ok {
+			chainDef.Router, err = tp.GetTestRouter(ds, chainDef.Selector)
+			if err != nil {
+				return fmt.Errorf("error fetching test router address for chain %d: %w", chainDef.Selector, err)
+			}
+		}
 	}
 	chainDef.FeeQuoterDestChainConfig = adapter.GetFeeQuoterDestChainConfig()
 	if chainDef.FeeQuoterDestChainConfigOverrides != nil {
 		(*chainDef.FeeQuoterDestChainConfigOverrides)(&chainDef.FeeQuoterDestChainConfig)
 	}
+	// TODO: should we also not populate gas price default as it will be used on updates? (see below)
 	if chainDef.GasPrice == nil {
 		chainDef.GasPrice = adapter.GetDefaultGasPrice()
 	}
+	// TODO: as this changeset is also used for updates, we should only populate token prices if they are not already set
+	// (to avoid overwriting any on-chain live changes). This would need to only happen on the first run of the changeset
+	// for a given lane, as currently the underlying adapter implementations always update with whats provided to them.
+	//
+	// if chainDef.TokenPrices == nil {
+	// 	populateTokenPrices(ds, chainDef, adapter)
+	// }
+
 	// handle v2 separately
 	return populateAddressesV2(ds, chainDef, adapter, version)
 }
@@ -225,4 +250,30 @@ func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adap
 	}
 	chainDef.DefaultOutboundCCVs = defaultOutboundCCVs
 	return nil
+}
+
+func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) {
+	var tokenPrices map[datastore.ContractType]*big.Int
+	// Check if adapter implements TokenPriceProvider (optional interface)
+	priceProvider, ok := adapter.(TokenPriceProvider)
+	if !ok {
+		return
+	}
+
+	// Get prices keyed by contract type
+	tokenPrices = priceProvider.GetDefaultTokenPrices()
+
+	// Resolve contract types to addresses
+	addressPrices := make(map[string]*big.Int)
+	for contractType, price := range tokenPrices {
+		refs := ds.Addresses().Filter(
+			datastore.AddressRefByType(contractType),
+			datastore.AddressRefByChainSelector(chainDef.Selector),
+		)
+		for _, ref := range refs {
+			addressPrices[ref.Address] = price
+		}
+	}
+
+	chainDef.TokenPrices = addressPrices
 }

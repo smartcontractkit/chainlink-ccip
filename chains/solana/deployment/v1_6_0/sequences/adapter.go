@@ -94,16 +94,16 @@ func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelecto
 func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChainConfig {
 	chainHex := common_utils.GetHexFromString(common_utils.SVMFamilySelector)
 	return laneapi.FeeQuoterDestChainConfig{
-		IsEnabled:               true,
-		MaxDataBytes:             30_000,
-		MaxPerMsgGasLimit:        3_000_000,
-		DestGasOverhead:          300_000,
-		DestGasPerPayloadByteBase: 16,
-		ChainFamilySelector:      binary.BigEndian.Uint32(chainHex[:]),
-		DefaultTokenFeeUSDCents:  25,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:        200_000,
-		NetworkFeeUSDCents:       10,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
 		V1Params: &laneapi.FeeQuoterV1Params{
 			MaxNumberOfTokensPerMsg:           10,
 			DestGasPerPayloadByteHigh:         40,
@@ -112,6 +112,10 @@ func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChain
 			DestGasPerDataAvailabilityByte:    16,
 			DestDataAvailabilityMultiplierBps: 1,
 			GasMultiplierWeiPerEth:            11e17,
+		},
+		V2Params: &laneapi.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
 		},
 	}
 }

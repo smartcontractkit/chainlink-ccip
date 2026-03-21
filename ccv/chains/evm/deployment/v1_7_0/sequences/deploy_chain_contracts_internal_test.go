@@ -14,7 +14,7 @@ import (
 
 func TestGetMockReceiverVerifiers(t *testing.T) {
 	chainSelector := uint64(12345)
-	v1_7_0 := semver.MustParse("1.7.0")
+	v1_7_0 := semver.MustParse("2.0.0")
 
 	// Note that address is not specified in the refs below - this is intentional.
 	requiredVerifierRef := datastore.AddressRef{

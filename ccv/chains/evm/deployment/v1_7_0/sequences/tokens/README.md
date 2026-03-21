@@ -1,6 +1,6 @@
-# Token sequences (v1.7.0)
+# Token sequences (v2.0.0)
 
-This package contains the sequences used to configure tokens and token pools for CCIP transfers on EVM chains at version 1.7.0. It includes logic to **import configuration from a prior (active) pool** when upgrading a token to a new pool while keeping the same registry and token.
+This package contains the sequences used to configure tokens and token pools for CCIP transfers on EVM chains at version 2.0.0. It includes logic to **import configuration from a prior (active) pool** when upgrading a token to a new pool while keeping the same registry and token.
 
 ## Configure tokens for transfers: flow
 
@@ -12,7 +12,7 @@ This package contains the sequences used to configure tokens and token pools for
 
 ## Importing config from prior pool versions
 
-When configuring a **new** 1.7.0 pool for a token that already has an **active pool** registered in the TokenAdminRegistry (e.g. upgrading from 1.5.1 or 1.6.1), the sequence can **import** rate limiter state and remote pool addresses from that active pool so you don’t have to re-specify everything.
+When configuring a **new** 2.0.0 pool for a token that already has an **active pool** registered in the TokenAdminRegistry (e.g. upgrading from 1.5.1 or 1.6.1), the sequence can **import** rate limiter state and remote pool addresses from that active pool so you don’t have to re-specify everything.
 
 ### When import runs
 

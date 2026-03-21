@@ -8,6 +8,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	erc20_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
 	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
@@ -23,12 +25,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 	"migrate-lock-release-pool-liquidity",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Migrates liquidity from a legacy LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
 		evmChain, ok := chains.EVMChains()[input.ChainSelector]
@@ -509,9 +510,9 @@ func appendAuthApproveDeposit(
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.DepositArgs{
-			Token:  tokenAddr,
-			Arg1:   remoteChainSelector,
-			Amount: amount,
+			Token:               tokenAddr,
+			RemoteChainSelector: remoteChainSelector,
+			Amount:              amount,
 		},
 	})
 	if err != nil {
