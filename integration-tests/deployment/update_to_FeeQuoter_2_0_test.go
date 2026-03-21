@@ -33,6 +33,7 @@ import (
 )
 
 func TestUpdateToFeeQuoter_2_0(t *testing.T) {
+	t.Parallel()
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,

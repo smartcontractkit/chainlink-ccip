@@ -142,11 +142,7 @@ func checkBidirectionalLaneConnectivity(
 	// Validate EVM onRamp/OffRamp/Router/FeeQuoter state
 	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from onRamp")
-	routerAddr := routerOnDestAddr
-	if disable {
-		routerAddr = common.HexToAddress("0x0").Bytes()
-	}
-	require.Equal(t, routerAddr, destChainConfig.Router.Bytes(), "router must equal expected")
+	require.Equal(t, routerOnDestAddr, destChainConfig.Router.Bytes(), "onRamp dest config router must always be the real router")
 	require.Equal(t, evmChain.AllowListEnabled, destChainConfig.AllowlistEnabled, "allowListEnabled must equal expected")
 
 	srcChainConfig, err := offRampDest.GetSourceChainConfig(nil, solanaChain.Selector)
@@ -557,12 +553,8 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 
 		destChainConfig, err := onRampSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 		require.NoError(t, err, "must get dest chain config from onRamp")
-		routerAddr := routerOnSrc.Address().Hex()
-		if disable {
-			routerAddr = common.HexToAddress("0x0").Hex()
-		}
-		require.Equal(t, routerAddr, destChainConfig.Router.Hex(), "router must equal expected")
-		require.Equal(t, lane.Dest.AllowListEnabled, destChainConfig.AllowlistEnabled, "allowListEnabled must equal expected")
+		require.Equal(t, routerOnSrc.Address().Hex(), destChainConfig.Router.Hex(), "onRamp dest config router must always be the real router")
+		require.Equal(t, lane.Source.AllowListEnabled, destChainConfig.AllowlistEnabled, "allowListEnabled must equal expected")
 
 		srcChainConfig, err := offRampDest.GetSourceChainConfig(nil, lane.Source.Selector)
 		require.NoError(t, err, "must get src chain config from offRamp")
@@ -615,6 +607,100 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 			require.Equal(t, lane.Dest.GasPrice, price.Value, "price must equal expected")
 		}
 	}
+}
+
+// TestConnectChains_EVM2EVM_Lifecycle exercises the full lifecycle of a bidirectional
+// EVM lane: connect with allowlists → idempotent reconnect (prices not overwritten) →
+// disconnect → idempotent disconnect (no revert). A single environment setup covers
+// all code paths efficiently.
+func TestConnectChains_EVM2EVM_Lifecycle(t *testing.T) {
+	t.Parallel()
+	chains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+		chain_selectors.POLYGON_MAINNET.Selector,
+	}
+	e, chain1, chain2, srcAdapter, destAdapter, version := setupEVM2EVMForConnectChains(t, chains)
+	mcmsRegistry := cs_core.GetRegistry()
+
+	allowedSender1 := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	allowedSender2 := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	chain1.AllowListEnabled = true
+	chain1.AllowList = []string{allowedSender1.Hex(), allowedSender2.Hex()}
+	chain2.AllowListEnabled = true
+	chain2.AllowList = []string{allowedSender1.Hex()}
+	initialGasPrice1 := new(big.Int).Set(chain1.GasPrice)
+	initialGasPrice2 := new(big.Int).Set(chain2.GasPrice)
+
+	connect := func(isDisabled bool) {
+		t.Helper()
+		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+			Lanes: []lanesapi.LaneConfig{
+				{Version: version, ChainA: chain1, ChainB: chain2, IsDisabled: isDisabled},
+			},
+		})
+		require.NoError(t, err)
+	}
+	freshBundle := func() {
+		t.Helper()
+		e.OperationsBundle = operations.NewBundle(t.Context, e.OperationsBundle.Logger, operations.NewMemoryReporter())
+	}
+
+	// ── Phase 1: Connect ─────────────────────────────────────────────────
+	connect(false)
+	checkBidirectionalLaneConnectivityEVM2EVM(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
+
+	// Verify allowlists: each chain's OnRamp reflects its own AllowList.
+	onRampAddr1, err := srcAdapter.GetOnRampAddress(e.DataStore, chain1.Selector)
+	require.NoError(t, err)
+	onRampOn1, err := onramp.NewOnRamp(common.BytesToAddress(onRampAddr1), e.BlockChains.EVMChains()[chain1.Selector].Client)
+	require.NoError(t, err)
+	al1, err := onRampOn1.GetAllowedSendersList(nil, chain2.Selector)
+	require.NoError(t, err)
+	require.True(t, al1.IsEnabled)
+	require.ElementsMatch(t, []common.Address{allowedSender1, allowedSender2}, al1.ConfiguredAddresses)
+
+	onRampAddr2, err := srcAdapter.GetOnRampAddress(e.DataStore, chain2.Selector)
+	require.NoError(t, err)
+	onRampOn2, err := onramp.NewOnRamp(common.BytesToAddress(onRampAddr2), e.BlockChains.EVMChains()[chain2.Selector].Client)
+	require.NoError(t, err)
+	al2, err := onRampOn2.GetAllowedSendersList(nil, chain1.Selector)
+	require.NoError(t, err)
+	require.True(t, al2.IsEnabled)
+	require.ElementsMatch(t, []common.Address{allowedSender1}, al2.ConfiguredAddresses)
+
+	// ── Phase 2: Reconnect with different prices (must NOT overwrite) ────
+	freshBundle()
+	chain1.GasPrice = new(big.Int).Mul(big.NewInt(999), big.NewInt(1e17))
+	chain2.GasPrice = big.NewInt(999_000_000_000)
+	connect(false)
+
+	fqAddr1, err := srcAdapter.GetFQAddress(e.DataStore, chain1.Selector)
+	require.NoError(t, err)
+	fqOn1, err := evmfq.NewFeeQuoter(common.BytesToAddress(fqAddr1), e.BlockChains.EVMChains()[chain1.Selector].Client)
+	require.NoError(t, err)
+	price1, err := fqOn1.GetDestinationChainGasPrice(nil, chain2.Selector)
+	require.NoError(t, err)
+	require.Equal(t, initialGasPrice2, price1.Value, "gas price must not be overwritten")
+
+	fqAddr2, err := srcAdapter.GetFQAddress(e.DataStore, chain2.Selector)
+	require.NoError(t, err)
+	fqOn2, err := evmfq.NewFeeQuoter(common.BytesToAddress(fqAddr2), e.BlockChains.EVMChains()[chain2.Selector].Client)
+	require.NoError(t, err)
+	price2, err := fqOn2.GetDestinationChainGasPrice(nil, chain1.Selector)
+	require.NoError(t, err)
+	require.Equal(t, initialGasPrice1, price2.Value, "gas price must not be overwritten")
+
+	// ── Phase 3: Disconnect ──────────────────────────────────────────────
+	freshBundle()
+	chain1.GasPrice = initialGasPrice1
+	chain2.GasPrice = initialGasPrice2
+	connect(true)
+	checkBidirectionalLaneConnectivityEVM2EVM(t, e, chain1, chain2, srcAdapter, destAdapter, false, true)
+
+	// ── Phase 4: Disconnect again (must not revert) ──────────────────────
+	freshBundle()
+	connect(true)
+	checkBidirectionalLaneConnectivityEVM2EVM(t, e, chain1, chain2, srcAdapter, destAdapter, false, true)
 }
 
 // TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion runs an e2e with 1.6 FeeQuoter, upgrades to 2.0,

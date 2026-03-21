@@ -161,22 +161,39 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		var offRampAdds []router.OffRamp
 		var offRampRemoves []router.OffRamp
 		if input.IsDisabled {
-			offRampRemoves = []router.OffRamp{offrampUpdate}
+			evmChain, ok := chains.EVMChains()[input.Dest.Selector]
+			if !ok {
+				return result, fmt.Errorf("chain with selector %d not defined", input.Dest.Selector)
+			}
+			rep, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+				ChainSelector: input.Dest.Selector,
+				Address:       common.BytesToAddress(input.Dest.Router),
+			})
+			if err != nil {
+				return result, fmt.Errorf("read offRamps from router: %w", err)
+			}
+			if offRampRegistered(rep.Output, input.Source.Selector, common.BytesToAddress(input.Dest.OffRamp)) {
+				offRampRemoves = []router.OffRamp{offrampUpdate}
+			} else {
+				b.Logger.Info("Skipping offRamp removal: not currently registered on router")
+			}
 		} else {
 			offRampAdds = []router.OffRamp{offrampUpdate}
 		}
-		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
-			Address:       common.BytesToAddress(input.Dest.Router),
-			ChainSelector: input.Dest.Selector,
-			UpdatesByChain: router.ApplyRampsUpdatesArgs{
-				OffRampAdds:    offRampAdds,
-				OffRampRemoves: offRampRemoves,
-			},
-		}, result)
-		if err != nil {
-			return result, err
+		if len(offRampAdds) > 0 || len(offRampRemoves) > 0 {
+			result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
+				Address:       common.BytesToAddress(input.Dest.Router),
+				ChainSelector: input.Dest.Selector,
+				UpdatesByChain: router.ApplyRampsUpdatesArgs{
+					OffRampAdds:    offRampAdds,
+					OffRampRemoves: offRampRemoves,
+				},
+			}, result)
+			if err != nil {
+				return result, err
+			}
+			b.Logger.Info("Ramps updated on Routers")
 		}
-		b.Logger.Info("Ramps updated on Routers")
 
 		return result, nil
 	},
@@ -260,6 +277,15 @@ func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes
 	result.BatchOps = append(result.BatchOps, batch)
 	b.Logger.Info("OnRamp allowlist applied")
 	return nil
+}
+
+func offRampRegistered(offRamps []router.OffRamp, sourceChainSelector uint64, offRamp common.Address) bool {
+	for _, r := range offRamps {
+		if r.SourceChainSelector == sourceChainSelector && r.OffRamp == offRamp {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *EVMAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
