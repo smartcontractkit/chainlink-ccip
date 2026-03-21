@@ -2,77 +2,95 @@ package sequences
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"ConfigureLaneLegAsSource",
-	semver.MustParse("1.0.0"),
+	semver.MustParse("1.6.0"),
 	"Configures lane leg as source on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
 
-	result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
-		Address:       common.BytesToAddress(input.Source.FeeQuoter),
-		ChainSelector: input.Source.Selector,
-		UpdatesByChain: []fqops.DestChainConfigArgs{
-			{
-				DestChainSelector: input.Dest.Selector,
-				DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
+		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+			Address:       common.BytesToAddress(input.Source.FeeQuoter),
+			ChainSelector: input.Source.Selector,
+			UpdatesByChain: []fqops.DestChainConfigArgs{
+				{
+					DestChainSelector: input.Dest.Selector,
+					DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
+				},
 			},
-		},
-	}, result)
+		}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Destination configs updated on FeeQuoters")
 
-	result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
-		Address:       common.BytesToAddress(input.Source.FeeQuoter),
-		ChainSelector: input.Source.Selector,
-		UpdatesByChain: fqops.PriceUpdates{
-			TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
-			GasPriceUpdates: []fqops.GasPriceUpdate{
+		evmChain, ok := chains.EVMChains()[input.Source.Selector]
+		if !ok {
+			return result, fmt.Errorf("chain with selector %d not defined", input.Source.Selector)
+		}
+		feeQuoterAddr := common.BytesToAddress(input.Source.FeeQuoter)
+		if input.Dest.GasPrice != nil || len(input.Source.TokenPrices) > 0 {
+			skip, err := feeQuoterPricesAlreadySeeded(b, evmChain, feeQuoterAddr, input.Source.Selector, input.Dest.Selector)
+			if err != nil {
+				return result, err
+			}
+			if skip {
+				b.Logger.Info("Skipping FeeQuoter price updates: prices already seeded for dest chain")
+			} else {
+				result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
+					Address:       feeQuoterAddr,
+					ChainSelector: input.Source.Selector,
+					UpdatesByChain: fqops.PriceUpdates{
+						GasPriceUpdates:   translateGasPrice(input.Dest.Selector, input.Dest.GasPrice),
+						TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
+					},
+				}, result)
+				if err != nil {
+					return result, err
+				}
+				b.Logger.Info("FeeQuoter prices seeded")
+			}
+		}
+
+		result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
+			Address:       common.BytesToAddress(input.Source.OnRamp),
+			ChainSelector: input.Source.Selector,
+			UpdatesByChain: []onrampops.DestChainConfigArgs{
 				{
+					Router:            common.BytesToAddress(input.Source.Router),
 					DestChainSelector: input.Dest.Selector,
-					UsdPerUnitGas:     input.Dest.GasPrice,
+					AllowlistEnabled:  input.Source.AllowListEnabled,
 				},
 			},
-		},
-	}, result)
+		}, result)
 		if err != nil {
 			return result, err
 		}
-		b.Logger.Info("Gas prices updated on FeeQuoters")
+		b.Logger.Info("OnRamp destination chain configs updated")
 
-	result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
-		Address:       common.BytesToAddress(input.Source.OnRamp),
-		ChainSelector: input.Source.Selector,
-		UpdatesByChain: []onrampops.DestChainConfigArgs{
-			{
-				Router:            common.BytesToAddress(input.Source.Router),
-				DestChainSelector: input.Dest.Selector,
-				AllowlistEnabled:  input.Dest.AllowListEnabled,
-			},
-		},
-	}, result)
-		if err != nil {
+		if err := applyOnRampAllowlist(b, evmChain, input, &result); err != nil {
 			return result, err
 		}
-		b.Logger.Info("Source configs updated on OffRamps")
 
 		onrampUpdate := router.OnRamp{
 			DestChainSelector: input.Dest.Selector,
@@ -105,16 +123,15 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		var result sequences.OnChainOutput
 		b.Logger.Infof("EVM Configuring lane leg as destination. src: %+v, dest: %+v", input.Source, input.Dest)
 
-	result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
-		Address:       common.BytesToAddress(input.Dest.OffRamp),
-		ChainSelector: input.Dest.Selector,
-		UpdatesByChain: []offrampops.SourceChainConfigArgs{
-			{
-				Router:              common.BytesToAddress(input.Dest.Router),
-				SourceChainSelector: input.Source.Selector,
-				// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
-				OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
-				IsEnabled:                 !input.IsDisabled,
+		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
+			Address:       common.BytesToAddress(input.Dest.OffRamp),
+			ChainSelector: input.Dest.Selector,
+			UpdatesByChain: []offrampops.SourceChainConfigArgs{
+				{
+					Router:                    common.BytesToAddress(input.Dest.Router),
+					SourceChainSelector:       input.Source.Selector,
+					OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
+					IsEnabled:                 !input.IsDisabled,
 					IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 				},
 			},
@@ -151,6 +168,67 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		return result, nil
 	},
 )
+
+// feeQuoterPricesAlreadySeeded checks whether a gas price entry already exists
+// for the dest chain. If so, prices have been seeded and should not be overwritten.
+func feeQuoterPricesAlreadySeeded(
+	b operations.Bundle,
+	chain cldf_evm.Chain,
+	feeQuoter common.Address,
+	sourceChainSelector uint64,
+	destChainSelector uint64,
+) (bool, error) {
+	rep, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
+		ChainSelector: sourceChainSelector,
+		Address:       feeQuoter,
+		Args:          destChainSelector,
+	})
+	if err != nil {
+		return false, fmt.Errorf("read destination gas price from fee quoter: %w", err)
+	}
+	return rep.Output.Timestamp > 0, nil
+}
+
+func translateGasPrice(destChainSelector uint64, gasPrice *big.Int) []fqops.GasPriceUpdate {
+	if gasPrice == nil {
+		return nil
+	}
+	return []fqops.GasPriceUpdate{{DestChainSelector: destChainSelector, UsdPerUnitGas: gasPrice}}
+}
+
+// applyOnRampAllowlist writes the full allowlist from the input to the OnRamp.
+// The input is treated as the complete desired state.
+func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes.UpdateLanesInput, result *sequences.OnChainOutput) error {
+	if len(input.Source.AllowList) > 0 && !input.Source.AllowListEnabled {
+		return errors.New("OnRamp allowlist: cannot specify AllowList addresses when AllowListEnabled is false")
+	}
+	desired := make([]common.Address, 0, len(input.Source.AllowList))
+	for _, h := range input.Source.AllowList {
+		if !common.IsHexAddress(h) {
+			return fmt.Errorf("allowlist address %q is not a valid hex address", h)
+		}
+		desired = append(desired, common.HexToAddress(h))
+	}
+	writeRep, err := operations.ExecuteOperation(b, onrampops.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]onrampops.AllowlistConfigArgs]{
+		ChainSelector: input.Source.Selector,
+		Address:       common.BytesToAddress(input.Source.OnRamp),
+		Args: []onrampops.AllowlistConfigArgs{{
+			DestChainSelector:       input.Dest.Selector,
+			AllowlistEnabled:        input.Source.AllowListEnabled,
+			AddedAllowlistedSenders: desired,
+		}},
+	})
+	if err != nil {
+		return fmt.Errorf("apply onramp allowlist updates: %w", err)
+	}
+	batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeRep.Output})
+	if err != nil {
+		return err
+	}
+	result.BatchOps = append(result.BatchOps, batch)
+	b.Logger.Info("OnRamp allowlist applied")
+	return nil
+}
 
 func (a *EVMAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return ConfigureLaneLegAsSource

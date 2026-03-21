@@ -43,12 +43,13 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		result.BatchOps = append(result.BatchOps, fqOut.Output.BatchOps...)
 
 		// Add Router
+		// Allowlist applies to senders of messages TO the remote chain (dest); mirror EVM OnRamp dest config.
 		routerOut, err := operations.ExecuteOperation(b, routerops.ConnectChains, chains.SolanaChains()[input.Source.Selector], routerops.ConnectChainsParams{
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
 			RemoteChainSelector: input.Dest.Selector,
-			AllowlistEnabled:    input.Source.AllowListEnabled,
-			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
+		AllowlistEnabled:    input.Source.AllowListEnabled,
+		AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize OffRamp: %w", err)
@@ -75,8 +76,6 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
 			RemoteChainSelector: input.Source.Selector,
-			AllowlistEnabled:    input.Source.AllowListEnabled,
-			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to add OffRamp to Router: %w", err)
