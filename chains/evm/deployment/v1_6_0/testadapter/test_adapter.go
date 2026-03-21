@@ -73,9 +73,15 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	}
 }
 
+var ErrNoAddressFound = errors.New("no address found")
+
 func (a *EVMAdapter) getAddress(ty datastore.ContractType) (common.Address, error) {
 	addr, err := a.state.GetAddress(ty)
 	if err != nil {
+		// if err matches "expected to find exactly 1 ref with criteria %s, found 0"
+		if strings.HasPrefix(err.Error(), "expected to find exactly 1 ref with criteria") && strings.HasSuffix(err.Error(), ",found 0") {
+			return common.Address{}, ErrNoAddressFound
+		}
 		return common.Address{}, fmt.Errorf("failed to get %v address: %w", ty, err)
 	}
 	return common.HexToAddress(addr), nil
@@ -225,11 +231,16 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 }
 
 func (a *EVMAdapter) CCIPReceiver() []byte {
-	receiverAddr, err := a.getAddress("CCIPReceiver")
-	if err != nil {
-		panic(err)
+	for _, typeStr := range []datastore.ContractType{"CCIPReceiver", "TestReceiver"} {
+		receiverAddr, err := a.getAddress(typeStr)
+		if err == nil {
+			return common.LeftPadBytes(receiverAddr.Bytes(), 32)
+		}
+		if !errors.Is(err, ErrNoAddressFound) {
+			panic(err)
+		}
 	}
-	return common.LeftPadBytes(receiverAddr.Bytes(), 32)
+	panic("no receiver address found")
 }
 
 func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
