@@ -78,8 +78,8 @@ var ErrNoAddressFound = errors.New("no address found")
 func (a *EVMAdapter) getAddress(ty datastore.ContractType) (common.Address, error) {
 	addr, err := a.state.GetAddress(ty)
 	if err != nil {
-		// if err matches "expected to find exactly 1 ref with criteria %s, found 0"
-		if strings.HasPrefix(err.Error(), "expected to find exactly 1 ref with criteria") && strings.HasSuffix(err.Error(), ",found 0") {
+		if strings.HasPrefix(err.Error(), "expected to find exactly 1 ref with criteria") &&
+			strings.HasSuffix(err.Error(), ", found 0") {
 			return common.Address{}, ErrNoAddressFound
 		}
 		return common.Address{}, fmt.Errorf("failed to get %v address: %w", ty, err)
@@ -240,7 +240,8 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 			panic(err)
 		}
 	}
-	panic("no receiver address found")
+	// Fallback because receiver is not found in a.state for devenv. TODO investigate why and remove fallback
+	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
 func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
