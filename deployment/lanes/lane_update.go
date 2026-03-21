@@ -80,6 +80,8 @@ type ChainDefinition struct {
 	// FeeQuoterDestChainConfig is the configuration that should be applied to this chain's FeeQuoter for it to be a destination in the lane.
 	// This is populated programmatically and is based on the chain family, with possible overrides from the user.
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
+	// FeeQuoterVersion is the contract version of the FeeQuoter (e.g. 1.6.0 or 2.0.0).
+	FeeQuoterVersion *semver.Version
 }
 
 // CantonLaneConfig holds Canton-specific configuration for lane setup.
@@ -214,11 +216,11 @@ type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
 func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuoterDestChainConfig {
 	chainHex := utils.GetSelectorHex(selector)
 	params := FeeQuoterDestChainConfig{
-		IsEnabled:               configEnabled,
-		MaxDataBytes:            30_000,
-		MaxPerMsgGasLimit:       3_000_000,
-		DestGasOverhead:         300_000,
-		DefaultTokenFeeUSDCents: 25,
+		IsEnabled:                   configEnabled,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DefaultTokenFeeUSDCents:     25,
 		DestGasPerPayloadByteBase:   16,
 		DefaultTokenDestGasOverhead: 90_000,
 		DefaultTxGasLimit:           200_000,

@@ -14,6 +14,7 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	fqops2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -27,48 +28,59 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 	"Configures lane leg as source on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
+		var err error
 		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
 
-		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
-			Address:       common.BytesToAddress(input.Source.FeeQuoter),
-			ChainSelector: input.Source.Selector,
-			UpdatesByChain: []fqops.DestChainConfigArgs{
-				{
-					DestChainSelector: input.Dest.Selector,
-					DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
-				},
-			},
-		}, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Destination configs updated on FeeQuoters")
+		isFQ2 := input.Source.FeeQuoterVersion != nil && input.Source.FeeQuoterVersion.Compare(fqops2.Version) >= 0
+		fqAddr := common.BytesToAddress(input.Source.FeeQuoter)
 
 		evmChain, ok := chains.EVMChains()[input.Source.Selector]
 		if !ok {
 			return result, fmt.Errorf("chain with selector %d not defined", input.Source.Selector)
 		}
-		feeQuoterAddr := common.BytesToAddress(input.Source.FeeQuoter)
-		if input.Dest.GasPrice != nil || len(input.Source.TokenPrices) > 0 {
-			skip, err := feeQuoterPricesAlreadySeeded(b, evmChain, feeQuoterAddr, input.Source.Selector, input.Dest.Selector)
+
+		if isFQ2 {
+			result, err = configureFeeQuoterV2(b, chains, input, fqAddr, evmChain, result)
 			if err != nil {
 				return result, err
 			}
-			if skip {
-				b.Logger.Info("Skipping FeeQuoter price updates: prices already seeded for dest chain")
-			} else {
-				result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
-					Address:       feeQuoterAddr,
-					ChainSelector: input.Source.Selector,
-					UpdatesByChain: fqops.PriceUpdates{
-						GasPriceUpdates:   translateGasPrice(input.Dest.Selector, input.Dest.GasPrice),
-						TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
+		} else {
+			result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+				Address:       fqAddr,
+				ChainSelector: input.Source.Selector,
+				UpdatesByChain: []fqops.DestChainConfigArgs{
+					{
+						DestChainSelector: input.Dest.Selector,
+						DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
 					},
-				}, result)
+				},
+			}, result)
+			if err != nil {
+				return result, err
+			}
+			b.Logger.Info("Destination configs updated on FeeQuoters")
+
+			if input.Dest.GasPrice != nil || len(input.Source.TokenPrices) > 0 {
+				skip, err := feeQuoterPricesAlreadySeeded(b, evmChain, fqAddr, input.Source.Selector, input.Dest.Selector)
 				if err != nil {
 					return result, err
 				}
-				b.Logger.Info("FeeQuoter prices seeded")
+				if skip {
+					b.Logger.Info("Skipping FeeQuoter price updates: prices already seeded for dest chain")
+				} else {
+					result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
+						Address:       fqAddr,
+						ChainSelector: input.Source.Selector,
+						UpdatesByChain: fqops.PriceUpdates{
+							GasPriceUpdates:   translateGasPrice(input.Dest.Selector, input.Dest.GasPrice),
+							TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
+						},
+					}, result)
+					if err != nil {
+						return result, err
+					}
+					b.Logger.Info("FeeQuoter prices seeded")
+				}
 			}
 		}
 
@@ -128,8 +140,9 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			ChainSelector: input.Dest.Selector,
 			UpdatesByChain: []offrampops.SourceChainConfigArgs{
 				{
-					Router:                    common.BytesToAddress(input.Dest.Router),
-					SourceChainSelector:       input.Source.Selector,
+					Router:              common.BytesToAddress(input.Dest.Router),
+					SourceChainSelector: input.Source.Selector,
+					// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
 					OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
 					IsEnabled:                 !input.IsDisabled,
 					IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
@@ -185,6 +198,25 @@ func feeQuoterPricesAlreadySeeded(
 	})
 	if err != nil {
 		return false, fmt.Errorf("read destination gas price from fee quoter: %w", err)
+	}
+	return rep.Output.Timestamp > 0, nil
+}
+
+// feeQuoterV2PricesAlreadySeeded is the FQ 2.0 equivalent of feeQuoterPricesAlreadySeeded.
+func feeQuoterV2PricesAlreadySeeded(
+	b operations.Bundle,
+	chain cldf_evm.Chain,
+	feeQuoter common.Address,
+	sourceChainSelector uint64,
+	destChainSelector uint64,
+) (bool, error) {
+	rep, err := operations.ExecuteOperation(b, fqops2.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
+		ChainSelector: sourceChainSelector,
+		Address:       feeQuoter,
+		Args:          destChainSelector,
+	})
+	if err != nil {
+		return false, fmt.Errorf("read destination gas price from fee quoter v2: %w", err)
 	}
 	return rep.Output.Timestamp > 0, nil
 }
@@ -266,6 +298,26 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
 	}
 }
 
+func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fqops2.DestChainConfig {
+	var v2 lanes.FeeQuoterV2Params
+	if fqc.V2Params != nil {
+		v2 = *fqc.V2Params
+	}
+	return fqops2.DestChainConfig{
+		IsEnabled:                   fqc.IsEnabled,
+		MaxDataBytes:                fqc.MaxDataBytes,
+		MaxPerMsgGasLimit:           fqc.MaxPerMsgGasLimit,
+		DestGasOverhead:             fqc.DestGasOverhead,
+		DestGasPerPayloadByteBase:   fqc.DestGasPerPayloadByteBase,
+		ChainFamilySelector:         [4]byte(binary.BigEndian.AppendUint32(nil, fqc.ChainFamilySelector)),
+		DefaultTokenFeeUSDCents:     fqc.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead: fqc.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           fqc.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          fqc.NetworkFeeUSDCents,
+		LinkFeeMultiplierPercent:    v2.LinkFeeMultiplierPercent,
+	}
+}
+
 func TranslateTokenPrices(prices map[string]*big.Int) []fqops.TokenPriceUpdate {
 	var result []fqops.TokenPriceUpdate
 	for k, v := range prices {
@@ -275,4 +327,75 @@ func TranslateTokenPrices(prices map[string]*big.Int) []fqops.TokenPriceUpdate {
 		})
 	}
 	return result
+}
+
+func TranslateTokenPricesV2(prices map[string]*big.Int) []fqops2.TokenPriceUpdate {
+	var result []fqops2.TokenPriceUpdate
+	for k, v := range prices {
+		result = append(result, fqops2.TokenPriceUpdate{
+			SourceToken: common.HexToAddress(k),
+			UsdPerToken: v,
+		})
+	}
+	return result
+}
+
+func configureFeeQuoterV2(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput, fqAddr common.Address, evmChain cldf_evm.Chain, result sequences.OnChainOutput) (sequences.OnChainOutput, error) {
+	destChainCfgReport, err := operations.ExecuteOperation(
+		b, fqops2.ApplyDestChainConfigUpdates, evmChain,
+		contract.FunctionInput[[]fqops2.DestChainConfigArgs]{
+			ChainSelector: evmChain.Selector,
+			Address:       fqAddr,
+			Args: []fqops2.DestChainConfigArgs{
+				{
+					DestChainSelector: input.Dest.Selector,
+					DestChainConfig:   TranslateFQtoV2(input.Dest.FeeQuoterDestChainConfig),
+				},
+			},
+		})
+	if err != nil {
+		return result, err
+	}
+	b.Logger.Info("Destination configs updated on FeeQuoters")
+
+	batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{destChainCfgReport.Output})
+	if err != nil {
+		return result, err
+	}
+	result.BatchOps = append(result.BatchOps, batch)
+
+	if input.Dest.GasPrice != nil || len(input.Source.TokenPrices) > 0 {
+		skip, err := feeQuoterV2PricesAlreadySeeded(b, evmChain, fqAddr, input.Source.Selector, input.Dest.Selector)
+		if err != nil {
+			return result, err
+		}
+		if skip {
+			b.Logger.Info("Skipping FeeQuoter v2 price updates: prices already seeded for dest chain")
+		} else {
+			priceReport, err := operations.ExecuteOperation(b, fqops2.UpdatePrices, evmChain, contract.FunctionInput[fqops2.PriceUpdates]{
+				ChainSelector: evmChain.Selector,
+				Address:       fqAddr,
+				Args: fqops2.PriceUpdates{
+					TokenPriceUpdates: TranslateTokenPricesV2(input.Source.TokenPrices),
+					GasPriceUpdates: []fqops2.GasPriceUpdate{
+						{
+							DestChainSelector: input.Dest.Selector,
+							UsdPerUnitGas:     input.Dest.GasPrice,
+						},
+					},
+				},
+			})
+			if err != nil {
+				return result, err
+			}
+			priceBatch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{priceReport.Output})
+			if err != nil {
+				return result, err
+			}
+			result.BatchOps = append(result.BatchOps, priceBatch)
+			b.Logger.Info("FeeQuoter v2 prices seeded")
+		}
+	}
+
+	return result, nil
 }
