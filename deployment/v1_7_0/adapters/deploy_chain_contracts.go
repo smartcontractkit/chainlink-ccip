@@ -123,9 +123,10 @@ type DeployChainContractsAdapter interface {
 }
 
 type DeployChainContractsRegistry struct {
-	mu              sync.Mutex
-	adapters        map[string]DeployChainContractsAdapter
-	configImporters map[string]deploy.ConfigImporter
+	mu                  sync.Mutex
+	adapters            map[string]DeployChainContractsAdapter
+	configImporters     map[string]deploy.ConfigImporter
+	laneVersionResolver map[string]deploy.LaneVersionResolver
 }
 
 var (
@@ -135,8 +136,9 @@ var (
 
 func NewDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	return &DeployChainContractsRegistry{
-		adapters:        make(map[string]DeployChainContractsAdapter),
-		configImporters: make(map[string]deploy.ConfigImporter),
+		adapters:            make(map[string]DeployChainContractsAdapter),
+		configImporters:     make(map[string]deploy.ConfigImporter),
+		laneVersionResolver: make(map[string]deploy.LaneVersionResolver),
 	}
 }
 
@@ -162,6 +164,25 @@ func (r *DeployChainContractsRegistry) RegisterConfigImporter(family string, ver
 	if _, exists := r.configImporters[id]; !exists {
 		r.configImporters[id] = importer
 	}
+}
+
+func (r *DeployChainContractsRegistry) RegisterLaneVersionResolver(family string, resolver deploy.LaneVersionResolver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.laneVersionResolver[family]; !exists {
+		r.laneVersionResolver[family] = resolver
+	}
+}
+
+func (r *DeployChainContractsRegistry) GetLaneVersionResolver(sel uint64) (deploy.LaneVersionResolver, bool) {
+	family, err := chainsel.GetSelectorFamily(sel)
+	if err != nil {
+		return nil, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	resolver, ok := r.laneVersionResolver[family]
+	return resolver, ok
 }
 
 func (r *DeployChainContractsRegistry) Get(family string) (DeployChainContractsAdapter, bool) {
