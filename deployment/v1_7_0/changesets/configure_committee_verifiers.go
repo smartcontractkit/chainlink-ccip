@@ -149,10 +149,15 @@ func ConfigureChainsForLanesFromTopology(
 			}
 		}
 
-		return lanes.ConnectChains(laneAdapterRegistry, mcmsRegistry).Apply(e, lanes.ConnectChainsConfig{
+		connectChainsCS := lanes.ConnectChains(laneAdapterRegistry, mcmsRegistry)
+		connectChainsCfg := lanes.ConnectChainsConfig{
 			Lanes: laneConfigs,
 			MCMS:  cfg.MCMS,
-		})
+		}
+		if err := connectChainsCS.VerifyPreconditions(e, connectChainsCfg); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("connect chains precondition check failed: %w", err)
+		}
+		return connectChainsCS.Apply(e, connectChainsCfg)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
