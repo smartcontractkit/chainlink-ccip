@@ -245,12 +245,24 @@ func translateGasPrice(destChainSelector uint64, gasPrice *big.Int) []fqops.GasP
 	return []fqops.GasPriceUpdate{{DestChainSelector: destChainSelector, UsdPerUnitGas: gasPrice}}
 }
 
-// applyOnRampAllowlist writes the full allowlist from the input to the OnRamp.
-// The input is treated as the complete desired state.
+// applyOnRampAllowlist reconciles the on-chain allowlist with the desired state
+// from the input. It reads the current list, computes adds/removes, and
+// short-circuits when on-chain state already matches.
 func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes.UpdateLanesInput, result *sequences.OnChainOutput) error {
 	if len(input.Source.AllowList) > 0 && !input.Source.AllowListEnabled {
 		return errors.New("OnRamp allowlist: cannot specify AllowList addresses when AllowListEnabled is false")
 	}
+
+	onRampAddr := common.BytesToAddress(input.Source.OnRamp)
+	currentRep, err := operations.ExecuteOperation(b, onrampops.GetAllowedSendersList, chain, contract.FunctionInput[uint64]{
+		ChainSelector: input.Source.Selector,
+		Address:       onRampAddr,
+		Args:          input.Dest.Selector,
+	})
+	if err != nil {
+		return fmt.Errorf("read current onramp allowlist: %w", err)
+	}
+
 	desired := make([]common.Address, 0, len(input.Source.AllowList))
 	for _, h := range input.Source.AllowList {
 		if !common.IsHexAddress(h) {
@@ -258,13 +270,22 @@ func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes
 		}
 		desired = append(desired, common.HexToAddress(h))
 	}
+
+	added, removed := diffAllowlist(currentRep.Output.ConfiguredAddresses, desired)
+
+	if currentRep.Output.IsEnabled == input.Source.AllowListEnabled && len(added) == 0 && len(removed) == 0 {
+		b.Logger.Info("OnRamp allowlist already matches desired state, skipping")
+		return nil
+	}
+
 	writeRep, err := operations.ExecuteOperation(b, onrampops.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]onrampops.AllowlistConfigArgs]{
 		ChainSelector: input.Source.Selector,
-		Address:       common.BytesToAddress(input.Source.OnRamp),
+		Address:       onRampAddr,
 		Args: []onrampops.AllowlistConfigArgs{{
-			DestChainSelector:       input.Dest.Selector,
-			AllowlistEnabled:        input.Source.AllowListEnabled,
-			AddedAllowlistedSenders: desired,
+			DestChainSelector:         input.Dest.Selector,
+			AllowlistEnabled:          input.Source.AllowListEnabled,
+			AddedAllowlistedSenders:   added,
+			RemovedAllowlistedSenders: removed,
 		}},
 	})
 	if err != nil {
@@ -277,6 +298,26 @@ func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes
 	result.BatchOps = append(result.BatchOps, batch)
 	b.Logger.Info("OnRamp allowlist applied")
 	return nil
+}
+
+func diffAllowlist(current, desired []common.Address) (added, removed []common.Address) {
+	currentSet := make(map[common.Address]struct{}, len(current))
+	for _, a := range current {
+		currentSet[a] = struct{}{}
+	}
+	desiredSet := make(map[common.Address]struct{}, len(desired))
+	for _, a := range desired {
+		desiredSet[a] = struct{}{}
+		if _, ok := currentSet[a]; !ok {
+			added = append(added, a)
+		}
+	}
+	for _, a := range current {
+		if _, ok := desiredSet[a]; !ok {
+			removed = append(removed, a)
+		}
+	}
+	return added, removed
 }
 
 func offRampRegistered(offRamps []router.OffRamp, sourceChainSelector uint64, offRamp common.Address) bool {
