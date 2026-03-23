@@ -16,7 +16,7 @@ import (
 type GenerateAggregatorConfigInput struct {
 	ServiceIdentifier  string
 	CommitteeQualifier string
-	ChainSelectors     []uint64
+	Topology           *offchain.EnvironmentTopology
 }
 
 func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry) deployment.ChangeSetV2[GenerateAggregatorConfigInput] {
@@ -27,19 +27,14 @@ func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry) deplo
 		if cfg.CommitteeQualifier == "" {
 			return fmt.Errorf("committee qualifier is required")
 		}
-		envSelectors := e.BlockChains.ListChainSelectors()
-		for _, s := range cfg.ChainSelectors {
-			if !slices.Contains(envSelectors, s) {
-				return fmt.Errorf("selector %d is not available in environment", s)
-			}
-		}
-		return nil
+		_, err := resolveAggregatorChainSelectors(e, cfg)
+		return err
 	}
 
 	apply := func(e deployment.Environment, cfg GenerateAggregatorConfigInput) (deployment.ChangesetOutput, error) {
-		chainSelectors := cfg.ChainSelectors
-		if len(chainSelectors) == 0 {
-			chainSelectors = e.BlockChains.ListChainSelectors()
+		chainSelectors, err := resolveAggregatorChainSelectors(e, cfg)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
 		}
 
 		committee, err := buildAggregatorCommittee(e, registry, cfg.CommitteeQualifier, chainSelectors)
@@ -64,6 +59,34 @@ func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry) deplo
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
+}
+
+func resolveAggregatorChainSelectors(e deployment.Environment, cfg GenerateAggregatorConfigInput) ([]uint64, error) {
+	if cfg.Topology == nil {
+		return nil, fmt.Errorf("topology is required")
+	}
+	if cfg.Topology.NOPTopology == nil {
+		return nil, fmt.Errorf("NOP topology is required")
+	}
+
+	committee, ok := cfg.Topology.NOPTopology.Committees[cfg.CommitteeQualifier]
+	if !ok {
+		return nil, fmt.Errorf("committee %q not found in topology", cfg.CommitteeQualifier)
+	}
+
+	chainSelectors, err := getCommitteeChainSelectors(committee)
+	if err != nil {
+		return nil, err
+	}
+
+	envSelectors := e.BlockChains.ListChainSelectors()
+	for _, s := range chainSelectors {
+		if !slices.Contains(envSelectors, s) {
+			return nil, fmt.Errorf("committee %q references chain selector %d which is not available in environment", cfg.CommitteeQualifier, s)
+		}
+	}
+
+	return chainSelectors, nil
 }
 
 func buildAggregatorCommittee(
@@ -105,7 +128,7 @@ func buildAggregatorCommittee(
 
 	committeeStates, ok := allCommittees[committeeQualifier]
 	if !ok || len(committeeStates) == 0 {
-		return nil, fmt.Errorf("committee %q not found in on-chain topology", committeeQualifier)
+		return nil, fmt.Errorf("committee %q not found in deployed verifier state", committeeQualifier)
 	}
 
 	quorumConfigs, err := buildQuorumConfigs(e.DataStore, registry, committeeStates, committeeQualifier, chainSelectors)
