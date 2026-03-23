@@ -281,6 +281,14 @@ func getOrRegisterMockLaneAdapter(t *testing.T) *mockLaneAdapter {
 	return mockAdapter
 }
 
+func fqOverride(isEnabled bool, maxDataBytes uint32) *lanes.FeeQuoterDestChainConfigOverride {
+	o := lanes.FeeQuoterDestChainConfigOverride(func(cfg *lanes.FeeQuoterDestChainConfig) {
+		cfg.IsEnabled = isEnabled
+		cfg.MaxDataBytes = maxDataBytes
+	})
+	return &o
+}
+
 func TestConfigureChainsForLanesFromTopology_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
@@ -548,10 +556,7 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 					Type:          "Executor",
 					Version:       semver.MustParse("1.0.0"),
 				},
-				FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-					IsEnabled:    true,
-					MaxDataBytes: 50000,
-				},
+				FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
 				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 					Enabled: true,
 				},
@@ -567,10 +572,7 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 								Type:          "Executor",
 								Version:       semver.MustParse("1.0.0"),
 							},
-							FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-								IsEnabled:    true,
-								MaxDataBytes: 50000,
-							},
+							FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
 							ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 								Enabled: true,
 							},
@@ -625,10 +627,7 @@ func TestConfigureChainsForLanesFromTopology_UsesRouterAndTestRouter(t *testing.
 					Type:          "Executor",
 					Version:       semver.MustParse("1.0.0"),
 				},
-				FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-					IsEnabled:    true,
-					MaxDataBytes: 50000,
-				},
+				FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
 				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 					Enabled: true,
 				},
@@ -683,10 +682,7 @@ func TestConfigureChainsForLanesFromTopology_UsesRouterAndTestRouter(t *testing.
 					Type:          "Executor",
 					Version:       semver.MustParse("1.0.0"),
 				},
-				FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-					IsEnabled:    true,
-					MaxDataBytes: 50000,
-				},
+				FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
 				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 					Enabled: true,
 				},
