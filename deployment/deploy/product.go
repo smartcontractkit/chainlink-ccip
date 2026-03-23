@@ -108,5 +108,7 @@ type ConfigImporter interface {
 // For example - in case of EVM chains, we can look at the onramps and offramps connected to the router to determine
 // which version of the lane is deployed for each remote chain.
 type LaneVersionResolver interface {
+	// IsSupportedChain checks if the given chain selector corresponds to a chain that is supported by this lane version resolver.
+	IsSupportedChain(e cldf.Environment, chainSel uint64) bool
 	DeriveLaneVersionsForChain(e cldf.Environment, chainSel uint64) (map[uint64]*semver.Version, []*semver.Version, error)
 }
