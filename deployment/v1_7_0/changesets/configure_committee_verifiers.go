@@ -40,7 +40,7 @@ type PartialChainConfig struct {
 	DefaultOutboundCCVs      []datastore.AddressRef
 	LaneMandatedOutboundCCVs []datastore.AddressRef
 	DefaultExecutor          datastore.AddressRef
-	FeeQuoterDestChainConfig lanes.FeeQuoterDestChainConfig
+	FeeQuoterDestChainConfigOverrides *lanes.FeeQuoterDestChainConfigOverride
 	ExecutorDestChainConfig  lanes.ExecutorDestChainConfig
 	AddressBytesLength       uint8
 	BaseExecutionGasCost     uint32
@@ -137,7 +137,7 @@ func ConfigureChainsForLanesFromTopology(
 						DefaultOutboundCCVs:      chain.DefaultOutboundCCVs,
 						LaneMandatedOutboundCCVs: chain.LaneMandatedOutboundCCVs,
 						DefaultExecutor:          chain.DefaultExecutor,
-						FeeQuoterDestChainConfig: chain.FeeQuoterDestChainConfig,
+						FeeQuoterDestChainConfigOverrides: chain.FeeQuoterDestChainConfigOverrides,
 						ExecutorDestChainConfig:  chain.ExecutorDestChainConfig,
 						AddressBytesLength:       chain.AddressBytesLength,
 						BaseExecutionGasCost:     chain.BaseExecutionGasCost,
@@ -149,10 +149,15 @@ func ConfigureChainsForLanesFromTopology(
 			}
 		}
 
-		return lanes.ConnectChains(laneAdapterRegistry, mcmsRegistry).Apply(e, lanes.ConnectChainsConfig{
+		connectChainsCS := lanes.ConnectChains(laneAdapterRegistry, mcmsRegistry)
+		connectChainsCfg := lanes.ConnectChainsConfig{
 			Lanes: laneConfigs,
 			MCMS:  cfg.MCMS,
-		})
+		}
+		if err := connectChainsCS.VerifyPreconditions(e, connectChainsCfg); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("connect chains precondition check failed: %w", err)
+		}
+		return connectChainsCS.Apply(e, connectChainsCfg)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
