@@ -43,7 +43,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: true,
+      fastFinality: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: customInbound
     });
@@ -52,7 +52,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationsInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+    emit TokenPool.FastFinalityInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
     uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(uint16(2)));

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -32,25 +33,23 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
-    uint16 minBlockConfirmations = 5;
+    bytes2 minFinality = bytes2(uint16(5));
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: true,
+      fastFinality: true,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
-    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
+    s_tokenPool.setFinalityConfig(minFinality);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationsOutboundRateLimitConsumed(
-      DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount
-    );
+    emit TokenPool.FastFinalityOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
     uint256 fee = s_tokenPool.getFee(lockOrBurnIn, bytes2(uint16(type(uint16).max)));
     vm.startPrank(s_allowedOnRamp);
@@ -66,7 +65,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: true,
+      fastFinality: true,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
@@ -74,7 +73,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
     // Enable custom block confirmation handling so consumption emits.
-    s_tokenPool.setMinBlockConfirmations(1);
+    s_tokenPool.setFinalityConfig(bytes2(uint16(1)));
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -83,10 +82,10 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationsFeeUSDCents: 0,
-        customBlockConfirmationsFeeUSDCents: 0,
-        defaultBlockConfirmationsTransferFeeBps: 0,
-        customBlockConfirmationsTransferFeeBps: 250, // 2.5%
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: 0,
+        fastFinalityTransferFeeBps: 250, // 2.5%
         isEnabled: true
       })
     });
@@ -98,9 +97,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     uint256 expectedAmount = lockOrBurnIn.amount - fee;
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationsOutboundRateLimitConsumed(
-      DEST_CHAIN_SELECTOR, address(s_token), expectedAmount
-    );
+    emit TokenPool.FastFinalityOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), expectedAmount);
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(uint16(type(uint16).max)), "", fee);
@@ -118,10 +115,10 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationsFeeUSDCents: 0,
-        customBlockConfirmationsFeeUSDCents: 0,
-        defaultBlockConfirmationsTransferFeeBps: defaultFeeBps,
-        customBlockConfirmationsTransferFeeBps: 0,
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: defaultFeeBps,
+        fastFinalityTransferFeeBps: 0,
         isEnabled: true
       })
     });
@@ -146,7 +143,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   /// @notice When custom block confirmations are requested but no custom outbound bucket is configured,
   /// the fallback consumes from the default outbound bucket.
   function test_validateLockOrBurn_WithFastFinality_FallsBackToDefaultBucket() public {
-    s_tokenPool.setMinBlockConfirmations(1);
+    s_tokenPool.setFinalityConfig(bytes2(uint16(1)));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -158,26 +155,27 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(uint16(type(uint16).max)), "", fee);
   }
 
-  function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmations() public {
-    uint16 minBlockConfirmations = 5;
-    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
+  function test_validateLockOrBurn_RevertWhen_InvalidFinalityConfig() public {
+    bytes2 minFinality = bytes2(uint16(5));
+    s_tokenPool.setFinalityConfig(minFinality);
+    vm.startPrank(s_allowedOnRamp);
+
+    bytes2 requestedFinality = bytes2(uint16(uint16(minFinality) - 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, minFinality)
+    );
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), requestedFinality, "", 0);
+  }
+
+  function test_validateLockOrBurn_RevertWhen_FastFinalityNotEnabled() public {
+    vm.startPrank(OWNER);
+    s_tokenPool.setFinalityConfig(bytes2(0));
+
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        TokenPool.InvalidMinBlockConfirmations.selector, minBlockConfirmations - 1, minBlockConfirmations
-      )
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(uint16(1)), bytes2(0))
     );
-    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), bytes2(uint16(minBlockConfirmations - 1)), "", 0);
-  }
-
-  function test_validateLockOrBurn_RevertWhen_CustomBlockConfirmationsNotEnabled() public {
-    vm.startPrank(OWNER);
-    s_tokenPool.setMinBlockConfirmations(0);
-
-    vm.startPrank(s_allowedOnRamp);
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.CustomBlockConfirmationsNotEnabled.selector));
     s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1e18), bytes2(uint16(1)), "", 0);
   }
 

@@ -9,21 +9,21 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 
 contract TokenPool_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
-    uint16 minBlockConfirmations = 5;
-    uint16 defaultBlockConfirmationsTransferFeeBps = 100;
-    uint16 customBlockConfirmationsTransferFeeBps = 500;
+    bytes2 minFinality = bytes2(uint16(5));
+    uint16 finalityTransferFeeBps = 100;
+    uint16 fastFinalityTransferFeeBps = 500;
     uint256 amount = 1_000e18;
-    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
+    s_tokenPool.setFinalityConfig(minFinality);
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationsFeeUSDCents: 0,
-        customBlockConfirmationsFeeUSDCents: 0,
-        defaultBlockConfirmationsTransferFeeBps: defaultBlockConfirmationsTransferFeeBps,
-        customBlockConfirmationsTransferFeeBps: customBlockConfirmationsTransferFeeBps,
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: finalityTransferFeeBps,
+        fastFinalityTransferFeeBps: fastFinalityTransferFeeBps,
         isEnabled: true
       })
     });
@@ -37,12 +37,12 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       localToken: address(s_token)
     });
 
-    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, bytes2(uint16(minBlockConfirmations)));
-    assertEq(amountAfterFee, amount - ((amount * customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER));
+    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, minFinality);
+    assertEq(amountAfterFee, amount - ((amount * fastFinalityTransferFeeBps) / BPS_DIVIDER));
   }
 
   function test_applyFee_DefaultFinality() public {
-    uint16 defaultBlockConfirmationsTransferFeeBps = 250; // 2.5%
+    uint16 finalityTransferFeeBps = 250; // 2.5%
     uint256 amount = 1_000e18;
 
     vm.startPrank(OWNER);
@@ -52,10 +52,10 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationsFeeUSDCents: 0,
-        customBlockConfirmationsFeeUSDCents: 0,
-        defaultBlockConfirmationsTransferFeeBps: defaultBlockConfirmationsTransferFeeBps,
-        customBlockConfirmationsTransferFeeBps: 0,
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: finalityTransferFeeBps,
+        fastFinalityTransferFeeBps: 0,
         isEnabled: true
       })
     });
@@ -70,6 +70,6 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
     });
 
     uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, bytes2(0));
-    assertEq(amountAfterFee, amount - ((amount * defaultBlockConfirmationsTransferFeeBps) / BPS_DIVIDER));
+    assertEq(amountAfterFee, amount - ((amount * finalityTransferFeeBps) / BPS_DIVIDER));
   }
 }

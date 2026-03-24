@@ -125,7 +125,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     }
 
     CCTPVerifier.DynamicConfig memory dynamicConfig = CCTPVerifier(verifierImpl).getDynamicConfig();
-    transferFeeConfig.customBlockConfirmationsTransferFeeBps = dynamicConfig.fastFinalityBps;
+    transferFeeConfig.fastFinalityTransferFeeBps = dynamicConfig.fastFinalityBps;
 
     return transferFeeConfig;
   }

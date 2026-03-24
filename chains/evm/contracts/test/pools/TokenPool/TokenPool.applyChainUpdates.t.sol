@@ -119,7 +119,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
       TokenPool.RateLimitConfigArgs[] memory customRLArgs = new TokenPool.RateLimitConfigArgs[](1);
       customRLArgs[0] = TokenPool.RateLimitConfigArgs({
         remoteChainSelector: evmChainSelector,
-        customBlockConfirmations: true,
+        fastFinality: true,
         outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18}),
         inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18})
       });
