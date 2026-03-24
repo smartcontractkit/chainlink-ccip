@@ -2,14 +2,12 @@ package testsetup
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -19,13 +17,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
 func CreateBasicFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
-	familySelector, _ := hex.DecodeString(utils.EVMFamilySelector)
+	sel := (&adapters.ChainFamilyAdapter{}).GetChainFamilySelector()
 	return lanes.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
@@ -36,7 +35,7 @@ func CreateBasicFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 		DefaultTokenDestGasOverhead: 90_000,
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          10,
-		ChainFamilySelector:         binary.BigEndian.Uint32(familySelector),
+		ChainFamilySelector:         binary.BigEndian.Uint32(sel[:]),
 		V2Params: &lanes.FeeQuoterV2Params{
 			LinkFeeMultiplierPercent: 90,
 			USDPerUnitGas:            big.NewInt(1e6),

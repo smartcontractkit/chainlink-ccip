@@ -523,6 +523,14 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 		{Source: chainTwo, Dest: chainOne},
 	}
 	for _, lane := range lanes {
+		// The adapter for the destination chain provides the expected FQ config.
+		// In this EVM↔EVM test both adapters are identical, but we pick the right one.
+		destAdapterForLane := destAdapter
+		if lane.Dest.Selector == chainOne.Selector {
+			destAdapterForLane = srcAdapter
+		}
+		expectedFQCfg := destAdapterForLane.GetFeeQuoterDestChainConfig()
+
 		chain := e.BlockChains.EVMChains()[lane.Source.Selector]
 		onRampSrcAddr, err := srcAdapter.GetOnRampAddress(e.DataStore, lane.Source.Selector)
 		require.NoError(t, err, "must get onRamp from srcAdapter")
@@ -596,8 +604,8 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 			require.NoError(t, err, "must instantiate FeeQuoter v2")
 			destCfg, err := fqContract.GetDestChainConfig(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get dest chain config from FeeQuoter v2")
-			require.Equal(t, lane.Dest.FeeQuoterDestChainConfig.IsEnabled, destCfg.IsEnabled, "feeQuoter v2 dest chain config IsEnabled must equal expected")
-			require.Equal(t, lane.Dest.FeeQuoterDestChainConfig.DefaultTxGasLimit, destCfg.DefaultTxGasLimit, "feeQuoter v2 dest chain config DefaultTxGasLimit must equal expected")
+			require.Equal(t, expectedFQCfg.IsEnabled, destCfg.IsEnabled, "feeQuoter v2 dest chain config IsEnabled must equal expected")
+			require.Equal(t, expectedFQCfg.DefaultTxGasLimit, destCfg.DefaultTxGasLimit, "feeQuoter v2 dest chain config DefaultTxGasLimit must equal expected")
 			price, err := fqContract.GetDestinationChainGasPrice(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get gas price from FeeQuoter v2")
 			require.Equal(t, lane.Dest.GasPrice, price.Value, "feeQuoter v2 gas price must equal expected")
@@ -606,7 +614,7 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 			require.NoError(t, err, "must instantiate feeQuoter 1.6")
 			feeQuoterDestConfig, err := feeQuoterOnSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get dest chain config from feeQuoter")
-			expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(lane.Dest.FeeQuoterDestChainConfig))
+			expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(expectedFQCfg))
 			require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 			price, err := feeQuoterOnSrc.GetDestinationChainGasPrice(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get price from feeQuoter")
