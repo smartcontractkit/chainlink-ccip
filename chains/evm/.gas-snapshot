@@ -1,5 +1,5 @@
 AdvancedPoolHooksExtractor_extract:test_extract_PostflightCheck() (gas: 63184)
-AdvancedPoolHooksExtractor_extract:test_extract_PreflightCheck() (gas: 49468)
+AdvancedPoolHooksExtractor_extract:test_extract_PreflightCheck() (gas: 49534)
 AdvancedPoolHooks_applyAllowListUpdates:test_applyAllowListUpdates() (gas: 184272)
 AdvancedPoolHooks_applyAllowListUpdates:test_applyAllowListUpdates_SkipsZero() (gas: 24071)
 AdvancedPoolHooks_applyAuthorizedCallerUpdates:test_applyAuthorizedCallerUpdates_AddAndRemove() (gas: 65310)

@@ -16,14 +16,14 @@ pragma solidity ^0.8.4;
 ///                        flags (6 bits)                  depth (10 bits)
 ///                                                        max = 1023 (0x3FF)
 ///
-///  S  (bit 10) = WAIT_FOR_SAFE_FLAG  — wait for the `safe` tag instead of a block count.
+///  S  (bit 10) = WAIT_FOR_SAFE_FLAG  — wait for the `safe` tag.
 ///  R  (bits 11-15) = Reserved for future flags (currently unassigned; accepted on the wire).
 ///                    Reserved bits may be assigned in the future, read the docs for the latest bit definitions.
 ///
 ///  Special values:
 ///    0x0000  WAIT_FOR_FINALITY_FLAG  — wait for full finality (safest, default).
 ///    0x0400  WAIT_FOR_SAFE_FLAG      — wait for the `safe` head (bit 10 set, no depth).
-///    0x0001..0x03FF                  — wait for N confirmation blocks (depth only, no flags).
+///    0x0001..0x03FF                  — wait for N blocks.
 library FinalityCodec {
   error InvalidBlockDepth(uint16 requestedDepth, uint16 maxDepth);
   error InvalidRequestedFinality(bytes2 requestedFinality, bytes2 allowedFinality);
@@ -47,7 +47,7 @@ library FinalityCodec {
   bytes2 public constant WAIT_FOR_SAFE_FLAG = bytes2(uint16(1 << BLOCK_DEPTH_BITS));
 
   /// @notice Helper to encode block depth into the finality params. Will revert if the block depth is greater than the
-  /// maximum block depth.
+  /// maximum block depth. Returns WAIT_FOR_FINALITY_FLAG if the block depth is zero.
   /// @param blockDepth The block depth to encode into the finality params.
   /// @return The encoded finality params with the block depth.
   function _encodeBlockDepth(
@@ -110,11 +110,11 @@ library FinalityCodec {
     bytes2 allowedFinality
   ) internal pure {
     // Finality is always allowed.
-    if (requestedFinality == bytes2(0)) {
+    if (requestedFinality == WAIT_FOR_FINALITY_FLAG) {
       return;
     }
     // If any of the flags match, the request is allowed only when it has no depth field (flag-only request).
-    if (requestedFinality >> BLOCK_DEPTH_BITS & allowedFinality >> BLOCK_DEPTH_BITS != 0) {
+    if ((requestedFinality >> BLOCK_DEPTH_BITS) & (allowedFinality >> BLOCK_DEPTH_BITS) != 0) {
       if (uint16(requestedFinality & BLOCK_DEPTH_MASK) != 0) {
         revert InvalidRequestedFinality(requestedFinality, allowedFinality);
       }
