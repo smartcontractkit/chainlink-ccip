@@ -45,11 +45,12 @@ const (
 		  		bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
 				```
 	*/
-	EVMFamilySelector   = "2812d52c"
-	SVMFamilySelector   = "1e10bdc4"
-	AptosFamilySelector = "ac77ffec"
-	TVMFamilySelector   = "647e2ba9"
-	SuiFamilySelector   = "c4e05953"
+	EVMFamilySelector    = "2812d52c"
+	SVMFamilySelector    = "1e10bdc4"
+	AptosFamilySelector  = "ac77ffec"
+	TVMFamilySelector    = "647e2ba9"
+	SuiFamilySelector    = "c4e05953"
+	CantonFamilySelector = "e8dc1b56"
 )
 
 func GetSelectorHex(selector uint64) [4]byte {
@@ -67,6 +68,8 @@ func GetSelectorHex(selector uint64) [4]byte {
 		hexStr = TVMFamilySelector
 	case chain_selectors.FamilySui:
 		hexStr = SuiFamilySelector
+	case chain_selectors.FamilyCanton:
+		hexStr = CantonFamilySelector
 	default:
 		panic(fmt.Sprintf("unsupported chain family: %s", destFamily))
 	}
