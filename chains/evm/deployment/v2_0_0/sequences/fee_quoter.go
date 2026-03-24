@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
@@ -270,6 +271,7 @@ var (
 			isNewFQV2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
 			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
+			lastKnownGasPriceUpdates := make(map[uint64]*big.Int)
 			var providedRemoteChains map[uint64]struct{}
 			if len(input.RemoteChainSelectors) > 0 {
 				// initialize providedRemoteChains map if remote chains are provided in the input,
@@ -300,6 +302,7 @@ var (
 					}
 				}
 				destChainConfig := cfg.DestChainCfg
+				lastKnownGasPriceUpdates[remoteChain] = cfg.GasPrice
 				// check if gasprice stateness threashold is zero
 				if destChainConfig.GasPriceStalenessThreshold == 0 {
 					priceUpdates, err := HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
@@ -309,6 +312,7 @@ var (
 					output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, priceUpdates.GasPriceUpdates...)
 					output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, priceUpdates.TokenPriceUpdates...)
 				}
+
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
 					DestChainConfig: fqops.DestChainConfig{
@@ -346,6 +350,12 @@ var (
 				})
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
+			lastKnownPriceUpdates, err := getLastKnownPriceUpdates(fqOutput.TokenPrices, lastKnownGasPriceUpdates)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates: %w", err)
+			}
+			output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, lastKnownPriceUpdates.TokenPriceUpdates...)
+			output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, lastKnownPriceUpdates.GasPriceUpdates...)
 			if isNewFQV2Deployment {
 				// if new deployment, adding deployer key as price updater so that
 				// manual gas prices can be set right after deployment if needed
@@ -367,6 +377,7 @@ var (
 				}
 				output.DestChainConfigs = allDestChainConfigs
 			}
+
 			return output, nil
 		})
 
@@ -402,6 +413,21 @@ var (
 			}
 			if len(onRampMetadata) == 0 {
 				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for EVM2EVMOnRamp v1.5.0 on chain selector %d", input.ChainSelector)
+			}
+			priceRegMetadata, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
+				input.ExistingAddresses,
+				input.ContractMeta,
+				priceregistryops.ContractType,
+				priceregistryops.Version,
+				"",
+				input.ChainSelector,
+			)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for PriceRegistry v1.2.0 on chain selector %d: %w", input.ChainSelector, err)
+			}
+			if len(priceRegMetadata) != 1 {
+				return FeeQuoterUpdate{}, fmt.Errorf("expected exactly 1 metadata entry for PriceRegistry v1.2.0 on chain selector %d, but found %d",
+					input.ChainSelector, len(priceRegMetadata))
 			}
 			routerAddr := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
@@ -454,6 +480,17 @@ var (
 					providedRemoteChains[remoteChain] = struct{}{}
 				}
 			}
+			priceRegConfig, err := datastore_utils.ConvertMetadataToType[seq1_5.PriceRegistryImportConfigSequenceOutput](priceRegMetadata[0].Metadata)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
+					"PriceRegistryImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+			}
+			lastKnownPriceUpdates, err := getLastKnownPriceUpdates(priceRegConfig.TokenPrices, priceRegConfig.GasPrices)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates from price registry config: %w", err)
+			}
+			output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, lastKnownPriceUpdates.TokenPriceUpdates...)
+			output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, lastKnownPriceUpdates.GasPriceUpdates...)
 			for _, meta := range onRampMetadata {
 				var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 
@@ -809,4 +846,31 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
 		tokenTransferFeeConfigBatches = append(tokenTransferFeeConfigBatches, newBatches...)
 	}
 	return destChainConfigBatches, tokenTransferFeeConfigBatches
+}
+
+func getLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int) (fqops.PriceUpdates, error) {
+	var tokenPriceUpdates []fqops.TokenPriceUpdate
+	for token, price := range tokenPrices {
+		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid price %s for token %s in input additional config", price.String(), token.Hex())
+		}
+		tokenPriceUpdates = append(tokenPriceUpdates, fqops.TokenPriceUpdate{
+			SourceToken: token,
+			UsdPerToken: price,
+		})
+	}
+	var gasPriceUpdates []fqops.GasPriceUpdate
+	for chainSelector, price := range gasPrices {
+		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", price.String(), chainSelector)
+		}
+		gasPriceUpdates = append(gasPriceUpdates, fqops.GasPriceUpdate{
+			DestChainSelector: chainSelector,
+			UsdPerUnitGas:     price,
+		})
+	}
+	return fqops.PriceUpdates{
+		TokenPriceUpdates: tokenPriceUpdates,
+		GasPriceUpdates:   gasPriceUpdates,
+	}, nil
 }

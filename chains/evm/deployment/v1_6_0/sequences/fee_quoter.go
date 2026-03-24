@@ -188,6 +188,8 @@ var (
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
+			gasPricePerChain := make(map[uint64]*big.Int)
+			gasPriceMu := sync.Mutex{}
 			allTokens := make(map[common.Address]struct{})
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
@@ -203,13 +205,27 @@ var (
 						allTokens[token] = struct{}{}
 					}
 				}
+
 				tokenGrp.Go(func() error {
 					destChainMu.Lock()
 					_, enabled := destChainConfigs[remoteChain]
 					defer destChainMu.Unlock()
 					if !enabled {
-						return nil // skip token transfer fee config fetching if dest chain config is not enabled
+						return nil // skip if dest chain config is not enabled
 					}
+					gasPriceOutput, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
+						Address:       fqAddress,
+						ChainSelector: chainSelector,
+						Args:          remoteChain,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to get destination chain gas price for "+
+							"remote chain %d from feequoter %s on chain %d: %w",
+							remoteChain, fqAddress.Hex(), chainSelector, err)
+					}
+					gasPriceMu.Lock()
+					gasPricePerChain[remoteChain] = gasPriceOutput.Output.Value
+					gasPriceMu.Unlock()
 					tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
 					var tokenTransferFeeCfgsMu sync.Mutex
 					innerTokenGrp, _ := errgroup.WithContext(b.GetContext())
@@ -255,10 +271,13 @@ var (
 				return sequences.OnChainOutput{}, err
 			}
 			for remoteChain, destCfg := range destChainConfigs {
+				if !destCfg.IsEnabled {
+					continue
+				}
 				fqOutput[remoteChain] = FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 					DestChainCfg:         destCfg,
 					TokenTransferFeeCfgs: tokenTransferFeeCfgsPerChain[remoteChain],
-					TokenPrices:          tokenPricesPerChain[remoteChain],
+					GasPrice:             gasPricePerChain[remoteChain],
 				}
 			}
 			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[struct{}]{
