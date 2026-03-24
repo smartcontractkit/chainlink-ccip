@@ -9,6 +9,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
@@ -122,10 +123,10 @@ contract OnRamp_getFee is OnRampSetup {
     ccvArgs[0] = "";
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec.GenericExtraArgsV3({
+      gasLimit: GAS_LIMIT,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
-      blockConfirmations: 12,
-      gasLimit: GAS_LIMIT,
       executor: customExecutor,
       executorArgs: "",
       tokenReceiver: "",
@@ -294,6 +295,17 @@ contract OnRamp_getFee is OnRampSetup {
     message.tokenAmounts = new Client.EVMTokenAmount[](2);
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.CanOnlySendOneTokenPerMessage.selector));
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getFee_RevertWhen_InvalidRequestedFinality_FlagWithNonZeroDepth() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.finalityConfig = bytes2(uint16(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 1));
+    bytes2 invalidFinality = extraArgs.finalityConfig;
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, invalidFinality));
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 }

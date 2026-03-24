@@ -91,7 +91,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: 0,
+      finality: bytes2(0),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(s_onRamp),
       offRampAddress: abi.encodePacked(s_offRamp),

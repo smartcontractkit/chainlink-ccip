@@ -5,6 +5,7 @@ import {IExecutor} from "../../../interfaces/IExecutor.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
@@ -62,7 +63,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
       executorArgs: "",
@@ -83,7 +84,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: Client.NO_EXECUTION_ADDRESS,
       executorArgs: "",
@@ -106,7 +107,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
       executorArgs: "",
@@ -132,7 +133,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
       executorArgs: executorArgs,
@@ -155,7 +156,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: 0,
       executor: s_customExecutor,
       executorArgs: "",

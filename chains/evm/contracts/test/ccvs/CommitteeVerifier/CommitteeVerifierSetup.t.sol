@@ -64,7 +64,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
-      finality: 100,
+      finality: bytes2(uint16(100)),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),

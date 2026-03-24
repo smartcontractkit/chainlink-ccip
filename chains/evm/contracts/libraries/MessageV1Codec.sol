@@ -90,7 +90,7 @@ library MessageV1Codec {
   ///   uint64 messageNumber;       Auto-incrementing number for the message.
   ///   uint32 executionGasLimit;   Gas limit for message execution on the destination chain.
   ///   uint32 ccipReceiveGasLimit; Gas limit for the user callback on the destination chain.
-  ///   uint16 finality;            Configurable per-message finality value.
+  ///   bytes2 finality;            Configurable per-message finality value (see `FinalityCodec`).
   ///   bytes32 ccvAndExecutorHash; Hash of the verifiers and executor addresses.
   ///
   /// Variable length fields.
@@ -134,7 +134,7 @@ library MessageV1Codec {
     // Gas limit for the user callback on the destination chain.
     uint32 ccipReceiveGasLimit;
     // Configurable per-message finality value.
-    uint16 finality;
+    bytes2 finality;
     // A hash of the verifiers and executor addresses. This is used by the offchain systems to validate the list of CCVs
     // and executor that should be used for this message. This has no meaning on the destination chain ans is not
     // checked against anything.
@@ -428,7 +428,7 @@ library MessageV1Codec {
       message.ccipReceiveGasLimit = uint32(bytes4(encoded[29:33]));
 
       // finality (2 bytes, big endian).
-      message.finality = uint16(bytes2(encoded[33:35]));
+      message.finality = bytes2(encoded[33:35]);
 
       message.ccvAndExecutorHash = bytes32(encoded[35:67]);
 

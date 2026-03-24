@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -113,7 +114,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         destChainSelector,
         message.tokenAmounts[0].token,
         message.tokenAmounts[0].amount,
-        eventData.resolvedExtraArgs.blockConfirmations,
+        eventData.resolvedExtraArgs.finalityConfig,
         eventData.resolvedExtraArgs.tokenArgs
       );
     }
@@ -136,7 +137,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       messageNumber: msgNum,
       executionGasLimit: eventData.executionGasLimit,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: 0,
+      finality: bytes2(0),
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(
         eventData.resolvedExtraArgs.ccvs, eventData.resolvedExtraArgs.executor
       ),
@@ -175,8 +176,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
-      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       executor: address(0), // No executor specified.
       executorArgs: "",
       tokenReceiver: "",

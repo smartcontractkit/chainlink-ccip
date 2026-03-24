@@ -6,6 +6,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -145,7 +146,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
+      finalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -201,7 +202,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
+      finalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -252,7 +253,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
+      finalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -329,7 +330,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
+      finalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -376,7 +377,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
+      finalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",

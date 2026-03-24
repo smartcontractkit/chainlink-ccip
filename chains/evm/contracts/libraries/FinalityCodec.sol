@@ -49,8 +49,9 @@ library FinalityCodec {
     return _encodeBlockDepth(blockDepth) | WAIT_FOR_SAFE_FLAG;
   }
 
-  /// @notice Validates requested finality: either `bytes2(0)`, exactly `WAIT_FOR_SAFE_FLAG`, or a pure block depth
-  /// (no flag bits, depth in `1..MAX_BLOCK_DEPTH`). Never a flag combined with a non-zero depth.
+  /// @notice Validates requested finality: either `bytes2(0)`, exactly one set bit among the upper flag bits, or a pure
+  /// block depth (no flag bits, depth in `1..MAX_BLOCK_DEPTH`). Never a flag combined with a non-zero depth. Unknown
+  /// flags are accepted here for wire compatibility; pools/CCVs reject modes they do not implement.
   /// @param encodedFinality The encoded finality params to validate.
   function _validateRequestedFinality(
     bytes2 encodedFinality

@@ -41,7 +41,7 @@ contract TokenPoolHelper is TokenPool {
 
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality,
+    bytes2 finality,
     bytes calldata tokenArgs,
     uint256 feeAmount
   ) external {
@@ -51,7 +51,7 @@ contract TokenPoolHelper is TokenPool {
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    uint16 finality
+    bytes2 finality
   ) external returns (uint256) {
     _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
     return localAmount;
@@ -59,14 +59,14 @@ contract TokenPoolHelper is TokenPool {
 
   function applyFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality
+    bytes2 finality
   ) external view returns (uint256) {
     return lockOrBurnIn.amount - _getFee(lockOrBurnIn, finality);
   }
 
   function getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality
+    bytes2 finality
   ) external view returns (uint256) {
     return _getFee(lockOrBurnIn, finality);
   }

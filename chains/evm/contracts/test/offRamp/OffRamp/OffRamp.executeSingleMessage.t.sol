@@ -425,7 +425,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: bytes2(0),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),

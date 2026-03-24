@@ -18,7 +18,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(0));
 
     assertEq(localAmount, AMOUNT);
   }
@@ -32,7 +32,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(uint16(2)));
 
     assertEq(localAmount, AMOUNT);
   }
@@ -55,7 +55,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     emit TokenPool.CustomBlockConfirmationsInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(uint16(2)));
 
     assertEq(localAmount, AMOUNT);
   }
@@ -72,7 +72,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(s_allowedOffRamp);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount, bytes2(0));
   }
 
   function test_validateReleaseOrMint_InvalidToken() public {
@@ -82,7 +82,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     releaseOrMintIn.localToken = wrongToken; // Invalid token address.
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(0));
   }
 
   function test_validateReleaseOrMint_CursedByRMN() public {
@@ -96,7 +96,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     );
 
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(0));
   }
 
   function test_validateReleaseOrMint_InvalidOffRamp() public {
@@ -111,7 +111,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, s_allowedOffRamp));
     vm.startPrank(s_allowedOffRamp);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(0));
   }
 
   function test_validateReleaseOrMint_InvalidSourcePool() public {
@@ -122,7 +122,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidSourcePoolAddress.selector, abi.encode(invalidPool)));
     vm.startPrank(s_allowedOffRamp);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(0));
   }
 
   function _buildReleaseOrMintIn(

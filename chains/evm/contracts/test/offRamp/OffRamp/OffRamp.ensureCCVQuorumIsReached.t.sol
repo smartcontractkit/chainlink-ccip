@@ -26,7 +26,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
   address internal s_destTokenPool;
   bytes internal s_sender;
 
-  uint16 internal constant FINALITY = 0;
+  bytes2 internal constant FINALITY = bytes2(0);
 
   function setUp() public override {
     super.setUp();

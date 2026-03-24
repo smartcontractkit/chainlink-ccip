@@ -34,7 +34,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     assertEq(s_localToken, abi.decode(params[5].value, (address)));
 
     assertEq(s_extractor.PARAM_BLOCK_CONFIRMATIONS_REQUESTED(), params[6].name);
-    assertEq(BLOCK_CONFIRMATION_REQUESTED, abi.decode(params[6].value, (uint16)));
+    assertEq(BLOCK_CONFIRMATION_REQUESTED, abi.decode(params[6].value, (bytes2)));
   }
 
   function test_extract_PostflightCheck() public view {
@@ -60,7 +60,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     assertEq(s_localToken, abi.decode(params[4].value, (address)));
 
     assertEq(s_extractor.PARAM_BLOCK_CONFIRMATIONS_REQUESTED(), params[5].name);
-    assertEq(BLOCK_CONFIRMATION_REQUESTED, abi.decode(params[5].value, (uint16)));
+    assertEq(BLOCK_CONFIRMATION_REQUESTED, abi.decode(params[5].value, (bytes2)));
 
     assertEq(s_extractor.PARAM_SOURCE_POOL_ADDRESS(), params[6].name);
     assertEq(abi.encode(s_sourcePool), params[6].value);
@@ -94,7 +94,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     IPolicyEngine.Payload memory payload = IPolicyEngine.Payload({
       selector: IAdvancedPoolHooks.preflightCheck.selector,
       sender: s_sender,
-      data: abi.encode(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, amountPostFee),
+      data: abi.encode(lockOrBurnIn, bytes2(uint16(blockConfirmationsRequested)), tokenArgs, amountPostFee),
       context: tokenArgs
     });
 
@@ -107,7 +107,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     assertEq(amountPostFee, abi.decode(params[3].value, (uint256)));
     assertEq(remoteChainSelector, abi.decode(params[4].value, (uint64)));
     assertEq(localToken, abi.decode(params[5].value, (address)));
-    assertEq(blockConfirmationsRequested, abi.decode(params[6].value, (uint16)));
+    assertEq(bytes2(uint16(blockConfirmationsRequested)), abi.decode(params[6].value, (bytes2)));
   }
 
   function testFuzz_extract_PostflightCheck(
@@ -134,7 +134,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     IPolicyEngine.Payload memory payload = IPolicyEngine.Payload({
       selector: IAdvancedPoolHooks.postflightCheck.selector,
       sender: s_sender,
-      data: abi.encode(releaseOrMintIn, localAmount, blockConfirmationsRequested),
+      data: abi.encode(releaseOrMintIn, localAmount, bytes2(uint16(blockConfirmationsRequested))),
       context: ""
     });
 
@@ -146,7 +146,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     assertEq(localAmount, abi.decode(params[2].value, (uint256)));
     assertEq(remoteChainSelector, abi.decode(params[3].value, (uint64)));
     assertEq(localToken, abi.decode(params[4].value, (address)));
-    assertEq(blockConfirmationsRequested, abi.decode(params[5].value, (uint16)));
+    assertEq(bytes2(uint16(blockConfirmationsRequested)), abi.decode(params[5].value, (bytes2)));
     assertEq(abi.encode(sourcePool), params[6].value);
     assertEq(abi.encode("pool data"), params[7].value);
     assertEq(sourceDenominatedAmount, abi.decode(params[8].value, (uint256)));

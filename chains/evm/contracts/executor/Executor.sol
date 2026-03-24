@@ -196,12 +196,12 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param blockConfirmationsRequested The requested block confirmations for the message. `0` indicates waiting for finality.
+  /// @param finalityConfig The requested finality encoding for the message. `bytes2(0)` indicates waiting for finality.
   /// @param ccvs The CCVs that are requested on source.
   /// @return usdCentsFee The USD denominated fee for the executor.
   function getFee(
     uint64 destChainSelector,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     address[] calldata ccvs,
     bytes calldata, // extraArgs
     address // feeToken
@@ -210,8 +210,9 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     if (!remoteChainConfig.enabled) {
       revert InvalidDestChain(destChainSelector);
     }
-    if (blockConfirmationsRequested != 0 && blockConfirmationsRequested < s_dynamicConfig.minBlockConfirmations) {
-      revert Executor__RequestedBlockDepthTooLow(blockConfirmationsRequested, s_dynamicConfig.minBlockConfirmations);
+    uint16 requested = uint16(finalityConfig);
+    if (requested != 0 && requested < s_dynamicConfig.minBlockConfirmations) {
+      revert Executor__RequestedBlockDepthTooLow(requested, s_dynamicConfig.minBlockConfirmations);
     }
 
     if (s_dynamicConfig.ccvAllowlistEnabled) {

@@ -129,11 +129,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @notice For IPoolV2.lockOrBurn call, this contract only forwards tokens to the verifier.
   /// @dev Forward the net amount to the verifier; actual burn/bridge is done there.
   /// @param lockOrBurnIn The lock or burn input parameters.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes calldata tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver)
@@ -146,7 +146,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     // destTokenAmount.
     i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
 
-    return super.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+    return super.lockOrBurn(lockOrBurnIn, finalityConfig, tokenArgs);
   }
 
   /// @notice Backwards compatible lockOrBurn for lanes using the V1 flow.
@@ -298,7 +298,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     address,
     uint64,
     uint256,
-    uint16,
+    bytes2,
     bytes calldata,
     IPoolV2.MessageDirection
   ) public view virtual override returns (address[] memory requiredCCVs) {

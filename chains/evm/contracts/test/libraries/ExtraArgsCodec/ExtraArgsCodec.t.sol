@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {ExtraArgsCodecHelper} from "../../helpers/ExtraArgsCodecHelpers.sol";
 import {ExtraArgsCodecUnoptimized} from "../../helpers/ExtraArgsCodecUnoptimized.sol";
@@ -32,7 +33,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -51,7 +52,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: executor,
       executorArgs: "",
@@ -94,7 +95,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: makeAddr("executor"),
       executorArgs: "execArgs",
@@ -111,7 +112,7 @@ contract ExtraArgsCodec_Test is BaseTest {
   /// forge-config: ccip.fuzz.runs = 4096
   function testFuzz__encodeGenericExtraArgsV3_Differential_Identical(
     uint32 gasLimit,
-    uint16 blockConfirmations,
+    uint16 blockDepth,
     address[9] memory ccvs,
     bytes[9] memory ccvArgs,
     address executor,
@@ -131,9 +132,10 @@ contract ExtraArgsCodec_Test is BaseTest {
       vm.assume(ccvArgs[i].length <= type(uint16).max);
     }
 
+    uint256 boundedBlockDepth = bound(uint256(blockDepth), 0, uint256(FinalityCodec.MAX_BLOCK_DEPTH));
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: gasLimit,
-      blockConfirmations: blockConfirmations,
+      finalityConfig: FinalityCodec._encodeBlockDepth(uint16(boundedBlockDepth)),
       ccvs: ccvsDynamic,
       ccvArgs: ccvArgsDynamic,
       executor: executor,
@@ -170,7 +172,7 @@ contract ExtraArgsCodec_Test is BaseTest {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: new address[](2),
           ccvArgs: new bytes[](2),
-          blockConfirmations: 34,
+          finalityConfig: FinalityCodec._encodeBlockDepth(34),
           gasLimit: 59499,
           executor: address(0x1234567890123456789012345678901234567890),
           executorArgs: "3282389428935872359872395885792839273525",
@@ -186,7 +188,7 @@ contract ExtraArgsCodec_Test is BaseTest {
       ExtraArgsCodec.GenericExtraArgsV3({
         ccvs: new address[](2),
         ccvArgs: new bytes[](2),
-        blockConfirmations: 34,
+        finalityConfig: FinalityCodec._encodeBlockDepth(34),
         gasLimit: 59499,
         executor: address(0x1234567890123456789012345678901234567890),
         executorArgs: "3282389428935872359872395885792839273525",
@@ -204,7 +206,7 @@ contract ExtraArgsCodec_Test is BaseTest {
       ExtraArgsCodec.GenericExtraArgsV3({
         ccvs: new address[](2),
         ccvArgs: new bytes[](2),
-        blockConfirmations: 34,
+        finalityConfig: FinalityCodec._encodeBlockDepth(34),
         gasLimit: 59499,
         executor: address(0x1234567890123456789012345678901234567890),
         executorArgs: "3282389428935872359872395885792839273525",
@@ -228,7 +230,7 @@ contract ExtraArgsCodec_Test is BaseTest {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: new address[](2),
           ccvArgs: new bytes[](2),
-          blockConfirmations: 34,
+          finalityConfig: FinalityCodec._encodeBlockDepth(34),
           gasLimit: 59499,
           executor: address(0x1234567890123456789012345678901234567890),
           executorArgs: "3282389428935872359872395885792839273525",
@@ -253,7 +255,7 @@ contract ExtraArgsCodec_Test is BaseTest {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: new address[](0),
           ccvArgs: new bytes[](0),
-          blockConfirmations: 34,
+          finalityConfig: FinalityCodec._encodeBlockDepth(34),
           gasLimit: 59499,
           executor: address(0),
           executorArgs: "",
@@ -276,7 +278,7 @@ contract ExtraArgsCodec_Test is BaseTest {
       ExtraArgsCodec.GenericExtraArgsV3({
         ccvs: new address[](0),
         ccvArgs: new bytes[](0),
-        blockConfirmations: 34,
+        finalityConfig: FinalityCodec._encodeBlockDepth(34),
         gasLimit: 59499,
         executor: address(0),
         executorArgs: "",

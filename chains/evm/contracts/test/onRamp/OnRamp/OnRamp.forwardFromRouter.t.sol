@@ -8,6 +8,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -354,6 +355,17 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     // Assert that the emitted value is the original amount before pool fees
     assertEq(originalAmount, emittedTokenAmount, "tokenAmountBeforeTokenPoolFees should be original amount");
     assertTrue(emittedTokenAmount > destAmount, "tokenAmountBeforeTokenPoolFees should be greater than destAmount");
+  }
+
+  function test_forwardFromRouter_RevertWhen_InvalidRequestedFinality_FlagWithNonZeroDepth() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.finalityConfig = bytes2(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 1);
+    bytes2 invalidFinality = bytes2(extraArgs.finalityConfig);
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, invalidFinality));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e18, STRANGER);
   }
 
   function _getReceiptsFromLogs(

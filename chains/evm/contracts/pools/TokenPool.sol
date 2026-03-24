@@ -126,7 +126,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice The division factor for bps. This also represents the maximum bps fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
   /// @dev Constant representing the default finality.
-  uint16 internal constant WAIT_FOR_FINALITY = 0;
+  bytes2 internal constant WAIT_FOR_FINALITY = bytes2(0);
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -284,15 +284,15 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev The _getFee function deducts the fee from the amount and returns the amount after fee deduction.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested block confirmations.
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes calldata tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationsRequested);
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, feeAmount);
+    uint256 feeAmount = _getFee(lockOrBurnIn, finalityConfig);
+    _validateLockOrBurn(lockOrBurnIn, finalityConfig, tokenArgs, feeAmount);
     destTokenAmount = lockOrBurnIn.amount - feeAmount;
     _lockOrBurn(lockOrBurnIn.remoteChainSelector, destTokenAmount);
 
@@ -350,16 +350,16 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @dev The _validateReleaseOrMint check is an essential security check.
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested block confirmations.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) public virtual override(IPoolV2) returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 localAmount = _calculateLocalAmount(
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationsRequested);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, finalityConfig);
 
     _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
 
@@ -406,14 +406,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// - rate limiting for either default or custom block confirmations transfer messages.
   /// - preflight checks hooks (if enabled)
   /// @param lockOrBurnIn The input to validate.
-  /// @param blockConfirmationsRequested The minimum block confirmations requested by the message. A value of zero is used for default finality.
+  /// @param finalityConfig The minimum block confirmations requested by the message. A value of zero is used for default finality.
   /// @param tokenArgs Additional token arguments passed in by the sender of the message.
   /// @param feeAmount The fee amount deducted from the transfer amount.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes memory tokenArgs,
     uint256 feeAmount
   ) internal virtual {
@@ -426,13 +426,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     uint256 amount = lockOrBurnIn.amount - feeAmount;
     // If custom block confirmations are requested, validate against the minimum and apply the custom rate limit.
-    if (blockConfirmationsRequested != WAIT_FOR_FINALITY) {
+    if (finalityConfig != WAIT_FOR_FINALITY) {
       uint16 minBlockConfirmationsConfigured = s_minBlockConfirmations;
-      if (minBlockConfirmationsConfigured == WAIT_FOR_FINALITY) {
+      if (minBlockConfirmationsConfigured == 0) {
         revert CustomBlockConfirmationsNotEnabled();
       }
-      if (blockConfirmationsRequested < minBlockConfirmationsConfigured) {
-        revert InvalidMinBlockConfirmations(blockConfirmationsRequested, minBlockConfirmationsConfigured);
+      if (uint16(finalityConfig) < minBlockConfirmationsConfigured) {
+        revert InvalidMinBlockConfirmations(uint16(finalityConfig), minBlockConfirmationsConfigured);
       }
       _consumeCustomBlockConfirmationsOutboundRateLimit(
         lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount
@@ -441,7 +441,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       _consumeOutboundRateLimit(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount);
     }
 
-    _preflightCheck(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, amount);
+    _preflightCheck(lockOrBurnIn, finalityConfig, tokenArgs, amount);
   }
 
   /// @notice Hook for pre-flight checks on lock or burn.
@@ -449,17 +449,17 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// not needed, you can override this function in the derived contract with an empty implementation. This will result
   /// in the compiler removing the function and all related code, saving close to 1KB.
   /// @param lockOrBurnIn The input to validate.
-  /// @param blockConfirmationsRequested The minimum block confirmations requested by the message.
+  /// @param finalityConfig The minimum block confirmations requested by the message.
   /// @param tokenArgs Additional token arguments passed in by the sender of the message.
   /// @param amountPostFee The amount after token pool bps-based fees have been deducted.
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes memory tokenArgs,
     uint256 amountPostFee
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
-      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, amountPostFee);
+      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, finalityConfig, tokenArgs, amountPostFee);
     }
   }
 
@@ -471,13 +471,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// - rate limiting for either default or custom block confirmations transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param blockConfirmationsRequested The minimum block confirmations requested by the message. A value of zero is used for default finality.
+  /// @param finalityConfig The minimum block confirmations requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) internal virtual {
     if (!isSupportedToken(releaseOrMintIn.localToken)) {
       revert InvalidToken(releaseOrMintIn.localToken);
@@ -489,7 +489,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-    if (blockConfirmationsRequested != WAIT_FOR_FINALITY) {
+    if (finalityConfig != WAIT_FOR_FINALITY) {
       _consumeCustomBlockConfirmationsInboundRateLimit(
         releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount
       );
@@ -497,7 +497,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     }
 
-    _postflightCheck(releaseOrMintIn, localAmount, blockConfirmationsRequested);
+    _postflightCheck(releaseOrMintIn, localAmount, finalityConfig);
   }
 
   /// @notice Hook for post-flight checks on release or mint.
@@ -506,14 +506,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// in the compiler removing the function and all related code, saving close to 1KB.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param blockConfirmationsRequested The minimum block confirmations requested by the message.
+  /// @param finalityConfig The minimum block confirmations requested by the message.
   function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
-      s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, blockConfirmationsRequested);
+      s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, finalityConfig);
     }
   }
 
@@ -959,7 +959,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param sourceDenominatedAmount The amount being transferred, source denominated.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested block confirmations.
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
@@ -967,7 +967,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     address localToken,
     uint64 remoteChainSelector,
     uint256 sourceDenominatedAmount,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) public view virtual returns (address[] memory requiredCCVs) {
@@ -984,7 +984,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (direction == IPoolV2.MessageDirection.Outbound) {
       TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[remoteChainSelector];
       if (feeConfig.isEnabled) {
-        if (blockConfirmationsRequested != WAIT_FOR_FINALITY) {
+        if (finalityConfig != WAIT_FOR_FINALITY) {
           amount = sourceDenominatedAmount
             - (sourceDenominatedAmount * feeConfig.customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;
         } else {
@@ -1001,9 +1001,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       amount = _calculateLocalAmount(sourceDenominatedAmount, _parseRemoteDecimals(extraData));
     }
 
-    return s_advancedPoolHooks.getRequiredCCVs(
-      localToken, remoteChainSelector, amount, blockConfirmationsRequested, extraData, direction
-    );
+    return
+      s_advancedPoolHooks.getRequiredCCVs(localToken, remoteChainSelector, amount, finalityConfig, extraData, direction);
   }
 
   // ================================================================
@@ -1056,7 +1055,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    uint16, // blockConfirmationsRequested
+    bytes2, // finalityConfig
     bytes calldata // tokenArgs
   ) external view virtual returns (TokenTransferFeeConfig memory feeConfig) {
     return s_tokenTransferFeeConfig[destChainSelector];
@@ -1065,13 +1064,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @notice Returns the pool fee parameters that will apply to a transfer.
   /// @param destChainSelector The destination lane selector.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested block confirmations.
   function getFee(
     address, // localToken
     uint64 destChainSelector,
     uint256, // amount
     address, // feeToken
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes calldata // tokenArgs
   )
     external
@@ -1080,7 +1079,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
     uint16 minBlockConfirmationsConfigured = s_minBlockConfirmations;
-    if (blockConfirmationsRequested != WAIT_FOR_FINALITY && minBlockConfirmationsConfigured == 0) {
+    if (finalityConfig != WAIT_FOR_FINALITY && minBlockConfirmationsConfigured == 0) {
       revert CustomBlockConfirmationsNotEnabled();
     }
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
@@ -1090,9 +1089,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       return (0, 0, 0, 0, false);
     }
 
-    if (blockConfirmationsRequested != WAIT_FOR_FINALITY) {
-      if (blockConfirmationsRequested < minBlockConfirmationsConfigured) {
-        revert InvalidMinBlockConfirmations(blockConfirmationsRequested, minBlockConfirmationsConfigured);
+    if (finalityConfig != WAIT_FOR_FINALITY) {
+      if (uint16(finalityConfig) < minBlockConfirmationsConfigured) {
+        revert InvalidMinBlockConfirmations(uint16(finalityConfig), minBlockConfirmationsConfigured);
       }
       return (
         feeConfig.customBlockConfirmationsFeeUSDCents,
@@ -1113,17 +1112,17 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @dev Calculates the fee based on the transferred amount, and the configured basis points.
   /// @param lockOrBurnIn The original lock or burn request.
-  /// @param blockConfirmationsRequested The minimum block confirmations requested by the message.
+  /// @param finalityConfig The minimum block confirmations requested by the message.
   /// A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
   /// Returns the fee amount.
   function _getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) internal view virtual returns (uint256) {
     TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 
     // Determine which fee basis points to apply based on finality type.
-    if (blockConfirmationsRequested != WAIT_FOR_FINALITY) {
+    if (finalityConfig != WAIT_FOR_FINALITY) {
       return (lockOrBurnIn.amount * feeConfig.customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;
     } else {
       return (lockOrBurnIn.amount * feeConfig.defaultBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;

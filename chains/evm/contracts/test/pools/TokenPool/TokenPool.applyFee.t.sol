@@ -37,7 +37,7 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       localToken: address(s_token)
     });
 
-    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, minBlockConfirmations);
+    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, bytes2(uint16(minBlockConfirmations)));
     assertEq(amountAfterFee, amount - ((amount * customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER));
   }
 
@@ -69,7 +69,7 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       localToken: address(s_token)
     });
 
-    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, 0);
+    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, bytes2(0));
     assertEq(amountAfterFee, amount - ((amount * defaultBlockConfirmationsTransferFeeBps) / BPS_DIVIDER));
   }
 }

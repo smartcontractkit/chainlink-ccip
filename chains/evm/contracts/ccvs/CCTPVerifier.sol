@@ -242,7 +242,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     }
 
     DepositForBurnParams memory params = DepositForBurnParams({
-      messageId: messageId, finality: message.finality, finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
+      messageId: messageId,
+      finality: uint32(uint16(message.finality)),
+      finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
     });
 
     // The maximum fee, taken on destination, is a portion of the total amount transferred.

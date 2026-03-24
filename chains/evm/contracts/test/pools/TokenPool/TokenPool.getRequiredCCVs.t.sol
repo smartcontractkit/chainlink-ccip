@@ -9,8 +9,8 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
 contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
-  uint16 internal constant WAIT_FOR_FINALITY = 0;
-  uint16 internal constant CUSTOM_BLOCK_CONFIRMATION = 10;
+  bytes2 internal constant WAIT_FOR_FINALITY = bytes2(0);
+  bytes2 internal constant CUSTOM_BLOCK_CONFIRMATION = bytes2(uint16(10));
   uint16 internal constant DEFAULT_FEE_BPS = 100; // 1%
   uint16 internal constant CUSTOM_FEE_BPS = 200; // 2%
 

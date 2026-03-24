@@ -24,7 +24,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     uint256 amount = 1_000e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), 0, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(0), "");
 
     assertEq(usdFeeCents, feeConfig.defaultBlockConfirmationsFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -52,8 +52,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_500e6;
-    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minBlockConfirmations, "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) = s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(uint16(minBlockConfirmations)), ""
+    );
 
     assertEq(usdFeeCents, feeConfig.customBlockConfirmationsFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -65,7 +66,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   function test_getFee_NoConfig() public view {
     uint256 amount = 777e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), 0, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(0), "");
 
     assertEq(usdFeeCents, 0);
     assertEq(destGasOverhead, 0);
@@ -80,7 +81,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     uint16 requestedBlockConfirmations = 1; // Any non-zero value triggers custom finality path
 
     vm.expectRevert(TokenPool.CustomBlockConfirmationsNotEnabled.selector);
-    s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), requestedBlockConfirmations, "");
+    s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), bytes2(uint16(requestedBlockConfirmations)), ""
+    );
   }
 
   function test_getFee_RevertWhen_InvalidMinBlockConfirmations() public {
@@ -108,7 +111,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
         TokenPool.InvalidMinBlockConfirmations.selector, requestedBlockConfirmations, minBlockConfirmations
       )
     );
-    s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), requestedBlockConfirmations, "");
+    s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(uint16(requestedBlockConfirmations)), ""
+    );
   }
 
   function test_getFee_DisabledConfig_ReturnsZeros() public {
@@ -132,7 +137,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     uint256 amount = 1_000e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), 0, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(0), "");
 
     // Should return all zeros with isEnabled=false when disabled
     assertEq(usdFeeCents, 0, "Fee should be zero");
@@ -167,8 +172,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(new TokenPool.TokenTransferFeeConfigArgs[](0), disableConfigs);
 
     uint256 amount = 1_500e6;
-    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minBlockConfirmations, "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) = s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(uint16(minBlockConfirmations)), ""
+    );
 
     // Should return all zeros with isEnabled=false when disabled, even for custom finality
     assertEq(usdFeeCents, 0, "Fee should be zero");

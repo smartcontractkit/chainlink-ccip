@@ -475,7 +475,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver,
     bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality,
+    bytes2 finality,
     bool isTokenOnlyTransfer
   ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     address[] memory requiredPoolCCVs = new address[](0);
@@ -683,7 +683,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The source chain selector.
   /// @param receiver The receiver address.
   /// @param sender The sender of the message on the source chain.
-  /// @param messageRequestedBlockDepth The finality requirement of the message.
+  /// @param messageRequestedFinality The finality requirement of the message (see `FinalityCodec`).
   /// @return requiredCCV The required CCVs.
   /// @return optionalCCVs The optional CCVs.
   /// @return optionalThreshold The threshold of optional CCVs.
@@ -691,7 +691,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     bytes memory sender,
-    uint16 messageRequestedBlockDepth
+    bytes2 messageRequestedFinality
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
     // Default block confirmations requirement is 0, which means "wait for finality". A receiver implementing
     // IAny2EVMMessageReceiverV2 can return a different value.
@@ -714,14 +714,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     // If non-zero it means FTF is enabled. Ensure it follows the min requirements from the receiver.
-    if (messageRequestedBlockDepth != 0) {
+    uint16 requestedWire = uint16(messageRequestedFinality);
+    if (requestedWire != 0) {
       // If the receiver requires finality, but the msg is FTF, revert.
       if (minBlockConfirmations == 0) {
-        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockConfirmations);
+        revert InvalidFinalityForReceiver(receiver, requestedWire, minBlockConfirmations);
       }
       // If the receiver specified a minBlockConfirmations that is higher than the message requested block confirmations, revert.
-      if (minBlockConfirmations > messageRequestedBlockDepth) {
-        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockConfirmations);
+      if (minBlockConfirmations > requestedWire) {
+        revert InvalidFinalityForReceiver(receiver, requestedWire, minBlockConfirmations);
       }
     }
 
@@ -747,7 +748,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
-    uint16 finality,
+    bytes2 finality,
     bytes memory extraData
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
@@ -780,12 +781,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param tokenTransfer Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
     address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 
@@ -820,7 +821,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
     // account for 90k gas overhead due to the interface check.
     if (localPoolAddress._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationsRequested) returns (
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, finalityConfig) returns (
         Pool.ReleaseOrMintOutV1 memory result
       ) {
         returnData = result;

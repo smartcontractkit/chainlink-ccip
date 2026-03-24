@@ -9,6 +9,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -86,7 +87,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      blockConfirmations: 0,
+      finalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -461,7 +462,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -536,7 +537,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      blockConfirmations: 12,
+      finalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: 3_600_000, // A large gas limit that should be ignored for pricing.
       executor: Client.NO_EXECUTION_ADDRESS,
       executorArgs: "",

@@ -230,7 +230,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     // Mock the lock release pool's IPoolV2.lockOrBurn.
     vm.mockCall(
       address(s_lockReleasePool),
-      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationsRequested, tokenArgs)),
+      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, bytes2(uint16(blockConfirmationsRequested)), tokenArgs)),
       abi.encode(expectedOutput, amount)
     );
 
@@ -238,12 +238,12 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.expectCall(
       address(s_lockReleasePool),
-      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationsRequested, tokenArgs))
+      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, bytes2(uint16(blockConfirmationsRequested)), tokenArgs))
     );
     vm.expectCall(address(s_USDCToken), abi.encodeCall(IERC20.transfer, (address(s_lockReleasePool), amount)));
 
     (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
-      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(uint16(blockConfirmationsRequested)), tokenArgs);
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
@@ -269,7 +269,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, 1, tokenArgs),
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, bytes2(uint16(1)), tokenArgs),
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}), amount)
     );
 
@@ -285,12 +285,14 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.expectCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, blockConfirmationsRequested, tokenArgs)
+      abi.encodeWithSelector(
+        IPoolV2.lockOrBurn.selector, lockOrBurnIn, bytes2(uint16(blockConfirmationsRequested)), tokenArgs
+      )
     );
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, verifierImpl, amount));
 
     (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
-      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(uint16(blockConfirmationsRequested)), tokenArgs);
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
@@ -335,7 +337,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         amount: amount,
         localToken: address(s_USDCToken)
       }),
-      0,
+      bytes2(0),
       ""
     );
   }
@@ -365,7 +367,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         amount: amount,
         localToken: address(s_USDCToken)
       }),
-      blockConfirmationsRequested,
+      bytes2(uint16(blockConfirmationsRequested)),
       tokenArgs
     );
   }
@@ -489,7 +491,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_InvalidMechanism() public {
@@ -515,7 +517,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.INVALID_MECHANISM
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_LockReleasePoolNotSet() public {
@@ -557,7 +559,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     vm.expectRevert(
       abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, lockReleaseChainSelector)
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_UnsupportedMechanism_CCTPV1() public {
@@ -577,7 +579,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_UnsupportedMechanism_CCTPV2() public {
@@ -597,6 +599,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
   }
 }

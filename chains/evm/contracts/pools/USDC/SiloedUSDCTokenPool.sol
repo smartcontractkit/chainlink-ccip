@@ -109,13 +109,13 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @notice Mint tokens from the pool to the recipient.
   /// @dev Uses a fixed remote decimal of 6 for canonical USDC.
   /// @param releaseOrMintIn The release or mint input parameters.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since USDC is 6 decimals on all chains, we don't need to convert to a different denomination.
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationsRequested);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, finalityConfig);
 
     uint64 remoteChainSelector = releaseOrMintIn.remoteChainSelector;
     uint256 excludedTokens = s_tokensExcludedFromBurn[remoteChainSelector];

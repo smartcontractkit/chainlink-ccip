@@ -47,10 +47,10 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   /// LockedOrBurned is still emitted for consumers that expect it.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes2 finalityConfig,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, 0);
+    _validateLockOrBurn(lockOrBurnIn, finalityConfig, tokenArgs, 0);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -74,9 +74,9 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   /// ReleasedOrMinted is still emitted for consumers that expect it.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationsRequested
+    bytes2 finalityConfig
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationsRequested);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, finalityConfig);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -114,7 +114,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    uint16, // blockConfirmationsRequested,
+    bytes2, // finalityConfig
     bytes calldata // tokenArgs
   ) external view override returns (TokenTransferFeeConfig memory feeConfig) {
     TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector];
@@ -160,13 +160,13 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
-    uint16
+    bytes2
   ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
-    uint16,
+    bytes2,
     bytes memory,
     uint256
   ) internal virtual override {}

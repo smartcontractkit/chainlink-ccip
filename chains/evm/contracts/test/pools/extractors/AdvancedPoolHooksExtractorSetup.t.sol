@@ -21,7 +21,7 @@ contract AdvancedPoolHooksExtractorSetup is Test {
   uint64 internal constant REMOTE_CHAIN_SELECTOR = 123;
   uint256 internal constant AMOUNT = 100e18;
   uint256 internal constant AMOUNT_POST_FEE = 99e18;
-  uint16 internal constant BLOCK_CONFIRMATION_REQUESTED = 5;
+  bytes2 internal constant BLOCK_CONFIRMATION_REQUESTED = bytes2(uint16(5));
   uint256 internal constant SOURCE_DENOMINATED_AMOUNT = 200e18;
 
   function setUp() public virtual {

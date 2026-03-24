@@ -20,7 +20,7 @@ contract MessageV1CodecSetup is Test {
       messageNumber: 100,
       executionGasLimit: 150000,
       ccipReceiveGasLimit: 50000,
-      finality: 1000,
+      finality: bytes2(uint16(1000)),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1234567890123456789012345678901234567890)),
       offRampAddress: abi.encodePacked(address(0x0987654321098765432109876543210987654321)),
