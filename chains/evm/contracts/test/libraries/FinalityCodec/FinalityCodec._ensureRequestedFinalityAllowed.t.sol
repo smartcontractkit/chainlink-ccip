@@ -40,7 +40,9 @@ contract FinalityCodec__ensureRequestedFinalityAllowed is FinalityCodecSetup {
     uint16 requested = 99;
     uint16 allowed = requested + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(requested), bytes2(allowed)));
+    vm.expectRevert(
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(requested), bytes2(allowed))
+    );
     s_helper.ensureRequestedFinalityAllowed(bytes2(requested), bytes2(allowed));
   }
 

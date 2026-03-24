@@ -23,7 +23,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     assertEq(localAmount, AMOUNT);
   }
 
-  /// @notice When custom block confirmations are requested but no custom bucket is configured,
+  /// @notice When fast finality is requested but no custom bucket is configured,
   /// the fallback consumes from the default inbound bucket.
   function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);

@@ -62,7 +62,7 @@ contract CCTPThroughCCVTokenPool_getTokenTransferFeeConfig is CCTPThroughCCVToke
     assertEq(returnedFeeConfig.finalityFeeUSDCents, feeConfig.finalityFeeUSDCents);
     assertEq(returnedFeeConfig.fastFinalityFeeUSDCents, feeConfig.fastFinalityFeeUSDCents);
     assertEq(returnedFeeConfig.finalityTransferFeeBps, 0);
-    // Custom block confirmation transfer fee bps should be overridden by the CCTPVerifier's fast finality bps.
+    // Fast finality transfer fee bps should be overridden by the CCTPVerifier's fast finality bps.
     assertEq(returnedFeeConfig.fastFinalityTransferFeeBps, FAST_FINALITY_BPS);
     assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
   }

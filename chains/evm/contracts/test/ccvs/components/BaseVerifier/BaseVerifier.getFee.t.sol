@@ -30,7 +30,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_WithAllowedBlockDepth() public {
-    // Configure chain to allow up to 10 block confirmations.
+    // Configure chain to allow up to block depth 10.
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
     configs[0].finalityConfig = FinalityCodec._encodeBlockDepth(10);
@@ -44,7 +44,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_RevertWhen_BlockDepthBelowMinimum() public {
-    // Configure chain to require at least 10 block confirmations.
+    // Configure chain to require at least block depth 10.
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
     configs[0].finalityConfig = FinalityCodec._encodeBlockDepth(10);
@@ -65,14 +65,22 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   function test_getFee_RevertWhen_BlockDepthRequestedButOnlyFinalityAllowed() public {
     // Default setup has finalityConfig = bytes2(0) → only WAIT_FOR_FINALITY accepted.
     Client.EVM2AnyMessage memory message;
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec._encodeBlockDepth(1), bytes2(0)));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec._encodeBlockDepth(1), bytes2(0)
+      )
+    );
     s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec._encodeBlockDepth(1));
   }
 
   function test_getFee_RevertWhen_SafeFlagNotAllowed() public {
     // Default setup only allows finality (bytes2(0)) — WAIT_FOR_SAFE is not in allowed flags.
     Client.EVM2AnyMessage memory message;
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec.WAIT_FOR_SAFE_FLAG, bytes2(0)));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec.WAIT_FOR_SAFE_FLAG, bytes2(0)
+      )
+    );
     s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec.WAIT_FOR_SAFE_FLAG);
   }
 

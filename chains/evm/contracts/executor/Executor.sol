@@ -39,6 +39,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     RemoteChainConfig config;
   }
 
+  // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
     address feeAggregator; // ───────╮ Address to send withdrawn fees to.
     bytes2 allowedFinalityConfig; // │ The allowed finality config according to the `FinalityCodec` encoding.

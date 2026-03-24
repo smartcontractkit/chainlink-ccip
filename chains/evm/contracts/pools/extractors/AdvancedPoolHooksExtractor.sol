@@ -24,8 +24,8 @@ contract AdvancedPoolHooksExtractor is IExtractor {
   bytes32 public constant PARAM_REMOTE_CHAIN_SELECTOR = keccak256("remote_chain_selector");
   /// @notice Parameter key for the local token address.
   bytes32 public constant PARAM_TOKEN = keccak256("token");
-  /// @notice Parameter key for the requested number of block confirmations.
-  bytes32 public constant PARAM_BLOCK_CONFIRMATIONS_REQUESTED = keccak256("block_confirmations_requested");
+  /// @notice Parameter key for the requested finality encoding.
+  bytes32 public constant PARAM_REQUESTED_FINALITY = keccak256("requested_finality");
   /// @notice Parameter key for the source pool address. Only present in postflight.
   bytes32 public constant PARAM_SOURCE_POOL_ADDRESS = keccak256("source_pool_address");
   /// @notice Parameter key for the source pool data. Only present in postflight.
@@ -63,7 +63,7 @@ contract AdvancedPoolHooksExtractor is IExtractor {
     result[3] = IPolicyEngine.Parameter(PARAM_AMOUNT_POST_FEE, abi.encode(amountPostFee));
     result[4] = IPolicyEngine.Parameter(PARAM_REMOTE_CHAIN_SELECTOR, abi.encode(lockOrBurnIn.remoteChainSelector));
     result[5] = IPolicyEngine.Parameter(PARAM_TOKEN, abi.encode(lockOrBurnIn.localToken));
-    result[6] = IPolicyEngine.Parameter(PARAM_BLOCK_CONFIRMATIONS_REQUESTED, abi.encode(finalityConfig));
+    result[6] = IPolicyEngine.Parameter(PARAM_REQUESTED_FINALITY, abi.encode(finalityConfig));
 
     return result;
   }
@@ -83,7 +83,7 @@ contract AdvancedPoolHooksExtractor is IExtractor {
     result[2] = IPolicyEngine.Parameter(PARAM_AMOUNT, abi.encode(localAmount));
     result[3] = IPolicyEngine.Parameter(PARAM_REMOTE_CHAIN_SELECTOR, abi.encode(releaseOrMintIn.remoteChainSelector));
     result[4] = IPolicyEngine.Parameter(PARAM_TOKEN, abi.encode(releaseOrMintIn.localToken));
-    result[5] = IPolicyEngine.Parameter(PARAM_BLOCK_CONFIRMATIONS_REQUESTED, abi.encode(finalityConfig));
+    result[5] = IPolicyEngine.Parameter(PARAM_REQUESTED_FINALITY, abi.encode(finalityConfig));
     result[6] = IPolicyEngine.Parameter(PARAM_SOURCE_POOL_ADDRESS, releaseOrMintIn.sourcePoolAddress);
     result[7] = IPolicyEngine.Parameter(PARAM_SOURCE_POOL_DATA, releaseOrMintIn.sourcePoolData);
     result[8] =

@@ -72,7 +72,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
-    // Enable custom block confirmation handling so consumption emits.
+    // Enable fast finality handling so consumption emits.
     s_tokenPool.setFinalityConfig(bytes2(uint16(1)));
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
@@ -140,7 +140,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     assertEq(outboundBucket.tokens, _getOutboundRateLimiterConfig().capacity - expectedAmount);
   }
 
-  /// @notice When custom block confirmations are requested but no custom outbound bucket is configured,
+  /// @notice When fast finality is requested but no custom outbound bucket is configured,
   /// the fallback consumes from the default outbound bucket.
   function test_validateLockOrBurn_WithFastFinality_FallsBackToDefaultBucket() public {
     s_tokenPool.setFinalityConfig(bytes2(uint16(1)));

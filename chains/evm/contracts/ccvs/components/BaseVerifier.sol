@@ -30,6 +30,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
+  // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
     IRouter router; // ──────────╮ Local router to use for messages to/fom this chain.
     uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]

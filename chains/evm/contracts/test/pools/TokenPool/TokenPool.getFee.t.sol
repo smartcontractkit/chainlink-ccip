@@ -48,7 +48,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(OWNER);
-    // Enable custom block confirmations by setting minFinality > 0.
+    // Enable fast finalitys by setting minFinality > 0.
     s_tokenPool.setFinalityConfig(minFinality);
     _applyFeeConfig(feeConfig);
 
@@ -89,7 +89,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   function test_getFee_RevertWhen_InvalidFinalityConfig() public {
     bytes2 minFinality = bytes2(uint16(10));
 
-    // Set custom block confirmation config with minimum of 10 blocks
+    // Set fast finality config with minimum of 10 blocks
     s_tokenPool.setFinalityConfig(minFinality);
 
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({

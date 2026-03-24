@@ -164,7 +164,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @inheritdoc IPoolV2
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param finalityConfig Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
@@ -247,7 +247,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
   /// @inheritdoc IPoolV2
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param finalityConfig Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     bytes2 finalityConfig
@@ -402,7 +402,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @param destChainSelector The destination lane selector.
   /// @param amount The amount of tokens being bridged on this lane.
   /// @param feeToken The token used to pay feeUSDCents.
-  /// @param finalityConfig Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Opaque token arguments supplied by the caller.
   // solhint-disable-next-line chainlink-solidity/explicit-returns
   function getFee(
@@ -430,7 +430,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @inheritdoc IPoolV2
   /// @param localToken The local asset being transferred.
   /// @param destChainSelector The chain selector of the destination chain.
-  /// @param finalityConfig Requested block confirmations.
+  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token argument from the CCIP message.
   function getTokenTransferFeeConfig(
     address localToken,
