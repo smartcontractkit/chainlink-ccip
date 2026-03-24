@@ -26,9 +26,10 @@ pragma solidity ^0.8.4;
 ///    0x0001..0x03FF                  — wait for N confirmation blocks (depth only, no flags).
 library FinalityCodec {
   error InvalidBlockDepth(uint16 requestedDepth, uint16 maxDepth);
+  error InvalidRequestedFinality(bytes2 requestedFinality, bytes2 allowedFinality);
   /// @notice Requested finality must be exactly one mode: any of the flag bits or a block depth with no upper flag bits.
   /// It cannot combine a flag with a block depth.
-  error InvalidRequestedFinality(bytes2 encodedFinality);
+  error RequestedFinalityCanOnlyHaveOneMode(bytes2 encodedFinality);
 
   /// @notice The block depth is stored in the lower 10 bits, leaving the upper 6 bits for flags. This allows for a
   /// maximum block depth of 1023, which should be sufficient for most use cases. For more security, users should wait
@@ -95,7 +96,7 @@ library FinalityCodec {
     // There must be exactly one active mode: either a block depth or a single flag. Selecting multiple modes is only
     // allowed for `allowedFinality` set by Pools, CCVs, etc., but not for `requestedFinality` set by senders.
     if (activeModes != 1) {
-      revert InvalidRequestedFinality(encodedFinality);
+      revert RequestedFinalityCanOnlyHaveOneMode(encodedFinality);
     }
   }
 
@@ -115,7 +116,7 @@ library FinalityCodec {
     // If any of the flags match, the request is allowed only when it has no depth field (flag-only request).
     if (requestedFinality >> BLOCK_DEPTH_BITS & allowedFinality >> BLOCK_DEPTH_BITS != 0) {
       if (uint16(requestedFinality & BLOCK_DEPTH_MASK) != 0) {
-        revert InvalidRequestedFinality(requestedFinality);
+        revert InvalidRequestedFinality(requestedFinality, allowedFinality);
       }
       return;
     }
@@ -123,7 +124,7 @@ library FinalityCodec {
     uint16 requestedBlockDepth = uint16(requestedFinality & BLOCK_DEPTH_MASK);
     uint16 allowedBlockDepth = uint16(allowedFinality & BLOCK_DEPTH_MASK);
     if (allowedBlockDepth == 0 || requestedBlockDepth < allowedBlockDepth) {
-      revert InvalidBlockDepth(requestedBlockDepth, allowedBlockDepth);
+      revert InvalidRequestedFinality(requestedFinality, allowedFinality);
     }
   }
 }

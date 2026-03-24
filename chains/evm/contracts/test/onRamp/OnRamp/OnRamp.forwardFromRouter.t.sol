@@ -364,7 +364,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     bytes2 invalidFinality = bytes2(extraArgs.finalityConfig);
     message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
 
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, invalidFinality));
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.RequestedFinalityCanOnlyHaveOneMode.selector, invalidFinality));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e18, STRANGER);
   }
 

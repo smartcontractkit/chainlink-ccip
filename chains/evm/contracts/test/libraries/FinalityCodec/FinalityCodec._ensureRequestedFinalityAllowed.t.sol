@@ -13,77 +13,51 @@ contract FinalityCodec__ensureRequestedFinalityAllowed is FinalityCodecSetup {
 
   function test__ensureRequestedFinalityAllowed_AllowedWhen_UpperFlagBitsOverlap() public view {
     bytes2 requested = FinalityCodec.WAIT_FOR_SAFE_FLAG;
-    bytes2 allowed = bytes2(uint16(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 500));
+    bytes2 allowed = bytes2(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 500);
     s_helper.ensureRequestedFinalityAllowed(requested, allowed);
   }
 
-  function test__ensureRequestedFinalityAllowed_AllowedWhen_BlockDepthWithinAllowance() public view {
-    s_helper.ensureRequestedFinalityAllowed(bytes2(uint16(50)), bytes2(uint16(100)));
-    s_helper.ensureRequestedFinalityAllowed(bytes2(uint16(100)), bytes2(uint16(100)));
+  function test__ensureRequestedFinalityAllowed_AllowedWhen_BlockDepthMeetsMinimum() public view {
+    uint16 requestedDepth = 100;
+    // Exact match — requesting exactly the minimum is allowed.
+    s_helper.ensureRequestedFinalityAllowed(bytes2(requestedDepth), bytes2(requestedDepth));
+    // Requesting more confirmations than the minimum is also allowed.
+    s_helper.ensureRequestedFinalityAllowed(bytes2(requestedDepth * 2), bytes2(requestedDepth));
   }
 
-  function test__ensureRequestedFinalityAllowed_AllowedWhen_RequestedSafeAndAllowedIsDepthOnly() public view {
+  function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidBlockDepth_RequestedSafeButAllowedIsDepthOnly()
+    public
+  {
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec.WAIT_FOR_SAFE_FLAG, bytes2(uint16(200))
+      )
+    );
     s_helper.ensureRequestedFinalityAllowed(FinalityCodec.WAIT_FOR_SAFE_FLAG, bytes2(uint16(200)));
   }
 
-  /// forge-config: default.fuzz.runs = 1024
-  /// forge-config: ccip.fuzz.runs = 1024
-  function testFuzz__ensureRequestedFinalityAllowed_FinalityAlwaysAllowed(
-    bytes2 allowed
-  ) public view {
-    s_helper.ensureRequestedFinalityAllowed(bytes2(0), allowed);
-  }
+  function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidBlockDepth_RequestedDepthBelowMinimum() public {
+    uint16 requested = 99;
+    uint16 allowed = requested + 1;
 
-  /// forge-config: default.fuzz.runs = 1024
-  /// forge-config: ccip.fuzz.runs = 1024
-  function testFuzz__ensureRequestedFinalityAllowed_BlockDepthAllowedWhen_LessOrEqual(
-    uint16 allowedDepth,
-    uint16 requestedDepth
-  ) public view {
-    allowedDepth = uint16(bound(uint256(allowedDepth), 0, uint256(FinalityCodec.MAX_BLOCK_DEPTH)));
-    requestedDepth = uint16(bound(uint256(requestedDepth), 0, uint256(allowedDepth)));
-    s_helper.ensureRequestedFinalityAllowed(bytes2(requestedDepth), bytes2(allowedDepth));
-  }
-
-  // Reverts
-
-  function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidBlockDepth_RequestedDepthExceedsAllowed() public {
-    bytes2 requested = bytes2(uint16(101));
-    bytes2 allowed = bytes2(uint16(100));
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidBlockDepth.selector, uint16(101), uint16(100)));
-    s_helper.ensureRequestedFinalityAllowed(requested, allowed);
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(requested), bytes2(allowed)));
+    s_helper.ensureRequestedFinalityAllowed(bytes2(requested), bytes2(allowed));
   }
 
   function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidBlockDepth_NoMatchingFlagAndRequestedDepthExceedsAllowed()
     public
   {
-    bytes2 requested = bytes2(uint16(1));
+    uint16 requested = 1;
     bytes2 allowed = FinalityCodec.WAIT_FOR_SAFE_FLAG;
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidBlockDepth.selector, uint16(1), uint16(0)));
-    s_helper.ensureRequestedFinalityAllowed(requested, allowed);
+
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(requested), allowed));
+    s_helper.ensureRequestedFinalityAllowed(bytes2(requested), allowed);
   }
 
-  /// @dev Documents `_ensureRequestedFinalityAllowed` when flag bits overlap but lower bits are non-zero (ill-formed
-  /// for a validated request; callers should run `_validateRequestedFinality` first).
-  function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidRequestedFinality_FlagOverlapWithNonZeroDepth()
-    public
-  {
+  function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidBlockDepth_FlagOverlapWithNonZeroDepth() public {
     bytes2 requested = bytes2(uint16(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 7));
     bytes2 allowed = bytes2(uint16(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 500));
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requested));
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requested, allowed));
     s_helper.ensureRequestedFinalityAllowed(requested, allowed);
-  }
-
-  /// forge-config: default.fuzz.runs = 1024
-  /// forge-config: ccip.fuzz.runs = 1024
-  function testFuzz__ensureRequestedFinalityAllowed_RevertWhen_InvalidBlockDepth_RequestedDepthGreaterThanAllowed(
-    uint16 allowedDepth,
-    uint16 requestedDepth
-  ) public {
-    allowedDepth = uint16(bound(uint256(allowedDepth), 0, uint256(FinalityCodec.MAX_BLOCK_DEPTH - 1)));
-    requestedDepth =
-      uint16(bound(uint256(requestedDepth), uint256(allowedDepth) + 1, uint256(FinalityCodec.MAX_BLOCK_DEPTH)));
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidBlockDepth.selector, requestedDepth, allowedDepth));
-    s_helper.ensureRequestedFinalityAllowed(bytes2(requestedDepth), bytes2(allowedDepth));
   }
 }

@@ -15,24 +15,21 @@ contract FinalityCodec__validateRequestedFinality is FinalityCodecSetup {
 
   function test__validateRequestedFinality_PureBlockDepth_Boundaries() public view {
     s_helper.validateRequestedFinality(bytes2(uint16(1)));
+    s_helper.validateRequestedFinality(bytes2(uint16(10)));
     s_helper.validateRequestedFinality(bytes2(FinalityCodec.MAX_BLOCK_DEPTH));
-  }
-
-  function test__validateRequestedFinality_PureBlockDepth_MidRange() public view {
-    s_helper.validateRequestedFinality(bytes2(uint16(500)));
   }
 
   // Reverts
 
   function test__validateRequestedFinality_RevertWhen_InvalidRequestedFinality_FlagWithNonZeroDepth() public {
     bytes2 invalid = bytes2(uint16(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 1));
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, invalid));
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.RequestedFinalityCanOnlyHaveOneMode.selector, invalid));
     s_helper.validateRequestedFinality(invalid);
   }
 
   function test__validateRequestedFinality_RevertWhen_InvalidRequestedFinality_MultipleFlagBits() public {
     bytes2 invalid = bytes2(uint16((1 << 10) | (1 << 11)));
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, invalid));
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.RequestedFinalityCanOnlyHaveOneMode.selector, invalid));
     s_helper.validateRequestedFinality(invalid);
   }
 }

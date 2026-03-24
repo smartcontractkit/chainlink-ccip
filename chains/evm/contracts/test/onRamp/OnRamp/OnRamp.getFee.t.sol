@@ -305,7 +305,7 @@ contract OnRamp_getFee is OnRampSetup {
     bytes2 invalidFinality = extraArgs.finalityConfig;
     message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
 
-    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, invalidFinality));
+    vm.expectRevert(abi.encodeWithSelector(FinalityCodec.RequestedFinalityCanOnlyHaveOneMode.selector, invalidFinality));
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 }

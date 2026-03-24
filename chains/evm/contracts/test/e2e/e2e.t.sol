@@ -46,7 +46,8 @@ contract e2e is OnRampSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
+      finalityConfig: bytes2(0)
     });
     s_sourceCommitteeVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
 

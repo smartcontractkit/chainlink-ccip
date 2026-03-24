@@ -21,7 +21,8 @@ contract LombardVerifier_applyAllowlistUpdates is LombardVerifierSetup {
       allowlistEnabled: true,
       feeUSDCents: 100,
       gasForVerification: 50_000,
-      payloadSizeBytes: 100
+      payloadSizeBytes: 100,
+      finalityConfig: bytes2(0)
     });
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
@@ -46,13 +47,13 @@ contract LombardVerifier_applyAllowlistUpdates is LombardVerifierSetup {
 
     s_lombardVerifier.applyAllowlistUpdates(allowlistConfigArgs);
 
-    (bool allowlistEnabled,, address[] memory allowedSenders) =
+    (BaseVerifier.RemoteChainConfigArgs memory config1, address[] memory allowedSenders1) =
       s_lombardVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
 
-    assertTrue(allowlistEnabled);
-    assertEq(allowedSenders.length, 2);
-    assertEq(allowedSenders[0], SENDER1);
-    assertEq(allowedSenders[1], SENDER2);
+    assertTrue(config1.allowlistEnabled);
+    assertEq(allowedSenders1.length, 2);
+    assertEq(allowedSenders1[0], SENDER1);
+    assertEq(allowedSenders1[1], SENDER2);
   }
 
   function test_applyAllowlistUpdates_RemoveSenders() public {
@@ -88,7 +89,7 @@ contract LombardVerifier_applyAllowlistUpdates is LombardVerifierSetup {
 
     s_lombardVerifier.applyAllowlistUpdates(allowlistConfigArgs);
 
-    (,, address[] memory allowedSenders) = s_lombardVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
+    (, address[] memory allowedSenders) = s_lombardVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
 
     assertEq(allowedSenders.length, 2);
     // Verify SENDER2 is not in the list
@@ -125,9 +126,9 @@ contract LombardVerifier_applyAllowlistUpdates is LombardVerifierSetup {
 
     s_lombardVerifier.applyAllowlistUpdates(allowlistConfigArgs);
 
-    (bool allowlistEnabled,,) = s_lombardVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
+    (BaseVerifier.RemoteChainConfigArgs memory config2,) = s_lombardVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
 
-    assertFalse(allowlistEnabled);
+    assertFalse(config2.allowlistEnabled);
   }
 
   function test_applyAllowlistUpdates_RevertWhen_NotOwner() public {

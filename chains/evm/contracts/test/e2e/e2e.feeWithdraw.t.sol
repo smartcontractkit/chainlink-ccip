@@ -115,7 +115,8 @@ contract e2e_feeWithdrawal is OnRampSetup {
       allowlistEnabled: false,
       feeUSDCents: uint16(VERIFIER_FEE_USD_CENTS), // $2.00 fee for verifier
       gasForVerification: VERIFIER_GAS,
-      payloadSizeBytes: VERIFIER_BYTES
+      payloadSizeBytes: uint16(VERIFIER_BYTES),
+      finalityConfig: bytes2(0)
     });
     s_verifierImpl.applyRemoteChainConfigUpdates(destChainConfigs);
 

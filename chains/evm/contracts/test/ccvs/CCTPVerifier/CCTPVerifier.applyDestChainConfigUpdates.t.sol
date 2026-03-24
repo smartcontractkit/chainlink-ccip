@@ -19,7 +19,8 @@ contract CCTPVerifier_applyRemoteChainConfigUpdates is CCTPVerifierSetup {
       allowlistEnabled: true,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
+      finalityConfig: bytes2(0)
     });
 
     vm.expectEmit();
@@ -27,11 +28,11 @@ contract CCTPVerifier_applyRemoteChainConfigUpdates is CCTPVerifierSetup {
 
     s_cctpVerifier.applyRemoteChainConfigUpdates(args);
 
-    (bool allowlistEnabled, address newRouter, address[] memory allowedSenders) =
+    (BaseVerifier.RemoteChainConfigArgs memory config, address[] memory allowedSenders) =
       s_cctpVerifier.getRemoteChainConfig(newChainSelector);
 
-    assertEq(allowlistEnabled, true);
-    assertEq(newRouter, router);
+    assertEq(config.allowlistEnabled, true);
+    assertEq(address(config.router), router);
     assertEq(allowedSenders.length, 0);
   }
 

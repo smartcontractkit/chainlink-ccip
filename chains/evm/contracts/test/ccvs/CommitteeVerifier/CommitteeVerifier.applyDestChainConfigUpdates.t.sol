@@ -19,7 +19,8 @@ contract CommitteeVerifier_applyRemoteChainConfigUpdates is CommitteeVerifierSet
       allowlistEnabled: true,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
+      finalityConfig: bytes2(0)
     });
 
     vm.expectEmit();
@@ -27,11 +28,11 @@ contract CommitteeVerifier_applyRemoteChainConfigUpdates is CommitteeVerifierSet
 
     s_committeeVerifier.applyRemoteChainConfigUpdates(args);
 
-    (bool allowlistEnabled, address newRouter, address[] memory allowedSenders) =
+    (BaseVerifier.RemoteChainConfigArgs memory config, address[] memory allowedSenders) =
       s_committeeVerifier.getRemoteChainConfig(NEW_DEST_SELECTOR);
 
-    assertEq(allowlistEnabled, true);
-    assertEq(newRouter, router);
+    assertEq(config.allowlistEnabled, true);
+    assertEq(address(config.router), router);
     assertEq(allowedSenders.length, 0);
   }
 
