@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -35,38 +36,43 @@ const (
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
-
-	// https://github.com/smartcontractkit/chainlink/blob/1423e2581e8640d9e5cd06f745c6067bb2893af2/contracts/src/v0.8/ccip/libraries/Internal.sol#L275-L279
-	/*
-				```Solidity
-					// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
-					bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
-					// bytes4(keccak256("CCIP ChainFamilySelector SVM"));
-		  		bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
-				```
-	*/
-	EVMFamilySelector   = "2812d52c"
-	SVMFamilySelector   = "1e10bdc4"
-	AptosFamilySelector = "ac77ffec"
-	TVMFamilySelector   = "647e2ba9"
-	SuiFamilySelector   = "c4e05953"
 )
 
+// familySelectors is a concurrent-safe registry of chain family → 4-byte
+// on-chain selector. It is populated automatically when adapters that implement
+// ChainMetadataProvider are registered via LaneAdapterRegistry.RegisterLaneAdapter.
+var familySelectors sync.Map
+
+// RegisterChainFamilySelector records the 4-byte on-chain selector for a chain
+// family (e.g. "evm" → [0x28,0x12,0xd5,0x2c]). Adapters call this indirectly
+// through LaneAdapterRegistry.RegisterLaneAdapter.
+func RegisterChainFamilySelector(family string, selector [4]byte) {
+	familySelectors.Store(family, selector)
+}
+
+// GetSelectorHex returns the 4-byte on-chain family selector for a given chain
+// selector. It first checks the adapter-populated registry (populated when
+// adapters that implement ChainMetadataProvider register via
+// LaneAdapterRegistry.RegisterLaneAdapter). For chain families whose adapters
+// live in external repos and haven't adopted ChainMetadataProvider yet, it
+// falls back to inline constants.
 func GetSelectorHex(selector uint64) [4]byte {
 	destFamily, _ := chain_selectors.GetSelectorFamily(selector)
 
+	if val, ok := familySelectors.Load(destFamily); ok {
+		return val.([4]byte)
+	}
+
+	// Fallback for chain families whose adapters haven't implemented
+	// ChainMetadataProvider yet (external repos).
 	var hexStr string
 	switch destFamily {
-	case chain_selectors.FamilyEVM:
-		hexStr = EVMFamilySelector
-	case chain_selectors.FamilySolana:
-		hexStr = SVMFamilySelector
 	case chain_selectors.FamilyAptos:
-		hexStr = AptosFamilySelector
+		hexStr = "ac77ffec"
 	case chain_selectors.FamilyTon:
-		hexStr = TVMFamilySelector
+		hexStr = "647e2ba9"
 	case chain_selectors.FamilySui:
-		hexStr = SuiFamilySelector
+		hexStr = "c4e05953"
 	default:
 		panic(fmt.Sprintf("unsupported chain family: %s", destFamily))
 	}
