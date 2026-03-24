@@ -40,6 +40,11 @@ type FeeQuoterVersionProvider interface {
 	GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64) (*semver.Version, error)
 }
 
+// DynamicFeeQuoter is an optional interface that LaneAdapters can implement to dynamically retrieve the FeeQuoter.
+type DynamicFeeQuoter interface {
+	GetFQAddressDynamic(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) ([]byte, error)
+}
+
 // TokenPriceProvider is an optional interface that LaneAdapters can implement
 // to provide default fee token prices for a chain.
 // This is primarily used by EVM chains; other chains can skip this.

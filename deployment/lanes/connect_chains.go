@@ -82,11 +82,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(e.DataStore, chainA, chainAAdapter, lane.Version, lane.TestRouter)
+			err = populateAddresses(chainA, chainAAdapter, lane.Version, lane.TestRouter, e)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(e.DataStore, chainB, chainBAdapter, lane.Version, lane.TestRouter)
+			err = populateAddresses(chainB, chainBAdapter, lane.Version, lane.TestRouter, e)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
@@ -160,7 +160,8 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool) error {
+func populateAddresses(chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool, e cldf.Environment) error {
+	ds := e.DataStore
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
 	if err != nil {
@@ -170,9 +171,11 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching offramp address for chain %d: %w", chainDef.Selector, err)
 	}
-	chainDef.FeeQuoter, err = adapter.GetFQAddress(ds, chainDef.Selector)
-	if err != nil {
-		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
+	if dfq, ok := adapter.(DynamicFeeQuoter); ok {
+		chainDef.FeeQuoter, err = dfq.GetFQAddressDynamic(ds, chainDef.Selector, e.BlockChains)
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
+		}
 	}
 	if vp, ok := adapter.(FeeQuoterVersionProvider); ok {
 		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector)
