@@ -122,7 +122,7 @@ library FinalityCodec {
     // Otherwise, it must be block-depth based.
     uint16 requestedBlockDepth = uint16(requestedFinality & BLOCK_DEPTH_MASK);
     uint16 allowedBlockDepth = uint16(allowedFinality & BLOCK_DEPTH_MASK);
-    if (allowedBlockDepth == 0 || requestedBlockDepth > allowedBlockDepth) {
+    if (allowedBlockDepth == 0 || requestedBlockDepth < allowedBlockDepth) {
       revert InvalidBlockDepth(requestedBlockDepth, allowedBlockDepth);
     }
   }
