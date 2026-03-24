@@ -5,23 +5,24 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
+import {Client} from "../libraries/Client.sol";
+import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
+import "../libraries/FinalityCodec.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
+
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
+import {Internal} from "../libraries/Internal.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
-import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
-import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-
-import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
@@ -44,7 +45,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
-  error InvalidFinalityForReceiver(address receiver, uint16 msgBlockDepth, uint16 requiredBlockDepth);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
@@ -693,16 +693,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes memory sender,
     bytes2 messageRequestedFinality
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // Default block confirmations requirement is 0, which means "wait for finality". A receiver implementing
-    // IAny2EVMMessageReceiverV2 can return a different value.
+    // Default finality config is 0, which means "wait for finality". A receiver implementing IAny2EVMMessageReceiverV2
+    // can return a different value.
     // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
     // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
-    uint16 minBlockConfirmations;
+    bytes2 receiverFinalityConfig = bytes2(0);
 
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-      (requiredCCV, optionalCCVs, optionalThreshold, minBlockConfirmations) =
-        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockConfirmations(sourceChainSelector, sender);
+      (requiredCCV, optionalCCVs, optionalThreshold, receiverFinalityConfig) =
+        IAny2EVMMessageReceiverV2(receiver).getCCVsAndFinalityConfig(sourceChainSelector, sender);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
@@ -713,18 +713,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       }
     }
 
-    // If non-zero it means FTF is enabled. Ensure it follows the min requirements from the receiver.
-    uint16 requestedWire = uint16(messageRequestedFinality);
-    if (requestedWire != 0) {
-      // If the receiver requires finality, but the msg is FTF, revert.
-      if (minBlockConfirmations == 0) {
-        revert InvalidFinalityForReceiver(receiver, requestedWire, minBlockConfirmations);
-      }
-      // If the receiver specified a minBlockConfirmations that is higher than the message requested block confirmations, revert.
-      if (minBlockConfirmations > requestedWire) {
-        revert InvalidFinalityForReceiver(receiver, requestedWire, minBlockConfirmations);
-      }
-    }
+    // Check the finality requirement of the message against the allowed finality for the receiver.
+    FinalityCodec._ensureRequestedFinalityAllowed(messageRequestedFinality, receiverFinalityConfig);
 
     // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
     // If they did specify something, we use what they specified.
@@ -742,6 +732,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param localToken The local token address.
   /// @param sourceChainSelector The source chain selector.
   /// @param amount The amount of the token to be released/minted.
+  /// @param finality The finality requirement of the message (see `FinalityCodec`).
   /// @param extraData The extra data for the pool.
   /// @return requiredCCV The required CCVs.
   function _getCCVsFromPool(

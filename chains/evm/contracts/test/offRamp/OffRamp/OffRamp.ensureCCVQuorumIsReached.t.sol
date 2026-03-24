@@ -121,11 +121,12 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     // Mock receiver to return no required CCVs (so it falls back to defaults via address(0)).
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(
         new address[](0), // no required CCVs - will fall back to defaults.
         new address[](0), // no optional CCVs.
-        uint8(0) // no optional threshold.
+        uint8(0), // no optional threshold.
+        bytes2(0) // allowedFinalityConfig - require finality.
       )
     );
 
@@ -186,8 +187,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(new address[](0), receiverOptional, uint8(2))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(2), bytes2(0))
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
@@ -216,8 +217,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     receiverRequired[0] = s_requiredCCV;
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(receiverRequired, new address[](0), uint8(0))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(receiverRequired, new address[](0), uint8(0), bytes2(0))
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
@@ -250,8 +251,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     receiverRequired[0] = s_requiredCCV;
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(receiverRequired, new address[](0), uint8(0))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(receiverRequired, new address[](0), uint8(0), bytes2(0))
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
@@ -286,8 +287,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(new address[](0), receiverOptional, uint8(2))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(2), bytes2(0))
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(new MessageV1Codec.TokenTransferV1[](0), false);
@@ -310,8 +311,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(new address[](0), receiverOptional, uint8(1))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(1), bytes2(0))
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);

@@ -47,7 +47,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error ReentrancyGuardReentrantCall();
   error DestinationChainNotSupported(uint64 destChainSelector);
   error InvalidDestChainAddress(bytes destChainAddress);
-  error CustomBlockConfirmationsNotSupportedOnPoolV1();
+  error FTFNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
@@ -756,7 +756,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         // V1 pools don't understand `finalityConfig`/`tokenArgs`.
         // We enforce default finality and no `tokenArgs` to avoid silent mis-interpretation.
         if (finalityConfig != bytes2(0)) {
-          revert CustomBlockConfirmationsNotSupportedOnPoolV1();
+          revert FTFNotSupportedOnPoolV1();
         }
         if (tokenArgs.length != 0) {
           revert TokenArgsNotSupportedOnPoolV1();

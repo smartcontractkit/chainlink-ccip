@@ -144,10 +144,10 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   }
 
   function test_getFee_DisabledConfig_CustomFinality_ReturnsZeros() public {
-    uint16 minFinality = 5;
+    bytes2 minFinality = bytes2(uint16(5));
 
     vm.startPrank(OWNER);
-    s_tokenPool.setFinalityConfig(bytes2(uint16(minFinality)));
+    s_tokenPool.setFinalityConfig(minFinality);
 
     // First enable a config
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({

@@ -137,7 +137,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     assertEq(transfer.extraData, abi.encode("poolData"));
   }
 
-  function test_lockOrBurnSingleToken_RevertWhen_CustomBlockConfirmationsNotSupportedOnPoolV1() public {
+  function test_lockOrBurnSingleToken_RevertWhen_FTFNotSupportedOnPoolV1() public {
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false));
     // mock lockOrBurn v1 call.
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
@@ -146,7 +146,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     bytes2 finality = bytes2(uint16(5));
     bytes memory tokenArgs = "";
 
-    vm.expectRevert(OnRamp.CustomBlockConfirmationsNotSupportedOnPoolV1.selector);
+    vm.expectRevert(OnRamp.FTFNotSupportedOnPoolV1.selector);
     s_onRampHelper.lockOrBurnSingleToken(
       tokenAndAmount, DEST_CHAIN_SELECTOR, receiver, originalSender, finality, tokenArgs
     );

@@ -44,12 +44,12 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       address[] memory retRequiredCCVs,
       address[] memory retOptionalCCVs,
       uint8 retOptionalThreshold,
-      uint16 minBlockConfirmations
-    ) = s_client.getCCVsAndMinBlockConfirmations(SOURCE_CHAIN_SELECTOR, sender);
+      bytes2 allowedFinalityConfig
+    ) = s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
-    assertEq(minBlockConfirmations, 1);
+    assertEq(allowedFinalityConfig, bytes2(uint16(1)));
     for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertEq(retRequiredCCVs[i], requiredCCVs[i]);
     }
@@ -153,7 +153,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     s_client.applyCCVConfigUpdates(args);
   }
 
-  function test_getCCVsAndMinBlockConfirmations_RequireFinality_ReturnsZeroMinBlockConfirmations() public {
+  function test_getCCVsAndFinalityConfig_RequireFinality_ReturnsZeroAllowedFinalityConfig() public {
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);
 
@@ -170,14 +170,14 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
 
-    (address[] memory retRequired,,, uint16 minBlockConfirmations) =
-      s_client.getCCVsAndMinBlockConfirmations(SOURCE_CHAIN_SELECTOR, sender);
+    (address[] memory retRequired,,, bytes2 allowedFinalityConfig) =
+      s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    assertEq(minBlockConfirmations, 0);
+    assertEq(allowedFinalityConfig, bytes2(0));
   }
 
-  function test_getCCVsAndMinBlockConfirmations_NoRequireFinality_ReturnsNonZeroMinBlockConfirmations() public {
+  function test_getCCVsAndFinalityConfig_NoRequireFinality_ReturnsNonZeroAllowedFinalityConfig() public {
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);
 
@@ -194,10 +194,10 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
 
-    (address[] memory retRequired,,, uint16 minBlockConfirmations) =
-      s_client.getCCVsAndMinBlockConfirmations(SOURCE_CHAIN_SELECTOR, sender);
+    (address[] memory retRequired,,, bytes2 allowedFinalityConfig) =
+      s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    assertEq(minBlockConfirmations, 1);
+    assertEq(allowedFinalityConfig, bytes2(uint16(1)));
   }
 }

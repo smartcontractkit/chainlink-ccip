@@ -104,11 +104,11 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     }
   }
 
-  /// @notice Provides the required and optional CCVs and min block confirmations for a source chain.
+  /// @notice Provides the required and optional CCVs and allowed finality config for a source chain.
   /// @dev OffRamp will apply the defaults for the lane if no CCVs are defined for a source chain.
-  /// @dev WARNING: minBlockConfirmations must be used carefully, when in doubt it's safer to require finality (minBlockConfirmations = 0) than
+  /// @dev WARNING: allowedFinalityConfig must be used carefully, when in doubt it's safer to require finality (allowedFinalityConfig = bytes2(0)) than
   /// to allow FTF messages (any non-zero value) as FTF messages can be reorged.
-  function getCCVsAndMinBlockConfirmations(
+  function getCCVsAndFinalityConfig(
     uint64 sourceChainSelector,
     bytes calldata
   )
@@ -120,14 +120,14 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
       address[] memory requiredCCVs,
       address[] memory optionalCCVs,
       uint8 optionalThreshold,
-      uint16 minBlockConfirmations
+      bytes2 allowedFinalityConfig
     )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
-    // If allowFasterThanFinality is true, minBlockConfirmations = 1 (allow any FTF level) - WARNING only use a finality of 1 when
+    // If allowFasterThanFinality is true, allowedFinalityConfig = bytes2(uint16(1)) (allow any FTF level) - WARNING only use a finality of 1 when
     // you use a trusted sender on the source chain that manages the finality risk when sending messages.
-    // If allowFasterThanFinality is false, minBlockConfirmations = 0 (require finality).
-    minBlockConfirmations = config.allowFasterThanFinality ? 1 : 0;
-    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, minBlockConfirmations);
+    // If allowFasterThanFinality is false, allowedFinalityConfig = bytes2(0) (require finality).
+    allowedFinalityConfig = config.allowFasterThanFinality ? bytes2(uint16(1)) : bytes2(0);
+    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, allowedFinalityConfig);
   }
 }
