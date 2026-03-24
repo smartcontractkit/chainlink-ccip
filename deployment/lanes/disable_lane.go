@@ -84,11 +84,11 @@ func makeDisableApply(
 			chainADef := &ChainDefinition{Selector: lane.ChainA}
 			chainBDef := &ChainDefinition{Selector: lane.ChainB}
 
-			err = populateAddresses(e.DataStore, chainADef, chainAAdapter, lane.Version, false)
+			err = populateAddresses(chainADef, chainAAdapter, lane.Version, false, e)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching addresses for chain %d: %w", lane.ChainA, err)
 			}
-			err = populateAddresses(e.DataStore, chainBDef, chainBAdapter, lane.Version, false)
+			err = populateAddresses(chainBDef, chainBAdapter, lane.Version, false, e)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching addresses for chain %d: %w", lane.ChainB, err)
 			}
