@@ -2,11 +2,13 @@ package sequences
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -14,7 +16,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -47,11 +49,13 @@ type FeeQuoterImportConfigSequenceOutput struct {
 	RemoteChainCfgs map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain
 	PriceUpdaters   []common.Address
 	StaticCfg       fqops.StaticConfig
+	TokenPrices     map[common.Address]*big.Int
 }
 
 type FeeQuoterImportConfigSequenceOutputPerRemoteChain struct {
 	DestChainCfg         fqops.DestChainConfig
 	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
+	GasPrice             *big.Int
 }
 
 var (
@@ -184,12 +188,21 @@ var (
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
+			allTokens := make(map[common.Address]struct{})
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
 			tokenGrp.SetLimit(10)
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
 				remoteChain := remoteChain
 				tokens := tokens
+				for _, token := range tokens {
+					if token == (common.Address{}) {
+						continue
+					}
+					if _, exists := allTokens[token]; !exists {
+						allTokens[token] = struct{}{}
+					}
+				}
 				tokenGrp.Go(func() error {
 					destChainMu.Lock()
 					_, enabled := destChainConfigs[remoteChain]
@@ -203,6 +216,9 @@ var (
 					innerTokenGrp.SetLimit(10)
 					for _, token := range tokens {
 						token := token
+						if token == (common.Address{}) {
+							continue
+						}
 						innerTokenGrp.Go(func() error {
 							opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
 								contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
@@ -242,6 +258,7 @@ var (
 				fqOutput[remoteChain] = FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 					DestChainCfg:         destCfg,
 					TokenTransferFeeCfgs: tokenTransferFeeCfgsPerChain[remoteChain],
+					TokenPrices:          tokenPricesPerChain[remoteChain],
 				}
 			}
 			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[struct{}]{
@@ -260,6 +277,20 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get all authorized callers from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
+			tokenSlice := maps.Keys(allTokens)
+			tokenPrices, err := operations.ExecuteOperation(b, fqops.GetTokenPrices, evmChain, contract.FunctionInput[[]common.Address]{
+				Address:       fqAddress,
+				ChainSelector: chainSelector,
+				Args:          tokenSlice,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token prices from feequoter %s on chain %d: %w",
+					fqAddress.Hex(), chainSelector, err)
+			}
+			tokenPricesPerToken := make(map[common.Address]*big.Int)
+			for i, token := range tokenSlice {
+				tokenPricesPerToken[token] = tokenPrices.Output[i].Value
+			}
 			contractMetadata = []datastore.ContractMetadata{
 				{
 					Address:       fqAddress.Hex(),
@@ -268,6 +299,7 @@ var (
 						RemoteChainCfgs: fqOutput,
 						StaticCfg:       staticCfgOutput.Output,
 						PriceUpdaters:   priceUpdaters.Output,
+						TokenPrices:     tokenPricesPerToken,
 					},
 				},
 			}
