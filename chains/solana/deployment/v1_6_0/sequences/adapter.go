@@ -18,7 +18,6 @@ import (
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	laneapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
@@ -91,15 +90,17 @@ func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelecto
 	return addr, nil
 }
 
+// svmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector SVM")) = 0x1e10bdc4.
+var svmFamilySelector = [4]byte{0x1e, 0x10, 0xbd, 0xc4}
+
 func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChainConfig {
-	chainHex := common_utils.GetHexFromString(common_utils.SVMFamilySelector)
 	return laneapi.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
 		DestGasOverhead:             300_000,
 		DestGasPerPayloadByteBase:   16,
-		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		ChainFamilySelector:         binary.BigEndian.Uint32(svmFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
 		DefaultTxGasLimit:           200_000,
@@ -125,5 +126,5 @@ func (a *SolanaAdapter) GetDefaultGasPrice() *big.Int {
 }
 
 func (a *SolanaAdapter) GetChainFamilySelector() [4]byte {
-	return common_utils.GetHexFromString(common_utils.SVMFamilySelector)
+	return svmFamilySelector
 }
