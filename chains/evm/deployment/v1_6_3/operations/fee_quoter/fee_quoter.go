@@ -117,6 +117,26 @@ func (c *FeeQuoterContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]comm
 	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
 }
 
+func (c *FeeQuoterContract) GetTokenPrices(opts *bind.CallOpts, args []common.Address) ([]TimestampedPackedUint224, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getTokenPrices", args)
+	if err != nil {
+		var zero []TimestampedPackedUint224
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]TimestampedPackedUint224)).(*[]TimestampedPackedUint224), nil
+}
+
+func (c *FeeQuoterContract) GetDestinationChainGasPrice(opts *bind.CallOpts, args uint64) (TimestampedPackedUint224, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getDestinationChainGasPrice", args)
+	if err != nil {
+		var zero TimestampedPackedUint224
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(TimestampedPackedUint224)).(*TimestampedPackedUint224), nil
+}
+
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
@@ -168,6 +188,11 @@ type StaticConfig struct {
 	MaxFeeJuelsPerMsg            *big.Int
 	LinkToken                    common.Address
 	TokenPriceStalenessThreshold uint32
+}
+
+type TimestampedPackedUint224 struct {
+	Value     *big.Int
+	Timestamp uint32
 }
 
 type TokenPriceFeedConfig struct {
@@ -359,5 +384,27 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
+	},
+})
+
+var GetTokenPrices = contract.NewRead(contract.ReadParams[[]common.Address, []TimestampedPackedUint224, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-token-prices",
+	Version:      Version,
+	Description:  "Calls getTokenPrices on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args []common.Address) ([]TimestampedPackedUint224, error) {
+		return c.GetTokenPrices(opts, args)
+	},
+})
+
+var GetDestinationChainGasPrice = contract.NewRead(contract.ReadParams[uint64, TimestampedPackedUint224, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-destination-chain-gas-price",
+	Version:      Version,
+	Description:  "Calls getDestinationChainGasPrice on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args uint64) (TimestampedPackedUint224, error) {
+		return c.GetDestinationChainGasPrice(opts, args)
 	},
 })
