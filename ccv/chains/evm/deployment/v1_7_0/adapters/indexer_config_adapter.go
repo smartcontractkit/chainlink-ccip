@@ -34,7 +34,11 @@ func (a *EVMIndexerConfigAdapter) ResolveVerifierAddresses(
 	)
 
 	if len(refs) == 0 {
-		return nil, fmt.Errorf("no %s verifier addresses found for chain %d with qualifier %q", kind, chainSelector, qualifier)
+		return nil, &ccvadapters.MissingIndexerVerifierAddressesError{
+			Kind:          kind,
+			ChainSelector: chainSelector,
+			Qualifier:     qualifier,
+		}
 	}
 
 	addresses := make([]string, 0, len(refs))

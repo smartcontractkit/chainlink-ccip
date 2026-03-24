@@ -35,6 +35,14 @@ type mockDeployAdapter struct {
 	errByChain    map[uint64]error
 }
 
+func (m *mockDeployAdapter) IsSupportedChain(_ deployment.Environment, _ uint64) bool {
+	return false
+}
+
+func (m *mockDeployAdapter) DeriveLaneVersionsForChain(_ deployment.Environment, _ uint64) (map[uint64]*semver.Version, []*semver.Version, error) {
+	return map[uint64]*semver.Version{}, []*semver.Version{}, nil
+}
+
 func (m *mockDeployAdapter) InitializeAdapter(_ deployment.Environment, _ uint64) error {
 	return nil
 }
@@ -285,41 +293,6 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 	}
 }
 
-func TestDeployChainContracts_With_MissingAdapterForConfigImport(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-	env := newDeployTestEnv(t, []uint64{sel1})
-
-	expectedAddr := datastore.AddressRef{
-		ChainSelector: sel1,
-		Type:          "TestContract",
-		Version:       semver.MustParse("2.0.0"),
-		Address:       "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-	}
-
-	mock := &mockDeployAdapter{
-		outputByChain: map[uint64]sequences.OnChainOutput{
-			sel1: {
-				Addresses: []datastore.AddressRef{expectedAddr},
-			},
-		},
-	}
-
-	registry := adapters.NewDeployChainContractsRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
-
-	cs := changesets.DeployChainContracts(registry)
-	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:       newDeployTestTopology(sel1),
-			ChainSelectors: []uint64{sel1},
-			DefaultCfg:     newDefaultPerChainCfg(),
-		},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no ConfigImporter adapter registered")
-}
-
 func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	env := newDeployTestEnv(t, []uint64{sel1})
@@ -334,7 +307,7 @@ func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
 	}
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &mockDeployAdapter{})
+	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, mock)
 
 	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{

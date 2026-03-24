@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/uuid"
@@ -19,14 +20,15 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	linkops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
+	wethops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	feequoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-
-	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 )
 
@@ -78,40 +80,70 @@ func (m *CCIP16EVM) ChainSelector() uint64 {
 	return m.chainDetails.ChainSelector
 }
 
-func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf_evm.Chain) error {
+// UpdateEVMFeeQuoterPrices applies devenv stub USD token prices and destination gas prices on the latest
+// FeeQuoter for src (see EVMAdapter.GetFQAddress — after a 1.6→2.0 upgrade this is FeeQuoter 2.0).
+// On FQ 2.0, fee tokens appear in getFeeTokens only after updatePrices; if the set is empty, LINK and WETH9
+// are taken from the datastore (same pair devenv deploys). Otherwise every on-chain fee token is updated.
+func UpdateEVMFeeQuoterPrices(ctx context.Context, ds datastore.DataStore, src uint64, destSelectors []uint64, srcChain cldf_evm.Chain) error {
 	a := &evmseqs.EVMAdapter{}
-	fqAddr, err := a.GetFQAddress(datastore, src)
+	fqAddr, err := a.GetFQAddress(ds, src)
 	if err != nil {
 		return fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
-	fq, err := fee_quoter.NewFeeQuoter(
+	fq, err := feequoter.NewFeeQuoter(
 		common.BytesToAddress(fqAddr),
 		srcChain.Client)
 	if err != nil {
 		return fmt.Errorf("failed to create fee quoter instance: %w", err)
 	}
-	feeTokens, err := fq.GetFeeTokens(nil)
+	feeTokens, err := fq.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
 	}
-	sender := srcChain.DeployerKey
-	tx, err := fq.UpdatePrices(sender, fee_quoter.InternalPriceUpdates{
-		TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
-			{
-				SourceToken: feeTokens[0],
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
-			},
-			{
-				SourceToken: feeTokens[1],
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
-			},
-		},
-		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
-			{
-				DestChainSelector: dest,
-				UsdPerUnitGas:     big.NewInt(20000e9),
-			},
-		},
+	if len(feeTokens) == 0 {
+		// FeeQuoter 2.0 only adds fee tokens when updatePrices runs (see FeeQuoter.sol). After a 1.6→2.0
+		// upgrade, getFeeTokens can be empty until the first price update; seed devenv LINK + WETH.
+		linkRefs := ds.Addresses().Filter(
+			datastore.AddressRefByChainSelector(src),
+			datastore.AddressRefByType(datastore.ContractType(linkops.ContractType)),
+			datastore.AddressRefByVersion(linkops.Version),
+		)
+		wethRefs := ds.Addresses().Filter(
+			datastore.AddressRefByChainSelector(src),
+			datastore.AddressRefByType(datastore.ContractType(wethops.ContractType)),
+			datastore.AddressRefByVersion(wethops.Version),
+		)
+		if len(linkRefs) != 1 || len(wethRefs) != 1 {
+			return fmt.Errorf("fee quoter has no fee tokens yet and datastore missing Link/WETH for chain %d (link=%d weth=%d)", src, len(linkRefs), len(wethRefs))
+		}
+		feeTokens = []common.Address{
+			common.HexToAddress(linkRefs[0].Address),
+			common.HexToAddress(wethRefs[0].Address),
+		}
+	}
+	usdPerToken := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000))
+	tokenUpdates := make([]feequoter.InternalTokenPriceUpdate, len(feeTokens))
+	for i, t := range feeTokens {
+		tokenUpdates[i] = feequoter.InternalTokenPriceUpdate{
+			SourceToken: t,
+			UsdPerToken: new(big.Int).Set(usdPerToken),
+		}
+	}
+	gasUpdates := make([]feequoter.InternalGasPriceUpdate, 0, len(destSelectors))
+	for _, dest := range destSelectors {
+		if dest == src {
+			continue
+		}
+		gasUpdates = append(gasUpdates, feequoter.InternalGasPriceUpdate{
+			DestChainSelector: dest,
+			UsdPerUnitGas:     big.NewInt(20000e9),
+		})
+	}
+	txOpts := *srcChain.DeployerKey
+	txOpts.Context = ctx
+	tx, err := fq.UpdatePrices(&txOpts, feequoter.InternalPriceUpdates{
+		TokenPriceUpdates: tokenUpdates,
+		GasPriceUpdates:   gasUpdates,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update prices: %w", err)

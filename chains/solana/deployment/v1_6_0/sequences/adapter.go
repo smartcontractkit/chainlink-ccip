@@ -113,6 +113,10 @@ func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChain
 			DestDataAvailabilityMultiplierBps: 1,
 			GasMultiplierWeiPerEth:            11e17,
 		},
+		V2Params: &laneapi.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
 	}
 }
 

@@ -40,11 +40,16 @@ type PartialChainConfig struct {
 	DefaultOutboundCCVs      []datastore.AddressRef
 	LaneMandatedOutboundCCVs []datastore.AddressRef
 	DefaultExecutor          datastore.AddressRef
-	FeeQuoterDestChainConfig lanes.FeeQuoterDestChainConfig
+	FeeQuoterDestChainConfigOverrides *lanes.FeeQuoterDestChainConfigOverride
 	ExecutorDestChainConfig  lanes.ExecutorDestChainConfig
 	AddressBytesLength       uint8
 	BaseExecutionGasCost     uint32
-	RemoteChains             map[uint64]lanes.ChainDefinition
+	RemoteChains             map[uint64]RemoteLaneConfig
+}
+
+type RemoteLaneConfig struct {
+	Chain      lanes.ChainDefinition
+	TestRouter bool
 }
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
@@ -120,7 +125,8 @@ func ConfigureChainsForLanesFromTopology(
 				})
 			}
 
-			for remoteChainSelector, remoteChainDef := range chain.RemoteChains {
+			for remoteChainSelector, remoteLaneConfig := range chain.RemoteChains {
+				remoteChainDef := remoteLaneConfig.Chain
 				remoteChainDef.Selector = remoteChainSelector
 				laneConfigs = append(laneConfigs, lanes.LaneConfig{
 					ChainA: lanes.ChainDefinition{
@@ -131,21 +137,27 @@ func ConfigureChainsForLanesFromTopology(
 						DefaultOutboundCCVs:      chain.DefaultOutboundCCVs,
 						LaneMandatedOutboundCCVs: chain.LaneMandatedOutboundCCVs,
 						DefaultExecutor:          chain.DefaultExecutor,
-						FeeQuoterDestChainConfig: chain.FeeQuoterDestChainConfig,
+						FeeQuoterDestChainConfigOverrides: chain.FeeQuoterDestChainConfigOverrides,
 						ExecutorDestChainConfig:  chain.ExecutorDestChainConfig,
 						AddressBytesLength:       chain.AddressBytesLength,
 						BaseExecutionGasCost:     chain.BaseExecutionGasCost,
 					},
-					ChainB:  remoteChainDef,
-					Version: semver.MustParse("2.0.0"),
+					ChainB:     remoteChainDef,
+					Version:    semver.MustParse("2.0.0"),
+					TestRouter: remoteLaneConfig.TestRouter,
 				})
 			}
 		}
 
-		return lanes.ConnectChains(laneAdapterRegistry, mcmsRegistry).Apply(e, lanes.ConnectChainsConfig{
+		connectChainsCS := lanes.ConnectChains(laneAdapterRegistry, mcmsRegistry)
+		connectChainsCfg := lanes.ConnectChainsConfig{
 			Lanes: laneConfigs,
 			MCMS:  cfg.MCMS,
-		})
+		}
+		if err := connectChainsCS.VerifyPreconditions(e, connectChainsCfg); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("connect chains precondition check failed: %w", err)
+		}
+		return connectChainsCS.Apply(e, connectChainsCfg)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)

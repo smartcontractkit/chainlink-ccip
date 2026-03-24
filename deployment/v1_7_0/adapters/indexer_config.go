@@ -16,6 +16,21 @@ const (
 	LombardVerifierKind   VerifierKind = "lombard"
 )
 
+type MissingIndexerVerifierAddressesError struct {
+	Kind          VerifierKind
+	ChainSelector uint64
+	Qualifier     string
+}
+
+func (e *MissingIndexerVerifierAddressesError) Error() string {
+	return fmt.Sprintf(
+		"no %s verifier addresses found for chain %d with qualifier %q",
+		e.Kind,
+		e.ChainSelector,
+		e.Qualifier,
+	)
+}
+
 type IndexerConfigAdapter interface {
 	ResolveVerifierAddresses(ds datastore.DataStore, chainSelector uint64, qualifier string, kind VerifierKind) ([]string, error)
 }
@@ -74,4 +89,10 @@ func (r *IndexerConfigRegistry) GetByChain(chainSelector uint64) (IndexerConfigA
 		return nil, fmt.Errorf("no indexer config adapter registered for chain family %q", family)
 	}
 	return adapter, nil
+}
+
+func (r *IndexerConfigRegistry) HasAdapters() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.adapters) > 0
 }

@@ -31,6 +31,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters" // register FeeQuoter 2.0 updater for UpdateFeeQuoterChangeset
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -44,6 +45,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
+	ccipevm "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
 
@@ -221,6 +223,71 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	return runningDS.Seal(), nil
 }
 
+// UpgradeEVMFeeQuotersTo2_0AfterLanes runs FeeQuoter 2.0 deployment + ramp repoint for each selector (1.6 MCMS path).
+// Must run after ConnectChains: UpdateFeeQuoterChangeset uses LaneVersionResolver, which reads onramp versions from the
+// router and requires lanes to already be configured.
+func UpgradeEVMFeeQuotersTo2_0AfterLanes(ctx context.Context, e *deployment.Environment, bcs []*blockchain.Input, evmSelectors []uint64, chainTypeBySelector map[uint64]string) error {
+	if len(evmSelectors) == 0 {
+		return nil
+	}
+	v16 := semver.MustParse("1.6.0")
+	chains := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain, len(evmSelectors))
+	for _, sel := range evmSelectors {
+		chains[sel] = deployops.UpdateFeeQuoterInputPerChain{
+			FeeQuoterVersion: semver.MustParse("2.0.0"),
+			RampsVersion:     v16,
+		}
+	}
+	e.OperationsBundle = operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	fqOut, err := deployops.UpdateFeeQuoterChangeset().Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: chains,
+		MCMS:   devenvScheduleMCMSInput("devenv: upgrade FeeQuoter to 2.0"),
+	})
+	if err != nil {
+		return fmt.Errorf("upgrading FeeQuoter to 2.0: %w", err)
+	}
+	if len(fqOut.MCMSTimelockProposals) > 0 {
+		for _, sel := range evmSelectors {
+			if chainTypeBySelector[sel] != blockchain.TypeAnvil {
+				return errors.New("FeeQuoter 2.0 upgrade produced timelock proposals; only Anvil EVM chains support automatic MCMS execution in devenv")
+			}
+		}
+		if err := blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, fqOut.MCMSTimelockProposals); err != nil {
+			return fmt.Errorf("executing MCMS timelock proposals for FeeQuoter upgrade: %w", err)
+		}
+	}
+	if err := fqOut.DataStore.Merge(e.DataStore); err != nil {
+		return fmt.Errorf("merging FeeQuoter upgrade datastore: %w", err)
+	}
+	e.DataStore = fqOut.DataStore.Seal()
+	// v1.6→2.0 import can omit token/gas price updates; republish devenv stub prices on the new FQ (same as ccip-evm helper).
+	for _, sel := range evmSelectors {
+		chain, ok := e.BlockChains.EVMChains()[sel]
+		if !ok {
+			return fmt.Errorf("evm chain %d not in environment", sel)
+		}
+		if err := ccipevm.UpdateEVMFeeQuoterPrices(ctx, e.DataStore, sel, evmSelectors, chain); err != nil {
+			return fmt.Errorf("update FeeQuoter prices on chain %d: %w", sel, err)
+		}
+	}
+	return nil
+}
+
+func devenvScheduleMCMSInput(description string) mcms.Input {
+	return mcms.Input{
+		OverridePreviousRoot: false,
+		ValidUntil:           math.MaxUint32,
+		TimelockDelay:        mcms_types.MustParseDuration("1s"),
+		TimelockAction:       mcms_types.TimelockActionSchedule,
+		Qualifier:            cciputils.CLLQualifier,
+		Description:          description,
+	}
+}
+
 func SingleGroupMCMS() mcmstypes.Config {
 	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
 	// Convert the public key to an Ethereum address
@@ -270,15 +337,9 @@ func getTokenPricesForChain(ds datastore.DataStore, selector uint64, version *se
 	return addressPrices
 }
 
-func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
+func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64, bcs []*blockchain.Input, chainBlockchainType string) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Connecting contracts with selectors")
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
 
 	mcmsRegistry := changesetscore.GetRegistry()
 	version := semver.MustParse("1.6.0")
@@ -287,18 +348,23 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 	chainATokenPrices := getTokenPricesForChain(e.DataStore, selector, version)
 
 	chainA := lanesapi.ChainDefinition{
-		Selector:                 selector,
-		TokenPrices:              chainATokenPrices,
+		Selector:    selector,
+		TokenPrices: chainATokenPrices,
 	}
 	for _, destSelector := range remoteSelectors {
+		e.OperationsBundle = operations.NewBundle(
+			func() context.Context { return context.Background() },
+			e.Logger,
+			operations.NewMemoryReporter(),
+		)
 		// Get token prices for the destination chain - uses the LaneAdapter for chain-specific logic
 		chainBTokenPrices := getTokenPricesForChain(e.DataStore, destSelector, version)
 
 		chainB := lanesapi.ChainDefinition{
-			Selector:                 destSelector,
-			TokenPrices:              chainBTokenPrices,
+			Selector:    destSelector,
+			TokenPrices: chainBTokenPrices,
 		}
-		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 			Lanes: []lanesapi.LaneConfig{
 				{
 					Version: version,
@@ -306,9 +372,24 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 					ChainB:  chainB,
 				},
 			},
+			MCMS: devenvScheduleMCMSInput("devenv: ConnectChains"),
 		})
 		if err != nil {
 			return fmt.Errorf("connecting chains %d and %d: %w", chainA.Selector, chainB.Selector, err)
+		}
+		if len(connectOut.MCMSTimelockProposals) > 0 {
+			if chainBlockchainType != blockchain.TypeAnvil {
+				return errors.New("timelock proposals from ConnectChains are only supported on Anvil chains in devenv")
+			}
+			if err := blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, connectOut.MCMSTimelockProposals); err != nil {
+				return fmt.Errorf("processing MCMS timelock proposals for ConnectChains %d <-> %d: %w", chainA.Selector, chainB.Selector, err)
+			}
+		}
+		if connectOut.DataStore != nil {
+			if err := connectOut.DataStore.Merge(e.DataStore); err != nil {
+				return fmt.Errorf("merging ConnectChains datastore for %d and %d: %w", chainA.Selector, chainB.Selector, err)
+			}
+			e.DataStore = connectOut.DataStore.Seal()
 		}
 	}
 
