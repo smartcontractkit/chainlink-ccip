@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {IExecutor} from "../../interfaces/IExecutor.sol";
 
 contract MockExecutor is IExecutor {
-  function getMinBlockConfirmations() external view virtual returns (uint16) {
-    return 0;
+  function getAllowedFinalityConfig() external view virtual returns (bytes2) {
+    return bytes2(0);
   }
 
   function getFee(

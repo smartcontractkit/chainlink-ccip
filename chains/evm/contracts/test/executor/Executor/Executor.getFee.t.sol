@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 contract Executor_getFee is ExecutorSetup {
@@ -14,17 +15,13 @@ contract Executor_getFee is ExecutorSetup {
     assertEq(DEFAULT_EXEC_FEE_USD_CENTS, fee);
   }
 
-  function test_getFee_RevertWhen_Executor__RequestedBlockDepthTooLow() public {
-    uint16 blockConfirmationsRequested = MIN_BLOCK_CONFIRMATIONS - 1;
+  function test_getFee_RevertWhen_InvalidRequestedFinality() public {
+    bytes2 requestedFinality = bytes2(uint16(MIN_FINALITY_CONFIG) - 1);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        Executor.Executor__RequestedBlockDepthTooLow.selector, blockConfirmationsRequested, MIN_BLOCK_CONFIRMATIONS
-      )
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, MIN_FINALITY_CONFIG)
     );
-    s_executor.getFee(
-      DEST_CHAIN_SELECTOR, bytes2(uint16(blockConfirmationsRequested)), new address[](1), "", s_sourceFeeToken
-    );
+    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedFinality, new address[](1), "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_InvalidDestChain() public {

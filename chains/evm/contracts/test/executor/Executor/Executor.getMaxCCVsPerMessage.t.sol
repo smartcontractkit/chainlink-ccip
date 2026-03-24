@@ -11,7 +11,7 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
 
     uint8 newMaxCCVs = INITIAL_MAX_CCVS + 5;
     Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
-      feeAggregator: FEE_AGGREGATOR, minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS, ccvAllowlistEnabled: false
+      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: MIN_FINALITY_CONFIG, ccvAllowlistEnabled: false
     });
     s_executor = new Executor(newMaxCCVs, dynamicConfig);
     maxCCVs = s_executor.getMaxCCVsPerMessage();
@@ -19,8 +19,9 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
   }
 
   function test_constructor_RevertWhen_InvalidMaxPossibleCCVsPerMsg() public {
-    Executor.DynamicConfig memory dynamicConfig =
-      Executor.DynamicConfig({feeAggregator: FEE_AGGREGATOR, minBlockConfirmations: 0, ccvAllowlistEnabled: false});
+    Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
+      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: bytes2(0), ccvAllowlistEnabled: false
+    });
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidMaxPossibleCCVsPerMsg.selector, 0));
     new Executor(0, dynamicConfig);
