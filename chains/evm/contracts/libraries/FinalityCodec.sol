@@ -4,6 +4,26 @@ pragma solidity ^0.8.4;
 /// @notice This library provides encoding and validation for finality parameters used in cross-chain transfers.
 /// @dev this codec supports all the bit flags, even though some might not be assigned any meaning yet. This is
 /// intentional to allow for future flexibility.
+///
+/// @dev Bit layout of the `bytes2` finality value (16 bits, MSB on the left):
+///
+///  Bit:  15   14   13   12   11   10 | 9    8    7    6    5    4    3    2    1    0
+///       +----+----+----+----+----+---+----+----+----+----+----+----+----+----+----+----+
+///       | R  | R  | R  | R  | R  | S |              block depth (10 bits)              |
+///       +----+----+----+----+----+---+----+----+----+----+----+----+----+----+----+----+
+///        \____________________  ____/  \________________________  _____________________/
+///                             \/                                \/
+///                        flags (6 bits)                  depth (10 bits)
+///                                                        max = 1023 (0x3FF)
+///
+///  S  (bit 10) = WAIT_FOR_SAFE_FLAG  — wait for the `safe` tag instead of a block count.
+///  R  (bits 11-15) = Reserved for future flags (currently unassigned; accepted on the wire).
+///                    Reserved bits may be assigned in the future, read the docs for the latest bit definitions.
+///
+///  Special values:
+///    0x0000  WAIT_FOR_FINALITY_FLAG  — wait for full finality (safest, default).
+///    0x0400  WAIT_FOR_SAFE_FLAG      — wait for the `safe` head (bit 10 set, no depth).
+///    0x0001..0x03FF                  — wait for N confirmation blocks (depth only, no flags).
 library FinalityCodec {
   error InvalidBlockDepth(uint16 requestedDepth, uint16 maxDepth);
   /// @notice Requested finality must be exactly one mode: any of the flag bits or a block depth with no upper flag bits.
