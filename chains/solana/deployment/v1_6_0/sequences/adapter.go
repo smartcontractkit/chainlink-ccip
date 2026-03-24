@@ -123,3 +123,7 @@ func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChain
 func (a *SolanaAdapter) GetDefaultGasPrice() *big.Int {
 	return big.NewInt(4e12)
 }
+
+func (a *SolanaAdapter) GetChainFamilySelector() [4]byte {
+	return common_utils.GetHexFromString(common_utils.SVMFamilySelector)
+}

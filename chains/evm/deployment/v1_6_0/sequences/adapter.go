@@ -236,6 +236,10 @@ func (a *EVMAdapter) GetDefaultGasPrice() *big.Int {
 	return big.NewInt(2e12)
 }
 
+func (a *EVMAdapter) GetChainFamilySelector() [4]byte {
+	return utils.GetHexFromString(utils.EVMFamilySelector)
+}
+
 // GetFQVersion implements the optional FeeQuoterVersionProvider interface so that
 // update_lanes can choose 1.6 vs 2.0 FeeQuoter operations based on the deployed contract version.
 func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64) (*semver.Version, error) {

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -52,8 +53,27 @@ const (
 	SuiFamilySelector   = "c4e05953"
 )
 
+// familySelectors is a concurrent-safe registry of chain family → 4-byte
+// on-chain selector. It is populated automatically when adapters that implement
+// ChainMetadataProvider are registered via LaneAdapterRegistry.RegisterLaneAdapter.
+var familySelectors sync.Map
+
+// RegisterChainFamilySelector records the 4-byte on-chain selector for a chain
+// family (e.g. "evm" → [0x28,0x12,0xd5,0x2c]). Adapters call this indirectly
+// through LaneAdapterRegistry.RegisterLaneAdapter.
+func RegisterChainFamilySelector(family string, selector [4]byte) {
+	familySelectors.Store(family, selector)
+}
+
+// GetSelectorHex returns the 4-byte on-chain family selector for a given chain
+// selector. It first checks the adapter-populated registry; if no adapter has
+// registered the family yet it falls back to the hardcoded constants.
 func GetSelectorHex(selector uint64) [4]byte {
 	destFamily, _ := chain_selectors.GetSelectorFamily(selector)
+
+	if val, ok := familySelectors.Load(destFamily); ok {
+		return val.([4]byte)
+	}
 
 	var hexStr string
 	switch destFamily {

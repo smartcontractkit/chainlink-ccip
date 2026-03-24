@@ -460,14 +460,12 @@ func setupEVM2EVMForConnectChains(t *testing.T, chains []uint64) (
 	}
 
 	chain1 = lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e17),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e17),
 	}
 	chain2 = lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.POLYGON_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.POLYGON_MAINNET.Selector),
+		Selector: chain_selectors.POLYGON_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 
 	laneRegistry := lanesapi.GetLaneAdapterRegistry()
