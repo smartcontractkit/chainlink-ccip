@@ -50,8 +50,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   /// @dev The maximum supply of the token, 0 if unlimited
   uint256 internal immutable i_maxSupply;
 
-  /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers,
-  /// and can only be transferred by the owner.
+  /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers.
   address internal s_ccipAdmin;
 
   constructor(
@@ -65,7 +64,6 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     // Mint the initial supply to the ccipAdmin, saving gas by not calling if the mint amount is zero.
     if (args.preMint != 0) {
       _mint(ccipAdmin, args.preMint);
-      _assertMaxSupply();
     }
 
     _setCCIPAdmin(ccipAdmin);

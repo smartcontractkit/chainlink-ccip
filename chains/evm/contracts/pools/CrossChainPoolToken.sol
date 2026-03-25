@@ -52,6 +52,8 @@ contract CrossChainPoolToken is TokenPool, BaseERC20 {
   /// @dev Overrides BaseERC20._update to allow this contract to receive its own tokens.
   /// The CCIP Router transfers tokens to the pool (which IS this contract) before
   /// lockOrBurn is called, so transfers to address(this) must be permitted.
+  /// @dev This function must reflect any changes made in BaseERC20._update, which it currently does by adding the
+  /// supply check.
   function _update(
     address from,
     address to,
