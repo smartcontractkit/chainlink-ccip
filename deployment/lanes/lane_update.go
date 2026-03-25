@@ -1,13 +1,10 @@
 package lanes
 
 import (
-	"encoding/binary"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
@@ -31,10 +28,11 @@ type ChainDefinition struct {
 	// This is provided by the user
 	// 1.6 only
 	RMNVerificationEnabled bool
-	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
+	// AllowListEnabled is true if we want an allowlist to restrict who on this chain can send outbound messages.
 	// This is provided by the user
 	AllowListEnabled bool
-	// AllowList is the list of addresses that are allowed to send messages TO this chain.
+	// AllowList is the list of addresses on this chain that are allowed to send outbound messages.
+	// Addresses must be in this chain's native format (e.g. hex for EVM, base58 for Solana).
 	// This is provided by the user
 	AllowList []string
 	// The CommitteeVerifiers on the chain being configured.
@@ -208,53 +206,5 @@ type UpdateLanesInput struct {
 }
 
 // FeeQuoterDestChainConfigOverride is a functional option that mutates a
-// FeeQuoterDestChainConfig in place. Pass one or more overrides to
-// DefaultFeeQuoterDestChainConfig to selectively change default values.
+// FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
 type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
-
-func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuoterDestChainConfig {
-	chainHex := utils.GetSelectorHex(selector)
-	params := FeeQuoterDestChainConfig{
-		IsEnabled:                   configEnabled,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DefaultTokenFeeUSDCents:     25,
-		DestGasPerPayloadByteBase:   16,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
-		V1Params: &FeeQuoterV1Params{
-			MaxNumberOfTokensPerMsg:           10,
-			DestGasPerPayloadByteHigh:         40,
-			DestGasPerPayloadByteThreshold:    3000,
-			DestDataAvailabilityOverheadGas:   100,
-			DestGasPerDataAvailabilityByte:    16,
-			DestDataAvailabilityMultiplierBps: 1,
-			GasMultiplierWeiPerEth:            11e17,
-		},
-		V2Params: &FeeQuoterV2Params{
-			LinkFeeMultiplierPercent: 90,
-			USDPerUnitGas:            big.NewInt(1e6),
-		},
-	}
-	family, _ := chain_selectors.GetSelectorFamily(selector)
-	switch family {
-	case chain_selectors.FamilyTon:
-		params.MaxPerMsgGasLimit = 4_200_000_000 // 4_200_000_000 nano TON = 4.2 TON
-	}
-	return params
-}
-
-func DefaultGasPrice(selector uint64) *big.Int {
-	family, _ := chain_selectors.GetSelectorFamily(selector)
-	switch family {
-	case chain_selectors.FamilyTon:
-		return big.NewInt(2.12e9) // 1 TON ~2.13 USD -> 1 nanoTON = 2.13e−9 USD -> 1 nanoTON expressed in 1e18 (1 USD) = 2.13e9
-	}
-	// Gas price in USD (18 decimals) per unit of gas
-	// 2e12 = $0.000002 per gas unit
-	// With ~500,000 gas, this results in ~$1 USD fee per message
-	return big.NewInt(2e12)
-}

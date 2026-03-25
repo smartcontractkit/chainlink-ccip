@@ -181,6 +181,10 @@ contracts:
         access: public
       - name: getTokenTransferFeeConfig
         access: public
+      - name: getTokenPrice
+        access: public
+      - name: getDestinationChainGasPrice
+        access: public
       - name: getStaticConfig
         access: public
       - name: getAllAuthorizedCallers
@@ -191,6 +195,10 @@ contracts:
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: getAllowedSendersList
+        access: public
       - name: getDestChainConfig
         access: public
       - name: getStaticConfig

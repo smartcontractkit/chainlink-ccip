@@ -33,6 +33,9 @@ import (
 )
 
 func TestUpdateToFeeQuoter_2_0(t *testing.T) {
+	// Cannot use t.Parallel(): the ConfigImportAdapter singleton in the
+	// FQAndRampUpdaterRegistry is mutated by InitializeAdapter, so concurrent
+	// FQ-upgrade tests sharing ETHEREUM_MAINNET race on its address fields.
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,
