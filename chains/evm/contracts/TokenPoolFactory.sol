@@ -125,6 +125,9 @@ contract TokenPoolFactory is ITypeAndVersion {
   ///   Only the CrossChainToken contract is supported with the following required constructor args
   ///   - ConstructorParams.ccipAdmin must be set to this TokenPoolFactory.
   ///   - burnMintRoleAdmin must be set to this TokenPoolFactory if localPoolType is BURN_MINT.
+  /// The factory will register the token in the token admin registry, after which the role effectively is spent. The
+  /// factory retaining this role is therefore completely safe, as long as it transferred the token admin registry
+  /// permissions.
   /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended.
   /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address.
