@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -204,8 +205,8 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			}
 			var result sequences.OnChainOutput
 			result, err = sequences.RunAndMergeSequence(b, chains,
-				seq1_5.PriceRegistryImportConfigSequence,
-				seq1_5.PriceRegistryImportConfigSequenceInput{
+				sequences1_2.PriceRegistryImportConfigSequence,
+				sequences1_2.PriceRegistryImportConfigSequenceInput{
 					ChainSelector:   chainSelector,
 					PriceRegistry:   ci.PriceRegistry,
 					SupportedTokens: maps.Keys(allTokens),

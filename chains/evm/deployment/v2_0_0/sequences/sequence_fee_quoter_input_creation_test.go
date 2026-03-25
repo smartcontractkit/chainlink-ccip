@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	sequences2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	onrampv1_5ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	onrampv1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
@@ -423,7 +424,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 	{
 		Address:       "0xC101C101C101C101C101C101C101C101C101C101",
 		ChainSelector: 5009297550715157269,
-		Metadata: seq1_5.PriceRegistryImportConfigSequenceOutput{
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
 			GasPrices: map[uint64]*big.Int{
 				15971525489660198786: new(big.Int).Set(testImportGasPriceWei),
 			},
@@ -435,7 +436,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 	{
 		Address:       "0xC102C102C102C102C102C102C102C102C102C102",
 		ChainSelector: 4949039107694359620,
-		Metadata: seq1_5.PriceRegistryImportConfigSequenceOutput{
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
 			GasPrices: map[uint64]*big.Int{
 				5009297550715157269:  new(big.Int).Set(testImportGasPriceWei),
 				15971525489660198786: new(big.Int).Set(testImportGasPriceWei),
@@ -448,7 +449,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 	{
 		Address:       "0xC103C103C103C103C103C103C103C103C103C103",
 		ChainSelector: 15971525489660198786,
-		Metadata: seq1_5.PriceRegistryImportConfigSequenceOutput{
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
 			GasPrices: map[uint64]*big.Int{
 				5009297550715157269: new(big.Int).Set(testImportGasPriceWei),
 			},
@@ -460,7 +461,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 	{
 		Address:       "0xC104C104C104C104C104C104C104C104C104C104",
 		ChainSelector: 5936861837188149645,
-		Metadata: seq1_5.PriceRegistryImportConfigSequenceOutput{
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
 			GasPrices: map[uint64]*big.Int{
 				5009297550715157269:  new(big.Int).Set(testImportGasPriceWei),
 				4949039107694359620:  new(big.Int).Set(testImportGasPriceWei),

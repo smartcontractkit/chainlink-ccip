@@ -21,6 +21,7 @@ import (
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -480,7 +481,7 @@ var (
 					providedRemoteChains[remoteChain] = struct{}{}
 				}
 			}
-			priceRegConfig, err := datastore_utils.ConvertMetadataToType[seq1_5.PriceRegistryImportConfigSequenceOutput](priceRegMetadata[0].Metadata)
+			priceRegConfig, err := datastore_utils.ConvertMetadataToType[sequences1_2.PriceRegistryImportConfigSequenceOutput](priceRegMetadata[0].Metadata)
 			if err != nil {
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 					"PriceRegistryImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
