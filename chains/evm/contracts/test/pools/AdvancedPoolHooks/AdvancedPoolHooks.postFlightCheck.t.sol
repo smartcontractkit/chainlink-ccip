@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngine.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
@@ -37,7 +38,7 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
     uint256 localAmount = 100e18;
-    bytes2 finalityConfig = bytes2(uint16(5));
+    bytes2 finalityConfig = FinalityCodec._encodeBlockDepth(5);
     releaseOrMintIn.sourcePoolData = abi.encode("custom source pool data");
     releaseOrMintIn.offchainTokenData = abi.encode("custom offchain token data");
 
@@ -55,7 +56,7 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, bytes2(uint16(5)));
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, FinalityCodec._encodeBlockDepth(5));
   }
 
   function test_postflightCheck_RevertWhen_PolicyEngineRejects() public {
@@ -66,13 +67,13 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
     vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, expectedRevertReason));
-    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, bytes2(uint16(5)));
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, FinalityCodec._encodeBlockDepth(5));
   }
 
   function test_postflightCheck_OnlyAuthorizedCallersCanInvoke() public {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, bytes2(uint16(5)));
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, FinalityCodec._encodeBlockDepth(5));
   }
 
   function test_postflightCheck_RevertWhen_UnauthorizedCaller() public {
@@ -82,6 +83,6 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
 
     vm.prank(s_unauthorizedCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
-    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, bytes2(uint16(5)));
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, FinalityCodec._encodeBlockDepth(5));
   }
 }

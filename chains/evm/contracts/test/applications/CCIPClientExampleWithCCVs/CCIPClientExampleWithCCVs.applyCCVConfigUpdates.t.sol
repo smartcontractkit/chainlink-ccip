@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -49,7 +50,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
-    assertEq(allowedFinalityConfig, bytes2(uint16(1)));
+    assertEq(allowedFinalityConfig, FinalityCodec._encodeBlockDepthAndSafeFlag(1));
     for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertEq(retRequiredCCVs[i], requiredCCVs[i]);
     }
@@ -198,6 +199,6 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    assertEq(allowedFinalityConfig, bytes2(uint16(1)));
+    assertEq(allowedFinalityConfig, FinalityCodec._encodeBlockDepthAndSafeFlag(1));
   }
 }

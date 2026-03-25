@@ -14,8 +14,8 @@ contract FinalityCodec__validateRequestedFinality is FinalityCodecSetup {
   }
 
   function test__validateRequestedFinality_PureBlockDepth_Boundaries() public view {
-    s_helper.validateRequestedFinality(bytes2(uint16(1)));
-    s_helper.validateRequestedFinality(bytes2(uint16(10)));
+    s_helper.validateRequestedFinality(FinalityCodec._encodeBlockDepth(1));
+    s_helper.validateRequestedFinality(FinalityCodec._encodeBlockDepth(10));
     s_helper.validateRequestedFinality(bytes2(FinalityCodec.MAX_BLOCK_DEPTH));
   }
 

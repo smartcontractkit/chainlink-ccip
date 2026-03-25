@@ -33,7 +33,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
-    bytes2 minFinality = bytes2(uint16(5));
+    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
@@ -51,9 +51,9 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.expectEmit();
     emit TokenPool.FastFinalityOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
-    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, bytes2(uint16(type(uint16).max)));
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, minFinality);
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(uint16(type(uint16).max)), "", fee);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, minFinality, "", fee);
 
     (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
@@ -73,7 +73,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
     // Enable fast finality handling so consumption emits.
-    s_tokenPool.setFinalityConfig(bytes2(uint16(1)));
+    s_tokenPool.setFinalityConfig(FinalityCodec._encodeBlockDepth(1));
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -93,14 +93,15 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.stopPrank();
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1_000e18);
-    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, bytes2(uint16(type(uint16).max)));
+    bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(1);
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, requestedFinality);
     uint256 expectedAmount = lockOrBurnIn.amount - fee;
 
     vm.expectEmit();
     emit TokenPool.FastFinalityOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), expectedAmount);
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(uint16(type(uint16).max)), "", fee);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, requestedFinality, "", fee);
 
     (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - expectedAmount);
@@ -143,20 +144,21 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   /// @notice When fast finality is requested but no custom outbound bucket is configured,
   /// the fallback consumes from the default outbound bucket.
   function test_validateLockOrBurn_WithFastFinality_FallsBackToDefaultBucket() public {
-    s_tokenPool.setFinalityConfig(bytes2(uint16(1)));
+    bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(1);
+    s_tokenPool.setFinalityConfig(requestedFinality);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
-    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, bytes2(uint16(type(uint16).max)));
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, requestedFinality);
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(uint16(type(uint16).max)), "", fee);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, requestedFinality, "", fee);
   }
 
   function test_validateLockOrBurn_RevertWhen_RequestedDepthBelowMinimum() public {
-    bytes2 minFinality = bytes2(uint16(5));
+    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
     s_tokenPool.setFinalityConfig(minFinality);
     vm.startPrank(s_allowedOnRamp);
 
@@ -174,9 +176,11 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(
-      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(uint16(1)), bytes2(0))
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec._encodeBlockDepth(1), bytes2(0)
+      )
     );
-    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1e18), bytes2(uint16(1)), "", 0);
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1e18), FinalityCodec._encodeBlockDepth(1), "", 0);
   }
 
   function _buildLockOrBurnIn(

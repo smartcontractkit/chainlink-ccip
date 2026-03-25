@@ -3,6 +3,7 @@ pragma solidity ^0.8.4;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
+import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {CCIPClientExample} from "./CCIPClientExample.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -124,10 +125,11 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
-    // If allowFasterThanFinality is true, allowedFinalityConfig = bytes2(uint16(1)) (allow any FTF level) - WARNING only use a finality of 1 when
-    // you use a trusted sender on the source chain that manages the finality risk when sending messages.
-    // If allowFasterThanFinality is false, allowedFinalityConfig = bytes2(0) (require finality).
-    allowedFinalityConfig = config.allowFasterThanFinality ? bytes2(uint16(1)) : bytes2(0);
+    // If allowFasterThanFinality is true, encode depth=1 plus the WAIT_FOR_SAFE flag so that the allowed config
+    // accepts both block-depth-based FTF (any depth >= 1) and safe-head-based FTF. WARNING: only enable this when
+    // using a trusted sender on the source chain that manages re-org risk when sending FTF messages.
+    // If allowFasterThanFinality is false, allowedFinalityConfig = bytes2(0) (require full finality).
+    allowedFinalityConfig = config.allowFasterThanFinality ? FinalityCodec._encodeBlockDepthAndSafeFlag(1) : bytes2(0);
     return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, allowedFinalityConfig);
   }
 }

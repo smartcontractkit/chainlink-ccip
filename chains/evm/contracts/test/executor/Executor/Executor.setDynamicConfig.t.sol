@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -9,7 +10,7 @@ contract Executor_setDynamicConfig is ExecutorSetup {
   function test_setDynamicConfig() public {
     Executor.DynamicConfig memory newConfig = Executor.DynamicConfig({
       feeAggregator: makeAddr("newFeeAggregator"),
-      allowedFinalityConfig: bytes2(uint16(123)),
+      allowedFinalityConfig: FinalityCodec._encodeBlockDepth(123),
       ccvAllowlistEnabled: false
     });
 

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -9,7 +10,7 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 
 contract TokenPool_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
-    bytes2 minFinality = bytes2(uint16(5));
+    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
     uint16 finalityTransferFeeBps = 100;
     uint16 fastFinalityTransferFeeBps = 500;
     uint256 amount = 1_000e18;

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Client} from "../../../libraries/Client.sol";
@@ -59,7 +60,10 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   function test_releaseOrMintSingleToken_CallsV2Function() public {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
-    bytes2 finality = bytes2(uint16(2));
+    bytes2 finality = FinalityCodec._encodeBlockDepth(2);
+
+    // Allow depth-2 FTF on the pool so the inbound finality check inside releaseOrMint passes.
+    s_pool.setFinalityConfig(finality);
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV2.releaseOrMint, (expectedInput, finality)));
 
@@ -95,14 +99,15 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
-    bytes memory callData = abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, bytes2(uint16(2)));
+    bytes memory callData =
+      abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, FinalityCodec._encodeBlockDepth(2));
     vm.expectCall(address(s_pool), callData);
     bytes memory poolRevertData = abi.encode("pool-error");
     vm.mockCallRevert(address(s_pool), callData, poolRevertData);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
     s_offRamp.releaseOrMintSingleToken(
-      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, bytes2(uint16(2))
+      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, FinalityCodec._encodeBlockDepth(2)
     );
   }
 

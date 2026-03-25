@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {CommitteeVerifier} from "../../../ccvs/CommitteeVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "../../../ccvs/components/SignatureQuorumValidator.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
@@ -65,7 +66,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
-      finality: bytes2(uint16(100)),
+      finality: FinalityCodec._encodeBlockDepth(100),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),

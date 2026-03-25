@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -26,19 +28,25 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
   /// @notice When fast finality is requested but no custom bucket is configured,
   /// the fallback consumes from the default inbound bucket.
   function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
+    // Allow depth-2 FTF on this pool so the inbound finality check passes.
+    s_tokenPool.setFinalityConfig(FinalityCodec._encodeBlockDepth(2));
+
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(uint16(2)));
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec._encodeBlockDepth(2));
 
     assertEq(localAmount, AMOUNT);
   }
 
   /// @notice When a custom inbound bucket IS configured, the custom event is emitted instead.
   function test_validateReleaseOrMint_NonZeroFinality_UsesCustomBucketWhenConfigured() public {
+    // Allow depth-2 FTF on this pool so the inbound finality check passes.
+    s_tokenPool.setFinalityConfig(FinalityCodec._encodeBlockDepth(2));
+
     RateLimiter.Config memory customInbound = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
@@ -55,7 +63,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     emit TokenPool.FastFinalityInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, bytes2(uint16(2)));
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec._encodeBlockDepth(2));
 
     assertEq(localAmount, AMOUNT);
   }

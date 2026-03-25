@@ -6,6 +6,7 @@ import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Router} from "../../../../Router.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
@@ -269,7 +270,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, bytes2(uint16(1)), tokenArgs),
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, FinalityCodec._encodeBlockDepth(1), tokenArgs),
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}), amount)
     );
 

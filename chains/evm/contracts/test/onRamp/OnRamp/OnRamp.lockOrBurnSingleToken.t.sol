@@ -5,6 +5,7 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -70,7 +71,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = bytes2(uint16(5));
+    bytes2 finality = FinalityCodec._encodeBlockDepth(5);
     bytes memory tokenArgs = abi.encode("tokenArgs");
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
@@ -143,7 +144,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = bytes2(uint16(5));
+    bytes2 finality = FinalityCodec._encodeBlockDepth(5);
     bytes memory tokenArgs = "";
 
     vm.expectRevert(OnRamp.FTFNotSupportedOnPoolV1.selector);
