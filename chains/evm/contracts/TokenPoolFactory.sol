@@ -413,7 +413,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @notice Sets the token pool address in the token admin registry for a newly deployed token pool.
   /// @dev this function should only be called when the token is deployed by this contract as well, otherwise
   /// the token pool will not be able to be set in the token admin registry, and this function will revert.
-  /// @param token The address of the token to set the pool for.`
+  /// @param token The address of the token to set the pool for.
   /// @param pool The address of the pool to set in the token admin registry.
   function _setTokenPoolInTokenAdminRegistry(
     address token,
