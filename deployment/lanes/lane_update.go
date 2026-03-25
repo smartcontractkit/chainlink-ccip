@@ -28,10 +28,11 @@ type ChainDefinition struct {
 	// This is provided by the user
 	// 1.6 only
 	RMNVerificationEnabled bool
-	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
+	// AllowListEnabled is true if we want an allowlist to restrict who on this chain can send outbound messages.
 	// This is provided by the user
 	AllowListEnabled bool
-	// AllowList is the list of addresses that are allowed to send messages TO this chain.
+	// AllowList is the list of addresses on this chain that are allowed to send outbound messages.
+	// Addresses must be in this chain's native format (e.g. hex for EVM, base58 for Solana).
 	// This is provided by the user
 	AllowList []string
 	// The CommitteeVerifiers on the chain being configured.
