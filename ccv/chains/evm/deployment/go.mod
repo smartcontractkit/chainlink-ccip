@@ -20,14 +20,13 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260319162701-d96a00a71caf
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260320173405-6792325c5a25
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260325195645-a44d381f3a0f
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/mcms v0.36.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 )
 
 require (
@@ -290,6 +289,7 @@ require (
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect

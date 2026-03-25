@@ -137,38 +137,44 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				},
 			}
 			if !cfg.Cfg.IgnoreImportedConfigFromPreviousVersion {
-				// so far we do not need any config from 1.5.0 , so only importing config from 1.6.0
-				// if in the future we need to import some config from 1.5.0,
-				// we should leverage lane version resolver to get the right adapter to import config
-				version := semver.MustParse("1.6.0")
-				configImporter, ok := registry.GetConfigImporter(sel, version)
-				if !ok {
-					return deployment.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", sel, version)
-				}
-				populateCfgOutput, err := deploy.PopulateMetaDataFromConfigImporter(e, configImporter, sel)
+				importNeeded, err := shouldImportConfigFromPreviousVersion(e, registry, sel)
 				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate metadata from config importer for chain %d: %w", sel, err)
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to check if config import from previous version is needed for chain %d: %w", sel, err)
 				}
-				// if the importer found config from previous version,
-				// import it and merge it with the input config, giving precedence to the imported config
-				if len(populateCfgOutput.Metadata.Contracts) > 0 {
-					importReport, err := operations.ExecuteSequence(
-						e.OperationsBundle,
-						adapter.SetContractParamsFromImportedConfig(),
-						e.BlockChains, adapters.DeployChainConfigCreatorInput{
-							ChainSelector:      sel,
-							ContractMeta:       populateCfgOutput.Metadata.Contracts,
-							ExistingAddresses:  existingAddresses,
-							UserProvidedConfig: input.ContractParams,
-						})
-					if err != nil {
-						return deployment.ChangesetOutput{Reports: allReports},
-							fmt.Errorf("failed to execute config importer sequence for chain %d: %w", sel, err)
+				if importNeeded {
+					// so far we do not need any config from 1.5.0 , so only importing config from 1.6.0
+					// if in the future we need to import some config from 1.5.0,
+					// we should leverage lane version resolver to get the right adapter to import config
+					version := semver.MustParse("1.6.0")
+					configImporter, ok := registry.GetConfigImporter(sel, version)
+					if !ok {
+						return deployment.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", sel, version)
 					}
-					allReports = append(allReports, importReport.ExecutionReports...)
-					input.ContractParams, err = input.ContractParams.MergeWithOverrideIfNotEmpty(importReport.Output)
+					populateCfgOutput, err := deploy.PopulateMetaDataFromConfigImporter(e, configImporter, sel)
 					if err != nil {
-						return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge imported config with input config for chain %d: %w", sel, err)
+						return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate metadata from config importer for chain %d: %w", sel, err)
+					}
+					// if the importer found config from previous version,
+					// import it and merge it with the input config, giving precedence to the imported config
+					if len(populateCfgOutput.Metadata.Contracts) > 0 {
+						importReport, err := operations.ExecuteSequence(
+							e.OperationsBundle,
+							adapter.SetContractParamsFromImportedConfig(),
+							e.BlockChains, adapters.DeployChainConfigCreatorInput{
+								ChainSelector:      sel,
+								ContractMeta:       populateCfgOutput.Metadata.Contracts,
+								ExistingAddresses:  existingAddresses,
+								UserProvidedConfig: input.ContractParams,
+							})
+						if err != nil {
+							return deployment.ChangesetOutput{Reports: allReports},
+								fmt.Errorf("failed to execute config importer sequence for chain %d: %w", sel, err)
+						}
+						allReports = append(allReports, importReport.ExecutionReports...)
+						input.ContractParams, err = input.ContractParams.MergeWithOverrideIfNotEmpty(importReport.Output)
+						if err != nil {
+							return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge imported config with input config for chain %d: %w", sel, err)
+						}
 					}
 				}
 			}
@@ -262,4 +268,27 @@ func BuildCommitteeVerifierParams(
 	}
 
 	return params, nil
+}
+
+// shouldImportConfigFromPreviousVersion checks if any of the lanes connected to the given chain selector are using version 1.6.0,
+// if so, it returns true, indicating that we should import config from previous version, otherwise it returns false
+func shouldImportConfigFromPreviousVersion(e deployment.Environment, registry *adapters.DeployChainContractsRegistry, sel uint64) (bool, error) {
+	res, exists := registry.GetLaneVersionResolver(sel)
+	if !exists {
+		return false, fmt.Errorf("no lane version resolver registered for chain %d", sel)
+	}
+	if !res.IsSupportedChain(e, sel) {
+		return false, nil
+	}
+	_, versions, err := res.DeriveLaneVersionsForChain(e, sel)
+	if err != nil {
+		return false, fmt.Errorf("failed to derive lane versions for chain %d: %w", sel, err)
+	}
+	reqVersion := semver.MustParse("1.6.0")
+	for _, v := range versions {
+		if v.Equal(reqVersion) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

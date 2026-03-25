@@ -32,8 +32,14 @@ type UpdateFeeQuoterInput struct {
 
 type UpdateFeeQuoterInputPerChain struct {
 	FeeQuoterVersion *semver.Version
-	FeeQuoterConfig  *AdditionalFeeQuoterConfig
-	RampsVersion     *semver.Version
+	// DoNotDeployFQOrUpdateFQConfig is used to skip the step of populating config for the FeeQuoter when updating,
+	// which would be used in a scenario where the existing config is expected to be correct and compatible
+	//with the new version of the FeeQuoter, so we can save time by not re-populating it.
+	//This would be relevant for an upgrade to a version of the FeeQuoter that supports config re-configuration, i.e. >= 2.0.0.
+	// This might be needed when this changeset is used only to update Ramps to point to an existing FeeQuoter without changing  any configuration of the FeeQuoter contract itself
+	DoNotDeployFQOrUpdateFQConfig bool
+	FeeQuoterConfig               *AdditionalFeeQuoterConfig
+	RampsVersion                  *semver.Version
 	// RemoteChainSelectors is used to determine which remote chains to pull config for when populating config for the FeeQuoter
 	// if RemoteChainSelectors is empty, it will pull all remote chain configs using 1.5.0 and 1.6.0 config importer
 	RemoteChainSelectors []uint64
@@ -219,6 +225,11 @@ func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error 
 				Version:       perChainInput.FeeQuoterVersion,
 			}, chainSel, datastore_utils.FullRef)
 			if err != nil {
+				// If DoNotDeployFQOrUpdateFQConfig is true, we expect a feeQuoter to be present
+				if perChainInput.DoNotDeployFQOrUpdateFQConfig {
+					return fmt.Errorf("fee quoter address not found for chain selector %d and "+
+						"version %s: %w", chainSel, perChainInput.FeeQuoterVersion.String(), err)
+				}
 				// errors are alright if we don't expect to find the ref
 				// but we only support deploying/updating fee quoters with versions >= 2.0.0
 				supportedVersion := semver.MustParse("2.0.0")
@@ -252,8 +263,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					feeQuoterAddrRef.Address, chainSel, perChainInput.FeeQuoterVersion.String())
 			}
 			isNewFeeQuoterDeployment := len(feeQuoterAddrRefs) == 0
-			if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) {
-				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
+			if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) && !perChainInput.DoNotDeployFQOrUpdateFQConfig {
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
 					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("FeeQuoterUpdater", chainSel, perChainInput.FeeQuoterVersion)

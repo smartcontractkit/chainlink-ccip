@@ -191,8 +191,8 @@ type ChainDefinition struct {
     TokenPrices                map[string]*big.Int          // Token USD prices (18 decimals)
     FeeQuoterDestChainConfig   FeeQuoterDestChainConfig     // Fee config when this chain is a destination
     RMNVerificationEnabled     bool                         // RMN blessing for messages FROM this chain
-    AllowListEnabled           bool                         // Allowlist for messages TO this chain
-    AllowList                  []string                     // Allowed sender addresses
+    AllowListEnabled           bool                         // Restrict who on this chain can send outbound messages
+    AllowList                  []string                     // Addresses on this chain allowed to send outbound messages
 
     // Populated programmatically (do not set)
     OnRamp    []byte  // OnRamp contract address

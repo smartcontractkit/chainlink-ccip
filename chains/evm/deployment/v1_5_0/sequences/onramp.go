@@ -152,7 +152,7 @@ var (
 							}
 							ttfcMu.Lock()
 							tokenTransferFeeConfig[token] = ttfcOut.Output
-							defer ttfcMu.Unlock()
+							ttfcMu.Unlock()
 							return nil
 						})
 					}
@@ -171,7 +171,7 @@ var (
 							FeeTokenConfig:         feeTokenConfig,
 						},
 					})
-					defer contractMetaMu.Unlock()
+					contractMetaMu.Unlock()
 					return nil
 				})
 			}

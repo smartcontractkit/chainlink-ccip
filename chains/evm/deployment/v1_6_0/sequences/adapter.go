@@ -26,7 +26,6 @@ import (
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
@@ -203,15 +202,17 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64,
 	return feeQRef, nil
 }
 
+// evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
+var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
 func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
-	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
 	return ccipapi.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
 		DestGasOverhead:             300_000,
 		DestGasPerPayloadByteBase:   16,
-		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		ChainFamilySelector:         binary.BigEndian.Uint32(evmFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
 		DefaultTxGasLimit:           200_000,
@@ -225,9 +226,35 @@ func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainCon
 			DestDataAvailabilityMultiplierBps: 1,
 			GasMultiplierWeiPerEth:            11e17,
 		},
+		V2Params: &ccipapi.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
 	}
 }
 
 func (a *EVMAdapter) GetDefaultGasPrice() *big.Int {
 	return big.NewInt(2e12)
+}
+
+func (a *EVMAdapter) GetChainFamilySelector() [4]byte {
+	return evmFamilySelector
+}
+
+// GetFQVersion implements the optional FeeQuoterVersionProvider interface so that
+// update_lanes can choose 1.6 vs 2.0 FeeQuoter operations based on the deployed contract version.
+func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64) (*semver.Version, error) {
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
+		datastore.AddressRefByChainSelector(chainSelector),
+	)
+	ref, err := GetFeeQuoterAddress(refs, chainSelector, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Sanity check that the AddressRef we found matches the one we expect.
+	if ref.Address != common.BytesToAddress(address).Hex() {
+		return nil, fmt.Errorf("fee quoter address mismatch for chain selector %d: expected %s, got %s", chainSelector, common.BytesToAddress(address).Hex(), ref.Address)
+	}
+	return ref.Version, nil
 }

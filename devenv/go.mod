@@ -22,7 +22,7 @@ replace (
 require (
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260318142809-6d01aa31fbff
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20260318142809-6d01aa31fbff
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260320214544-301aa035f327
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260325195645-a44d381f3a0f
 )
 
 require (
