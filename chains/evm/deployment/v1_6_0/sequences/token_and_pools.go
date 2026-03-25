@@ -3,7 +3,6 @@ package sequences
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -408,13 +407,6 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, input tokensapi
 	// ensuring that decimals is not more than 18
 	if input.Decimals > 18 {
 		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
-	}
-	// ensuring that supply and pre-mint are not negative
-	if input.Supply != nil && input.Supply.Cmp(big.NewInt(0)) < 0 {
-		return fmt.Errorf("token supply cannot be negative, got %v", *input.Supply)
-	}
-	if input.PreMint != nil && input.PreMint.Cmp(big.NewInt(0)) < 0 {
-		return fmt.Errorf("token pre-mint cannot be negative, got %v", *input.PreMint)
 	}
 
 	return nil

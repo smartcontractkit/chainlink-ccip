@@ -34,14 +34,17 @@ func TestEVMTokenDeployments(t *testing.T) {
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 	}
 
+	maxSupply := uint64(1_000_000_000) // 1 billion tokens
+	preMint := uint64(1_000_000)       // 1 million tokens
+
 	testCases := []struct {
 		name           string
 		tokenType      cldf.ContractType
 		tokenName      string
 		tokenSymbol    string
 		decimals       uint8
-		supply         *big.Int
-		preMint        *big.Int
+		supply         *uint64
+		preMint        *uint64
 		ccipAdmin      string   // Address to set as CCIP admin
 		externalAdmins []string // Addresses to grant admin role
 		requiresOwner  bool
@@ -59,10 +62,10 @@ func TestEVMTokenDeployments(t *testing.T) {
 			tokenType:      burn_mint_erc20.ContractType,
 			tokenName:      "Test BurnMint ERC20",
 			tokenSymbol:    "TBMERC20",
-			decimals:       8,
+			decimals:       18,
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
-			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)), // 1 billion tokens
-			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)), // 1 million tokens
+			supply:         &maxSupply,
+			preMint:        &preMint,
 			requiresSupply: true,
 		},
 		{
@@ -70,10 +73,10 @@ func TestEVMTokenDeployments(t *testing.T) {
 			tokenType:      burn_mint_erc20_with_drip.ContractType,
 			tokenName:      "Test BurnMint ERC20 With Drip",
 			tokenSymbol:    "TBMDRIP",
-			decimals:       8,
+			decimals:       18,
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
-			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
-			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)),
+			supply:         &maxSupply,
+			preMint:        &preMint,
 			requiresSupply: true,
 		},
 	}
@@ -166,16 +169,18 @@ func TestEVMTokenDeployments(t *testing.T) {
 						t.Logf("  On-chain decimals: %d", onChainDecimals)
 
 						// Verify max supply
+						expectedMaxSupply := new(big.Int).Mul(new(big.Int).SetUint64(*tc.supply), new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(tc.decimals)), nil))
 						onChainMaxSupply, err := tokenContract.MaxSupply(&bind.CallOpts{})
 						require.NoError(t, err, "Failed to get token max supply from chain")
-						require.Equal(t, tc.supply.String(), onChainMaxSupply.String(), "Token max supply mismatch for %s", tc.name)
+						require.Equal(t, expectedMaxSupply.String(), onChainMaxSupply.String(), "Token max supply mismatch for %s", tc.name)
 						t.Logf("  On-chain maxSupply: %s", onChainMaxSupply.String())
 
 						// Verify total supply (should match preMint if set)
+						expectedPreMint := new(big.Int).Mul(new(big.Int).SetUint64(*tc.preMint), new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(tc.decimals)), nil))
 						onChainTotalSupply, err := tokenContract.TotalSupply(&bind.CallOpts{})
 						require.NoError(t, err, "Failed to get token total supply from chain")
 						if tc.preMint != nil {
-							require.Equal(t, tc.preMint.String(), onChainTotalSupply.String(), "Token total supply mismatch for %s", tc.name)
+							require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String(), "Token total supply mismatch for %s", tc.name)
 							t.Logf("  On-chain totalSupply: %s (matches preMint)", onChainTotalSupply.String())
 						} else {
 							t.Logf("  On-chain totalSupply: %s", onChainTotalSupply.String())

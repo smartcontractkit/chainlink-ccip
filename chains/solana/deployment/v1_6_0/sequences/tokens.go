@@ -3,6 +3,7 @@ package sequences
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -467,7 +468,13 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				}
 				var premint uint64 = 0
 				if input.PreMint != nil {
-					premint = input.PreMint.Uint64()
+					scaler := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(input.Decimals)), nil)
+					result := new(big.Int).Mul(new(big.Int).SetUint64(*input.PreMint), scaler)
+					if !result.IsUint64() {
+						return sequences.OnChainOutput{}, fmt.Errorf("pre-mint amount is too large after scaling by decimals: %s", result.String())
+					}
+
+					premint = result.Uint64()
 				}
 				deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
 					ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
@@ -718,4 +725,3 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokenapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
-

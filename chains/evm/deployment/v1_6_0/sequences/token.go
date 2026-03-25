@@ -2,6 +2,7 @@ package sequences
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -58,6 +59,26 @@ var DeployToken = cldf_ops.NewSequence(
 		var err error
 		var tokenRef datastore.AddressRef
 		qualifier := input.Symbol
+
+		// This is the amount that `supply` and `preMint` will be scaled by (i.e. 10 ^ decimals)
+		scaler := new(big.Int).Exp(
+			big.NewInt(10),
+			big.NewInt(int64(input.Decimals)),
+			nil,
+		)
+
+		// Default max supply is 0 (i.e. unlimited supply)
+		maxSupply := big.NewInt(0)
+		if input.Supply != nil {
+			maxSupply = new(big.Int).Mul(new(big.Int).SetUint64(*input.Supply), scaler)
+		}
+
+		// Default pre-mint amount is 0 (i.e. don't pre mint any tokens)
+		preMint := big.NewInt(0)
+		if input.PreMint != nil {
+			preMint = new(big.Int).Mul(new(big.Int).SetUint64(*input.PreMint), scaler)
+		}
+
 		switch input.Type {
 		case erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, erc20.Deploy, chain, contract.DeployInput[erc20.ConstructorArgs]{
@@ -81,8 +102,8 @@ var DeployToken = cldf_ops.NewSequence(
 					Name:      input.Name,
 					Symbol:    input.Symbol,
 					Decimals:  input.Decimals,
-					MaxSupply: input.Supply,
-					PreMint:   input.PreMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
+					MaxSupply: maxSupply,
+					PreMint:   preMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
 				},
 				Qualifier: &qualifier,
 			}, nil)
@@ -98,8 +119,8 @@ var DeployToken = cldf_ops.NewSequence(
 					Name:      input.Name,
 					Symbol:    input.Symbol,
 					Decimals:  input.Decimals,
-					MaxSupply: input.Supply,
-					PreMint:   input.PreMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
+					MaxSupply: maxSupply,
+					PreMint:   preMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
 				},
 				Qualifier: &qualifier,
 			}, nil)

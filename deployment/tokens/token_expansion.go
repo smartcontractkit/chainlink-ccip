@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,11 +40,11 @@ type TokenExpansionInputPerChain struct {
 }
 
 type DeployTokenInput struct {
-	Name     string   `yaml:"name" json:"name"`
-	Symbol   string   `yaml:"symbol" json:"symbol"`
-	Decimals uint8    `yaml:"decimals" json:"decimals"`
-	Supply   *big.Int `yaml:"supply" json:"supply"`
-	PreMint  *big.Int `yaml:"preMint" json:"preMint"`
+	Name     string  `yaml:"name" json:"name"`
+	Symbol   string  `yaml:"symbol" json:"symbol"`
+	Decimals uint8   `yaml:"decimals" json:"decimals"`
+	Supply   *uint64 `yaml:"supply,string" json:"supply,string"`
+	PreMint  *uint64 `yaml:"preMint,string" json:"preMint,string"`
 	// Customer admin who will be granted admin rights on the token
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
 	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`

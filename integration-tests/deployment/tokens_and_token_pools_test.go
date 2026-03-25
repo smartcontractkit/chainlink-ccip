@@ -3,8 +3,6 @@ package deployment
 import (
 	"bytes"
 	"fmt"
-	"math"
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -121,8 +119,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "SOL_TEST",
 				Name:                   "SOLANA Test Token",
 				Type:                   solanautils.SPLTokens,
-				Supply:                 big.NewInt(math.MaxInt64),
-				PreMint:                big.NewInt(math.MaxInt64 / 2),
+				Supply:                 nil, // unlimited supply
+				PreMint:                nil, // no pre-mint
 				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
@@ -141,8 +139,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "SOL_TEST2",
 				Name:                   "SOLANA Test Token 2",
 				Type:                   solanautils.SPLTokens,
-				Supply:                 big.NewInt(math.MaxInt64),
-				PreMint:                big.NewInt(math.MaxInt64 / 2),
+				Supply:                 nil, // unlimited supply
+				PreMint:                nil, // no pre-mint
 				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
@@ -176,8 +174,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "EVM_TEST_A",
 				Name:                   "EVM Test Token A",
 				Type:                   bnmERC20ops.ContractType,
-				Supply:                 big.NewInt(0), // unlimited supply
-				PreMint:                big.NewInt(0),
+				Supply:                 nil, // unlimited supply
+				PreMint:                nil, // no pre-mint
 				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
@@ -196,8 +194,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "EVM_TEST_B",
 				Name:                   "EVM Test Token B",
 				Type:                   bnmERC20ops.ContractType,
-				Supply:                 big.NewInt(0), // unlimited supply
-				PreMint:                big.NewInt(0),
+				Supply:                 nil, // unlimited supply
+				PreMint:                nil, // no pre-mint
 				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
@@ -340,7 +338,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 				// Verify on-chain token info matches what we provided to the changeset
 				require.Equal(t, timelockRef.Address, ccipAdmin.String(), fmt.Sprintf("expected CCIP admin %q to be timelock %q", ccipAdmin.Hex(), timelockRef.Address))
-				require.Equal(t, 0, data.Token.Supply.Cmp(supp))
+				require.Equal(t, 0, supp)
 				require.Equal(t, data.Token.Decimals, deci)
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)
@@ -616,7 +614,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:            tokenSymbol,
 				Name:              solbnm.Token.Name,
 				Type:              solanautils.SPLTokens,
-				Supply:            big.NewInt(0),
+				Supply:            nil, // unlimited supply
 				TokenPrivKey:      tokenPrivKey.String(),
 				ChainSelector:     solbnm.Chain.Selector,
 				ExistingDataStore: env.DataStore,
