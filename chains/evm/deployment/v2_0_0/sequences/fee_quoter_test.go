@@ -435,9 +435,11 @@ func tokenTransferFeeConfigArgsFromSelectors(selectors ...uint64) []fqops.TokenT
 func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 	t.Run("empty input returns nil batches", func(t *testing.T) {
 		input := sequences.FeeQuoterUpdate{}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
-		require.Nil(t, destBatches)
-		require.Nil(t, tokenBatches)
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
 
 	t.Run("constructor dest chain configs within batch size stay in constructor and one apply batch", func(t *testing.T) {
@@ -447,11 +449,13 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
 			},
 		}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Len(t, input.ConstructorArgs.DestChainConfigArgs, 3)
 		require.Equal(t, cfgs, input.ConstructorArgs.DestChainConfigArgs)
-		require.Empty(t, destBatches)
-		require.Nil(t, tokenBatches)
+		require.Empty(t, got.DestChainConfigBatches)
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
 
 	t.Run("constructor dest chain configs over batch size keeps first batch in constructor rest in dest batches", func(t *testing.T) {
@@ -465,12 +469,14 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
 			},
 		}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Len(t, input.ConstructorArgs.DestChainConfigArgs, 8)
 		require.Equal(t, cfgs[:8], input.ConstructorArgs.DestChainConfigArgs)
-		require.Len(t, destBatches, 1)
-		require.Equal(t, []fqops.DestChainConfigArgs{cfgs[8]}, destBatches[0])
-		require.Nil(t, tokenBatches)
+		require.Len(t, got.DestChainConfigBatches, 1)
+		require.Equal(t, []fqops.DestChainConfigArgs{cfgs[8]}, got.DestChainConfigBatches[0])
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
 
 	t.Run("update DestChainConfigs only are batched by size 8", func(t *testing.T) {
@@ -482,11 +488,13 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		input := sequences.FeeQuoterUpdate{
 			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
 		}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
-		require.Len(t, destBatches, 2)
-		require.Equal(t, cfgs[:sequences.DestChainConfigUpdateBatchLen], destBatches[0])
-		require.Equal(t, cfgs[sequences.DestChainConfigUpdateBatchLen:], destBatches[1])
-		require.Nil(t, tokenBatches)
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, got.DestChainConfigBatches, 2)
+		require.Equal(t, cfgs[:sequences.DestChainConfigUpdateBatchLen], got.DestChainConfigBatches[0])
+		require.Equal(t, cfgs[sequences.DestChainConfigUpdateBatchLen:], got.DestChainConfigBatches[1])
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
 
 	t.Run("constructor remainder and update DestChainConfigs are concatenated", func(t *testing.T) {
@@ -499,10 +507,10 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 			},
 			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), updates...),
 		}
-		destBatches, _ := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
-		require.Len(t, destBatches, 2)
-		require.Equal(t, []fqops.DestChainConfigArgs{cons[sequences.DestChainConfigUpdateBatchLen]}, destBatches[0])
-		require.Equal(t, updates, destBatches[1])
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, got.DestChainConfigBatches, 2)
+		require.Equal(t, []fqops.DestChainConfigArgs{cons[sequences.DestChainConfigUpdateBatchLen]}, got.DestChainConfigBatches[0])
+		require.Equal(t, updates, got.DestChainConfigBatches[1])
 	})
 
 	t.Run("constructor token transfer fee configs over batch size splits first batch into constructor", func(t *testing.T) {
@@ -516,12 +524,14 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), args...),
 			},
 		}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
-		require.Nil(t, destBatches)
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
 		require.Len(t, input.ConstructorArgs.TokenTransferFeeConfigArgs, sequences.TokenTransferFeeConfigUpdateBatchLen)
 		require.Equal(t, args[:sequences.TokenTransferFeeConfigUpdateBatchLen], input.ConstructorArgs.TokenTransferFeeConfigArgs)
-		require.Len(t, tokenBatches, 1)
-		require.Equal(t, []fqops.TokenTransferFeeConfigArgs{args[sequences.TokenTransferFeeConfigUpdateBatchLen]}, tokenBatches[0])
+		require.Len(t, got.TokenTransferFeeConfigBatches, 1)
+		require.Equal(t, []fqops.TokenTransferFeeConfigArgs{args[sequences.TokenTransferFeeConfigUpdateBatchLen]}, got.TokenTransferFeeConfigBatches[0])
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
 
 	t.Run("TokenTransferFeeConfigUpdates only are batched by size 5", func(t *testing.T) {
@@ -535,11 +545,13 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), args...),
 			},
 		}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
-		require.Nil(t, destBatches)
-		require.Len(t, tokenBatches, 2)
-		require.Equal(t, args[:5], tokenBatches[0])
-		require.Equal(t, args[5:], tokenBatches[1])
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
+		require.Len(t, got.TokenTransferFeeConfigBatches, 2)
+		require.Equal(t, args[:5], got.TokenTransferFeeConfigBatches[0])
+		require.Equal(t, args[5:], got.TokenTransferFeeConfigBatches[1])
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
 
 	t.Run("DestChainConfigs and TokenTransferFeeConfigUpdates batched together", func(t *testing.T) {
@@ -561,14 +573,186 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), tokenArgs...),
 			},
 		}
-		destBatches, tokenBatches := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 
-		require.Len(t, destBatches, 2)
-		require.Equal(t, destCfgs[:sequences.DestChainConfigUpdateBatchLen], destBatches[0])
-		require.Equal(t, destCfgs[sequences.DestChainConfigUpdateBatchLen:], destBatches[1])
+		require.Len(t, got.DestChainConfigBatches, 2)
+		require.Equal(t, destCfgs[:sequences.DestChainConfigUpdateBatchLen], got.DestChainConfigBatches[0])
+		require.Equal(t, destCfgs[sequences.DestChainConfigUpdateBatchLen:], got.DestChainConfigBatches[1])
 
-		require.Len(t, tokenBatches, 2)
-		require.Equal(t, tokenArgs[:sequences.TokenTransferFeeConfigUpdateBatchLen], tokenBatches[0])
-		require.Equal(t, tokenArgs[sequences.TokenTransferFeeConfigUpdateBatchLen:], tokenBatches[1])
+		require.Len(t, got.TokenTransferFeeConfigBatches, 2)
+		require.Equal(t, tokenArgs[:sequences.TokenTransferFeeConfigUpdateBatchLen], got.TokenTransferFeeConfigBatches[0])
+		require.Equal(t, tokenArgs[sequences.TokenTransferFeeConfigUpdateBatchLen:], got.TokenTransferFeeConfigBatches[1])
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Nil(t, got.TokenPriceUpdateBatches)
+	})
+
+	t.Run("GasPriceUpdates within batch size returns single batch", func(t *testing.T) {
+		gasUpdates := make([]fqops.GasPriceUpdate, sequences.GasPriceUpdateBatchLen)
+		for i := range gasUpdates {
+			gasUpdates[i] = fqops.GasPriceUpdate{
+				DestChainSelector: uint64(i + 1),
+				UsdPerUnitGas:     big.NewInt(int64(i + 1)),
+			}
+		}
+		input := sequences.FeeQuoterUpdate{
+			PriceUpdates: fqops.PriceUpdates{GasPriceUpdates: append([]fqops.GasPriceUpdate(nil), gasUpdates...)},
+		}
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Len(t, got.GasPriceUpdateBatches, 1)
+		require.Equal(t, gasUpdates, got.GasPriceUpdateBatches[0])
+		require.Nil(t, got.TokenPriceUpdateBatches)
+		require.Equal(t, gasUpdates, input.PriceUpdates.GasPriceUpdates)
+	})
+
+	t.Run("GasPriceUpdates over batch size split into batches of GasPriceUpdateBatchLen", func(t *testing.T) {
+		n := sequences.GasPriceUpdateBatchLen + 3
+		gasUpdates := make([]fqops.GasPriceUpdate, n)
+		for i := range gasUpdates {
+			gasUpdates[i] = fqops.GasPriceUpdate{
+				DestChainSelector: uint64(100 + i),
+				UsdPerUnitGas:     big.NewInt(int64(100 + i)),
+			}
+		}
+		input := sequences.FeeQuoterUpdate{
+			PriceUpdates: fqops.PriceUpdates{GasPriceUpdates: append([]fqops.GasPriceUpdate(nil), gasUpdates...)},
+		}
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Len(t, got.GasPriceUpdateBatches, 2)
+		require.Equal(t, gasUpdates[:sequences.GasPriceUpdateBatchLen], got.GasPriceUpdateBatches[0])
+		require.Equal(t, gasUpdates[sequences.GasPriceUpdateBatchLen:], got.GasPriceUpdateBatches[1])
+		require.Nil(t, got.TokenPriceUpdateBatches)
+		require.Equal(t, gasUpdates, input.PriceUpdates.GasPriceUpdates)
+	})
+
+	t.Run("TokenPriceUpdates within batch size returns single batch", func(t *testing.T) {
+		tokenUpdates := make([]fqops.TokenPriceUpdate, sequences.TokenPriceUpdateBatchLen)
+		for i := range tokenUpdates {
+			tokenUpdates[i] = fqops.TokenPriceUpdate{
+				SourceToken: common.BytesToAddress([]byte{byte(i + 1)}),
+				UsdPerToken: big.NewInt(int64(i + 1)),
+			}
+		}
+		input := sequences.FeeQuoterUpdate{
+			PriceUpdates: fqops.PriceUpdates{TokenPriceUpdates: append([]fqops.TokenPriceUpdate(nil), tokenUpdates...)},
+		}
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Len(t, got.TokenPriceUpdateBatches, 1)
+		require.Equal(t, tokenUpdates, got.TokenPriceUpdateBatches[0])
+		require.Equal(t, tokenUpdates, input.PriceUpdates.TokenPriceUpdates)
+	})
+
+	t.Run("TokenPriceUpdates over batch size split into batches of TokenPriceUpdateBatchLen", func(t *testing.T) {
+		n := sequences.TokenPriceUpdateBatchLen + 2
+		tokenUpdates := make([]fqops.TokenPriceUpdate, n)
+		for i := range tokenUpdates {
+			tokenUpdates[i] = fqops.TokenPriceUpdate{
+				SourceToken: common.BytesToAddress([]byte{byte(100 + i)}),
+				UsdPerToken: big.NewInt(int64(100 + i)),
+			}
+		}
+		input := sequences.FeeQuoterUpdate{
+			PriceUpdates: fqops.PriceUpdates{TokenPriceUpdates: append([]fqops.TokenPriceUpdate(nil), tokenUpdates...)},
+		}
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Nil(t, got.DestChainConfigBatches)
+		require.Nil(t, got.TokenTransferFeeConfigBatches)
+		require.Nil(t, got.GasPriceUpdateBatches)
+		require.Len(t, got.TokenPriceUpdateBatches, 2)
+		require.Equal(t, tokenUpdates[:sequences.TokenPriceUpdateBatchLen], got.TokenPriceUpdateBatches[0])
+		require.Equal(t, tokenUpdates[sequences.TokenPriceUpdateBatchLen:], got.TokenPriceUpdateBatches[1])
+		require.Equal(t, tokenUpdates, input.PriceUpdates.TokenPriceUpdates)
+	})
+
+	t.Run("gas and token price batches both split for large inputs", func(t *testing.T) {
+		gasN := sequences.GasPriceUpdateBatchLen + 1
+		gasUpdates := make([]fqops.GasPriceUpdate, gasN)
+		for i := range gasUpdates {
+			gasUpdates[i] = fqops.GasPriceUpdate{DestChainSelector: uint64(i), UsdPerUnitGas: big.NewInt(1)}
+		}
+		tokenN := sequences.TokenPriceUpdateBatchLen + 3
+		tokenUpdates := make([]fqops.TokenPriceUpdate, tokenN)
+		for i := range tokenUpdates {
+			tokenUpdates[i] = fqops.TokenPriceUpdate{SourceToken: common.BytesToAddress([]byte{byte(200 + i)}), UsdPerToken: big.NewInt(2)}
+		}
+		input := sequences.FeeQuoterUpdate{
+			PriceUpdates: fqops.PriceUpdates{
+				GasPriceUpdates:   append([]fqops.GasPriceUpdate(nil), gasUpdates...),
+				TokenPriceUpdates: append([]fqops.TokenPriceUpdate(nil), tokenUpdates...),
+			},
+		}
+		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
+		require.Len(t, got.GasPriceUpdateBatches, 2)
+		require.Len(t, got.TokenPriceUpdateBatches, 2)
+		require.Equal(t, gasUpdates[:sequences.GasPriceUpdateBatchLen], got.GasPriceUpdateBatches[0])
+		require.Equal(t, gasUpdates[sequences.GasPriceUpdateBatchLen:], got.GasPriceUpdateBatches[1])
+		require.Equal(t, tokenUpdates[:sequences.TokenPriceUpdateBatchLen], got.TokenPriceUpdateBatches[0])
+		require.Equal(t, tokenUpdates[sequences.TokenPriceUpdateBatchLen:], got.TokenPriceUpdateBatches[1])
+	})
+}
+
+func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
+	link := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
+	validToken := map[common.Address]*big.Int{link: big.NewInt(1_000_000_000_000_000_000)}
+	validGas := map[uint64]*big.Int{5009297550715157269: big.NewInt(1_000_000_000)}
+
+	t.Run("zero_token_price_does_not_err", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			map[common.Address]*big.Int{link: big.NewInt(0)},
+			validGas,
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("nil_token_price_does_not_error", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			map[common.Address]*big.Int{link: nil},
+			validGas,
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("zero_gas_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{42: big.NewInt(0)},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+		require.Contains(t, err.Error(), "42")
+	})
+
+	t.Run("negative_gas_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{99: big.NewInt(-100)},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+	})
+
+	t.Run("nil_gas_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{7: nil},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+		require.Contains(t, err.Error(), "nil")
+	})
+
+	t.Run("valid_prices_succeed", func(t *testing.T) {
+		out, err := sequences.GetLastKnownPriceUpdates(validToken, validGas)
+		require.NoError(t, err)
+		require.Len(t, out.TokenPriceUpdates, 1)
+		require.Len(t, out.GasPriceUpdates, 1)
+		require.Equal(t, 0, out.TokenPriceUpdates[0].UsdPerToken.Cmp(validToken[link]))
+		require.Equal(t, 0, out.GasPriceUpdates[0].UsdPerUnitGas.Cmp(validGas[5009297550715157269]))
 	})
 }

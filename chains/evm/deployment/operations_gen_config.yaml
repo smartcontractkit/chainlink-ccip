@@ -44,6 +44,10 @@ contracts:
         access: public
       - name: getAllAuthorizedCallers
         access: public
+      - name: getTokenPrices
+        access: public
+      - name: getDestinationChainGasPrice
+        access: public
 
   # 1.6.2
   - contract_name: CCTPMessageTransmitterProxy

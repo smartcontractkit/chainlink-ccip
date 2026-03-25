@@ -18,11 +18,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	sequences2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	onrampv1_5ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	onrampv1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	evmadapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -31,6 +32,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	dseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+)
+
+// testImportTokenPriceWei / testImportGasPriceWei align dummy FeeQuoter and PriceRegistry metadata
+// with CreateFeeQuoterUpdateInputFromV16x / CreateFeeQuoterUpdateInputFromV150 (GetLastKnownPriceUpdates).
+var (
+	testImportTokenPriceWei = big.NewInt(1_000_000_000_000_000_000)
+	testImportGasPriceWei   = big.NewInt(1_000_000_000)
 )
 
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
@@ -48,6 +56,10 @@ var dummyAddressRefs = []datastore.AddressRef{
 	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x7070707070707070707070707070707070707070", ChainSelector: 5936861837188149645, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x5555555555555555555555555555555555555551", ChainSelector: 5936861837188149645, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
+	{Address: "0xC101C101C101C101C101C101C101C101C101C101", ChainSelector: 5009297550715157269, Type: datastore.ContractType("PriceRegistry"), Version: semver.MustParse("1.2.0")},
+	{Address: "0xC102C102C102C102C102C102C102C102C102C102", ChainSelector: 4949039107694359620, Type: datastore.ContractType("PriceRegistry"), Version: semver.MustParse("1.2.0")},
+	{Address: "0xC103C103C103C103C103C103C103C103C103C103", ChainSelector: 15971525489660198786, Type: datastore.ContractType("PriceRegistry"), Version: semver.MustParse("1.2.0")},
+	{Address: "0xC104C104C104C104C104C104C104C104C104C104", ChainSelector: 5936861837188149645, Type: datastore.ContractType("PriceRegistry"), Version: semver.MustParse("1.2.0")},
 }
 
 var dummyContractMetadata = []datastore.ContractMetadata{
@@ -88,6 +100,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 							IsEnabled:         true,
 						},
 					},
+					GasPrice: new(big.Int).Set(testImportGasPriceWei),
 				},
 			},
 			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
@@ -98,6 +111,9 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			PriceUpdaters: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
 			},
 		},
 	},
@@ -190,6 +206,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 							IsEnabled:         true,
 						},
 					},
+					GasPrice: new(big.Int).Set(testImportGasPriceWei),
 				},
 			},
 			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
@@ -200,6 +217,9 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			PriceUpdaters: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
 			},
 		},
 	},
@@ -326,6 +346,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
+					GasPrice:             new(big.Int).Set(testImportGasPriceWei),
 				},
 				4949039107694359620: {
 					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
@@ -350,6 +371,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
+					GasPrice:             new(big.Int).Set(testImportGasPriceWei),
 				},
 			},
 			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
@@ -360,6 +382,9 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			PriceUpdaters: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
 			},
 		},
 	},
@@ -394,6 +419,57 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 				EnforceOutOfOrder:                 false,
 			},
 			TokenTransferFeeConfig: map[common.Address]evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampTokenTransferFeeConfig{},
+		},
+	},
+	{
+		Address:       "0xC101C101C101C101C101C101C101C101C101C101",
+		ChainSelector: 5009297550715157269,
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
+			GasPrices: map[uint64]*big.Int{
+				15971525489660198786: new(big.Int).Set(testImportGasPriceWei),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
+			},
+		},
+	},
+	{
+		Address:       "0xC102C102C102C102C102C102C102C102C102C102",
+		ChainSelector: 4949039107694359620,
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
+			GasPrices: map[uint64]*big.Int{
+				5009297550715157269:  new(big.Int).Set(testImportGasPriceWei),
+				15971525489660198786: new(big.Int).Set(testImportGasPriceWei),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
+			},
+		},
+	},
+	{
+		Address:       "0xC103C103C103C103C103C103C103C103C103C103",
+		ChainSelector: 15971525489660198786,
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
+			GasPrices: map[uint64]*big.Int{
+				5009297550715157269: new(big.Int).Set(testImportGasPriceWei),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
+			},
+		},
+	},
+	{
+		Address:       "0xC104C104C104C104C104C104C104C104C104C104",
+		ChainSelector: 5936861837188149645,
+		Metadata: sequences2.PriceRegistryImportConfigSequenceOutput{
+			GasPrices: map[uint64]*big.Int{
+				5009297550715157269:  new(big.Int).Set(testImportGasPriceWei),
+				4949039107694359620:  new(big.Int).Set(testImportGasPriceWei),
+				15971525489660198786: new(big.Int).Set(testImportGasPriceWei),
+			},
+			TokenPrices: map[common.Address]*big.Int{
+				common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"): new(big.Int).Set(testImportTokenPriceWei),
+			},
 		},
 	},
 }
@@ -482,6 +558,14 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 			},
 		},
+		PriceUpdates: fqops.PriceUpdates{
+			GasPriceUpdates: []fqops.GasPriceUpdate{
+				{DestChainSelector: 15971525489660198786, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+			},
+			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
+			},
+		},
 	}
 
 	// Chain 4949039107694359620: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
@@ -563,6 +647,15 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 			},
 		},
+		PriceUpdates: fqops.PriceUpdates{
+			GasPriceUpdates: []fqops.GasPriceUpdate{
+				{DestChainSelector: 5009297550715157269, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+				{DestChainSelector: 15971525489660198786, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+			},
+			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
+			},
+		},
 	}
 
 	// Chain 15971525489660198786: Only has OnRamp v1.5.0
@@ -619,6 +712,14 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 			},
 			PriceUpdaters: []common.Address{
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
+			},
+		},
+		PriceUpdates: fqops.PriceUpdates{
+			GasPriceUpdates: []fqops.GasPriceUpdate{
+				{DestChainSelector: 5009297550715157269, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+			},
+			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
 			},
 		},
 	}
@@ -697,9 +798,57 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 			},
 		},
+		PriceUpdates: fqops.PriceUpdates{
+			GasPriceUpdates: []fqops.GasPriceUpdate{
+				{DestChainSelector: 5009297550715157269, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+				{DestChainSelector: 4949039107694359620, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+				{DestChainSelector: 15971525489660198786, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
+			},
+			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
+			},
+		},
 	}
 
 	return expected
+}
+
+func requirePriceUpdatesMatch(t *testing.T, expected, actual fqops.PriceUpdates, chainSelector uint64) {
+	t.Helper()
+	require.Len(t, actual.GasPriceUpdates, len(expected.GasPriceUpdates),
+		"gas price update count on chain %d", chainSelector)
+	for _, eg := range expected.GasPriceUpdates {
+		found := false
+		for _, ag := range actual.GasPriceUpdates {
+			if eg.DestChainSelector != ag.DestChainSelector {
+				continue
+			}
+			require.NotNil(t, eg.UsdPerUnitGas)
+			require.NotNil(t, ag.UsdPerUnitGas)
+			if eg.UsdPerUnitGas.Cmp(ag.UsdPerUnitGas) == 0 {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "missing gas price update for dest %d on chain %d", eg.DestChainSelector, chainSelector)
+	}
+	require.Len(t, actual.TokenPriceUpdates, len(expected.TokenPriceUpdates),
+		"token price update count on chain %d", chainSelector)
+	for _, et := range expected.TokenPriceUpdates {
+		found := false
+		for _, at := range actual.TokenPriceUpdates {
+			if et.SourceToken != at.SourceToken {
+				continue
+			}
+			require.NotNil(t, et.UsdPerToken)
+			require.NotNil(t, at.UsdPerToken)
+			if et.UsdPerToken.Cmp(at.UsdPerToken) == 0 {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "missing token price update for token %s on chain %d", et.SourceToken.Hex(), chainSelector)
+	}
 }
 
 func TestSequenceFeeQuoterInputCreation(t *testing.T) {
@@ -957,6 +1106,8 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 			"AuthorizedCallerUpdates.AddedCallers should match expected value on chain %d", chainSelector)
 		require.ElementsMatch(t, expected.AuthorizedCallerUpdates.RemovedCallers, output.AuthorizedCallerUpdates.RemovedCallers,
 			"AuthorizedCallerUpdates.RemovedCallers should match expected value on chain %d", chainSelector)
+
+		requirePriceUpdatesMatch(t, expected.PriceUpdates, output.PriceUpdates, chainSelector)
 
 		t.Logf("Successfully executed SequenceFeeQuoterInputCreation for chain %d", chainSelector)
 	}
