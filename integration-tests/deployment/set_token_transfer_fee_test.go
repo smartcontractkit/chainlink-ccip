@@ -279,14 +279,12 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	MergeAddresses(t, e, out.DataStore)
 
 	chain1 := lanes.ChainDefinition{
-		Selector:                 src,
-		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanes.DefaultFeeQuoterDestChainConfig(true, src),
+		Selector: src,
+		GasPrice: big.NewInt(1e9),
 	}
 	chain2 := lanes.ChainDefinition{
-		Selector:                 dst,
-		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanes.DefaultFeeQuoterDestChainConfig(true, dst),
+		Selector: dst,
+		GasPrice: big.NewInt(1e9),
 	}
 	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{

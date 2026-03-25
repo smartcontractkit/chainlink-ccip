@@ -26,7 +26,6 @@ import (
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
@@ -203,15 +202,17 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64,
 	return feeQRef, nil
 }
 
+// evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
+var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
 func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
-	chainHex := utils.GetHexFromString(utils.EVMFamilySelector)
 	return ccipapi.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
 		DestGasOverhead:             300_000,
 		DestGasPerPayloadByteBase:   16,
-		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		ChainFamilySelector:         binary.BigEndian.Uint32(evmFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
 		DefaultTxGasLimit:           200_000,
@@ -234,6 +235,10 @@ func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainCon
 
 func (a *EVMAdapter) GetDefaultGasPrice() *big.Int {
 	return big.NewInt(2e12)
+}
+
+func (a *EVMAdapter) GetChainFamilySelector() [4]byte {
+	return evmFamilySelector
 }
 
 // GetFQVersion implements the optional FeeQuoterVersionProvider interface so that
