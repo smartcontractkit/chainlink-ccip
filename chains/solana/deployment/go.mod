@@ -38,7 +38,7 @@ require github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-202602
 require (
 	github.com/creachadair/jrpc2 v1.2.0 // indirect
 	github.com/creachadair/mds v0.13.4 // indirect
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260213025045-83535910e2c0 // indirect
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260325213023-351ee49d446f // indirect
 	github.com/stellar/go-stellar-sdk v0.1.0 // indirect
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
