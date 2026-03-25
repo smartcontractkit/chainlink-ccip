@@ -121,7 +121,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice The division factor for bps. This also represents the maximum bps fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
   /// @dev Constant representing the default finality.
-  bytes2 internal constant WAIT_FOR_FINALITY = bytes2(0);
+  bytes2 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -132,7 +132,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @dev The address of the router.
   IRouter internal s_router;
-  /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`). bytes2(0) means wait for finality.
+  /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
   bytes2 internal s_finalityConfig;
   /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal s_advancedPoolHooks;
@@ -465,7 +465,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// - rate limiting for either default or FTF transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finalityConfig The requested finality encoding (see `FinalityCodec`). bytes2(0) means wait for finality.
+  /// @param finalityConfig The requested finality encoding (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(

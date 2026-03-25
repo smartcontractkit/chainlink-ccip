@@ -70,7 +70,7 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       localToken: address(s_token)
     });
 
-    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, bytes2(0));
+    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(amountAfterFee, amount - ((amount * finalityTransferFeeBps) / BPS_DIVIDER));
   }
 }

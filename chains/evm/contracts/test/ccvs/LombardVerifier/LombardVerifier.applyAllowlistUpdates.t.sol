@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -22,7 +23,7 @@ contract LombardVerifier_applyAllowlistUpdates is LombardVerifierSetup {
       feeUSDCents: 100,
       gasForVerification: 50_000,
       payloadSizeBytes: 100,
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }

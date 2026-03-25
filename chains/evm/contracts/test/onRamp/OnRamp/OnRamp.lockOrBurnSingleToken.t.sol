@@ -108,7 +108,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = bytes2(0);
+    bytes2 finality = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
     bytes memory tokenArgs = "";
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
@@ -159,7 +159,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = bytes2(0);
+    bytes2 finality = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
     bytes memory tokenArgs = abi.encode("tokenArgs");
 
     vm.expectRevert(OnRamp.TokenArgsNotSupportedOnPoolV1.selector);
@@ -176,7 +176,12 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, s_sourceToken));
     s_onRampHelper.lockOrBurnSingleToken(
-      tokenAndAmount, DEST_CHAIN_SELECTOR, abi.encodePacked(makeAddr("receiver")), makeAddr("sender"), bytes2(0), ""
+      tokenAndAmount,
+      DEST_CHAIN_SELECTOR,
+      abi.encodePacked(makeAddr("receiver")),
+      makeAddr("sender"),
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG,
+      ""
     );
   }
 }

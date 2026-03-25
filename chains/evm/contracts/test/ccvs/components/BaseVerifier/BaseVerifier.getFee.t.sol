@@ -10,7 +10,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   function test_getFee() public view {
     Client.EVM2AnyMessage memory message;
     (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-      s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", bytes2(0));
+      s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     assertEq(feeUSDCents, DEFAULT_CCV_FEE_USD_CENTS);
     assertEq(gasForVerification, DEFAULT_CCV_GAS_LIMIT);
@@ -63,22 +63,26 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_RevertWhen_BlockDepthRequestedButOnlyFinalityAllowed() public {
-    // Default setup has finalityConfig = bytes2(0) → only WAIT_FOR_FINALITY accepted.
+    // Default setup has finalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG → only WAIT_FOR_FINALITY accepted.
     Client.EVM2AnyMessage memory message;
     vm.expectRevert(
       abi.encodeWithSelector(
-        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec._encodeBlockDepth(1), bytes2(0)
+        FinalityCodec.InvalidRequestedFinality.selector,
+        FinalityCodec._encodeBlockDepth(1),
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
       )
     );
     s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec._encodeBlockDepth(1));
   }
 
   function test_getFee_RevertWhen_SafeFlagNotAllowed() public {
-    // Default setup only allows finality (bytes2(0)) — WAIT_FOR_SAFE is not in allowed flags.
+    // Default setup only allows finality (FinalityCodec.WAIT_FOR_FINALITY_FLAG) — WAIT_FOR_SAFE is not in allowed flags.
     Client.EVM2AnyMessage memory message;
     vm.expectRevert(
       abi.encodeWithSelector(
-        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec.WAIT_FOR_SAFE_FLAG, bytes2(0)
+        FinalityCodec.InvalidRequestedFinality.selector,
+        FinalityCodec.WAIT_FOR_SAFE_FLAG,
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
       )
     );
     s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec.WAIT_FOR_SAFE_FLAG);
@@ -89,6 +93,6 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     Client.EVM2AnyMessage memory message;
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.RemoteChainNotSupported.selector, wrongDestChainSelector));
-    s_baseVerifier.getFee(wrongDestChainSelector, message, "", bytes2(0));
+    s_baseVerifier.getFee(wrongDestChainSelector, message, "", FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 }

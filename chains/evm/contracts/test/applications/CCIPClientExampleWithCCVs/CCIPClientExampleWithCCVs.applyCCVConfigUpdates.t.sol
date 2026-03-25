@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCIPClientExample} from "../../../applications/CCIPClientExample.sol";
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
@@ -50,8 +49,8 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
-    // No finality config set via enableChain, so defaults to bytes2(0) (require full finality).
-    assertEq(allowedFinalityConfig, bytes2(0));
+    // No finality config set via enableChain, so defaults to FinalityCodec.WAIT_FOR_FINALITY_FLAG (require full finality).
+    assertEq(allowedFinalityConfig, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertEq(retRequiredCCVs[i], requiredCCVs[i]);
     }
@@ -171,8 +170,8 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    // No enableChain call — defaults to bytes2(0) (require full finality).
-    assertEq(allowedFinalityConfig, bytes2(0));
+    // No enableChain call — defaults to FinalityCodec.WAIT_FOR_FINALITY_FLAG (require full finality).
+    assertEq(allowedFinalityConfig, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test_getCCVsAndFinalityConfig_FtfAllowed_ReturnsConfiguredAllowedFinalityConfig() public {
@@ -206,7 +205,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   function test_enableChain_AddsToRemoteChainSelectors() public {
     assertEq(s_client.getRemoteChainSelectors().length, 0);
 
-    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, bytes2(0));
+    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     uint64[] memory selectors = s_client.getRemoteChainSelectors();
     assertEq(selectors.length, 1);
@@ -214,7 +213,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   }
 
   function test_disableChain_RemovesFromRemoteChainSelectors() public {
-    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, bytes2(0));
+    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(s_client.getRemoteChainSelectors().length, 1);
 
     s_client.disableChain(SOURCE_CHAIN_SELECTOR);

@@ -702,7 +702,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // can return a different value.
     // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
     // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
-    bytes2 receiverFinalityConfig = bytes2(0);
+    bytes2 receiverFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
 
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {

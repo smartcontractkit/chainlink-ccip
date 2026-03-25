@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IRouter} from "../../../../interfaces/IRouter.sol";
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../../libraries/MessageV1Codec.sol";
 import {FeeQuoterSetup} from "../../../feeQuoter/FeeQuoterSetup.t.sol";
 import {BaseVerifierTestHelper} from "../../../helpers/BaseVerifierTestHelper.sol";
@@ -45,7 +46,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
@@ -65,7 +66,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
   }
 
@@ -93,7 +94,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: bytes2(0),
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),

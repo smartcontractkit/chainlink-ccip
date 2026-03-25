@@ -6,9 +6,9 @@ import {FinalityCodecSetup} from "./FinalityCodecSetup.t.sol";
 
 contract FinalityCodec__ensureRequestedFinalityAllowed is FinalityCodecSetup {
   function test__ensureRequestedFinalityAllowed_FinalityAlwaysAllowed() public view {
-    s_helper.ensureRequestedFinalityAllowed(bytes2(0), bytes2(0));
-    s_helper.ensureRequestedFinalityAllowed(bytes2(0), FinalityCodec._encodeBlockDepth(1));
-    s_helper.ensureRequestedFinalityAllowed(bytes2(0), FinalityCodec.WAIT_FOR_SAFE_FLAG);
+    s_helper.ensureRequestedFinalityAllowed(FinalityCodec.WAIT_FOR_FINALITY_FLAG, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    s_helper.ensureRequestedFinalityAllowed(FinalityCodec.WAIT_FOR_FINALITY_FLAG, FinalityCodec._encodeBlockDepth(1));
+    s_helper.ensureRequestedFinalityAllowed(FinalityCodec.WAIT_FOR_FINALITY_FLAG, FinalityCodec.WAIT_FOR_SAFE_FLAG);
   }
 
   function test__ensureRequestedFinalityAllowed_AllowedWhen_UpperFlagBitsOverlap() public view {
@@ -70,9 +70,11 @@ contract FinalityCodec__ensureRequestedFinalityAllowed is FinalityCodecSetup {
   function test__ensureRequestedFinalityAllowed_RevertWhen_InvalidRequestedFinality_FinalityRequired() public {
     uint16 requested = 50;
     vm.expectRevert(
-      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, bytes2(requested), bytes2(0))
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector, bytes2(requested), FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      )
     );
-    s_helper.ensureRequestedFinalityAllowed(bytes2(requested), bytes2(0));
+    s_helper.ensureRequestedFinalityAllowed(bytes2(requested), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test__ensureRequestedFinalityAllowed_AllowedWhen_BlockDepthAtMaxVsMinAllowed() public view {

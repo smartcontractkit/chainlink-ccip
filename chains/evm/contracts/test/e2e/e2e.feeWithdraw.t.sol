@@ -8,6 +8,7 @@ import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.so
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Executor} from "../../executor/Executor.sol";
 import {Client} from "../../libraries/Client.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -116,7 +117,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
       feeUSDCents: uint16(VERIFIER_FEE_USD_CENTS), // $2.00 fee for verifier
       gasForVerification: VERIFIER_GAS,
       payloadSizeBytes: uint16(VERIFIER_BYTES),
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_verifierImpl.applyRemoteChainConfigUpdates(destChainConfigs);
 

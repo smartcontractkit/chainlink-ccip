@@ -6,6 +6,7 @@ import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageRece
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
@@ -100,7 +101,7 @@ contract OffRampSetup is BaseTest {
     vm.mockCall(
       receiver,
       abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, sourceChainSelector),
-      abi.encode(requiredCCVs, optionalCCVs, optionalThreshold, bytes2(0))
+      abi.encode(requiredCCVs, optionalCCVs, optionalThreshold, FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
   }
 

@@ -146,7 +146,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory decoded = s_helper._decodeGenericExtraArgsV3(encoded);
 
     assertEq(decoded.gasLimit, 0);
-    assertEq(decoded.finalityConfig, bytes2(0));
+    assertEq(decoded.finalityConfig, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test__decodeGenericExtraArgsV3_MaxValues() public view {

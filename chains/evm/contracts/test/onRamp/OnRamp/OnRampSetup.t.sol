@@ -137,7 +137,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       messageNumber: msgNum,
       executionGasLimit: eventData.executionGasLimit,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: bytes2(0),
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(
         eventData.resolvedExtraArgs.ccvs, eventData.resolvedExtraArgs.executor
       ),

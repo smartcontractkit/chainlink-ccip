@@ -196,7 +196,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param requestedFinality The requested finality encoding for the message. `bytes2(0)` indicates waiting for finality.
+  /// @param requestedFinality The requested finality encoding for the message.
   /// @param ccvs The CCVs that are requested on source.
   /// @return usdCentsFee The USD denominated fee for the executor.
   function getFee(

@@ -24,8 +24,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_000e6;
-    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(0), "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) = s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG, ""
+    );
 
     assertEq(usdFeeCents, feeConfig.finalityFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -65,8 +66,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
   function test_getFee_NoConfig() public view {
     uint256 amount = 777e6;
-    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(0), "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) = s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG, ""
+    );
 
     assertEq(usdFeeCents, 0);
     assertEq(destGasOverhead, 0);
@@ -81,7 +83,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(1);
 
     vm.expectRevert(
-      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, bytes2(0))
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      )
     );
     s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), requestedFinality, "");
   }
@@ -132,8 +136,9 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(new TokenPool.TokenTransferFeeConfigArgs[](0), disableConfigs);
 
     uint256 amount = 1_000e6;
-    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(0), "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) = s_tokenPool.getFee(
+      address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG, ""
+    );
 
     // Should return all zeros with isEnabled=false when disabled
     assertEq(usdFeeCents, 0, "Fee should be zero");

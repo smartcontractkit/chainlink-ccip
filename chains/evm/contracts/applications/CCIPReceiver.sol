@@ -6,6 +6,7 @@ import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2
 
 import {Client} from "../libraries/Client.sol";
 
+import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
@@ -57,7 +58,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
 
   /// @notice Return the CCVs required/optional and allowed finality config for a source chain.
   /// @dev This can be overridden to specify different CCVs per source chain. The current implementation means the
-  /// default CCV is used and finality is required (allowedFinalityConfig = bytes2(0)).
+  /// default CCV is used and finality is required (allowedFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG).
   function getCCVsAndFinalityConfig(
     uint64,
     bytes calldata
@@ -73,8 +74,8 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
     )
   {
     // By default no specific CCVs are required or optional. This means the default CCV is chosen.
-    // allowedFinalityConfig = bytes2(0) means finality is required.
-    return (new address[](0), new address[](0), 0, bytes2(0));
+    // allowedFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG means finality is required.
+    return (new address[](0), new address[](0), 0, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   error InvalidRouter(address router);

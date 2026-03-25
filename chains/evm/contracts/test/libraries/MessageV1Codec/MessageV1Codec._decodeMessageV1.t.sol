@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MessageV1CodecSetup} from "./MessageV1CodecSetup.t.sol";
 
@@ -115,7 +116,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       messageNumber: 3,
       executionGasLimit: 0,
       ccipReceiveGasLimit: 0,
-      finality: bytes2(0),
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: "",
       offRampAddress: "",

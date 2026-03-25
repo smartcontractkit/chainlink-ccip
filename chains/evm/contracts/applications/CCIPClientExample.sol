@@ -33,7 +33,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
 
   /// @notice Per-remote-chain configuration: outbound extra args and the finality the receiver
   /// will accept for inbound messages arriving from that chain.
-  /// @dev allowedFinalityConfig follows FinalityCodec encoding: bytes2(0) = require full finality
+  /// @dev allowedFinalityConfig follows FinalityCodec encoding: FinalityCodec.WAIT_FOR_FINALITY_FLAG = require full finality
   /// (safest, default), any non-zero value permits faster-than-finality messages. Only configure
   /// a non-zero value when using a trusted sender that manages re-org risk on the source side.
   struct RemoteChainConfig {

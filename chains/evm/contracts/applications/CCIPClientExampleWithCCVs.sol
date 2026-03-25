@@ -101,7 +101,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
 
   /// @notice Provides the required and optional CCVs and allowed finality config for a source chain.
   /// @dev OffRamp will apply the defaults for the lane if no CCVs are defined for a source chain.
-  /// @dev The allowed finality is configured via enableChain in the base contract. When bytes2(0),
+  /// @dev The allowed finality is configured via enableChain in the base contract. When FinalityCodec.WAIT_FOR_FINALITY_FLAG,
   /// full finality is required (safest). Non-zero values permit faster-than-finality messages — only
   /// enable this when using a trusted sender on the source chain that manages re-org risk.
   function getCCVsAndFinalityConfig(

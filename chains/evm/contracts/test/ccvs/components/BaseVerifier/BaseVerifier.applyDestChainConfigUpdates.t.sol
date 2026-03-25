@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {BaseVerifierSetup} from "./BaseVerifierSetup.t.sol";
 
 contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
@@ -46,7 +47,7 @@ contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: 0, // Zero gas should revert.
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestGasCannotBeZero.selector, remoteChainSelector));

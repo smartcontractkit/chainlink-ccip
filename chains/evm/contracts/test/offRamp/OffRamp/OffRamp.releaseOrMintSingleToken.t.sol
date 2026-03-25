@@ -86,8 +86,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
 
-    (Client.EVMTokenAmount memory dest, address localPoolAddress) =
-      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, bytes2(0));
+    (Client.EVMTokenAmount memory dest, address localPoolAddress) = s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
@@ -126,7 +127,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     vm.mockCallRevert(address(s_pool), callData, poolRevertData);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, bytes2(0));
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_PoolAddressZero() public {
@@ -139,7 +142,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, bytes2(0));
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_UnsupportedInterface() public {
@@ -151,7 +156,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(s_pool)));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, bytes2(0));
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -20,7 +21,7 @@ contract CCTPVerifier_applyRemoteChainConfigUpdates is CCTPVerifierSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     vm.expectEmit();

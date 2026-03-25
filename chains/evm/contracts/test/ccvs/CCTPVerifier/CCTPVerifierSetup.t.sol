@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
@@ -72,7 +73,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: bytes2(0)
+      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 

@@ -567,7 +567,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // Validate the wire shape of the requested finality. Note: the receiver's finality policy
     // (getCCVsAndFinalityConfig) is checked on delivery by the OffRamp, not here. A sender using a non-zero
-    // finalityConfig targeting a receiver that only accepts bytes2(0) will succeed at send time but fail on
+    // finalityConfig targeting a receiver that only accepts FinalityCodec.WAIT_FOR_FINALITY_FLAG will succeed at send time but fail on
     // execution. Senders should consult the receiver's policy off-chain before choosing a finalityConfig.
     FinalityCodec._validateRequestedFinality(resolvedArgs.finalityConfig);
 
@@ -759,7 +759,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       } else {
         // V1 pools don't understand `finalityConfig`/`tokenArgs`.
         // We enforce default finality and no `tokenArgs` to avoid silent mis-interpretation.
-        if (finalityConfig != bytes2(0)) {
+        if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
           revert FTFNotSupportedOnPoolV1();
         }
         if (tokenArgs.length != 0) {

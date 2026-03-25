@@ -3,13 +3,14 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
 contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
-  bytes2 internal constant WAIT_FOR_FINALITY = bytes2(0);
+  bytes2 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
   bytes2 internal constant CUSTOM_BLOCK_CONFIRMATION = bytes2(uint16(10));
   uint16 internal constant DEFAULT_FEE_BPS = 100; // 1%
   uint16 internal constant CUSTOM_FEE_BPS = 200; // 2%

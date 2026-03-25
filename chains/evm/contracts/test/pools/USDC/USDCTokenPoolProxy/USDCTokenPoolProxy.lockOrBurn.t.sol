@@ -336,7 +336,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         amount: amount,
         localToken: address(s_USDCToken)
       }),
-      bytes2(0),
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ""
     );
   }
@@ -490,7 +490,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_InvalidMechanism() public {
@@ -516,7 +516,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.INVALID_MECHANISM
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_LockReleasePoolNotSet() public {
@@ -558,7 +558,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     vm.expectRevert(
       abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, lockReleaseChainSelector)
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_UnsupportedMechanism_CCTPV1() public {
@@ -578,7 +578,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_UnsupportedMechanism_CCTPV2() public {
@@ -598,6 +598,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, bytes2(0), "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 }

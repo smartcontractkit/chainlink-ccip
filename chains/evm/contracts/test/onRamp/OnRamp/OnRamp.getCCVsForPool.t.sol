@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {MockPoolV2} from "../../mocks/MockPoolV2.sol";
@@ -60,7 +61,8 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     _deployPoolV2(expectedCCVs);
 
-    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, bytes2(0), "");
+    address[] memory result =
+      s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
     assertEq(result.length, expectedCCVs.length, "Should surface pool-provided CCVs");
     assertEq(result[0], expectedCCVs[0], "First CCV should match");
@@ -77,7 +79,8 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
     );
 
-    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, bytes2(0), "");
+    address[] memory result =
+      s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
     assertEq(result.length, 1, "Should fall back to default CCV when pool is V1");
     assertEq(result[0], s_helperDefaultCCV, "Returned CCV should be the helper default");
@@ -86,7 +89,8 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
   function test_getCCVsForPool_ReturnsDefaultCCVs_WhenPoolReturnsEmptyArray() public {
     _deployPoolV2(new address[](0));
 
-    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, bytes2(0), "");
+    address[] memory result =
+      s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
     assertEq(result.length, 1, "Should fall back to default CCV when pool is silent");
     assertEq(result[0], s_helperDefaultCCV, "Returned CCV should be the helper default");
@@ -100,7 +104,8 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     _deployPoolV2(poolCCVs);
 
-    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, bytes2(0), "");
+    address[] memory result =
+      s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
     assertEq(result.length, poolCCVs.length, "Should substitute defaults for sentinel while preserving other CCVs");
     assertEq(result[0], poolCCVs[0], "First CCV should remain the pool requirement");

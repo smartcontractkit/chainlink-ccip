@@ -16,9 +16,9 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
-    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, bytes2(0));
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(0), "", fee);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", fee);
   }
 
   function test_validateLockOrBurn_RevertWhen_InvalidToken() public {
@@ -29,7 +29,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(0), "", 0);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 0);
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
@@ -127,14 +127,14 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.stopPrank();
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1_000e18);
-    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, bytes2(0));
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     uint256 expectedAmount = lockOrBurnIn.amount - fee;
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), expectedAmount);
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(0), "", fee);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", fee);
 
     (RateLimiter.TokenBucket memory outboundBucket,) =
       s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, false);
@@ -171,13 +171,15 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
 
   function test_validateLockOrBurn_RevertWhen_FtfNotAllowedByPool() public {
     vm.startPrank(OWNER);
-    s_tokenPool.setFinalityConfig(bytes2(0));
+    s_tokenPool.setFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        FinalityCodec.InvalidRequestedFinality.selector, FinalityCodec._encodeBlockDepth(1), bytes2(0)
+        FinalityCodec.InvalidRequestedFinality.selector,
+        FinalityCodec._encodeBlockDepth(1),
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
       )
     );
     s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1e18), FinalityCodec._encodeBlockDepth(1), "", 0);

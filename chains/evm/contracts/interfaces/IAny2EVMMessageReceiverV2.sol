@@ -5,9 +5,10 @@ import {IAny2EVMMessageReceiver} from "./IAny2EVMMessageReceiver.sol";
 
 interface IAny2EVMMessageReceiverV2 is IAny2EVMMessageReceiver {
   /// @notice Get the CCV configuration & allowed finality config for a source chain and sender.
-  /// @dev Implementations must return an appropriate allowedFinalityConfig value. Returning bytes2(0) signals that only fully finalized
-  /// messages are accepted. Returning a non-zero value allows faster-than-finality (FTF) messages whose requested
-  /// finality is permitted by the allowedFinalityConfig (see `FinalityCodec._ensureRequestedFinalityAllowed`).
+  /// @dev Implementations must return an appropriate allowedFinalityConfig value. Returning
+  /// FinalityCodec.WAIT_FOR_FINALITY_FLAG signals that only fully finalized messages are accepted. Returning a non-zero
+  /// value allows faster-than-finality (FTF) messages whose requested finality is permitted by the
+  /// allowedFinalityConfig (see `FinalityCodec._ensureRequestedFinalityAllowed`).
   /// When a trusted sender is used (and verified by the receiver), this is less critical as the trusted sender
   /// will only send messages with a certain level of finality. The simplest way to implement this is to either allow FTF
   /// messages when sender-verification is used, or require finality for all messages. That means the config can be a
