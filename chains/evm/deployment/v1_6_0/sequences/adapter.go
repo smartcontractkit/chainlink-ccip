@@ -272,18 +272,26 @@ func (a *EVMAdapter) GetChainFamilySelector() [4]byte {
 
 // GetFQVersion implements the optional FeeQuoterVersionProvider interface so that
 // update_lanes can choose 1.6 vs 2.0 FeeQuoter operations based on the deployed contract version.
-func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64) (*semver.Version, error) {
-	refs := ds.Addresses().Filter(
-		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
-		datastore.AddressRefByChainSelector(chainSelector),
-	)
-	ref, err := GetFeeQuoterAddress(refs, chainSelector, nil)
+func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64, chains cldf_chain.BlockChains) (*semver.Version, error) {
+	addressOnChain, err := a.GetFQAddressDynamic(ds, chainSelector, chains)
 	if err != nil {
 		return nil, err
 	}
 	// Sanity check that the AddressRef we found matches the one we expect.
-	if ref.Address != common.BytesToAddress(address).Hex() {
-		return nil, fmt.Errorf("fee quoter address mismatch for chain selector %d: expected %s, got %s", chainSelector, common.BytesToAddress(address).Hex(), ref.Address)
+	if common.BytesToAddress(addressOnChain).Hex() != common.BytesToAddress(address).Hex() {
+		return nil, fmt.Errorf("fee quoter address mismatch for chain selector %d: expected %s, got %s", chainSelector, common.BytesToAddress(address).Hex(), common.BytesToAddress(addressOnChain).Hex())
 	}
-	return ref.Version, nil
+
+	ref := ds.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByAddress(common.BytesToAddress(addressOnChain).Hex()),
+	)
+	if len(ref) == 0 {
+		return nil, fmt.Errorf("no fee quoter address found for chain selector %d at address %s", chainSelector, common.BytesToAddress(address).Hex())
+	}
+	if len(ref) > 1 {
+		return nil, fmt.Errorf("multiple fee quoter addresses found for chain selector %d at address %s", chainSelector, common.BytesToAddress(address).Hex())
+	}
+	return ref[0].Version, nil
 }
