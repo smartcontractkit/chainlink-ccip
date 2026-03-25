@@ -350,7 +350,7 @@ var (
 				})
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
-			lastKnownPriceUpdates, err := getLastKnownPriceUpdates(fqOutput.TokenPrices, lastKnownGasPriceUpdates)
+			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(fqOutput.TokenPrices, lastKnownGasPriceUpdates)
 			if err != nil {
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates: %w", err)
 			}
@@ -485,7 +485,7 @@ var (
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 					"PriceRegistryImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 			}
-			lastKnownPriceUpdates, err := getLastKnownPriceUpdates(priceRegConfig.TokenPrices, priceRegConfig.GasPrices)
+			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(priceRegConfig.TokenPrices, priceRegConfig.GasPrices)
 			if err != nil {
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates from price registry config: %w", err)
 			}
@@ -878,11 +878,15 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
 	return destChainConfigBatches, tokenTransferFeeConfigBatches
 }
 
-func getLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int) (fqops.PriceUpdates, error) {
+func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int) (fqops.PriceUpdates, error) {
 	var tokenPriceUpdates []fqops.TokenPriceUpdate
 	for token, price := range tokenPrices {
 		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid price %s for token %s in input additional config", price.String(), token.Hex())
+			priceStr := "nil"
+			if price != nil {
+				priceStr = price.String()
+			}
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid price %s for token %s in input additional config", priceStr, token.Hex())
 		}
 		tokenPriceUpdates = append(tokenPriceUpdates, fqops.TokenPriceUpdate{
 			SourceToken: token,
@@ -892,7 +896,11 @@ func getLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 	var gasPriceUpdates []fqops.GasPriceUpdate
 	for chainSelector, price := range gasPrices {
 		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", price.String(), chainSelector)
+			priceStr := "nil"
+			if price != nil {
+				priceStr = price.String()
+			}
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", priceStr, chainSelector)
 		}
 		gasPriceUpdates = append(gasPriceUpdates, fqops.GasPriceUpdate{
 			DestChainSelector: chainSelector,

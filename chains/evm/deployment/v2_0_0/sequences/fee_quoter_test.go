@@ -572,3 +572,76 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		require.Equal(t, tokenArgs[sequences.TokenTransferFeeConfigUpdateBatchLen:], tokenBatches[1])
 	})
 }
+
+func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
+	link := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
+	validToken := map[common.Address]*big.Int{link: big.NewInt(1_000_000_000_000_000_000)}
+	validGas := map[uint64]*big.Int{5009297550715157269: big.NewInt(1_000_000_000)}
+
+	t.Run("zero_token_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			map[common.Address]*big.Int{link: big.NewInt(0)},
+			validGas,
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid price")
+		require.Contains(t, err.Error(), link.Hex())
+	})
+
+	t.Run("negative_token_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			map[common.Address]*big.Int{link: big.NewInt(-1)},
+			validGas,
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid price")
+	})
+
+	t.Run("nil_token_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			map[common.Address]*big.Int{link: nil},
+			validGas,
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid price")
+		require.Contains(t, err.Error(), "nil")
+	})
+
+	t.Run("zero_gas_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{42: big.NewInt(0)},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+		require.Contains(t, err.Error(), "42")
+	})
+
+	t.Run("negative_gas_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{99: big.NewInt(-100)},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+	})
+
+	t.Run("nil_gas_price", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{7: nil},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+		require.Contains(t, err.Error(), "nil")
+	})
+
+	t.Run("valid_prices_succeed", func(t *testing.T) {
+		out, err := sequences.GetLastKnownPriceUpdates(validToken, validGas)
+		require.NoError(t, err)
+		require.Len(t, out.TokenPriceUpdates, 1)
+		require.Len(t, out.GasPriceUpdates, 1)
+		require.Equal(t, 0, out.TokenPriceUpdates[0].UsdPerToken.Cmp(validToken[link]))
+		require.Equal(t, 0, out.GasPriceUpdates[0].UsdPerUnitGas.Cmp(validGas[5009297550715157269]))
+	})
+}

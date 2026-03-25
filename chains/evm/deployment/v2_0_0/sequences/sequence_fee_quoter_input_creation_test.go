@@ -34,7 +34,7 @@ import (
 )
 
 // testImportTokenPriceWei / testImportGasPriceWei align dummy FeeQuoter and PriceRegistry metadata
-// with CreateFeeQuoterUpdateInputFromV16x / CreateFeeQuoterUpdateInputFromV150 (getLastKnownPriceUpdates).
+// with CreateFeeQuoterUpdateInputFromV16x / CreateFeeQuoterUpdateInputFromV150 (GetLastKnownPriceUpdates).
 var (
 	testImportTokenPriceWei = big.NewInt(1_000_000_000_000_000_000)
 	testImportGasPriceWei   = big.NewInt(1_000_000_000)
