@@ -146,7 +146,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address.
-  /// @param newAdmin The address of the new CCIPAdmin. Setting this to address(0) is now allowed.
+  /// @param newAdmin The address of the new CCIPAdmin. Setting this to address(0) is not allowed.
   /// @dev The BaseERC20 has no notion of ownership, so this function can be called by the CCIP admin. Tokens expanding
   /// from this base contract can choose to restrict this function to other roles instead.
   function setCCIPAdmin(
