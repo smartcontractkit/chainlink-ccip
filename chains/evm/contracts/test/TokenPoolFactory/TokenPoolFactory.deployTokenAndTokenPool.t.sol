@@ -217,7 +217,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -380,7 +380,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -446,7 +446,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -460,7 +460,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -618,7 +618,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: 6,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -723,6 +723,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     vm.stopPrank();
     address deployer = makeAddr("deployer");
     address futureOwner = makeAddr("futureOwner");
+    address preMintRecipient = makeAddr("preMintRecipient");
     address factory = address(s_tokenPoolFactory);
 
     bytes memory tokenInitCode = abi.encodePacked(
@@ -734,7 +735,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
           decimals: LOCAL_TOKEN_DECIMALS,
           maxSupply: 0,
           preMint: PREMINT_AMOUNT,
-          preMintRecipient: address(0),
+          preMintRecipient: preMintRecipient,
           ccipAdmin: factory
         }),
         factory,
@@ -757,7 +758,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
 
     assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).totalSupply(), "Total supply should match premint amount");
     assertEq(
-      PREMINT_AMOUNT, IERC20Metadata(tokenAddress).balanceOf(futureOwner), "All tokens should be minted to futureOwner"
+      PREMINT_AMOUNT,
+      IERC20Metadata(tokenAddress).balanceOf(preMintRecipient),
+      "All tokens should be minted to preMintRecipient"
     );
 
     // futureOwner accepts the 2-step transfers
@@ -817,7 +820,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: deployer
       }),
       deployer,
@@ -1074,7 +1077,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -1087,7 +1090,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),

@@ -45,12 +45,12 @@ contract BaseERC20_constructor is BaseERC20Setup {
         decimals: 18,
         maxSupply: 0,
         preMint: 1000e18,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: address(0)
       })
     );
 
-    // msg.sender is OWNER due to BaseTest prank
+    // ccipAdmin defaults to msg.sender (OWNER) when address(0) is passed; preMintRecipient is set explicitly to OWNER
     assertEq(OWNER, token.getCCIPAdmin());
     assertEq(1000e18, token.balanceOf(OWNER));
   }
@@ -85,6 +85,21 @@ contract BaseERC20_constructor is BaseERC20Setup {
     assertEq("BaseERC20 2.0.0-dev", s_baseERC20.typeAndVersion());
   }
 
+  function test_constructor_RevertWhen_PreMintAddressNotSet() public {
+    vm.expectRevert(BaseERC20.PreMintAddressNotSet.selector);
+    new BaseERC20(
+      BaseERC20.ConstructorParams({
+        name: "No Recipient",
+        symbol: "NR",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 1e18,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
+      })
+    );
+  }
+
   function test_constructor_RevertWhen_MaxSupplyExceeded() public {
     uint256 maxSupply = 500e18;
     uint256 preMint = maxSupply + 1;
@@ -97,7 +112,7 @@ contract BaseERC20_constructor is BaseERC20Setup {
         decimals: 18,
         maxSupply: maxSupply,
         preMint: preMint,
-        preMintRecipient: address(0),
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       })
     );

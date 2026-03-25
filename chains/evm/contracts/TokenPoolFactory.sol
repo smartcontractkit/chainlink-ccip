@@ -162,7 +162,7 @@ contract TokenPoolFactory is ITypeAndVersion {
       crossChainToken.renounceRole(crossChainToken.BURN_MINT_ADMIN_ROLE(), address(this));
     }
 
-    // If the token was pre-minted to this contract, transfer it to the future owner.
+    // If any tokens were sent to this contract (e.g. preMintRecipient was set to the factory), transfer them to the future owner.
     uint256 factoryTokenBalance = crossChainToken.balanceOf(address(this));
     if (factoryTokenBalance > 0) {
       crossChainToken.safeTransfer(futureOwner, factoryTokenBalance);
