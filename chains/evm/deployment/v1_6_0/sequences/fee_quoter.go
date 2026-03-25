@@ -161,6 +161,8 @@ var (
 			var destChainMu sync.Mutex
 			destGrp, _ := errgroup.WithContext(b.GetContext())
 			destGrp.SetLimit(10)
+			gasPricePerChain := make(map[uint64]*big.Int)
+			gasPriceMu := sync.Mutex{}
 			for _, remoteChain := range in.RemoteChains {
 				remoteChain := remoteChain
 				destGrp.Go(func() error {
@@ -180,6 +182,19 @@ var (
 					destChainMu.Lock()
 					destChainConfigs[remoteChain] = opsOutput.Output
 					defer destChainMu.Unlock()
+					gasPriceOutput, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
+						Address:       fqAddress,
+						ChainSelector: chainSelector,
+						Args:          remoteChain,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to get destination chain gas price for "+
+							"remote chain %d from feequoter %s on chain %d: %w",
+							remoteChain, fqAddress.Hex(), chainSelector, err)
+					}
+					gasPriceMu.Lock()
+					gasPricePerChain[remoteChain] = gasPriceOutput.Output.Value
+					gasPriceMu.Unlock()
 					return nil
 				})
 			}
@@ -188,8 +203,6 @@ var (
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
-			gasPricePerChain := make(map[uint64]*big.Int)
-			gasPriceMu := sync.Mutex{}
 			allTokens := make(map[common.Address]struct{})
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
@@ -213,19 +226,7 @@ var (
 					if !enabled {
 						return nil // skip if dest chain config is not enabled
 					}
-					gasPriceOutput, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
-						Address:       fqAddress,
-						ChainSelector: chainSelector,
-						Args:          remoteChain,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to get destination chain gas price for "+
-							"remote chain %d from feequoter %s on chain %d: %w",
-							remoteChain, fqAddress.Hex(), chainSelector, err)
-					}
-					gasPriceMu.Lock()
-					gasPricePerChain[remoteChain] = gasPriceOutput.Output.Value
-					gasPriceMu.Unlock()
+
 					tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
 					var tokenTransferFeeCfgsMu sync.Mutex
 					innerTokenGrp, _ := errgroup.WithContext(b.GetContext())

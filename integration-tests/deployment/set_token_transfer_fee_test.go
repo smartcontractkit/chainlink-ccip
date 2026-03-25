@@ -317,7 +317,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	MergeAddresses(t, e, out.DataStore)
 
 	for _, chainSel := range chains {
-		fqUpgradeValidation(t, e, chainSel, chains, true)
+		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 
 	// Configure fees registry

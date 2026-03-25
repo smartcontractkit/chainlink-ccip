@@ -886,7 +886,7 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 			if price != nil {
 				priceStr = price.String()
 			}
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid price %s for token %s in input additional config", priceStr, token.Hex())
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid price %s for token %s", priceStr, token.Hex())
 		}
 		tokenPriceUpdates = append(tokenPriceUpdates, fqops.TokenPriceUpdate{
 			SourceToken: token,
@@ -900,7 +900,7 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 			if price != nil {
 				priceStr = price.String()
 			}
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", priceStr, chainSelector)
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d", priceStr, chainSelector)
 		}
 		gasPriceUpdates = append(gasPriceUpdates, fqops.GasPriceUpdate{
 			DestChainSelector: chainSelector,

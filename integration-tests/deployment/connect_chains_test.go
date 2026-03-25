@@ -36,7 +36,7 @@ import (
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
-	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 )
 
 // convertOpsConfigToGobinding converts operations type to gobinding type for test assertions.
