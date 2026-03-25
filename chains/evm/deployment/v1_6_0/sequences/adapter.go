@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -100,11 +100,10 @@ func (a *EVMAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSelector u
 
 	chain := chains.EVMChains()[chainSelector]
 
-	onrampContract, err := onramp.NewOnRampContract(common.Address(onRampAddr), chain.Client)
+	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
 	}
-
 	dynamicConfig, err := onrampContract.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to call GetDynamicConfig on onramp contract for chain selector %d: %w", chainSelector, err)
