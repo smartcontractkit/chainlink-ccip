@@ -225,7 +225,8 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import onramp config for chain %d: %w", chainSelector, err)
 			}
-			result, err = sequences.RunAndMergeSequence(b, chains,
+			// this is not required as of now, commenting it out to save time during import, can be uncommented in future if we want to import offramp config as well
+			/*result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OffRampImportConfigSequence,
 				seq1_5.OffRampImportConfigSequenceInput{
 					ChainSelector:          chainSelector,
@@ -234,6 +235,7 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import offramp config for chain %d: %w", chainSelector, err)
 			}
+			*/
 			return result, nil
 		})
 }

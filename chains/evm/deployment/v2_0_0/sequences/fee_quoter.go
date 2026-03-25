@@ -882,11 +882,8 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 	var tokenPriceUpdates []fqops.TokenPriceUpdate
 	for token, price := range tokenPrices {
 		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
-			priceStr := "nil"
-			if price != nil {
-				priceStr = price.String()
-			}
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid price %s for token %s", priceStr, token.Hex())
+			// if price is not found or invalid, we just skip adding price update for that token,
+			continue
 		}
 		tokenPriceUpdates = append(tokenPriceUpdates, fqops.TokenPriceUpdate{
 			SourceToken: token,
