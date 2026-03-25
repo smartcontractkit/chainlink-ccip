@@ -82,11 +82,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(chainA, chainAAdapter, lane.Version, lane.TestRouter, e)
+			err = populateAddresses(&e, chainA, chainAAdapter, lane.Version, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(chainB, chainBAdapter, lane.Version, lane.TestRouter, e)
+			err = populateAddresses(&e, chainB, chainBAdapter, lane.Version, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
@@ -160,7 +160,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool, e cldf.Environment) error {
+func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool) error {
 	ds := e.DataStore
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
