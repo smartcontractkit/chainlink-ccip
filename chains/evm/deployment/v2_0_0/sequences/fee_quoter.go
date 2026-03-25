@@ -19,7 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -37,6 +39,8 @@ const (
 	NetworkFeeUSDCents                   uint16 = 10
 	DestChainConfigUpdateBatchLen               = 8
 	TokenTransferFeeConfigUpdateBatchLen        = 5
+	GasPriceUpdateBatchLen                      = 10
+	TokenPriceUpdateBatchLen                    = 10
 )
 
 var (
@@ -86,7 +90,12 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-			destChainConfigBatches, tokenTransferFeeConfigBatches := BatchedInputForSequenceFeeQuoterUpdate(&input)
+			batches := BatchedInputForSequenceFeeQuoterUpdate(&input)
+			destChainConfigBatches := batches.DestChainConfigBatches
+			tokenTransferFeeConfigBatches := batches.TokenTransferFeeConfigBatches
+			gasPriceUpdateBatches := batches.GasPriceUpdateBatches
+			tokenPriceUpdateBatches := batches.TokenPriceUpdateBatches
+
 			// deploy fee quoter or fetch existing fee quoter address
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
@@ -120,15 +129,30 @@ var (
 				writes = append(writes, feeQuoterReport.Output)
 			}
 
-			// update price
-			if len(input.PriceUpdates.GasPriceUpdates) > 0 || len(input.PriceUpdates.TokenPriceUpdates) > 0 {
+			// update price (gas and token prices batched to avoid block gas limit; paired by step index)
+			priceUpdateSteps := len(gasPriceUpdateBatches)
+			if len(tokenPriceUpdateBatches) > priceUpdateSteps {
+				priceUpdateSteps = len(tokenPriceUpdateBatches)
+			}
+			for i := 0; i < priceUpdateSteps; i++ {
+				var gasBatch []fqops.GasPriceUpdate
+				if i < len(gasPriceUpdateBatches) {
+					gasBatch = gasPriceUpdateBatches[i]
+				}
+				var tokenBatch []fqops.TokenPriceUpdate
+				if i < len(tokenPriceUpdateBatches) {
+					tokenBatch = tokenPriceUpdateBatches[i]
+				}
+				if len(gasBatch) == 0 && len(tokenBatch) == 0 {
+					continue
+				}
 				feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
 						ChainSelector: chain.Selector,
 						Address:       fqAddr,
 						Args: fqops.PriceUpdates{
-							GasPriceUpdates:   input.PriceUpdates.GasPriceUpdates,
-							TokenPriceUpdates: input.PriceUpdates.TokenPriceUpdates,
+							GasPriceUpdates:   gasBatch,
+							TokenPriceUpdates: tokenBatch,
 						},
 					})
 				if err != nil {
@@ -270,6 +294,7 @@ var (
 			isNewFQV2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
 			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
+			lastKnownGasPriceUpdates := make(map[uint64]*big.Int)
 			var providedRemoteChains map[uint64]struct{}
 			if len(input.RemoteChainSelectors) > 0 {
 				// initialize providedRemoteChains map if remote chains are provided in the input,
@@ -300,6 +325,7 @@ var (
 					}
 				}
 				destChainConfig := cfg.DestChainCfg
+				lastKnownGasPriceUpdates[remoteChain] = cfg.GasPrice
 				// check if gasprice stateness threashold is zero
 				if destChainConfig.GasPriceStalenessThreshold == 0 {
 					priceUpdates, err := HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
@@ -309,6 +335,7 @@ var (
 					output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, priceUpdates.GasPriceUpdates...)
 					output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, priceUpdates.TokenPriceUpdates...)
 				}
+
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
 					DestChainConfig: fqops.DestChainConfig{
@@ -346,6 +373,12 @@ var (
 				})
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
+			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(fqOutput.TokenPrices, lastKnownGasPriceUpdates)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates: %w", err)
+			}
+			output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, lastKnownPriceUpdates.TokenPriceUpdates...)
+			output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, lastKnownPriceUpdates.GasPriceUpdates...)
 			if isNewFQV2Deployment {
 				// if new deployment, adding deployer key as price updater so that
 				// manual gas prices can be set right after deployment if needed
@@ -367,6 +400,7 @@ var (
 				}
 				output.DestChainConfigs = allDestChainConfigs
 			}
+
 			return output, nil
 		})
 
@@ -402,6 +436,21 @@ var (
 			}
 			if len(onRampMetadata) == 0 {
 				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for EVM2EVMOnRamp v1.5.0 on chain selector %d", input.ChainSelector)
+			}
+			priceRegMetadata, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
+				input.ExistingAddresses,
+				input.ContractMeta,
+				priceregistryops.ContractType,
+				priceregistryops.Version,
+				"",
+				input.ChainSelector,
+			)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for PriceRegistry v1.2.0 on chain selector %d: %w", input.ChainSelector, err)
+			}
+			if len(priceRegMetadata) != 1 {
+				return FeeQuoterUpdate{}, fmt.Errorf("expected exactly 1 metadata entry for PriceRegistry v1.2.0 on chain selector %d, but found %d",
+					input.ChainSelector, len(priceRegMetadata))
 			}
 			routerAddr := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
@@ -454,6 +503,17 @@ var (
 					providedRemoteChains[remoteChain] = struct{}{}
 				}
 			}
+			priceRegConfig, err := datastore_utils.ConvertMetadataToType[sequences1_2.PriceRegistryImportConfigSequenceOutput](priceRegMetadata[0].Metadata)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
+					"PriceRegistryImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+			}
+			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(priceRegConfig.TokenPrices, priceRegConfig.GasPrices)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates from price registry config: %w", err)
+			}
+			output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, lastKnownPriceUpdates.TokenPriceUpdates...)
+			output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, lastKnownPriceUpdates.GasPriceUpdates...)
 			for _, meta := range onRampMetadata {
 				var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 
@@ -622,7 +682,37 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	// AuthorizedCallerUpdates: merge unique entries from both outputs
 	result.AuthorizedCallerUpdates = mergePriceUpdaters(result.AuthorizedCallerUpdates, output15.AuthorizedCallerUpdates)
 
+	// PriceUpdates: merge by dest chain / token; v1.6.x (output16) takes precedence on duplicates
+	result.PriceUpdates = mergeFeeQuoterPriceUpdates(output16.PriceUpdates, output15.PriceUpdates)
+
 	return result, nil
+}
+
+// mergeFeeQuoterPriceUpdates merges token and gas price updates from two sources. For duplicate
+// destination chain selectors (gas) or source tokens (token prices), values from p16 win.
+func mergeFeeQuoterPriceUpdates(p16, p15 fqops.PriceUpdates) fqops.PriceUpdates {
+	gasByDest := make(map[uint64]fqops.GasPriceUpdate)
+	for _, u := range p15.GasPriceUpdates {
+		gasByDest[u.DestChainSelector] = u
+	}
+	for _, u := range p16.GasPriceUpdates {
+		gasByDest[u.DestChainSelector] = u
+	}
+	tokenByAddr := make(map[common.Address]fqops.TokenPriceUpdate)
+	for _, u := range p15.TokenPriceUpdates {
+		tokenByAddr[u.SourceToken] = u
+	}
+	for _, u := range p16.TokenPriceUpdates {
+		tokenByAddr[u.SourceToken] = u
+	}
+	var out fqops.PriceUpdates
+	for _, u := range gasByDest {
+		out.GasPriceUpdates = append(out.GasPriceUpdates, u)
+	}
+	for _, u := range tokenByAddr {
+		out.TokenPriceUpdates = append(out.TokenPriceUpdates, u)
+	}
+	return out
 }
 
 func mergeTokenTransferFeeConfigArgs(args1, args2 []fqops.TokenTransferFeeConfigArgs) []fqops.TokenTransferFeeConfigArgs {
@@ -771,14 +861,52 @@ func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fqops.TokenT
 	return batches
 }
 
-// BatchedInputForSequenceFeeQuoterUpdate takes the FeeQuoterUpdate output from the import sequences and checks if the number of dest chain configs or token transfer fee configs exceed the batch length limit for on-chain update.
-// If it does, it splits them into batches and returns the batches separately for constructor args and update args, so that they can be applied in batches on-chain in the ApplyDestChainConfigUpdates and ApplyTokenTransferFeeConfigUpdates sequences.
-// This is to avoid hitting block gas limit when there are too many dest chain configs or token transfer fee configs to be updated on-chain.
+func batchedGasPriceUpdates(gasPriceUpdates []fqops.GasPriceUpdate) [][]fqops.GasPriceUpdate {
+	var batches [][]fqops.GasPriceUpdate
+	if len(gasPriceUpdates) <= GasPriceUpdateBatchLen {
+		return append(batches, gasPriceUpdates)
+	}
+	for i := 0; i < len(gasPriceUpdates); i += GasPriceUpdateBatchLen {
+		end := i + GasPriceUpdateBatchLen
+		if end > len(gasPriceUpdates) {
+			end = len(gasPriceUpdates)
+		}
+		batches = append(batches, gasPriceUpdates[i:end])
+	}
+	return batches
+}
+
+func batchedTokenPriceUpdates(tokenPriceUpdates []fqops.TokenPriceUpdate) [][]fqops.TokenPriceUpdate {
+	var batches [][]fqops.TokenPriceUpdate
+	if len(tokenPriceUpdates) <= TokenPriceUpdateBatchLen {
+		return append(batches, tokenPriceUpdates)
+	}
+	for i := 0; i < len(tokenPriceUpdates); i += TokenPriceUpdateBatchLen {
+		end := i + TokenPriceUpdateBatchLen
+		if end > len(tokenPriceUpdates) {
+			end = len(tokenPriceUpdates)
+		}
+		batches = append(batches, tokenPriceUpdates[i:end])
+	}
+	return batches
+}
+
+type BatchedFeeQuoterUpdate struct {
+	DestChainConfigBatches        [][]fqops.DestChainConfigArgs
+	TokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs
+	GasPriceUpdateBatches         [][]fqops.GasPriceUpdate
+	TokenPriceUpdateBatches       [][]fqops.TokenPriceUpdate
+}
+
+// BatchedInputForSequenceFeeQuoterUpdate takes the FeeQuoterUpdate output from the import sequences and checks if the number of dest chain configs, token transfer fee configs, gas price updates, or token price updates exceed the batch length limit for on-chain update.
+// If it does, it splits them into batches and returns the batches separately for constructor args and update args, so that they can be applied in batches on-chain in the ApplyDestChainConfigUpdates, ApplyTokenTransferFeeConfigUpdates, and UpdatePrices sequences.
+// This is to avoid hitting block gas limit when there are too many dest chain configs, token transfer fee configs, gas price updates, or token price updates to be updated on-chain.
 // Exported for testing.
-func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
-	destChainConfigBatches [][]fqops.DestChainConfigArgs,
-	tokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs,
-) {
+func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) BatchedFeeQuoterUpdate {
+	var destChainConfigBatches [][]fqops.DestChainConfigArgs
+	var tokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs
+	var gasPriceUpdateBatches [][]fqops.GasPriceUpdate
+	var tokenPriceUpdateBatches [][]fqops.TokenPriceUpdate
 	// check the destchain configs in constructor args, if it needs batching, we send batch 1
 	// in constructor args, and then rest of the batches in ApplyDestChainConfigUpdates,
 	// this is to make sure that if there are a lot of dest chain configs to be updated, we don't run into block gas limit issue
@@ -808,5 +936,48 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) (
 		newBatches := batchedTokenTransferFeeConfigArgs(input.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs)
 		tokenTransferFeeConfigBatches = append(tokenTransferFeeConfigBatches, newBatches...)
 	}
-	return destChainConfigBatches, tokenTransferFeeConfigBatches
+	if len(input.PriceUpdates.GasPriceUpdates) > 0 {
+		gasPriceUpdateBatches = append(gasPriceUpdateBatches, batchedGasPriceUpdates(input.PriceUpdates.GasPriceUpdates)...)
+	}
+	if len(input.PriceUpdates.TokenPriceUpdates) > 0 {
+		tokenPriceUpdateBatches = append(tokenPriceUpdateBatches, batchedTokenPriceUpdates(input.PriceUpdates.TokenPriceUpdates)...)
+	}
+	return BatchedFeeQuoterUpdate{
+		DestChainConfigBatches:        destChainConfigBatches,
+		TokenTransferFeeConfigBatches: tokenTransferFeeConfigBatches,
+		GasPriceUpdateBatches:         gasPriceUpdateBatches,
+		TokenPriceUpdateBatches:       tokenPriceUpdateBatches,
+	}
+}
+
+func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int) (fqops.PriceUpdates, error) {
+	var tokenPriceUpdates []fqops.TokenPriceUpdate
+	for token, price := range tokenPrices {
+		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
+			// if price is not found or invalid, we just skip adding price update for that token,
+			continue
+		}
+		tokenPriceUpdates = append(tokenPriceUpdates, fqops.TokenPriceUpdate{
+			SourceToken: token,
+			UsdPerToken: price,
+		})
+	}
+	var gasPriceUpdates []fqops.GasPriceUpdate
+	for chainSelector, price := range gasPrices {
+		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
+			priceStr := "nil"
+			if price != nil {
+				priceStr = price.String()
+			}
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d", priceStr, chainSelector)
+		}
+		gasPriceUpdates = append(gasPriceUpdates, fqops.GasPriceUpdate{
+			DestChainSelector: chainSelector,
+			UsdPerUnitGas:     price,
+		})
+	}
+	return fqops.PriceUpdates{
+		TokenPriceUpdates: tokenPriceUpdates,
+		GasPriceUpdates:   gasPriceUpdates,
+	}, nil
 }

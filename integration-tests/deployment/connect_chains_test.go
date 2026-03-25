@@ -36,7 +36,7 @@ import (
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
-	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 )
 
 // convertOpsConfigToGobinding converts operations type to gobinding type for test assertions.
@@ -655,7 +655,13 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 	// Deploy MCMS so we can run the FeeQuoter 2.0 upgrade (timelock).
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.POLYGON_MAINNET.Selector, []string{cciputils.CLLQualifier})
-
+	// Reset bundle so second ConnectChains runs without cached executions.
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	fqInput := map[uint64]deployops.UpdateFeeQuoterInputPerChain{
 		chain_selectors.ETHEREUM_MAINNET.Selector: {
 			FeeQuoterVersion: semver.MustParse("2.0.0"),
@@ -678,7 +684,7 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 	e.DataStore = out.DataStore.Seal()
 
 	// Reset bundle so second ConnectChains runs without cached executions.
-	bundle := operations.NewBundle(
+	bundle = operations.NewBundle(
 		func() context.Context { return context.Background() },
 		e.Logger,
 		operations.NewMemoryReporter(),
