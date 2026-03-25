@@ -176,6 +176,11 @@ func populateAddresses(chainDef *ChainDefinition, adapter LaneAdapter, version *
 		if err != nil {
 			return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
 		}
+	} else {
+		chainDef.FeeQuoter, err = adapter.GetFQAddress(ds, chainDef.Selector)
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
+		}
 	}
 	if vp, ok := adapter.(FeeQuoterVersionProvider); ok {
 		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector)
