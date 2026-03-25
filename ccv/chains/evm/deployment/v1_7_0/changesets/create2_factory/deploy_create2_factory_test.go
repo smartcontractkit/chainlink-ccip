@@ -102,6 +102,18 @@ func TestDeployCREATE2Factory_NonceNotZero(t *testing.T) {
 	require.ErrorContains(t, err, "nonce of the deployer key must be 0, got 1", "Error should mention nonce is not 0")
 }
 
+func TestDeployCREATE2Factory_VerifyPreconditions(t *testing.T) {
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+	)
+	require.NoError(t, err)
+
+	err = create2_factory.DeployCREATE2Factory.VerifyPreconditions(*e, create2_factory.DeployCREATE2FactoryCfg{
+		ChainSel: 5009297550715157269,
+	})
+	require.NoError(t, err, "VerifyPreconditions should always return nil")
+}
+
 func TestDeployCREATE2Factory_InvalidChain(t *testing.T) {
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
