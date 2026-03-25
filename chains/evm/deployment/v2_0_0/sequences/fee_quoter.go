@@ -659,7 +659,37 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	// AuthorizedCallerUpdates: merge unique entries from both outputs
 	result.AuthorizedCallerUpdates = mergePriceUpdaters(result.AuthorizedCallerUpdates, output15.AuthorizedCallerUpdates)
 
+	// PriceUpdates: merge by dest chain / token; v1.6.x (output16) takes precedence on duplicates
+	result.PriceUpdates = mergeFeeQuoterPriceUpdates(output16.PriceUpdates, output15.PriceUpdates)
+
 	return result, nil
+}
+
+// mergeFeeQuoterPriceUpdates merges token and gas price updates from two sources. For duplicate
+// destination chain selectors (gas) or source tokens (token prices), values from p16 win.
+func mergeFeeQuoterPriceUpdates(p16, p15 fqops.PriceUpdates) fqops.PriceUpdates {
+	gasByDest := make(map[uint64]fqops.GasPriceUpdate)
+	for _, u := range p15.GasPriceUpdates {
+		gasByDest[u.DestChainSelector] = u
+	}
+	for _, u := range p16.GasPriceUpdates {
+		gasByDest[u.DestChainSelector] = u
+	}
+	tokenByAddr := make(map[common.Address]fqops.TokenPriceUpdate)
+	for _, u := range p15.TokenPriceUpdates {
+		tokenByAddr[u.SourceToken] = u
+	}
+	for _, u := range p16.TokenPriceUpdates {
+		tokenByAddr[u.SourceToken] = u
+	}
+	var out fqops.PriceUpdates
+	for _, u := range gasByDest {
+		out.GasPriceUpdates = append(out.GasPriceUpdates, u)
+	}
+	for _, u := range tokenByAddr {
+		out.TokenPriceUpdates = append(out.TokenPriceUpdates, u)
+	}
+	return out
 }
 
 func mergeTokenTransferFeeConfigArgs(args1, args2 []fqops.TokenTransferFeeConfigArgs) []fqops.TokenTransferFeeConfigArgs {
