@@ -473,11 +473,6 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 
-	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
-	}
-
 	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, homeChainType, in.Blockchains)
 	if err != nil {
 		return nil, err
@@ -509,13 +504,38 @@ func NewEnvironment() (*Cfg, error) {
 					selsToConnect = append(selsToConnect, sel)
 				}
 			}
-			err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
+			err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect, in.Blockchains, in.Blockchains[i].Type)
 			if err != nil {
 				return nil, err
 			}
 		}
+		// FeeQuoter 2.0 upgrade uses LaneVersionResolver (router onramps/offramps); run only after lanes exist.
+		// Single-chain CCIP envs never get router lane wiring, so skip (would fail the resolver).
+		if len(selectors) > 1 {
+			evmSelectors := make([]uint64, 0)
+			evmChainTypeBySel := make(map[uint64]string)
+			for i := range impls {
+				switch in.Blockchains[i].Type {
+				case "anvil", "geth":
+					sel := impls[i].ChainSelector()
+					evmSelectors = append(evmSelectors, sel)
+					evmChainTypeBySel[sel] = in.Blockchains[i].Type
+				}
+			}
+			if err := devenvcommon.UpgradeEVMFeeQuotersTo2_0AfterLanes(ctx, e, in.Blockchains, evmSelectors, evmChainTypeBySel); err != nil {
+				return nil, err
+			}
+		} else {
+			L.Info().Msg("Skipping FeeQuoter 2.0 upgrade: single-chain environment (no cross-chain lanes)")
+		}
 		tr.Record("[changeset] deployed product contracts")
 	}
+
+	// Propose CCIP jobs after on-chain setup is complete (lanes, FeeQuoter 2.0, etc.) so nodes observe final config.
+	if err = CreateJobs(ctx, allNodeClients, nodeKeyBundles); err != nil {
+		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
+	}
+
 	tr.Record("[infra] deployed CL nodes")
 
 	Plog.Info().Str("BootstrapNode", in.NodeSets[0].Out.CLNodes[0].Node.ExternalURL).Send()

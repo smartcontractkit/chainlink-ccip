@@ -63,6 +63,24 @@ func (c *OnRampContract) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, ar
 	return c.contract.Transact(opts, "applyDestChainConfigUpdates", args)
 }
 
+func (c *OnRampContract) ApplyAllowlistUpdates(opts *bind.TransactOpts, args []AllowlistConfigArgs) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "applyAllowlistUpdates", args)
+}
+
+func (c *OnRampContract) GetAllowedSendersList(opts *bind.CallOpts, args uint64) (GetAllowedSendersListResult, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllowedSendersList", args)
+	outstruct := new(GetAllowedSendersListResult)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.IsEnabled = *abi.ConvertType(out[0], new(bool)).(*bool)
+	outstruct.ConfiguredAddresses = *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
+
+	return *outstruct, nil
+}
+
 func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (GetDestChainConfigResult, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getDestChainConfig", args)
@@ -102,6 +120,13 @@ func (c *OnRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicC
 	return c.contract.Transact(opts, "setDynamicConfig", args)
 }
 
+type AllowlistConfigArgs struct {
+	DestChainSelector         uint64
+	AllowlistEnabled          bool
+	AddedAllowlistedSenders   []common.Address
+	RemovedAllowlistedSenders []common.Address
+}
+
 type DestChainConfigArgs struct {
 	DestChainSelector uint64
 	Router            common.Address
@@ -114,6 +139,11 @@ type DynamicConfig struct {
 	MessageInterceptor     common.Address
 	FeeAggregator          common.Address
 	AllowlistAdmin         common.Address
+}
+
+type GetAllowedSendersListResult struct {
+	IsEnabled           bool
+	ConfiguredAddresses []common.Address
 }
 
 type GetDestChainConfigResult struct {
@@ -166,6 +196,35 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 		args []DestChainConfigArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyDestChainConfigUpdates(opts, args)
+	},
+})
+
+var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistConfigArgs, *OnRampContract]{
+	Name:            "onramp:apply-allowlist-updates",
+	Version:         Version,
+	Description:     "Calls applyAllowlistUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, []AllowlistConfigArgs],
+	Validate:        func([]AllowlistConfigArgs) error { return nil },
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args []AllowlistConfigArgs,
+	) (*types.Transaction, error) {
+		return c.ApplyAllowlistUpdates(opts, args)
+	},
+})
+
+var GetAllowedSendersList = contract.NewRead(contract.ReadParams[uint64, GetAllowedSendersListResult, *OnRampContract]{
+	Name:         "onramp:get-allowed-senders-list",
+	Version:      Version,
+	Description:  "Calls getAllowedSendersList on the contract",
+	ContractType: ContractType,
+	NewContract:  NewOnRampContract,
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (GetAllowedSendersListResult, error) {
+		return c.GetAllowedSendersList(opts, args)
 	},
 })
 
