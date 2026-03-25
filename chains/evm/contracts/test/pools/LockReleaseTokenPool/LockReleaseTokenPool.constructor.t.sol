@@ -13,7 +13,9 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 contract LockReleaseTokenPool_constructor is BaseTest {
   function test_constructor() public {
     CrossChainToken token = new CrossChainToken(
-      BaseERC20.ConstructorParams({name: "T", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER}),
+      BaseERC20.ConstructorParams({
+        name: "T", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, preMintRecipient: address(0), ccipAdmin: OWNER
+      }),
       OWNER,
       OWNER
     );
@@ -35,14 +37,18 @@ contract LockReleaseTokenPool_constructor is BaseTest {
 
   function test_constructor_RevertWhen_InvalidToken() public {
     CrossChainToken token = new CrossChainToken(
-      BaseERC20.ConstructorParams({name: "T", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER}),
+      BaseERC20.ConstructorParams({
+        name: "T", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, preMintRecipient: address(0), ccipAdmin: OWNER
+      }),
       OWNER,
       OWNER
     );
     ERC20LockBox lockBox = new ERC20LockBox(address(token));
 
     CrossChainToken invalidToken = new CrossChainToken(
-      BaseERC20.ConstructorParams({name: "IT", symbol: "IT", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER}),
+      BaseERC20.ConstructorParams({
+        name: "IT", symbol: "IT", decimals: 18, maxSupply: 0, preMint: 0, preMintRecipient: address(0), ccipAdmin: OWNER
+      }),
       OWNER,
       OWNER
     );

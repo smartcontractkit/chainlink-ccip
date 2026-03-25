@@ -12,6 +12,7 @@ import {RegistryModuleOwnerCustom} from "./tokenAdminRegistry/RegistryModuleOwne
 import {CrossChainToken} from "./tokens/CrossChainToken.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry.
@@ -20,6 +21,7 @@ import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 /// @dev The address prediction mechanism is only capable of deploying and predicting addresses for EVM based chains.
 /// adding compatibility for other chains will require additional offchain computation.
 contract TokenPoolFactory is ITypeAndVersion {
+  using SafeERC20 for CrossChainToken;
   using Create2 for bytes32;
 
   error InvalidZeroAddress();
@@ -163,7 +165,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     // If the token was pre-minted to this contract, transfer it to the future owner.
     uint256 factoryTokenBalance = crossChainToken.balanceOf(address(this));
     if (factoryTokenBalance > 0) {
-      crossChainToken.transfer(futureOwner, factoryTokenBalance);
+      crossChainToken.safeTransfer(futureOwner, factoryTokenBalance);
     }
 
     // Set the token pool for token in the token admin registry since this contract is the ccipAdmin.

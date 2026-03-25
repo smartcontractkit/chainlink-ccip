@@ -57,6 +57,7 @@ contract e2e_factoryDeployedPool is e2e {
           decimals: 18,
           maxSupply: 0,
           preMint: PREMINT,
+          preMintRecipient: address(0),
           ccipAdmin: address(s_factory)
         }),
         address(s_factory),
@@ -94,7 +95,13 @@ contract e2e_factoryDeployedPool is e2e {
 
     CrossChainToken destToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "FactoryToken", symbol: "FTK", decimals: 18, maxSupply: 0, preMint: PREMINT, ccipAdmin: OWNER
+        name: "FactoryToken",
+        symbol: "FTK",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: PREMINT,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -233,7 +240,7 @@ contract e2e_factoryDeployedPool is e2e {
       type(CrossChainToken).creationCode,
       abi.encode(
         BaseERC20.ConstructorParams({
-          name: "RemoteToken", symbol: "RMT", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: address(destFactory)
+          name: "RemoteToken", symbol: "RMT", decimals: 18, maxSupply: 0, preMint: 0, preMintRecipient: address(0), ccipAdmin: address(destFactory)
         }),
         address(destFactory),
         alice

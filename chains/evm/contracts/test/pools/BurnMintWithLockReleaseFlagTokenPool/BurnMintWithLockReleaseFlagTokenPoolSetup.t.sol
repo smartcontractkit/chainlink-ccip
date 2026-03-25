@@ -19,7 +19,13 @@ contract BurnMintWithLockReleaseFlagTokenPoolSetup is TokenPoolSetup {
       address(
         new CrossChainToken(
           BaseERC20.ConstructorParams({
-            name: "Chainlink Token", symbol: "LINK", decimals: 6, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+            name: "Chainlink Token",
+            symbol: "LINK",
+            decimals: 6,
+            maxSupply: 0,
+            preMint: 0,
+            preMintRecipient: address(0),
+            ccipAdmin: OWNER
           }),
           OWNER,
           OWNER

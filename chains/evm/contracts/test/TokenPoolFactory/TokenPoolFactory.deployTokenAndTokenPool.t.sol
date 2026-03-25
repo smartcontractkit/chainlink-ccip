@@ -217,6 +217,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),
@@ -379,6 +380,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),
@@ -444,6 +446,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),
@@ -457,6 +460,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),
@@ -614,6 +618,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: 6,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),
@@ -729,6 +734,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
           decimals: LOCAL_TOKEN_DECIMALS,
           maxSupply: 0,
           preMint: PREMINT_AMOUNT,
+          preMintRecipient: address(0),
           ccipAdmin: factory
         }),
         factory,
@@ -811,6 +817,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: deployer
       }),
       deployer,
@@ -872,6 +879,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
           decimals: LOCAL_TOKEN_DECIMALS,
           maxSupply: 0,
           preMint: 0,
+          preMintRecipient: address(0),
           ccipAdmin: address(s_tokenPoolFactory)
         }),
         address(s_tokenPoolFactory),
@@ -954,6 +962,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
           decimals: LOCAL_TOKEN_DECIMALS,
           maxSupply: 0,
           preMint: 0,
+          preMintRecipient: address(0),
           ccipAdmin: address(s_tokenPoolFactory)
         }),
         address(s_tokenPoolFactory),
@@ -1065,6 +1074,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),
@@ -1077,6 +1087,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),

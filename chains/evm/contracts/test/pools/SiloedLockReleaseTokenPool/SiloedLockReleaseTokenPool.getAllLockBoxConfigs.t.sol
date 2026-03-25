@@ -28,7 +28,13 @@ contract SiloedLockReleaseTokenPool_getAllLockBoxConfigs is BaseTest {
       address(
         new CrossChainToken(
           BaseERC20.ConstructorParams({
-            name: "TEST", symbol: "TST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+            name: "TEST",
+            symbol: "TST",
+            decimals: 18,
+            maxSupply: 0,
+            preMint: 0,
+            preMintRecipient: address(0),
+            ccipAdmin: OWNER
           }),
           OWNER,
           OWNER

@@ -54,7 +54,13 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address destToken = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "destToken", symbol: "destToken", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "destToken",
+          symbol: "destToken",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER
@@ -89,7 +95,13 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address destToken = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "destToken", symbol: "destToken", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "destToken",
+          symbol: "destToken",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER
@@ -122,7 +134,13 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address destToken = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "destToken", symbol: "destToken", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "destToken",
+          symbol: "destToken",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER

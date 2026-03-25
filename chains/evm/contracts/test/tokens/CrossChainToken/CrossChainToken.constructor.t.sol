@@ -24,7 +24,13 @@ contract CrossChainToken_constructor is CrossChainTokenSetup {
   function test_constructor_OwnerDefaultsToMsgSender() public {
     CrossChainToken token = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "Test", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "Test",
+        symbol: "T",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       address(0),
       address(0)

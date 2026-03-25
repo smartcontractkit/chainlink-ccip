@@ -20,6 +20,7 @@ contract BaseERC20Setup is BaseTest {
         decimals: DEFAULT_TOKEN_DECIMALS,
         maxSupply: MAX_SUPPLY,
         preMint: PRE_MINT,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       })
     );

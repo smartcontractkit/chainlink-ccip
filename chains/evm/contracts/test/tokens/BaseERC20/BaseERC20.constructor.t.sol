@@ -22,7 +22,13 @@ contract BaseERC20_constructor is BaseERC20Setup {
     uint8 decimals = 6;
     BaseERC20 token = new BaseERC20(
       BaseERC20.ConstructorParams({
-        name: "No Mint", symbol: "NM", decimals: decimals, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "No Mint",
+        symbol: "NM",
+        decimals: decimals,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       })
     );
 
@@ -34,7 +40,13 @@ contract BaseERC20_constructor is BaseERC20Setup {
   function test_constructor_CcipAdminDefaultsToMsgSender() public {
     BaseERC20 token = new BaseERC20(
       BaseERC20.ConstructorParams({
-        name: "Default Admin", symbol: "DA", decimals: 18, maxSupply: 0, preMint: 1000e18, ccipAdmin: address(0)
+        name: "Default Admin",
+        symbol: "DA",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 1000e18,
+        preMintRecipient: address(0),
+        ccipAdmin: address(0)
       })
     );
 
@@ -48,6 +60,31 @@ contract BaseERC20_constructor is BaseERC20Setup {
     assertTrue(s_baseERC20.supportsInterface(type(IGetCCIPAdmin).interfaceId));
   }
 
+  function test_constructor_PreMintRecipient() public {
+    address recipient = makeAddr("preMintRecipient");
+    uint256 amount = 500e18;
+
+    BaseERC20 token = new BaseERC20(
+      BaseERC20.ConstructorParams({
+        name: "Recipient Token",
+        symbol: "RT",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: amount,
+        preMintRecipient: recipient,
+        ccipAdmin: OWNER
+      })
+    );
+
+    assertEq(amount, token.balanceOf(recipient));
+    assertEq(0, token.balanceOf(OWNER));
+    assertEq(amount, token.totalSupply());
+  }
+
+  function test_typeAndVersion() public view {
+    assertEq("BaseERC20 2.0.0-dev", s_baseERC20.typeAndVersion());
+  }
+
   function test_constructor_RevertWhen_MaxSupplyExceeded() public {
     uint256 maxSupply = 500e18;
     uint256 preMint = maxSupply + 1;
@@ -55,12 +92,14 @@ contract BaseERC20_constructor is BaseERC20Setup {
     vm.expectRevert(abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, preMint));
     new BaseERC20(
       BaseERC20.ConstructorParams({
-        name: "Over", symbol: "OVR", decimals: 18, maxSupply: maxSupply, preMint: preMint, ccipAdmin: OWNER
+        name: "Over",
+        symbol: "OVR",
+        decimals: 18,
+        maxSupply: maxSupply,
+        preMint: preMint,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       })
     );
-  }
-
-  function test_typeAndVersion() public view {
-    assertEq("BaseERC20 2.0.0-dev", s_baseERC20.typeAndVersion());
   }
 }

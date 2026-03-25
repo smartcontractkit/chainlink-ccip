@@ -44,6 +44,7 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
         decimals: 18,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: address(0),
         ccipAdmin: factory
       }),
       factory,
