@@ -499,8 +499,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address[] memory requiredReceiverCCVs;
     if (isTokenOnlyTransfer) {
       if (tokenTransfer.length > 0) {
-        // For token-only transfers, we skip querying the receiver for CCVs, and don't add the defaults. This enables
-        // pure token transfers to only require the pool CCVs, as the token issuer is the only party that takes any risk.
+        // For token-only transfers with tokens, we skip querying the receiver for CCVs, and don't add the defaults.
+        // This enables pure token transfers to only require the pool CCVs, as the token issuer is the only party that
+        // takes any risk. As a consequence, the receiver's finality policy (getCCVsAndFinalityConfig) is intentionally
+        // NOT checked against message.finality for this path — finality enforcement is delegated entirely to the pool
+        // (which validates finality in _validateReleaseOrMint). If a receiver wants to enforce its own finality policy
+        // for token transfers it must NOT qualify as a token-only transfer (i.e. it must have a non-zero data payload
+        // or a non-zero ccipReceiveGasLimit).
         requiredReceiverCCVs = new address[](0);
         optionalCCVs = new address[](0);
         optionalThreshold = 0;

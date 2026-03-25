@@ -100,10 +100,8 @@ library FinalityCodec {
     }
   }
 
-  /// @notice Ensures `requestedFinality` is permitted by `allowedFinality`. When matching on flags, the request must not
-  /// carry a block depth (lower bits zero aside from the all-zero finality case, which is handled earlier).
-  /// @param requestedFinality The requested finality params to check. This value must already be validated by
-  /// `_validateRequestedFinality` to ensure it is well-formed.
+  /// @notice Validates that `requestedFinality` is well-formed and permitted by `allowedFinality`.
+  /// @param requestedFinality The requested finality params to check.
   /// @param allowedFinality The allowed finality params to check against.
   function _ensureRequestedFinalityAllowed(
     bytes2 requestedFinality,
@@ -113,6 +111,10 @@ library FinalityCodec {
     if (requestedFinality == WAIT_FOR_FINALITY_FLAG) {
       return;
     }
+
+    // Validate the structural shape of the requested finality, as it is only allowed to signal one mode.
+    _validateRequestedFinality(requestedFinality);
+
     // If any of the flags match, the request is allowed only when it has no depth field (flag-only request).
     if ((requestedFinality >> BLOCK_DEPTH_BITS) & (allowedFinality >> BLOCK_DEPTH_BITS) != 0) {
       if (uint16(requestedFinality & BLOCK_DEPTH_MASK) != 0) {

@@ -565,6 +565,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
+    // Validate the wire shape of the requested finality. Note: the receiver's finality policy
+    // (getCCVsAndFinalityConfig) is checked on delivery by the OffRamp, not here. A sender using a non-zero
+    // finalityConfig targeting a receiver that only accepts bytes2(0) will succeed at send time but fail on
+    // execution. Senders should consult the receiver's policy off-chain before choosing a finalityConfig.
     FinalityCodec._validateRequestedFinality(resolvedArgs.finalityConfig);
 
     return resolvedArgs;

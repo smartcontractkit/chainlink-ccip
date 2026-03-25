@@ -9,11 +9,11 @@ import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
 import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
+import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
@@ -43,8 +43,6 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error InvalidFinalityConfig(uint16 requested, uint16 minFinality);
-  error FastFinalityNotEnabled();
   error InvalidTransferFeeBps(uint256 bps);
   error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
   error CallerIsNotARampOnRouter(address caller);
@@ -89,7 +87,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event FinalityConfigSet(bytes2 minFinality);
+  event FinalityConfigSet(bytes2 allowedFinality);
   event AdvancedPoolHooksUpdated(IAdvancedPoolHooks oldHook, IAdvancedPoolHooks newHook);
 
   struct ChainUpdate {
@@ -253,7 +251,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function setFinalityConfig(
     bytes2 allowedFinality
   ) public virtual onlyOwner {
-    // Every value
+    // Any bytes2 value is accepted as allowedFinality; the FinalityCodec semantics are enforced when requests are
+    // checked against this value via FinalityCodec._ensureRequestedFinalityAllowed.
     s_finalityConfig = allowedFinality;
 
     emit FinalityConfigSet(allowedFinality);
@@ -485,6 +484,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
     if (finalityConfig != WAIT_FOR_FINALITY) {
+      // Validate that the finality carried in the inbound message is permitted by this pool's config. This mirrors
+      // the outbound check in _validateLockOrBurn and ensures the FTF inbound rate-limit bucket is only consumed for
+      // modes the pool has explicitly enabled, even if a future OffRamp skips this check.
+      FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_finalityConfig);
       _consumeFastFinalityInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     } else {
       _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
@@ -1066,8 +1069,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     virtual
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    // Use the codec to validate that the requested finality is allowed by the pool's configuration. This will revert
-    // if the requested finality is not allowed.
+    // Validate that the requested finality is well-formed and permitted by this pool's config.
     FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_finalityConfig);
 
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];

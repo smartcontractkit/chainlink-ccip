@@ -155,7 +155,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, bytes2(uint16(type(uint16).max)), "", fee);
   }
 
-  function test_validateLockOrBurn_RevertWhen_InvalidFinalityConfig() public {
+  function test_validateLockOrBurn_RevertWhen_RequestedDepthBelowMinimum() public {
     bytes2 minFinality = bytes2(uint16(5));
     s_tokenPool.setFinalityConfig(minFinality);
     vm.startPrank(s_allowedOnRamp);
@@ -167,7 +167,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), requestedFinality, "", 0);
   }
 
-  function test_validateLockOrBurn_RevertWhen_FastFinalityNotEnabled() public {
+  function test_validateLockOrBurn_RevertWhen_FtfNotAllowedByPool() public {
     vm.startPrank(OWNER);
     s_tokenPool.setFinalityConfig(bytes2(0));
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
-import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";

@@ -136,7 +136,7 @@ library MessageV1Codec {
     // Configurable per-message finality value.
     bytes2 finality;
     // A hash of the verifiers and executor addresses. This is used by the offchain systems to validate the list of CCVs
-    // and executor that should be used for this message. This has no meaning on the destination chain ans is not
+    // and executor that should be used for this message. This has no meaning on the destination chain and is not
     // checked against anything.
     bytes32 ccvAndExecutorHash;
     // Variable length fields - must match wire format order.

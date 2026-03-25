@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-
 import {Router} from "../../Router.sol";
-
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {RouterSetup} from "./RouterSetup.t.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract Router_recoverTokens is RouterSetup {
   function test_RecoverTokens() public {

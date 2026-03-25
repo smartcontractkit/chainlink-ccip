@@ -37,7 +37,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     s_baseVerifier.applyRemoteChainConfigUpdates(configs);
 
     Client.EVM2AnyMessage memory message;
-    // Request 10 blocks — meets the minimum of 5 (request more security than required is fine).
+    // Request 10 blocks — meets the minimum of 10 (requesting at least the minimum is allowed).
     (uint256 feeUSDCents,,) =
       s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec._encodeBlockDepth(10));
     assertEq(feeUSDCents, DEFAULT_CCV_FEE_USD_CENTS);

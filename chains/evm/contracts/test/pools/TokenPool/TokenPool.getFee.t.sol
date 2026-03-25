@@ -77,7 +77,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
   // Reverts
 
-  function test_getFee_RevertWhen_FastFinalityNotEnabled() public {
+  function test_getFee_RevertWhen_FtfNotAllowedByPool() public {
     bytes2 requestedFinality = bytes2(uint16(1)); // Any non-zero value triggers custom finality path
 
     vm.expectRevert(
@@ -86,7 +86,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), requestedFinality, "");
   }
 
-  function test_getFee_RevertWhen_InvalidFinalityConfig() public {
+  function test_getFee_RevertWhen_RequestedDepthBelowMinimum() public {
     bytes2 minFinality = bytes2(uint16(10));
 
     // Set fast finality config with minimum of 10 blocks
