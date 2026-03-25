@@ -3,6 +3,7 @@ package deployment
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -338,7 +339,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 				// Verify on-chain token info matches what we provided to the changeset
 				require.Equal(t, timelockRef.Address, ccipAdmin.String(), fmt.Sprintf("expected CCIP admin %q to be timelock %q", ccipAdmin.Hex(), timelockRef.Address))
-				require.Equal(t, 0, supp)
+				require.Equal(t, 0, supp.Cmp(big.NewInt(0)), "expected token to have unlimited supply (i.e. max supply of 0)")
 				require.Equal(t, data.Token.Decimals, deci)
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)

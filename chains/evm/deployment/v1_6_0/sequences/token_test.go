@@ -176,10 +176,10 @@ func TestEVMTokenDeployments(t *testing.T) {
 						t.Logf("  On-chain maxSupply: %s", onChainMaxSupply.String())
 
 						// Verify total supply (should match preMint if set)
-						expectedPreMint := new(big.Int).Mul(new(big.Int).SetUint64(*tc.preMint), new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(tc.decimals)), nil))
 						onChainTotalSupply, err := tokenContract.TotalSupply(&bind.CallOpts{})
 						require.NoError(t, err, "Failed to get token total supply from chain")
 						if tc.preMint != nil {
+							expectedPreMint := new(big.Int).Mul(new(big.Int).SetUint64(*tc.preMint), new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(tc.decimals)), nil))
 							require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String(), "Token total supply mismatch for %s", tc.name)
 							t.Logf("  On-chain totalSupply: %s (matches preMint)", onChainTotalSupply.String())
 						} else {
