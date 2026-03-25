@@ -47,8 +47,10 @@ var (
 		chain_selectors.FamilyAptos: big.NewInt(15e11),
 		chain_selectors.FamilySui:   big.NewInt(15e11),
 	}
-	GetNetworkFeeUSDCents = func(chainSelector uint64) uint16 {
-		if chainSelector == chain_selectors.ETHEREUM_MAINNET.Selector || chainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector {
+	getNetworkFeeUSDCents = func(chainSelector uint64) uint16 {
+		if chainSelector == chain_selectors.ETHEREUM_MAINNET.Selector ||
+			chainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector ||
+			chainSelector == chain_selectors.ETHEREUM_TESTNET_HOODI.Selector {
 			return 50
 		}
 		return 10
@@ -353,7 +355,7 @@ var (
 						DefaultTokenFeeUSDCents:     destChainConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: destChainConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           destChainConfig.DefaultTxGasLimit,
-						NetworkFeeUSDCents:          GetNetworkFeeUSDCents(remoteChain),
+						NetworkFeeUSDCents:          getNetworkFeeUSDCents(remoteChain),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
@@ -565,7 +567,7 @@ var (
 						DefaultTokenFeeUSDCents:     onRampCfg.DynamicConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
-						NetworkFeeUSDCents:          GetNetworkFeeUSDCents(onRampCfg.RemoteChainSelector),
+						NetworkFeeUSDCents:          getNetworkFeeUSDCents(onRampCfg.RemoteChainSelector),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				})
