@@ -35,18 +35,23 @@ import (
 )
 
 const (
-	LinkFeeMultiplierPercent             uint8  = 90
-	NetworkFeeUSDCents                   uint16 = 10
-	DestChainConfigUpdateBatchLen               = 8
-	TokenTransferFeeConfigUpdateBatchLen        = 5
-	GasPriceUpdateBatchLen                      = 10
-	TokenPriceUpdateBatchLen                    = 10
+	LinkFeeMultiplierPercent             uint8 = 90
+	DestChainConfigUpdateBatchLen              = 8
+	TokenTransferFeeConfigUpdateBatchLen       = 5
+	GasPriceUpdateBatchLen                     = 10
+	TokenPriceUpdateBatchLen                   = 10
 )
 
 var (
 	staticGasPriceByChainFamily = map[string]*big.Int{
 		chain_selectors.FamilyAptos: big.NewInt(15e11),
 		chain_selectors.FamilySui:   big.NewInt(15e11),
+	}
+	GetNetworkFeeUSDCents = func(chainSelector uint64) uint16 {
+		if chainSelector == chain_selectors.ETHEREUM_MAINNET.Selector || chainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector {
+			return 50
+		}
+		return 10
 	}
 )
 
@@ -348,7 +353,7 @@ var (
 						DefaultTokenFeeUSDCents:     destChainConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: destChainConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           destChainConfig.DefaultTxGasLimit,
-						NetworkFeeUSDCents:          uint16(destChainConfig.NetworkFeeUSDCents),
+						NetworkFeeUSDCents:          GetNetworkFeeUSDCents(remoteChain),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
@@ -560,7 +565,7 @@ var (
 						DefaultTokenFeeUSDCents:     onRampCfg.DynamicConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
-						NetworkFeeUSDCents:          NetworkFeeUSDCents,
+						NetworkFeeUSDCents:          GetNetworkFeeUSDCents(onRampCfg.RemoteChainSelector),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				})
