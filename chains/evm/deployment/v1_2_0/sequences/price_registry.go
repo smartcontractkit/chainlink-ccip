@@ -28,9 +28,9 @@ type PriceRegistryImportConfigSequenceOutput struct {
 }
 
 var PriceRegistryImportConfigSequence = operations.NewSequence(
-	"PriceRegistryImportTokenPricesSequence",
-	semver.MustParse("1.5.0"),
-	"Imports token prices from the Price Registry contract on an EVM chain",
+	"PriceRegistryImportTokenAndGasPricesSequence",
+	semver.MustParse("1.2.0"),
+	"Imports token and gas prices from the Price Registry contract on an EVM chain",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input PriceRegistryImportConfigSequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {

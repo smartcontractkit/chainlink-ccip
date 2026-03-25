@@ -181,7 +181,7 @@ var (
 					}
 					destChainMu.Lock()
 					destChainConfigs[remoteChain] = opsOutput.Output
-					defer destChainMu.Unlock()
+					destChainMu.Unlock()
 					gasPriceOutput, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
 						Address:       fqAddress,
 						ChainSelector: chainSelector,
@@ -222,7 +222,7 @@ var (
 				tokenGrp.Go(func() error {
 					destChainMu.Lock()
 					_, enabled := destChainConfigs[remoteChain]
-					defer destChainMu.Unlock()
+					destChainMu.Unlock()
 					if !enabled {
 						return nil // skip if dest chain config is not enabled
 					}
@@ -254,7 +254,7 @@ var (
 							if opsOutput.Output.IsEnabled {
 								tokenTransferFeeCfgsMu.Lock()
 								tokenTransferFeeCfgs[token] = opsOutput.Output
-								defer tokenTransferFeeCfgsMu.Unlock()
+								tokenTransferFeeCfgsMu.Unlock()
 							}
 							return nil
 						})
@@ -264,7 +264,7 @@ var (
 					}
 					ttfcMu.Lock()
 					tokenTransferFeeCfgsPerChain[remoteChain] = tokenTransferFeeCfgs
-					defer ttfcMu.Unlock()
+					ttfcMu.Unlock()
 					return nil
 				})
 			}

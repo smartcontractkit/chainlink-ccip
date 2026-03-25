@@ -264,7 +264,6 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 			}
 			isNewFeeQuoterDeployment := len(feeQuoterAddrRefs) == 0
 			if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) && !perChainInput.DoNotDeployFQOrUpdateFQConfig {
-				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
 					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("FeeQuoterUpdater", chainSel, perChainInput.FeeQuoterVersion)
