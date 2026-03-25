@@ -22,6 +22,9 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   error MaxSupplyExceeded(uint256 supplyAfterMint, uint256 maxSupply);
   error OnlyCCIPAdmin();
 
+  /// @notice Emitted when the CCIPAdmin role is transferred to a new address.
+  /// @param previousAdmin The address of the previous CCIPAdmin.
+  /// @param newAdmin The address of the new CCIPAdmin.
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
   /// @param name The name of the token
