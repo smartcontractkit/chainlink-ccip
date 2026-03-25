@@ -97,6 +97,13 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	// Deploy MCMS
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -115,7 +122,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
+	bundle = operations.NewBundle(
 		func() context.Context { return context.Background() },
 		e.Logger,
 		operations.NewMemoryReporter(),
@@ -197,6 +204,13 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	currentFeeQuoterAddr := make(map[uint64]common.Address)
 	for _, chainSel := range chains {
 		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
@@ -225,6 +239,13 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 	// Deploy MCMS
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// do this to reset cached executions
+	bundle = operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -293,6 +314,13 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	currentFeeQuoterAddr := make(map[uint64]common.Address)
 	for _, chainSel := range chains {
 		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
@@ -320,7 +348,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 		require.Equal(t, currentFeeQuoterAddr[chainSel], feeQAddrAfterChangesetRun, "FeeQuoter address on ramps should not change after update when ramps are not included in the changeset for chain selector %d", chainSel)
 	}
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
+	bundle = operations.NewBundle(
 		func() context.Context { return context.Background() },
 		e.Logger,
 		operations.NewMemoryReporter(),
