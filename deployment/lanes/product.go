@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -55,6 +56,15 @@ type TokenPriceProvider interface {
 	GetDefaultTokenPrices() map[datastore.ContractType]*big.Int
 }
 
+// ChainMetadataProvider is an optional interface that LaneAdapters can implement
+// to expose the on-chain 4-byte chain family selector (e.g. 0x2812d52c for EVM).
+// When implemented, the selector is automatically registered in the global
+// family-selector registry so that GetSelectorHex can resolve it without a
+// hardcoded switch.
+type ChainMetadataProvider interface {
+	GetChainFamilySelector() [4]byte
+}
+
 type laneAdapterID string
 
 // LaneAdapterRegistry maintains a registry of LaneAdapters.
@@ -72,6 +82,8 @@ func newLaneAdapterRegistry() *LaneAdapterRegistry {
 }
 
 // RegisterLaneAdapter registers a new adapter; panics if the key already exists.
+// If the adapter implements ChainMetadataProvider, its chain family selector is
+// also registered in the global family-selector registry for GetSelectorHex.
 func (r *LaneAdapterRegistry) RegisterLaneAdapter(chainFamily string, version *semver.Version, adapter LaneAdapter) {
 	id := newLaneAdapterID(chainFamily, version)
 
@@ -82,6 +94,10 @@ func (r *LaneAdapterRegistry) RegisterLaneAdapter(chainFamily string, version *s
 		panic(fmt.Errorf("LaneAdapter '%s %s' already registered", chainFamily, version))
 	}
 	r.m[id] = adapter
+
+	if mp, ok := adapter.(ChainMetadataProvider); ok {
+		utils.RegisterChainFamilySelector(chainFamily, mp.GetChainFamilySelector())
+	}
 }
 
 // GetLaneAdapter looks up an adapter; the second return value tells you if it was found.

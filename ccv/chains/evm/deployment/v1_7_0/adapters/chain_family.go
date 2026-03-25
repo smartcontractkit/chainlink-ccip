@@ -3,10 +3,12 @@ package adapters
 import (
 	"fmt"
 	"math/big"
+  "encoding/binary"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -130,8 +132,31 @@ func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector
 	return addr, nil
 }
 
+// evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
+var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
+func (a *ChainFamilyAdapter) GetChainFamilySelector() [4]byte {
+	return evmFamilySelector
+}
+
 func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
-	return lanes.DefaultFeeQuoterDestChainConfig(false, chainsel.ETHEREUM_MAINNET.Selector)
+	sel := a.GetChainFamilySelector()
+	return lanes.FeeQuoterDestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(sel[:]),
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		V2Params: &lanes.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
+	}
 }
 
 func (a *ChainFamilyAdapter) GetDefaultGasPrice() *big.Int {
