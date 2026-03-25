@@ -3,7 +3,6 @@ pragma solidity ^0.8.4;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {CCIPClientExample} from "./CCIPClientExample.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -12,17 +11,16 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 /// @dev Each source chain can define its own CCV configuration, meaning that incoming traffic
 /// from different chains can have different security requirements. If no CCV configuration
 /// is defined for a source chain, the default CCV configuration for the lane will be used.
+/// @dev The allowed finality for a source chain is configured via the base class enableChain
+/// function, using the allowedFinalityConfig field of RemoteChainConfig. This separates
+/// CCV policy (which CCVs to require) from finality policy (which finality modes to accept).
 contract CCIPClientExampleWithCCVs is CCIPClientExample {
   error DuplicateCCV(uint64 sourceChainSelector, address ccv);
   error InvalidOptionalThreshold(uint64 sourceChainSelector, uint8 optionalThreshold);
   error ZeroAddressNotAllowedAsOptional();
 
   event CCVConfigSet(
-    uint64 indexed sourceChainSelector,
-    address[] requiredCCVs,
-    address[] optionalCCVs,
-    uint8 optionalThreshold,
-    bool allowFasterThanFinality
+    uint64 indexed sourceChainSelector, address[] requiredCCVs, address[] optionalCCVs, uint8 optionalThreshold
   );
 
   /// @notice CCV configuration for a source chain.
@@ -32,7 +30,6 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] requiredCCVs;
     address[] optionalCCVs;
     uint8 optionalThreshold;
-    bool allowFasterThanFinality;
   }
 
   /// @notice Arguments required to add a CCV configuration for a source chain.
@@ -41,7 +38,6 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] optionalCCVs;
     uint64 sourceChainSelector;
     uint8 optionalThreshold;
-    bool allowFasterThanFinality;
   }
 
   /// @notice CCV configurations by source chain selector.
@@ -51,6 +47,13 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     IRouterClient router,
     IERC20 feeToken
   ) CCIPClientExample(router, feeToken) {}
+
+  /// @notice Returns the CCV configuration for a given source chain selector.
+  function getCCVConfig(
+    uint64 sourceChainSelector
+  ) external view returns (CCVConfig memory) {
+    return s_ccvConfigs[sourceChainSelector];
+  }
 
   /// @notice Set CCV configurations for source chains.
   /// @param ccvConfigsToSet List of CCV configs to set.
@@ -90,25 +93,17 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
         }
       }
       s_ccvConfigs[args.sourceChainSelector] = CCVConfig({
-        requiredCCVs: args.requiredCCVs,
-        optionalCCVs: args.optionalCCVs,
-        optionalThreshold: args.optionalThreshold,
-        allowFasterThanFinality: args.allowFasterThanFinality
+        requiredCCVs: args.requiredCCVs, optionalCCVs: args.optionalCCVs, optionalThreshold: args.optionalThreshold
       });
-      emit CCVConfigSet(
-        args.sourceChainSelector,
-        args.requiredCCVs,
-        args.optionalCCVs,
-        args.optionalThreshold,
-        args.allowFasterThanFinality
-      );
+      emit CCVConfigSet(args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold);
     }
   }
 
   /// @notice Provides the required and optional CCVs and allowed finality config for a source chain.
   /// @dev OffRamp will apply the defaults for the lane if no CCVs are defined for a source chain.
-  /// @dev WARNING: allowedFinalityConfig must be used carefully, when in doubt it's safer to require finality (allowedFinalityConfig = bytes2(0)) than
-  /// to allow FTF messages (any non-zero value) as FTF messages can be reorged.
+  /// @dev The allowed finality is configured via enableChain in the base contract. When bytes2(0),
+  /// full finality is required (safest). Non-zero values permit faster-than-finality messages — only
+  /// enable this when using a trusted sender on the source chain that manages re-org risk.
   function getCCVsAndFinalityConfig(
     uint64 sourceChainSelector,
     bytes calldata
@@ -125,11 +120,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
-    // If allowFasterThanFinality is true, encode depth=1 plus the WAIT_FOR_SAFE flag so that the allowed config
-    // accepts both block-depth-based FTF (any depth >= 1) and safe-head-based FTF. WARNING: only enable this when
-    // using a trusted sender on the source chain that manages re-org risk when sending FTF messages.
-    // If allowFasterThanFinality is false, allowedFinalityConfig = bytes2(0) (require full finality).
-    allowedFinalityConfig = config.allowFasterThanFinality ? FinalityCodec._encodeBlockDepthAndSafeFlag(1) : bytes2(0);
+    allowedFinalityConfig = s_chains[sourceChainSelector].allowedFinalityConfig;
     return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, allowedFinalityConfig);
   }
 }

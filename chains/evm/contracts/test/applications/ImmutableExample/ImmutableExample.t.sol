@@ -21,8 +21,8 @@ contract CCIPClientExample_sanity is RouterSetup {
     // Can set chain
     Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: 300_000});
     bytes memory encodedExtraArgs = Client._argsToBytes(extraArgs);
-    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs);
-    assertEq(exampleContract.s_chains(DEST_CHAIN_SELECTOR), encodedExtraArgs);
+    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs, bytes2(0));
+    assertEq(exampleContract.getRemoteChainConfig(DEST_CHAIN_SELECTOR).extraArgs, encodedExtraArgs);
 
     address toAddress = makeAddr("toAddress");
 

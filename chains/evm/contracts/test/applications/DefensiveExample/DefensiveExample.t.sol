@@ -15,7 +15,7 @@ contract DefensiveExampleTest is RouterSetup {
     super.setUp();
 
     s_receiver = new DefensiveExample(s_destRouter, IERC20(s_destFeeToken));
-    s_receiver.enableChain(s_sourceChainSelector, abi.encode(""));
+    s_receiver.enableChain(s_sourceChainSelector, abi.encode(""), bytes2(0));
   }
 
   function test_Recovery() public {

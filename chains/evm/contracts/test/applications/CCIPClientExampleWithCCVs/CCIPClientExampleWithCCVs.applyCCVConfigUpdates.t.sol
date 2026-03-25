@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {CCIPClientExample} from "../../../applications/CCIPClientExample.sol";
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
@@ -9,6 +10,8 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   CCIPClientExampleWithCCVs internal s_client;
+
+  bytes internal constant EXTRA_ARGS = abi.encode("extraArgs");
 
   function setUp() public virtual override {
     super.setUp();
@@ -29,14 +32,11 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
-      optionalThreshold: optionalThreshold,
-      allowFasterThanFinality: true
+      optionalThreshold: optionalThreshold
     });
 
     vm.expectEmit();
-    emit CCIPClientExampleWithCCVs.CCVConfigSet(
-      SOURCE_CHAIN_SELECTOR, requiredCCVs, optionalCCVs, optionalThreshold, args[0].allowFasterThanFinality
-    );
+    emit CCIPClientExampleWithCCVs.CCVConfigSet(SOURCE_CHAIN_SELECTOR, requiredCCVs, optionalCCVs, optionalThreshold);
     s_client.applyCCVConfigUpdates(args);
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
@@ -50,7 +50,8 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
-    assertEq(allowedFinalityConfig, FinalityCodec._encodeBlockDepthAndSafeFlag(1));
+    // No finality config set via enableChain, so defaults to bytes2(0) (require full finality).
+    assertEq(allowedFinalityConfig, bytes2(0));
     for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertEq(retRequiredCCVs[i], requiredCCVs[i]);
     }
@@ -72,8 +73,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
-      optionalThreshold: optionalThreshold,
-      allowFasterThanFinality: true
+      optionalThreshold: optionalThreshold
     });
 
     vm.expectRevert(
@@ -100,8 +100,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: new address[](1),
       optionalCCVs: new address[](0),
-      optionalThreshold: 1,
-      allowFasterThanFinality: true
+      optionalThreshold: 1
     });
 
     vm.expectRevert(
@@ -123,8 +122,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
-      optionalThreshold: optionalThreshold,
-      allowFasterThanFinality: true
+      optionalThreshold: optionalThreshold
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCIPClientExampleWithCCVs.ZeroAddressNotAllowedAsOptional.selector));
@@ -144,8 +142,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: requiredCCVs,
       optionalCCVs: optionalCCVs,
-      optionalThreshold: optionalThreshold,
-      allowFasterThanFinality: true
+      optionalThreshold: optionalThreshold
     });
 
     vm.expectRevert(
@@ -163,8 +160,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: requiredCCVs,
       optionalCCVs: new address[](0),
-      optionalThreshold: 0,
-      allowFasterThanFinality: false
+      optionalThreshold: 0
     });
 
     s_client.applyCCVConfigUpdates(args);
@@ -175,10 +171,16 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
+    // No enableChain call — defaults to bytes2(0) (require full finality).
     assertEq(allowedFinalityConfig, bytes2(0));
   }
 
-  function test_getCCVsAndFinalityConfig_NoRequireFinality_ReturnsNonZeroAllowedFinalityConfig() public {
+  function test_getCCVsAndFinalityConfig_FtfAllowed_ReturnsConfiguredAllowedFinalityConfig() public {
+    bytes2 ftfConfig = FinalityCodec._encodeBlockDepthAndSafeFlag(1);
+
+    // Configure finality via the base class enableChain.
+    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, ftfConfig);
+
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);
 
@@ -187,8 +189,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       requiredCCVs: requiredCCVs,
       optionalCCVs: new address[](0),
-      optionalThreshold: 0,
-      allowFasterThanFinality: true
+      optionalThreshold: 0
     });
 
     s_client.applyCCVConfigUpdates(args);
@@ -199,6 +200,32 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
-    assertEq(allowedFinalityConfig, FinalityCodec._encodeBlockDepthAndSafeFlag(1));
+    assertEq(allowedFinalityConfig, ftfConfig);
+  }
+
+  function test_enableChain_AddsToRemoteChainSelectors() public {
+    assertEq(s_client.getRemoteChainSelectors().length, 0);
+
+    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, bytes2(0));
+
+    uint64[] memory selectors = s_client.getRemoteChainSelectors();
+    assertEq(selectors.length, 1);
+    assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
+  }
+
+  function test_disableChain_RemovesFromRemoteChainSelectors() public {
+    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, bytes2(0));
+    assertEq(s_client.getRemoteChainSelectors().length, 1);
+
+    s_client.disableChain(SOURCE_CHAIN_SELECTOR);
+    assertEq(s_client.getRemoteChainSelectors().length, 0);
+  }
+
+  function test_enableChain_SetsAllowedFinalityConfig() public {
+    bytes2 customFinality = FinalityCodec._encodeBlockDepth(10);
+    s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, customFinality);
+
+    bytes2 storedConfig = s_client.getRemoteChainConfig(SOURCE_CHAIN_SELECTOR).allowedFinalityConfig;
+    assertEq(storedConfig, customFinality);
   }
 }
