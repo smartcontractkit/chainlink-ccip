@@ -3,7 +3,6 @@ package deployment
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"math/big"
 	"testing"
 
@@ -57,6 +56,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 	// For simplicity, both EVM and Solana will use BurnMint token pools in this test
 	evmTokenPoolType := cciputils.BurnMintTokenPool
+
+	// Default max supply and pre mint amounts
+	defaultMaxSupply := uint64(1e6) // 1 million tokens
+	defaultPreMint := uint64(1e5)   // 100k tokens
 
 	// Preload Solana programs
 	programsPath, ds, err := PreloadSolanaEnvironment(t, solChainSel)
@@ -121,8 +124,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "SOL_TEST",
 				Name:                   "SOLANA Test Token",
 				Type:                   solanautils.SPLTokens,
-				Supply:                 big.NewInt(math.MaxInt64),
-				PreMint:                big.NewInt(math.MaxInt64 / 2),
+				Supply:                 nil, // unlimited supply
+				PreMint:                &defaultPreMint,
 				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
@@ -141,8 +144,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "SOL_TEST2",
 				Name:                   "SOLANA Test Token 2",
 				Type:                   solanautils.SPLTokens,
-				Supply:                 big.NewInt(math.MaxInt64),
-				PreMint:                big.NewInt(math.MaxInt64 / 2),
+				Supply:                 nil, // unlimited supply
+				PreMint:                nil, // no pre-mint
 				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
@@ -176,8 +179,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "EVM_TEST_A",
 				Name:                   "EVM Test Token A",
 				Type:                   bnmERC20ops.ContractType,
-				Supply:                 big.NewInt(0), // unlimited supply
-				PreMint:                big.NewInt(0),
+				Supply:                 &defaultMaxSupply,
+				PreMint:                &defaultPreMint,
 				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
@@ -196,8 +199,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "EVM_TEST_B",
 				Name:                   "EVM Test Token B",
 				Type:                   bnmERC20ops.ContractType,
-				Supply:                 big.NewInt(0), // unlimited supply
-				PreMint:                big.NewInt(0),
+				Supply:                 nil, // unlimited supply
+				PreMint:                nil, // no pre-mint
 				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
@@ -259,6 +262,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		}
 
 		solbnm, sollnr := solTestData[0], solTestData[1]
+
 		input := make(map[uint64]tokensapi.TokenExpansionInputPerChain)
 		// Define token expansion input
 		input[solbnm.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
@@ -322,12 +326,24 @@ func TestTokensAndTokenPools(t *testing.T) {
 				)
 				require.NoError(t, err)
 
+				// Get max supply and pre-mint
+				maxSupply := big.NewInt(0)
+				if data.Token.Supply != nil {
+					maxSupply = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*data.Token.Supply), data.Token.Decimals)
+				}
+				preMint := big.NewInt(0)
+				if data.Token.PreMint != nil {
+					preMint = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*data.Token.PreMint), data.Token.Decimals)
+				}
+
 				// Query EVM token info from the chain
 				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, &datastore.AddressRef{Qualifier: data.Token.Symbol})
 				require.NoError(t, err)
 				tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, data.Chain.Client)
 				require.NoError(t, err)
-				supp, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
+				balance, err := tokn.BalanceOf(&bind.CallOpts{Context: t.Context()}, data.Deployer)
+				require.NoError(t, err)
+				supply, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 				deci, err := tokn.Decimals(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
@@ -340,10 +356,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 				// Verify on-chain token info matches what we provided to the changeset
 				require.Equal(t, timelockRef.Address, ccipAdmin.String(), fmt.Sprintf("expected CCIP admin %q to be timelock %q", ccipAdmin.Hex(), timelockRef.Address))
-				require.Equal(t, 0, data.Token.Supply.Cmp(supp))
 				require.Equal(t, data.Token.Decimals, deci)
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)
+
+				// Verify max supply and pre-mint
+				require.Equal(t, 0, maxSupply.Cmp(supply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), supply.String()))
+				require.Equal(t, 0, preMint.Cmp(preMint), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), balance.String()))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
@@ -600,8 +619,34 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 	t.Run("Solana Token Adapter", func(t *testing.T) {
 		t.Run("Validate TokenExpansion ", func(t *testing.T) {
-			// TODO: implement this once DeriveTokenAddress is supported for Solana
-			t.Skip("Skipping Solana token expansion verification")
+			for _, data := range solTestData {
+				preMint := big.NewInt(0)
+				if data.Token.PreMint != nil {
+					preMint = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*data.Token.PreMint), data.Token.Decimals)
+				}
+
+				tokenProgramID, err := solanautils.GetTokenProgramID(deployment.ContractType(data.Token.Type))
+				require.NoError(t, err)
+
+				tokenRef, err := datastore_utils.FindAndFormatRef(
+					env.DataStore,
+					datastore.AddressRef{Qualifier: data.Token.Symbol},
+					data.Chain.Selector,
+					datastore_utils.FullRef,
+				)
+				require.NoError(t, err)
+
+				tokenAddr, err := solana.PublicKeyFromBase58(tokenRef.Address)
+				require.NoError(t, err)
+
+				deployerATA, _, err := tokens.FindAssociatedTokenAddress(tokenProgramID, tokenAddr, data.Deployer.PublicKey())
+				require.NoError(t, err)
+
+				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, deployerATA, solchain.SolDefaultCommitment)
+				require.NoError(t, err)
+
+				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %q", preMint.String(), balance))
+			}
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
@@ -616,7 +661,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:            tokenSymbol,
 				Name:              solbnm.Token.Name,
 				Type:              solanautils.SPLTokens,
-				Supply:            big.NewInt(0),
+				Supply:            nil, // unlimited supply
 				TokenPrivKey:      tokenPrivKey.String(),
 				ChainSelector:     solbnm.Chain.Selector,
 				ExistingDataStore: env.DataStore,
