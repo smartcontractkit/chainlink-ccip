@@ -58,7 +58,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 	evmTokenPoolType := cciputils.BurnMintTokenPool
 
 	// Default pre mint amount
-	defaultPreMint := uint64(1_000_000) // 1 million tokens
+	defaultMaxSupply := uint64(1e6) // 1 million tokens
+	defaultPreMint := uint64(1e5)   // 100k tokens
 
 	// Preload Solana programs
 	programsPath, ds, err := PreloadSolanaEnvironment(t, solChainSel)
@@ -178,7 +179,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Symbol:                 "EVM_TEST_A",
 				Name:                   "EVM Test Token A",
 				Type:                   bnmERC20ops.ContractType,
-				Supply:                 nil, // unlimited supply
+				Supply:                 &defaultMaxSupply,
 				PreMint:                &defaultPreMint,
 				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
@@ -325,7 +326,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				// Get pre-mint
+				// Get max supply and pre-mint
+				maxSupply := big.NewInt(0)
+				if data.Token.Supply != nil {
+					maxSupply = new(big.Int).SetUint64(*data.Token.Supply)
+				}
 				preMint := big.NewInt(0)
 				if data.Token.PreMint != nil {
 					preMint = new(big.Int).SetUint64(*data.Token.PreMint)
@@ -338,7 +343,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 				balance, err := tokn.BalanceOf(&bind.CallOpts{Context: t.Context()}, data.Deployer)
 				require.NoError(t, err)
-				supp, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
+				supply, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 				deci, err := tokn.Decimals(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
@@ -351,13 +356,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 				// Verify on-chain token info matches what we provided to the changeset
 				require.Equal(t, timelockRef.Address, ccipAdmin.String(), fmt.Sprintf("expected CCIP admin %q to be timelock %q", ccipAdmin.Hex(), timelockRef.Address))
-				require.Equal(t, 0, supp.Cmp(big.NewInt(0)), "expected token to have unlimited supply (i.e. max supply of 0)")
 				require.Equal(t, data.Token.Decimals, deci)
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)
 
-				// Verify pre-mint
+				// Verify max supply and pre-mint
 				multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(data.Token.Decimals)), nil)
+				require.Equal(t, 0, maxSupply.Cmp(new(big.Int).Mul(supply, multiplier)))
 				require.Equal(t, 0, preMint.Cmp(new(big.Int).Mul(balance, multiplier)))
 
 				// Query EVM token pool info from chain
