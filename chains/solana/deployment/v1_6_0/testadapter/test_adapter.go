@@ -562,9 +562,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 		return tokensapi.TokenExpansionInputPerChain{}
 	}
 
-	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(DefaultTokenDecimals)), nil)
-	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
-
+	preMintAmount := uint64(1_000_000) // pre-mint 1 million tokens
 	return tokensapi.TokenExpansionInputPerChain{
 		TokenPoolVersion: cciputils.Version_1_6_0,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
@@ -572,8 +570,8 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			Symbol:                 "TEST_TOKEN_" + suffix,
 			Name:                   "TEST TOKEN " + suffix,
 			Type:                   DefaultTokenType,
-			Supply:                 big.NewInt(0),             // unlimited supply
-			PreMint:                mintAmnt,                  // pre-mint some tokens for transfers
+			Supply:                 nil,                       // unlimited supply
+			PreMint:                &preMintAmount,            // pre-mint some tokens for transfers
 			Senders:                []string{admin, receiver}, // use deployer as sender
 			ExternalAdmin:          "",                        // not needed for tests
 			DisableFreezeAuthority: false,                     // don't revoke freeze authority after token creation

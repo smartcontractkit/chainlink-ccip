@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -322,6 +323,135 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			require.NotNil(t, output)
 		})
 	}
+}
+
+// configureCCTPFailMock fails only during ConfigureCCTPChainForLanes, not Deploy.
+type configureCCTPFailMock struct {
+	cctpTest_MockCCTPChain
+}
+
+func (m *configureCCTPFailMock) ConfigureCCTPChainForLanes() *cldf_ops.Sequence[adapters.ConfigureCCTPChainForLanesInput, sequences.OnChainOutput, adapters.ConfigureCCTPChainForLanesDeps] {
+	return cldf_ops.NewSequence(
+		"fail-configure-cctp",
+		semver.MustParse("1.0.0"),
+		"Always fails configure",
+		func(_ cldf_ops.Bundle, _ adapters.ConfigureCCTPChainForLanesDeps, _ adapters.ConfigureCCTPChainForLanesInput) (sequences.OnChainOutput, error) {
+			return sequences.OnChainOutput{}, errors.New("configure boom")
+		},
+	)
+}
+
+func TestDeployCCTPChains_Apply_TwoChainSuccess_WithRemoteChains(t *testing.T) {
+	// Exercises the combinedDS merge path and ConfigureCCTPChainForLanes with non-empty RemoteChains.
+	selA := uint64(5009297550715157269)
+	selB := uint64(15971525489660198786)
+
+	lggr, err := logger.New()
+	require.NoError(t, err)
+	bundle := cldf_ops.NewBundle(
+		func() context.Context { return context.Background() },
+		lggr,
+		cldf_ops.NewMemoryReporter(),
+	)
+	e := deployment.Environment{
+		OperationsBundle: bundle,
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
+	}
+
+	cctpChainRegistry := adapters.NewCCTPChainRegistry()
+	mcmsRegistry := changesets.GetRegistry()
+	cctpChainRegistry.RegisterCCTPChain("evm", &cctpTest_MockCCTPChain{})
+
+	cs := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	out, err := cs.Apply(e, v1_7_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+			selA: {
+				USDCType:         adapters.Canonical,
+				TokenMessengerV2: "0x9999999999999999999999999999999999999999",
+				RemoteChains:     map[uint64]adapters.RemoteCCTPChainConfig{selB: {}},
+			},
+			selB: {
+				USDCType:         adapters.Canonical,
+				TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+				RemoteChains:     map[uint64]adapters.RemoteCCTPChainConfig{selA: {}},
+			},
+		},
+		MCMS: nil,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+
+	// Both chains should have deployed their USDCTokenPoolProxy address.
+	addrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	assert.Len(t, addrs, 2)
+}
+
+func TestDeployCCTPChains_Apply_ConfigureSequenceError(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+
+	lggr, err := logger.New()
+	require.NoError(t, err)
+	bundle := cldf_ops.NewBundle(
+		func() context.Context { return context.Background() },
+		lggr,
+		cldf_ops.NewMemoryReporter(),
+	)
+	e := deployment.Environment{
+		OperationsBundle: bundle,
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
+	}
+
+	cctpChainRegistry := adapters.NewCCTPChainRegistry()
+	mcmsRegistry := changesets.GetRegistry()
+	cctpChainRegistry.RegisterCCTPChain("evm", &configureCCTPFailMock{})
+
+	cs := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	_, err = cs.Apply(e, v1_7_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+			chainSelector: {
+				USDCType:         adapters.Canonical,
+				TokenMessengerV2: "0x9999999999999999999999999999999999999999",
+				RemoteChains:     make(map[uint64]adapters.RemoteCCTPChainConfig),
+			},
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to configure CCTP")
+}
+
+func TestDeployCCTPChains_Apply_NilMCMS_Succeeds(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+
+	lggr, err := logger.New()
+	require.NoError(t, err)
+	bundle := cldf_ops.NewBundle(
+		func() context.Context { return context.Background() },
+		lggr,
+		cldf_ops.NewMemoryReporter(),
+	)
+	e := deployment.Environment{
+		OperationsBundle: bundle,
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
+	}
+
+	cctpChainRegistry := adapters.NewCCTPChainRegistry()
+	mcmsRegistry := changesets.GetRegistry()
+	cctpChainRegistry.RegisterCCTPChain("evm", &cctpTest_MockCCTPChain{})
+
+	cs := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	out, err := cs.Apply(e, v1_7_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+			chainSelector: {
+				USDCType:         adapters.Canonical,
+				TokenMessengerV2: "0x9999999999999999999999999999999999999999",
+				RemoteChains:     make(map[uint64]adapters.RemoteCCTPChainConfig),
+			},
+		},
+		MCMS: nil, // nil MCMS → mcmsInput is zero-value
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out)
 }
 
 func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
