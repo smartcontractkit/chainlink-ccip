@@ -63,7 +63,7 @@ var DeployToken = cldf_ops.NewSequence(
 		// This is the amount that `supply` and `preMint` will be scaled by (i.e. 10 ^ decimals)
 		scaler := new(big.Int).Exp(
 			big.NewInt(10),
-			big.NewInt(int64(input.Decimals)),
+			new(big.Int).SetUint64(uint64(input.Decimals)),
 			nil,
 		)
 

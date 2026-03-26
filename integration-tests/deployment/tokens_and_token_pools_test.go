@@ -57,6 +57,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// For simplicity, both EVM and Solana will use BurnMint token pools in this test
 	evmTokenPoolType := cciputils.BurnMintTokenPool
 
+	// Default pre mint amount
+	defaultPreMint := uint64(1_000_000) // 1 million tokens
+
 	// Preload Solana programs
 	programsPath, ds, err := PreloadSolanaEnvironment(t, solChainSel)
 	require.NoError(t, err)
@@ -121,7 +124,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Name:                   "SOLANA Test Token",
 				Type:                   solanautils.SPLTokens,
 				Supply:                 nil, // unlimited supply
-				PreMint:                nil, // no pre-mint
+				PreMint:                &defaultPreMint,
 				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
@@ -176,7 +179,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Name:                   "EVM Test Token A",
 				Type:                   bnmERC20ops.ContractType,
 				Supply:                 nil, // unlimited supply
-				PreMint:                nil, // no pre-mint
+				PreMint:                &defaultPreMint,
 				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
@@ -258,6 +261,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		}
 
 		solbnm, sollnr := solTestData[0], solTestData[1]
+
 		input := make(map[uint64]tokensapi.TokenExpansionInputPerChain)
 		// Define token expansion input
 		input[solbnm.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
@@ -321,10 +325,18 @@ func TestTokensAndTokenPools(t *testing.T) {
 				)
 				require.NoError(t, err)
 
+				// Get pre-mint
+				preMint := big.NewInt(0)
+				if data.Token.PreMint != nil {
+					preMint = new(big.Int).SetUint64(*data.Token.PreMint)
+				}
+
 				// Query EVM token info from the chain
 				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, &datastore.AddressRef{Qualifier: data.Token.Symbol})
 				require.NoError(t, err)
 				tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, data.Chain.Client)
+				require.NoError(t, err)
+				balance, err := tokn.BalanceOf(&bind.CallOpts{Context: t.Context()}, data.Deployer)
 				require.NoError(t, err)
 				supp, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
@@ -343,6 +355,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Decimals, deci)
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)
+
+				// Verify pre-mint
+				multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(data.Token.Decimals)), nil)
+				require.Equal(t, 0, preMint.Cmp(new(big.Int).Mul(balance, multiplier)))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
@@ -599,8 +615,20 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 	t.Run("Solana Token Adapter", func(t *testing.T) {
 		t.Run("Validate TokenExpansion ", func(t *testing.T) {
-			// TODO: implement this once DeriveTokenAddress is supported for Solana
-			t.Skip("Skipping Solana token expansion verification")
+			for _, data := range solTestData {
+				preMint := uint64(0)
+				if data.Token.PreMint != nil {
+					preMint = *data.Token.PreMint
+				}
+
+				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, data.Deployer.PublicKey(), solchain.SolDefaultCommitment)
+				require.NoError(t, err)
+
+				multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(data.Token.Decimals)), nil)
+				scaledAmnt := new(big.Int).Mul(big.NewInt(int64(balance)), multiplier)
+				require.True(t, scaledAmnt.IsUint64())
+				require.Equal(t, preMint, scaledAmnt.Uint64())
+			}
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
