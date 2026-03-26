@@ -100,10 +100,10 @@ contract BaseERC20_constructor is BaseERC20Setup {
     );
   }
 
-  function test_constructor_RevertWhen_PreMintSetWithZeroPreMint() public {
+  function test_constructor_RevertWhen_PreMintSetWithZeroPrintRecipient() public {
     address recipient = makeAddr("recipient");
 
-    vm.expectRevert(abi.encodeWithSelector(BaseERC20.PreMintSetWithZeroPrintMint.selector, recipient));
+    vm.expectRevert(abi.encodeWithSelector(BaseERC20.PreMintSetWithZeroPrintRecipient.selector, recipient));
     new BaseERC20(
       BaseERC20.ConstructorParams({
         name: "Zero Mint",
