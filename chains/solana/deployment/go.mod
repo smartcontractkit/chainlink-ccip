@@ -12,8 +12,8 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip/chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../
 
-// Make sure we're working with the latest chainlink-ccip/deployment
-// github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment // TODO: uncomment
+	// Make sure we're working with the latest chainlink-ccip/deployment
+	github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 )
 
 require (
@@ -38,7 +38,7 @@ require github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-202602
 require (
 	github.com/creachadair/jrpc2 v1.2.0 // indirect
 	github.com/creachadair/mds v0.13.4 // indirect
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260213025045-83535910e2c0 // indirect
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260325213023-351ee49d446f // indirect
 	github.com/stellar/go-stellar-sdk v0.1.0 // indirect
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect

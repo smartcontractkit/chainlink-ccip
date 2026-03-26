@@ -5,7 +5,7 @@ go 1.25.5
 // Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
 
-// replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment // TODO: uncomment
+replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 
 replace github.com/smartcontractkit/chainlink-ccip => ../../../.
 
@@ -22,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260213025045-83535910e2c0
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260325213023-351ee49d446f
 	github.com/smartcontractkit/mcms v0.36.0
 	github.com/stretchr/testify v1.11.1
 	github.com/xssnick/tonutils-go v1.14.1
