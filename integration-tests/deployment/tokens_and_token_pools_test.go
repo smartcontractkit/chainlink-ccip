@@ -58,7 +58,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// For simplicity, both EVM and Solana will use BurnMint token pools in this test
 	evmTokenPoolType := cciputils.BurnMintTokenPool
 
-	// Default pre mint amount
+	// Default max supply and pre mint amounts
 	defaultMaxSupply := uint64(1e6) // 1 million tokens
 	defaultPreMint := uint64(1e5)   // 100k tokens
 
