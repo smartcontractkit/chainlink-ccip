@@ -451,7 +451,6 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	}
 	// check the destination chain config for the lane for few elements to make sure it was copied correctly
 	destChainConfig20, err := fq20Contract.GetDestChainConfig(nil, remoteChainSelector)
-	t.Log("Dest chain config from FQ 2.0: ", destChainConfig20)
 	require.NoError(t, err, "Failed to get FeeQuoter dest chain config for chain selector %d", chainSel)
 	destChainConfig16, err := fq16Contract.GetDestChainConfig(nil, remoteChainSelector)
 	require.NoError(t, err, "Failed to get FeeQuoter dest chain config for old contract for chain selector %d", chainSel)

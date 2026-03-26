@@ -735,10 +735,6 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 			GasForCallExactCheck:                    uint16(5000),
 		}
-		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
-			FeeQuoterVersion: semver.MustParse("2.0.0"),
-			RampsVersion:     semver.MustParse("1.6.0"),
-		}
 	}
 
 	fqInput[chain_selectors.ETHEREUM_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
