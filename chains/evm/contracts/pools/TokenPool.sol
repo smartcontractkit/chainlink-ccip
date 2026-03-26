@@ -178,8 +178,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     i_token = token;
     i_rmnProxy = rmnProxy;
 
-    // In the case the token is not yet fully deployed, we skip this check.
-    if (address(token).code.length > 0) {
+    // In the case the token is also the pool, it won't exist yet so we skip this check.
+    if (address(token) != address(this)) {
       try IERC20Metadata(address(token)).decimals() returns (uint8 actualTokenDecimals) {
         if (localTokenDecimals != actualTokenDecimals) {
           revert InvalidDecimalArgs(localTokenDecimals, actualTokenDecimals);

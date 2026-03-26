@@ -23,10 +23,40 @@ func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.M
 }
 
 func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
-	return func(e cldf.Environment, cfg ConnectChainsConfig) error {
-		// TODO: implement
+	return func(_ cldf.Environment, cfg ConnectChainsConfig) error {
+		for i, lane := range cfg.Lanes {
+			if err := validateChainDefinition(lane.ChainA); err != nil {
+				return fmt.Errorf("lane %d ChainA: %w", i, err)
+			}
+			if err := validateChainDefinition(lane.ChainB); err != nil {
+				return fmt.Errorf("lane %d ChainB: %w", i, err)
+			}
+		}
 		return nil
 	}
+}
+
+// validateChainDefinition rejects input where the caller has set fields that
+// are populated programmatically by the changeset. Setting these is always a
+// mistake — the values would be silently overwritten by populateAddresses.
+func validateChainDefinition(def ChainDefinition) error {
+	type check struct {
+		name string
+		set  bool
+	}
+	for _, c := range []check{
+		{"OnRamp", len(def.OnRamp) > 0},
+		{"OffRamp", len(def.OffRamp) > 0},
+		{"Router", len(def.Router) > 0},
+		{"FeeQuoter", len(def.FeeQuoter) > 0},
+		{"FeeQuoterDestChainConfig", def.FeeQuoterDestChainConfig != (FeeQuoterDestChainConfig{})},
+		{"FeeQuoterVersion", def.FeeQuoterVersion != nil},
+	} {
+		if c.set {
+			return fmt.Errorf("field %q must not be set by the caller (populated programmatically)", c.name)
+		}
+	}
+	return nil
 }
 
 func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) (cldf.ChangesetOutput, error) {
@@ -144,6 +174,12 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
 	}
+	if vp, ok := adapter.(FeeQuoterVersionProvider); ok {
+		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector)
+		if err != nil {
+			return fmt.Errorf("error fetching fee quoter version for chain %d: %w", chainDef.Selector, err)
+		}
+	}
 	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
@@ -160,12 +196,17 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if chainDef.FeeQuoterDestChainConfigOverrides != nil {
 		(*chainDef.FeeQuoterDestChainConfigOverrides)(&chainDef.FeeQuoterDestChainConfig)
 	}
+	// TODO: should we also not populate gas price default as it will be used on updates? (see below)
 	if chainDef.GasPrice == nil {
 		chainDef.GasPrice = adapter.GetDefaultGasPrice()
 	}
-	if chainDef.TokenPrices == nil {
-		populateTokenPrices(ds, chainDef, adapter)
-	}
+	// TODO: as this changeset is also used for updates, we should only populate token prices if they are not already set
+	// (to avoid overwriting any on-chain live changes). This would need to only happen on the first run of the changeset
+	// for a given lane, as currently the underlying adapter implementations always update with whats provided to them.
+	//
+	// if chainDef.TokenPrices == nil {
+	// 	populateTokenPrices(ds, chainDef, adapter)
+	// }
 
 	// handle v2 separately
 	return populateAddressesV2(ds, chainDef, adapter, version)

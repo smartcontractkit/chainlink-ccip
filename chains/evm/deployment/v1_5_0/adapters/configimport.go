@@ -14,9 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -190,7 +192,29 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			}
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for chain %d (%s)", chainSelector, evmChain.Name())
+			allTokens := make(map[common.Address]struct{})
+			for _, tokens := range in.TokensPerRemoteChain {
+				for _, token := range tokens {
+					if token == (common.Address{}) {
+						continue
+					}
+					if _, exists := allTokens[token]; !exists {
+						allTokens[token] = struct{}{}
+					}
+				}
+			}
 			var result sequences.OnChainOutput
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				sequences1_2.PriceRegistryImportConfigSequence,
+				sequences1_2.PriceRegistryImportConfigSequenceInput{
+					ChainSelector:   chainSelector,
+					PriceRegistry:   ci.PriceRegistry,
+					SupportedTokens: maps.Keys(allTokens),
+					RemoteChains:    in.RemoteChains,
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to import price registry config for chain %d: %w", chainSelector, err)
+			}
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OnRampImportConfigSequence,
 				seq1_5.OnRampImportConfigSequenceInput{
@@ -202,7 +226,8 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import onramp config for chain %d: %w", chainSelector, err)
 			}
-			result, err = sequences.RunAndMergeSequence(b, chains,
+			// this is not required as of now, commenting it out to save time during import, can be uncommented in future if we want to import offramp config as well
+			/*result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OffRampImportConfigSequence,
 				seq1_5.OffRampImportConfigSequenceInput{
 					ChainSelector:          chainSelector,
@@ -211,6 +236,7 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import offramp config for chain %d: %w", chainSelector, err)
 			}
+			*/
 			return result, nil
 		})
 }
@@ -252,6 +278,10 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			if err != nil {
 				return fmt.Errorf("failed to get pool for token %s from token admin registry at %s on chain %d: %w",
 					tokenAddr.String(), tokenAdminRegAddr.String(), chain.Selector, err)
+			}
+			if poolAddr == (common.Address{}) {
+				// no pool configured for this token, skip
+				return nil
 			}
 			tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 			if err != nil {
