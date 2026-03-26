@@ -37,8 +37,8 @@ type CommitteeVerifierInputConfig struct {
 // and RemoteLanes (remote selector → remote lane endpoint), separate from CommitteeVerifierInputConfig.RemoteChains.
 type ChainConfigForLanesFromTopology struct {
 	lanes.ChainDefinition
-	CommitteeVerifiers []CommitteeVerifierInputConfig
-	RemoteLanes        map[uint64]RemoteLaneConfig
+	CommitteeVerifierConfigs []CommitteeVerifierInputConfig
+	RemoteLanes              map[uint64]RemoteLaneConfig
 }
 
 type RemoteLaneConfig struct {
