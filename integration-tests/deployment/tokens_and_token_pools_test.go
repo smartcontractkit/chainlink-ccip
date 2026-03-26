@@ -24,6 +24,7 @@ import (
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -361,8 +362,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Name, name)
 
 				// Verify max supply and pre-mint
-				require.Equal(t, 0, maxSupply.Cmp(tokensapi.ScaleTokenAmount(supply, data.Token.Decimals)))
-				require.Equal(t, 0, preMint.Cmp(tokensapi.ScaleTokenAmount(balance, data.Token.Decimals)))
+				actualMaxSupply, actualPreMint := tokensapi.ScaleTokenAmount(supply, data.Token.Decimals), tokensapi.ScaleTokenAmount(balance, data.Token.Decimals)
+				require.Equal(t, 0, maxSupply.Cmp(actualMaxSupply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), actualMaxSupply.String()))
+				require.Equal(t, 0, preMint.Cmp(actualPreMint), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), actualPreMint.String()))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
@@ -625,7 +627,24 @@ func TestTokensAndTokenPools(t *testing.T) {
 					preMint = *data.Token.PreMint
 				}
 
-				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, data.Deployer.PublicKey(), solchain.SolDefaultCommitment)
+				tokenProgramID, err := solutils.GetTokenProgramID(deployment.ContractType(data.Token.Type))
+				require.NoError(t, err)
+
+				tokenRef, err := datastore_utils.FindAndFormatRef(
+					env.DataStore,
+					datastore.AddressRef{Qualifier: data.Token.Symbol},
+					data.Chain.Selector,
+					datastore_utils.FullRef,
+				)
+				require.NoError(t, err)
+
+				tokenAddr, err := solana.PublicKeyFromBase58(tokenRef.Address)
+				require.NoError(t, err)
+
+				deployerATA, _, err := tokens.FindAssociatedTokenAddress(tokenProgramID, tokenAddr, data.Deployer.PublicKey())
+				require.NoError(t, err)
+
+				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, deployerATA, solchain.SolDefaultCommitment)
 				require.NoError(t, err)
 
 				scaledAmount := tokensapi.ScaleTokenAmount(big.NewInt(int64(balance)), data.Token.Decimals)
