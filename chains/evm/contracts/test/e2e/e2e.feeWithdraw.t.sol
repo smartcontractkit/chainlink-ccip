@@ -65,7 +65,13 @@ contract e2e_feeWithdrawal is OnRampSetup {
     // Deploy a test token and pool
     s_testToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "TestToken", symbol: "TEST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "TestToken",
+        symbol: "TEST",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER

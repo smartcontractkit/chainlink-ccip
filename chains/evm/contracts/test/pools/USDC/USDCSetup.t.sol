@@ -74,7 +74,13 @@ contract USDCSetup is BaseTest {
     super.setUp();
     CrossChainToken usdcToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "USD Coin", symbol: "USDC", decimals: 6, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "USD Coin",
+        symbol: "USDC",
+        decimals: 6,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER

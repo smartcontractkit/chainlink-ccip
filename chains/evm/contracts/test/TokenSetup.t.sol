@@ -36,7 +36,13 @@ contract TokenSetup is BaseTest {
   ) internal returns (CrossChainToken) {
     return new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: tokenName, symbol: tokenName, decimals: decimals, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: tokenName,
+        symbol: tokenName,
+        decimals: decimals,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER

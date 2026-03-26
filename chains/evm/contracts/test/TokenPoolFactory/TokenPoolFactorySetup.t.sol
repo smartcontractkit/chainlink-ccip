@@ -39,7 +39,13 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   ) internal pure returns (bytes memory) {
     bytes memory tokenCreationParams = abi.encode(
       BaseERC20.ConstructorParams({
-        name: "TestToken", symbol: "TT", decimals: 18, maxSupply: type(uint256).max, preMint: 0, ccipAdmin: factory
+        name: "TestToken",
+        symbol: "TT",
+        decimals: 18,
+        maxSupply: type(uint256).max,
+        preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
+        ccipAdmin: factory
       }),
       factory,
       OWNER

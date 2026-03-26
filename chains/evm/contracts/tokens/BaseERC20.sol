@@ -18,20 +18,26 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   error InvalidRecipient(address recipient);
   error MaxSupplyExceeded(uint256 supplyAfterMint);
   error OnlyCCIPAdmin();
+  error PreMintAddressNotSet();
+  error PreMintSetWithZeroPrintMint(address preMintRecipient);
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
   /// @param name The name of the token
   /// @param symbol The symbol of the token
-  /// @param decimals_ The number of decimals the token uses
   /// @param maxSupply_ The maximum supply of the token, 0 if unlimited
-  /// @param preMint The amount of tokens to mint to the deployer upon construction. NOTE: the base version of this
-  /// contract does not support minting additional tokens after deployment, so this should be set to the full supply.
+  /// @param preMint The amount of tokens to mint upon construction. Must be zero, or preMintRecipient must be set.
+  /// NOTE: the base version of this contract does not support minting additional tokens after deployment, so this
+  /// should be set to the full supply.
+  /// @param preMintRecipient The address to receive the pre-mint amount. Must be non-zero if preMint is non-zero.
+  /// @param decimals The number of decimals the token uses
+  /// @param ccipAdmin The initial CCIPAdmin. If set to address(0), the deployer will be set as the initial CCIPAdmin.
   struct ConstructorParams {
     string name;
     string symbol;
     uint256 maxSupply;
     uint256 preMint;
+    address preMintRecipient;
     uint8 decimals;
     address ccipAdmin;
   }
@@ -52,15 +58,17 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
     i_decimals = args.decimals;
     i_maxSupply = args.maxSupply;
 
-    address ccipAdmin = args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin;
-
-    // Mint the initial supply to the ccipAdmin, saving gas by not calling if the mint amount is zero.
+    // Mint the initial supply to the preMintRecipient, saving gas by not calling if the mint amount is zero.
     if (args.preMint != 0) {
+      if (args.preMintRecipient == address(0)) revert PreMintAddressNotSet();
       if (args.maxSupply != 0 && args.preMint > args.maxSupply) revert MaxSupplyExceeded(args.preMint);
-      _mint(ccipAdmin, args.preMint);
+
+      _mint(args.preMintRecipient, args.preMint);
+    } else if (args.preMintRecipient != address(0)) {
+      revert PreMintSetWithZeroPrintMint(args.preMintRecipient);
     }
 
-    _setCCIPAdmin(ccipAdmin);
+    _setCCIPAdmin(args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin);
   }
 
   /// @inheritdoc IERC165

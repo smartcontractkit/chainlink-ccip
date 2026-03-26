@@ -20,7 +20,13 @@ contract LombardTokenPool_getTokenDecimals is BaseTest {
     super.setUp();
     s_token = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "Lombard", symbol: "LBD", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "Lombard",
+        symbol: "LBD",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER

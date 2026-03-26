@@ -17,14 +17,26 @@ contract USDCTokenPoolProxy_withdrawFeeTokens is USDCTokenPoolProxySetup {
 
     s_feeToken1 = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "FeeToken1", symbol: "FT1", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "FeeToken1",
+        symbol: "FT1",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
     );
     s_feeToken2 = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "FeeToken2", symbol: "FT2", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "FeeToken2",
+        symbol: "FT2",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
