@@ -361,9 +361,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Name, name)
 
 				// Verify max supply and pre-mint
-				multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(data.Token.Decimals)), nil)
-				require.Equal(t, 0, maxSupply.Cmp(new(big.Int).Mul(supply, multiplier)))
-				require.Equal(t, 0, preMint.Cmp(new(big.Int).Mul(balance, multiplier)))
+				require.Equal(t, 0, maxSupply.Cmp(tokensapi.ScaleTokenAmount(supply, data.Token.Decimals)))
+				require.Equal(t, 0, preMint.Cmp(tokensapi.ScaleTokenAmount(balance, data.Token.Decimals)))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
@@ -629,10 +628,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, data.Deployer.PublicKey(), solchain.SolDefaultCommitment)
 				require.NoError(t, err)
 
-				multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(data.Token.Decimals)), nil)
-				scaledAmnt := new(big.Int).Mul(big.NewInt(int64(balance)), multiplier)
-				require.True(t, scaledAmnt.IsUint64())
-				require.Equal(t, preMint, scaledAmnt.Uint64())
+				scaledAmount := tokensapi.ScaleTokenAmount(big.NewInt(int64(balance)), data.Token.Decimals)
+				require.Equal(t, 0, new(big.Int).SetUint64(preMint).Cmp(scaledAmount))
 			}
 		})
 

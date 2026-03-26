@@ -60,23 +60,16 @@ var DeployToken = cldf_ops.NewSequence(
 		var tokenRef datastore.AddressRef
 		qualifier := input.Symbol
 
-		// This is the amount that `supply` and `preMint` will be scaled by (i.e. 10 ^ decimals)
-		scaler := new(big.Int).Exp(
-			big.NewInt(10),
-			new(big.Int).SetUint64(uint64(input.Decimals)),
-			nil,
-		)
-
 		// Default max supply is 0 (i.e. unlimited supply)
 		maxSupply := big.NewInt(0)
 		if input.Supply != nil {
-			maxSupply = new(big.Int).Mul(new(big.Int).SetUint64(*input.Supply), scaler)
+			maxSupply = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.Supply), input.Decimals)
 		}
 
 		// Default pre-mint amount is 0 (i.e. don't pre mint any tokens)
 		preMint := big.NewInt(0)
 		if input.PreMint != nil {
-			preMint = new(big.Int).Mul(new(big.Int).SetUint64(*input.PreMint), scaler)
+			preMint = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
 		}
 
 		switch input.Type {

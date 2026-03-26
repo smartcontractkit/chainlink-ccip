@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -392,4 +393,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
+	multiplier := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil)
+	return new(big.Int).Mul(amount, multiplier)
 }

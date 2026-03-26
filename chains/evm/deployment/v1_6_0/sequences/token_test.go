@@ -169,7 +169,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 						t.Logf("  On-chain decimals: %d", onChainDecimals)
 
 						// Verify max supply
-						expectedMaxSupply := new(big.Int).Mul(new(big.Int).SetUint64(*tc.supply), new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(tc.decimals)), nil))
+						expectedMaxSupply := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*tc.supply), tc.decimals)
 						onChainMaxSupply, err := tokenContract.MaxSupply(&bind.CallOpts{})
 						require.NoError(t, err, "Failed to get token max supply from chain")
 						require.Equal(t, expectedMaxSupply.String(), onChainMaxSupply.String(), "Token max supply mismatch for %s", tc.name)
@@ -179,7 +179,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 						onChainTotalSupply, err := tokenContract.TotalSupply(&bind.CallOpts{})
 						require.NoError(t, err, "Failed to get token total supply from chain")
 						if tc.preMint != nil {
-							expectedPreMint := new(big.Int).Mul(new(big.Int).SetUint64(*tc.preMint), new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(tc.decimals)), nil))
+							expectedPreMint := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*tc.preMint), tc.decimals)
 							require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String(), "Token total supply mismatch for %s", tc.name)
 							t.Logf("  On-chain totalSupply: %s (matches preMint)", onChainTotalSupply.String())
 						} else {
