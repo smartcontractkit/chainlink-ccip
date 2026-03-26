@@ -26,6 +26,7 @@ contract CrossChainPoolToken_sendReceive is CrossChainPoolTokenSetup {
         decimals: DEFAULT_TOKEN_DECIMALS,
         maxSupply: MAX_SUPPLY,
         preMint: 0,
+        preMintRecipient: address(0),
         ccipAdmin: OWNER
       }),
       address(0),

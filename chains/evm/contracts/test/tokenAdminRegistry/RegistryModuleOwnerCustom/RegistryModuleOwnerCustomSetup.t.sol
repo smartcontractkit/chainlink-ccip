@@ -22,7 +22,13 @@ contract RegistryModuleOwnerCustomSetup is Test {
     s_token = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "Test", symbol: "TST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "Test",
+          symbol: "TST",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER

@@ -29,7 +29,13 @@ contract FeeTokenHandler_withdrawFeeTokens is BaseTest {
     s_feeToken = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "FeeToken", symbol: "FEE", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "FeeToken",
+          symbol: "FEE",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER

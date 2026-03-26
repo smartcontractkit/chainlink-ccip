@@ -14,7 +14,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     address newToken = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "New Token",
+          symbol: "NEW",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER
@@ -41,7 +47,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     uint256 countBefore = s_lombardVerifier.getSupportedTokens().length;
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -69,7 +81,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     // First add a token.
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -99,7 +117,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     // First add a token with an adapter.
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -133,7 +157,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_RotateAdapter_RevokesOldAdapterAllowance() public {
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -165,7 +195,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_SwitchFromNoAdapterToAdapter_RevokesBridgeAllowance() public {
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -198,7 +234,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_SwitchFromAdapterToNoAdapter_RevokesAdapterAllowance() public {
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
@@ -227,7 +269,13 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_SameAdapter_NoRedundantRevoke() public {
     CrossChainToken newToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "New Token", symbol: "NEW", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "New Token",
+        symbol: "NEW",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER

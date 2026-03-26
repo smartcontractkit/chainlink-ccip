@@ -49,7 +49,13 @@ contract CommitteeVerifier_withdrawFeeTokens is CommitteeVerifierSetup {
     address token2 = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "Token2", symbol: "TK2", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "Token2",
+          symbol: "TK2",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER

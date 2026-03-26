@@ -12,7 +12,13 @@ contract SiloedLockReleaseTokenPool_constructor is BaseTest {
   function test_constructor() public {
     CrossChainToken token = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "TKN", symbol: "T", decimals: DEFAULT_TOKEN_DECIMALS, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "TKN",
+        symbol: "T",
+        decimals: DEFAULT_TOKEN_DECIMALS,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER

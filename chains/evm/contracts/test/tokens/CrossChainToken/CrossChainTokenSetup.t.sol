@@ -21,6 +21,7 @@ contract CrossChainTokenSetup is BaseTest {
         decimals: DEFAULT_TOKEN_DECIMALS,
         maxSupply: MAX_SUPPLY,
         preMint: PRE_MINT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),

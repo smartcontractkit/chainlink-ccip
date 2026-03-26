@@ -119,7 +119,13 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     uint256 amount = 1000e18;
     CrossChainToken unsupportedToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "BAD", symbol: "BAD", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "BAD",
+        symbol: "BAD",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
