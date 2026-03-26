@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type ChainDefinition struct {
@@ -35,9 +36,15 @@ type ChainDefinition struct {
 	// Addresses must be in this chain's native format (e.g. hex for EVM, base58 for Solana).
 	// This is provided by the user
 	AllowList []string
-	// The CommitteeVerifiers on the chain being configured.
-	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
+	// CommitteeVerifiers holds fully resolved committee verifier configuration.
+	// For v2.0 lanes, either this or CommitteeVerifierInputs must be populated.
+	// Mutually exclusive with CommitteeVerifierInputs.
 	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
+	// CommitteeVerifierInputs holds raw committee verifier configuration that
+	// requires resolution (contract lookup + signing key fetch) during apply.
+	// When set, ConnectChainsConfig.CommitteeResolver must also be provided.
+	// Mutually exclusive with CommitteeVerifiers.
+	CommitteeVerifierInputs []CommitteeVerifierInput
 	// The addresses of CCVs that will be applied to messages FROM this chain if no receiver is specified.
 	DefaultInboundCCVs []datastore.AddressRef
 	// Addresses of any CCVs that must always be used for messages FROM this chain.
@@ -183,6 +190,10 @@ type ExecutorDestChainConfig struct {
 type ConnectChainsConfig struct {
 	Lanes []LaneConfig
 	MCMS  mcms.Input
+	// CommitteeResolver resolves CommitteeVerifierInputs into fully configured
+	// CommitteeVerifierConfig values during apply. Required when any ChainDefinition
+	// in Lanes has CommitteeVerifierInputs set. Nil for 1.6-only usage.
+	CommitteeResolver CommitteeVerifierResolver
 }
 type LaneConfig struct {
 	ChainA       ChainDefinition
@@ -208,3 +219,34 @@ type UpdateLanesInput struct {
 // FeeQuoterDestChainConfigOverride is a functional option that mutates a
 // FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
 type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
+
+// CommitteeVerifierResolver resolves raw CommitteeVerifierInput values into
+// fully configured CommitteeVerifierConfig values. Implementations encapsulate
+// contract registry lookup, signing key resolution, and topology mapping.
+type CommitteeVerifierResolver interface {
+	ResolveCommitteeConfig(
+		e cldf.Environment,
+		chainSelector uint64,
+		inputs []CommitteeVerifierInput,
+	) ([]CommitteeVerifierConfig[datastore.AddressRef], error)
+}
+
+// CommitteeVerifierInput describes raw committee verifier configuration before
+// resolution. The resolver transforms these into CommitteeVerifierConfig values
+// by looking up contracts and computing signing quorums.
+type CommitteeVerifierInput struct {
+	CommitteeQualifier string
+	RemoteChains       map[uint64]CommitteeVerifierRemoteChainInput
+}
+
+// CommitteeVerifierRemoteChainInput is the user-provided portion of remote
+// chain config. The resolver adds SignatureConfig (signers + threshold) during
+// resolution to produce CommitteeVerifierRemoteChainConfig.
+type CommitteeVerifierRemoteChainInput struct {
+	AllowlistEnabled          bool
+	AddedAllowlistedSenders   []string
+	RemovedAllowlistedSenders []string
+	FeeUSDCents               uint16
+	GasForVerification        uint32
+	PayloadSizeBytes          uint32
+}
