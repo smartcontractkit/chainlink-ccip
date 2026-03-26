@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -822,6 +823,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Len(t, out.DataStore.Addresses().Filter(), 0, "new addresses found on downgrade")
+	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 
 	for _, chainSel := range chains {
 		fqUpgradeValidation(t, e, chainSel, chains, false, true)
@@ -835,6 +837,59 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 			},
 		},
 	})
+
+	// Verify the version in Datastore is still 1.6.0 after downgrade
+	chain1Family, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+
+	chain1Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain1Family, version)
+	if !exists {
+		t.Fatal("no adapter found")
+	}
+
+	chain2Family, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+
+	chain2Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain2Family, version)
+	if !exists {
+		t.Fatal("no adapter found")
+	}
+
+	// Verify the version of the FQ version has been downgraded
+	fqAddressChain1 := common.Address{}
+	if dfq, ok := chain1Adapter.(lanesapi.DynamicFeeQuoter); ok {
+		fqAddressChain1Bytes, err := dfq.GetFQAddressDynamic(e.DataStore, chain1.Selector, e.BlockChains)
+		if err != nil {
+			t.Fatalf("error fetching fee quoter address %d", chain1.Selector)
+		}
+		fqAddressChain1 = common.BytesToAddress(fqAddressChain1Bytes)
+	}
+	chain1Ref := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chain1.Selector),
+		datastore.AddressRefByType(datastore.ContractType(cciputils.FeeQuoter)),
+		datastore.AddressRefByAddress(fqAddressChain1.Hex()),
+	)
+	if len(chain1Ref) != 1 {
+		t.Fatalf("expected exactly 1 fee quoter address for chain1 after downgrade, found %d", len(chain1Ref))
+	}
+
+	fqAddressChain2 := common.Address{}
+	if dfq, ok := chain2Adapter.(lanesapi.DynamicFeeQuoter); ok {
+		fqAddressChain2Bytes, err := dfq.GetFQAddressDynamic(e.DataStore, chain2.Selector, e.BlockChains)
+		if err != nil {
+			t.Fatalf("error fetching fee quoter address %d", chain1.Selector)
+		}
+		fqAddressChain2 = common.BytesToAddress(fqAddressChain2Bytes)
+	}
+	chain2Ref := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chain2.Selector),
+		datastore.AddressRefByType(datastore.ContractType(cciputils.FeeQuoter)),
+		datastore.AddressRefByAddress(fqAddressChain2.Hex()),
+	)
+	if len(chain2Ref) != 1 {
+		t.Fatalf("expected exactly 1 fee quoter address for chain2 after downgrade, found %d", len(chain2Ref))
+	}
+
+	require.Equal(t, chain1Ref[0].Version, semver.MustParse("1.6.3"))
+	require.Equal(t, chain2Ref[0].Version, semver.MustParse("1.6.3"))
 
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 }
