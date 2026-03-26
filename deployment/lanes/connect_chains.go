@@ -166,6 +166,9 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			// at the lane level and then set them to nil before passing to the adapters
 			chainA.FeeQuoterDestChainConfigOverrides = nil
 			chainB.FeeQuoterDestChainConfigOverrides = nil
+			// RMN verification is not supported in lanes, so we disable it to avoid confusion.
+			chainA.RMNVerificationEnabled = false
+			chainB.RMNVerificationEnabled = false
 			type lanePair struct {
 				src         *ChainDefinition
 				dest        *ChainDefinition
