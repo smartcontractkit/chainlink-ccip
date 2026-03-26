@@ -126,15 +126,14 @@ func validateChainDefinition(def ChainDefinition) error {
 
 func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error) {
-		if err := resolveCommitteeConfigs(e, cfg.Lanes, cfg.CommitteePopulator); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
 		for i := range cfg.Lanes {
 			lane := &cfg.Lanes[i]
+			if err := populateCommitteeInputsIfNeeded(e, lane, cfg.CommitteePopulator); err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
 			chainA, chainB := &lane.ChainA, &lane.ChainB
 			chainAFamily, err := chain_selectors.GetSelectorFamily(chainA.Selector)
 			if err != nil {
@@ -228,41 +227,29 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-// resolveCommitteeConfigs runs the CommitteeConfigPopulator once per unique
-// chain selector, caching the resolved CommitteeVerifiers. This is the only
-// population step that is both expensive (external JD call) and truly
-// per-chain (independent of per-lane settings like TestRouter or overrides).
-// Address population and per-lane transformations are deliberately left to
-// the per-lane loop because they depend on lane-level context.
-func resolveCommitteeConfigs(
-	e cldf.Environment,
-	lanes []LaneConfig,
-	populator CommitteeConfigPopulator,
-) error {
+// populateCommitteeInputsIfNeeded calls the CommitteeConfigPopulator for each
+// chain in the lane that has CommitteeVerifierInputs, replacing them with
+// resolved CommitteeVerifiers. No-op for chains that already have resolved
+// verifiers or no committee config (e.g. 1.6 lanes).
+//
+// The expensive work (fetching signing keys from JD) is handled internally
+// by the populator's own caching (e.g. sync.Once), so calling this per-lane
+// is cheap after the first invocation — subsequent calls only do in-memory
+// topology lookups and datastore address resolution.
+func populateCommitteeInputsIfNeeded(e cldf.Environment, lane *LaneConfig, populator CommitteeConfigPopulator) error {
 	if populator == nil {
 		return nil
 	}
-	cache := make(map[uint64][]CommitteeVerifierConfig[datastore.AddressRef])
-	for i := range lanes {
-		lane := &lanes[i]
-		for _, def := range []*ChainDefinition{&lane.ChainA, &lane.ChainB} {
-			if len(def.CommitteeVerifierInputs) == 0 {
-				continue
-			}
-			sel := def.Selector
-			if cached, ok := cache[sel]; ok {
-				def.CommitteeVerifiers = cached
-				def.CommitteeVerifierInputs = nil
-				continue
-			}
-			populated, err := populator.PopulateCommitteeConfig(e, sel, def.CommitteeVerifierInputs)
-			if err != nil {
-				return fmt.Errorf("failed to populate committee config for chain %d: %w", sel, err)
-			}
-			cache[sel] = populated
-			def.CommitteeVerifiers = populated
-			def.CommitteeVerifierInputs = nil
+	for _, def := range []*ChainDefinition{&lane.ChainA, &lane.ChainB} {
+		if len(def.CommitteeVerifierInputs) == 0 {
+			continue
 		}
+		populated, err := populator.PopulateCommitteeConfig(e, def.Selector, def.CommitteeVerifierInputs)
+		if err != nil {
+			return fmt.Errorf("failed to populate committee config for chain %d: %w", def.Selector, err)
+		}
+		def.CommitteeVerifiers = populated
+		def.CommitteeVerifierInputs = nil
 	}
 	return nil
 }
