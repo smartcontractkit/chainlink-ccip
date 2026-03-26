@@ -42,7 +42,7 @@ type ChainDefinition struct {
 	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
 	// CommitteeVerifierInputs holds raw committee verifier configuration that
 	// requires resolution (contract lookup + signing key fetch) during apply.
-	// When set, ConnectChainsConfig.CommitteeResolver must also be provided.
+	// When set, ConnectChainsConfig.CommitteePopulator must also be provided.
 	// Mutually exclusive with CommitteeVerifiers.
 	CommitteeVerifierInputs []CommitteeVerifierInput
 	// The addresses of CCVs that will be applied to messages FROM this chain if no receiver is specified.
@@ -190,10 +190,10 @@ type ExecutorDestChainConfig struct {
 type ConnectChainsConfig struct {
 	Lanes []LaneConfig
 	MCMS  mcms.Input
-	// CommitteeResolver resolves CommitteeVerifierInputs into fully configured
+	// CommitteePopulator populates CommitteeVerifierInputs into fully configured
 	// CommitteeVerifierConfig values during apply. Required when any ChainDefinition
 	// in Lanes has CommitteeVerifierInputs set. Nil for 1.6-only usage.
-	CommitteeResolver CommitteeVerifierResolver
+	CommitteePopulator CommitteeConfigPopulator
 }
 type LaneConfig struct {
 	ChainA       ChainDefinition
@@ -220,11 +220,11 @@ type UpdateLanesInput struct {
 // FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
 type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
 
-// CommitteeVerifierResolver resolves raw CommitteeVerifierInput values into
+// CommitteeConfigPopulator populates raw CommitteeVerifierInput values into
 // fully configured CommitteeVerifierConfig values. Implementations encapsulate
-// contract registry lookup, signing key resolution, and topology mapping.
-type CommitteeVerifierResolver interface {
-	ResolveCommitteeConfig(
+// contract registry lookup, signing key fetch, and topology mapping.
+type CommitteeConfigPopulator interface {
+	PopulateCommitteeConfig(
 		e cldf.Environment,
 		chainSelector uint64,
 		inputs []CommitteeVerifierInput,

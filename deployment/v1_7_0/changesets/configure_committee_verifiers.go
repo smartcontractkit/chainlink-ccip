@@ -14,10 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-// TopologyCommitteeResolver implements lanes.CommitteeVerifierResolver by
-// resolving committee verifier contracts from a registry and signing keys
+// TopologyCommitteePopulator implements lanes.CommitteeConfigPopulator by
+// populating committee verifier contracts from a registry and signing keys
 // from NOP topology + JD.
-type TopologyCommitteeResolver struct {
+type TopologyCommitteePopulator struct {
 	contractRegistry *adapters.CommitteeVerifierContractRegistry
 	topology         *offchain.EnvironmentTopology
 
@@ -25,20 +25,20 @@ type TopologyCommitteeResolver struct {
 	signingKeys     fetch_signing_keys.SigningKeysByNOP
 }
 
-// NewTopologyCommitteeResolver creates a resolver that encapsulates the
-// topology-aware committee verifier resolution. It is intended to be
+// NewTopologyCommitteePopulator creates a populator that encapsulates the
+// topology-aware committee verifier population. It is intended to be
 // created per-invocation with the relevant topology config.
-func NewTopologyCommitteeResolver(
+func NewTopologyCommitteePopulator(
 	contractRegistry *adapters.CommitteeVerifierContractRegistry,
 	topology *offchain.EnvironmentTopology,
-) *TopologyCommitteeResolver {
-	return &TopologyCommitteeResolver{
+) *TopologyCommitteePopulator {
+	return &TopologyCommitteePopulator{
 		contractRegistry: contractRegistry,
 		topology:         topology,
 	}
 }
 
-func (r *TopologyCommitteeResolver) ResolveCommitteeConfig(
+func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 	e deployment.Environment,
 	chainSelector uint64,
 	inputs []lanes.CommitteeVerifierInput,

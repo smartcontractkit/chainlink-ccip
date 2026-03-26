@@ -32,10 +32,10 @@ func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(c
 				return fmt.Errorf("lane %d ChainB: %w", i, err)
 			}
 			if lane.Version != nil && !lane.Version.LessThan(common_utils.Version_2_0_0) {
-				if err := validateV2ChainDefinition(lane.ChainA, cfg.CommitteeResolver); err != nil {
+				if err := validateV2ChainDefinition(lane.ChainA, cfg.CommitteePopulator); err != nil {
 					return fmt.Errorf("lane %d ChainA: %w", i, err)
 				}
-				if err := validateV2ChainDefinition(lane.ChainB, cfg.CommitteeResolver); err != nil {
+				if err := validateV2ChainDefinition(lane.ChainB, cfg.CommitteePopulator); err != nil {
 					return fmt.Errorf("lane %d ChainB: %w", i, err)
 				}
 			}
@@ -47,17 +47,30 @@ func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(c
 // validateV2ChainDefinition checks that v2.0-required fields are properly
 // configured. For chains that participate in committee verification, either
 // resolved CommitteeVerifiers or resolvable CommitteeVerifierInputs (with a
-// CommitteeResolver) must be provided.
-func validateV2ChainDefinition(def ChainDefinition, resolver CommitteeVerifierResolver) error {
+// CommitteePopulator) must be provided.
+func validateV2ChainDefinition(def ChainDefinition, populator CommitteeConfigPopulator) error {
 	hasResolved := len(def.CommitteeVerifiers) > 0
 	hasInputs := len(def.CommitteeVerifierInputs) > 0
+	hasCommitteeConfig := hasResolved || hasInputs
 
 	if hasResolved && hasInputs {
 		return fmt.Errorf("CommitteeVerifiers and CommitteeVerifierInputs are mutually exclusive")
 	}
 
-	if hasInputs && resolver == nil {
-		return fmt.Errorf("CommitteeVerifierInputs provided but no CommitteeResolver on config")
+	if hasInputs && populator == nil {
+		return fmt.Errorf("CommitteeVerifierInputs provided but no CommitteePopulator on config")
+	}
+
+	// For v2.0 lanes, allowlist fields are managed at the committee verifier
+	// level (CommitteeVerifierRemoteChainInput / CommitteeVerifierRemoteChainConfig),
+	// not on ChainDefinition. Reject if the user sets them at the wrong level.
+	if hasCommitteeConfig {
+		if def.AllowListEnabled {
+			return fmt.Errorf("AllowListEnabled must not be set on ChainDefinition for v2.0 lanes; set it on CommitteeVerifierRemoteChainInput instead")
+		}
+		if len(def.AllowList) > 0 {
+			return fmt.Errorf("AllowList must not be set on ChainDefinition for v2.0 lanes; use AddedAllowlistedSenders on CommitteeVerifierRemoteChainInput instead")
+		}
 	}
 
 	if hasResolved {
@@ -102,11 +115,11 @@ func validateChainDefinition(def ChainDefinition) error {
 	return nil
 }
 
-// resolveCommitteeInputsIfNeeded calls the CommitteeVerifierResolver for each
+// populateCommitteeInputsIfNeeded calls the CommitteeConfigPopulator for each
 // chain in the lane that has CommitteeVerifierInputs, replacing them with fully
-// resolved CommitteeVerifiers. This is a no-op for chains that already have
-// resolved CommitteeVerifiers or no committee config at all (e.g. 1.6 lanes).
-func resolveCommitteeInputsIfNeeded(e cldf.Environment, lane *LaneConfig, resolver CommitteeVerifierResolver) error {
+// populated CommitteeVerifiers. This is a no-op for chains that already have
+// populated CommitteeVerifiers or no committee config at all (e.g. 1.6 lanes).
+func populateCommitteeInputsIfNeeded(e cldf.Environment, lane *LaneConfig, populator CommitteeConfigPopulator) error {
 	for _, entry := range []struct {
 		name string
 		def  *ChainDefinition
@@ -117,11 +130,11 @@ func resolveCommitteeInputsIfNeeded(e cldf.Environment, lane *LaneConfig, resolv
 		if len(entry.def.CommitteeVerifierInputs) == 0 {
 			continue
 		}
-		resolved, err := resolver.ResolveCommitteeConfig(e, entry.def.Selector, entry.def.CommitteeVerifierInputs)
+		populated, err := populator.PopulateCommitteeConfig(e, entry.def.Selector, entry.def.CommitteeVerifierInputs)
 		if err != nil {
-			return fmt.Errorf("failed to resolve committee config for %s (chain %d): %w", entry.name, entry.def.Selector, err)
+			return fmt.Errorf("failed to populate committee config for %s (chain %d): %w", entry.name, entry.def.Selector, err)
 		}
-		entry.def.CommitteeVerifiers = resolved
+		entry.def.CommitteeVerifiers = populated
 		entry.def.CommitteeVerifierInputs = nil
 	}
 	return nil
@@ -134,7 +147,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 		ds := datastore.NewMemoryDataStore()
 		for i := range cfg.Lanes {
 			lane := &cfg.Lanes[i]
-			if err := resolveCommitteeInputsIfNeeded(e, lane, cfg.CommitteeResolver); err != nil {
+			if err := populateCommitteeInputsIfNeeded(e, lane, cfg.CommitteePopulator); err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 			chainA, chainB := &lane.ChainA, &lane.ChainB

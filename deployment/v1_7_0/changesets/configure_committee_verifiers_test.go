@@ -78,13 +78,13 @@ func newResolverTestEnv(t *testing.T, selectors []uint64) deployment.Environment
 	}
 }
 
-func TestTopologyCommitteeResolver_AdapterNotRegistered(t *testing.T) {
+func TestTopologyCommitteePopulator_AdapterNotRegistered(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
 
-	resolver := changesets.NewTopologyCommitteeResolver(committeeRegistry, &offchain.EnvironmentTopology{
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{
 				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
@@ -102,7 +102,7 @@ func TestTopologyCommitteeResolver_AdapterNotRegistered(t *testing.T) {
 
 	env := newResolverTestEnv(t, []uint64{sel1, sel2})
 
-	_, err := resolver.ResolveCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
 		{
 			CommitteeQualifier: "default",
 			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
@@ -114,7 +114,7 @@ func TestTopologyCommitteeResolver_AdapterNotRegistered(t *testing.T) {
 	assert.Contains(t, err.Error(), "no committee verifier contract adapter")
 }
 
-func TestTopologyCommitteeResolver_AddressResolutionFails(t *testing.T) {
+func TestTopologyCommitteePopulator_AddressResolutionFails(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -123,7 +123,7 @@ func TestTopologyCommitteeResolver_AddressResolutionFails(t *testing.T) {
 		resolveErr: fmt.Errorf("contract not deployed"),
 	})
 
-	resolver := changesets.NewTopologyCommitteeResolver(committeeRegistry, &offchain.EnvironmentTopology{
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{
 				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
@@ -141,7 +141,7 @@ func TestTopologyCommitteeResolver_AddressResolutionFails(t *testing.T) {
 
 	env := newResolverTestEnv(t, []uint64{sel1, sel2})
 
-	_, err := resolver.ResolveCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
 		{
 			CommitteeQualifier: "default",
 			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
@@ -153,7 +153,7 @@ func TestTopologyCommitteeResolver_AddressResolutionFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "contract not deployed")
 }
 
-func TestTopologyCommitteeResolver_MissingSignerForNOP(t *testing.T) {
+func TestTopologyCommitteePopulator_MissingSignerForNOP(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -166,7 +166,7 @@ func TestTopologyCommitteeResolver_MissingSignerForNOP(t *testing.T) {
 		},
 	})
 
-	resolver := changesets.NewTopologyCommitteeResolver(committeeRegistry, &offchain.EnvironmentTopology{
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{
 				{Alias: "nop-1"},
@@ -184,7 +184,7 @@ func TestTopologyCommitteeResolver_MissingSignerForNOP(t *testing.T) {
 
 	env := newResolverTestEnv(t, []uint64{sel1, sel2})
 
-	_, err := resolver.ResolveCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
 		{
 			CommitteeQualifier: "default",
 			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
@@ -196,7 +196,7 @@ func TestTopologyCommitteeResolver_MissingSignerForNOP(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing signer_address")
 }
 
-func TestTopologyCommitteeResolver_CommitteeNotFound(t *testing.T) {
+func TestTopologyCommitteePopulator_CommitteeNotFound(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -205,7 +205,7 @@ func TestTopologyCommitteeResolver_CommitteeNotFound(t *testing.T) {
 		contractsByChainAndQualifier: map[string][]datastore.AddressRef{},
 	})
 
-	resolver := changesets.NewTopologyCommitteeResolver(committeeRegistry, &offchain.EnvironmentTopology{
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{
 				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
@@ -218,7 +218,7 @@ func TestTopologyCommitteeResolver_CommitteeNotFound(t *testing.T) {
 
 	env := newResolverTestEnv(t, []uint64{sel1, sel2})
 
-	_, err := resolver.ResolveCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
 		{
 			CommitteeQualifier: "nonexistent",
 			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
@@ -230,7 +230,7 @@ func TestTopologyCommitteeResolver_CommitteeNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), `committee "nonexistent" not found`)
 }
 
-func TestTopologyCommitteeResolver_ResolvesSuccessfully(t *testing.T) {
+func TestTopologyCommitteePopulator_PopulatesSuccessfully(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -247,7 +247,7 @@ func TestTopologyCommitteeResolver_ResolvesSuccessfully(t *testing.T) {
 		},
 	})
 
-	resolver := changesets.NewTopologyCommitteeResolver(committeeRegistry, &offchain.EnvironmentTopology{
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{
 				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
@@ -266,7 +266,7 @@ func TestTopologyCommitteeResolver_ResolvesSuccessfully(t *testing.T) {
 
 	env := newResolverTestEnv(t, []uint64{sel1, sel2})
 
-	result, err := resolver.ResolveCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+	result, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
 		{
 			CommitteeQualifier: "default",
 			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
