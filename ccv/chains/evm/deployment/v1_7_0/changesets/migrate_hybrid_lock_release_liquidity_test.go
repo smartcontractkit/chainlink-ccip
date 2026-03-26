@@ -1,6 +1,8 @@
 package changesets_test
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,7 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -116,4 +122,81 @@ func TestMigrateHybridLockReleaseLiquidity_Validate_InvalidWithdrawChainSelector
 	err := migrateCS().VerifyPreconditions(deployment.Environment{}, cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid chain selector")
+}
+
+// ---- Apply tests ----
+
+// migrateTest_MockReader is a controllable MCMSReader for Apply tests.
+type migrateTest_MockReader struct {
+	timelockErr error
+}
+
+var _ cs_core.MCMSReader = (*migrateTest_MockReader)(nil)
+
+func (r *migrateTest_MockReader) GetMCMSRef(_ deployment.Environment, _ uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{}, nil
+}
+
+func (r *migrateTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, _ mcms.Input) (mcms_types.ChainMetadata, error) {
+	return mcms_types.ChainMetadata{}, nil
+}
+
+func (r *migrateTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	if r.timelockErr != nil {
+		return datastore.AddressRef{}, r.timelockErr
+	}
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          "Timelock",
+		Address:       "0x5555555555555555555555555555555555555555",
+	}, nil
+}
+
+func newMigrateApplyEnv(t *testing.T) deployment.Environment {
+	t.Helper()
+	lggr := logger.Test(t)
+	return deployment.Environment{
+		Name:        "test",
+		BlockChains: cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{}),
+		DataStore:   datastore.NewMemoryDataStore().Seal(),
+		Logger:      lggr,
+		OperationsBundle: cldf_ops.NewBundle(
+			func() context.Context { return context.Background() },
+			lggr,
+			cldf_ops.NewMemoryReporter(),
+		),
+	}
+}
+
+func TestMigrateHybridLockReleaseLiquidity_Apply_NoMCMSReaderRegistered(t *testing.T) {
+	env := newMigrateApplyEnv(t)
+	var registry cs_core.MCMSReaderRegistry // no reader registered
+	cs := changesets.MigrateHybridLockReleaseLiquidity(&registry)
+
+	_, err := cs.Apply(env, validMigrateConfig())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no MCMS reader registered for chain family 'evm'")
+}
+
+func TestMigrateHybridLockReleaseLiquidity_Apply_TimelockRefFails(t *testing.T) {
+	env := newMigrateApplyEnv(t)
+	var registry cs_core.MCMSReaderRegistry
+	registry.RegisterMCMSReader("evm", &migrateTest_MockReader{timelockErr: errors.New("timelock not found")})
+	cs := changesets.MigrateHybridLockReleaseLiquidity(&registry)
+
+	_, err := cs.Apply(env, validMigrateConfig())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to resolve timelock address")
+}
+
+func TestMigrateHybridLockReleaseLiquidity_Apply_SequenceExecutionError(t *testing.T) {
+	// The sequence fails because no EVM chain for the Sepolia selector is present in BlockChains.
+	env := newMigrateApplyEnv(t)
+	var registry cs_core.MCMSReaderRegistry
+	registry.RegisterMCMSReader("evm", &migrateTest_MockReader{})
+	cs := changesets.MigrateHybridLockReleaseLiquidity(&registry)
+
+	_, err := cs.Apply(env, validMigrateConfig())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to migrate hybrid lock-release liquidity")
 }

@@ -286,6 +286,30 @@ func TestDeployLombardChains_Apply_DeploySequenceError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to deploy Lombard")
 }
 
+func TestDeployLombardChains_Apply_TwoChainSuccess_WithRemoteChains(t *testing.T) {
+	// Exercises combinedDS merge and ConfigureLombardChainForLanes with non-empty RemoteChains.
+	env := newLombardTestEnv(t)
+
+	mock := &mockLombardAdapter{deployAddr: "0xLombardPoolA"}
+	registry := adapters.NewLombardChainRegistry()
+	registry.RegisterLombardChain(chainsel.FamilyEVM, mock)
+
+	cs := changesets.DeployLombardChains(registry, lombardRegistry())
+	out, err := cs.Apply(env, changesets.DeployLombardChainsConfig{
+		Chains: map[uint64]changesets.LombardChainConfig{
+			lombSelA: {RemoteChains: map[uint64]adapters.RemoteLombardChainConfig{lombSelB: {}}},
+			lombSelB: {RemoteChains: map[uint64]adapters.RemoteLombardChainConfig{lombSelA: {}}},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out.DataStore)
+
+	addrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	// One address per chain (both use the same deployAddr from the mock).
+	assert.Len(t, addrs, 2)
+}
+
 func TestDeployLombardChains_Apply_ConfigureSequenceError(t *testing.T) {
 	env := newLombardTestEnv(t)
 

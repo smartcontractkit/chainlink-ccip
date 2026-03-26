@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -116,4 +117,69 @@ func TestFetchSigningKeysForNOPs_AllSignersPresent_ReturnsNil(t *testing.T) {
 	}
 	result := fetchSigningKeysForNOPs(e, nops)
 	assert.Nil(t, result)
+}
+
+// jdMockOffchain overrides ListNodes and ListNodeChainConfigs so the JD code path
+// in fetchSigningKeysForNOPs can be exercised without a real JD server.
+type jdMockOffchain struct {
+	internalStubOffchain
+	listNodesFn            func(context.Context, *nodev1.ListNodesRequest, ...grpc.CallOption) (*nodev1.ListNodesResponse, error)
+	listNodeChainConfigsFn func(context.Context, *nodev1.ListNodeChainConfigsRequest, ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error)
+}
+
+func (m *jdMockOffchain) ListNodes(ctx context.Context, in *nodev1.ListNodesRequest, opts ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
+	return m.listNodesFn(ctx, in, opts...)
+}
+
+func (m *jdMockOffchain) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNodeChainConfigsRequest, opts ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
+	return m.listNodeChainConfigsFn(ctx, in, opts...)
+}
+
+func TestFetchSigningKeysForNOPs_CallsJD_WhenSignerMissing(t *testing.T) {
+	// NOP without an EVM signer triggers the JD lookup path.
+	lggr := logger.Test(t)
+	bundle := cldf_ops.NewBundle(
+		func() context.Context { return context.Background() },
+		lggr,
+		cldf_ops.NewMemoryReporter(),
+	)
+
+	mock := &jdMockOffchain{
+		listNodesFn: func(_ context.Context, _ *nodev1.ListNodesRequest, _ ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
+			return &nodev1.ListNodesResponse{
+				Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop1"}},
+			}, nil
+		},
+		listNodeChainConfigsFn: func(_ context.Context, _ *nodev1.ListNodeChainConfigsRequest, _ ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
+			return &nodev1.ListNodeChainConfigsResponse{
+				ChainConfigs: []*nodev1.ChainConfig{
+					{
+						NodeId: "node-1",
+						Chain:  &nodev1.Chain{Type: nodev1.ChainType_CHAIN_TYPE_EVM},
+						Ocr2Config: &nodev1.OCR2Config{
+							OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{
+								OnchainSigningAddress: "0xdeadbeef",
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	e := deployment.Environment{
+		Logger:           lggr,
+		OperationsBundle: bundle,
+		Offchain:         mock,
+		NodeIDs:          []string{"node-1"},
+	}
+
+	nops := []offchain.NOPConfig{
+		{Alias: "nop1"}, // no EVM signer → triggers JD fetch
+	}
+
+	result := fetchSigningKeysForNOPs(e, nops)
+	require.NotNil(t, result)
+	require.Contains(t, result, "nop1")
+	assert.NotEmpty(t, result["nop1"][chainsel.FamilyEVM])
 }

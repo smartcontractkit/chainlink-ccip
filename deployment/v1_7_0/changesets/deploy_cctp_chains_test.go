@@ -341,6 +341,52 @@ func (m *configureCCTPFailMock) ConfigureCCTPChainForLanes() *cldf_ops.Sequence[
 	)
 }
 
+func TestDeployCCTPChains_Apply_TwoChainSuccess_WithRemoteChains(t *testing.T) {
+	// Exercises the combinedDS merge path and ConfigureCCTPChainForLanes with non-empty RemoteChains.
+	selA := uint64(5009297550715157269)
+	selB := uint64(15971525489660198786)
+
+	lggr, err := logger.New()
+	require.NoError(t, err)
+	bundle := cldf_ops.NewBundle(
+		func() context.Context { return context.Background() },
+		lggr,
+		cldf_ops.NewMemoryReporter(),
+	)
+	e := deployment.Environment{
+		OperationsBundle: bundle,
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
+	}
+
+	cctpChainRegistry := adapters.NewCCTPChainRegistry()
+	mcmsRegistry := changesets.GetRegistry()
+	cctpChainRegistry.RegisterCCTPChain("evm", &cctpTest_MockCCTPChain{})
+
+	cs := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	out, err := cs.Apply(e, v1_7_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+			selA: {
+				USDCType:         adapters.Canonical,
+				TokenMessengerV2: "0x9999999999999999999999999999999999999999",
+				RemoteChains:     map[uint64]adapters.RemoteCCTPChainConfig{selB: {}},
+			},
+			selB: {
+				USDCType:         adapters.Canonical,
+				TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+				RemoteChains:     map[uint64]adapters.RemoteCCTPChainConfig{selA: {}},
+			},
+		},
+		MCMS: nil,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+
+	// Both chains should have deployed their USDCTokenPoolProxy address.
+	addrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	assert.Len(t, addrs, 2)
+}
+
 func TestDeployCCTPChains_Apply_ConfigureSequenceError(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 

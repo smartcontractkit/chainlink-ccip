@@ -106,6 +106,17 @@ func TestRunAndMergeSequence_ErrorsOnConflictingChainMetadata(t *testing.T) {
 	assert.Contains(t, err.Error(), "conflicting chain metadata")
 }
 
+func TestRunAndMergeSequence_SetsEnvMetadataWhenAggregateHasNone(t *testing.T) {
+	seq := outputSequence(sequences.OnChainOutput{
+		Metadata: sequences.Metadata{Env: &datastore.EnvMetadata{}},
+	}, nil)
+
+	result, err := sequences.RunAndMergeSequence(newBundle(t), emptyChains, seq, struct{}{}, sequences.OnChainOutput{})
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Metadata.Env)
+}
+
 func TestRunAndMergeSequence_ErrorsOnConflictingEnvMetadata(t *testing.T) {
 	initial := sequences.OnChainOutput{
 		Metadata: sequences.Metadata{Env: &datastore.EnvMetadata{}},
@@ -160,6 +171,9 @@ func TestWriteMetadataToDatastore_WritesAllFields(t *testing.T) {
 	assert.Len(t, contracts, 2)
 
 	_, err = ds.ChainMetadata().Get(datastore.NewChainMetadataKey(42))
+	require.NoError(t, err)
+
+	_, err = ds.EnvMetadata().Get()
 	require.NoError(t, err)
 }
 

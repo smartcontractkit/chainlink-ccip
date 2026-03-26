@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
@@ -46,6 +47,14 @@ func TestDeployVerifierResolverViaCREATE2_DeploysAndAcceptsOwnership(t *testing.
 
 	// Two writes: CreateAndTransferOwnership + AcceptOwnership
 	assert.Len(t, report.Output.Writes, 2)
+
+	// Verify that AcceptOwnership completed: the deployer key must be the owner.
+	deployedAddr := common.HexToAddress(addr.Address)
+	resolver, err := versioned_verifier_resolver_bindings.NewVersionedVerifierResolver(deployedAddr, chain.Client)
+	require.NoError(t, err)
+	owner, err := resolver.Owner(nil)
+	require.NoError(t, err)
+	assert.Equal(t, chain.DeployerKey.From, owner, "owner should be the deployer key after AcceptOwnership")
 }
 
 // TestDeployVerifierResolverViaCREATE2_DifferentQualifiersProduceDifferentAddresses
