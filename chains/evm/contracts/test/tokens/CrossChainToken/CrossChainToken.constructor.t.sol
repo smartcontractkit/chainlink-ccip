@@ -47,7 +47,7 @@ contract CrossChainToken_constructor is CrossChainTokenSetup {
   }
 
   function test_typeAndVersion() public view {
-    assertEq("CrossChainToken 2.0.0-dev", s_crossChainToken.typeAndVersion());
+    assertEq("CrossChainToken 2.0.0", s_crossChainToken.typeAndVersion());
   }
 
   function test_constructor_Roles() public view {

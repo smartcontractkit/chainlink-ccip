@@ -82,7 +82,7 @@ contract BaseERC20_constructor is BaseERC20Setup {
   }
 
   function test_typeAndVersion() public view {
-    assertEq("BaseERC20 2.0.0-dev", s_baseERC20.typeAndVersion());
+    assertEq("BaseERC20 2.0.0", s_baseERC20.typeAndVersion());
   }
 
   function test_constructor_RevertWhen_PreMintAddressNotSet() public {

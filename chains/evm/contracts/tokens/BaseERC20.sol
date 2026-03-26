@@ -14,7 +14,7 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// exposed.
 contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BaseERC20 2.0.0-dev";
+    return "BaseERC20 2.0.0";
   }
 
   error CannotRenounceCCIPAdmin();

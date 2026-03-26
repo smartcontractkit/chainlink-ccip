@@ -17,7 +17,7 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// DEFAULT_ADMIN_ROLE. The DEFAULT_ADMIN_ROLE holder can also be used to register the token in the token admin registry.
 contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMintERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "CrossChainToken 2.0.0-dev";
+    return "CrossChainToken 2.0.0";
   }
 
   /// @notice The holder of this role can mint tokens.
