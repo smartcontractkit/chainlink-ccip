@@ -778,7 +778,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 	e.DataStore = out.DataStore.Seal()
 	for _, chainSel := range chains {
-		fqUpgradeValidation(t, e, chainSel, chains, true)
+		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 	// do this to reset cached executions
 	bundle := operations.NewBundle(
@@ -804,7 +804,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	require.Len(t, out.DataStore.Addresses().Filter(), 0, "new addresses found on downgrade")
 
 	for _, chainSel := range chains {
-		fqUpgradeValidation(t, e, chainSel, chains, false)
+		fqUpgradeValidation(t, e, chainSel, chains, false, true)
 	}
 
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
