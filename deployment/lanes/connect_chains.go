@@ -183,7 +183,7 @@ func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter L
 		}
 	}
 	if vp, ok := adapter.(FeeQuoterVersionProvider); ok {
-		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector)
+		chainDef.FeeQuoterVersion, err = vp.GetFQVersion(ds, chainDef.FeeQuoter, chainDef.Selector, e.BlockChains)
 		if err != nil {
 			return fmt.Errorf("error fetching fee quoter version for chain %d: %w", chainDef.Selector, err)
 		}

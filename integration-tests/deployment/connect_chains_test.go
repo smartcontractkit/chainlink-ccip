@@ -635,7 +635,6 @@ func TestConnectChains_EVM2EVM_Lifecycle(t *testing.T) {
 // TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion runs an e2e with 1.6 FeeQuoter, upgrades to 2.0,
 // then runs ConnectChains again (lane expansion / re-apply) and verifies connectivity using the 2.0 FeeQuoter path.
 func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) {
-	t.Parallel()
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.POLYGON_MAINNET.Selector,
@@ -699,6 +698,7 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 		},
 		MCMS: NewDefaultInputForMCMS("Connect Chains after FQ upgrade"),
 	})
+
 	require.NoError(t, err, "Failed to apply ConnectChains changeset after FQ upgrade")
 	testhelpers.ProcessTimelockProposals(t, *e, connectOut2.MCMSTimelockProposals, false)
 
@@ -707,6 +707,9 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 }
 
 func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
+	// Cannot use t.Parallel(): the ConfigImportAdapter singleton in the
+	// FQAndRampUpdaterRegistry is mutated by InitializeAdapter, so concurrent
+	// FQ-upgrade tests sharing ETHEREUM_MAINNET race on its address fields.
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,
@@ -768,13 +771,19 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	// Deploy MCMS
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
 		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
 	})
-
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)
 	require.Equal(t, 1, len(out.MCMSTimelockProposals))
@@ -787,7 +796,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
+	bundle = operations.NewBundle(
 		func() context.Context { return context.Background() },
 		e.Logger,
 		operations.NewMemoryReporter(),
@@ -805,14 +814,12 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
 	})
-
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Len(t, out.DataStore.Addresses().Filter(), 0, "new addresses found on downgrade")
 
 	for _, chainSel := range chains {
 		fqUpgradeValidation(t, e, chainSel, chains, false, true)
 	}
-
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{

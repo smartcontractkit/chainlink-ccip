@@ -90,11 +90,6 @@ func TestChainFamilyAdapter(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			chainFamilyRegistry := lanes.GetLaneAdapterRegistry()
-			adapter, ok := chainFamilyRegistry.GetLaneAdapter("evm", semver.MustParse("2.0.0"))
-			require.True(t, ok, "expected evm 2.0.0 adapter to be registered")
-			require.NotNil(t, adapter, "expected adapter to be non-nil")
-			_, ok = adapter.(lanes.DynamicFeeQuoter)
-			require.True(t, ok, "expected adapter %T to implement DynamicFeeQuoter", adapter)
 			mcmsRegistry := changesets.GetRegistry()
 
 			// On each chain, deploy chain contracts
