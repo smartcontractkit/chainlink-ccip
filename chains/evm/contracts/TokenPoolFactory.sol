@@ -117,6 +117,9 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// remote token pools. The token pool is then set in the token admin registry. Ownership of the everything is transferred
   /// to the futureOwner (or msg.sender if no futureOwner is given), but must be accepted in a separate transaction due
   /// to 2-step ownership transfer.
+  /// @dev Not all tokens are supported. This factory is designed to work with the CrossChainToken, and while other
+  /// tokens may be compatible, no guarantees are given. The factory does not verify compatibility, so using an
+  /// incompatible token may result in a broken deployment.
   /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
   /// or to be predicted if the pool has not been deployed yet on the remote chain.
   /// @param localTokenDecimals The amount of decimals to be used in the new token. Since decimals() is not part of the
@@ -126,6 +129,9 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended.
   /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address.
+  /// @param futureOwner The address that will own the token and pool after the transaction. If set to address(0), the
+  /// sender will be the future owner. If the token mints any funds to the factory, the factory will forward these to
+  /// the futureOwner.
   /// @return token The address of the token that was deployed.
   /// @return pool The address of the token pool that was deployed.
   function deployTokenAndTokenPool(
@@ -187,6 +193,8 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param tokenPoolInitCode The creation code for the token pool.
   /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token pool.
+  /// @param futureOwner The address that will own the pool after the transaction. If set to address(0), the sender will
+  /// be the future owner.
   /// @return poolAddress The address of the token pool that was deployed.
   function deployTokenPoolWithExistingToken(
     address token,

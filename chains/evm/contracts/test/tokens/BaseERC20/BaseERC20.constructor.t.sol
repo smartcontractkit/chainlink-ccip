@@ -121,7 +121,7 @@ contract BaseERC20_constructor is BaseERC20Setup {
     uint256 maxSupply = 500e18;
     uint256 preMint = maxSupply + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, preMint));
+    vm.expectRevert(abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, preMint, maxSupply));
     new BaseERC20(
       BaseERC20.ConstructorParams({
         name: "Over",
