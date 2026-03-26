@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -77,12 +77,12 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	require.NoError(t, out.DataStore.Merge(e.DataStore))
 	e.DataStore = out.DataStore.Seal()
 	chain1 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 	chain2 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.AVALANCHE_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
+		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
@@ -97,6 +97,13 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	// Deploy MCMS
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -112,10 +119,10 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 	e.DataStore = out.DataStore.Seal()
 	for _, chainSel := range chains {
-		fqUpgradeValidation(t, e, chainSel, chains, true)
+		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
+	bundle = operations.NewBundle(
 		func() context.Context { return context.Background() },
 		e.Logger,
 		operations.NewMemoryReporter(),
@@ -137,11 +144,252 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	require.Len(t, out.DataStore.Addresses().Filter(), 0, "new addresses found on downgrade")
 
 	for _, chainSel := range chains {
-		fqUpgradeValidation(t, e, chainSel, chains, false)
+		fqUpgradeValidation(t, e, chainSel, chains, false, true)
 	}
 }
 
-func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, chains []uint64, expected17fq bool) {
+func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
+	chains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+		chain_selectors.AVALANCHE_MAINNET.Selector,
+	}
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, chains),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
+	mcmsRegistry := cs_core.GetRegistry()
+	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	chainInput := make(map[uint64]deployops.ContractDeploymentConfigPerChain)
+	fqInput := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain)
+
+	for _, chainSel := range chains {
+		chainInput[chainSel] = deployops.ContractDeploymentConfigPerChain{
+			Version: version,
+			// FEE QUOTER CONFIG
+			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+			LinkPremiumMultiplier:        9e17, // 0.9 ETH
+			NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+			// OFFRAMP CONFIG
+			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+			GasForCallExactCheck:                    uint16(5000),
+		}
+		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
+			FeeQuoterVersion: semver.MustParse("2.0.0"),
+		}
+	}
+	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
+		MCMS:   mcms.Input{},
+		Chains: chainInput,
+	})
+	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+	require.NoError(t, out.DataStore.Merge(e.DataStore))
+	e.DataStore = out.DataStore.Seal()
+	chain1 := lanesapi.ChainDefinition{
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+	}
+	chain2 := lanesapi.ChainDefinition{
+		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
+	}
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		Lanes: []lanesapi.LaneConfig{
+			{
+				Version: version,
+				ChainA:  chain1,
+				ChainB:  chain2,
+			},
+		},
+	})
+	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+	currentFeeQuoterAddr := make(map[uint64]common.Address)
+	for _, chainSel := range chains {
+		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
+		var remoteChainSelector uint64
+		if chainSel == chain_selectors.ETHEREUM_MAINNET.Selector {
+			remoteChainSelector = chain_selectors.AVALANCHE_MAINNET.Selector
+		} else if chainSel == chain_selectors.AVALANCHE_MAINNET.Selector {
+			remoteChainSelector = chain_selectors.ETHEREUM_MAINNET.Selector
+		}
+		// set zero price explicitly to test that the update fails when zero price is returned from the oracles
+		_, err := operations.ExecuteSequence(e.OperationsBundle, seq1_6.FeeQuoterUpdatePricesSequence, e.BlockChains,
+			seq1_6.FeeQuoterUpdatePricesSequenceInput{
+				Address:       currentFeeQuoterAddr[chainSel],
+				ChainSelector: chainSel,
+				UpdatesByChain: fq163ops.PriceUpdates{
+					GasPriceUpdates: []fq163ops.GasPriceUpdate{
+						{
+							DestChainSelector: remoteChainSelector,
+							UsdPerUnitGas:     big.NewInt(0),
+						},
+					},
+				},
+			})
+		require.NoError(t, err, "Failed to execute FeeQuoterUpdatePricesSequence for chain selector %d", chainSel)
+	}
+	// Deploy MCMS
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// do this to reset cached executions
+	bundle = operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+	// now update to FeeQuoter 2.0.0
+	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
+	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: fqInput,
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
+	})
+	require.Errorf(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Contains(t, err.Error(), "invalid gas price 0 for remote chain", "Expected error about invalid gas price when applying changeset with zero gas price")
+}
+
+func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
+	chains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+		chain_selectors.AVALANCHE_MAINNET.Selector,
+	}
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, chains),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
+	mcmsRegistry := cs_core.GetRegistry()
+	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	chainInput := make(map[uint64]deployops.ContractDeploymentConfigPerChain)
+	fqInput := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain)
+
+	for _, chainSel := range chains {
+		chainInput[chainSel] = deployops.ContractDeploymentConfigPerChain{
+			Version: version,
+			// FEE QUOTER CONFIG
+			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+			LinkPremiumMultiplier:        9e17, // 0.9 ETH
+			NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+			// OFFRAMP CONFIG
+			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+			GasForCallExactCheck:                    uint16(5000),
+		}
+		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
+			FeeQuoterVersion: semver.MustParse("2.0.0"),
+		}
+	}
+	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
+		MCMS:   mcms.Input{},
+		Chains: chainInput,
+	})
+	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+	require.NoError(t, out.DataStore.Merge(e.DataStore))
+	e.DataStore = out.DataStore.Seal()
+	chain1 := lanesapi.ChainDefinition{
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
+	}
+	chain2 := lanesapi.ChainDefinition{
+		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
+	}
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		Lanes: []lanesapi.LaneConfig{
+			{
+				Version: version,
+				ChainA:  chain1,
+				ChainB:  chain2,
+			},
+		},
+	})
+	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+	currentFeeQuoterAddr := make(map[uint64]common.Address)
+	for _, chainSel := range chains {
+		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
+	}
+	// Deploy MCMS
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// now update to FeeQuoter 2.0.0
+	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
+	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: fqInput,
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
+	})
+	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Greater(t, len(out.Reports), 0)
+	require.Equal(t, 1, len(out.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
+	// update datastore with changeset output
+	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
+	e.DataStore = out.DataStore.Seal()
+	for _, chainSel := range chains {
+		fqUpgradeValidation(t, e, chainSel, chains, true, false)
+		feeQAddrAfterChangesetRun := getFeeQuoterFromRamps(t, e, chainSel)
+		require.Equal(t, currentFeeQuoterAddr[chainSel], feeQAddrAfterChangesetRun, "FeeQuoter address on ramps should not change after update when ramps are not included in the changeset for chain selector %d", chainSel)
+	}
+	// do this to reset cached executions
+	bundle = operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+	// now add the ramps
+	for _, chainSel := range chains {
+		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
+			FeeQuoterVersion:              semver.MustParse("2.0.0"),
+			RampsVersion:                  semver.MustParse("1.6.0"),
+			DoNotDeployFQOrUpdateFQConfig: true,
+		}
+	}
+	// there should not be any mcms proposals created since we are not updating the fee quoter config or address, just updating the ramps to point to the new fee quoter
+	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: fqInput,
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
+	})
+	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Empty(t, out.MCMSTimelockProposals)
+	for _, chainSel := range chains {
+		fqUpgradeValidation(t, e, chainSel, chains, true, true)
+	}
+
+	// Re run the changeset with DoNotDeployFQOrUpdateFQConfig as false
+	for chainSel := range fqInput {
+		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
+			FeeQuoterVersion:              semver.MustParse("2.0.0"),
+			RampsVersion:                  semver.MustParse("1.6.0"),
+			DoNotDeployFQOrUpdateFQConfig: false,
+		}
+	}
+	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: fqInput,
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
+	})
+	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Equal(t, 1, len(out.MCMSTimelockProposals))
+}
+
+func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, chains []uint64, expected17fq bool, withRampUpdate bool) {
 	chain := e.BlockChains.EVMChains()[chainSel]
 
 	// get fee quoter address and check config
@@ -151,12 +399,12 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 		datastore.AddressRefByVersion(fqops.Version),
 	)
 	require.Len(t, fq17AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for chain selector %d", chainSel)
-	fq17Addr := common.HexToAddress(fq17AddrRefs[0].Address)
-	fq17Contract, err := fqops.NewFeeQuoterContract(fq17Addr, chain.Client)
+	fq20Addr := common.HexToAddress(fq17AddrRefs[0].Address)
+	fq20Contract, err := fqops.NewFeeQuoterContract(fq20Addr, chain.Client)
 	require.NoError(t, err, "Failed to instantiate FeeQuoter 2.0 contract for chain selector %d", chainSel)
 	fq16AddrRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSel),
-		datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
+		datastore.AddressRefByType(datastore.ContractType(fq163ops.ContractType)),
 		datastore.AddressRefByVersion(fq163ops.Version),
 	)
 	require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.0 and chain selector %d", chainSel)
@@ -166,13 +414,13 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	require.NoError(t, err, "Failed to instantiate old FeeQuoter 1.6.0 contract for chain selector %d", chainSel)
 	staticConfig16, err := fq16Contract.GetStaticConfig(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter config for old contract for chain selector %d", chainSel)
-	staticConfig17, err := fq17Contract.GetStaticConfig(nil)
+	staticConfig17, err := fq20Contract.GetStaticConfig(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter config for chain selector %d", chainSel)
 	require.Equal(t, staticConfig16.MaxFeeJuelsPerMsg, staticConfig17.MaxFeeJuelsPerMsg, "MaxFeeJuelsPerMsg should be the same after update for chain selector %d", chainSel)
 	require.Equal(t, staticConfig16.LinkToken, staticConfig17.LinkToken, "LinkToken address should be the same after update for chain selector %d", chainSel)
 	updaters16, err := fq16Contract.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for old contract for chain selector %d", chainSel)
-	updaters17, err := fq17Contract.GetAllAuthorizedCallers(nil)
+	updaters17, err := fq20Contract.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for chain selector %d", chainSel)
 	for _, caller := range updaters16 {
 		require.Contains(t, updaters17, caller, "FQ 2.0 should contain all authorized callers from FQ 1.6 for chain selector %d", chainSel)
@@ -189,7 +437,7 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 		require.NotEmpty(t, timelockRef.Address, "Expected timelock address for chain selector %d", chainSel)
 		timelockAddr := common.HexToAddress(timelockRef.Address)
 		require.Contains(t, updaters17, timelockAddr, "FQ 2.0 should have timelock as a price updater for chain selector %d", chainSel)
-		fq17Owner, err := fq17Contract.Owner(nil)
+		fq17Owner, err := fq20Contract.Owner(nil)
 		require.NoError(t, err, "Failed to get FeeQuoter 2.0 owner for chain selector %d", chainSel)
 		require.Equal(t, timelockAddr, fq17Owner, "FeeQuoter 2.0 should be owned by timelock after ownership transfer for chain selector %d", chainSel)
 	}
@@ -202,13 +450,34 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 		}
 	}
 	// check the destination chain config for the lane for few elements to make sure it was copied correctly
-	destChainConfig17, err := fq17Contract.GetDestChainConfig(nil, remoteChainSelector)
+	destChainConfig20, err := fq20Contract.GetDestChainConfig(nil, remoteChainSelector)
 	require.NoError(t, err, "Failed to get FeeQuoter dest chain config for chain selector %d", chainSel)
 	destChainConfig16, err := fq16Contract.GetDestChainConfig(nil, remoteChainSelector)
 	require.NoError(t, err, "Failed to get FeeQuoter dest chain config for old contract for chain selector %d", chainSel)
-	require.Equal(t, destChainConfig16.IsEnabled, destChainConfig17.IsEnabled, "IsEnabled in dest chain config should be the same after update for chain selector %d", chainSel)
-	require.Equal(t, destChainConfig16.DefaultTxGasLimit, destChainConfig17.DefaultTxGasLimit, "DefaultTxGasLimit in dest chain config should be the same after update for chain selector %d", chainSel)
+	require.Equal(t, destChainConfig16.IsEnabled, destChainConfig20.IsEnabled, "IsEnabled in dest chain config should be the same after update for chain selector %d", chainSel)
+	require.Equal(t, destChainConfig16.DefaultTxGasLimit, destChainConfig20.DefaultTxGasLimit, "DefaultTxGasLimit in dest chain config should be the same after update for chain selector %d", chainSel)
+	// verify gas prices are copied correctly
+	gaspriceFQ20, err := fq20Contract.GetDestinationChainGasPrice(nil, remoteChainSelector)
+	require.NoError(t, err, "Failed to get gas price for destination chain from FeeQuoter 2.0 for chain selector %d", chainSel)
+	gaspriceFQ16, err := fq16Contract.GetDestinationChainGasPrice(nil, remoteChainSelector)
+	require.NoError(t, err, "Failed to get gas price for destination chain from FeeQuoter 1.6 for chain selector %d", chainSel)
+	require.Equal(t, gaspriceFQ16.Value, gaspriceFQ20.Value, "Gas price for destination chain should be the same after update for chain selector %d", chainSel)
 
+	feeQOnRamps := getFeeQuoterFromRamps(t, e, chainSel)
+	expectedFQAddr := fq20Addr
+	if !expected17fq {
+		expectedFQAddr = fq16Addr
+	}
+	if withRampUpdate {
+		require.Equal(t, feeQOnRamps, expectedFQAddr, "Ramps should point to expected FeeQuoter after update for chain selector %d", chainSel)
+	}
+}
+
+func getFeeQuoterFromRamps(t *testing.T, e *cldf.Environment, chainSel uint64) common.Address {
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
+	if !ok {
+		t.Fatalf("EVM chain with selector %d not found in environment", chainSel)
+	}
 	// get the onramp and offramp
 	onRampAddrRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSel),
@@ -229,13 +498,9 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	offRampContract, err := offramp.NewOffRamp(offRampAddr, chain.Client)
 	require.NoError(t, err, "Failed to instantiate OffRamp contract for chain selector %d", chainSel)
 	onRampDCfg, err := onRampContract.GetDynamicConfig(nil)
-	require.NoError(t, err, "Failed to get OnRamp static config for chain selector %d", chainSel)
+	require.NoError(t, err, "Failed to get OnRamp dynamic config for chain selector %d", chainSel)
 	offRampDCfg, err := offRampContract.GetDynamicConfig(nil)
-	require.NoError(t, err, "Failed to get OffRamp static config for chain selector %d", chainSel)
-	expectedFQAddr := fq17Addr
-	if !expected17fq {
-		expectedFQAddr = fq16Addr
-	}
-	require.Equal(t, onRampDCfg.FeeQuoter, expectedFQAddr, "OnRamp should point to expected FeeQuoter after update for chain selector %d", chainSel)
-	require.Equal(t, offRampDCfg.FeeQuoter, expectedFQAddr, "OffRamp should point to expected FeeQuoter after update for chain selector %d", chainSel)
+	require.NoError(t, err, "Failed to get OffRamp dynamic config for chain selector %d", chainSel)
+	require.Equal(t, onRampDCfg.FeeQuoter, offRampDCfg.FeeQuoter, "OnRamp and OffRamp should point to the same FeeQuoter for chain selector %d", chainSel)
+	return onRampDCfg.FeeQuoter
 }
