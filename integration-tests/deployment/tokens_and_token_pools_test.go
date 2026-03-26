@@ -329,11 +329,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 				// Get max supply and pre-mint
 				maxSupply := big.NewInt(0)
 				if data.Token.Supply != nil {
-					maxSupply = new(big.Int).SetUint64(*data.Token.Supply)
+					maxSupply = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*data.Token.Supply), data.Token.Decimals)
 				}
 				preMint := big.NewInt(0)
 				if data.Token.PreMint != nil {
-					preMint = new(big.Int).SetUint64(*data.Token.PreMint)
+					preMint = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*data.Token.PreMint), data.Token.Decimals)
 				}
 
 				// Query EVM token info from the chain
@@ -361,9 +361,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Name, name)
 
 				// Verify max supply and pre-mint
-				actualMaxSupply, actualPreMint := tokensapi.ScaleTokenAmount(supply, data.Token.Decimals), tokensapi.ScaleTokenAmount(balance, data.Token.Decimals)
-				require.Equal(t, 0, maxSupply.Cmp(actualMaxSupply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), actualMaxSupply.String()))
-				require.Equal(t, 0, preMint.Cmp(actualPreMint), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), actualPreMint.String()))
+				require.Equal(t, 0, maxSupply.Cmp(supply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), supply.String()))
+				require.Equal(t, 0, preMint.Cmp(preMint), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), balance.String()))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
@@ -621,9 +620,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("Solana Token Adapter", func(t *testing.T) {
 		t.Run("Validate TokenExpansion ", func(t *testing.T) {
 			for _, data := range solTestData {
-				preMint := uint64(0)
+				preMint := big.NewInt(0)
 				if data.Token.PreMint != nil {
-					preMint = *data.Token.PreMint
+					preMint = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*data.Token.PreMint), data.Token.Decimals)
 				}
 
 				tokenProgramID, err := solanautils.GetTokenProgramID(deployment.ContractType(data.Token.Type))
@@ -646,8 +645,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, deployerATA, solchain.SolDefaultCommitment)
 				require.NoError(t, err)
 
-				scaledAmount := tokensapi.ScaleTokenAmount(big.NewInt(int64(balance)), data.Token.Decimals)
-				require.Equal(t, 0, new(big.Int).SetUint64(preMint).Cmp(scaledAmount))
+				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %q", preMint.String(), balance))
 			}
 		})
 
