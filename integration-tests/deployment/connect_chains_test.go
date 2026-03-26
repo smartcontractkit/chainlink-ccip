@@ -669,10 +669,17 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 			RemoteChainSelectors: []uint64{chain_selectors.AVALANCHE_MAINNET.Selector},
 		},
 		chain_selectors.POLYGON_MAINNET.Selector: {
-			FeeQuoterVersion:     semver.MustParse("2.0.0"),
-			RampsVersion:         version,
-			RemoteChainSelectors: []uint64{chain_selectors.ETHEREUM_MAINNET.Selector},
+			FeeQuoterVersion: semver.MustParse("2.0.0"),
+			RampsVersion:     version,
 		},
+	}
+	fqInput[chain_selectors.ETHEREUM_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion: semver.MustParse("2.0.0"),
+		RampsVersion:     semver.MustParse("1.6.0"),
+	}
+	fqInput[chain_selectors.AVALANCHE_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion: semver.MustParse("2.0.0"),
+		RampsVersion:     semver.MustParse("1.6.0"),
 	}
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err := fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -744,6 +751,17 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 			FeeQuoterVersion: semver.MustParse("2.0.0"),
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
+	}
+
+	fqInput[chain_selectors.ETHEREUM_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion:     semver.MustParse("2.0.0"),
+		RampsVersion:         semver.MustParse("1.6.0"),
+		RemoteChainSelectors: []uint64{chain_selectors.AVALANCHE_MAINNET.Selector},
+	}
+	fqInput[chain_selectors.AVALANCHE_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion:     semver.MustParse("2.0.0"),
+		RampsVersion:         semver.MustParse("1.6.0"),
+		RemoteChainSelectors: []uint64{chain_selectors.ETHEREUM_MAINNET.Selector},
 	}
 
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
