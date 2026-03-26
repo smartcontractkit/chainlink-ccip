@@ -19,6 +19,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   error MaxSupplyExceeded(uint256 supplyAfterMint);
   error OnlyCCIPAdmin();
   error PreMintAddressNotSet();
+  error PreMintSetWithZeroPrintMint(address preMintRecipient);
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
@@ -63,6 +64,8 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
       if (args.maxSupply != 0 && args.preMint > args.maxSupply) revert MaxSupplyExceeded(args.preMint);
 
       _mint(args.preMintRecipient, args.preMint);
+    } else if (args.preMintRecipient != address(0)) {
+      revert PreMintSetWithZeroPrintMint(args.preMintRecipient);
     }
 
     _setCCIPAdmin(args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin);

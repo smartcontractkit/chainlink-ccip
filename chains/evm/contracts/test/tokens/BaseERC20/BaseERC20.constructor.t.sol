@@ -100,6 +100,23 @@ contract BaseERC20_constructor is BaseERC20Setup {
     );
   }
 
+  function test_constructor_RevertWhen_PreMintSetWithZeroPreMint() public {
+    address recipient = makeAddr("recipient");
+
+    vm.expectRevert(abi.encodeWithSelector(BaseERC20.PreMintSetWithZeroPrintMint.selector, recipient));
+    new BaseERC20(
+      BaseERC20.ConstructorParams({
+        name: "Zero Mint",
+        symbol: "ZM",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: recipient,
+        ccipAdmin: OWNER
+      })
+    );
+  }
+
   function test_constructor_RevertWhen_MaxSupplyExceeded() public {
     uint256 maxSupply = 500e18;
     uint256 preMint = maxSupply + 1;
