@@ -58,7 +58,13 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     address tokenWithAdapter = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "Token With Adapter", symbol: "TWA", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "Token With Adapter",
+          symbol: "TWA",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER
@@ -136,7 +142,13 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     address tokenWithAdapter = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "Token With Adapter", symbol: "TWA", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: address(0)
+          name: "Token With Adapter",
+          symbol: "TWA",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: address(0)
         }),
         address(0),
         address(0)

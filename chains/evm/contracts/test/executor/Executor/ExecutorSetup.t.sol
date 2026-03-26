@@ -30,7 +30,13 @@ contract ExecutorSetup is BaseTest {
     s_sourceFeeToken = address(
       new CrossChainToken(
         BaseERC20.ConstructorParams({
-          name: "test", symbol: "test", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          name: "test",
+          symbol: "test",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
         }),
         OWNER,
         OWNER

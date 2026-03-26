@@ -217,6 +217,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -262,6 +263,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       FAKE_SALT,
       address(0)
     );
+
+    assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).totalSupply(), "Total supply should match premint amount");
+    assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).balanceOf(OWNER), "The OWNER should have the tokens");
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
 
@@ -376,6 +380,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -441,6 +446,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -454,6 +460,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -611,6 +618,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: 6,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -715,13 +723,20 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     vm.stopPrank();
     address deployer = makeAddr("deployer");
     address futureOwner = makeAddr("futureOwner");
+    address preMintRecipient = makeAddr("preMintRecipient");
     address factory = address(s_tokenPoolFactory);
 
     bytes memory tokenInitCode = abi.encodePacked(
       type(CrossChainToken).creationCode,
       abi.encode(
         BaseERC20.ConstructorParams({
-          name: "TestToken", symbol: "TT", decimals: LOCAL_TOKEN_DECIMALS, maxSupply: 0, preMint: 0, ccipAdmin: factory
+          name: "TestToken",
+          symbol: "TT",
+          decimals: LOCAL_TOKEN_DECIMALS,
+          maxSupply: 0,
+          preMint: PREMINT_AMOUNT,
+          preMintRecipient: preMintRecipient,
+          ccipAdmin: factory
         }),
         factory,
         futureOwner
@@ -739,6 +754,13 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       address(0),
       FAKE_SALT,
       futureOwner
+    );
+
+    assertEq(PREMINT_AMOUNT, IERC20Metadata(tokenAddress).totalSupply(), "Total supply should match premint amount");
+    assertEq(
+      PREMINT_AMOUNT,
+      IERC20Metadata(tokenAddress).balanceOf(preMintRecipient),
+      "All tokens should be minted to preMintRecipient"
     );
 
     // futureOwner accepts the 2-step transfers
@@ -798,6 +820,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: deployer
       }),
       deployer,
@@ -859,6 +882,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
           decimals: LOCAL_TOKEN_DECIMALS,
           maxSupply: 0,
           preMint: 0,
+          preMintRecipient: address(0),
           ccipAdmin: address(s_tokenPoolFactory)
         }),
         address(s_tokenPoolFactory),
@@ -941,6 +965,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
           decimals: LOCAL_TOKEN_DECIMALS,
           maxSupply: 0,
           preMint: 0,
+          preMintRecipient: address(0),
           ccipAdmin: address(s_tokenPoolFactory)
         }),
         address(s_tokenPoolFactory),
@@ -990,7 +1015,13 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       type(CrossChainToken).creationCode,
       abi.encode(
         BaseERC20.ConstructorParams({
-          name: "TestToken", symbol: "TT", decimals: LOCAL_TOKEN_DECIMALS, maxSupply: 0, preMint: 0, ccipAdmin: factory
+          name: "TestToken",
+          symbol: "TT",
+          decimals: LOCAL_TOKEN_DECIMALS,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: factory
         }),
         factory,
         address(0) // address(0) → deployer (factory) becomes defaultAdmin / owner
@@ -1095,6 +1126,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),
@@ -1107,6 +1139,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         decimals: LOCAL_TOKEN_DECIMALS,
         maxSupply: type(uint256).max,
         preMint: PREMINT_AMOUNT,
+        preMintRecipient: OWNER,
         ccipAdmin: OWNER
       }),
       address(0),

@@ -21,7 +21,9 @@ contract SiloedLockReleaseTokenPool_configureLockBoxes is BaseTest {
   function setUp() public override {
     super.setUp();
     s_token = new CrossChainToken(
-      BaseERC20.ConstructorParams({name: "TKN", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER}),
+      BaseERC20.ConstructorParams({
+        name: "TKN", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, preMintRecipient: address(0), ccipAdmin: OWNER
+      }),
       OWNER,
       OWNER
     );

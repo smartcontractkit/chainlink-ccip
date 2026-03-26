@@ -11,17 +11,25 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
+/// @dev This contract inherits its access control from AccessControlDefaultAdminRules, meaning it relies on OZ
+/// AccessControl with 2-step ownership transfers. There's also a separate `ccipAdmin` role which can be used to
+/// register with the CCIP token admin registry but has no other special powers, and can only be transferred by the
+/// DEFAULT_ADMIN_ROLE. The DEFAULT_ADMIN_ROLE holder can also be used to register the token in the token admin registry.
 contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMintERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "CrossChainToken 2.0.0-dev";
   }
 
+  /// @notice The holder of this role can mint tokens.
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  /// @notice The holder of this role can burn tokens.
   bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+  /// @notice The holder of this role can grant/revoke both the MINTER_ROLE and the BURNER_ROLE.
   bytes32 public constant BURN_MINT_ADMIN_ROLE = keccak256("BURN_MINT_ADMIN_ROLE");
 
   /// @param args The parameters for the ERC20 token, including name, symbol, decimals, max supply, and pre-mint amount.
-  /// @param burnMintRoleAdmin The address to grant the BURN_MINT_ADMIN_ROLE.
+  /// @param burnMintRoleAdmin The address to grant the BURN_MINT_ADMIN_ROLE. If set to address(0), no address will be
+  /// granted the role.
   /// @param owner The address to set as the owner of the contract, which has the default admin role. If set to
   /// address(0), the deployer will be set as the owner.
   constructor(
@@ -49,8 +57,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   // │                      Burning & minting                       │
   // ================================================================
 
+  /// @inheritdoc IBurnMintERC20
   /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
-  /// @dev Decreases the total supply.
   function burn(
     uint256 amount
   ) public virtual override onlyRole(BURNER_ROLE) {
@@ -67,8 +75,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     burnFrom(account, amount);
   }
 
+  /// @inheritdoc IBurnMintERC20
   /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
-  /// @dev Decreases the total supply.
   function burnFrom(
     address account,
     uint256 amount
@@ -78,16 +86,12 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   }
 
   /// @inheritdoc IBurnMintERC20
-  /// @dev Uses OZ ERC20 _mint to disallow minting to address(0).
-  /// @dev Disallows minting to address(this)
-  /// @dev Increases the total supply.
+  /// @dev Uses OZ ERC20 _mint to disallow minting to address(0), and BaseERC20 to disallow minting to address(this).
+  /// @dev Uses BaseERC20's max supply logic.
   function mint(
     address account,
     uint256 amount
   ) public virtual override onlyRole(MINTER_ROLE) {
-    if (account == address(this)) revert InvalidRecipient(account);
-    if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
-
     _mint(account, amount);
   }
 
@@ -96,6 +100,7 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
   // ================================================================
 
   /// @notice grants both mint and burn roles to `burnAndMinter`.
+  /// @param burnAndMinter The address to be granted both the MINTER_ROLE and BURNER_ROLE.
   /// @dev calls public functions so this function does not require
   /// access controls. This is handled in the inner functions.
   function grantMintAndBurnRoles(
@@ -105,7 +110,8 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     grantRole(BURNER_ROLE, burnAndMinter);
   }
 
-  /// @notice Overrides the default CCIP admin role setter to require the caller to have the DEFAULT_ADMIN_ROLE.
+  /// @notice Sets the CCIP admin role to `newAdmin`.
+  /// @dev Overrides the default CCIP admin role setter to require the caller to have the DEFAULT_ADMIN_ROLE.
   /// @param newAdmin The address of the new CCIP admin.
   function setCCIPAdmin(
     address newAdmin

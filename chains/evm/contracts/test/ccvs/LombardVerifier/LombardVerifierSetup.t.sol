@@ -46,7 +46,13 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     // Deploy test token and add it as a supported token.
     s_testToken = new CrossChainToken(
       BaseERC20.ConstructorParams({
-        name: "Test Token", symbol: "TEST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        name: "Test Token",
+        symbol: "TEST",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
       }),
       OWNER,
       OWNER
