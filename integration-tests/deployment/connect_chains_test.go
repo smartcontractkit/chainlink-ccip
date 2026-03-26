@@ -743,6 +743,16 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
+	fqInput[chain_selectors.ETHEREUM_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion:     semver.MustParse("2.0.0"),
+		RampsVersion:         semver.MustParse("1.6.0"),
+		RemoteChainSelectors: []uint64{chain_selectors.AVALANCHE_MAINNET.Selector},
+	}
+	fqInput[chain_selectors.AVALANCHE_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion:     semver.MustParse("2.0.0"),
+		RampsVersion:         semver.MustParse("1.6.0"),
+		RemoteChainSelectors: []uint64{chain_selectors.ETHEREUM_MAINNET.Selector},
+	}
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
