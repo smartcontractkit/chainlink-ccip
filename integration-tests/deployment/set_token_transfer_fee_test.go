@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -299,7 +301,13 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	// Deploy MCMS
 	DeployMCMS(t, e, src, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, dst, []string{common_utils.CLLQualifier})
-
+	// Reset bundle so second ConnectChains runs without cached executions.
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deploy.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deploy.UpdateFeeQuoterInput{
@@ -315,7 +323,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	MergeAddresses(t, e, out.DataStore)
 
 	for _, chainSel := range chains {
-		fqUpgradeValidation(t, e, chainSel, chains, true)
+		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 
 	// Configure fees registry
