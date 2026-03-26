@@ -96,13 +96,12 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
-compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
 compileContract rmn/RMNRemote
 compileContract rmn/RMNProxy
 
 if [ "$ZKSYNC" != "true" ]; then
   compileContract CREATE2Factory
-  compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
+  compileContract TokenPoolFactory
 fi
 
 # Pools
