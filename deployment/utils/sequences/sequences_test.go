@@ -22,7 +22,7 @@ func newBundle(t *testing.T) cldf_ops.Bundle {
 	t.Helper()
 	lggr := logger.Test(t)
 	return cldf_ops.NewBundle(
-		func() context.Context { return context.Background() },
+		func() context.Context { return t.Context() },
 		lggr,
 		cldf_ops.NewMemoryReporter(),
 	)

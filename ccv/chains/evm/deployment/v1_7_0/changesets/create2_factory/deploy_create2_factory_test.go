@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/create2_factory"
 	create2_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -103,13 +104,14 @@ func TestDeployCREATE2Factory_NonceNotZero(t *testing.T) {
 }
 
 func TestDeployCREATE2Factory_VerifyPreconditions(t *testing.T) {
+	chainSel := chainsel.ETHEREUM_MAINNET.Selector
 	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+		environment.WithEVMSimulated(t, []uint64{chainSel}),
 	)
 	require.NoError(t, err)
 
 	err = create2_factory.DeployCREATE2Factory.VerifyPreconditions(*e, create2_factory.DeployCREATE2FactoryCfg{
-		ChainSel: 5009297550715157269,
+		ChainSel: chainSel,
 	})
 	require.NoError(t, err, "VerifyPreconditions should always return nil")
 }
