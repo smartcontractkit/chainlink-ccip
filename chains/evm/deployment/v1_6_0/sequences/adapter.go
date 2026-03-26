@@ -285,7 +285,7 @@ func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainS
 	ref := ds.Addresses().Filter(
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
-		datastore.AddressRefByAddress(common.BytesToAddress(addressOnChain).Hex()),
+		datastore.AddressRefByAddress(common.BytesToAddress(address).Hex()),
 	)
 	if len(ref) == 0 {
 		return nil, fmt.Errorf("no fee quoter address found for chain selector %d at address %s", chainSelector, common.BytesToAddress(address).Hex())

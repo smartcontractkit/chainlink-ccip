@@ -779,6 +779,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	)
 	e.OperationsBundle = bundle
 	// now update to FeeQuoter 2.0.0
+	t.Log(out.DataStore.Addresses())
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
@@ -787,11 +788,12 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)
 	require.Equal(t, 1, len(out.MCMSTimelockProposals))
-
+	t.Log(out.DataStore.Addresses())
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 	// update datastore with changeset output
 	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 	e.DataStore = out.DataStore.Seal()
+
 	for _, chainSel := range chains {
 		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
