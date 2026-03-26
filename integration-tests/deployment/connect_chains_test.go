@@ -846,7 +846,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		t.Fatal("no adapter found")
 	}
 
-	chain2Family, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+	chain2Family, err := chain_selectors.GetSelectorFamily(chain2.Selector)
 
 	chain2Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain2Family, version)
 	if !exists {
