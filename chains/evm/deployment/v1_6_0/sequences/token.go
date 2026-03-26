@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -141,20 +142,27 @@ var DeployToken = cldf_ops.NewSequence(
 
 		// If senders are provided and token supports pre-minting, transfer the pre-minted tokens from the deployer to the first sender in the list
 		if tokenSupportsPreMint(input.Type) && preMint.Cmp(big.NewInt(0)) > 0 && len(input.Senders) > 0 {
-			sender := common.HexToAddress(input.Senders[0])
+			firstSender := input.Senders[0]
+			if !common.IsHexAddress(firstSender) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid sender address: %s", firstSender)
+			}
+			tokReceiver := common.HexToAddress(firstSender)
+			if tokReceiver == (common.Address{}) {
+				return sequences.OnChainOutput{}, errors.New("refusing to transfer pre-minted tokens to the zero address")
+			}
 			if len(input.Senders) > 1 {
-				b.Logger.Warnf("Multiple senders provided but only the first one (%s) will receive the pre-minted tokens", sender.Hex())
+				b.Logger.Warnf("Multiple senders provided but only the first one (%s) will receive the pre-minted tokens", tokReceiver.Hex())
 			}
 			transferReport, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
 				ChainSelector: chain.Selector,
 				Address:       tokenAddr,
 				Args: erc20.TransferArgs{
-					Receiver: sender,
+					Receiver: tokReceiver,
 					Amount:   preMint,
 				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer pre-minted tokens to sender %s: %w", sender.Hex(), err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer pre-minted tokens to sender %s: %w", tokReceiver.Hex(), err)
 			}
 			writes = append(writes, transferReport.Output)
 		}

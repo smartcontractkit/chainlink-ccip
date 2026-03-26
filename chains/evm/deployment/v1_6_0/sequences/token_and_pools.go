@@ -410,8 +410,8 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, input tokensapi
 		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
 	}
 
-	// Pre-mint amount can't be greater than the max supply
-	if input.PreMint != nil && input.Supply != nil && *input.PreMint > *input.Supply {
+	// Pre-mint amount can't be greater than the max supply (note: a nil or zero supply means uncapped supply, so we only enforce this check if supply is non-nil and non-zero)
+	if input.PreMint != nil && input.Supply != nil && *input.Supply != 0 && *input.PreMint > *input.Supply {
 		return fmt.Errorf("pre-mint amount cannot be greater than max supply, got pre-mint %d and supply %d", *input.PreMint, *input.Supply)
 	}
 
