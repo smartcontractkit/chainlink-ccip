@@ -43,6 +43,12 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 	chainSelector uint64,
 	inputs []lanes.CommitteeVerifierInput,
 ) ([]lanes.CommitteeVerifierConfig[datastore.AddressRef], error) {
+	if r.topology == nil || r.topology.NOPTopology == nil {
+		return nil, fmt.Errorf("TopologyCommitteePopulator: topology/NOPTopology must not be nil")
+	}
+	if r.contractRegistry == nil {
+		return nil, fmt.Errorf("TopologyCommitteePopulator: contractRegistry must not be nil")
+	}
 	r.signingKeysOnce.Do(func() {
 		r.signingKeys = fetchSigningKeysForNOPs(e, r.topology.NOPTopology.NOPs)
 	})

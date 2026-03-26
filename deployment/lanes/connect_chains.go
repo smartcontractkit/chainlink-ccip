@@ -25,13 +25,16 @@ func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.M
 func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
 	return func(_ cldf.Environment, cfg ConnectChainsConfig) error {
 		for i, lane := range cfg.Lanes {
+			if lane.Version == nil {
+				return fmt.Errorf("lane %d: Version must not be nil", i)
+			}
 			if err := validateChainDefinition(lane.ChainA); err != nil {
 				return fmt.Errorf("lane %d ChainA: %w", i, err)
 			}
 			if err := validateChainDefinition(lane.ChainB); err != nil {
 				return fmt.Errorf("lane %d ChainB: %w", i, err)
 			}
-			if lane.Version != nil && !lane.Version.LessThan(common_utils.Version_2_0_0) {
+			if !lane.Version.LessThan(common_utils.Version_2_0_0) {
 				if err := validateV2ChainDefinition(lane.ChainA, cfg.CommitteePopulator); err != nil {
 					return fmt.Errorf("lane %d ChainA: %w", i, err)
 				}
