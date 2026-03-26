@@ -22,18 +22,86 @@ func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.M
 	return cldf.CreateChangeSet(makeApply(laneRegistry, mcmsRegistry), makeVerify(laneRegistry, mcmsRegistry))
 }
 
-func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
+func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
 	return func(_ cldf.Environment, cfg ConnectChainsConfig) error {
 		for i, lane := range cfg.Lanes {
+			if lane.Version == nil {
+				return fmt.Errorf("lane %d: Version must not be nil", i)
+			}
 			if err := validateChainDefinition(lane.ChainA); err != nil {
 				return fmt.Errorf("lane %d ChainA: %w", i, err)
 			}
 			if err := validateChainDefinition(lane.ChainB); err != nil {
 				return fmt.Errorf("lane %d ChainB: %w", i, err)
 			}
+			if !lane.Version.LessThan(common_utils.Version_2_0_0) {
+				if err := validateV2ChainDefinition(lane.ChainA, cfg.CommitteePopulator); err != nil {
+					return fmt.Errorf("lane %d ChainA: %w", i, err)
+				}
+				if err := validateV2ChainDefinition(lane.ChainB, cfg.CommitteePopulator); err != nil {
+					return fmt.Errorf("lane %d ChainB: %w", i, err)
+				}
+			}
+			for _, sel := range []uint64{lane.ChainA.Selector, lane.ChainB.Selector} {
+				family, err := chain_selectors.GetSelectorFamily(sel)
+				if err != nil {
+					return fmt.Errorf("lane %d chain %d: %w", i, sel, err)
+				}
+				if _, exists := laneRegistry.GetLaneAdapter(family, lane.Version); !exists {
+					return fmt.Errorf("lane %d chain %d: no LaneAdapter registered for chain family %q", i, sel, family)
+				}
+			}
 		}
 		return nil
 	}
+}
+
+// validateV2ChainDefinition checks that v2.0-required fields are properly
+// configured. For chains that participate in committee verification, either
+// resolved CommitteeVerifiers or resolvable CommitteeVerifierInputs (with a
+// CommitteePopulator) must be provided.
+func validateV2ChainDefinition(def ChainDefinition, populator CommitteeConfigPopulator) error {
+	hasResolved := len(def.CommitteeVerifiers) > 0
+	hasInputs := len(def.CommitteeVerifierInputs) > 0
+	hasCommitteeConfig := hasResolved || hasInputs
+
+	if hasResolved && hasInputs {
+		return fmt.Errorf("CommitteeVerifiers and CommitteeVerifierInputs are mutually exclusive")
+	}
+
+	if hasInputs && populator == nil {
+		return fmt.Errorf("CommitteeVerifierInputs provided but no CommitteePopulator on config")
+	}
+
+	// For v2.0 lanes, allowlist fields are managed at the committee verifier
+	// level (CommitteeVerifierRemoteChainInput / CommitteeVerifierRemoteChainConfig),
+	// not on ChainDefinition. Reject if the user sets them at the wrong level.
+	if hasCommitteeConfig {
+		if def.AllowListEnabled {
+			return fmt.Errorf("AllowListEnabled must not be set on ChainDefinition for v2.0 lanes; set it on CommitteeVerifierRemoteChainInput instead")
+		}
+		if len(def.AllowList) > 0 {
+			return fmt.Errorf("AllowList must not be set on ChainDefinition for v2.0 lanes; use AddedAllowlistedSenders on CommitteeVerifierRemoteChainInput instead")
+		}
+	}
+
+	if hasResolved {
+		for i, cv := range def.CommitteeVerifiers {
+			if len(cv.CommitteeVerifier) == 0 {
+				return fmt.Errorf("CommitteeVerifiers[%d] has no contracts", i)
+			}
+			for remoteChain, rc := range cv.RemoteChains {
+				if rc.SignatureConfig.Threshold == 0 {
+					return fmt.Errorf("CommitteeVerifiers[%d] remote chain %d has zero threshold", i, remoteChain)
+				}
+				if len(rc.SignatureConfig.Signers) == 0 {
+					return fmt.Errorf("CommitteeVerifiers[%d] remote chain %d has no signers", i, remoteChain)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // validateChainDefinition rejects input where the caller has set fields that
@@ -64,7 +132,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
-		for _, lane := range cfg.Lanes {
+		for i := range cfg.Lanes {
+			lane := &cfg.Lanes[i]
+			if err := populateCommitteeInputsIfNeeded(e, lane, cfg.CommitteePopulator); err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
 			chainA, chainB := &lane.ChainA, &lane.ChainB
 			chainAFamily, err := chain_selectors.GetSelectorFamily(chainA.Selector)
 			if err != nil {
@@ -90,10 +162,10 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
-			// to allow for type serialization, we apply fee quoter dest chain config overrides
-			// at the lane level and then set them to nil before passing to the adapters
 			chainA.FeeQuoterDestChainConfigOverrides = nil
 			chainB.FeeQuoterDestChainConfigOverrides = nil
+			chainA.RMNVerificationEnabled = false
+			chainB.RMNVerificationEnabled = false
 			type lanePair struct {
 				src         *ChainDefinition
 				dest        *ChainDefinition
@@ -121,7 +193,6 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 					}
 				}
-				// Write metadata to datastore
 				err = sequences.WriteMetadataToDatastore(ds, configureLaneReport.Output.Metadata)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to write metadata to datastore: %w", err)
@@ -144,7 +215,6 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 					}
 				}
-				// Write metadata to datastore
 				err = sequences.WriteMetadataToDatastore(ds, configureLaneReport.Output.Metadata)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to write metadata to datastore: %w", err)
@@ -158,6 +228,33 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+// populateCommitteeInputsIfNeeded calls the CommitteeConfigPopulator for each
+// chain in the lane that has CommitteeVerifierInputs, replacing them with
+// resolved CommitteeVerifiers. No-op for chains that already have resolved
+// verifiers or no committee config (e.g. 1.6 lanes).
+//
+// The expensive work (fetching signing keys from JD) is handled internally
+// by the populator's own caching (e.g. sync.Once), so calling this per-lane
+// is cheap after the first invocation — subsequent calls only do in-memory
+// topology lookups and datastore address resolution.
+func populateCommitteeInputsIfNeeded(e cldf.Environment, lane *LaneConfig, populator CommitteeConfigPopulator) error {
+	if populator == nil {
+		return nil
+	}
+	for _, def := range []*ChainDefinition{&lane.ChainA, &lane.ChainB} {
+		if len(def.CommitteeVerifierInputs) == 0 {
+			continue
+		}
+		populated, err := populator.PopulateCommitteeConfig(e, def.Selector, def.CommitteeVerifierInputs)
+		if err != nil {
+			return fmt.Errorf("failed to populate committee config for chain %d: %w", def.Selector, err)
+		}
+		def.CommitteeVerifiers = populated
+		def.CommitteeVerifierInputs = nil
+	}
+	return nil
 }
 
 func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool) error {
@@ -208,11 +305,9 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	// 	populateTokenPrices(ds, chainDef, adapter)
 	// }
 
-	// handle v2 separately
 	return populateAddressesV2(ds, chainDef, adapter, version)
 }
 
-// This function is V2 fields only
 func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version) error {
 	if version.LessThan(common_utils.Version_2_0_0) {
 		return nil
@@ -284,16 +379,13 @@ func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adap
 
 func populateTokenPrices(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) {
 	var tokenPrices map[datastore.ContractType]*big.Int
-	// Check if adapter implements TokenPriceProvider (optional interface)
 	priceProvider, ok := adapter.(TokenPriceProvider)
 	if !ok {
 		return
 	}
 
-	// Get prices keyed by contract type
 	tokenPrices = priceProvider.GetDefaultTokenPrices()
 
-	// Resolve contract types to addresses
 	addressPrices := make(map[string]*big.Int)
 	for contractType, price := range tokenPrices {
 		refs := ds.Addresses().Filter(
