@@ -32,9 +32,10 @@ type CommitteeVerifierInputConfig struct {
 	RemoteChains       map[uint64]CommitteeVerifierRemoteChainConfig
 }
 
-// ChainConfigForLanesFromTopology is one chain's configuration for ConfigureChainsForLanesFromTopology:
-// embedded lanes.ChainDefinition for that chain, CommitteeVerifierInputConfig resolved via topology,
-// and RemoteLanes (remote selector → remote lane endpoint), separate from CommitteeVerifierInputConfig.RemoteChains.
+// ChainConfigForLanesFromTopology configures one chain for ConfigureChainsForLanesFromTopology
+//
+// committeeVerifiers will be resolved from topology and provided CommitteeVerifierConfigs,
+// lanes.ChainDefinition.CommitteeVerifiers will be populated from the resolved committee verifier contracts.
 type ChainConfigForLanesFromTopology struct {
 	lanes.ChainDefinition
 	CommitteeVerifierConfigs []CommitteeVerifierInputConfig
@@ -84,8 +85,8 @@ func ConfigureChainsForLanesFromTopology(
 
 		laneConfigs := make([]lanes.LaneConfig, 0)
 		for _, chain := range cfg.Chains {
-			committeeVerifiers := make([]lanes.CommitteeVerifierConfig[datastore.AddressRef], 0, len(chain.CommitteeVerifiers))
-			for _, cv := range chain.CommitteeVerifiers {
+			committeeVerifiers := make([]lanes.CommitteeVerifierConfig[datastore.AddressRef], 0, len(chain.CommitteeVerifierConfigs))
+			for _, cv := range chain.CommitteeVerifierConfigs {
 				remoteChains := make(map[uint64]lanes.CommitteeVerifierRemoteChainConfig, len(cv.RemoteChains))
 				for remoteChainSelector, remoteChainConfig := range cv.RemoteChains {
 					signatureConfig, err := getSignatureConfigForLane(e, cfg.Topology, cv.CommitteeQualifier, chain.Selector, remoteChainSelector, signingKeysByNOP)

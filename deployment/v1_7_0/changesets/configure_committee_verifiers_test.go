@@ -388,7 +388,7 @@ func TestConfigureChainsForLanesFromTopology_AdapterNotRegistered(t *testing.T) 
 		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
 				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+				CommitteeVerifierConfigs: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
 						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
@@ -435,7 +435,7 @@ func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T
 		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
 				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+				CommitteeVerifierConfigs: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
 						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
@@ -487,7 +487,7 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
 		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
 				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+				CommitteeVerifierConfigs: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
 						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
@@ -562,7 +562,7 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 					AddressBytesLength:   20,
 					BaseExecutionGasCost: 80000,
 				},
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+				CommitteeVerifierConfigs: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
 						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
@@ -684,7 +684,7 @@ func TestConfigureChainsForLanesFromTopology_UsesRouterAndTestRouter(t *testing.
 					AddressBytesLength:   20,
 					BaseExecutionGasCost: 80000,
 				},
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+				CommitteeVerifierConfigs: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
 						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
@@ -766,7 +766,7 @@ func TestConfigureChainsForLanesFromTopology_CommitteeNotFound(t *testing.T) {
 		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
 				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+				CommitteeVerifierConfigs: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "nonexistent",
 						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
