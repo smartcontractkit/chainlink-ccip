@@ -24,7 +24,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   /// @dev Calls into Facade to reenter Router exactly 1 time
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2, // finalityConfig
+    bytes4, // finalityConfig
     bytes calldata // tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
     if (s_attacked) {
@@ -52,7 +52,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes2 // finalityConfig
+    bytes4 // finalityConfig
   ) public pure override returns (Pool.ReleaseOrMintOutV1 memory) {
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }

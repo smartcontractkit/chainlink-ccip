@@ -37,7 +37,6 @@ contract e2e_feeWithdrawal is OnRampSetup {
     uint256 tokenPoolBalance;
     uint256 feeAggregatorBalance;
   }
-  bytes2 internal constant MIN_FINALITY_CONFIG = bytes2(uint16(50));
 
   OffRampHelper internal s_offRamp;
   address internal s_destVerifier;
@@ -138,7 +137,9 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_executorImpl = new Executor(
       10, // maxCCVsPerMsg
       Executor.DynamicConfig({
-        feeAggregator: s_feeAggregator, allowedFinalityConfig: MIN_FINALITY_CONFIG, ccvAllowlistEnabled: false
+        feeAggregator: s_feeAggregator,
+        allowedFinalityConfig: FinalityCodec._encodeBlockDepth(50),
+        ccvAllowlistEnabled: false
       })
     );
 

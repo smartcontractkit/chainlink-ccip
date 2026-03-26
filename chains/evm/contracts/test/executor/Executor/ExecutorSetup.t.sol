@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
@@ -11,7 +12,7 @@ contract ExecutorSetup is BaseTest {
   address internal constant FEE_AGGREGATOR = address(999999);
   uint8 internal constant INITIAL_MAX_CCVS = 1;
   uint16 internal constant DEFAULT_EXEC_FEE_USD_CENTS = 89;
-  bytes2 internal constant MIN_FINALITY_CONFIG = bytes2(uint16(50));
+  bytes4 internal s_minFinalityConfig = FinalityCodec._encodeBlockDepth(50);
 
   uint8 internal constant EVM_ADDRESS_LENGTH = 20;
 
@@ -22,7 +23,7 @@ contract ExecutorSetup is BaseTest {
     super.setUp();
 
     Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
-      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: MIN_FINALITY_CONFIG, ccvAllowlistEnabled: true
+      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: s_minFinalityConfig, ccvAllowlistEnabled: true
     });
 
     s_executor = new Executor(INITIAL_MAX_CCVS, dynamicConfig);

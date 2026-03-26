@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 interface IExecutor {
   /// @notice Returns the allowed finality config according to the FinalityCodec encoding.
-  function getAllowedFinalityConfig() external view returns (bytes2);
+  function getAllowedFinalityConfig() external view returns (bytes4);
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
@@ -12,7 +12,7 @@ interface IExecutor {
   /// @param extraArgs Extra arguments for the executor.
   function getFee(
     uint64 destChainSelector,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     address[] memory ccvAddresses,
     bytes memory extraArgs,
     address feeToken

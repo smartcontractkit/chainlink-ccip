@@ -168,7 +168,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes memory tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
@@ -250,7 +250,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
@@ -410,7 +410,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint64 destChainSelector,
     uint256 amount,
     address feeToken,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   )
     external
@@ -435,7 +435,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig) {
     (address pool, bool isPoolV2) = _getPoolForMechanism(destChainSelector);
@@ -505,7 +505,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     address, // localToken
     uint64 remoteChainSelector,
     uint256, // amount
-    bytes2, // finalityConfig
+    bytes4, // finalityConfig
     bytes calldata extraData,
     MessageDirection direction
   ) external view returns (address[] memory requiredCCVs) {

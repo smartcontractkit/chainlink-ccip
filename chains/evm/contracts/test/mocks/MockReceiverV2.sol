@@ -10,7 +10,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   address[] internal s_required;
   address[] internal s_optional;
   uint8 internal s_threshold;
-  bytes2 internal s_allowedFinalityConfig;
+  bytes4 internal s_allowedFinalityConfig;
 
   constructor(
     address[] memory required,
@@ -23,7 +23,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   }
 
   function setAllowedFinalityConfig(
-    bytes2 allowedFinalityConfig
+    bytes4 allowedFinalityConfig
   ) external {
     s_allowedFinalityConfig = allowedFinalityConfig;
   }
@@ -44,7 +44,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
       address[] memory requiredVerifier,
       address[] memory optionalVerifiers,
       uint8 threshold,
-      bytes2 allowedFinalityConfig
+      bytes4 allowedFinalityConfig
     )
   {
     return (s_required, s_optional, s_threshold, s_allowedFinalityConfig);

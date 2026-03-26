@@ -17,10 +17,10 @@ contract Executor_getFee is ExecutorSetup {
   }
 
   function test_getFee_RevertWhen_InvalidRequestedFinality() public {
-    bytes2 requestedFinality = bytes2(uint16(MIN_FINALITY_CONFIG) - 1);
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(49);
 
     vm.expectRevert(
-      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, MIN_FINALITY_CONFIG)
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, s_minFinalityConfig)
     );
     s_executor.getFee(DEST_CHAIN_SELECTOR, requestedFinality, new address[](1), "", s_sourceFeeToken);
   }

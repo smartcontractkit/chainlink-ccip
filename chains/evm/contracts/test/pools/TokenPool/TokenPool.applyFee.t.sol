@@ -10,7 +10,7 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 
 contract TokenPool_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
-    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
     uint16 finalityTransferFeeBps = 100;
     uint16 fastFinalityTransferFeeBps = 500;
     uint256 amount = 1_000e18;

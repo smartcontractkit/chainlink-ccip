@@ -10,8 +10,7 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
 contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
-  bytes2 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
-  bytes2 internal constant CUSTOM_BLOCK_CONFIRMATION = bytes2(uint16(10));
+  bytes4 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
   uint16 internal constant DEFAULT_FEE_BPS = 100; // 1%
   uint16 internal constant CUSTOM_FEE_BPS = 200; // 2%
 
@@ -64,6 +63,7 @@ contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
   function test_getRequiredCCVs_WithFastFinality_AppliesCustomFeeBps() public {
     uint256 amount = 10_000e18;
     uint256 expectedAmountAfterFee = amount - (amount * CUSTOM_FEE_BPS) / BPS_DIVIDER; // 9,800e18 (2% fee deducted)
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(10);
 
     // Expect the hook to be called with the fee-adjusted amount
     vm.expectCall(
@@ -74,7 +74,7 @@ contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
           address(s_token),
           DEST_CHAIN_SELECTOR,
           expectedAmountAfterFee,
-          CUSTOM_BLOCK_CONFIRMATION,
+          requestedFinality,
           "",
           IPoolV2.MessageDirection.Outbound
         )
@@ -82,7 +82,7 @@ contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
     );
 
     s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, amount, CUSTOM_BLOCK_CONFIRMATION, "", IPoolV2.MessageDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, amount, requestedFinality, "", IPoolV2.MessageDirection.Outbound
     );
   }
 

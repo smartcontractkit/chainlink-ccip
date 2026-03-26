@@ -34,7 +34,7 @@ abstract contract MultiTokenPool is TokenPool {
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
     (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, finalityConfig, tokenArgs);
@@ -73,7 +73,7 @@ abstract contract MultiTokenPool is TokenPool {
 
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory out) {
     out = super.releaseOrMint(releaseOrMintIn, finalityConfig);
 

@@ -60,7 +60,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   function test_releaseOrMintSingleToken_CallsV2Function() public {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
-    bytes2 finality = FinalityCodec._encodeBlockDepth(2);
+    bytes4 finality = FinalityCodec._encodeBlockDepth(2);
 
     // Allow depth-2 FTF on the pool so the inbound finality check inside releaseOrMint passes.
     s_pool.setFinalityConfig(finality);

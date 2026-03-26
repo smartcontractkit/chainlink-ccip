@@ -116,7 +116,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
       address[] memory requiredCCVs,
       address[] memory optionalCCVs,
       uint8 optionalThreshold,
-      bytes2 allowedFinalityConfig
+      bytes4 allowedFinalityConfig
     )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];

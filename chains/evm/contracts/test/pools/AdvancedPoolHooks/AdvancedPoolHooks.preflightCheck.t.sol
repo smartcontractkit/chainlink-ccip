@@ -37,7 +37,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
-    bytes2 finalityConfig = FinalityCodec._encodeBlockDepth(5);
+    bytes4 finalityConfig = FinalityCodec._encodeBlockDepth(5);
     bytes memory tokenArgs = abi.encode("custom token args");
 
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, finalityConfig, tokenArgs, lockOrBurnIn.amount);

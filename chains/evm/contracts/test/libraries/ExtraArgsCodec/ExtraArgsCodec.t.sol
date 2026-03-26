@@ -71,7 +71,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     bytes memory invalidEncoded = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       GAS_LIMIT,
-      uint16(12),
+      FinalityCodec._encodeBlockDepth(12),
       uint8(0),
       uint8(10),
       bytes10(0x12345678901234567890),

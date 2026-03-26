@@ -37,7 +37,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
   function test_getFee_CustomFinality() public {
     uint16 customFeeBps = 400; // 4%
-    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -80,7 +80,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   // Reverts
 
   function test_getFee_RevertWhen_FtfNotAllowedByPool() public {
-    bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(1);
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(1);
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -91,7 +91,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   }
 
   function test_getFee_RevertWhen_RequestedDepthBelowMinimum() public {
-    bytes2 minFinality = FinalityCodec._encodeBlockDepth(10);
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(10);
 
     // Set fast finality config with minimum of 10 blocks
     s_tokenPool.setFinalityConfig(minFinality);
@@ -108,7 +108,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_000e6;
-    bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(5); // Less than minimum of 10
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(5); // Less than minimum of 10
 
     vm.expectRevert(
       abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, minFinality)
@@ -149,7 +149,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   }
 
   function test_getFee_DisabledConfig_CustomFinality_ReturnsZeros() public {
-    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
 
     vm.startPrank(OWNER);
     s_tokenPool.setFinalityConfig(minFinality);
@@ -174,7 +174,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     uint256 amount = 1_500e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes2(uint16(minFinality)), "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes4(uint32(minFinality)), "");
 
     // Should return all zeros with isEnabled=false when disabled, even for custom finality
     assertEq(usdFeeCents, 0, "Fee should be zero");

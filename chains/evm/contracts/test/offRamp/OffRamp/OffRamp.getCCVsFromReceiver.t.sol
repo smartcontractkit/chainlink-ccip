@@ -176,7 +176,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
   function test_getCCVsFromReceiver_RevertWhen_noContract_FTF() public {
     address eoa = makeAddr("eoa");
 
-    bytes2 ftfFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 ftfFinality = FinalityCodec._encodeBlockDepth(5);
     vm.expectRevert(
       abi.encodeWithSelector(
         FinalityCodec.InvalidRequestedFinality.selector, ftfFinality, FinalityCodec.WAIT_FOR_FINALITY_FLAG
@@ -189,7 +189,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     address contractAddress = makeAddr("contract");
     vm.etch(contractAddress, "some source code");
 
-    bytes2 ftfFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 ftfFinality = FinalityCodec._encodeBlockDepth(5);
     vm.expectRevert(
       abi.encodeWithSelector(
         FinalityCodec.InvalidRequestedFinality.selector, ftfFinality, FinalityCodec.WAIT_FOR_FINALITY_FLAG
@@ -205,7 +205,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
 
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
 
-    bytes2 ftfFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 ftfFinality = FinalityCodec._encodeBlockDepth(5);
     vm.expectRevert(
       abi.encodeWithSelector(
         FinalityCodec.InvalidRequestedFinality.selector, ftfFinality, FinalityCodec.WAIT_FOR_FINALITY_FLAG
@@ -218,7 +218,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(new address[](0), new address[](0), 0);
     receiver.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(10));
 
-    bytes2 insufficientFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 insufficientFinality = FinalityCodec._encodeBlockDepth(5);
     vm.expectRevert(
       abi.encodeWithSelector(
         FinalityCodec.InvalidRequestedFinality.selector, insufficientFinality, FinalityCodec._encodeBlockDepth(10)

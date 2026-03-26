@@ -33,7 +33,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
-    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
@@ -93,7 +93,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.stopPrank();
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1_000e18);
-    bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(1);
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(1);
     uint256 fee = s_tokenPool.getFee(lockOrBurnIn, requestedFinality);
     uint256 expectedAmount = lockOrBurnIn.amount - fee;
 
@@ -144,7 +144,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   /// @notice When fast finality is requested but no custom outbound bucket is configured,
   /// the fallback consumes from the default outbound bucket.
   function test_validateLockOrBurn_WithFastFinality_FallsBackToDefaultBucket() public {
-    bytes2 requestedFinality = FinalityCodec._encodeBlockDepth(1);
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(1);
     s_tokenPool.setFinalityConfig(requestedFinality);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
@@ -158,11 +158,11 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   }
 
   function test_validateLockOrBurn_RevertWhen_RequestedDepthBelowMinimum() public {
-    bytes2 minFinality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
     s_tokenPool.setFinalityConfig(minFinality);
     vm.startPrank(s_allowedOnRamp);
 
-    bytes2 requestedFinality = bytes2(uint16(uint16(minFinality) - 1));
+    bytes4 requestedFinality = bytes4(uint32(uint32(minFinality) - 1));
     vm.expectRevert(
       abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, minFinality)
     );

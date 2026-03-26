@@ -110,7 +110,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   function _createMessageV1WithTokenTransfer(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint16 finality,
+    uint32 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver
@@ -131,7 +131,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
-      finality: bytes2(uint16(finality)),
+      finality: bytes4(uint32(finality)),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),

@@ -36,7 +36,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
     uint32 gasForVerification; //│ The gas to reserve for verification of messages on the remote chain.
     uint16 payloadSizeBytes; //  │ The size of the verification payload on the remote chain.
-    bytes2 finalityConfig; //    │ The finality configuration for the local chain for messages to the remote chain.
+    bytes4 finalityConfig; //    │ The finality configuration for the local chain for messages to the remote chain.
     bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
@@ -48,7 +48,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this remote chain.
     uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the remote chain.
     uint16 payloadSizeBytes; //    │ The size of the verification payload on the remote chain.
-    bytes2 finalityConfig; // ─────╯ The finality configuration for the local chain for messages to the remote chain.
+    bytes4 finalityConfig; // ─────╯ The finality configuration for the local chain for messages to the remote chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -258,7 +258,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
-    bytes2 requestedFinality
+    bytes4 requestedFinality
   ) external view virtual returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
     RemoteChainConfig storage config = _getRemoteChainConfig(destChainSelector);
 

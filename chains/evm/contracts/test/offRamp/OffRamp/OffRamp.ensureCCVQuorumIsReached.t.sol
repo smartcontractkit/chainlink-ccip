@@ -27,7 +27,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
   address internal s_destTokenPool;
   bytes internal s_sender;
 
-  bytes2 internal constant FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+  bytes4 internal constant FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
 
   function setUp() public override {
     super.setUp();

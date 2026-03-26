@@ -36,7 +36,7 @@ contract OnRampHelper is OnRamp {
     uint64 destChainSelector,
     address token,
     uint256 amount,
-    bytes2 finality,
+    bytes4 finality,
     bytes memory tokenArgs
   ) external view returns (address[] memory) {
     return _getCCVsForPool(destChainSelector, token, amount, finality, tokenArgs);
@@ -58,7 +58,7 @@ contract OnRampHelper is OnRamp {
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    bytes2 finality,
+    bytes4 finality,
     bytes memory tokenArgs
   ) external returns (MessageV1Codec.TokenTransferV1 memory) {
     return _lockOrBurnSingleToken(tokenAndAmount, destChainSelector, receiver, originalSender, finality, tokenArgs);

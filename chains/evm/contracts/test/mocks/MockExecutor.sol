@@ -6,13 +6,13 @@ import {IExecutor} from "../../interfaces/IExecutor.sol";
 import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 
 contract MockExecutor is IExecutor {
-  function getAllowedFinalityConfig() external view virtual returns (bytes2) {
+  function getAllowedFinalityConfig() external view virtual returns (bytes4) {
     return FinalityCodec.WAIT_FOR_FINALITY_FLAG;
   }
 
   function getFee(
     uint64, // destChainSelector,
-    bytes2, // finalityConfig
+    bytes4, // finalityConfig
     address[] memory, // ccvs,
     bytes memory, // extraArgs
     address // feeToken

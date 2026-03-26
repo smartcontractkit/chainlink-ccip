@@ -38,7 +38,7 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
     uint256 localAmount = 100e18;
-    bytes2 finalityConfig = FinalityCodec._encodeBlockDepth(5);
+    bytes4 finalityConfig = FinalityCodec._encodeBlockDepth(5);
     releaseOrMintIn.sourcePoolData = abi.encode("custom source pool data");
     releaseOrMintIn.offchainTokenData = abi.encode("custom offchain token data");
 

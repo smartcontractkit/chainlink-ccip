@@ -112,7 +112,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since USDC is 6 decimals on all chains, we don't need to convert to a different denomination.
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, finalityConfig);

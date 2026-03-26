@@ -18,7 +18,7 @@ contract MockPoolV2 {
     address,
     uint64,
     uint256,
-    bytes2,
+    bytes4,
     bytes memory,
     IPoolV2.MessageDirection
   ) external view returns (address[] memory) {

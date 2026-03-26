@@ -14,7 +14,7 @@ interface IAdvancedPoolHooks {
   /// @dev This function may revert if the preflight check fails. This means the transaction is rolled back on source.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs,
     uint256 amountPostFee
   ) external;
@@ -28,7 +28,7 @@ interface IAdvancedPoolHooks {
   function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) external;
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
@@ -43,7 +43,7 @@ interface IAdvancedPoolHooks {
     address localToken,
     uint64 remoteChainSelector,
     uint256 amount,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) external view returns (address[] memory requiredCCVs);

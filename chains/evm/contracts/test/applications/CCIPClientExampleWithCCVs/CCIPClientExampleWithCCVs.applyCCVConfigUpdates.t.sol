@@ -44,7 +44,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
       address[] memory retRequiredCCVs,
       address[] memory retOptionalCCVs,
       uint8 retOptionalThreshold,
-      bytes2 allowedFinalityConfig
+      bytes4 allowedFinalityConfig
     ) = s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
@@ -166,7 +166,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
 
-    (address[] memory retRequired,,, bytes2 allowedFinalityConfig) =
+    (address[] memory retRequired,,, bytes4 allowedFinalityConfig) =
       s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
@@ -175,7 +175,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   }
 
   function test_getCCVsAndFinalityConfig_FtfAllowed_ReturnsConfiguredAllowedFinalityConfig() public {
-    bytes2 ftfConfig = FinalityCodec._encodeBlockDepthAndSafeFlag(1);
+    bytes4 ftfConfig = FinalityCodec._encodeBlockDepthAndSafeFlag(1);
 
     // Configure finality via the base class enableChain.
     s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, ftfConfig);
@@ -195,7 +195,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     bytes memory sender = abi.encodePacked(makeAddr("sender"));
 
-    (address[] memory retRequired,,, bytes2 allowedFinalityConfig) =
+    (address[] memory retRequired,,, bytes4 allowedFinalityConfig) =
       s_client.getCCVsAndFinalityConfig(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
@@ -221,10 +221,10 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   }
 
   function test_enableChain_SetsAllowedFinalityConfig() public {
-    bytes2 customFinality = FinalityCodec._encodeBlockDepth(10);
+    bytes4 customFinality = FinalityCodec._encodeBlockDepth(10);
     s_client.enableChain(SOURCE_CHAIN_SELECTOR, EXTRA_ARGS, customFinality);
 
-    bytes2 storedConfig = s_client.getRemoteChainConfig(SOURCE_CHAIN_SELECTOR).allowedFinalityConfig;
+    bytes4 storedConfig = s_client.getRemoteChainConfig(SOURCE_CHAIN_SELECTOR).allowedFinalityConfig;
     assertEq(storedConfig, customFinality);
   }
 }

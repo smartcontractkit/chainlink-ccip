@@ -16,10 +16,10 @@ library ExtraArgsCodec {
 
   // Base size excludes all variable-length fields (CCV addresses/args, executor address, executorArgs, tokenReceiver,
   // tokenArgs).
-  // Encoding order: tag(4) + gasLimit(4) + finalityConfig(2) + ccvsLength(1) + executorLength(1) +
-  // executorArgsLength(2) + tokenReceiverLength(1) + tokenArgsLength(2) = 17 bytes.
-  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 2 + 1 + 1 + 2 + 1 + 2;
-  uint256 public constant GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE = 4 + 4 + 2 + 1;
+  // Encoding order: tag(4) + gasLimit(4) + finalityConfig(4) + ccvsLength(1) + executorLength(1) +
+  // executorArgsLength(2) + tokenReceiverLength(1) + tokenArgsLength(2) = 19 bytes.
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 4 + 1 + 1 + 2 + 1 + 2;
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE = 4 + 4 + 4 + 1;
   // Base size: tag(4) + useATA(1) + accountIsWritableBitmap(8) + accountsLength(1) = 14 bytes.
   uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1 + 8 + 1;
   // Base size: tag(4) + objectIdsLength(1) = 5 bytes.
@@ -51,7 +51,7 @@ library ExtraArgsCodec {
   /// Static length fields.
   ///   bytes4 tag;                     Version tag.
   ///   uint32 gasLimit;                Gas limit for the callback on the destination chain.
-  ///   bytes2 finalityConfig;           Finality config (see `FinalityCodec`): block depth and/or flags.
+  ///   bytes4 finalityConfig;           Finality config (see `FinalityCodec`): block depth and/or flags.
   ///   uint8 ccvsLength;               Number of cross-chain verifiers.
   ///
   /// Variable length fields (per CCV, repeated ccvsLength times).
@@ -82,7 +82,7 @@ library ExtraArgsCodec {
     uint32 gasLimit;
     /// @notice The finality config, see FinalityCodec for encoding details.
     /// @dev May be zero to indicate waiting for finality is desired.
-    bytes2 finalityConfig;
+    bytes4 finalityConfig;
     /// @notice An array of CCV addresses representing the cross-chain verifiers to be used for the message.
     /// @dev May be empty to specify the default verifier(s) should be used.
     address[] ccvs;
@@ -461,14 +461,14 @@ library ExtraArgsCodec {
       let gasLimit := calldataload(add(encoded.offset, 4))
       mstore(extraArgs, and(shr(224, gasLimit), 0xFFFFFFFF))
 
-      // Read finalityConfig (2 bytes).
-      // bytes2 is left-aligned in memory, so mask the top 2 bytes of the loaded word directly
+      // Read finalityConfig (4 bytes).
+      // bytes4 is left-aligned in memory, so mask the top 4 bytes of the loaded word directly
       // instead of shifting right (which would produce a right-aligned uint that reads back as zero).
       let finalityWord := calldataload(add(encoded.offset, 8))
-      mstore(add(extraArgs, 32), and(finalityWord, shl(240, 0xFFFF)))
+      mstore(add(extraArgs, 32), and(finalityWord, shl(224, 0xFFFFFFFF)))
 
       // Read ccvs length (1 byte).
-      ccvsLength := byte(0, calldataload(add(encoded.offset, 10)))
+      ccvsLength := byte(0, calldataload(add(encoded.offset, 12)))
     }
 
     uint256 offset = GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE; // Skip tag, gasLimit, finalityConfig, ccvsLength.

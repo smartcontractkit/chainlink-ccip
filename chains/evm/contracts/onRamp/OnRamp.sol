@@ -724,7 +724,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
@@ -867,7 +867,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     address token,
     uint256 amount,
-    bytes2 finality,
+    bytes4 finality,
     bytes memory tokenArgs
   ) internal view returns (address[] memory requiredCCVs) {
     address[] storage defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;

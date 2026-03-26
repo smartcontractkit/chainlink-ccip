@@ -12,7 +12,7 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
 
     uint8 newMaxCCVs = INITIAL_MAX_CCVS + 5;
     Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
-      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: MIN_FINALITY_CONFIG, ccvAllowlistEnabled: false
+      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: s_minFinalityConfig, ccvAllowlistEnabled: false
     });
     s_executor = new Executor(newMaxCCVs, dynamicConfig);
     maxCCVs = s_executor.getMaxCCVsPerMessage();

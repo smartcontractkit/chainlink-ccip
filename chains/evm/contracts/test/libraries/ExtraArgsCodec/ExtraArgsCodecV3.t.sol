@@ -54,7 +54,8 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   }
 
   function test__decodeGenericExtraArgsV3_RevertWhen_InvalidExtraArgsTag() public {
-    bytes memory invalidData = abi.encodePacked(bytes4(0xdeadbeef), uint32(GAS_LIMIT), uint16(1), bytes7(0));
+    bytes memory invalidData =
+      abi.encodePacked(bytes4(0xdeadbeef), uint32(GAS_LIMIT), FinalityCodec._encodeBlockDepth(1), bytes7(0));
     vm.expectRevert(
       abi.encodeWithSelector(
         ExtraArgsCodec.InvalidExtraArgsTag.selector, ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG, bytes4(0xdeadbeef)
@@ -150,7 +151,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   }
 
   function test__decodeGenericExtraArgsV3_MaxValues() public view {
-    bytes2 highestValidFinalityTag = bytes2(uint16(1 << 15));
+    bytes4 highestValidFinalityTag = bytes4(uint32(1 << 31));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: type(uint32).max,
@@ -185,7 +186,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     bytes memory invalidData = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       GAS_LIMIT,
-      uint16(1),
+      FinalityCodec._encodeBlockDepth(1),
       uint8(0),
       uint8(10),
       bytes10(0x12345678901234567890),
@@ -202,7 +203,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     bytes memory invalidData = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       GAS_LIMIT,
-      uint16(1),
+      FinalityCodec._encodeBlockDepth(1),
       uint8(1),
       uint8(10),
       bytes10(0x12345678901234567890),
@@ -246,12 +247,12 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     assembly {
-      mstore(encoded, 35)
+      mstore(encoded, 37)
     }
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 35
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 37
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -265,12 +266,12 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     assembly {
-      mstore(encoded, 33)
+      mstore(encoded, 35)
     }
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_LENGTH, 32
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_LENGTH, 34
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -285,12 +286,12 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     assembly {
-      mstore(encoded, 34)
+      mstore(encoded, 36)
     }
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 34
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 36
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -302,12 +303,12 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     assembly {
-      mstore(encoded, 18)
+      mstore(encoded, 20)
     }
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 12
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 14
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);

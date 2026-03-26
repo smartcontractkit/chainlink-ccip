@@ -71,7 +71,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     bytes memory tokenArgs = abi.encode("tokenArgs");
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
@@ -108,7 +108,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+    bytes4 finality = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
     bytes memory tokenArgs = "";
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
@@ -144,7 +144,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = FinalityCodec._encodeBlockDepth(5);
+    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     bytes memory tokenArgs = "";
 
     vm.expectRevert(OnRamp.FTFNotSupportedOnPoolV1.selector);
@@ -159,7 +159,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
     bytes memory receiver = abi.encodePacked(makeAddr("receiver"));
     address originalSender = makeAddr("sender");
-    bytes2 finality = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+    bytes4 finality = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
     bytes memory tokenArgs = abi.encode("tokenArgs");
 
     vm.expectRevert(OnRamp.TokenArgsNotSupportedOnPoolV1.selector);

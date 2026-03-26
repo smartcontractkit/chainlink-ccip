@@ -87,7 +87,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event FinalityConfigSet(bytes2 allowedFinality);
+  event FinalityConfigSet(bytes4 allowedFinality);
   event AdvancedPoolHooksUpdated(IAdvancedPoolHooks oldHook, IAdvancedPoolHooks newHook);
 
   struct ChainUpdate {
@@ -121,7 +121,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice The division factor for bps. This also represents the maximum bps fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
   /// @dev Constant representing the default finality.
-  bytes2 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+  bytes4 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -133,7 +133,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev The address of the router.
   IRouter internal s_router;
   /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
-  bytes2 internal s_finalityConfig;
+  bytes4 internal s_finalityConfig;
   /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal s_advancedPoolHooks;
   /// @dev Separate buckets provide isolated rate limits for fast finality transfers, as their risk
@@ -218,7 +218,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice Gets the finality config as defined in the FinalityCodec library. This value does NOT 1:1 translate to
   /// a block depth. The finality config contains special flags and should only be encoded/decoded using the
   /// FinalityCodec library. Checks must happen by calling `FinalityCodec._ensureRequestedFinalityAllowed`.
-  function getFinalityConfig() public view virtual returns (bytes2 allowedFinality) {
+  function getFinalityConfig() public view virtual returns (bytes4 allowedFinality) {
     return s_finalityConfig;
   }
 
@@ -249,9 +249,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice Sets the finality config according to the FinalityCodec library encoding.
   /// @param allowedFinality The finality settings allowed in this pool, according to the FinalityCodec encoding.
   function setFinalityConfig(
-    bytes2 allowedFinality
+    bytes4 allowedFinality
   ) public virtual onlyOwner {
-    // Any bytes2 value is accepted as allowedFinality; the FinalityCodec semantics are enforced when requests are
+    // Any bytes4 value is accepted as allowedFinality; the FinalityCodec semantics are enforced when requests are
     // checked against this value via FinalityCodec._ensureRequestedFinalityAllowed.
     s_finalityConfig = allowedFinality;
 
@@ -288,7 +288,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
     uint256 feeAmount = _getFee(lockOrBurnIn, finalityConfig);
@@ -353,7 +353,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param finalityConfig Requested finality config according to the FinalityCodec.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) public virtual override(IPoolV2) returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 localAmount = _calculateLocalAmount(
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
@@ -413,7 +413,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// for various exploits.
   function _validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 requestedFinality,
+    bytes4 requestedFinality,
     bytes memory tokenArgs,
     uint256 feeAmount
   ) internal virtual {
@@ -448,7 +448,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param amountPostFee The amount after token pool bps-based fees have been deducted.
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 requestedFinalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes memory tokenArgs,
     uint256 amountPostFee
   ) internal virtual {
@@ -471,7 +471,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function _validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) internal virtual {
     if (!isSupportedToken(releaseOrMintIn.localToken)) {
       revert InvalidToken(releaseOrMintIn.localToken);
@@ -506,7 +506,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
       s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, finalityConfig);
@@ -959,7 +959,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     address localToken,
     uint64 remoteChainSelector,
     uint256 sourceDenominatedAmount,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) public view virtual returns (address[] memory requiredCCVs) {
@@ -1046,7 +1046,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    bytes2, // finalityConfig
+    bytes4, // finalityConfig
     bytes calldata // tokenArgs
   ) external view virtual returns (TokenTransferFeeConfig memory feeConfig) {
     return s_tokenTransferFeeConfig[destChainSelector];
@@ -1061,7 +1061,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint64 destChainSelector,
     uint256, // amount
     address, // feeToken
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata // tokenArgs
   )
     external
@@ -1104,7 +1104,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// Returns the fee amount.
   function _getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) internal view virtual returns (uint256) {
     TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -20,7 +21,7 @@ contract MessageV1CodecSetup is Test {
       messageNumber: 100,
       executionGasLimit: 150000,
       ccipReceiveGasLimit: 50000,
-      finality: bytes2(uint16(1000)),
+      finality: FinalityCodec._encodeBlockDepth(1000),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1234567890123456789012345678901234567890)),
       offRampAddress: abi.encodePacked(address(0x0987654321098765432109876543210987654321)),

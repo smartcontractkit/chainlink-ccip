@@ -70,7 +70,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
       address[] memory requiredCCVs,
       address[] memory optionalCCVs,
       uint8 optionalThreshold,
-      bytes2 allowedFinalityConfig
+      bytes4 allowedFinalityConfig
     )
   {
     // By default no specific CCVs are required or optional. This means the default CCV is chosen.

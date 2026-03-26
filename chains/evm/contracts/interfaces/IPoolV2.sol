@@ -32,7 +32,7 @@ interface IPoolV2 is IERC165 {
   /// @return destTokenAmount The amount of tokens that will be set in TokenTransferV1.amount to be released/mint on destination.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount);
 
@@ -42,7 +42,7 @@ interface IPoolV2 is IERC165 {
   /// @return releaseOrMintOut Encoded data fields describing the result of the release or mint.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) external returns (Pool.ReleaseOrMintOutV1 memory releaseOrMintOut);
 
   /// @notice Returns the set of required CCVs for transfers in a given direction.
@@ -57,7 +57,7 @@ interface IPoolV2 is IERC165 {
     address localToken,
     uint64 remoteChainSelector,
     uint256 sourceAmount,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata extraData,
     MessageDirection direction
   ) external view returns (address[] memory requiredCCVs);
@@ -71,7 +71,7 @@ interface IPoolV2 is IERC165 {
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
 
@@ -92,7 +92,7 @@ interface IPoolV2 is IERC165 {
     uint64 destChainSelector,
     uint256 amount,
     address feeToken,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   )
     external

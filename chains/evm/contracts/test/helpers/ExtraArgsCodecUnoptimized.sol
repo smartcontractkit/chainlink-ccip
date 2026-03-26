@@ -94,9 +94,9 @@ library ExtraArgsCodecUnoptimized {
     extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
     offset += 4;
 
-    // finalityConfig (2 bytes).
-    extraArgs.finalityConfig = bytes2(encoded[offset:offset + 2]);
-    offset += 2;
+    // finalityConfig (4 bytes).
+    extraArgs.finalityConfig = bytes4(encoded[offset:offset + 4]);
+    offset += 4;
 
     // ccvs length (1 byte).
     uint256 ccvsLength = uint8(bytes1(encoded[offset:offset + 1]));

@@ -42,7 +42,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
     address feeAggregator; // ───────╮ Address to send withdrawn fees to.
-    bytes2 allowedFinalityConfig; // │ The allowed finality config according to the `FinalityCodec` encoding.
+    bytes4 allowedFinalityConfig; // │ The allowed finality config according to the `FinalityCodec` encoding.
     bool ccvAllowlistEnabled; // ────╯ Whether the CCV allowlist is enabled.
   }
 
@@ -149,7 +149,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IExecutor
-  function getAllowedFinalityConfig() external view virtual returns (bytes2) {
+  function getAllowedFinalityConfig() external view virtual returns (bytes4) {
     return s_dynamicConfig.allowedFinalityConfig;
   }
 
@@ -201,7 +201,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @return usdCentsFee The USD denominated fee for the executor.
   function getFee(
     uint64 destChainSelector,
-    bytes2 requestedFinality,
+    bytes4 requestedFinality,
     address[] calldata ccvs,
     bytes calldata, // extraArgs
     address // feeToken

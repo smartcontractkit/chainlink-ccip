@@ -133,7 +133,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes2 finalityConfig,
+    bytes4 finalityConfig,
     bytes calldata tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver)
@@ -298,7 +298,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     address,
     uint64,
     uint256,
-    bytes2,
+    bytes4,
     bytes calldata,
     IPoolV2.MessageDirection
   ) public view virtual override returns (address[] memory requiredCCVs) {

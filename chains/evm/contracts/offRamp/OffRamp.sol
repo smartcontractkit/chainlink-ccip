@@ -475,7 +475,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver,
     bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    bytes2 finality,
+    bytes4 finality,
     bool isTokenOnlyTransfer
   ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     address[] memory requiredPoolCCVs = new address[](0);
@@ -696,13 +696,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     bytes memory sender,
-    bytes2 messageRequestedFinality
+    bytes4 messageRequestedFinality
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
     // Default finality config is 0, which means "wait for finality". A receiver implementing IAny2EVMMessageReceiverV2
     // can return a different value.
     // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
     // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
-    bytes2 receiverFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+    bytes4 receiverFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
 
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
@@ -744,7 +744,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
-    bytes2 finality,
+    bytes4 finality,
     bytes memory extraData
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
@@ -782,7 +782,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    bytes2 finalityConfig
+    bytes4 finalityConfig
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
     address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 

@@ -360,8 +360,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function test_forwardFromRouter_RevertWhen_InvalidRequestedFinality_FlagWithNonZeroDepth() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
-    extraArgs.finalityConfig = bytes2(uint16(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 1);
-    bytes2 invalidFinality = bytes2(extraArgs.finalityConfig);
+    extraArgs.finalityConfig = FinalityCodec.WAIT_FOR_SAFE_FLAG | FinalityCodec._encodeBlockDepth(1);
+    bytes4 invalidFinality = extraArgs.finalityConfig;
     message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
 
     vm.expectRevert(abi.encodeWithSelector(FinalityCodec.RequestedFinalityCanOnlyHaveOneMode.selector, invalidFinality));

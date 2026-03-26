@@ -48,13 +48,13 @@ contract AdvancedPoolHooksExtractor is IExtractor {
     revert IPolicyEngine.UnsupportedSelector(payload.selector);
   }
 
-  /// @dev Decodes preflightCheck arguments: (LockOrBurnInV1, bytes2, bytes, uint256).
+  /// @dev Decodes preflightCheck arguments: (LockOrBurnInV1, bytes4, bytes, uint256).
   function _extractPreflightCheck(
     IPolicyEngine.Payload calldata payload
   ) internal pure returns (IPolicyEngine.Parameter[] memory) {
     // tokenArgs is skipped as it is treated as context in the payload.
-    (Pool.LockOrBurnInV1 memory lockOrBurnIn, bytes2 finalityConfig,, uint256 amountPostFee) =
-      abi.decode(payload.data, (Pool.LockOrBurnInV1, bytes2, bytes, uint256));
+    (Pool.LockOrBurnInV1 memory lockOrBurnIn, bytes4 finalityConfig,, uint256 amountPostFee) =
+      abi.decode(payload.data, (Pool.LockOrBurnInV1, bytes4, bytes, uint256));
 
     IPolicyEngine.Parameter[] memory result = new IPolicyEngine.Parameter[](7);
     result[0] = IPolicyEngine.Parameter(PARAM_FROM, abi.encode(lockOrBurnIn.originalSender));
@@ -68,12 +68,12 @@ contract AdvancedPoolHooksExtractor is IExtractor {
     return result;
   }
 
-  /// @dev Decodes postflightCheck arguments: (ReleaseOrMintInV1, uint256, bytes2).
+  /// @dev Decodes postflightCheck arguments: (ReleaseOrMintInV1, uint256, bytes4).
   function _extractPostflightCheck(
     IPolicyEngine.Payload calldata payload
   ) internal pure returns (IPolicyEngine.Parameter[] memory) {
-    (Pool.ReleaseOrMintInV1 memory releaseOrMintIn, uint256 localAmount, bytes2 finalityConfig) =
-      abi.decode(payload.data, (Pool.ReleaseOrMintInV1, uint256, bytes2));
+    (Pool.ReleaseOrMintInV1 memory releaseOrMintIn, uint256 localAmount, bytes4 finalityConfig) =
+      abi.decode(payload.data, (Pool.ReleaseOrMintInV1, uint256, bytes4));
 
     // offchainTokenData is skipped as it is treated as context in the payload.
     // Note offchainTokenData is no longer used in v2+ TokenPools.

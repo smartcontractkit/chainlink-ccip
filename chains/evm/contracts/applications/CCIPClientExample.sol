@@ -38,7 +38,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   /// a non-zero value when using a trusted sender that manages re-org risk on the source side.
   struct RemoteChainConfig {
     bytes extraArgs;
-    bytes2 allowedFinalityConfig;
+    bytes4 allowedFinalityConfig;
   }
 
   // Current feeToken
@@ -76,7 +76,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   function enableChain(
     uint64 remoteChainSelector,
     bytes memory extraArgs,
-    bytes2 allowedFinalityConfig
+    bytes4 allowedFinalityConfig
   ) external onlyOwner {
     s_chains[remoteChainSelector] =
       RemoteChainConfig({extraArgs: extraArgs, allowedFinalityConfig: allowedFinalityConfig});
@@ -140,7 +140,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       address[] memory requiredCCVs,
       address[] memory optionalCCVs,
       uint8 optionalThreshold,
-      bytes2 allowedFinalityConfig
+      bytes4 allowedFinalityConfig
     )
   {
     return (new address[](0), new address[](0), 0, s_chains[remoteChainSelector].allowedFinalityConfig);
