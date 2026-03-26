@@ -537,6 +537,99 @@ func TestDeployChainContracts_Apply_NoAdapterRegistered(t *testing.T) {
 	assert.Contains(t, err.Error(), "no deploy chain contracts adapter registered")
 }
 
+// versionAwareLVR is a LaneVersionResolver whose behaviour is controlled by the test.
+type versionAwareLVR struct {
+	supported bool
+	versions  []*semver.Version
+	err       error
+}
+
+func (v *versionAwareLVR) IsSupportedChain(_ deployment.Environment, _ uint64) bool {
+	return v.supported
+}
+
+func (v *versionAwareLVR) DeriveLaneVersionsForChain(_ deployment.Environment, _ uint64) (map[uint64]*semver.Version, []*semver.Version, error) {
+	return map[uint64]*semver.Version{}, v.versions, v.err
+}
+
+var _ deploy.LaneVersionResolver = (*versionAwareLVR)(nil)
+
+func TestDeployChainContracts_Apply_NoLaneVersionResolverRegistered(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	env := newDeployTestEnv(t, []uint64{sel1})
+
+	mock := &mockDeployAdapter{}
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+	// Intentionally no RegisterLaneVersionResolver call.
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:       newDeployTestTopology(sel1),
+			ChainSelectors: []uint64{sel1},
+			DefaultCfg:     newDefaultPerChainCfg(),
+			// IgnoreImportedConfigFromPreviousVersion defaults to false → calls shouldImportConfigFromPreviousVersion
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no lane version resolver")
+}
+
+func TestDeployChainContracts_Apply_ImportsConfig_When16Found(t *testing.T) {
+	// IsSupportedChain=true + versions=[1.6.0] → shouldImport=true → no ConfigImporter → error
+	sel1 := chainsel.TEST_90000001.Selector
+	env := newDeployTestEnv(t, []uint64{sel1})
+
+	mock := &mockDeployAdapter{}
+	lvr := &versionAwareLVR{
+		supported: true,
+		versions:  []*semver.Version{semver.MustParse("1.6.0")},
+	}
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, lvr)
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:       newDeployTestTopology(sel1),
+			ChainSelectors: []uint64{sel1},
+			DefaultCfg:     newDefaultPerChainCfg(),
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ConfigImporter")
+}
+
+func TestDeployChainContracts_Apply_SkipsImport_WhenNo16Version(t *testing.T) {
+	// IsSupportedChain=true + versions=[1.7.0] → shouldImport=false → deploys normally
+	sel1 := chainsel.TEST_90000001.Selector
+	env := newDeployTestEnv(t, []uint64{sel1})
+
+	mock := &mockDeployAdapter{}
+	lvr := &versionAwareLVR{
+		supported: true,
+		versions:  []*semver.Version{semver.MustParse("1.7.0")},
+	}
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, lvr)
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:       newDeployTestTopology(sel1),
+			ChainSelectors: []uint64{sel1},
+			DefaultCfg:     newDefaultPerChainCfg(),
+		},
+	})
+	require.NoError(t, err)
+}
+
 func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {
 	sel := chainsel.TEST_90000001.Selector
 	selStr := strconv.FormatUint(sel, 10)
