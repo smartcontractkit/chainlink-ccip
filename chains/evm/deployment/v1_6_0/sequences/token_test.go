@@ -47,6 +47,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 		preMint        *uint64
 		ccipAdmin      string   // Address to set as CCIP admin
 		externalAdmins []string // Addresses to grant admin role
+		sender         string   // Address that will receive the pre-mint tokens (if applicable)
 		requiresOwner  bool
 		requiresSupply bool
 	}{
@@ -64,6 +65,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 			tokenSymbol:    "TBMERC20",
 			decimals:       18,
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
+			sender:         "0x1111111111111111111111111111111111111111",
 			supply:         &maxSupply,
 			preMint:        &preMint,
 			requiresSupply: true,
@@ -75,6 +77,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 			tokenSymbol:    "TBMDRIP",
 			decimals:       18,
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
+			sender:         "",
 			supply:         &maxSupply,
 			preMint:        &preMint,
 			requiresSupply: true,
@@ -107,6 +110,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 				Type:          tc.tokenType,
 				ExternalAdmin: externalAdmin,
 				CCIPAdmin:     tc.ccipAdmin,
+				Senders:       []string{},
 				ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 			}
 
@@ -116,6 +120,13 @@ func TestEVMTokenDeployments(t *testing.T) {
 				if tc.preMint != nil {
 					tokenInput.PreMint = tc.preMint
 				}
+			}
+
+			// Set the expected pre-mint receiver address (defaults to deployer if not specified)
+			expectedPreMintReceiver := deployerAddr
+			if tc.sender != "" {
+				tokenInput.Senders = append(tokenInput.Senders, tc.sender)
+				expectedPreMintReceiver = common.HexToAddress(tc.sender)
 			}
 
 			// Get the EVM token adapter and execute the DeployToken sequence directly
@@ -181,6 +192,9 @@ func TestEVMTokenDeployments(t *testing.T) {
 						if tc.preMint != nil {
 							expectedPreMint := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*tc.preMint), tc.decimals)
 							require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String(), "Token total supply mismatch for %s", tc.name)
+							balance, err := tokenContract.BalanceOf(&bind.CallOpts{}, expectedPreMintReceiver)
+							require.NoError(t, err, "Failed to get balance of pre-mint receiver from chain")
+							require.Equal(t, expectedPreMint.String(), balance.String(), "Pre-mint receiver balance mismatch for address %s and token %s", expectedPreMintReceiver, tc.name)
 							t.Logf("  On-chain totalSupply: %s (matches preMint)", onChainTotalSupply.String())
 						} else {
 							t.Logf("  On-chain totalSupply: %s", onChainTotalSupply.String())

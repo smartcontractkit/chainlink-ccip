@@ -396,6 +396,5 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 }
 
 func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
-	multiplier := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil)
-	return new(big.Int).Mul(amount, multiplier)
+	return new(big.Int).Mul(amount, new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil))
 }

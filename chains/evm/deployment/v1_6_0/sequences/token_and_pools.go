@@ -404,9 +404,15 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, input tokensapi
 	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
 		return err
 	}
+
 	// ensuring that decimals is not more than 18
 	if input.Decimals > 18 {
 		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
+	}
+
+	// Pre-mint amount can't be greater than the max supply
+	if input.PreMint != nil && input.Supply != nil && *input.PreMint > *input.Supply {
+		return fmt.Errorf("pre-mint amount cannot be greater than max supply, got pre-mint %d and supply %d", *input.PreMint, *input.Supply)
 	}
 
 	return nil
