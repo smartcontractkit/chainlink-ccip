@@ -32,19 +32,13 @@ type CommitteeVerifierInputConfig struct {
 	RemoteChains       map[uint64]CommitteeVerifierRemoteChainConfig
 }
 
-type PartialChainConfig struct {
-	ChainSelector            uint64
-	CommitteeVerifiers       []CommitteeVerifierInputConfig
-	DefaultInboundCCVs       []datastore.AddressRef
-	LaneMandatedInboundCCVs  []datastore.AddressRef
-	DefaultOutboundCCVs      []datastore.AddressRef
-	LaneMandatedOutboundCCVs []datastore.AddressRef
-	DefaultExecutor          datastore.AddressRef
-	FeeQuoterDestChainConfigOverrides *lanes.FeeQuoterDestChainConfigOverride
-	ExecutorDestChainConfig  lanes.ExecutorDestChainConfig
-	AddressBytesLength       uint8
-	BaseExecutionGasCost     uint32
-	RemoteChains             map[uint64]RemoteLaneConfig
+// ChainConfigForLanesFromTopology is one chain's configuration for ConfigureChainsForLanesFromTopology:
+// embedded lanes.ChainDefinition for that chain, CommitteeVerifierInputConfig resolved via topology,
+// and RemoteLanes (remote selector → remote lane endpoint), separate from CommitteeVerifierInputConfig.RemoteChains.
+type ChainConfigForLanesFromTopology struct {
+	lanes.ChainDefinition
+	CommitteeVerifiers []CommitteeVerifierInputConfig
+	RemoteLanes        map[uint64]RemoteLaneConfig
 }
 
 type RemoteLaneConfig struct {
@@ -54,7 +48,7 @@ type RemoteLaneConfig struct {
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
 	Topology *offchain.EnvironmentTopology
-	Chains   []PartialChainConfig
+	Chains   []ChainConfigForLanesFromTopology
 	MCMS     mcms.Input
 }
 
@@ -73,8 +67,8 @@ func ConfigureChainsForLanesFromTopology(
 		}
 
 		for _, chain := range cfg.Chains {
-			if !slices.Contains(e.BlockChains.ListChainSelectors(), chain.ChainSelector) {
-				return fmt.Errorf("chain selector %d is not available in environment", chain.ChainSelector)
+			if !slices.Contains(e.BlockChains.ListChainSelectors(), chain.Selector) {
+				return fmt.Errorf("chain selector %d is not available in environment", chain.Selector)
 			}
 		}
 
@@ -94,9 +88,9 @@ func ConfigureChainsForLanesFromTopology(
 			for _, cv := range chain.CommitteeVerifiers {
 				remoteChains := make(map[uint64]lanes.CommitteeVerifierRemoteChainConfig, len(cv.RemoteChains))
 				for remoteChainSelector, remoteChainConfig := range cv.RemoteChains {
-					signatureConfig, err := getSignatureConfigForLane(e, cfg.Topology, cv.CommitteeQualifier, chain.ChainSelector, remoteChainSelector, signingKeysByNOP)
+					signatureConfig, err := getSignatureConfigForLane(e, cfg.Topology, cv.CommitteeQualifier, chain.Selector, remoteChainSelector, signingKeysByNOP)
 					if err != nil {
-						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for lane local chain %d -> remote chain %d: %w", chain.ChainSelector, remoteChainSelector, err)
+						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for lane local chain %d -> remote chain %d: %w", chain.Selector, remoteChainSelector, err)
 					}
 					remoteChains[remoteChainSelector] = lanes.CommitteeVerifierRemoteChainConfig{
 						AllowlistEnabled:          remoteChainConfig.AllowlistEnabled,
@@ -109,14 +103,14 @@ func ConfigureChainsForLanesFromTopology(
 					}
 				}
 
-				adapter, err := committeeVerifierContractRegistry.GetByChain(chain.ChainSelector)
+				adapter, err := committeeVerifierContractRegistry.GetByChain(chain.Selector)
 				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("no committee verifier contract adapter for chain %d: %w", chain.ChainSelector, err)
+					return deployment.ChangesetOutput{}, fmt.Errorf("no committee verifier contract adapter for chain %d: %w", chain.Selector, err)
 				}
 
-				contracts, err := adapter.ResolveCommitteeVerifierContracts(e.DataStore, chain.ChainSelector, cv.CommitteeQualifier)
+				contracts, err := adapter.ResolveCommitteeVerifierContracts(e.DataStore, chain.Selector, cv.CommitteeQualifier)
 				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve committee verifier contracts for chain %d qualifier %q: %w", chain.ChainSelector, cv.CommitteeQualifier, err)
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve committee verifier contracts for chain %d qualifier %q: %w", chain.Selector, cv.CommitteeQualifier, err)
 				}
 
 				committeeVerifiers = append(committeeVerifiers, lanes.CommitteeVerifierConfig[datastore.AddressRef]{
@@ -125,23 +119,14 @@ func ConfigureChainsForLanesFromTopology(
 				})
 			}
 
-			for remoteChainSelector, remoteLaneConfig := range chain.RemoteChains {
+			chainA := chain.ChainDefinition
+			chainA.CommitteeVerifiers = committeeVerifiers
+
+			for remoteChainSelector, remoteLaneConfig := range chain.RemoteLanes {
 				remoteChainDef := remoteLaneConfig.Chain
 				remoteChainDef.Selector = remoteChainSelector
 				laneConfigs = append(laneConfigs, lanes.LaneConfig{
-					ChainA: lanes.ChainDefinition{
-						Selector:                 chain.ChainSelector,
-						CommitteeVerifiers:       committeeVerifiers,
-						DefaultInboundCCVs:       chain.DefaultInboundCCVs,
-						LaneMandatedInboundCCVs:  chain.LaneMandatedInboundCCVs,
-						DefaultOutboundCCVs:      chain.DefaultOutboundCCVs,
-						LaneMandatedOutboundCCVs: chain.LaneMandatedOutboundCCVs,
-						DefaultExecutor:          chain.DefaultExecutor,
-						FeeQuoterDestChainConfigOverrides: chain.FeeQuoterDestChainConfigOverrides,
-						ExecutorDestChainConfig:  chain.ExecutorDestChainConfig,
-						AddressBytesLength:       chain.AddressBytesLength,
-						BaseExecutionGasCost:     chain.BaseExecutionGasCost,
-					},
+					ChainA:     chainA,
 					ChainB:     remoteChainDef,
 					Version:    semver.MustParse("2.0.0"),
 					TestRouter: remoteLaneConfig.TestRouter,

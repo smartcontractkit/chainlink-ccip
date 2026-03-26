@@ -340,8 +340,8 @@ func TestConfigureChainsForLanesFromTopology_Validation(t *testing.T) {
 						},
 					},
 				},
-				Chains: []changesets.PartialChainConfig{
-					{ChainSelector: 9999},
+				Chains: []changesets.ChainConfigForLanesFromTopology{
+					{ChainDefinition: lanes.ChainDefinition{Selector: 9999}},
 				},
 			},
 			errContains: "chain selector 9999 is not available in environment",
@@ -385,9 +385,9 @@ func TestConfigureChainsForLanesFromTopology_AdapterNotRegistered(t *testing.T) 
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
+		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
-				ChainSelector: sel1,
+				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -432,9 +432,9 @@ func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
+		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
-				ChainSelector: sel1,
+				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -484,9 +484,9 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
+		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
-				ChainSelector: sel1,
+				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -546,9 +546,22 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
+		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
-				ChainSelector: sel1,
+				ChainDefinition: lanes.ChainDefinition{
+					Selector: sel1,
+					DefaultExecutor: datastore.AddressRef{
+						ChainSelector: sel1,
+						Type:          "Executor",
+						Version:       semver.MustParse("1.0.0"),
+					},
+					FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
+					ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+						Enabled: true,
+					},
+					AddressBytesLength:   20,
+					BaseExecutionGasCost: 80000,
+				},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -562,18 +575,7 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 						},
 					},
 				},
-				DefaultExecutor: datastore.AddressRef{
-					ChainSelector: sel1,
-					Type:          "Executor",
-					Version:       semver.MustParse("1.0.0"),
-				},
-				FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
-				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-					Enabled: true,
-				},
-				AddressBytesLength:   20,
-				BaseExecutionGasCost: 80000,
-				RemoteChains: map[uint64]changesets.RemoteLaneConfig{
+				RemoteLanes: map[uint64]changesets.RemoteLaneConfig{
 					sel2: {
 						TestRouter: true,
 						Chain: lanes.ChainDefinition{
@@ -666,9 +668,22 @@ func TestConfigureChainsForLanesFromTopology_UsesRouterAndTestRouter(t *testing.
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
+		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
-				ChainSelector: sel1,
+				ChainDefinition: lanes.ChainDefinition{
+					Selector: sel1,
+					DefaultExecutor: datastore.AddressRef{
+						ChainSelector: sel1,
+						Type:          "Executor",
+						Version:       semver.MustParse("1.0.0"),
+					},
+					FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
+					ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+						Enabled: true,
+					},
+					AddressBytesLength:   20,
+					BaseExecutionGasCost: 80000,
+				},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -688,18 +703,7 @@ func TestConfigureChainsForLanesFromTopology_UsesRouterAndTestRouter(t *testing.
 						},
 					},
 				},
-				DefaultExecutor: datastore.AddressRef{
-					ChainSelector: sel1,
-					Type:          "Executor",
-					Version:       semver.MustParse("1.0.0"),
-				},
-				FeeQuoterDestChainConfigOverrides: fqOverride(true, 50000),
-				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-					Enabled: true,
-				},
-				AddressBytesLength:   20,
-				BaseExecutionGasCost: 80000,
-				RemoteChains: map[uint64]changesets.RemoteLaneConfig{
+				RemoteLanes: map[uint64]changesets.RemoteLaneConfig{
 					sel2: remoteLane(sel2),
 					sel3: func() changesets.RemoteLaneConfig {
 						cfg := remoteLane(sel3)
@@ -759,9 +763,9 @@ func TestConfigureChainsForLanesFromTopology_CommitteeNotFound(t *testing.T) {
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
+		Chains: []changesets.ChainConfigForLanesFromTopology{
 			{
-				ChainSelector: sel1,
+				ChainDefinition: lanes.ChainDefinition{Selector: sel1},
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "nonexistent",
