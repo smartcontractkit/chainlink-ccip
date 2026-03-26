@@ -24,7 +24,6 @@ import (
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -627,7 +626,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 					preMint = *data.Token.PreMint
 				}
 
-				tokenProgramID, err := solutils.GetTokenProgramID(deployment.ContractType(data.Token.Type))
+				tokenProgramID, err := solanautils.GetTokenProgramID(deployment.ContractType(data.Token.Type))
 				require.NoError(t, err)
 
 				tokenRef, err := datastore_utils.FindAndFormatRef(
