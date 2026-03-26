@@ -1005,6 +1005,55 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertTrue(token.hasRole(token.BURNER_ROLE(), poolAddress));
   }
 
+  function test_deployTokenAndTokenPool_FactoryIsOwner_BeginsDefaultAdminTransferToFutureOwner() public {
+    address futureOwner = makeAddr("futureOwner");
+    address factory = address(s_tokenPoolFactory);
+
+    // Build token init code where owner is address(0), which causes the deployer (factory) to become the defaultAdmin.
+    // This is the "backup" path: the user forgot to set an owner in the constructor args.
+    bytes memory tokenInitCode = abi.encodePacked(
+      type(CrossChainToken).creationCode,
+      abi.encode(
+        BaseERC20.ConstructorParams({
+          name: "TestToken",
+          symbol: "TT",
+          decimals: LOCAL_TOKEN_DECIMALS,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: factory
+        }),
+        factory,
+        address(0) // address(0) → deployer (factory) becomes defaultAdmin / owner
+      )
+    );
+
+    (address tokenAddress,) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      tokenInitCode,
+      POOL_INIT_CODE,
+      address(0),
+      FAKE_SALT,
+      futureOwner
+    );
+
+    CrossChainToken token = CrossChainToken(tokenAddress);
+
+    // Factory should have initiated a transfer — futureOwner must be pending admin.
+    (address pendingAdmin,) = token.pendingDefaultAdmin();
+    assertEq(pendingAdmin, futureOwner, "beginDefaultAdminTransfer should have queued futureOwner as pending admin");
+
+    // futureOwner can complete the transfer — warp past the acceptance schedule
+    // (OZ uses strict `schedule < block.timestamp` even with delay=0).
+    vm.warp(block.timestamp + 1);
+    vm.startPrank(futureOwner);
+    token.acceptDefaultAdminTransfer();
+
+    assertEq(token.owner(), futureOwner, "futureOwner should own the token after accepting");
+  }
+
   function test_deployTokenAndTokenPool_RevertWhen_EmptyRemoteTokenInitCode() public {
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remoteTokenPools = new TokenPoolFactory.RemoteTokenPoolInfo[](1);
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(

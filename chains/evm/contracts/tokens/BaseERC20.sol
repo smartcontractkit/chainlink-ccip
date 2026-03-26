@@ -9,8 +9,7 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
-/// @notice A basic ERC20 compatible token contract with burn and minting roles.
-/// @dev The total supply can be limited during deployment.
+/// @notice A basic ERC20 that has no burn/mint functions.
 /// @dev If this contract is deployed with a pre-mint of 0, it is effectively useless as no mint functionality is
 /// exposed.
 contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {

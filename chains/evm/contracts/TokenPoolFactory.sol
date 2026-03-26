@@ -126,6 +126,13 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// the ERC20 standard, and thus cannot be certain to exist, the amount must be supplied via user input.
   /// @param localPoolType The type of pool to deploy locally (BURN_MINT or LOCK_RELEASE).
   /// @param tokenInitCode The creation code for the token, which includes the constructor parameters already appended.
+  /// NOTE:
+  ///   Only the CrossChainToken contract is supported with the following required constructor args
+  ///   - ConstructorParams.ccipAdmin must be set to this TokenPoolFactory.
+  ///   - burnMintRoleAdmin must be set to this TokenPoolFactory if localPoolType is BURN_MINT.
+  /// The factory will register the token in the token admin registry, after which the role effectively is spent. The
+  /// factory retaining this role is therefore completely safe, as long as it transferred the token admin registry
+  /// permissions.
   /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended.
   /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address.
@@ -438,6 +445,13 @@ contract TokenPoolFactory is ITypeAndVersion {
 
     // Begin the 2 admin transfer process which must be accepted in a separate tx.
     i_tokenAdminRegistry.transferAdminRole(token, futureOwner);
+
+    // If this contact is the owner of the token, begin the ownership transfer of the token to the futureOwner as well.
+    // Ideally the user supplies an owner in the constructor args of the token, but this is a backup to ensure
+    // ownership is always transferred.
+    if (CrossChainToken(token).owner() == address(this)) {
+      CrossChainToken(token).beginDefaultAdminTransfer(futureOwner);
+    }
   }
 }
 
