@@ -111,13 +111,9 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			}
 		}
 
-		family, err := chain_selectors.GetSelectorFamily(selector)
+		adapter, family, err := ResolveAdapter(tokenRegistry, selector, tokenPool.Version)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", selector, err)
-		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, ResolveAdapterVersion(tokenPool.Version))
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPool.Version.String())
+			return nil, nil, nil, fmt.Errorf("failed to resolve adapter for chain selector %d: %w", selector, err)
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
@@ -212,13 +208,9 @@ func convertRemoteChainConfig(
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
-		remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+		remoteAdapter, _, err := ResolveAdapter(tokenAdapterRegistry, remoteChainSelector, fullRemotePoolRef.Version)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
-		}
-		remoteAdapter, ok := tokenAdapterRegistry.GetTokenAdapter(remoteFamily, ResolveAdapterVersion(fullRemotePoolRef.Version))
-		if !ok {
-			return outCfg, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, fullRemotePoolRef.Version)
+			return outCfg, fmt.Errorf("failed to resolve remote adapter for remote chain selector %d: %w", remoteChainSelector, err)
 		}
 		outCfg.RemotePool, err = remoteAdapter.AddressRefToBytes(fullRemotePoolRef)
 		if err != nil {
@@ -281,13 +273,20 @@ func convertRemoteChainConfig(
 	return outCfg, nil
 }
 
-func ResolveAdapterVersion(tokenPoolVersion *semver.Version) *semver.Version {
-	adapterVersion := deploy_utils.StripPatchVersion(tokenPoolVersion)
-
+func ResolveAdapter(registry *TokenAdapterRegistry, selector uint64, tokenPoolVersion *semver.Version) (TokenAdapter, string, error) {
 	// NOTE: the v1.6.0 adapter currently handles v1.5.x pools
-	if adapterVersion == deploy_utils.Version_1_5_0 {
-		return deploy_utils.Version_1_6_0
+	version := deploy_utils.StripPatchVersion(tokenPoolVersion)
+	if version.String() == deploy_utils.Version_1_5_0.String() {
+		version = deploy_utils.Version_1_6_0
+	}
+	family, err := chain_selectors.GetSelectorFamily(selector)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", selector, err)
+	}
+	adapter, ok := registry.GetTokenAdapter(family, version)
+	if !ok {
+		return nil, "", fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, version.String())
 	}
 
-	return adapterVersion
+	return adapter, family, nil
 }
