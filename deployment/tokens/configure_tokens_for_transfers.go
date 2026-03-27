@@ -274,14 +274,13 @@ func convertRemoteChainConfig(
 }
 
 func ResolveAdapter(registry *TokenAdapterRegistry, selector uint64, tokenPoolVersion *semver.Version) (TokenAdapter, string, error) {
-	// NOTE: the v1.6.0 adapter currently handles v1.5.x pools
-	version := deploy_utils.StripPatchVersion(tokenPoolVersion)
-	if version.String() == deploy_utils.Version_1_5_0.String() {
-		version = deploy_utils.Version_1_6_0
-	}
 	family, err := chain_selectors.GetSelectorFamily(selector)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", selector, err)
+	}
+	version := deploy_utils.StripPatchVersion(tokenPoolVersion)
+	if family == chain_selectors.FamilyEVM && version.String() == deploy_utils.Version_1_5_0.String() {
+		version = deploy_utils.Version_1_6_0 // NOTE: for EVM, the v1.6.0 adapter currently handles v1.5.x pools
 	}
 	adapter, ok := registry.GetTokenAdapter(family, version)
 	if !ok {
