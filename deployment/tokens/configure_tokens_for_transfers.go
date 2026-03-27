@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	deploy_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -113,9 +115,9 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", selector, err)
 		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, tokenPool.Version)
+		adapter, ok := tokenRegistry.GetTokenAdapter(family, ResolveAdapterVersion(tokenPool.Version))
 		if !ok {
-			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPool.Version)
+			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPool.Version.String())
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
@@ -214,7 +216,7 @@ func convertRemoteChainConfig(
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
 		}
-		remoteAdapter, ok := tokenAdapterRegistry.GetTokenAdapter(remoteFamily, fullRemotePoolRef.Version)
+		remoteAdapter, ok := tokenAdapterRegistry.GetTokenAdapter(remoteFamily, ResolveAdapterVersion(fullRemotePoolRef.Version))
 		if !ok {
 			return outCfg, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, fullRemotePoolRef.Version)
 		}
@@ -277,4 +279,15 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	return outCfg, nil
+}
+
+func ResolveAdapterVersion(tokenPoolVersion *semver.Version) *semver.Version {
+	adapterVersion := deploy_utils.StripPatchVersion(tokenPoolVersion)
+
+	// NOTE: the v1.6.0 adapter currently handles v1.5.x pools
+	if adapterVersion == deploy_utils.Version_1_5_0 {
+		return deploy_utils.Version_1_6_0
+	}
+
+	return adapterVersion
 }
