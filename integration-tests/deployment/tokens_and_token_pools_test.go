@@ -505,10 +505,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmA.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
-									ChainSelector: evmA.Chain.Selector,
-									Qualifier:     evmA.TokenPoolQualifier,
-									Type:          datastore.ContractType(evmTokenPoolType),
-									Version:       v1_5_1,
+									Address: poolAddressA.Hex(), // Testing a different code path
 								},
 								RegistryRef: datastore.AddressRef{}, // inferred
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{

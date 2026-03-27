@@ -113,9 +113,9 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", selector, err)
 		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
+		adapter, ok := tokenRegistry.GetTokenAdapter(family, tokenPool.Version)
 		if !ok {
-			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, token.TokenPoolRef.Version)
+			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPool.Version)
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
