@@ -120,14 +120,6 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
 		for remoteChainSelector, inCfg := range token.RemoteChains {
-			remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
-			}
-			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, inCfg.RemotePool.Version)
-			if !ok {
-				return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, inCfg.RemotePool.Version)
-			}
 			counterpart, ok := cfg[remoteChainSelector]
 			if !ok {
 				return nil, nil, nil, fmt.Errorf("missing token transfer config for remote chain selector %d", remoteChainSelector)
@@ -139,7 +131,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(
 				e,
 				selector,
-				remoteAdapter,
+				tokenRegistry,
 				remoteChainSelector,
 				inCfg,
 				counterpartRemoteChainCfg.DefaultFinalityOutboundRateLimiterConfig,
@@ -196,7 +188,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 func convertRemoteChainConfig(
 	e cldf.Environment,
 	chainSelector uint64,
-	remoteAdapter TokenAdapter,
+	tokenAdapterRegistry *TokenAdapterRegistry,
 	remoteChainSelector uint64,
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
 	chainSelectorDefaultFinalityOutboundTprl RateLimiterConfigFloatInput,
@@ -212,10 +204,19 @@ func convertRemoteChainConfig(
 		DefaultFinalityOutboundRateLimiterConfig: inCfg.DefaultFinalityOutboundRateLimiterConfig,
 		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
 	}
+
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
+		}
+		remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
+		}
+		remoteAdapter, ok := tokenAdapterRegistry.GetTokenAdapter(remoteFamily, fullRemotePoolRef.Version)
+		if !ok {
+			return outCfg, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, fullRemotePoolRef.Version)
 		}
 		outCfg.RemotePool, err = remoteAdapter.AddressRefToBytes(fullRemotePoolRef)
 		if err != nil {

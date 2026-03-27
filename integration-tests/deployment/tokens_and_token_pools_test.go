@@ -470,6 +470,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, err)
 			poolA, err := bnmpool.NewBurnMintTokenPool(poolAddressA, evmA.Chain.Client)
 			require.NoError(t, err)
+			tokA, err := poolA.GetToken(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
 			outboundRateLimitAB, err := poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
 			require.NoError(t, err)
 			inboundRateLimitAB, err := poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
@@ -547,15 +549,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 										OutboundCCVs:                             []datastore.AddressRef{},
 										InboundCCVs:                              []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
-											ChainSelector: evmA.Chain.Selector,
-											Qualifier:     evmA.Token.Symbol,
-											Type:          datastore.ContractType(evmA.Token.Type),
+											Address: tokA.Hex(), // Testing a different code path
 										},
 										RemotePool: &datastore.AddressRef{
-											ChainSelector: evmA.Chain.Selector,
-											Qualifier:     evmA.TokenPoolQualifier,
-											Type:          datastore.ContractType(evmTokenPoolType),
-											Version:       v1_5_1,
+											Address: poolAddressA.Hex(), // Testing a different code path
 										},
 									},
 								},
