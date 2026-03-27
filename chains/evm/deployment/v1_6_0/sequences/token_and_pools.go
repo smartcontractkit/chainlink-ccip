@@ -217,7 +217,7 @@ func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector
 			pool = tp
 		}
 	default:
-		return 0, fmt.Errorf("Unsupported token pool version %s for token pool at address %q on chain selector %d", addrRef.Version.String(), tpAddr.Hex(), addrRef.ChainSelector)
+		return 0, fmt.Errorf("unsupported token pool version %s for token pool at address %q on chain selector %d", addrRef.Version.String(), tpAddr.Hex(), addrRef.ChainSelector)
 	}
 
 	return pool.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
@@ -686,7 +686,7 @@ func (a *EVMAdapter) GetTokenPoolAdmins(ctx context.Context, chain *evm.Chain, r
 			pool = tp
 		}
 	default:
-		return common.Address{}, common.Address{}, fmt.Errorf("Unsupported token pool version %s for token pool at address %q on chain selector %d", ref.Version.String(), addr.Hex(), ref.ChainSelector)
+		return common.Address{}, common.Address{}, fmt.Errorf("unsupported token pool version %s for token pool at address %q on chain selector %d", ref.Version.String(), addr.Hex(), ref.ChainSelector)
 	}
 
 	poolOwner, err = pool.Owner(&bind.CallOpts{Context: ctx})

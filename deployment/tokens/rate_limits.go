@@ -45,7 +45,7 @@ type TPRLRemotes struct {
 	ExistingDataStore                        datastore.DataStore
 
 	// If true, the changeset will check if timelock or the deployer key has sufficient permissions to set rate limits
-	// on the token pool. If either account is missing permissions (i.e. not the pool owner or rate limit admin), then
+	// on the token pool. If both accounts are missing permissions (i.e. not the pool owner or rate limit admin), then
 	// a warning will be logged and the changeset will NOT perform the rate limit update since it has a high chance of
 	// failure. This flag is disabled by default so that it still allows flexibility for callers to schedule both rate
 	// limit permission updates AND token pool rate limit updates in parallel / in the same batch. At the time of this
