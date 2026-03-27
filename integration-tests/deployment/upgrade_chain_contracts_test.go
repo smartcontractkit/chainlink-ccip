@@ -151,7 +151,6 @@ func TestUpgradeChainContracts(t *testing.T) {
 	SolanaTransferOwnership(t, e, solSelector)
 
 	// Capture deployed program addresses before upgrade
-	chain := e.BlockChains.SolanaChains()[solSelector]
 	allAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(solSelector))
 	preUpgradeAddresses := make(map[cldf.ContractType]string)
 	for _, addr := range allAddresses {
@@ -166,37 +165,30 @@ func TestUpgradeChainContracts(t *testing.T) {
 	require.NotEmpty(t, offRampAddr, "OffRamp address should exist")
 
 	// Step 3: Build upgrade artifacts with keys matching deployed programs
-	upgradeVersion := semver.MustParse("1.6.1")
-	upgradeAuthority := chain.DeployerKey.PublicKey()
-
 	uReg := deployapi.GetUpgraderRegistry()
 	_, err = deployapi.UpgradeContracts(uReg, dReg).Apply(*e, deployapi.ContractUpgradeConfig{
-		MCMS: mcms.Input{},
-		Chains: map[uint64]deployapi.ContractUpgradeConfigPerChain{
-			solSelector: {
-				Version: version,
-				Upgrades: map[cldf.ContractType]*semver.Version{
-					routerops.ContractType:  upgradeVersion,
-					fqops.ContractType:      upgradeVersion,
-					offrampops.ContractType: upgradeVersion,
-				},
-				UpgradeAuthority: upgradeAuthority.String(),
-				ChainSpecific: &solutils.SolanaBuildConfig{
-					ContractVersion: solutils.VersionSolanaV1_6_1,
-					DestinationDir:  programsPath,
-					LocalBuild: &solutils.LocalBuildConfig{
-						BuildLocally:        true,
-						CleanDestinationDir: true,
-						CleanGitDir:         true,
-						UpgradeKeys: map[cldf.ContractType]string{
-							routerops.ContractType:  routerAddr,
-							fqops.ContractType:      fqAddr,
-							offrampops.ContractType: offRampAddr,
-						},
-					},
+		ChainSelector: solSelector,
+		Version:       version,
+		Contracts: []cldf.ContractType{
+			routerops.ContractType,
+			fqops.ContractType,
+			offrampops.ContractType,
+		},
+		ChainSpecific: &solutils.SolanaBuildConfig{
+			ContractVersion: solutils.VersionSolanaV1_6_1,
+			DestinationDir:  programsPath,
+			LocalBuild: &solutils.LocalBuildConfig{
+				BuildLocally:        true,
+				CleanDestinationDir: true,
+				CleanGitDir:         true,
+				UpgradeKeys: map[cldf.ContractType]string{
+					routerops.ContractType:  routerAddr,
+					fqops.ContractType:      fqAddr,
+					offrampops.ContractType: offRampAddr,
 				},
 			},
 		},
+		MCMS: mcms.Input{},
 	})
 	require.NoError(t, err)
 

@@ -25,6 +25,9 @@ import (
 )
 
 // contractTypeToProgram maps contract types to their compiled program binary names.
+// NOTE: The legacy system had a separate "redeploy" path for the offramp (fresh deploy +
+// re-wire fee quoter). In practice, the offramp is always upgraded in place like other
+// programs, so the redeploy path was intentionally not carried forward.
 var contractTypeToProgram = map[cldf.ContractType]string{
 	routerops.ContractType:            routerops.ProgramName,
 	fqops.ContractType:                fqops.ProgramName,
@@ -37,7 +40,7 @@ var contractTypeToProgram = map[cldf.ContractType]string{
 	utils.AccessControllerProgramType: mcmsops.AccessControllerProgramName,
 }
 
-func (a *SolanaAdapter) UpgradeChainContracts() *cldf_ops.Sequence[deployapi.ContractUpgradeConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *SolanaAdapter) UpgradeChainContracts() *cldf_ops.Sequence[deployapi.ContractUpgradeConfigWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return UpgradeChainContracts
 }
 
@@ -45,9 +48,8 @@ var UpgradeChainContracts = cldf_ops.NewSequence(
 	"upgrade-chain-contracts",
 	semver.MustParse("1.6.0"),
 	"Upgrades deployed Solana CCIP programs in place via BPF Loader Upgradeable",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deployapi.ContractUpgradeConfigPerChainWithAddress) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deployapi.ContractUpgradeConfigWithAddress) (sequences.OnChainOutput, error) {
 		chain := chains.SolanaChains()[input.ChainSelector]
-		upgradeAuthority := solana.MustPublicKeyFromBase58(input.UpgradeAuthority)
 
 		addresses := make([]datastore.AddressRef, 0)
 		allBatchOps := make([]mcmsTypes.BatchOperation, 0)
@@ -58,7 +60,7 @@ var UpgradeChainContracts = cldf_ops.NewSequence(
 			"cll",
 		)
 
-		for contractType, targetVersion := range input.Upgrades {
+		for _, contractType := range input.Contracts {
 			programName, ok := contractTypeToProgram[contractType]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("no program name mapping for contract type %s", contractType)
@@ -70,13 +72,17 @@ var UpgradeChainContracts = cldf_ops.NewSequence(
 			}
 			programID := solana.MustPublicKeyFromBase58(existingAddr)
 
+			upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, programID)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to read upgrade authority for %s (%s): %w", contractType, programID.String(), err)
+			}
+
 			batchOps, err := upgradeProgram(
 				b,
 				chain,
 				programID,
 				programName,
 				contractType,
-				targetVersion,
 				upgradeAuthority,
 				timelockSignerPDA,
 			)
@@ -89,7 +95,7 @@ var UpgradeChainContracts = cldf_ops.NewSequence(
 				Address:       programID.String(),
 				ChainSelector: chain.Selector,
 				Type:          datastore.ContractType(contractType),
-				Version:       targetVersion,
+				Version:       input.Version,
 			})
 		}
 
@@ -106,11 +112,9 @@ func upgradeProgram(
 	programID solana.PublicKey,
 	programName string,
 	contractType cldf.ContractType,
-	targetVersion *semver.Version,
 	upgradeAuthority solana.PublicKey,
 	timelockSignerPDA solana.PublicKey,
 ) ([]mcmsTypes.BatchOperation, error) {
-	// Step 1: Deploy program binary to a buffer account
 	b.Logger.Infow("Deploying upgrade buffer", "program", contractType, "name", programName)
 	bufferAddress, err := utils.DeployToBuffer(chain, b.Logger, programName)
 	if err != nil {
@@ -118,13 +122,13 @@ func upgradeProgram(
 	}
 	b.Logger.Infow("Buffer deployed", "program", contractType, "buffer", bufferAddress.String())
 
-	// Step 2: Transfer buffer authority to the upgrade authority (e.g. timelock)
+	// Transfer buffer authority to the on-chain upgrade authority
 	setAuthIxn := utils.SetUpgradeAuthority(bufferAddress, chain.DeployerKey.PublicKey(), upgradeAuthority, true)
 	if err := chain.Confirm([]solana.Instruction{setAuthIxn}); err != nil {
 		return nil, fmt.Errorf("failed to set buffer authority: %w", err)
 	}
 
-	// Step 3: Extend program if the new binary is larger (permissionless)
+	// Extend program if the new binary is larger (permissionless — any payer)
 	bufferSize, err := utils.GetBufferSize(chain, bufferAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get buffer size: %w", err)
@@ -139,11 +143,10 @@ func upgradeProgram(
 		}
 	}
 
-	// Step 4: Generate upgrade + close buffer instructions
 	upgradeIxn := utils.GenerateUpgradeInstruction(programID, bufferAddress, chain.DeployerKey.PublicKey(), upgradeAuthority)
 	closeIxn := utils.GenerateCloseBufferInstruction(bufferAddress, chain.DeployerKey.PublicKey(), upgradeAuthority)
 
-	// Step 5: Execute directly or wrap in MCMS batch depending on authority
+	// Execute directly if deployer owns it, otherwise wrap in MCMS proposal
 	if upgradeAuthority != timelockSignerPDA {
 		if err := chain.Confirm([]solana.Instruction{upgradeIxn, closeIxn}); err != nil {
 			return nil, fmt.Errorf("failed to confirm upgrade: %w", err)

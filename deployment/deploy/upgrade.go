@@ -22,29 +22,28 @@ import (
 // (e.g. EVM uses proxy patterns instead), so this is kept separate to avoid
 // forcing all Deployer implementations to stub upgrade methods.
 type Upgrader interface {
-	UpgradeChainContracts() *cldf_ops.Sequence[ContractUpgradeConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpgradeChainContracts() *cldf_ops.Sequence[ContractUpgradeConfigWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
+// ContractUpgradeConfig targets a single chain. Upgrades are chain-specific
+// operations — unlike deploys, they won't be batched across chains.
 type ContractUpgradeConfig struct {
-	Chains map[uint64]ContractUpgradeConfigPerChain
-	MCMS   mcms.Input
-}
-
-type ContractUpgradeConfigPerChain struct {
+	ChainSelector uint64
+	// Version selects which upgrader adapter to use from the registry.
 	Version *semver.Version
-	// Upgrades maps contract types to their target upgrade versions.
-	Upgrades map[cldf.ContractType]*semver.Version
-	// UpgradeAuthority is the current authority that owns the deployed programs.
-	// On Solana this is typically the timelock signer PDA or the deployer key.
-	UpgradeAuthority string
+	// Contracts lists the contract types to upgrade. The upgrade authority
+	// and existing addresses are read from on-chain state by the adapter.
+	Contracts []cldf.ContractType
 	// ChainSpecific holds chain-family-specific upgrade configuration.
-	// Solana adapters expect *SolanaUpgradeExtensions here.
+	// Solana adapters expect *SolanaBuildConfig here for artifact preparation.
 	ChainSpecific any
+	MCMS          mcms.Input
 }
 
-type ContractUpgradeConfigPerChainWithAddress struct {
-	ContractUpgradeConfigPerChain
-	ChainSelector     uint64
+// ContractUpgradeConfigWithAddress is the input passed to the upgrade sequence,
+// enriched with existing on-chain addresses by the changeset.
+type ContractUpgradeConfigWithAddress struct {
+	ContractUpgradeConfig
 	ExistingAddresses []datastore.AddressRef
 }
 
@@ -94,68 +93,61 @@ func UpgradeContracts(upgraderReg *UpgraderRegistry, deployerReg *DeployerRegist
 }
 
 func upgradeContractsVerify(_ cldf.Environment, cfg ContractUpgradeConfig) error {
-	for selector, config := range cfg.Chains {
-		_, err := chain_selectors.GetSelectorFamily(selector)
-		if err != nil {
-			return fmt.Errorf("no selector %d found in environment: %w", selector, err)
-		}
-		if config.Version == nil {
-			return fmt.Errorf("no version specified for chain with selector %d", selector)
-		}
-		if len(config.Upgrades) == 0 {
-			return fmt.Errorf("no upgrades specified for chain with selector %d", selector)
-		}
+	_, err := chain_selectors.GetSelectorFamily(cfg.ChainSelector)
+	if err != nil {
+		return fmt.Errorf("no selector %d found: %w", cfg.ChainSelector, err)
+	}
+	if cfg.Version == nil {
+		return fmt.Errorf("no version specified for chain with selector %d", cfg.ChainSelector)
+	}
+	if len(cfg.Contracts) == 0 {
+		return fmt.Errorf("no contracts specified for upgrade on chain with selector %d", cfg.ChainSelector)
 	}
 	return nil
 }
 
 func upgradeContractsApply(u *UpgraderRegistry, d *DeployerRegistry) func(cldf.Environment, ContractUpgradeConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ContractUpgradeConfig) (cldf.ChangesetOutput, error) {
-		reports := make([]cldf_ops.Report[any, any], 0)
+		family, err := chain_selectors.GetSelectorFamily(cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+		upgrader, exists := u.GetUpgrader(family, cfg.Version)
+		if !exists {
+			return cldf.ChangesetOutput{}, fmt.Errorf("no upgrader registered for chain family %s and version %s", family, cfg.Version.String())
+		}
+		// If the deployer also implements ArtifactPreparer, run it for upgrades too.
+		// Upgrade builds typically need key replacement to match existing program IDs.
+		deployer, deployerExists := d.GetDeployer(family, cfg.Version)
+		if deployerExists {
+			if preparer, ok := deployer.(ArtifactPreparer); ok {
+				deployCfg := ContractDeploymentConfigPerChain{
+					Version:       cfg.Version,
+					ChainSpecific: cfg.ChainSpecific,
+				}
+				if err := preparer.PrepareArtifacts(e, cfg.ChainSelector, deployCfg); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to prepare artifacts for upgrade on chain %d: %w", cfg.ChainSelector, err)
+				}
+			}
+		}
+		existingAddrs := d.ExistingAddressesForChain(e, cfg.ChainSelector)
+		seqCfg := ContractUpgradeConfigWithAddress{
+			ContractUpgradeConfig: cfg,
+			ExistingAddresses:     existingAddrs,
+		}
+		upgradeReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, upgrader.UpgradeChainContracts(), e.BlockChains, seqCfg)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to upgrade contracts on chain with selector %d: %w", cfg.ChainSelector, err)
+		}
 		ds := datastore.NewMemoryDataStore()
-		for selector, upgradeCfg := range cfg.Chains {
-			family, err := chain_selectors.GetSelectorFamily(selector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, err
+		for _, r := range upgradeReport.Output.Addresses {
+			if err := ds.Addresses().Add(r); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 			}
-			upgrader, exists := u.GetUpgrader(family, upgradeCfg.Version)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no upgrader registered for chain family %s and version %s", family, upgradeCfg.Version.String())
-			}
-			// If the deployer also implements ArtifactPreparer, run it for upgrades too.
-			// Upgrade builds typically need key replacement to match existing program IDs.
-			deployer, deployerExists := d.GetDeployer(family, upgradeCfg.Version)
-			if deployerExists {
-				if preparer, ok := deployer.(ArtifactPreparer); ok {
-					deployCfg := ContractDeploymentConfigPerChain{
-						Version:       upgradeCfg.Version,
-						ChainSpecific: upgradeCfg.ChainSpecific,
-					}
-					if err := preparer.PrepareArtifacts(e, selector, deployCfg); err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to prepare artifacts for upgrade on chain %d: %w", selector, err)
-					}
-				}
-			}
-			existingAddrs := d.ExistingAddressesForChain(e, selector)
-			seqCfg := ContractUpgradeConfigPerChainWithAddress{
-				ContractUpgradeConfigPerChain: upgradeCfg,
-				ExistingAddresses:             existingAddrs,
-				ChainSelector:                 selector,
-			}
-			upgradeReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, upgrader.UpgradeChainContracts(), e.BlockChains, seqCfg)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to upgrade contracts on chain with selector %d: %w", selector, err)
-			}
-			for _, r := range upgradeReport.Output.Addresses {
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
-				}
-			}
-			reports = append(reports, upgradeReport.ExecutionReports...)
 		}
 
 		return changesets.NewOutputBuilder(e, nil).
-			WithReports(reports).
+			WithReports(upgradeReport.ExecutionReports).
 			WithDataStore(ds).
 			Build(cfg.MCMS)
 	}
