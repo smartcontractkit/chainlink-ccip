@@ -130,7 +130,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @dev The address of the router.
   IRouter internal s_router;
-  /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
+  /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`).
+  /// FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
   bytes4 internal s_allowedFinalityConfig;
   /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal s_advancedPoolHooks;
@@ -178,8 +179,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
           revert InvalidDecimalArgs(localTokenDecimals, actualTokenDecimals);
         }
       } catch {
-        // The decimals function doesn't exist, which is possible since it's optional in the ERC20 spec. We skip the check and
-        // assume the supplied token decimals are correct.
+        // The decimals function doesn't exist, which is possible since it's optional in the ERC20 spec. We skip the
+        // check and assume the supplied token decimals are correct.
       }
     }
     i_tokenDecimals = localTokenDecimals;
@@ -463,7 +464,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// - rate limiting for either default or FTF transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param requestedFinalityConfig The requested finality encoding (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
+  /// @param requestedFinalityConfig The requested finality encoding (see `FinalityCodec`).
+  /// FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
@@ -1119,8 +1121,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev FeeTokenHandler will revert if `recipient` is zero address.
   /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
   /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
-  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract balance is safe
-  /// and clears only accrued fees.
+  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract
+  /// balance is safe and clears only accrued fees.
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
   /// @param recipient The address to withdraw the fee tokens to.
   function withdrawFeeTokens(
