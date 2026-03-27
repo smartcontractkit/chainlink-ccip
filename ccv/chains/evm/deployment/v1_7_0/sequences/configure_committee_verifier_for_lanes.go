@@ -86,8 +86,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			}
 			currRemote := currentRemoteReport.Output
 
-			if currRemote.Router != desiredRemoteChainArg.Router ||
-				currRemote.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
+			if currRemote.RemoteChainConfig.Router != desiredRemoteChainArg.Router ||
+				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
 				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
@@ -104,7 +104,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 				if currFee.FeeUSDCents != desiredRemoteChainArg.FeeUSDCents ||
 					currFee.GasForVerification != desiredRemoteChainArg.GasForVerification ||
-					currFee.PayloadSizeBytes != desiredRemoteChainArg.PayloadSizeBytes {
+					uint16(currFee.PayloadSizeBytes) != desiredRemoteChainArg.PayloadSizeBytes {
 					remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 				}
 			}

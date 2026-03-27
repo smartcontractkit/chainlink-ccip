@@ -286,11 +286,11 @@ func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.Ex
 		result = append(result, sequences.ExecutorParams{
 			Version:       ep.Version,
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
-			DynamicConfig: executor.DynamicConfig{
-				FeeAggregator:         feeAgg,
-				MinBlockConfirmations: ep.DynamicConfig.MinBlockConfirmations,
-				CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,
-			},
+		DynamicConfig: executor.DynamicConfig{
+			FeeAggregator:         feeAgg,
+			AllowedFinalityConfig: sequences.BlockDepthFinalityConfig(ep.DynamicConfig.MinBlockConfirmations),
+			CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,
+		},
 			Qualifier: ep.Qualifier,
 		})
 	}
@@ -301,12 +301,12 @@ func convertMockReceivers(params []ccvadapters.MockReceiverDeployParams) []seque
 	result := make([]sequences.MockReceiverParams, 0, len(params))
 	for _, mr := range params {
 		result = append(result, sequences.MockReceiverParams{
-			Version:                   mr.Version,
-			RequiredVerifiers:         mr.RequiredVerifiers,
-			OptionalVerifiers:         mr.OptionalVerifiers,
-			OptionalThreshold:         mr.OptionalThreshold,
-			MinimumBlockConfirmations: mr.MinimumBlockConfirmations,
-			Qualifier:                 mr.Qualifier,
+			Version:               mr.Version,
+			RequiredVerifiers:     mr.RequiredVerifiers,
+			OptionalVerifiers:     mr.OptionalVerifiers,
+			OptionalThreshold:     mr.OptionalThreshold,
+			AllowedFinalityConfig: sequences.BlockDepthFinalityConfig(mr.MinimumBlockConfirmations),
+			Qualifier:             mr.Qualifier,
 		})
 	}
 	return result

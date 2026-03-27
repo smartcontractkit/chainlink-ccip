@@ -621,7 +621,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Contains(t, homeCCTPV2AuthorizedCallers, homeUSDCTokenPoolProxyAddr, "USDCTokenPoolProxy should be an authorized caller on CCTP V2 token pool on home chain")
 
 	// Check USDCTokenPoolProxy required CCVs on home chain
-	homeRequiredCCVs, err := homeUSDCTokenPoolProxy.GetRequiredCCVs(nil, homeSetup.USDCToken, nonHomeChainSelector, big.NewInt(1e18), 1, []byte{}, 0)
+	homeRequiredCCVs, err := homeUSDCTokenPoolProxy.GetRequiredCCVs(nil, homeSetup.USDCToken, nonHomeChainSelector, big.NewInt(1e18), [4]byte{0, 0, 0, 1}, []byte{}, 0)
 	require.NoError(t, err, "Failed to get required CCVs from USDCTokenPoolProxy on home chain")
 	require.Equal(t, []common.Address{homeCCTPVerifierResolverAddr}, homeRequiredCCVs, "Required CCVs should match on home chain")
 
@@ -646,7 +646,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// Check CCTPVerifier remote chain config on home chain
 	homeVerifierRemoteChainConfig, err := homeCCTPVerifier.GetRemoteChainConfig(nil, nonHomeChainSelector)
 	require.NoError(t, err, "Failed to get remote chain config from CCTPVerifier on home chain")
-	require.Equal(t, homeSetup.Router, homeVerifierRemoteChainConfig.Router, "CCTPVerifier remote chain config Router should match on home chain")
+	require.Equal(t, homeSetup.Router, homeVerifierRemoteChainConfig.RemoteChainConfig.Router, "CCTPVerifier remote chain config Router should match on home chain")
 
 	// Check CCTP V2 token pool domain on home chain
 	homeCCTPV2Domain, err := homeCCTPV2TokenPool.GetDomain(nil, nonHomeChainSelector)
@@ -754,7 +754,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// Check CCTPVerifier remote chain config on non-home chain
 	nonHomeVerifierRemoteChainConfig, err := nonHomeCCTPVerifier.GetRemoteChainConfig(nil, homeChainSelector)
 	require.NoError(t, err, "Failed to get remote chain config from CCTPVerifier on non-home chain")
-	require.Equal(t, nonHomeSetup.Router, nonHomeVerifierRemoteChainConfig.Router, "CCTPVerifier remote chain config Router should match on non-home chain")
+	require.Equal(t, nonHomeSetup.Router, nonHomeVerifierRemoteChainConfig.RemoteChainConfig.Router, "CCTPVerifier remote chain config Router should match on non-home chain")
 
 	// Check CCTP V2 token pool domain on non-home chain
 	nonHomeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2.NewUSDCTokenPoolCCTPV2Contract(nonHomeCCTPV2TokenPoolAddr, nonHomeChain.Client)

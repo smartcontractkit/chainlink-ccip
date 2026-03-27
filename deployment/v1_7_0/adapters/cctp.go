@@ -34,7 +34,7 @@ type RemoteCCTPChainConfig struct {
 	// GasForVerification is the gas required to verify the CCTP message on the remote chain.
 	GasForVerification uint32
 	// PayloadSizeBytes is the size of the CCTP verification payload to be checked on the remote chain.
-	PayloadSizeBytes uint32
+	PayloadSizeBytes uint16
 	// LockOrBurnMechanism specifies the mechanism by which the CCTP message will be handled.
 	// Each chain family may interpret this string differently.
 	LockOrBurnMechanism string

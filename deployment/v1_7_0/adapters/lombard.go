@@ -67,7 +67,7 @@ type RemoteLombardChainConfig struct {
 	RemoteAdapter      string
 	FeeUSDCents        uint16
 	GasForVerification uint32
-	PayloadSizeBytes   uint32
+	PayloadSizeBytes   uint16
 }
 
 // ConfigureLombardChainForLanesDeps are the dependencies for the ConfigureLombardChainForLanes sequence.
