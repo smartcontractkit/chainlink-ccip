@@ -49,6 +49,11 @@ type ContractDeploymentConfigPerChain struct {
 	// PING PONG DEMO CONFIG
 	// DeployPingPongDapp enables deployment of the PingPongDemo contract (default: false)
 	DeployPingPongDapp bool
+	// ChainSpecific holds chain-family-specific configuration that the adapter
+	// is responsible for type-asserting. Nil for chains with no extra config.
+	// For example, Solana adapters expect *SolanaBuildConfig here to control
+	// artifact downloading, local builds, and key replacement.
+	ChainSpecific any
 }
 
 type ContractDeploymentConfigPerChainWithAddress struct {
@@ -86,12 +91,17 @@ func deployContractsApply(d *DeployerRegistry) func(cldf.Environment, ContractDe
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			deployer, exists := d.GetDeployer(family, contractCfg.Version)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, contractCfg.Version.String())
+		deployer, exists := d.GetDeployer(family, contractCfg.Version)
+		if !exists {
+			return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, contractCfg.Version.String())
+		}
+		if preparer, ok := deployer.(ArtifactPreparer); ok {
+			if err := preparer.PrepareArtifacts(e, selector, contractCfg); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to prepare artifacts for chain %d: %w", selector, err)
 			}
-			// find existing addresses for this chain from the env
-			existingAddrs := d.ExistingAddressesForChain(e, selector)
+		}
+		// find existing addresses for this chain from the env
+		existingAddrs := d.ExistingAddressesForChain(e, selector)
 			// create the sequence input
 			seqCfg := ContractDeploymentConfigPerChainWithAddress{
 				ContractDeploymentConfigPerChain: contractCfg,

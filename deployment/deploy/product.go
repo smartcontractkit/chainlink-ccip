@@ -36,6 +36,14 @@ type Deployer interface {
 	UpdateMCMSConfig() *cldf_ops.Sequence[UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
+// ArtifactPreparer is an optional interface that Deployer adapters may implement
+// to prepare chain-specific artifacts (e.g. program binaries) before deployment.
+// This is checked via type assertion in the deploy path — chains that don't need
+// artifact preparation (e.g. EVM) simply don't implement it.
+type ArtifactPreparer interface {
+	PrepareArtifacts(e cldf.Environment, chainSelector uint64, cfg ContractDeploymentConfigPerChain) error
+}
+
 type DeployerRegistry struct {
 	mu        sync.Mutex
 	deployers map[string]Deployer

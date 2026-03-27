@@ -2,13 +2,17 @@ package sequences
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
@@ -27,11 +31,13 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	laneapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
-	deployapi.GetRegistry().RegisterDeployer(chain_selectors.FamilySolana, v, &SolanaAdapter{})
-	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
-	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilySolana, &SolanaAdapter{})
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	adapter := &SolanaAdapter{}
+	laneapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, adapter)
+	deployapi.GetRegistry().RegisterDeployer(chain_selectors.FamilySolana, v, adapter)
+	deployapi.GetUpgraderRegistry().RegisterUpgrader(chain_selectors.FamilySolana, v, adapter)
+	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilySolana, v, adapter)
+	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilySolana, adapter)
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilySolana, v, adapter)
 }
 
 type SolanaAdapter struct {
@@ -76,6 +82,45 @@ func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector u
 		return nil, err
 	}
 	return addr, nil
+}
+
+// PrepareArtifacts implements deploy.ArtifactPreparer.
+// It ensures Solana program .so files are available in ProgramsPath before deployment.
+// If ChainSpecific contains a *utils.SolanaBuildConfig, it uses that to drive the
+// build/download. Otherwise, it checks that artifacts already exist (the in-memory test path).
+func (a *SolanaAdapter) PrepareArtifacts(e cldf.Environment, chainSelector uint64, cfg deployapi.ContractDeploymentConfigPerChain) error {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return fmt.Errorf("solana chain not found for selector %d", chainSelector)
+	}
+
+	buildCfg, _ := cfg.ChainSpecific.(*utils.SolanaBuildConfig)
+	if buildCfg == nil {
+		// No explicit build config — check if artifacts already exist on disk.
+		// In-memory tests preload programs before genesis, so this is a no-op.
+		if _, err := os.Stat(chain.ProgramsPath); err != nil {
+			return fmt.Errorf("no build config provided and programs path does not exist: %s", chain.ProgramsPath)
+		}
+		// Verify at least one .so file exists
+		entries, err := os.ReadDir(chain.ProgramsPath)
+		if err != nil {
+			return fmt.Errorf("failed to read programs path: %w", err)
+		}
+		for _, entry := range entries {
+			if filepath.Ext(entry.Name()) == ".so" {
+				e.Logger.Infow("Artifacts already present, skipping build", "path", chain.ProgramsPath)
+				return nil
+			}
+		}
+		return fmt.Errorf("no .so artifacts found in %s and no build config provided", chain.ProgramsPath)
+	}
+
+	// Override destination to the chain's programs path if not explicitly set
+	if buildCfg.DestinationDir == "" {
+		buildCfg.DestinationDir = chain.ProgramsPath
+	}
+
+	return utils.BuildSolana(e.GetContext(), e.Logger, *buildCfg)
 }
 
 func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
