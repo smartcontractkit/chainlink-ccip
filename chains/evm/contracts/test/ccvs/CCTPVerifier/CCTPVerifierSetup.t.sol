@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
@@ -31,8 +32,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
   uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
 
-  uint16 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = 0;
-  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
+  bytes4 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+  bytes4 internal constant CCIP_FAST_FINALITY_THRESHOLD = bytes4(uint32(1));
 
   uint32 internal constant REMOTE_DOMAIN_IDENTIFIER = 9999;
   uint32 internal constant LOCAL_DOMAIN_IDENTIFIER = 8888;
@@ -71,7 +72,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
@@ -113,7 +115,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   function _createCCIPMessage(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint16 finality,
+    bytes4 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver

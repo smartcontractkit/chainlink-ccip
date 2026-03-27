@@ -8,6 +8,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Client} from "../../libraries/Client.sol";
 
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
@@ -29,12 +30,14 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
+  // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
-    IRouter router; // ──────────╮ Local router to use for messages to/fom this chain.
-    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
-    uint32 gasForVerification; //│ The gas to reserve for verification of messages on the remote chain.
-    uint32 payloadSizeBytes; //  │ The size of the verification payload on the remote chain.
-    bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
+    IRouter router; // ─────────────╮ Local router to use for messages to/from this chain.
+    uint16 feeUSDCents; //          │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
+    uint32 gasForVerification; //   │ The gas to reserve for verification of messages on the remote chain.
+    uint16 payloadSizeBytes; //     │ The size of the verification payload on the remote chain.
+    bytes4 allowedFinalityConfig; //│ The finality configuration for the local chain for messages to the remote chain.
+    bool allowlistEnabled; // ──────╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
@@ -43,8 +46,9 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 remoteChainSelector; // │ Remote chain selector.
     bool allowlistEnabled; //      │ True if the allowlist is enabled.
     uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this remote chain.
-    uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the remote chain.
-    uint32 payloadSizeBytes; // ───╯ The size of the verification payload on the remote chain.
+    uint32 gasForVerification; // ────╮ The gas to reserve for verification of messages on the remote chain.
+    uint16 payloadSizeBytes; //       │ The size of the verification payload on the remote chain.
+    bytes4 allowedFinalityConfig; // ─╯ The finality configuration for the local chain for messages to the remote chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -108,17 +112,29 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @notice get ChainConfig configured for the remoteChainSelector.
   /// @param remoteChainSelector The remote chain selector.
-  /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
-  /// @return router address of the local router.
+  /// @return remoteChainConfig The struct containing the remote chain settings.
   /// @return allowedSendersList list of addresses that are allowed to send messages to the remote chain.
   function getRemoteChainConfig(
     uint64 remoteChainSelector
-  ) external view virtual returns (bool allowlistEnabled, address router, address[] memory allowedSendersList) {
+  )
+    external
+    view
+    virtual
+    returns (RemoteChainConfigArgs memory remoteChainConfig, address[] memory allowedSendersList)
+  {
     RemoteChainConfig storage config = _getRemoteChainConfig(remoteChainSelector);
-    allowlistEnabled = config.allowlistEnabled;
-    router = address(config.router);
-    allowedSendersList = config.allowedSendersList.values();
-    return (allowlistEnabled, router, allowedSendersList);
+    return (
+      RemoteChainConfigArgs({
+        router: config.router,
+        remoteChainSelector: remoteChainSelector,
+        allowlistEnabled: config.allowlistEnabled,
+        feeUSDCents: config.feeUSDCents,
+        gasForVerification: config.gasForVerification,
+        payloadSizeBytes: config.payloadSizeBytes,
+        allowedFinalityConfig: config.allowedFinalityConfig
+      }),
+      config.allowedSendersList.values()
+    );
   }
 
   function _getRemoteChainConfig(
@@ -152,6 +168,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       remoteChainConfig.gasForVerification = remoteChainConfigArg.gasForVerification;
       // The payload could be zero bytes if no offchain data is required.
       remoteChainConfig.payloadSizeBytes = remoteChainConfigArg.payloadSizeBytes;
+      remoteChainConfig.allowedFinalityConfig = remoteChainConfigArg.allowedFinalityConfig;
 
       emit RemoteChainConfigSet(
         remoteChainSelector, address(remoteChainConfigArg.router), remoteChainConfig.allowlistEnabled
@@ -241,16 +258,16 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
-    uint16 // blockConfirmations
+    bytes4 requestedFinality
   ) external view virtual returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
-    if (s_remoteChainConfigs[destChainSelector].router == IRouter(address(0))) {
+    RemoteChainConfig storage config = _getRemoteChainConfig(destChainSelector);
+
+    if (config.router == IRouter(address(0))) {
       revert RemoteChainNotSupported(destChainSelector);
     }
-    return (
-      s_remoteChainConfigs[destChainSelector].feeUSDCents,
-      s_remoteChainConfigs[destChainSelector].gasForVerification,
-      s_remoteChainConfigs[destChainSelector].payloadSizeBytes
-    );
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, config.allowedFinalityConfig);
+
+    return (config.feeUSDCents, config.gasForVerification, config.payloadSizeBytes);
   }
 
   function _assertNotCursedByRMN(

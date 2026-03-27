@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {BaseVerifierSetup} from "./BaseVerifierSetup.t.sol";
 
 contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
@@ -20,10 +21,10 @@ contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
     s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Verify config was set.
-    (bool allowlistEnabled, address router,) =
+    (BaseVerifier.RemoteChainConfigArgs memory config,) =
       s_baseVerifier.getRemoteChainConfig(remoteChainConfigs[0].remoteChainSelector);
-    assertEq(router, address(remoteChainConfigs[0].router));
-    assertEq(allowlistEnabled, remoteChainConfigs[0].allowlistEnabled);
+    assertEq(address(config.router), address(remoteChainConfigs[0].router));
+    assertEq(config.allowlistEnabled, remoteChainConfigs[0].allowlistEnabled);
   }
 
   // Reverts
@@ -45,7 +46,8 @@ contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: 0, // Zero gas should revert.
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestGasCannotBeZero.selector, remoteChainSelector));

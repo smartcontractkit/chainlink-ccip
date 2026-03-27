@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -36,12 +37,12 @@ contract TokenPoolHelper is TokenPool {
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
+    _validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 0);
   }
 
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality,
+    bytes4 finality,
     bytes calldata tokenArgs,
     uint256 feeAmount
   ) external {
@@ -51,7 +52,7 @@ contract TokenPoolHelper is TokenPool {
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    uint16 finality
+    bytes4 finality
   ) external returns (uint256) {
     _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
     return localAmount;
@@ -59,14 +60,14 @@ contract TokenPoolHelper is TokenPool {
 
   function applyFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality
+    bytes4 finality
   ) external view returns (uint256) {
     return lockOrBurnIn.amount - _getFee(lockOrBurnIn, finality);
   }
 
   function getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality
+    bytes4 finality
   ) external view returns (uint256) {
     return _getFee(lockOrBurnIn, finality);
   }
@@ -83,19 +84,15 @@ contract TokenPoolHelper is TokenPool {
     _onlyOffRamp(remoteChainSelector);
   }
 
-  function getCustomMinBlockConfirmations() external view returns (uint16 minBlockConfirmations) {
-    return s_minBlockConfirmations;
-  }
-
   function getFastOutboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_customBlockConfirmationsOutboundRateLimiterConfig[remoteChainSelector];
+    return s_fastFinalityOutboundRateLimiterConfig[remoteChainSelector];
   }
 
   function getFastInboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_customBlockConfirmationsInboundRateLimiterConfig[remoteChainSelector];
+    return s_fastFinalityInboundRateLimiterConfig[remoteChainSelector];
   }
 }

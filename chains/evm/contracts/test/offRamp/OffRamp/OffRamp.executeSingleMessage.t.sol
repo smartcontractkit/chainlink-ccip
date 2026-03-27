@@ -12,6 +12,7 @@ import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
@@ -425,7 +426,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Client} from "../../../libraries/Client.sol";
@@ -59,7 +60,10 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   function test_releaseOrMintSingleToken_CallsV2Function() public {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
-    uint16 finality = 2;
+    bytes4 finality = FinalityCodec._encodeBlockDepth(2);
+
+    // Allow depth-2 FTF on the pool so the inbound finality check inside releaseOrMint passes.
+    s_pool.setAllowedFinalityConfig(finality);
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV2.releaseOrMint, (expectedInput, finality)));
 
@@ -82,8 +86,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
 
-    (Client.EVMTokenAmount memory dest, address localPoolAddress) =
-      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0);
+    (Client.EVMTokenAmount memory dest, address localPoolAddress) = s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
@@ -95,13 +100,16 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
-    bytes memory callData = abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, uint16(2));
+    bytes memory callData =
+      abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, FinalityCodec._encodeBlockDepth(2));
     vm.expectCall(address(s_pool), callData);
     bytes memory poolRevertData = abi.encode("pool-error");
     vm.mockCallRevert(address(s_pool), callData, poolRevertData);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2);
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, FinalityCodec._encodeBlockDepth(2)
+    );
   }
 
   function test_releaseOrMintSingleToken_PropagatesPoolError_V1Pool() public {
@@ -119,7 +127,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     vm.mockCallRevert(address(s_pool), callData, poolRevertData);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0);
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_PoolAddressZero() public {
@@ -132,7 +142,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_UnsupportedInterface() public {
@@ -144,7 +156,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(s_pool)));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
+    s_offRamp.releaseOrMintSingleToken(
+      tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {

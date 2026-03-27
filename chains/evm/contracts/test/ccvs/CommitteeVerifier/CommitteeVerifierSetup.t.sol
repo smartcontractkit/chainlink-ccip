@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {CommitteeVerifier} from "../../../ccvs/CommitteeVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "../../../ccvs/components/SignatureQuorumValidator.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
@@ -38,7 +39,8 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     s_committeeVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
@@ -64,7 +66,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
-      finality: 100,
+      finality: FinalityCodec._encodeBlockDepth(100),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
