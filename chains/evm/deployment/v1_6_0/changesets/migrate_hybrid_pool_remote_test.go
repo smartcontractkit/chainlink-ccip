@@ -30,12 +30,12 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type migrateTokenPoolMockReader struct {
+type migrateHybridPoolRemoteMockReader struct {
 	timelockByChain map[uint64]string
 	mcmByChain      map[uint64]string
 }
 
-func (m *migrateTokenPoolMockReader) GetTimelockRef(_ cldf.Environment, chainSelector uint64, _ mcms.Input) (cldf_datastore.AddressRef, error) {
+func (m *migrateHybridPoolRemoteMockReader) GetTimelockRef(_ cldf.Environment, chainSelector uint64, _ mcms.Input) (cldf_datastore.AddressRef, error) {
 	return cldf_datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Address:       m.timelockByChain[chainSelector],
@@ -43,7 +43,7 @@ func (m *migrateTokenPoolMockReader) GetTimelockRef(_ cldf.Environment, chainSel
 	}, nil
 }
 
-func (m *migrateTokenPoolMockReader) GetMCMSRef(_ cldf.Environment, chainSelector uint64, _ mcms.Input) (cldf_datastore.AddressRef, error) {
+func (m *migrateHybridPoolRemoteMockReader) GetMCMSRef(_ cldf.Environment, chainSelector uint64, _ mcms.Input) (cldf_datastore.AddressRef, error) {
 	return cldf_datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Address:       m.mcmByChain[chainSelector],
@@ -51,14 +51,14 @@ func (m *migrateTokenPoolMockReader) GetMCMSRef(_ cldf.Environment, chainSelecto
 	}, nil
 }
 
-func (m *migrateTokenPoolMockReader) GetChainMetadata(_ cldf.Environment, chainSelector uint64, _ mcms.Input) (mcms_types.ChainMetadata, error) {
+func (m *migrateHybridPoolRemoteMockReader) GetChainMetadata(_ cldf.Environment, chainSelector uint64, _ mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
 		StartingOpCount: 1,
 		MCMAddress:      m.mcmByChain[chainSelector],
 	}, nil
 }
 
-type migrateTokenPoolFixture struct {
+type migrateHybridPoolRemoteFixture struct {
 	env            *cldf.Environment
 	hubSelector    uint64
 	remoteSelector uint64
@@ -75,19 +75,19 @@ type migrateTokenPoolFixture struct {
 	remoteTARAddress     common.Address
 	remoteTAR            *token_admin_registry_bindings.TokenAdminRegistry
 
-	reader   *migrateTokenPoolMockReader
+	reader   *migrateHybridPoolRemoteMockReader
 	registry *core_changesets.MCMSReaderRegistry
 }
 
-func newMigrateTokenPoolFixture(t *testing.T) *migrateTokenPoolFixture {
-	return newMigrateTokenPoolFixtureWithRemotePreMint(t, big.NewInt(0))
+func newMigrateHybridPoolRemoteFixture(t *testing.T) *migrateHybridPoolRemoteFixture {
+	return newMigrateHybridPoolRemoteFixtureWithPreMint(t, big.NewInt(0))
 }
 
-func newMigrateTokenPoolFixtureWithRemotePreMint(t *testing.T, remotePreMint *big.Int) *migrateTokenPoolFixture {
+func newMigrateHybridPoolRemoteFixtureWithPreMint(t *testing.T, remotePreMint *big.Int) *migrateHybridPoolRemoteFixture {
 	t.Helper()
 
 	hubSelector := chainsel.ETHEREUM_MAINNET.Selector
-	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
+	remoteSelector := chainsel.ETHEREUM_MAINNET_BASE_1.Selector
 
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{hubSelector, remoteSelector}),
@@ -148,7 +148,7 @@ func newMigrateTokenPoolFixtureWithRemotePreMint(t *testing.T, remotePreMint *bi
 	tx, err = remoteTAR.AcceptAdminRole(remoteChain.DeployerKey, remoteTokenAddress)
 	confirmTx(t, remoteChain, tx, err)
 
-	reader := &migrateTokenPoolMockReader{
+	reader := &migrateHybridPoolRemoteMockReader{
 		timelockByChain: map[uint64]string{
 			hubSelector:    hubChain.DeployerKey.From.Hex(),
 			remoteSelector: remoteChain.DeployerKey.From.Hex(),
@@ -161,7 +161,7 @@ func newMigrateTokenPoolFixtureWithRemotePreMint(t *testing.T, remotePreMint *bi
 	registry := &core_changesets.MCMSReaderRegistry{}
 	registry.RegisterMCMSReader(chainsel.FamilyEVM, reader)
 
-	return &migrateTokenPoolFixture{
+	return &migrateHybridPoolRemoteFixture{
 		env:                  e,
 		hubSelector:          hubSelector,
 		remoteSelector:       remoteSelector,
@@ -216,12 +216,12 @@ func confirmTx(t *testing.T, chain evm.Chain, tx *types.Transaction, callErr err
 	require.NoError(t, err)
 }
 
-func (f *migrateTokenPoolFixture) changeset(registry *core_changesets.MCMSReaderRegistry) cldf.ChangeSetV2[v1_6_0_changesets.MigrateTokenPoolConfig] {
-	return v1_6_0_changesets.MigrateTokenPool(registry)
+func (f *migrateHybridPoolRemoteFixture) changeset(registry *core_changesets.MCMSReaderRegistry) cldf.ChangeSetV2[v1_6_0_changesets.MigrateHybridPoolRemoteConfig] {
+	return v1_6_0_changesets.MigrateHybridPoolRemote(registry)
 }
 
-func (f *migrateTokenPoolFixture) validConfig(targetGroup uint8) v1_6_0_changesets.MigrateTokenPoolConfig {
-	return v1_6_0_changesets.MigrateTokenPoolConfig{
+func (f *migrateHybridPoolRemoteFixture) validConfig(targetGroup uint8) v1_6_0_changesets.MigrateHybridPoolRemoteConfig {
+	return v1_6_0_changesets.MigrateHybridPoolRemoteConfig{
 		HubChainSelector:     f.hubSelector,
 		HubPoolAddress:       f.hubPoolAddress.Hex(),
 		RemoteChainSelector:  f.remoteSelector,
@@ -240,7 +240,7 @@ func (f *migrateTokenPoolFixture) validConfig(targetGroup uint8) v1_6_0_changese
 	}
 }
 
-func (f *migrateTokenPoolFixture) addHubRemotePool(t *testing.T, pool common.Address) {
+func (f *migrateHybridPoolRemoteFixture) addHubRemotePool(t *testing.T, pool common.Address) {
 	t.Helper()
 
 	isSupported, err := f.hubPool.IsSupportedChain(&bind.CallOpts{Context: t.Context()}, f.remoteSelector)
@@ -279,13 +279,13 @@ func (f *migrateTokenPoolFixture) addHubRemotePool(t *testing.T, pool common.Add
 	confirmTx(t, f.hubChain, tx, err)
 }
 
-func (f *migrateTokenPoolFixture) setTARPool(t *testing.T, pool common.Address) {
+func (f *migrateHybridPoolRemoteFixture) setTARPool(t *testing.T, pool common.Address) {
 	t.Helper()
 	tx, err := f.remoteTAR.SetPool(f.remoteChain.DeployerKey, f.remoteTokenAddress, pool)
 	confirmTx(t, f.remoteChain, tx, err)
 }
 
-func (f *migrateTokenPoolFixture) addRawHubRemotePool(t *testing.T, pool common.Address) {
+func (f *migrateHybridPoolRemoteFixture) addRawHubRemotePool(t *testing.T, pool common.Address) {
 	t.Helper()
 	tx, err := f.hubPool.AddRemotePool(
 		f.hubChain.DeployerKey,
@@ -295,29 +295,29 @@ func (f *migrateTokenPoolFixture) addRawHubRemotePool(t *testing.T, pool common.
 	confirmTx(t, f.hubChain, tx, err)
 }
 
-func (f *migrateTokenPoolFixture) currentHubRemotePools(t *testing.T) [][]byte {
+func (f *migrateHybridPoolRemoteFixture) currentHubRemotePools(t *testing.T) [][]byte {
 	t.Helper()
 	remotePools, err := f.hubPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, f.remoteSelector)
 	require.NoError(t, err)
 	return remotePools
 }
 
-func (f *migrateTokenPoolFixture) currentHubGroup(t *testing.T) uint8 {
+func (f *migrateHybridPoolRemoteFixture) currentHubGroup(t *testing.T) uint8 {
 	t.Helper()
 	group, err := f.hubPool.GetGroup(&bind.CallOpts{Context: t.Context()}, f.remoteSelector)
 	require.NoError(t, err)
 	return group
 }
 
-func (f *migrateTokenPoolFixture) currentTARPool(t *testing.T) common.Address {
+func (f *migrateHybridPoolRemoteFixture) currentTARPool(t *testing.T) common.Address {
 	t.Helper()
 	cfg, err := f.remoteTAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, f.remoteTokenAddress)
 	require.NoError(t, err)
 	return cfg.TokenPool
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_Valid(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_Valid(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
@@ -325,8 +325,8 @@ func TestMigrateTokenPool_VerifyPreconditions_Valid(t *testing.T) {
 	require.NoError(t, cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0)))
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_InvalidInputs(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_InvalidInputs(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 	cs := fixture.changeset(fixture.registry)
@@ -366,12 +366,12 @@ func TestMigrateTokenPool_VerifyPreconditions_InvalidInputs(t *testing.T) {
 	})
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_MissingMCMSRef(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_MissingMCMSRef(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
-	badReader := &migrateTokenPoolMockReader{
+	badReader := &migrateHybridPoolRemoteMockReader{
 		timelockByChain: fixture.reader.timelockByChain,
 		mcmByChain: map[uint64]string{
 			fixture.hubSelector: fixture.reader.mcmByChain[fixture.hubSelector],
@@ -385,8 +385,8 @@ func TestMigrateTokenPool_VerifyPreconditions_MissingMCMSRef(t *testing.T) {
 	require.ErrorContains(t, err, "missing MCMS for remote chain")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_UnsupportedRemoteChainOnHub(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_UnsupportedRemoteChainOnHub(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
 	cs := fixture.changeset(fixture.registry)
@@ -394,8 +394,8 @@ func TestMigrateTokenPool_VerifyPreconditions_UnsupportedRemoteChainOnHub(t *tes
 	require.ErrorContains(t, err, "is not supported on hub pool")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_UnexpectedHubRemotePool(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_UnexpectedHubRemotePool(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.addRawHubRemotePool(t, common.HexToAddress("0x0000000000000000000000000000000000000abc"))
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
@@ -405,8 +405,8 @@ func TestMigrateTokenPool_VerifyPreconditions_UnexpectedHubRemotePool(t *testing
 	require.ErrorContains(t, err, "unexpected pool")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_HubPoolTypeAndVersionMismatch(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_HubPoolTypeAndVersionMismatch(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
@@ -417,12 +417,12 @@ func TestMigrateTokenPool_VerifyPreconditions_HubPoolTypeAndVersionMismatch(t *t
 	require.ErrorContains(t, err, "failed to read typeAndVersion for hub pool")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_HubOwnerMismatch(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_HubOwnerMismatch(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
-	badReader := &migrateTokenPoolMockReader{
+	badReader := &migrateHybridPoolRemoteMockReader{
 		timelockByChain: map[uint64]string{
 			fixture.hubSelector:    common.HexToAddress("0x0000000000000000000000000000000000000c01").Hex(),
 			fixture.remoteSelector: fixture.reader.timelockByChain[fixture.remoteSelector],
@@ -438,12 +438,12 @@ func TestMigrateTokenPool_VerifyPreconditions_HubOwnerMismatch(t *testing.T) {
 	require.ErrorContains(t, err, "does not match timelock")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_TARAdminMismatch(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_TARAdminMismatch(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
-	badReader := &migrateTokenPoolMockReader{
+	badReader := &migrateHybridPoolRemoteMockReader{
 		timelockByChain: map[uint64]string{
 			fixture.hubSelector:    fixture.reader.timelockByChain[fixture.hubSelector],
 			fixture.remoteSelector: common.HexToAddress("0x0000000000000000000000000000000000000d01").Hex(),
@@ -459,8 +459,8 @@ func TestMigrateTokenPool_VerifyPreconditions_TARAdminMismatch(t *testing.T) {
 	require.ErrorContains(t, err, "does not match timelock")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_SupplyMismatch(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_VerifyPreconditions_SupplyMismatch(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
@@ -471,8 +471,20 @@ func TestMigrateTokenPool_VerifyPreconditions_SupplyMismatch(t *testing.T) {
 	require.ErrorContains(t, err, "does not match remote token totalSupply")
 }
 
-func TestMigrateTokenPool_VerifyPreconditions_LockedTokensBound(t *testing.T) {
-	fixture := newMigrateTokenPoolFixtureWithRemotePreMint(t, big.NewInt(100))
+func TestMigrateHybridPoolRemote_VerifyPreconditions_SupplyMismatch_WhenGroupAlreadyTarget(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
+	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
+	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
+
+	cs := fixture.changeset(fixture.registry)
+	cfg := fixture.validConfig(0)
+	cfg.RemoteChainSupply = big.NewInt(1)
+	err := cs.VerifyPreconditions(*fixture.env, cfg)
+	require.ErrorContains(t, err, "does not match remote token totalSupply")
+}
+
+func TestMigrateHybridPoolRemote_VerifyPreconditions_LockedTokensBound(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixtureWithPreMint(t, big.NewInt(100))
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
@@ -481,8 +493,8 @@ func TestMigrateTokenPool_VerifyPreconditions_LockedTokensBound(t *testing.T) {
 	require.ErrorContains(t, err, "exceeds locked token accounting")
 }
 
-func TestMigrateTokenPool_Apply_FreshState_ProposalOnly(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_Apply_FreshState_ProposalOnly(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
@@ -520,8 +532,8 @@ func TestMigrateTokenPool_Apply_FreshState_ProposalOnly(t *testing.T) {
 	require.Equal(t, fixture.oldRemotePoolAddress, fixture.currentTARPool(t))
 }
 
-func TestMigrateTokenPool_Apply_PartialState(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_Apply_PartialState(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.addHubRemotePool(t, fixture.newRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
@@ -540,8 +552,8 @@ func TestMigrateTokenPool_Apply_PartialState(t *testing.T) {
 	require.Equal(t, 1, txCounts[fixture.remoteSelector])
 }
 
-func TestMigrateTokenPool_Apply_AlreadyComplete_NoProposal(t *testing.T) {
-	fixture := newMigrateTokenPoolFixture(t)
+func TestMigrateHybridPoolRemote_Apply_AlreadyComplete_NoProposal(t *testing.T) {
+	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.newRemotePoolAddress)
 	fixture.setTARPool(t, fixture.newRemotePoolAddress)
 

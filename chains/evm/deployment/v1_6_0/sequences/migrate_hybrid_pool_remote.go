@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-type MigrateTokenPoolInput struct {
+type MigrateHybridPoolRemoteInput struct {
 	HubChainSelector     uint64
 	HubPoolAddress       common.Address
 	RemoteChainSelector  uint64
@@ -58,11 +58,11 @@ var migrationSetPool = evm_contract.NewWrite(evm_contract.WriteParams[
 	},
 })
 
-var MigrateTokenPool = cldf_ops.NewSequence(
-	"migrate-token-pool",
+var MigrateHybridPoolRemote = cldf_ops.NewSequence(
+	"migrate-hybrid-pool-remote",
 	semver.MustParse("1.6.0"),
 	"Migrates a remote chain token pool from lock-release to burn-mint on a hybrid hub pool",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input MigrateTokenPoolInput) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input MigrateHybridPoolRemoteInput) (sequences.OnChainOutput, error) {
 		hubChain, ok := chains.EVMChains()[input.HubChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("hub chain with selector %d not defined", input.HubChainSelector)

@@ -34,7 +34,7 @@ var supportedOldPoolTypeAndVersions = map[string]struct{}{
 
 var expectedNewPoolTypeAndVersion = v1_6_0_burn_mint_with_external_minter_token_pool_ops.TypeAndVersion.String()
 
-type MigrateTokenPoolConfig struct {
+type MigrateHybridPoolRemoteConfig struct {
 	HubChainSelector     uint64     `json:"hubChainSelector" yaml:"hubChainSelector"`
 	HubPoolAddress       string     `json:"hubPoolAddress" yaml:"hubPoolAddress"`
 	RemoteChainSelector  uint64     `json:"remoteChainSelector" yaml:"remoteChainSelector"`
@@ -47,17 +47,17 @@ type MigrateTokenPoolConfig struct {
 	MCMS                 mcms.Input `json:"mcms,omitempty" yaml:"mcms,omitempty"`
 }
 
-func MigrateTokenPool(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[MigrateTokenPoolConfig] {
+func MigrateHybridPoolRemote(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[MigrateHybridPoolRemoteConfig] {
 	return cldf.CreateChangeSet(
-		makeApplyMigrateTokenPool(mcmsRegistry),
-		makeVerifyMigrateTokenPool(mcmsRegistry),
+		makeApplyMigrateHybridPoolRemote(mcmsRegistry),
+		makeVerifyMigrateHybridPoolRemote(mcmsRegistry),
 	)
 }
 
-func makeVerifyMigrateTokenPool(
+func makeVerifyMigrateHybridPoolRemote(
 	mcmsRegistry *changesets.MCMSReaderRegistry,
-) func(cldf.Environment, MigrateTokenPoolConfig) error {
-	return func(e cldf.Environment, cfg MigrateTokenPoolConfig) error {
+) func(cldf.Environment, MigrateHybridPoolRemoteConfig) error {
+	return func(e cldf.Environment, cfg MigrateHybridPoolRemoteConfig) error {
 		if err := cfg.MCMS.Validate(); err != nil {
 			return fmt.Errorf("invalid MCMS config: %w", err)
 		}
@@ -316,54 +316,44 @@ func makeVerifyMigrateTokenPool(
 			)
 		}
 
-		groupReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, v1_6_0_hybrid_pool_ops.GetGroup, hubChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: cfg.HubChainSelector,
-			Address:       hubPoolAddress,
-			Args:          cfg.RemoteChainSelector,
-		})
+		remoteToken, err := burn_mint_erc20.NewBurnMintERC20(remoteTokenAddress, remoteChain.Client)
 		if err != nil {
-			return fmt.Errorf("failed to read group for remote chain %d on hub chain %d: %w", cfg.RemoteChainSelector, cfg.HubChainSelector, err)
+			return fmt.Errorf("failed to bind remote token %s on chain %d: %w", remoteTokenAddress, cfg.RemoteChainSelector, err)
 		}
-		if groupReport.Output != cfg.TargetGroup {
-			remoteToken, err := burn_mint_erc20.NewBurnMintERC20(remoteTokenAddress, remoteChain.Client)
-			if err != nil {
-				return fmt.Errorf("failed to bind remote token %s on chain %d: %w", remoteTokenAddress, cfg.RemoteChainSelector, err)
-			}
-			totalSupply, err := remoteToken.TotalSupply(&bind.CallOpts{Context: e.GetContext()})
-			if err != nil {
-				return fmt.Errorf("failed to read totalSupply for remote token %s on chain %d: %w", remoteTokenAddress, cfg.RemoteChainSelector, err)
-			}
-			if totalSupply.Cmp(cfg.RemoteChainSupply) != 0 {
-				return fmt.Errorf(
-					"remote chain supply %s does not match remote token totalSupply %s for token %s on chain %d",
-					cfg.RemoteChainSupply.String(),
-					totalSupply.String(),
-					remoteTokenAddress,
-					cfg.RemoteChainSelector,
-				)
-			}
+		totalSupply, err := remoteToken.TotalSupply(&bind.CallOpts{Context: e.GetContext()})
+		if err != nil {
+			return fmt.Errorf("failed to read totalSupply for remote token %s on chain %d: %w", remoteTokenAddress, cfg.RemoteChainSelector, err)
+		}
+		if totalSupply.Cmp(cfg.RemoteChainSupply) != 0 {
+			return fmt.Errorf(
+				"remote chain supply %s does not match remote token totalSupply %s for token %s on chain %d",
+				cfg.RemoteChainSupply.String(),
+				totalSupply.String(),
+				remoteTokenAddress,
+				cfg.RemoteChainSelector,
+			)
+		}
 
-			if cfg.TargetGroup == 1 {
-				lockedTokensReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, v1_6_0_hybrid_pool_ops.GetLockedTokens, hubChain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: cfg.HubChainSelector,
-					Address:       hubPoolAddress,
-					Args:          struct{}{},
-				})
-				if err != nil {
-					return fmt.Errorf("failed to read locked token accounting from hub pool %s on chain %d: %w", hubPoolAddress, cfg.HubChainSelector, err)
-				}
-				if lockedTokensReport.Output == nil {
-					return fmt.Errorf("hub pool %s returned nil locked token accounting on chain %d", hubPoolAddress, cfg.HubChainSelector)
-				}
-				if cfg.RemoteChainSupply.Cmp(lockedTokensReport.Output) > 0 {
-					return fmt.Errorf(
-						"remote chain supply %s exceeds locked token accounting %s for hub pool %s on chain %d",
-						cfg.RemoteChainSupply.String(),
-						lockedTokensReport.Output.String(),
-						hubPoolAddress,
-						cfg.HubChainSelector,
-					)
-				}
+		if cfg.TargetGroup == 1 {
+			lockedTokensReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, v1_6_0_hybrid_pool_ops.GetLockedTokens, hubChain, evm_contract.FunctionInput[struct{}]{
+				ChainSelector: cfg.HubChainSelector,
+				Address:       hubPoolAddress,
+				Args:          struct{}{},
+			})
+			if err != nil {
+				return fmt.Errorf("failed to read locked token accounting from hub pool %s on chain %d: %w", hubPoolAddress, cfg.HubChainSelector, err)
+			}
+			if lockedTokensReport.Output == nil {
+				return fmt.Errorf("hub pool %s returned nil locked token accounting on chain %d", hubPoolAddress, cfg.HubChainSelector)
+			}
+			if cfg.RemoteChainSupply.Cmp(lockedTokensReport.Output) > 0 {
+				return fmt.Errorf(
+					"remote chain supply %s exceeds locked token accounting %s for hub pool %s on chain %d",
+					cfg.RemoteChainSupply.String(),
+					lockedTokensReport.Output.String(),
+					hubPoolAddress,
+					cfg.HubChainSelector,
+				)
 			}
 		}
 
@@ -412,10 +402,10 @@ func makeVerifyMigrateTokenPool(
 	}
 }
 
-func makeApplyMigrateTokenPool(
+func makeApplyMigrateHybridPoolRemote(
 	mcmsRegistry *changesets.MCMSReaderRegistry,
-) func(cldf.Environment, MigrateTokenPoolConfig) (cldf.ChangesetOutput, error) {
-	return func(e cldf.Environment, cfg MigrateTokenPoolConfig) (cldf.ChangesetOutput, error) {
+) func(cldf.Environment, MigrateHybridPoolRemoteConfig) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg MigrateHybridPoolRemoteConfig) (cldf.ChangesetOutput, error) {
 		hubPoolAddress, err := parseRequiredAddress("hubPoolAddress", cfg.HubPoolAddress)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
@@ -437,7 +427,7 @@ func makeApplyMigrateTokenPool(
 			return cldf.ChangesetOutput{}, err
 		}
 
-		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, v1_6_0_sequences.MigrateTokenPool, e.BlockChains, v1_6_0_sequences.MigrateTokenPoolInput{
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, v1_6_0_sequences.MigrateHybridPoolRemote, e.BlockChains, v1_6_0_sequences.MigrateHybridPoolRemoteInput{
 			HubChainSelector:     cfg.HubChainSelector,
 			HubPoolAddress:       hubPoolAddress,
 			RemoteChainSelector:  cfg.RemoteChainSelector,
