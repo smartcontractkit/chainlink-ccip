@@ -842,24 +842,18 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	chain1Family, err := chain_selectors.GetSelectorFamily(chain1.Selector)
 
 	chain1Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain1Family, version)
-	if !exists {
-		t.Fatal("no adapter found")
-	}
+	require.Equal(t, exists, true, "adapter should exist for chain1")
 
 	chain2Family, err := chain_selectors.GetSelectorFamily(chain2.Selector)
 
 	chain2Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain2Family, version)
-	if !exists {
-		t.Fatal("no adapter found")
-	}
+	require.Equal(t, exists, true, "adapter should exist for chain2")
 
 	// Verify the version of the FQ version has been downgraded
 	fqAddressChain1 := common.Address{}
 	if dfq, ok := chain1Adapter.(lanesapi.DynamicFeeQuoter); ok {
 		fqAddressChain1Bytes, err := dfq.GetFQAddressDynamic(e.DataStore, chain1.Selector, e.BlockChains)
-		if err != nil {
-			t.Fatalf("error fetching fee quoter address %d", chain1.Selector)
-		}
+		require.NoError(t, err, "error fetching fee quoter address %d", chain1.Selector)
 		fqAddressChain1 = common.BytesToAddress(fqAddressChain1Bytes)
 	}
 	chain1Ref := e.DataStore.Addresses().Filter(
@@ -867,16 +861,12 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		datastore.AddressRefByType(datastore.ContractType(cciputils.FeeQuoter)),
 		datastore.AddressRefByAddress(fqAddressChain1.Hex()),
 	)
-	if len(chain1Ref) != 1 {
-		t.Fatalf("expected exactly 1 fee quoter address for chain1 after downgrade, found %d", len(chain1Ref))
-	}
+	require.Len(t, chain1Ref, 1, "expected exactly 1 fee quoter address for chain1 after downgrade")
 
 	fqAddressChain2 := common.Address{}
 	if dfq, ok := chain2Adapter.(lanesapi.DynamicFeeQuoter); ok {
 		fqAddressChain2Bytes, err := dfq.GetFQAddressDynamic(e.DataStore, chain2.Selector, e.BlockChains)
-		if err != nil {
-			t.Fatalf("error fetching fee quoter address %d", chain1.Selector)
-		}
+		require.NoError(t, err, "error fetching fee quoter address %d", chain2.Selector)
 		fqAddressChain2 = common.BytesToAddress(fqAddressChain2Bytes)
 	}
 	chain2Ref := e.DataStore.Addresses().Filter(
@@ -884,9 +874,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		datastore.AddressRefByType(datastore.ContractType(cciputils.FeeQuoter)),
 		datastore.AddressRefByAddress(fqAddressChain2.Hex()),
 	)
-	if len(chain2Ref) != 1 {
-		t.Fatalf("expected exactly 1 fee quoter address for chain2 after downgrade, found %d", len(chain2Ref))
-	}
+	require.Len(t, chain2Ref, 1, "expected exactly 1 fee quoter address for chain2 after downgrade")
 
 	require.Equal(t, chain1Ref[0].Version, semver.MustParse("1.6.3"))
 	require.Equal(t, chain2Ref[0].Version, semver.MustParse("1.6.3"))
