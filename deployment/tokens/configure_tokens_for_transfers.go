@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	deploy_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -109,25 +111,13 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			}
 		}
 
-		family, err := chain_selectors.GetSelectorFamily(selector)
+		adapter, family, err := ResolveAdapter(tokenRegistry, selector, tokenPool.Version)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", selector, err)
-		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, token.TokenPoolRef.Version)
+			return nil, nil, nil, fmt.Errorf("failed to resolve adapter for chain selector %d: %w", selector, err)
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
 		for remoteChainSelector, inCfg := range token.RemoteChains {
-			remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
-			}
-			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, inCfg.RemotePool.Version)
-			if !ok {
-				return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, inCfg.RemotePool.Version)
-			}
 			counterpart, ok := cfg[remoteChainSelector]
 			if !ok {
 				return nil, nil, nil, fmt.Errorf("missing token transfer config for remote chain selector %d", remoteChainSelector)
@@ -139,7 +129,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(
 				e,
 				selector,
-				remoteAdapter,
+				tokenRegistry,
 				remoteChainSelector,
 				inCfg,
 				counterpartRemoteChainCfg.DefaultFinalityOutboundRateLimiterConfig,
@@ -196,7 +186,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 func convertRemoteChainConfig(
 	e cldf.Environment,
 	chainSelector uint64,
-	remoteAdapter TokenAdapter,
+	tokenAdapterRegistry *TokenAdapterRegistry,
 	remoteChainSelector uint64,
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
 	chainSelectorDefaultFinalityOutboundTprl RateLimiterConfigFloatInput,
@@ -212,10 +202,15 @@ func convertRemoteChainConfig(
 		DefaultFinalityOutboundRateLimiterConfig: inCfg.DefaultFinalityOutboundRateLimiterConfig,
 		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
 	}
+
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
+		}
+		remoteAdapter, _, err := ResolveAdapter(tokenAdapterRegistry, remoteChainSelector, fullRemotePoolRef.Version)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve remote adapter for remote chain selector %d: %w", remoteChainSelector, err)
 		}
 		outCfg.RemotePool, err = remoteAdapter.AddressRefToBytes(fullRemotePoolRef)
 		if err != nil {
@@ -276,4 +271,21 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	return outCfg, nil
+}
+
+func ResolveAdapter(registry *TokenAdapterRegistry, selector uint64, tokenPoolVersion *semver.Version) (TokenAdapter, string, error) {
+	family, err := chain_selectors.GetSelectorFamily(selector)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", selector, err)
+	}
+	version := deploy_utils.StripPatchVersion(tokenPoolVersion)
+	if family == chain_selectors.FamilyEVM && version.String() == deploy_utils.Version_1_5_0.String() {
+		version = deploy_utils.Version_1_6_0 // NOTE: for EVM, the v1.6.0 adapter currently handles v1.5.x pools
+	}
+	adapter, ok := registry.GetTokenAdapter(family, version)
+	if !ok {
+		return nil, "", fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, version.String())
+	}
+
+	return adapter, family, nil
 }

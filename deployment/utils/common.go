@@ -109,6 +109,10 @@ var (
 	Version_2_0_0 = semver.MustParse("2.0.0")
 )
 
+func StripPatchVersion(version *semver.Version) *semver.Version {
+	return semver.New(version.Major(), version.Minor(), 0, version.Prerelease(), version.Metadata())
+}
+
 func NewRegistererID(chainFamily string, version *semver.Version) string {
 	return fmt.Sprintf("%s-%s", chainFamily, version.String())
 }
