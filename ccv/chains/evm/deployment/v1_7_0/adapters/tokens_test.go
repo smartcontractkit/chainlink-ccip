@@ -351,12 +351,12 @@ func TestTokenAdapter(t *testing.T) {
 				if chainSel == chainA {
 					boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 					require.NoError(t, err, "Failed to instantiate token pool contract")
-					inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
+					inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), [4]byte{}, []byte{}, inbound)
 					require.NoError(t, err, "Failed to get inbound CCVs from token pool")
 					require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
 					require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
 
-					outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
+					outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), [4]byte{}, []byte{}, outbound)
 					require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 					require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
 					require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")

@@ -6,12 +6,13 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
@@ -143,7 +144,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 				MaxCCVsPerMsg: 10,
 				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
-					MinBlockConfirmations: 1,
+					AllowedFinalityConfig: sequences.BlockDepthFinalityConfig(1),
 					CcvAllowlistEnabled:   false,
 				},
 				Qualifier: "default",
@@ -153,7 +154,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 				MaxCCVsPerMsg: 10,
 				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
-					MinBlockConfirmations: 1,
+					AllowedFinalityConfig: sequences.BlockDepthFinalityConfig(1),
 					CcvAllowlistEnabled:   false,
 				},
 				Qualifier: "custom",
