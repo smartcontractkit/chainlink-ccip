@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -36,7 +37,7 @@ contract TokenPoolHelper is TokenPool {
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
+    _validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 0);
   }
 
   function validateLockOrBurn(

@@ -120,8 +120,6 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @notice The division factor for bps. This also represents the maximum bps fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
-  /// @dev Constant representing the default finality.
-  bytes4 internal constant WAIT_FOR_FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -318,7 +316,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0); // feeAmount is zero
+    _validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 0); // feeAmount is zero
     _lockOrBurn(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
 
     emit LockedOrBurned({
@@ -380,7 +378,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+    return releaseOrMint(releaseOrMintIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   /// @notice Contains the specific release or mint token logic for a pool.
@@ -426,7 +424,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     uint256 amount = lockOrBurnIn.amount - feeAmount;
     // If FTF is requested, validate against the allowed and apply the custom rate limit.
-    if (requestedFinality != WAIT_FOR_FINALITY) {
+    if (requestedFinality != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       // Use the codec to validate that the requested finality is allowed by the pool's configuration. This will revert
       // if the requested finality is not allowed.
       FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, s_allowedFinalityConfig);
@@ -483,7 +481,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-    if (finalityConfig != WAIT_FOR_FINALITY) {
+    if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       // Validate that the finality carried in the inbound message is permitted by this pool's config. This mirrors
       // the outbound check in _validateLockOrBurn and ensures the FTF inbound rate-limit bucket is only consumed for
       // modes the pool has explicitly enabled, even if a future OffRamp skips this check.
@@ -976,7 +974,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (direction == IPoolV2.MessageDirection.Outbound) {
       TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[remoteChainSelector];
       if (feeConfig.isEnabled) {
-        if (finalityConfig != WAIT_FOR_FINALITY) {
+        if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
           amount =
             sourceDenominatedAmount - (sourceDenominatedAmount * feeConfig.fastFinalityTransferFeeBps) / BPS_DIVIDER;
         } else {
@@ -1078,7 +1076,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       return (0, 0, 0, 0, false);
     }
 
-    if (finalityConfig != WAIT_FOR_FINALITY) {
+    if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       return (
         feeConfig.fastFinalityFeeUSDCents,
         feeConfig.destGasOverhead,
@@ -1099,7 +1097,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev Calculates the fee based on the transferred amount, and the configured basis points.
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param finalityConfig The requested finality encoding (see `FinalityCodec`).
-  /// A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
+  /// A value of zero (FinalityCodec.WAIT_FOR_FINALITY_FLAG) applies default finality fees.
   /// Returns the fee amount.
   function _getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
@@ -1108,7 +1106,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 
     // Determine which fee basis points to apply based on finality type.
-    if (finalityConfig != WAIT_FOR_FINALITY) {
+    if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       return (lockOrBurnIn.amount * feeConfig.fastFinalityTransferFeeBps) / BPS_DIVIDER;
     } else {
       return (lockOrBurnIn.amount * feeConfig.finalityTransferFeeBps) / BPS_DIVIDER;
