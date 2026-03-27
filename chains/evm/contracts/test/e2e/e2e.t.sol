@@ -144,7 +144,7 @@ contract e2e is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: userCCVAddresses,
           ccvArgs: userCCVArgs,
-          finalityConfig: FinalityCodec._encodeBlockDepth(0),
+          requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
           gasLimit: GAS_LIMIT,
           executor: address(0),
           executorArgs: "",

@@ -242,7 +242,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       messageNumber: ++destChainConfig.messageNumber,
       executionGasLimit: 0, // Populated after getting receipts.
       ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
-      finality: resolvedExtraArgs.finalityConfig,
+      finality: resolvedExtraArgs.requestedFinalityConfig,
       ccvAndExecutorHash: bytes32(0), // Will be set after CCV list is finalized.
       onRampAddress: abi.encode(address(this)), // Source address, so abi encoded.
       offRampAddress: destChainConfig.offRamp, // Dest address, so unpadded bytes.
@@ -265,7 +265,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           destChainSelector,
           message.tokenAmounts[0].token,
           message.tokenAmounts[0].amount,
-          resolvedExtraArgs.finalityConfig,
+          resolvedExtraArgs.requestedFinalityConfig,
           resolvedExtraArgs.tokenArgs
         );
       }
@@ -310,7 +310,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         // then validated and trimmed to minimal bytes for destination chain encoding in the message.
         resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : message.receiver,
         originalSender,
-        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.requestedFinalityConfig,
         resolvedExtraArgs.tokenArgs
       );
 
@@ -567,9 +567,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // Validate the wire shape of the requested finality. Note: the receiver's finality policy
     // (getCCVsAndFinalityConfig) is checked on delivery by the OffRamp, not here. A sender using a non-zero
-    // finalityConfig targeting a receiver that only accepts FinalityCodec.WAIT_FOR_FINALITY_FLAG will succeed at send time but fail on
-    // execution. Senders should consult the receiver's policy off-chain before choosing a finalityConfig.
-    FinalityCodec._validateRequestedFinality(resolvedArgs.finalityConfig);
+    // requestedFinalityConfig targeting a receiver that only accepts FinalityCodec.WAIT_FOR_FINALITY_FLAG will succeed at send time but fail on
+    // execution. Senders should consult the receiver's policy off-chain before choosing a requestedFinalityConfig.
+    FinalityCodec._validateRequestedFinality(resolvedArgs.requestedFinalityConfig);
 
     return resolvedArgs;
   }
@@ -716,7 +716,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector Target destination chain selector of the message.
   /// @param receiver Message receiver in abi-encoded format (as expected by the pool on EVM source chains).
   /// @param originalSender Message sender.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments from the message.
   /// @return TokenTransferV1 token transfer encoding for MessageV1.
   function _lockOrBurnSingleToken(
@@ -724,7 +724,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
@@ -755,11 +755,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Use the V2 overload which returns a potentially adjusted destination amount.
       if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
         (poolReturnData, destTokenAmount) =
-          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, finalityConfig, tokenArgs);
+          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, requestedFinalityConfig, tokenArgs);
       } else {
-        // V1 pools don't understand `finalityConfig`/`tokenArgs`.
+        // V1 pools don't understand `requestedFinalityConfig`/`tokenArgs`.
         // We enforce default finality and no `tokenArgs` to avoid silent mis-interpretation.
-        if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
+        if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
           revert FTFNotSupportedOnPoolV1();
         }
         if (tokenArgs.length != 0) {
@@ -949,7 +949,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         message.tokenAmounts[0].token,
         message.tokenAmounts[0].amount,
-        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.requestedFinalityConfig,
         resolvedExtraArgs.tokenArgs
       );
     }
@@ -996,7 +996,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 ccvPayloadSizeBytes) = ICrossChainVerifierV1(implAddress)
-        .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.finalityConfig);
+        .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.requestedFinalityConfig);
 
       receipts[i] = Receipt({
         issuer: extraArgs.ccvs[i],
@@ -1038,7 +1038,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
               destChainSelector,
               message.tokenAmounts[0].amount,
               message.feeToken,
-              extraArgs.finalityConfig,
+              extraArgs.requestedFinalityConfig,
               extraArgs.tokenArgs
             );
       }
@@ -1141,7 +1141,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
         ? 0
         : IExecutor(extraArgs.executor)
-          .getFee(destChainSelector, extraArgs.finalityConfig, extraArgs.ccvs, extraArgs.executorArgs, feeToken),
+          .getFee(
+            destChainSelector, extraArgs.requestedFinalityConfig, extraArgs.ccvs, extraArgs.executorArgs, feeToken
+          ),
       extraArgs: extraArgs.executorArgs
     });
   }

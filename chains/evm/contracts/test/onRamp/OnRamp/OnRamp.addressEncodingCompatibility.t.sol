@@ -146,7 +146,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -202,7 +202,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -253,7 +253,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -330,7 +330,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -377,7 +377,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",

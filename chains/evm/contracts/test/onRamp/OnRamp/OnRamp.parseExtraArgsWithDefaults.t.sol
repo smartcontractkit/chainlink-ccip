@@ -62,7 +62,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: userCCVAddresses,
       ccvArgs: userCCVArgs,
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: makeAddr("userExecutor"),
       executorArgs: "execArgs",
@@ -118,7 +118,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -210,7 +210,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: 0, // pure token transfer
       executor: s_defaultExecutor,
       executorArgs: "",

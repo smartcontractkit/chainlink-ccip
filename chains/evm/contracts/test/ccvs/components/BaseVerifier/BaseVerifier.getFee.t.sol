@@ -63,7 +63,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_RevertWhen_BlockDepthRequestedButOnlyFinalityAllowed() public {
-    // Default setup has finalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG → only WAIT_FOR_FINALITY accepted.
+    // Default setup has requestedFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG → only WAIT_FOR_FINALITY accepted.
     Client.EVM2AnyMessage memory message;
     vm.expectRevert(
       abi.encodeWithSelector(

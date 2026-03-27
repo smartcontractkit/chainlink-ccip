@@ -55,7 +55,7 @@ library ExtraArgsCodecUnoptimized {
     bytes memory part1 = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       extraArgs.gasLimit,
-      extraArgs.finalityConfig,
+      extraArgs.requestedFinalityConfig,
       uint8(extraArgs.ccvs.length),
       encodedCCVs,
       uint8(encodedExecutor.length),
@@ -94,8 +94,8 @@ library ExtraArgsCodecUnoptimized {
     extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
     offset += 4;
 
-    // finalityConfig (4 bytes).
-    extraArgs.finalityConfig = bytes4(encoded[offset:offset + 4]);
+    // requestedFinalityConfig (4 bytes).
+    extraArgs.requestedFinalityConfig = bytes4(encoded[offset:offset + 4]);
     offset += 4;
 
     // ccvs length (1 byte).

@@ -87,7 +87,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      finalityConfig: FinalityCodec._encodeBlockDepth(0),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -462,7 +462,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      finalityConfig: FinalityCodec._encodeBlockDepth(12),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -537,7 +537,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      finalityConfig: FinalityCodec._encodeBlockDepth(12),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(12),
       gasLimit: 3_600_000, // A large gas limit that should be ignored for pricing.
       executor: Client.NO_EXECUTION_ADDRESS,
       executorArgs: "",

@@ -114,7 +114,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         destChainSelector,
         message.tokenAmounts[0].token,
         message.tokenAmounts[0].amount,
-        eventData.resolvedExtraArgs.finalityConfig,
+        eventData.resolvedExtraArgs.requestedFinalityConfig,
         eventData.resolvedExtraArgs.tokenArgs
       );
     }
@@ -177,7 +177,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
       gasLimit: GAS_LIMIT,
-      finalityConfig: FinalityCodec._encodeBlockDepth(12),
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(12),
       executor: address(0), // No executor specified.
       executorArgs: "",
       tokenReceiver: "",

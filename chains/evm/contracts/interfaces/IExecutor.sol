@@ -7,12 +7,12 @@ interface IExecutor {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param finalityConfig The requested finality encoding for the message (see `FinalityCodec`).
+  /// @param requestedFinalityConfig The requested finality encoding for the message (see `FinalityCodec`).
   /// @param ccvAddresses Array of CCV addresses that will be used for the message.
   /// @param extraArgs Extra arguments for the executor.
   function getFee(
     uint64 destChainSelector,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     address[] memory ccvAddresses,
     bytes memory extraArgs,
     address feeToken

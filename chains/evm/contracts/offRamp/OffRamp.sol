@@ -777,12 +777,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param tokenTransfer Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
     address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 
@@ -817,7 +817,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
     // account for 90k gas overhead due to the interface check.
     if (localPoolAddress._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, finalityConfig) returns (
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, requestedFinalityConfig) returns (
         Pool.ReleaseOrMintOutV1 memory result
       ) {
         returnData = result;

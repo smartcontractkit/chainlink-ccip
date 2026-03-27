@@ -164,11 +164,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @inheritdoc IPoolV2
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes memory tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
@@ -208,7 +208,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert InvalidLockOrBurnMechanism(mechanism);
     }
 
-    return IPoolV2(pool).lockOrBurn(lockOrBurnIn, finalityConfig, tokenArgs);
+    return IPoolV2(pool).lockOrBurn(lockOrBurnIn, requestedFinalityConfig, tokenArgs);
   }
 
   /// @inheritdoc IPoolV1
@@ -247,10 +247,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
   /// @inheritdoc IPoolV2
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
@@ -262,10 +262,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return IPoolV2(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn, finalityConfig);
+      return IPoolV2(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn, requestedFinalityConfig);
     }
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
-      return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, finalityConfig);
+      return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, requestedFinalityConfig);
     }
 
     revert InvalidMessageVersion(version);
@@ -402,7 +402,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @param destChainSelector The destination lane selector.
   /// @param amount The amount of tokens being bridged on this lane.
   /// @param feeToken The token used to pay feeUSDCents.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Opaque token arguments supplied by the caller.
   // solhint-disable-next-line chainlink-solidity/explicit-returns
   function getFee(
@@ -410,7 +410,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint64 destChainSelector,
     uint256 amount,
     address feeToken,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs
   )
     external
@@ -420,7 +420,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     (address pool, bool isPoolV2) = _getPoolForMechanism(destChainSelector);
 
     if (isPoolV2) {
-      return IPoolV2(pool).getFee(localToken, destChainSelector, amount, feeToken, finalityConfig, tokenArgs);
+      return IPoolV2(pool).getFee(localToken, destChainSelector, amount, feeToken, requestedFinalityConfig, tokenArgs);
     }
 
     // If an old mechanism is set, or none at all, revert.
@@ -430,18 +430,18 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @inheritdoc IPoolV2
   /// @param localToken The local asset being transferred.
   /// @param destChainSelector The chain selector of the destination chain.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token argument from the CCIP message.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig) {
     (address pool, bool isPoolV2) = _getPoolForMechanism(destChainSelector);
 
     if (isPoolV2) {
-      return IPoolV2(pool).getTokenTransferFeeConfig(localToken, destChainSelector, finalityConfig, tokenArgs);
+      return IPoolV2(pool).getTokenTransferFeeConfig(localToken, destChainSelector, requestedFinalityConfig, tokenArgs);
     }
 
     // For any other mechanism, return default empty config.
@@ -505,7 +505,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     address, // localToken
     uint64 remoteChainSelector,
     uint256, // amount
-    bytes4, // finalityConfig
+    bytes4, // requestedFinalityConfig
     bytes calldata extraData,
     MessageDirection direction
   ) external view returns (address[] memory requiredCCVs) {

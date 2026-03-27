@@ -8,13 +8,13 @@ import {IPoolV2} from "./IPoolV2.sol";
 interface IAdvancedPoolHooks {
   /// @notice Preflight check before lock or burn operation.
   /// @param lockOrBurnIn The lock or burn input parameters.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments.
   /// @param amountPostFee The amount after token pool bps-based fees have been deducted.
   /// @dev This function may revert if the preflight check fails. This means the transaction is rolled back on source.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs,
     uint256 amountPostFee
   ) external;
@@ -22,20 +22,20 @@ interface IAdvancedPoolHooks {
   /// @notice Postflight check before releasing or minting tokens.
   /// @param releaseOrMintIn The release or mint output parameters.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @dev This function may revert if the postflight check fails. This means the transaction is unexecutable until
   /// the issue is resolved.
   function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) external;
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
@@ -43,7 +43,7 @@ interface IAdvancedPoolHooks {
     address localToken,
     uint64 remoteChainSelector,
     uint256 amount,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) external view returns (address[] memory requiredCCVs);

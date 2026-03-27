@@ -12,7 +12,7 @@ contract MockExecutor is IExecutor {
 
   function getFee(
     uint64, // destChainSelector,
-    bytes4, // finalityConfig
+    bytes4, // requestedFinalityConfig
     address[] memory, // ccvs,
     bytes memory, // extraArgs
     address // feeToken

@@ -282,15 +282,15 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev The _getFee function deducts the fee from the amount and returns the amount after fee deduction.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param finalityConfig Requested finality config according to the FinalityCodec.
+  /// @param requestedFinalityConfig Requested finality config according to the FinalityCodec.
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    uint256 feeAmount = _getFee(lockOrBurnIn, finalityConfig);
-    _validateLockOrBurn(lockOrBurnIn, finalityConfig, tokenArgs, feeAmount);
+    uint256 feeAmount = _getFee(lockOrBurnIn, requestedFinalityConfig);
+    _validateLockOrBurn(lockOrBurnIn, requestedFinalityConfig, tokenArgs, feeAmount);
     destTokenAmount = lockOrBurnIn.amount - feeAmount;
     _lockOrBurn(lockOrBurnIn.remoteChainSelector, destTokenAmount);
 
@@ -348,16 +348,16 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @dev The _validateReleaseOrMint check is an essential security check.
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param finalityConfig Requested finality config according to the FinalityCodec.
+  /// @param requestedFinalityConfig Requested finality config according to the FinalityCodec.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) public virtual override(IPoolV2) returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 localAmount = _calculateLocalAmount(
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, finalityConfig);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, requestedFinalityConfig);
 
     _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
 
@@ -463,13 +463,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// - rate limiting for either default or FTF transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finalityConfig The requested finality encoding (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
+  /// @param requestedFinalityConfig The requested finality encoding (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) internal virtual {
     if (!isSupportedToken(releaseOrMintIn.localToken)) {
       revert InvalidToken(releaseOrMintIn.localToken);
@@ -481,17 +481,17 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-    if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
+    if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       // Validate that the finality carried in the inbound message is permitted by this pool's config. This mirrors
       // the outbound check in _validateLockOrBurn and ensures the FTF inbound rate-limit bucket is only consumed for
       // modes the pool has explicitly enabled, even if a future OffRamp skips this check.
-      FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_allowedFinalityConfig);
+      FinalityCodec._ensureRequestedFinalityAllowed(requestedFinalityConfig, s_allowedFinalityConfig);
       _consumeFastFinalityInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     } else {
       _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     }
 
-    _postflightCheck(releaseOrMintIn, localAmount, finalityConfig);
+    _postflightCheck(releaseOrMintIn, localAmount, requestedFinalityConfig);
   }
 
   /// @notice Hook for post-flight checks on release or mint.
@@ -500,14 +500,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// in the compiler removing the function and all related code, saving close to 1KB.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finalityConfig The requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig The requested finality encoding (see `FinalityCodec`).
   function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
-      s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, finalityConfig);
+      s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, requestedFinalityConfig);
     }
   }
 
@@ -949,7 +949,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param sourceDenominatedAmount The amount being transferred, source denominated.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
@@ -957,7 +957,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     address localToken,
     uint64 remoteChainSelector,
     uint256 sourceDenominatedAmount,
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) public view virtual returns (address[] memory requiredCCVs) {
@@ -974,7 +974,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (direction == IPoolV2.MessageDirection.Outbound) {
       TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[remoteChainSelector];
       if (feeConfig.isEnabled) {
-        if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
+        if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
           amount =
             sourceDenominatedAmount - (sourceDenominatedAmount * feeConfig.fastFinalityTransferFeeBps) / BPS_DIVIDER;
         } else {
@@ -990,8 +990,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       amount = _calculateLocalAmount(sourceDenominatedAmount, _parseRemoteDecimals(extraData));
     }
 
-    return
-      s_advancedPoolHooks.getRequiredCCVs(localToken, remoteChainSelector, amount, finalityConfig, extraData, direction);
+    return s_advancedPoolHooks.getRequiredCCVs(
+      localToken, remoteChainSelector, amount, requestedFinalityConfig, extraData, direction
+    );
   }
 
   // ================================================================
@@ -1044,7 +1045,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    bytes4, // finalityConfig
+    bytes4, // requestedFinalityConfig
     bytes calldata // tokenArgs
   ) external view virtual returns (TokenTransferFeeConfig memory feeConfig) {
     return s_tokenTransferFeeConfig[destChainSelector];
@@ -1053,13 +1054,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @notice Returns the pool fee parameters that will apply to a transfer.
   /// @param destChainSelector The destination lane selector.
-  /// @param finalityConfig Requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   function getFee(
     address, // localToken
     uint64 destChainSelector,
     uint256, // amount
     address, // feeToken
-    bytes4 finalityConfig,
+    bytes4 requestedFinalityConfig,
     bytes calldata // tokenArgs
   )
     external
@@ -1067,7 +1068,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     virtual
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_allowedFinalityConfig);
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinalityConfig, s_allowedFinalityConfig);
 
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
 
@@ -1076,7 +1077,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       return (0, 0, 0, 0, false);
     }
 
-    if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
+    if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       return (
         feeConfig.fastFinalityFeeUSDCents,
         feeConfig.destGasOverhead,
@@ -1096,17 +1097,17 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @dev Calculates the fee based on the transferred amount, and the configured basis points.
   /// @param lockOrBurnIn The original lock or burn request.
-  /// @param finalityConfig The requested finality encoding (see `FinalityCodec`).
+  /// @param requestedFinalityConfig The requested finality encoding (see `FinalityCodec`).
   /// A value of zero (FinalityCodec.WAIT_FOR_FINALITY_FLAG) applies default finality fees.
   /// Returns the fee amount.
   function _getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes4 finalityConfig
+    bytes4 requestedFinalityConfig
   ) internal view virtual returns (uint256) {
     TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 
     // Determine which fee basis points to apply based on finality type.
-    if (finalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
+    if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       return (lockOrBurnIn.amount * feeConfig.fastFinalityTransferFeeBps) / BPS_DIVIDER;
     } else {
       return (lockOrBurnIn.amount * feeConfig.finalityTransferFeeBps) / BPS_DIVIDER;
