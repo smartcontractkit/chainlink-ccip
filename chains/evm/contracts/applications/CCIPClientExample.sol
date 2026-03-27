@@ -44,17 +44,10 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   // Current feeToken
   IERC20 internal s_feeToken;
   // Below is a simplistic example (same params for all messages) of using storage to allow for new options without
-  // upgrading the dapp. Note that extra args are chain family specific (e.g. gasLimit is EVM specific etc.).
-  // and will always be backwards compatible i.e. upgrades are opt-in.
-  // Offchain we can compute the V1 extraArgs:
-  //    Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: 300_000});
-  //    bytes memory encodedV1ExtraArgs = Client._argsToBytes(extraArgs);
-  // Then later compute V2 extraArgs, for example if a refund feature was added:
-  //    Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({gasLimit: 300_000, destRefundAddress: 0x1234});
-  //    bytes memory encodedV2ExtraArgs = Client._argsToBytes(extraArgs);
-  // and update storage with the new args.
-  // If different options are required for different messages, for example different gas limits,
-  // one can simply key based on (chainSelector, messageType) instead of only chainSelector.
+  // upgrading the dapp. To construct a basic entry, use
+  // ExtraArgsCodec._getBasicEncodedExtraArgsV3(uint32 gasLimit, uint16 blockDepth);
+  // This will return a simple one-storage-slot sized ExtraArgsV3 encoding with the provided args. For more advanced
+  // cases use the GenericExtraArgsV3 struct and encode using ExtraArgsCodec._encodeGenericExtraArgsV3.
   mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_chains;
 
   // Tracks all configured remote chain selectors so they can be enumerated on-chain.
