@@ -32,7 +32,7 @@ func NewFeesAdapter(evmAdapter *evmseq16.EVMAdapter) *FeesAdapter {
 
 func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
 	ds := e.DataStore
-	fqAddr, err := a.evm.GetFQAddress(ds, src)
+	fqAddr, err := a.evm.GetFQAddressDynamic(ds, src, e.BlockChains)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
