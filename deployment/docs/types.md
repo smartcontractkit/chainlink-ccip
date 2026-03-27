@@ -343,8 +343,8 @@ type DeployTokenInput struct {
     Name                  string              // Token name
     Symbol                string              // Token symbol
     Decimals              uint8               // Token decimals
-    Supply                *big.Int            // Total supply
-    PreMint               *big.Int            // Amount to pre-mint
+    Supply                *uint64             // Total supply (decimal scaling happens automatically, nil or 0 means unlimited supply)
+    PreMint               *uint64             // Amount to pre-mint (decimal scaling happens automatically, nil or 0 means no pre-mint)
     ExternalAdmin         string              // External admin address (chain-agnostic string)
     CCIPAdmin             string              // CCIP admin address (defaults to timelock)
     Senders               []string            // Addresses needing special processing (e.g., Solana ATAs)

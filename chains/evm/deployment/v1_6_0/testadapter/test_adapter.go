@@ -414,18 +414,16 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 		return tokensapi.TokenExpansionInputPerChain{}
 	}
 
-	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(deci)), nil)
-	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
-
+	preMintAmount := uint64(1_000_000) // pre-mint 1 million tokens
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion:      cciputils.Version_1_5_1,
+		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
 			Name:                   "TEST TOKEN " + suffix,
 			Type:                   bnmERC20ops.ContractType, // BnM ERC20 is the most common
-			Supply:                 big.NewInt(0),            // unlimited supply
-			PreMint:                mintAmnt,                 // pre-mint some tokens for transfers
+			Supply:                 nil,                      // unlimited supply
+			PreMint:                &preMintAmount,           // pre-mint some tokens for transfers
 			Senders:                []string{admin},          // use deployer as sender
 			ExternalAdmin:          "",                       // not needed for tests
 			DisableFreezeAuthority: false,                    // not applicable for EVM
