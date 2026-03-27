@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -28,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
@@ -703,4 +705,179 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 
 	// Verify connectivity using 2.0 FeeQuoter (adapter now returns 2.0 address from datastore).
 	checkBidirectionalLaneConnectivityEVM2EVM(t, e, chain1, chain2, srcAdapter, destAdapter, true, false)
+}
+
+func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
+	chains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+		chain_selectors.AVALANCHE_MAINNET.Selector,
+	}
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, chains),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
+	mcmsRegistry := cs_core.GetRegistry()
+	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	chainInput := make(map[uint64]deployops.ContractDeploymentConfigPerChain)
+	fqInput := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain)
+
+	for _, chainSel := range chains {
+		chainInput[chainSel] = deployops.ContractDeploymentConfigPerChain{
+			Version: version,
+			// FEE QUOTER CONFIG
+			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+			LinkPremiumMultiplier:        9e17, // 0.9 ETH
+			NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+			// OFFRAMP CONFIG
+			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+			GasForCallExactCheck:                    uint16(5000),
+		}
+	}
+
+	fqInput[chain_selectors.ETHEREUM_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion:     semver.MustParse("2.0.0"),
+		RampsVersion:         semver.MustParse("1.6.0"),
+		RemoteChainSelectors: []uint64{chain_selectors.AVALANCHE_MAINNET.Selector},
+	}
+	fqInput[chain_selectors.AVALANCHE_MAINNET.Selector] = deployops.UpdateFeeQuoterInputPerChain{
+		FeeQuoterVersion:     semver.MustParse("2.0.0"),
+		RampsVersion:         semver.MustParse("1.6.0"),
+		RemoteChainSelectors: []uint64{chain_selectors.ETHEREUM_MAINNET.Selector},
+	}
+
+	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
+		MCMS:   mcms.Input{},
+		Chains: chainInput,
+	})
+	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+	require.NoError(t, out.DataStore.Merge(e.DataStore))
+	e.DataStore = out.DataStore.Seal()
+	chain1 := lanesapi.ChainDefinition{
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
+	}
+	chain2 := lanesapi.ChainDefinition{
+		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
+	}
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		Lanes: []lanesapi.LaneConfig{
+			{
+				Version: version,
+				ChainA:  chain1,
+				ChainB:  chain2,
+			},
+		},
+	})
+	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	// Deploy MCMS
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	// do this to reset cached executions
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+	// now update to FeeQuoter 2.0.0
+	t.Log(out.DataStore.Addresses())
+	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
+	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: fqInput,
+		MCMS:   NewDefaultInputForMCMS("Transfer ownership FQ2"),
+	})
+	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Greater(t, len(out.Reports), 0)
+	require.Equal(t, 1, len(out.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
+	// update datastore with changeset output
+	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
+	e.DataStore = out.DataStore.Seal()
+	t.Log(out.DataStore.Addresses())
+	for _, chainSel := range chains {
+		fqUpgradeValidation(t, e, chainSel, chains, true, true)
+	}
+	// do this to reset cached executions
+	bundle = operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+	// downgrade back to 1.6.3 to make sure the changeset is reversible
+	for _, chainSel := range chains {
+		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
+			FeeQuoterVersion: semver.MustParse("1.6.3"),
+			RampsVersion:     semver.MustParse("1.6.0"),
+		}
+	}
+	// now downgrade back to FeeQuoter 1.6.3
+	fqUpdateChangeset = deployops.UpdateFeeQuoterChangeset()
+	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+		Chains: fqInput,
+	})
+	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Len(t, out.DataStore.Addresses().Filter(), 0, "new addresses found on downgrade")
+	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
+
+	for _, chainSel := range chains {
+		fqUpgradeValidation(t, e, chainSel, chains, false, true)
+	}
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		Lanes: []lanesapi.LaneConfig{
+			{
+				Version: version,
+				ChainA:  chain1,
+				ChainB:  chain2,
+			},
+		},
+	})
+
+	// Verify the version in Datastore is still 1.6.0 after downgrade
+	chain1Family, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+
+	chain1Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain1Family, version)
+	require.True(t, exists, "adapter should exist for chain1")
+
+	chain2Family, err := chain_selectors.GetSelectorFamily(chain2.Selector)
+
+	chain2Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain2Family, version)
+	require.True(t, exists, "adapter should exist for chain2")
+
+	// Verify the version of the FQ version has been downgraded
+	fqAddressChain1 := common.Address{}
+	if dfq, ok := chain1Adapter.(lanesapi.DynamicFeeQuoter); ok {
+		fqAddressChain1Bytes, err := dfq.GetFQAddressDynamic(e.DataStore, chain1.Selector, e.BlockChains)
+		require.NoError(t, err, "error fetching fee quoter address %d", chain1.Selector)
+		fqAddressChain1 = common.BytesToAddress(fqAddressChain1Bytes)
+	}
+	chain1Ref := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chain1.Selector),
+		datastore.AddressRefByType(datastore.ContractType(cciputils.FeeQuoter)),
+		datastore.AddressRefByAddress(fqAddressChain1.Hex()),
+	)
+	require.Len(t, chain1Ref, 1, "expected exactly 1 fee quoter address for chain1 after downgrade")
+
+	fqAddressChain2 := common.Address{}
+	if dfq, ok := chain2Adapter.(lanesapi.DynamicFeeQuoter); ok {
+		fqAddressChain2Bytes, err := dfq.GetFQAddressDynamic(e.DataStore, chain2.Selector, e.BlockChains)
+		require.NoError(t, err, "error fetching fee quoter address %d", chain2.Selector)
+		fqAddressChain2 = common.BytesToAddress(fqAddressChain2Bytes)
+	}
+	chain2Ref := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chain2.Selector),
+		datastore.AddressRefByType(datastore.ContractType(cciputils.FeeQuoter)),
+		datastore.AddressRefByAddress(fqAddressChain2.Hex()),
+	)
+	require.Len(t, chain2Ref, 1, "expected exactly 1 fee quoter address for chain2 after downgrade")
+
+	require.Equal(t, chain1Ref[0].Version, semver.MustParse("1.6.3"))
+	require.Equal(t, chain2Ref[0].Version, semver.MustParse("1.6.3"))
+
+	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 }
