@@ -111,7 +111,7 @@ library FinalityCodec {
     _validateRequestedFinality(requestedFinality);
 
     // If any of the flags match, the request is allowed only when it has no depth field (flag-only request).
-    if ((requestedFinality >> BLOCK_DEPTH_BITS) & (allowedFinality >> BLOCK_DEPTH_BITS) != 0) {
+    if (((requestedFinality >> BLOCK_DEPTH_BITS) & (allowedFinality >> BLOCK_DEPTH_BITS)) != 0) {
       if (uint32(requestedFinality & BLOCK_DEPTH_MASK) != 0) {
         revert InvalidRequestedFinality(requestedFinality, allowedFinality);
       }
