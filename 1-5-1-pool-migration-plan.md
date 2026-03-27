@@ -12,11 +12,11 @@ One changeset invocation = one remote chain migration.
 
 Safety does **not** rely on cross-chain atomicity. It relies on the operational sequence:
 
-1. **Pre-pause** — A preceding proposal disables rate limits on all affected pools, halting traffic.
+1. **Pre-pause** — A preceding proposal sets inbound/outbound rate limits on all affected pools to zero-capacity configs (`isEnabled=true`, `capacity=0`, `rate=0`), halting token transfers.
 2. **Drain** — Operator waits for all inflight messages to complete (~30-60 min).
 3. **Execute this proposal** — Cutover: remote pool swap + group migration + TAR update.
 4. **Post-cutover verification** — Operator verifies: hub `getRemotePools`, hub `getGroup`, remote TAR pool, locked token balances.
-5. **Unpause** — Only after both chain batches succeed AND post-cutover verification passes, a separate proposal restores rate limits.
+5. **Unpause** — Only after both chain batches succeed AND post-cutover verification passes, a separate proposal restores the prior rate limits.
 
 FeeQuoter parity is a separate review item, not part of this migration write path.
 
@@ -40,19 +40,19 @@ FeeQuoter parity is a separate review item, not part of this migration write pat
 
 **Rationale:** The generated binding from `ccip-contract-examples` already exposes `Address()` (line 3694), `Owner()` (line 648), `GetGroup()` (line 318), `GetRemotePools()` (line 428), `AddRemotePool()` (line 726), `RemoveRemotePool()` (line 798), and `UpdateGroups()` (line 882). It satisfies the `ownableContract` interface (`Address() common.Address` + `Owner(*bind.CallOpts) (common.Address, error)`) at `write.go:143`. No custom wrapper needed.
 
-### 4. RemoteChainSupply is opaque operator input
+### 4. RemoteChainSupply stays explicit, but gets one exact check
 
-**Decision:** The changeset does not derive, normalize, or interpret `RemoteChainSupply`. No `totalSupply()` calls. No decimal conversion. No parity checks against hub/local decimals.
+**Decision:** `RemoteChainSupply` remains explicit operator input, but VerifyPreconditions enforces an exact `remoteToken.totalSupply()` match whenever the hub's current group for the target chain differs from `TargetGroup`. On a full no-op path (`currentGroup == TargetGroup`), the changeset still validates that the value is non-nil and non-negative, but skips the exact parity check because `updateGroups()` will not consume it. When `TargetGroup == 1` (Burn/Mint), VerifyPreconditions also requires `RemoteChainSupply <= hub.getLockedTokens()` as a sanity bound.
 
-**Rationale:** The operator/runbook owns choosing the correct value (captured as a snapshot during the drain phase). The changeset validates only: non-nil, non-negative, explicitly supplied. Semantic correctness is an operational concern, not a changeset validation concern.
+**Rationale:** Keeping the value explicit matches the runbook and proposal review flow, while the exact `totalSupply()` equality catches fat-fingered inputs after pause+drain without heuristics. Skipping the parity check on no-op paths preserves resume safety, and the locked-token bound is a cheap secondary check for the burn path.
 
-### 5. Generic changeset (no migration-direction assumptions)
+### 5. Generic across supported 1.5.1 pool migrations
 
-**Decision:** Do not assume the current group is Lock/Release (0) or that the target is Burn/Mint (1). Instead, accept `TargetGroup uint8` as input and validate generic invariants.
+**Decision:** Keep explicit addresses and `TargetGroup` input so one changeset can handle different remote chains and supported `1.5.1` pool types, but do not try to accept arbitrary contracts. VerifyPreconditions rejects any `oldPool`/`newPool` pair whose onchain identity does not match the migration's supported contract set.
 
-**Rationale:** Keeps the changeset reusable for any group migration direction. Validation checks: old endpoint matches expected state or is already gone; new endpoint matches expected state or is already present; any pool set containing addresses outside {old, new} is an error.
+**Rationale:** This preserves a single reusable changeset for the migrations we actually run, without weakening validation. The state machine stays generic over current-vs-target state, while contract identity remains deterministic.
 
-**Note:** `TargetGroup` is configurable in the API, but the `HybridWithExternalMinterTokenPool` currently only supports values `0` (LockRelease) and `1` (BurnMint). VerifyPreconditions enforces this.
+**Note:** `TargetGroup` is configurable in the API, but the `HybridWithExternalMinterTokenPool` currently only supports values `0` (LockRelease) and `1` (BurnMint). VerifyPreconditions enforces this. "Generic" here means reusable across supported `1.5.1` migration inputs, not arbitrary pool families.
 
 ### 6. Single MCMS proposal spanning hub + remote chains
 
@@ -68,17 +68,17 @@ FeeQuoter parity is a separate review item, not part of this migration write pat
 
 **Note:** Missing datastore refs are acceptable for contract inputs (pools, TAR, token) — those use explicit addresses. Missing datastore refs are NOT acceptable for MCMS/timelock resolution — those are infrastructure contracts that must exist in the datastore.
 
-### 8. Opportunistic datastore usage
+### 8. Explicit addresses with deterministic pool identity checks
 
-**Decision:** Config uses explicit addresses (mandatory). If datastore refs exist for any address, validate consistency. Persist new refs at end of Apply.
+**Decision:** Config uses explicit addresses (mandatory). VerifyPreconditions reads `typeAndVersion()` and `getToken()` from `oldPool` and `newPool` to validate that they are the expected contracts for this migration. If datastore refs exist for any address, validate consistency. Persist new refs at end of Apply.
 
-**Rationale:** The pools are externally deployed via `ccip-contract-examples` and may not be in the datastore. Explicit addresses are the primary input. Datastore provides a cross-check when available.
+**Rationale:** The pools are externally deployed via `ccip-contract-examples` and may not be in the datastore. Onchain identity checks catch obvious wrong-address input without depending on optional datastore entries or event heuristics.
 
-### 9. "Already complete" = no-op success, but still validates inputs
+### 9. "Already complete" = no-op success, but still validates config
 
-**Decision:** If all state matches the post-migration target (new pool present, old pool absent, group already at target, TAR already pointing to new pool), return success with an empty proposal. However, VerifyPreconditions still runs fully — MCMS input, governance refs, ownership, and all address validations are checked even on a no-op path.
+**Decision:** If all state matches the post-migration target (new pool present, old pool absent, group already at target, TAR already pointing to new pool), return success with an empty proposal. VerifyPreconditions still runs governance, ownership, address, and pool-identity checks on a no-op path. The exact `RemoteChainSupply` parity check only runs when `updateGroups()` would actually be emitted.
 
-**Rationale:** Makes re-runs safe. An operator can re-invoke after a partial failure without fear of duplicate transactions. Empty batch ops → `OutputBuilder.Build()` returns empty output. Full validation on no-op prevents silent acceptance of a bad config that happens to hit an already-migrated state.
+**Rationale:** Makes re-runs safe. An operator can re-invoke after a partial failure without fear of duplicate transactions. Empty batch ops → `OutputBuilder.Build()` returns empty output. Full validation on no-op prevents silent acceptance of a bad config that happens to hit an already-migrated state, while skipping the unused supply parity check avoids false failures when re-running after completion.
 
 ### 10. Address encoding: 32-byte left-padded
 
@@ -529,11 +529,22 @@ func MigrateTokenPool(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSe
      - `timelockRef, err := mcmsReader.GetTimelockRef(e, chainSelector, cfg.MCMS)` — on error or empty `timelockRef.Address`: fail with `"missing timelock for chain %d with qualifier %s"`. Note: the EVM implementation (`mcmsreader.go:49-58`) always returns `nil` error; when the ref is not found it returns an empty `AddressRef`. Check `timelockRef.Address == ""` rather than relying on error.
      - `mcmsRef, err := mcmsReader.GetMCMSRef(e, chainSelector, cfg.MCMS)` — same pattern: check for empty `mcmsRef.Address`. Fail with `"missing MCMS for chain %d with qualifier %s"`.
 
-3. **Executor ownership verification:**
+3. **Pool identity verification:**
+   - Read `typeAndVersion()` for `cfg.OldRemotePoolAddress` on the remote chain — require that it belongs to the supported `1.5.1` old-pool allowlist for this migration
+   - Read `typeAndVersion()` for `cfg.NewRemotePoolAddress` on the remote chain — require that it matches the expected new pool type/version for the rollout
+   - Read `getToken()` on both `oldPool` and `newPool` — require equality to `cfg.RemoteTokenAddress`
+
+4. **Executor ownership verification:**
    - Read hub pool owner (bind and call `Owner()`) — verify `hubPoolOwner == common.HexToAddress(hubTimelockRef.Address)`; fail with `"hub pool %s owner %s does not match timelock %s on chain %d"`
    - Read remote TAR config via `ExecuteOperation(GetTokenConfig, remoteChain, {TARAddr, tokenAddr})` — verify `tarConfig.Administrator == common.HexToAddress(remoteTimelockRef.Address)`; fail with `"TAR administrator %s for token %s does not match timelock %s on chain %d"`
 
-4. **Datastore cross-check (opportunistic):**
+5. **RemoteChainSupply verification:**
+   - Read current hub group via `ExecuteOperation(GetGroup, hubChain, ...)`
+   - If `currentGroup != cfg.TargetGroup`, bind `cfg.RemoteTokenAddress` as ERC20 on the remote chain and require `totalSupply() == cfg.RemoteChainSupply`
+   - If `currentGroup != cfg.TargetGroup && cfg.TargetGroup == 1`, read hub `getLockedTokens()` and require `cfg.RemoteChainSupply <= lockedTokens`
+   - If `currentGroup == cfg.TargetGroup`, skip the exact supply parity check because `updateGroups()` will not consume the value on this run
+
+6. **Datastore cross-check (opportunistic):**
    - If env.DataStore has refs matching any contract input address, verify they agree
    - If a ref exists but address differs from input, fail
    - Missing datastore refs for contract inputs are acceptable (pools are externally deployed)
@@ -600,9 +611,16 @@ func makeApplyMigrateTokenPool(mcmsRegistry *changesets.MCMSReaderRegistry) ... 
 | Missing hub MCMS ref | `GetMCMSRef` returns empty ref (`Address == ""`) | Error: `"missing MCMS for chain %d"` |
 | Missing remote timelock ref | `GetTimelockRef` returns empty ref (`Address == ""`) | Error: `"missing timelock for chain %d"` |
 | Missing remote MCMS ref | `GetMCMSRef` returns empty ref (`Address == ""`) | Error: `"missing MCMS for chain %d"` |
+| Unsupported old pool type | `oldPool.typeAndVersion()` not in allowlist | Error |
+| Unexpected new pool type | `newPool.typeAndVersion()` wrong | Error |
+| Old pool token mismatch | `oldPool.getToken() != RemoteTokenAddress` | Error |
+| New pool token mismatch | `newPool.getToken() != RemoteTokenAddress` | Error |
 | Hub pool not owned by timelock | Pool owner != timelock | Error: `"owner %s does not match timelock %s"` |
 | TAR not administered by timelock | TAR admin != timelock | Error: `"administrator %s does not match timelock %s"` |
+| Supply mismatch on real migration | `currentGroup != TargetGroup` and `RemoteChainSupply != remoteToken.totalSupply()` | Error |
+| Locked-token bound exceeded | `currentGroup != TargetGroup`, `TargetGroup == 1`, `RemoteChainSupply > hub.getLockedTokens()` | Error |
 | Datastore contradiction | Ref exists with different address | Error |
+| Full no-op with stale supply | Group already at target, `RemoteChainSupply` no longer matches current `totalSupply()` | Pass |
 | Full no-op still validates MCMS | All state migrated, bad MCMS input | Error (MCMS validation runs regardless) |
 
 **Apply-level tests — proposal-only behavior:**
@@ -645,7 +663,7 @@ func makeApplyMigrateTokenPool(mcmsRegistry *changesets.MCMSReaderRegistry) ... 
 - Set up TAR with old pool
 - Execute changeset → verify proposal contents
 - Execute proposal on simulated chains
-- Verify: `getRemotePools()` returns only new pool, `getGroup()` returns target, TAR `getTokenConfig()` returns new pool
+- Verify: `getRemotePools()` returns only new pool, `getGroup()` returns target, TAR `getTokenConfig()` returns new pool, and hub `getLockedTokens()` changes by the expected amount for the chosen target group
 
 ---
 
@@ -675,20 +693,23 @@ tx1 before tx2 ensures no routing gap. tx3 migrates accounting. tx4 is safe beca
 | `contract.NewWrite` framework | same file, line 66 |
 | TAR GetTokenConfig / SetPool ops | `chains/evm/deployment/v1_5_0/operations/token_admin_registry/token_admin_registry.go` |
 | Existing HybridWithExternalMinterTokenPool Deploy op | `chains/evm/deployment/v1_6_0/operations/hybrid_with_external_minter_token_pool/hybrid_with_external_minter_token_pool.go` |
+| `TypeAndVersion` helper | `chains/evm/deployment/utils/common.go` |
 | Address encoding proof (LeftPadBytes 32) | `chains/evm/deployment/v1_6_1/sequences/configure_token_pool_for_remote_chain.go:126` |
 | Read-before-write pattern | same file, lines 82-133 |
 | `MCMSReaderRegistry.GetMCMSReader` | `deployment/utils/changesets/output.go:70` |
 | EVM `MCMSReader` implementation (`GetTimelockRef`, `GetMCMSRef`) | `chains/evm/deployment/v1_0_0/adapters/mcmsreader.go` |
 | Changeset pattern (CreateChangeSet) | `chains/evm/deployment/v1_6_0/changesets/token_governor.go` |
 | OutputBuilder | `deployment/utils/changesets/output.go` |
+| Hybrid pool `updateGroups` / `getLockedTokens` semantics | `ccip-contract-examples/.../contracts/stablecoin-governor/HybridTokenPoolAbstract.sol` |
+| Rate limiter zero-capacity semantics | `chains/evm/contracts/libraries/RateLimiter.sol` |
 | Existing migration changeset for reference | `deployment/tokens/migrate_lock_release_pool_liquidity.go` |
 
 ---
 
 ## Verification
 
-1. `go build ./chains/evm/deployment/...` — compiles
-2. `go test ./chains/evm/deployment/v1_6_0/changesets/ -run TestMigrateTokenPool -v`
-3. `go test ./chains/evm/deployment/v1_6_0/operations/... -run TestUpdateGroups -v`
+1. From `chains/evm/deployment`: `go build ./...` — compiles
+2. From `chains/evm/deployment`: `go test ./v1_6_0/changesets -run TestMigrateTokenPool -v`
+3. From `chains/evm/deployment`: `go test ./v1_6_0/operations/... -run TestUpdateGroups -v`
 4. Inspect generated MCMS proposal: correct tx count per state, 2 chain batches, correct calldata
 5. Verify no `ExecInfo` populated on any write output (confirms proposal-only, no direct execution)
