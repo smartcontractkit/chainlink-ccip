@@ -48,22 +48,26 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]evm_contract.WriteOutput, 0)
 
-		// Deploy burn mint token.
-		deployTokenReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.Deploy, chain, evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			ChainSelector:  input.DeployTokenPoolInput.ChainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
-			Args: burn_mint_erc20_with_drip.ConstructorArgs{
-				Name:   input.DeployTokenPoolInput.TokenSymbol,
-				Symbol: input.DeployTokenPoolInput.TokenSymbol,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token to %s: %w", chain, err)
-		}
-		deployTokenReport.Output.Qualifier = input.DeployTokenPoolInput.TokenSymbol // Use the token symbol as the qualifier.
-		addresses = append(addresses, deployTokenReport.Output)
+		reuseExistingToken := input.DeployTokenPoolInput.ConstructorArgs.Token != (common.Address{})
+		tokenAddress := input.DeployTokenPoolInput.ConstructorArgs.Token
 
-		tokenAddress := common.HexToAddress(deployTokenReport.Output.Address)
+		if !reuseExistingToken {
+			deployTokenReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.Deploy, chain, evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+				ChainSelector:  input.DeployTokenPoolInput.ChainSel,
+				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
+				Args: burn_mint_erc20_with_drip.ConstructorArgs{
+					Name:   input.DeployTokenPoolInput.TokenSymbol,
+					Symbol: input.DeployTokenPoolInput.TokenSymbol,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token to %s: %w", chain, err)
+			}
+			deployTokenReport.Output.Qualifier = input.DeployTokenPoolInput.TokenSymbol
+			addresses = append(addresses, deployTokenReport.Output)
+			tokenAddress = common.HexToAddress(deployTokenReport.Output.Address)
+		}
+
 		// When RegistryAddress is set and RateLimitAdmin is not provided, import from the active pool if it is < 2.0.0.
 		if input.RegistryAddress != (common.Address{}) && input.DeployTokenPoolInput.RateLimitAdmin == (common.Address{}) {
 			rla, err := getRateLimitAdminFromActivePool(b, chain, input.ChainSelector(), input.RegistryAddress, tokenAddress)
@@ -75,7 +79,6 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 			}
 		}
 
-		// Deploy token pool.
 		input.DeployTokenPoolInput.ConstructorArgs.Token = tokenAddress
 		poolType := deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType)
 		poolVersion := input.DeployTokenPoolInput.TokenPoolVersion
@@ -115,7 +118,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		// Grant mint and burn roles to the token pool.
 		grantRolesReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
+			Address:       tokenAddress,
 			Args:          tokenPoolAddress,
 		})
 		if err != nil {
@@ -126,7 +129,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		// Grant roles to the deployer key so we can mint initial supply.
 		grantMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
+			Address:       tokenAddress,
 			Args:          chain.DeployerKey.From,
 		})
 		if err != nil {
@@ -138,7 +141,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		for account, amount := range input.Accounts {
 			mintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.Mint, chain, evm_contract.FunctionInput[burn_mint_erc20_with_drip.MintArgs]{
 				ChainSelector: input.DeployTokenPoolInput.ChainSel,
-				Address:       common.HexToAddress(deployTokenReport.Output.Address),
+				Address:       tokenAddress,
 				Args: burn_mint_erc20_with_drip.MintArgs{
 					Account: account,
 					Amount:  amount,
@@ -153,7 +156,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		// Revoke mint role from the deployer key for safety.
 		revokeMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.RevokeMintRole, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
+			Address:       tokenAddress,
 			Args:          chain.DeployerKey.From,
 		})
 		if err != nil {
@@ -164,7 +167,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		// Revoke burn role from the deployer key for safety.
 		revokeBurnReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.RevokeBurnRole, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
+			Address:       tokenAddress,
 			Args:          chain.DeployerKey.From,
 		})
 		if err != nil {
