@@ -21,8 +21,8 @@ type TPRLInput struct {
 }
 
 type RemoteOutbounds struct {
-	DefaultFinality RateLimiterConfigFloatInput
-	CustomFinality  RateLimiterConfigFloatInput
+	DefaultFinality RateLimiterConfigFloatInput `yaml:"defaultFinality" json:"defaultFinality"`
+	CustomFinality  RateLimiterConfigFloatInput `yaml:"customFinality" json:"customFinality"`
 }
 
 type TPRLConfig struct {
