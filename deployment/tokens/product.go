@@ -103,44 +103,44 @@ type TokenTransferFeeConfig struct {
 // float inputs for capacity and rate, which are then converted to big.Int internally after scaling by token decimals.
 type RateLimiterConfigFloatInput struct {
 	// IsEnabled specifies whether the rate limiter should be enabled.
-	IsEnabled bool
+	IsEnabled bool `yaml:"isEnabled" json:"isEnabled"`
 	// Capacity is the maximum number of tokens that can be in a rate limiter bucket.
-	Capacity float64
+	Capacity float64 `yaml:"capacity" json:"capacity"`
 	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
-	Rate float64
+	Rate float64 `yaml:"rate" json:"rate"`
 }
 
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
 	// If not provided, the token will be derived from the pool reference.
-	RemoteToken R
+	RemoteToken R `yaml:"remoteToken" json:"remoteToken"`
 	// The token pool on the remote chain.
-	RemotePool R
+	RemotePool R `yaml:"remotePool" json:"remotePool"`
 	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
 	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
 	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
-	DefaultFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
+	DefaultFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"defaultFinalityInboundRateLimiterConfig" json:"defaultFinalityInboundRateLimiterConfig"`
 	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
-	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"defaultFinalityOutboundRateLimiterConfig" json:"defaultFinalityOutboundRateLimiterConfig"`
 	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
 	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
 	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
-	CustomFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
+	CustomFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"customFinalityInboundRateLimiterConfig" json:"customFinalityInboundRateLimiterConfig"`
 	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
-	CustomFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
+	CustomFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"customFinalityOutboundRateLimiterConfig" json:"customFinalityOutboundRateLimiterConfig"`
 	// Decimals of the token on the remote chain.
-	RemoteDecimals uint8
+	RemoteDecimals uint8 `yaml:"remoteDecimals,string" json:"remoteDecimals,string"`
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
-	OutboundCCVs []CCV
+	OutboundCCVs []CCV `yaml:"outboundCCVs" json:"outboundCCVs"`
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
-	InboundCCVs []CCV
+	InboundCCVs []CCV `yaml:"inboundCCVs" json:"inboundCCVs"`
 	// OutboundCCVsToAddAboveThreshold specifies the verifiers to apply to outbound traffic above the threshold.
-	OutboundCCVsToAddAboveThreshold []CCV
+	OutboundCCVsToAddAboveThreshold []CCV `yaml:"outboundCCVsToAddAboveThreshold" json:"outboundCCVsToAddAboveThreshold"`
 	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
-	InboundCCVsToAddAboveThreshold []CCV
+	InboundCCVsToAddAboveThreshold []CCV `yaml:"inboundCCVsToAddAboveThreshold" json:"inboundCCVsToAddAboveThreshold"`
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
-	TokenTransferFeeConfig TokenTransferFeeConfig
+	TokenTransferFeeConfig TokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
