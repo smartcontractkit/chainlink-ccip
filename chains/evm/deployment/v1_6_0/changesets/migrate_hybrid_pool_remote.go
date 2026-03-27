@@ -315,6 +315,20 @@ func makeVerifyMigrateHybridPoolRemote(
 				cfg.RemoteChainSelector,
 			)
 		}
+		tarPool := tarConfigReport.Output.TokenPool
+		if tarPool == (common.Address{}) {
+			return fmt.Errorf("TAR has no pool set for token %s on chain %d", remoteTokenAddress, cfg.RemoteChainSelector)
+		}
+		if tarPool != oldRemotePoolAddress && tarPool != newRemotePoolAddress {
+			return fmt.Errorf(
+				"TAR pool %s for token %s on chain %d is neither old pool %s nor new pool %s",
+				tarPool,
+				remoteTokenAddress,
+				cfg.RemoteChainSelector,
+				oldRemotePoolAddress,
+				newRemotePoolAddress,
+			)
+		}
 
 		remoteToken, err := burn_mint_erc20.NewBurnMintERC20(remoteTokenAddress, remoteChain.Client)
 		if err != nil {

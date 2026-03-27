@@ -63,6 +63,10 @@ var MigrateHybridPoolRemote = cldf_ops.NewSequence(
 	semver.MustParse("1.6.0"),
 	"Migrates a remote chain token pool from lock-release to burn-mint on a hybrid hub pool",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input MigrateHybridPoolRemoteInput) (sequences.OnChainOutput, error) {
+		if input.RemoteChainSupply == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("RemoteChainSupply must not be nil")
+		}
+
 		hubChain, ok := chains.EVMChains()[input.HubChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("hub chain with selector %d not defined", input.HubChainSelector)
