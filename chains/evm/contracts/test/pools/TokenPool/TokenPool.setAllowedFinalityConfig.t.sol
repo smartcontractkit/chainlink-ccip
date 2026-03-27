@@ -7,20 +7,20 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract TokenPool_setFinalityConfig is AdvancedPoolHooksSetup {
-  function test_setFinalityConfig() public {
+contract TokenPool_setAllowedFinalityConfig is AdvancedPoolHooksSetup {
+  function test_setAllowedFinalityConfig() public {
     bytes4 newMinFinality = FinalityCodec._encodeBlockDepth(42);
     vm.expectEmit();
     emit TokenPool.FinalityConfigSet(newMinFinality);
-    s_tokenPool.setFinalityConfig(newMinFinality);
-    assertEq(s_tokenPool.getFinalityConfig(), newMinFinality);
+    s_tokenPool.setAllowedFinalityConfig(newMinFinality);
+    assertEq(s_tokenPool.getAllowedFinalityConfig(), newMinFinality);
   }
 
   // Reverts
-  function test_setFinalityConfig_RevertWhen_OnlyCallableByOwner() public {
+  function test_setAllowedFinalityConfig_RevertWhen_OnlyCallableByOwner() public {
     bytes4 newMinFinality = FinalityCodec._encodeBlockDepth(42);
     changePrank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.setFinalityConfig(newMinFinality);
+    s_tokenPool.setAllowedFinalityConfig(newMinFinality);
   }
 }

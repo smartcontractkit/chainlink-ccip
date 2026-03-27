@@ -14,7 +14,7 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
     uint16 finalityTransferFeeBps = 100;
     uint16 fastFinalityTransferFeeBps = 500;
     uint256 amount = 1_000e18;
-    s_tokenPool.setFinalityConfig(minFinality);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,

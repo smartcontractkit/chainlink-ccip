@@ -76,7 +76,7 @@ contract e2e_lombard is OnRampSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_sourceCommitteeVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
 
@@ -140,7 +140,7 @@ contract e2e_lombard is OnRampSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_destLombardVerifier.applyRemoteChainConfigUpdates(lombardSourceConfig);
 

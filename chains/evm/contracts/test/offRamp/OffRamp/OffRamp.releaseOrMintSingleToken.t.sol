@@ -63,7 +63,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     bytes4 finality = FinalityCodec._encodeBlockDepth(2);
 
     // Allow depth-2 FTF on the pool so the inbound finality check inside releaseOrMint passes.
-    s_pool.setFinalityConfig(finality);
+    s_pool.setAllowedFinalityConfig(finality);
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV2.releaseOrMint, (expectedInput, finality)));
 

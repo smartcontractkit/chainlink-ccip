@@ -133,7 +133,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev The address of the router.
   IRouter internal s_router;
   /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`). FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
-  bytes4 internal s_finalityConfig;
+  bytes4 internal s_allowedFinalityConfig;
   /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal s_advancedPoolHooks;
   /// @dev Separate buckets provide isolated rate limits for fast finality transfers, as their risk
@@ -218,8 +218,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice Gets the finality config as defined in the FinalityCodec library. This value does NOT 1:1 translate to
   /// a block depth. The finality config contains special flags and should only be encoded/decoded using the
   /// FinalityCodec library. Checks must happen by calling `FinalityCodec._ensureRequestedFinalityAllowed`.
-  function getFinalityConfig() public view virtual returns (bytes4 allowedFinality) {
-    return s_finalityConfig;
+  function getAllowedFinalityConfig() public view virtual returns (bytes4 allowedFinality) {
+    return s_allowedFinalityConfig;
   }
 
   /// @notice Gets the advanced pool hook contract address used by this pool.
@@ -248,12 +248,12 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @notice Sets the finality config according to the FinalityCodec library encoding.
   /// @param allowedFinality The finality settings allowed in this pool, according to the FinalityCodec encoding.
-  function setFinalityConfig(
+  function setAllowedFinalityConfig(
     bytes4 allowedFinality
   ) public virtual onlyOwner {
     // Any bytes4 value is accepted as allowedFinality; the FinalityCodec semantics are enforced when requests are
     // checked against this value via FinalityCodec._ensureRequestedFinalityAllowed.
-    s_finalityConfig = allowedFinality;
+    s_allowedFinalityConfig = allowedFinality;
 
     emit FinalityConfigSet(allowedFinality);
   }
@@ -429,7 +429,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (requestedFinality != WAIT_FOR_FINALITY) {
       // Use the codec to validate that the requested finality is allowed by the pool's configuration. This will revert
       // if the requested finality is not allowed.
-      FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, s_finalityConfig);
+      FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, s_allowedFinalityConfig);
       _consumeFastFinalityOutboundRateLimit(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount);
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount);
@@ -487,7 +487,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       // Validate that the finality carried in the inbound message is permitted by this pool's config. This mirrors
       // the outbound check in _validateLockOrBurn and ensures the FTF inbound rate-limit bucket is only consumed for
       // modes the pool has explicitly enabled, even if a future OffRamp skips this check.
-      FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_finalityConfig);
+      FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_allowedFinalityConfig);
       _consumeFastFinalityInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     } else {
       _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
@@ -1069,8 +1069,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     virtual
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    // Validate that the requested finality is well-formed and permitted by this pool's config.
-    FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_finalityConfig);
+    FinalityCodec._ensureRequestedFinalityAllowed(finalityConfig, s_allowedFinalityConfig);
 
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
 

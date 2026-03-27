@@ -32,8 +32,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
   uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
 
-  uint16 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = 0;
-  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
+  bytes4 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+  bytes4 internal constant CCIP_FAST_FINALITY_THRESHOLD = bytes4(uint32(1));
 
   uint32 internal constant REMOTE_DOMAIN_IDENTIFIER = 9999;
   uint32 internal constant LOCAL_DOMAIN_IDENTIFIER = 8888;
@@ -73,7 +73,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
@@ -115,7 +115,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   function _createCCIPMessage(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint32 finality,
+    bytes4 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver
@@ -136,7 +136,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
-      finality: bytes4(uint32(finality)),
+      finality: finality,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),

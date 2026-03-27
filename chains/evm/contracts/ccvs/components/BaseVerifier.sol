@@ -32,12 +32,12 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
-    IRouter router; // ──────────╮ Local router to use for messages to/from this chain.
-    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
-    uint32 gasForVerification; //│ The gas to reserve for verification of messages on the remote chain.
-    uint16 payloadSizeBytes; //  │ The size of the verification payload on the remote chain.
-    bytes4 finalityConfig; //    │ The finality configuration for the local chain for messages to the remote chain.
-    bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
+    IRouter router; // ─────────────╮ Local router to use for messages to/from this chain.
+    uint16 feeUSDCents; //          │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
+    uint32 gasForVerification; //   │ The gas to reserve for verification of messages on the remote chain.
+    uint16 payloadSizeBytes; //     │ The size of the verification payload on the remote chain.
+    bytes4 allowedFinalityConfig; //│ The finality configuration for the local chain for messages to the remote chain.
+    bool allowlistEnabled; // ──────╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
@@ -46,9 +46,9 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 remoteChainSelector; // │ Remote chain selector.
     bool allowlistEnabled; //      │ True if the allowlist is enabled.
     uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this remote chain.
-    uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the remote chain.
-    uint16 payloadSizeBytes; //    │ The size of the verification payload on the remote chain.
-    bytes4 finalityConfig; // ─────╯ The finality configuration for the local chain for messages to the remote chain.
+    uint32 gasForVerification; // ────╮ The gas to reserve for verification of messages on the remote chain.
+    uint16 payloadSizeBytes; //       │ The size of the verification payload on the remote chain.
+    bytes4 allowedFinalityConfig; // ─╯ The finality configuration for the local chain for messages to the remote chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -131,7 +131,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
         feeUSDCents: config.feeUSDCents,
         gasForVerification: config.gasForVerification,
         payloadSizeBytes: config.payloadSizeBytes,
-        finalityConfig: config.finalityConfig
+        allowedFinalityConfig: config.allowedFinalityConfig
       }),
       config.allowedSendersList.values()
     );
@@ -168,7 +168,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       remoteChainConfig.gasForVerification = remoteChainConfigArg.gasForVerification;
       // The payload could be zero bytes if no offchain data is required.
       remoteChainConfig.payloadSizeBytes = remoteChainConfigArg.payloadSizeBytes;
-      remoteChainConfig.finalityConfig = remoteChainConfigArg.finalityConfig;
+      remoteChainConfig.allowedFinalityConfig = remoteChainConfigArg.allowedFinalityConfig;
 
       emit RemoteChainConfigSet(
         remoteChainSelector, address(remoteChainConfigArg.router), remoteChainConfig.allowlistEnabled
@@ -265,7 +265,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     if (config.router == IRouter(address(0))) {
       revert RemoteChainNotSupported(destChainSelector);
     }
-    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, config.finalityConfig);
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, config.allowedFinalityConfig);
 
     return (config.feeUSDCents, config.gasForVerification, config.payloadSizeBytes);
   }

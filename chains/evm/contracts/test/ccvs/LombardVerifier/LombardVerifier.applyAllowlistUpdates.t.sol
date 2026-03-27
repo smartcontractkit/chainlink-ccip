@@ -23,7 +23,7 @@ contract LombardVerifier_applyAllowlistUpdates is LombardVerifierSetup {
       feeUSDCents: 100,
       gasForVerification: 50_000,
       payloadSizeBytes: 100,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }

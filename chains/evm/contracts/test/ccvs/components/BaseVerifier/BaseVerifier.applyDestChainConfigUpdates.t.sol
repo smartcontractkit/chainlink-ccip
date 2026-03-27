@@ -47,7 +47,7 @@ contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: 0, // Zero gas should revert.
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestGasCannotBeZero.selector, remoteChainSelector));

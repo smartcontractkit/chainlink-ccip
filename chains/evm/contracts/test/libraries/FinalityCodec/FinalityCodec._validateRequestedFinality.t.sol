@@ -16,13 +16,13 @@ contract FinalityCodec__validateRequestedFinality is FinalityCodecSetup {
   function test__validateRequestedFinality_PureBlockDepth_Boundaries() public view {
     s_helper.validateRequestedFinality(FinalityCodec._encodeBlockDepth(1));
     s_helper.validateRequestedFinality(FinalityCodec._encodeBlockDepth(10));
-    s_helper.validateRequestedFinality(bytes4(uint32(FinalityCodec.MAX_BLOCK_DEPTH)));
+    s_helper.validateRequestedFinality(FinalityCodec._encodeBlockDepth(FinalityCodec.MAX_BLOCK_DEPTH));
   }
 
   // Reverts
 
   function test__validateRequestedFinality_RevertWhen_InvalidRequestedFinality_FlagWithNonZeroDepth() public {
-    bytes4 invalid = bytes4(uint32(uint32(FinalityCodec.WAIT_FOR_SAFE_FLAG) | 1));
+    bytes4 invalid = FinalityCodec.WAIT_FOR_SAFE_FLAG | FinalityCodec._encodeBlockDepth(1);
     vm.expectRevert(abi.encodeWithSelector(FinalityCodec.RequestedFinalityCanOnlyHaveOneMode.selector, invalid));
     s_helper.validateRequestedFinality(invalid);
   }

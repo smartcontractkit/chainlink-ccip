@@ -46,7 +46,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
 
     s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
@@ -66,7 +66,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      finalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
     });
   }
 
@@ -110,7 +110,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   function _createMessageV1WithTokenTransfer(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint32 finality,
+    bytes4 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver
@@ -131,7 +131,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
-      finality: bytes4(uint32(finality)),
+      finality: finality,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),

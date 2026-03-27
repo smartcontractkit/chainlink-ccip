@@ -15,7 +15,7 @@ contract TokenPool_constructor is TokenPoolSetup {
     assertEq(address(s_mockRMNRemote), s_tokenPool.getRmnProxy());
     (address router, address rateLimitAdmin, address feeAggregator) = s_tokenPool.getDynamicConfig();
     assertEq(address(s_sourceRouter), router);
-    assertEq(FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_tokenPool.getFinalityConfig());
+    assertEq(FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_tokenPool.getAllowedFinalityConfig());
     assertEq(address(0), rateLimitAdmin);
     assertEq(address(0), feeAggregator);
     assertEq(DEFAULT_TOKEN_DECIMALS, s_tokenPool.getTokenDecimals());

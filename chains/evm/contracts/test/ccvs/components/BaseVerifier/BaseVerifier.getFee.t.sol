@@ -21,7 +21,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     // Configure chain to allow the WAIT_FOR_SAFE flag.
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    configs[0].finalityConfig = FinalityCodec.WAIT_FOR_SAFE_FLAG;
+    configs[0].allowedFinalityConfig = FinalityCodec.WAIT_FOR_SAFE_FLAG;
     s_baseVerifier.applyRemoteChainConfigUpdates(configs);
 
     Client.EVM2AnyMessage memory message;
@@ -33,7 +33,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     // Configure chain to allow up to block depth 10.
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    configs[0].finalityConfig = FinalityCodec._encodeBlockDepth(10);
+    configs[0].allowedFinalityConfig = FinalityCodec._encodeBlockDepth(10);
     s_baseVerifier.applyRemoteChainConfigUpdates(configs);
 
     Client.EVM2AnyMessage memory message;
@@ -47,7 +47,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     // Configure chain to require at least block depth 10.
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    configs[0].finalityConfig = FinalityCodec._encodeBlockDepth(10);
+    configs[0].allowedFinalityConfig = FinalityCodec._encodeBlockDepth(10);
     s_baseVerifier.applyRemoteChainConfigUpdates(configs);
 
     Client.EVM2AnyMessage memory message;

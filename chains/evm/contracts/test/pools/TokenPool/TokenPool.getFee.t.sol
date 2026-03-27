@@ -50,7 +50,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     vm.startPrank(OWNER);
     // Enable fast finalitys by setting minFinality > 0.
-    s_tokenPool.setFinalityConfig(minFinality);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_500e6;
@@ -94,7 +94,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     bytes4 minFinality = FinalityCodec._encodeBlockDepth(10);
 
     // Set fast finality config with minimum of 10 blocks
-    s_tokenPool.setFinalityConfig(minFinality);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
 
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
@@ -152,7 +152,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
 
     vm.startPrank(OWNER);
-    s_tokenPool.setFinalityConfig(minFinality);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
 
     // First enable a config
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
@@ -174,7 +174,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     uint256 amount = 1_500e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), bytes4(uint32(minFinality)), "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minFinality, "");
 
     // Should return all zeros with isEnabled=false when disabled, even for custom finality
     assertEq(usdFeeCents, 0, "Fee should be zero");

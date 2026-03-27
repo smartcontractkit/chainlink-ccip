@@ -30,7 +30,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
   /// the fallback consumes from the default inbound bucket.
   function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
     // Allow depth-2 FTF on this pool so the inbound finality check passes.
-    s_tokenPool.setFinalityConfig(FinalityCodec._encodeBlockDepth(2));
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(2));
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
@@ -46,7 +46,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
   /// @notice When a custom inbound bucket IS configured, the custom event is emitted instead.
   function test_validateReleaseOrMint_NonZeroFinality_UsesCustomBucketWhenConfigured() public {
     // Allow depth-2 FTF on this pool so the inbound finality check passes.
-    s_tokenPool.setFinalityConfig(FinalityCodec._encodeBlockDepth(2));
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(2));
 
     RateLimiter.Config memory customInbound = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);

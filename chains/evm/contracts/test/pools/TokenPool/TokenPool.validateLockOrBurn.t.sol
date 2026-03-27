@@ -43,7 +43,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
-    s_tokenPool.setFinalityConfig(minFinality);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
@@ -73,7 +73,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
     // Enable fast finality handling so consumption emits.
-    s_tokenPool.setFinalityConfig(FinalityCodec._encodeBlockDepth(1));
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(1));
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -145,7 +145,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   /// the fallback consumes from the default outbound bucket.
   function test_validateLockOrBurn_WithFastFinality_FallsBackToDefaultBucket() public {
     bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(1);
-    s_tokenPool.setFinalityConfig(requestedFinality);
+    s_tokenPool.setAllowedFinalityConfig(requestedFinality);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -159,10 +159,10 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
 
   function test_validateLockOrBurn_RevertWhen_RequestedDepthBelowMinimum() public {
     bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
-    s_tokenPool.setFinalityConfig(minFinality);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
     vm.startPrank(s_allowedOnRamp);
 
-    bytes4 requestedFinality = bytes4(uint32(uint32(minFinality) - 1));
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(uint16(uint32(minFinality) - 1));
     vm.expectRevert(
       abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, minFinality)
     );
@@ -171,7 +171,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
 
   function test_validateLockOrBurn_RevertWhen_FtfNotAllowedByPool() public {
     vm.startPrank(OWNER);
-    s_tokenPool.setFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     vm.startPrank(s_allowedOnRamp);
 
