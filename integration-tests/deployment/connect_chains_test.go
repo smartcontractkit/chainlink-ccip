@@ -842,12 +842,12 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	chain1Family, err := chain_selectors.GetSelectorFamily(chain1.Selector)
 
 	chain1Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain1Family, version)
-	require.Equal(t, exists, true, "adapter should exist for chain1")
+	require.True(t, exists, "adapter should exist for chain1")
 
 	chain2Family, err := chain_selectors.GetSelectorFamily(chain2.Selector)
 
 	chain2Adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(chain2Family, version)
-	require.Equal(t, exists, true, "adapter should exist for chain2")
+	require.True(t, exists, "adapter should exist for chain2")
 
 	// Verify the version of the FQ version has been downgraded
 	fqAddressChain1 := common.Address{}
