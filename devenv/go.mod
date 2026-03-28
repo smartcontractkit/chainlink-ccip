@@ -10,13 +10,19 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ../chains/solana/gobindings
-	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
+// github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment // TODO uncomment
 
 // local development
 // github.com/smartcontractkit/chainlink-ton => ../../../.
 // github.com/smartcontractkit/chainlink-ton/deployment => ../../../deployment
 // github.com/smartcontractkit/chainlink-ton/devenv => ../../../devenv
 // github.com/smartcontractkit/chainlink-testing-framework/framework => ../../chainlink-testing-framework/framework
+)
+
+require (
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260325195645-a44d381f3a0f
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20260325195645-a44d381f3a0f
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260325195645-a44d381f3a0f
 )
 
 require (
@@ -38,11 +44,8 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260116092715-df6a64d4bf00
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3 // indirect
