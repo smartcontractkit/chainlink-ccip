@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import {BaseERC20} from "./BaseERC20.sol";
+
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
+import {
+  AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts@5.3.0/access/extensions/AccessControlDefaultAdminRules.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+
+/// @notice A basic ERC20 compatible token contract with burn and minting roles.
+/// @dev The total supply can be limited during deployment.
+/// @dev This contract inherits its access control from AccessControlDefaultAdminRules, meaning it relies on OZ
+/// AccessControl with 2-step ownership transfers. There's also a separate `ccipAdmin` role which can be used to
+/// register with the CCIP token admin registry but has no other special powers, and can only be transferred by the
+/// DEFAULT_ADMIN_ROLE. The DEFAULT_ADMIN_ROLE holder can also be used to register the token in the token admin registry.
+contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMintERC20 {
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "CrossChainToken 2.0.0";
+  }
+
+  /// @notice The holder of this role can mint tokens.
+  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  /// @notice The holder of this role can burn tokens.
+  bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+  /// @notice The holder of this role can grant/revoke both the MINTER_ROLE and the BURNER_ROLE.
+  bytes32 public constant BURN_MINT_ADMIN_ROLE = keccak256("BURN_MINT_ADMIN_ROLE");
+
+  /// @param args The parameters for the ERC20 token, including name, symbol, decimals, max supply, and pre-mint amount.
+  /// @param burnMintRoleAdmin The address to grant the BURN_MINT_ADMIN_ROLE. If set to address(0), no address will be
+  /// granted the role.
+  /// @param owner The address to set as the owner of the contract, which has the default admin role. If set to
+  /// address(0), the deployer will be set as the owner.
+  constructor(
+    ConstructorParams memory args,
+    address burnMintRoleAdmin,
+    address owner
+  ) BaseERC20(args) AccessControlDefaultAdminRules(0, owner == address(0) ? msg.sender : owner) {
+    if (burnMintRoleAdmin != address(0)) {
+      _grantRole(BURN_MINT_ADMIN_ROLE, burnMintRoleAdmin);
+    }
+
+    _setRoleAdmin(MINTER_ROLE, BURN_MINT_ADMIN_ROLE);
+    _setRoleAdmin(BURNER_ROLE, BURN_MINT_ADMIN_ROLE);
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public view virtual override(AccessControlDefaultAdminRules, BaseERC20) returns (bool) {
+    return AccessControlDefaultAdminRules.supportsInterface(interfaceId) || BaseERC20.supportsInterface(interfaceId)
+      || interfaceId == type(IBurnMintERC20).interfaceId;
+  }
+
+  // ================================================================
+  // │                      Burning & minting                       │
+  // ================================================================
+
+  /// @inheritdoc IBurnMintERC20
+  /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
+  function burn(
+    uint256 amount
+  ) public virtual override onlyRole(BURNER_ROLE) {
+    _burn(_msgSender(), amount);
+  }
+
+  /// @inheritdoc IBurnMintERC20
+  /// @dev Alias for BurnFrom for compatibility with the older naming convention.
+  /// @dev Uses burnFrom for all validation & logic.
+  function burn(
+    address account,
+    uint256 amount
+  ) public virtual override {
+    burnFrom(account, amount);
+  }
+
+  /// @inheritdoc IBurnMintERC20
+  /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
+  function burnFrom(
+    address account,
+    uint256 amount
+  ) public virtual override onlyRole(BURNER_ROLE) {
+    _spendAllowance(account, _msgSender(), amount);
+    _burn(account, amount);
+  }
+
+  /// @inheritdoc IBurnMintERC20
+  /// @dev Uses OZ ERC20 _mint to disallow minting to address(0), and BaseERC20 to disallow minting to address(this).
+  /// @dev Uses BaseERC20's max supply logic.
+  function mint(
+    address account,
+    uint256 amount
+  ) public virtual override onlyRole(MINTER_ROLE) {
+    _mint(account, amount);
+  }
+
+  // ================================================================
+  // │                            Roles                             │
+  // ================================================================
+
+  /// @notice grants both mint and burn roles to `burnAndMinter`.
+  /// @param burnAndMinter The address to be granted both the MINTER_ROLE and BURNER_ROLE.
+  /// @dev calls public functions so this function does not require
+  /// access controls. This is handled in the inner functions.
+  function grantMintAndBurnRoles(
+    address burnAndMinter
+  ) public virtual {
+    grantRole(MINTER_ROLE, burnAndMinter);
+    grantRole(BURNER_ROLE, burnAndMinter);
+  }
+
+  /// @notice Sets the CCIP admin role to `newAdmin`.
+  /// @dev Overrides the default CCIP admin role setter to require the caller to have the DEFAULT_ADMIN_ROLE.
+  /// @param newAdmin The address of the new CCIP admin.
+  function setCCIPAdmin(
+    address newAdmin
+  ) external virtual override onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setCCIPAdmin(newAdmin);
+  }
+}

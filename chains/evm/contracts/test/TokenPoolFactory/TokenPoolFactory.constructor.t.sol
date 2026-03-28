@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
-import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
+import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
+import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
-import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
-
 contract TokenPoolFactory_constructor is TokenPoolFactorySetup {
-  using Create2 for bytes32;
-
   function test_constructor_getStaticConfig() public view {
     (address rmnProxy, address tokenAdminRegistry, address registryModuleOwnerCustom, address ccipRouter) =
       s_tokenPoolFactory.getStaticConfig();
@@ -28,10 +24,10 @@ contract TokenPoolFactory_constructor is TokenPoolFactorySetup {
     new TokenPoolFactory(ITokenAdminRegistry(address(0)), RegistryModuleOwnerCustom(address(0)), address(0), address(0));
 
     new TokenPoolFactory(
-      ITokenAdminRegistry(address(0xdeadbeef)),
-      RegistryModuleOwnerCustom(address(0xdeadbeef)),
-      address(0xdeadbeef),
-      address(0xdeadbeef)
+      ITokenAdminRegistry(makeAddr("TOKEN_ADMIN_REGISTRY")),
+      RegistryModuleOwnerCustom(makeAddr("REGISTRY_MODULE_OWNER_CUSTOM")),
+      makeAddr("RMN_PROXY"),
+      makeAddr("ROUTER")
     );
   }
 }
