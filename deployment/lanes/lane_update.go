@@ -7,9 +7,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
 type ChainDefinition struct {
@@ -162,6 +163,11 @@ type CommitteeVerifierRemoteChainConfig struct {
 	GasForVerification uint32
 	// The size of the CCV specific payload in bytes (used for billing).
 	PayloadSizeBytes uint16
+	// AllowedFinalityConfig encodes which finality modes (block depth, safe, finality) are permitted for messages
+	// sent to this remote chain. It is stored on-chain in BaseVerifier.RemoteChainConfig.allowedFinalityConfig and
+	// validated by FinalityCodec._ensureRequestedFinalityAllowed. A zero value (the default)
+	// permits only WAIT_FOR_FINALITY_FLAG (0x00000000), which rejects any block-depth or safe requests.
+	AllowedFinalityConfig [4]byte
 	// SignatureConfig specifies the signature configuration for the remote chain.
 	SignatureConfig CommitteeVerifierSignatureQuorumConfig
 }

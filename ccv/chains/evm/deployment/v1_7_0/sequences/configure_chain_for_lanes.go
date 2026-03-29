@@ -666,6 +666,7 @@ func filterCommitteeVerifierForRemote(cv lanes.CommitteeVerifierConfig[datastore
 			FeeUSDCents:               rc.FeeUSDCents,
 			GasForVerification:        rc.GasForVerification,
 			PayloadSizeBytes:          rc.PayloadSizeBytes,
+			AllowedFinalityConfig:     rc.AllowedFinalityConfig,
 			SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
 				Signers:   rc.SignatureConfig.Signers,
 				Threshold: rc.SignatureConfig.Threshold,

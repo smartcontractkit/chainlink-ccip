@@ -69,12 +69,13 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			desiredRemoteChainArg := committee_verifier.RemoteChainConfigArgs{
-				Router:              common.HexToAddress(input.Router),
-				RemoteChainSelector: remoteSelector,
-				AllowlistEnabled:    remoteConfig.AllowlistEnabled,
-				FeeUSDCents:         remoteConfig.FeeUSDCents,
-				GasForVerification:  remoteConfig.GasForVerification,
-				PayloadSizeBytes:    remoteConfig.PayloadSizeBytes,
+				Router:                common.HexToAddress(input.Router),
+				RemoteChainSelector:   remoteSelector,
+				AllowlistEnabled:      remoteConfig.AllowlistEnabled,
+				FeeUSDCents:           remoteConfig.FeeUSDCents,
+				GasForVerification:    remoteConfig.GasForVerification,
+				PayloadSizeBytes:      remoteConfig.PayloadSizeBytes,
+				AllowedFinalityConfig: remoteConfig.AllowedFinalityConfig,
 			}
 			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
@@ -87,7 +88,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			currRemote := currentRemoteReport.Output
 
 			if currRemote.RemoteChainConfig.Router != desiredRemoteChainArg.Router ||
-				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
+				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled ||
+				currRemote.RemoteChainConfig.AllowedFinalityConfig != desiredRemoteChainArg.AllowedFinalityConfig {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
 				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{

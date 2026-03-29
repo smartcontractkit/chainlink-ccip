@@ -64,10 +64,15 @@ type RemoteLombardChainConfig struct {
 	LombardChainId         uint32
 	// RemoteAdapter is the optional remote token identifier accepted by Lombard bridge.
 	// Accepts either an EVM address hex string or a 32-byte hex string. Leave empty to disable adapter override.
-	RemoteAdapter      string
-	FeeUSDCents        uint16
-	GasForVerification uint32
-	PayloadSizeBytes   uint16
+	RemoteAdapter string
+	FeeUSDCents   uint16
+	// AllowedFinalityConfig encodes which finality modes (block depth, safe, finality) are permitted for messages
+	// sent to this remote chain. It is stored on-chain in BaseVerifier.RemoteChainConfig.allowedFinalityConfig and
+	// validated by FinalityCodec._ensureRequestedFinalityAllowed. A zero value (the default)
+	// permits only WAIT_FOR_FINALITY_FLAG (0x00000000), which rejects any block-depth or safe requests.
+	AllowedFinalityConfig [4]byte
+	GasForVerification    uint32
+	PayloadSizeBytes      uint16
 }
 
 // ConfigureLombardChainForLanesDeps are the dependencies for the ConfigureLombardChainForLanes sequence.

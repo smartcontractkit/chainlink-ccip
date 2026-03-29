@@ -148,11 +148,12 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			})
 
 			remoteChainConfigArgs = append(remoteChainConfigArgs, lombard_verifier.RemoteChainConfigArgs{
-				Router:              routerAddress,
-				RemoteChainSelector: remoteChainSelector,
-				FeeUSDCents:         remoteChain.FeeUSDCents,
-				GasForVerification:  remoteChain.GasForVerification,
-				PayloadSizeBytes:    remoteChain.PayloadSizeBytes,
+				Router:                routerAddress,
+				RemoteChainSelector:   remoteChainSelector,
+				FeeUSDCents:           remoteChain.FeeUSDCents,
+				GasForVerification:    remoteChain.GasForVerification,
+				PayloadSizeBytes:      remoteChain.PayloadSizeBytes,
+				AllowedFinalityConfig: remoteChain.AllowedFinalityConfig,
 			})
 
 			advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
