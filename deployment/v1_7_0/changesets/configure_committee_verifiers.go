@@ -8,14 +8,15 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain/operations/fetch_signing_keys"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type CommitteeVerifierRemoteChainConfig struct {
@@ -25,6 +26,7 @@ type CommitteeVerifierRemoteChainConfig struct {
 	FeeUSDCents               uint16
 	GasForVerification        uint32
 	PayloadSizeBytes          uint16
+	AllowedFinalityConfig     [4]byte
 }
 
 type CommitteeVerifierInputConfig struct {
@@ -100,6 +102,7 @@ func ConfigureChainsForLanesFromTopology(
 						FeeUSDCents:               remoteChainConfig.FeeUSDCents,
 						GasForVerification:        remoteChainConfig.GasForVerification,
 						PayloadSizeBytes:          remoteChainConfig.PayloadSizeBytes,
+						AllowedFinalityConfig:     remoteChainConfig.AllowedFinalityConfig,
 						SignatureConfig:           *signatureConfig,
 					}
 				}
