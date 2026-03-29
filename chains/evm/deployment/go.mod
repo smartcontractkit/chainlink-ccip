@@ -16,8 +16,8 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260329160207-f6abb2a22bf9
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260329160207-f6abb2a22bf9
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260329162732-0ad0db37cbf7
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260329162732-0ad0db37cbf7
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
