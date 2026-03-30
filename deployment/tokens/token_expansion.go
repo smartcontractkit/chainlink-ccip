@@ -195,7 +195,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
 					}
 					if datastore_utils.IsAddressRefEmpty(timelockRef) {
-						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default CCIP admin address")
+						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default CCIP admin address", selector)
 					} else {
 						if deployTokenInput.ExternalAdmin == "" {
 							deployTokenInput.ExternalAdmin = timelockRef.Address
