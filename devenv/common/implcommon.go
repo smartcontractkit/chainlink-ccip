@@ -830,6 +830,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 	// Allow the router to withdraw a sensible amount of tokens from the account that will be transferring tokens.
 	for _, adapter := range adp {
+		if !adapter.SupportsTokenTransfers() {
+			continue
+		}
 		teConfig := adapter.GetTokenExpansionConfig()
 		selector := adapter.ChainSelector()
 
@@ -857,6 +860,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		}
 		for _, dst := range adp {
 			if dst.ChainSelector() == selector {
+				continue
+			}
+			if !dst.SupportsTokenTransfers() {
 				continue
 			}
 			dstTeConfig := dst.GetTokenExpansionConfig()
