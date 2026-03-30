@@ -273,11 +273,18 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 				if !ok {
 					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporterVersionResolver", chainSel, nil)
 				}
-				_, configImporterVersions, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
+				_, configImporterVersionsReturned, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve config importer version for chain %d: %w", chainSel, err)
 				}
 				contractMeta := make([]datastore.ContractMetadata, 0)
+				var configImporterVersions []*semver.Version
+				// we only import configs from 1.5.0 and 1.6.0 config importers,
+				for _, version := range configImporterVersionsReturned {
+					if version.Equal(semver.MustParse("1.5.0")) || version.Equal(semver.MustParse("1.6.0")) {
+						configImporterVersions = append(configImporterVersions, version)
+					}
+				}
 				for _, version := range configImporterVersions {
 					configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 					if !ok {
@@ -325,38 +332,40 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 				} else {
 					timelockAddr = timelockRef.Address
 				}
-
-				reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
-					ChainSelector:        chainSel,
-					ExistingAddresses:    e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
-					ContractMeta:         contractMeta,
-					RemoteChainSelectors: perChainInput.RemoteChainSelectors,
-					TimelockAddress:      timelockAddr,
-					AdditionalConfig:     perChainInput.FeeQuoterConfig,
-					PreviousVersions:     configImporterVersions,
-				})
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
-				}
-				reportFQUpdate, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceDeployOrUpdateFeeQuoter(), e.BlockChains, reportFQInputCreation.Output)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy or update FeeQuoter for chain %d: %w", chainSel, err)
-				}
-				batchOps = append(batchOps, reportFQUpdate.Output.BatchOps...)
-				addressRefs = append(addressRefs, reportFQUpdate.Output.Addresses...)
-				reports = append(reports, reportFQUpdate.ExecutionReports...)
-				if len(reportFQUpdate.Output.Addresses) == 0 {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no FeeQuoter address returned for chain %d", chainSel)
-				}
-				feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
-
-				if isNewFeeQuoterDeployment && timelockAddr != "" {
-					fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, &e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
+				// if no config importer versions are returned, it means there is no existing config to import, so we can skip the step of creating the FeeQuoter input and deploying/updating the FeeQuoter
+				if len(configImporterVersions) > 0 {
+					reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
+						ChainSelector:        chainSel,
+						ExistingAddresses:    e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
+						ContractMeta:         contractMeta,
+						RemoteChainSelectors: perChainInput.RemoteChainSelectors,
+						TimelockAddress:      timelockAddr,
+						AdditionalConfig:     perChainInput.FeeQuoterConfig,
+						PreviousVersions:     configImporterVersions,
+					})
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
 					}
-					batchOps = append(batchOps, fqTransferBatches...)
-					reports = append(reports, fqTransferReports...)
+					reportFQUpdate, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceDeployOrUpdateFeeQuoter(), e.BlockChains, reportFQInputCreation.Output)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy or update FeeQuoter for chain %d: %w", chainSel, err)
+					}
+					batchOps = append(batchOps, reportFQUpdate.Output.BatchOps...)
+					addressRefs = append(addressRefs, reportFQUpdate.Output.Addresses...)
+					reports = append(reports, reportFQUpdate.ExecutionReports...)
+					if len(reportFQUpdate.Output.Addresses) == 0 {
+						return cldf.ChangesetOutput{}, fmt.Errorf("no FeeQuoter address returned for chain %d", chainSel)
+					}
+					feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
+
+					if isNewFeeQuoterDeployment && timelockAddr != "" {
+						fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, &e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
+						if err != nil {
+							return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
+						}
+						batchOps = append(batchOps, fqTransferBatches...)
+						reports = append(reports, fqTransferReports...)
+					}
 				}
 			}
 			if perChainInput.RampsVersion != nil {
