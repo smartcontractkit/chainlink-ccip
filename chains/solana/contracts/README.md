@@ -2,11 +2,11 @@
 
 ## Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install)
+- [Rust](https://www.rust-lang.org/tools/install) (version pinned via `rust-toolchain.toml`)
 - [Solana CLI](https://docs.anza.xyz/cli/install) (provides `solana-test-validator`)
 - [Anchor CLI](https://www.anchor-lang.com/docs/installation)
 - [Go](https://go.dev/doc/install) (see `go.mod` for required version)
-- [anchor-go](https://github.com/gagliardetto/anchor-go) v1.0.0 — `go install github.com/gagliardetto/anchor-go@v1.0.0`
+- [anchor-go](https://github.com/gagliardetto/anchor-go) v0.2.3 — `GOTOOLCHAIN=go1.20 go install github.com/gagliardetto/anchor-go@v0.2.3`
 
 ## Build
 
@@ -67,7 +67,7 @@ earlier setup subtests won't have executed.
 Install `anchor-go` and regenerate bindings after contract changes:
 
 ```bash
-go install github.com/gagliardetto/anchor-go@v1.0.0
+GOTOOLCHAIN=go1.20 go install github.com/gagliardetto/anchor-go@v0.2.3
 make anchor-go-gen
 ```
 
