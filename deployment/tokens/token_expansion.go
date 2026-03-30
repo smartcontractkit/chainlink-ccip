@@ -177,10 +177,15 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenInput.ExistingDataStore = e.DataStore
 				deployTokenInput.ChainSelector = selector
 
-				// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
+				// If token is deployed by CLL, set CCIP admin as RBACTimelock by default.
 				// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
 				// and we may not be able to register the token by CLL in that case.
-				if deployTokenInput.CCIPAdmin == "" {
+				//
+				// External admin defaults to timelock admin if not provided - please take note
+				// that the timelock ref is lazy loaded from the datastore. This is intentional
+				// as some tests may not setup MCMS so querying the timelock ref in those cases
+				// will cause an error.
+				if deployTokenInput.CCIPAdmin == "" || deployTokenInput.ExternalAdmin == "" {
 					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
@@ -192,30 +197,14 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					if datastore_utils.IsAddressRefEmpty(timelockRef) {
 						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default CCIP admin address")
 					} else {
-						deployTokenInput.CCIPAdmin = timelockRef.Address
+						if deployTokenInput.ExternalAdmin == "" {
+							deployTokenInput.ExternalAdmin = timelockRef.Address
+						}
+						if deployTokenInput.CCIPAdmin == "" {
+							deployTokenInput.CCIPAdmin = timelockRef.Address
+						}
 					}
 				}
-
-				// External admin defaults to timelock admin if not provided - please take note
-				// that the timelock ref is lazy loaded from the datastore. This is intentional
-				// as some tests may not setup MCMS so querying the timelock ref in those cases
-				// will cause an error.
-				if deployTokenInput.ExternalAdmin == "" {
-					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
-					if !ok {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
-					}
-					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
-					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
-					}
-					if datastore_utils.IsAddressRefEmpty(timelockRef) {
-						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default external admin address")
-					} else {
-						deployTokenInput.ExternalAdmin = timelockRef.Address
-					}
-				}
-
 				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
