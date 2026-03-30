@@ -778,14 +778,16 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	for _, srcAdapter := range adp {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
 		srcSel := srcAdapter.ChainSelector()
-		srcFamily := srcAdapter.Family()
-		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
-			continue // only EVM and Solana are supported for token transfers in 1.6
+		if !srcAdapter.SupportsTokenTransfers() {
+			continue
 		}
 
 		for _, dstAdapter := range adp {
 			// dstCfg := dstAdapter.GetTokenExpansionConfig()
 			dstSel := dstAdapter.ChainSelector()
+			if !dstAdapter.SupportsTokenTransfers() {
+				continue
+			}
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{

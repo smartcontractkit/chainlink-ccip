@@ -552,6 +552,8 @@ func (a *SVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	return new(big.Int).SetUint64(uint64(balance)), nil
 }
 
+func (a *SVMAdapter) SupportsTokenTransfers() bool { return true }
+
 func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.PublicKey().String()

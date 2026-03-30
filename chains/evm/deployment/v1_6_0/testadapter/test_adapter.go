@@ -405,6 +405,8 @@ func (a *EVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	return balance, nil
 }
 
+func (a *EVMAdapter) SupportsTokenTransfers() bool { return true }
+
 func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.From.Hex()

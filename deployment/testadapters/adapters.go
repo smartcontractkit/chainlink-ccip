@@ -127,6 +127,10 @@ type TestAdapter interface {
 	// GetTokenBalance gets the token balance of the given owner address for the given token address.
 	GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error)
 
+	// SupportsTokenTransfers returns true if the chain supports cross-chain token transfers.
+	// Chains that return false are excluded from token deployment and remote chain configuration.
+	SupportsTokenTransfers() bool
+
 	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing cross-chain token transfers.
 	GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain
 
