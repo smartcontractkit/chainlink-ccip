@@ -96,7 +96,7 @@ func dummyDeployContractParams() ccvadapters.DeployContractParams {
 				MaxCCVsPerMsg: 3,
 				DynamicConfig: ccvadapters.ExecutorDynamicDeployConfig{
 					FeeAggregator:         "0xDummyExecutorFeeAgg",
-					MinBlockConfirmations: 5,
+					AllowedFinalityConfig: [4]byte{0, 0, 0, 5},
 					CcvAllowlistEnabled:   true,
 				},
 				Qualifier: "dummy-exec",

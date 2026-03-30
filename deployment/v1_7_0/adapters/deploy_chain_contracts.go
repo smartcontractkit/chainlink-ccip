@@ -54,8 +54,8 @@ type FeeQuoterDeployParams struct {
 
 type ExecutorDynamicDeployConfig struct {
 	FeeAggregator         string
-	MinBlockConfirmations uint16
 	CcvAllowlistEnabled   bool
+	AllowedFinalityConfig [4]byte
 }
 
 type ExecutorDeployParams struct {

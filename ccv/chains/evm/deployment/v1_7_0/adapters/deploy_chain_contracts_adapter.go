@@ -286,11 +286,11 @@ func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.Ex
 		result = append(result, sequences.ExecutorParams{
 			Version:       ep.Version,
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
-		DynamicConfig: executor.DynamicConfig{
-			FeeAggregator:         feeAgg,
-			AllowedFinalityConfig: sequences.BlockDepthFinalityConfig(ep.DynamicConfig.MinBlockConfirmations),
-			CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,
-		},
+			DynamicConfig: executor.DynamicConfig{
+				FeeAggregator:         feeAgg,
+				AllowedFinalityConfig: ep.DynamicConfig.AllowedFinalityConfig,
+				CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,
+			},
 			Qualifier: ep.Qualifier,
 		})
 	}
