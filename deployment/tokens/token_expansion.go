@@ -10,7 +10,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -182,27 +181,33 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
 				// and we may not be able to register the token by CLL in that case.
 				if deployTokenInput.CCIPAdmin == "" {
-					filter := datastore.AddressRef{
-						Type:          datastore.ContractType(utils.RBACTimelock),
-						ChainSelector: deployTokenInput.ChainSelector,
-						Qualifier:     utils.CLLQualifier,
+					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
 					}
-
-					timelockAddr, err := datastore_utils.FindAndFormatRef(
-						deployTokenInput.ExistingDataStore,
-						filter,
-						deployTokenInput.ChainSelector,
-						datastore_utils.FullRef,
-					)
+					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf(
-							"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
-							deployTokenInput.ChainSelector, utils.CLLQualifier, err,
-						)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
 					}
-
-					deployTokenInput.CCIPAdmin = timelockAddr.Address
+					deployTokenInput.CCIPAdmin = timelockRef.Address
 				}
+
+				// External admin defaults to timelock admin if not provided - please take note
+				// that the timelock ref is lazy loaded from the datastore. This is intentional
+				// as some tests may not setup MCMS so querying the timelock ref in those cases
+				// will cause an error.
+				if deployTokenInput.ExternalAdmin == "" {
+					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
+					}
+					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
+					}
+					deployTokenInput.ExternalAdmin = timelockRef.Address
+				}
+
 				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
