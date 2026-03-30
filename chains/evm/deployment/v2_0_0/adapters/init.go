@@ -10,6 +10,7 @@ import (
 	evmseqV1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fqdests"
 )
 
 func init() {
@@ -32,4 +33,8 @@ func init() {
 	fqReg.RegisterConfigImporterVersionResolver(chainsel.FamilyEVM, &adapters1_2.LaneVersionResolver{})
 
 	feeReg.RegisterFeeAdapter(chainsel.FamilyEVM, v, evmFeesAdapterV2_0)
+
+	fqDestsReg := fqdests.GetRegistry()
+	fqDestsReg.RegisterFQDestsAdapter(chainsel.FamilyEVM, v, NewFQDestsV2Adapter(&evmAdapter))
+	fqDestsReg.RegisterFQDestsAdapter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), adapters1_6.NewFQDestsAdapter(&evmAdapter))
 }

@@ -4,7 +4,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fqdests"
 )
 
 func init() {
@@ -15,4 +17,7 @@ func init() {
 		CurseAdapter:        NewCurseAdapter(),
 		CurseSubjectAdapter: NewCurseAdapter(),
 	})
+
+	fqDestsReg := fqdests.GetRegistry()
+	fqDestsReg.RegisterFQDestsAdapter(chainsel.FamilySolana, semver.MustParse("1.6.0"), NewFQDestsAdapter(&solseq.SolanaAdapter{}))
 }
