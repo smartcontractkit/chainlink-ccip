@@ -324,8 +324,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 				timelockRef, err := evmReaderMCMS.GetTimelockRef(*env, data.Chain.Selector, mcms.Input{Qualifier: cciputils.CLLQualifier})
 				require.NoError(t, err)
 
-				require.NoError(t, err)
-
 				// Get max supply and pre-mint
 				maxSupply := big.NewInt(0)
 				if data.Token.Supply != nil {
@@ -369,7 +367,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 				// Verify max supply and pre-mint
 				require.Equal(t, 0, maxSupply.Cmp(supply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), supply.String()))
-				require.Equal(t, 0, preMint.Cmp(preMint), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), balance.String()))
+				require.Equal(t, 0, preMint.Cmp(balance), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), balance.String()))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})

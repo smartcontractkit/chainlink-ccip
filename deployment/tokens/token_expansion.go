@@ -189,7 +189,11 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
 					}
-					deployTokenInput.CCIPAdmin = timelockRef.Address
+					if datastore_utils.IsAddressRefEmpty(timelockRef) {
+						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default CCIP admin address")
+					} else {
+						deployTokenInput.CCIPAdmin = timelockRef.Address
+					}
 				}
 
 				// External admin defaults to timelock admin if not provided - please take note
@@ -205,7 +209,11 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
 					}
-					deployTokenInput.ExternalAdmin = timelockRef.Address
+					if datastore_utils.IsAddressRefEmpty(timelockRef) {
+						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default external admin address")
+					} else {
+						deployTokenInput.ExternalAdmin = timelockRef.Address
+					}
 				}
 
 				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
