@@ -18,7 +18,7 @@
 - [Solana CLI](https://docs.anza.xyz/cli/install) (provides `solana-test-validator`)
 - [Anchor CLI](https://www.anchor-lang.com/docs/installation)
 - [anchor-go](https://github.com/gagliardetto/anchor-go) v0.2.3 — `GOTOOLCHAIN=go1.20 go install github.com/gagliardetto/anchor-go@v0.2.3`
-- [golangci-lint](https://golangci-lint.run/welcome/install/) — for `make lint-go`
+- [golangci-lint](https://golangci-lint.run/welcome/install/) v2.7.0 — `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.0`
 - [gotestloghelper](https://github.com/smartcontractkit/chainlink-testing-framework) — for `make go-tests` output formatting
 
 ### macOS (Apple Silicon) Note
