@@ -123,7 +123,8 @@ func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry) deployment.C
 			return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports, DataStore: manageReport.Output.DataStore}, nil
 		}
 
-		signingKeysByNOP, err := fetchSigningKeysForNOPs(e, cfg.Topology.NOPTopology.NOPs)
+		committeeNOPs := filterNOPsByAliases(cfg.Topology.NOPTopology.NOPs, getCommitteeNOPAliases(committee))
+		signingKeysByNOP, err := fetchSigningKeysForNOPs(e, committeeNOPs)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
 		}
@@ -457,6 +458,20 @@ func convertTopologyCommittee(committee offchain.CommitteeConfig) verifierCommit
 		NOPAliases:      shared.ConvertStringToNopAliases(getCommitteeNOPAliases(committee)),
 		ChainNOPAliases: chainNOPAliases,
 	}
+}
+
+func filterNOPsByAliases(nops []offchain.NOPConfig, aliases []string) []offchain.NOPConfig {
+	aliasSet := make(map[string]struct{}, len(aliases))
+	for _, a := range aliases {
+		aliasSet[a] = struct{}{}
+	}
+	filtered := make([]offchain.NOPConfig, 0, len(aliases))
+	for _, nop := range nops {
+		if _, ok := aliasSet[nop.Alias]; ok {
+			filtered = append(filtered, nop)
+		}
+	}
+	return filtered
 }
 
 func getCommitteeNOPAliases(committee offchain.CommitteeConfig) []string {
