@@ -138,6 +138,34 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig 
 	}
 }
 
+// ReverseTranslateFQ is the inverse of TranslateFQ: it maps the Solana on-chain
+// DestChainConfig back to the product-level FeeQuoterDestChainConfig.
+func ReverseTranslateFQ(dc fee_quoter.DestChainConfig) lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{
+		IsEnabled:                   dc.IsEnabled,
+		MaxDataBytes:                dc.MaxDataBytes,
+		MaxPerMsgGasLimit:           dc.MaxPerMsgGasLimit,
+		DestGasOverhead:             dc.DestGasOverhead,
+		DestGasPerPayloadByteBase:   uint8(dc.DestGasPerPayloadByteBase),
+		ChainFamilySelector:         binary.BigEndian.Uint32(dc.ChainFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     dc.DefaultTokenFeeUsdcents,
+		DefaultTokenDestGasOverhead: dc.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           dc.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          uint16(dc.NetworkFeeUsdcents),
+		V1Params: &lanes.FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           dc.MaxNumberOfTokensPerMsg,
+			DestGasPerPayloadByteHigh:         uint8(dc.DestGasPerPayloadByteHigh),
+			DestGasPerPayloadByteThreshold:    uint16(dc.DestGasPerPayloadByteThreshold),
+			DestDataAvailabilityOverheadGas:   dc.DestDataAvailabilityOverheadGas,
+			DestGasPerDataAvailabilityByte:    dc.DestGasPerDataAvailabilityByte,
+			DestDataAvailabilityMultiplierBps: dc.DestDataAvailabilityMultiplierBps,
+			EnforceOutOfOrder:                 dc.EnforceOutOfOrder,
+			GasMultiplierWeiPerEth:            dc.GasMultiplierWeiPerEth,
+			GasPriceStalenessThreshold:        dc.GasPriceStalenessThreshold,
+		},
+	}
+}
+
 func TranslateAllowlist(allowlist []string) []solana.PublicKey {
 	var pkList []solana.PublicKey
 	for _, addr := range allowlist {

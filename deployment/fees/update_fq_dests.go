@@ -1,4 +1,4 @@
-package fqdests
+package fees
 
 import (
 	"fmt"
@@ -14,14 +14,14 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-// UpdateFeeQuoterDests creates a changeset that updates FeeQuoter destination chain configs.
-// It supports multiple chain families (EVM, Solana) and dynamically detects the deployed
-// FeeQuoter version per source chain to dispatch to the correct versioned adapter.
-func UpdateFeeQuoterDests(fqDestsRegistry *FQDestsAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateFeeQuoterDestsInput] {
-	return cldf.CreateChangeSet(makeApply(fqDestsRegistry, mcmsRegistry), makeVerify(fqDestsRegistry))
+// UpdateFeeQuoterDests creates a changeset that updates FeeQuoter destination chain configs
+// with upsert semantics. For each destination, it reads the current on-chain config (or uses
+// defaults if none exists), applies the user's override function, and writes the result.
+func UpdateFeeQuoterDests(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateFeeQuoterDestsInput] {
+	return cldf.CreateChangeSet(makeFQDestsApply(feeRegistry, mcmsRegistry), makeFQDestsVerify(feeRegistry))
 }
 
-func makeVerify(fqDestsRegistry *FQDestsAdapterRegistry) func(cldf.Environment, UpdateFeeQuoterDestsInput) error {
+func makeFQDestsVerify(feeRegistry *FeeAdapterRegistry) func(cldf.Environment, UpdateFeeQuoterDestsInput) error {
 	return func(_ cldf.Environment, cfg UpdateFeeQuoterDestsInput) error {
 		if cfg.Version == nil {
 			return fmt.Errorf("version is required")
@@ -49,8 +49,8 @@ func makeVerify(fqDestsRegistry *FQDestsAdapterRegistry) func(cldf.Environment, 
 				return fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
 			}
 
-			if _, exists := fqDestsRegistry.GetFQDestsAdapter(srcFamily, cfg.Version); !exists {
-				return fmt.Errorf("no FQ dests adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
+			if _, exists := feeRegistry.GetFeeAdapter(srcFamily, cfg.Version); !exists {
+				return fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
 			}
 		}
 
@@ -58,12 +58,32 @@ func makeVerify(fqDestsRegistry *FQDestsAdapterRegistry) func(cldf.Environment, 
 	}
 }
 
+// resolveDestChainConfig reads on-chain state (or defaults) and applies the user's override.
+func resolveDestChainConfig(adapter FeeAdapter, e cldf.Environment, src, dst uint64, override *lanes.FeeQuoterDestChainConfigOverride) (lanes.FeeQuoterDestChainConfig, error) {
+	onchain, err := adapter.GetOnchainDestChainConfig(e, src, dst)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to read on-chain dest chain config for src %d, dst %d: %w", src, dst, err)
+	}
+
+	var base lanes.FeeQuoterDestChainConfig
+	if onchain.IsEnabled {
+		base = onchain
+	} else {
+		base = adapter.GetDefaultDestChainConfig(src, dst)
+	}
+
+	if override != nil {
+		(*override)(&base)
+	}
+	return base, nil
+}
+
 type fqDestsGroup struct {
-	adapter  FQDestsAdapter
+	adapter  FeeAdapter
 	settings map[uint64]lanes.FeeQuoterDestChainConfig
 }
 
-func makeApply(fqDestsRegistry *FQDestsAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateFeeQuoterDestsInput) (cldf.ChangesetOutput, error) {
+func makeFQDestsApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateFeeQuoterDestsInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg UpdateFeeQuoterDestsInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -74,12 +94,11 @@ func makeApply(fqDestsRegistry *FQDestsAdapterRegistry, mcmsRegistry *changesets
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
 			}
 
-			adapter, exists := fqDestsRegistry.GetFQDestsAdapter(srcFamily, cfg.Version)
+			adapter, exists := feeRegistry.GetFeeAdapter(srcFamily, cfg.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no FQ dests adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
+				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
 			}
 
-			// Detect actual FQ contract version per source and group destinations by FQ version.
 			versionGroups := map[string]fqDestsGroup{}
 
 			for _, dst := range src.Settings {
@@ -88,13 +107,17 @@ func makeApply(fqDestsRegistry *FQDestsAdapterRegistry, mcmsRegistry *changesets
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get FQ contract ref for src %d, dst %d: %w", src.Selector, dst.Selector, err)
 				}
 
-				// Normalize to major.minor.0 for adapter lookup, patch versions should not affect compatibility.
 				v := fqRef.Version
 				lookupVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()))
 
-				updater, exists := fqDestsRegistry.GetFQDestsAdapter(srcFamily, lookupVersion)
+				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
 				if !exists {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no FQ dests adapter found for chain family %s and version %s (detected from contract at %s)", srcFamily, lookupVersion.String(), fqRef.Address)
+					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s (detected from contract at %s)", srcFamily, lookupVersion.String(), fqRef.Address)
+				}
+
+				resolved, err := resolveDestChainConfig(updater, e, src.Selector, dst.Selector, dst.Override)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve dest chain config for src %d, dst %d: %w", src.Selector, dst.Selector, err)
 				}
 
 				versionKey := lookupVersion.String()
@@ -105,7 +128,7 @@ func makeApply(fqDestsRegistry *FQDestsAdapterRegistry, mcmsRegistry *changesets
 					}
 				}
 
-				versionGroups[versionKey].settings[dst.Selector] = dst.Config
+				versionGroups[versionKey].settings[dst.Selector] = resolved
 			}
 
 			for _, group := range versionGroups {
