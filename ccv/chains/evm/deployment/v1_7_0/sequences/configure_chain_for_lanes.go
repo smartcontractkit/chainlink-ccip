@@ -64,6 +64,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		offRampArgs := make([]offramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		onRampArgs := make([]onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
+		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]ExecutorRemoteChainConfigArgs)
@@ -83,6 +84,23 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			onRampArgs, err = maybeAddOnRampDestChainConfigArgOnLocalChain(b, chain, input, remoteSelector, remoteConfig, onRampArgs)
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("remote chain %d: %w", remoteSelector, err)
+			}
+
+			if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas != nil {
+				gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(input.FeeQuoter),
+					Args:          remoteSelector,
+				})
+				if err != nil {
+					return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+				}
+				if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
+					gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
+						DestChainSelector: remoteSelector,
+						UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
+					})
+				}
 			}
 
 			// Router OnRamp: only add if the router doesn't already point to our OnRamp
@@ -213,6 +231,22 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
 			}
 			writes = append(writes, feeQuoterReport.Output)
+		}
+
+		// Gas price updates live in a separate on-chain mapping (not dest chain config),
+		// so they must be applied via FeeQuoter.UpdatePrices.
+		if len(gasPriceUpdates) > 0 {
+			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(input.FeeQuoter),
+				Args: fee_quoter.PriceUpdates{
+					GasPriceUpdates: gasPriceUpdates,
+				},
+			})
+			if err != nil {
+				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to update gas prices on FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+			}
+			writes = append(writes, gasPriceReport.Output)
 		}
 
 		// CommitteeVerifier: for each verifier contract, configure outbound settings
@@ -416,6 +450,8 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 	return onRampArgs, nil
 }
 
+// USDPerUnitGas is intentionally excluded because it is updated via a separate
+// FeeQuoter.UpdatePrices call (gas prices live in a different on-chain mapping).
 func feeQuoterDestChainConfigEqualTo(cur fqc.FeeQuoterDestChainConfig, desired changesetadapters.FeeQuoterDestChainConfig) bool {
 	return cur.IsEnabled == desired.IsEnabled &&
 		cur.MaxDataBytes == desired.MaxDataBytes &&

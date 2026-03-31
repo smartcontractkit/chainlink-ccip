@@ -1,6 +1,7 @@
 package sequences_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -1047,5 +1048,46 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *tes
 	require.NoError(t, err)
 	assert.True(t, srcCfgEnabled.Output.IsEnabled,
 		"AllowTrafficFrom=true should re-enable traffic on the OffRamp source config")
+}
+
+func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	rc := input.RemoteChains[remoteChainSelector]
+	rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(42_000)
+	input.RemoteChains[remoteChainSelector] = rc
+
+	report1, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	gasPrice, err := operations.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, big.NewInt(42_000), gasPrice.Output.Value, "gas price should be 42000 after first run")
+
+	report2, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+	assert.Less(t, len(report2.ExecutionReports), len(report1.ExecutionReports),
+		"second run should skip gas price update since value is already set")
 }
 
