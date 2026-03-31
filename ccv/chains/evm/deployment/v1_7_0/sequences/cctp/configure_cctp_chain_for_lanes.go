@@ -231,6 +231,13 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 
 		// Configure token for transfers (CCTP-through-CCV pool; registration is done once)
+		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
+		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
+			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism != mechanismCCTPV2WithCCV {
+				continue
+			}
+			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
+		}
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:            input.ChainSelector,
 			TokenAddress:             input.USDCToken,
@@ -238,7 +245,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
 			MinFinalityValue:         1,
-			RemoteChains:             remoteChainConfigs,
+			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)
