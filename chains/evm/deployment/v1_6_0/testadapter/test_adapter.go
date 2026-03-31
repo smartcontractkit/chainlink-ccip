@@ -30,6 +30,7 @@ import (
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
@@ -230,7 +231,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	}
 }
 
-func (a *EVMAdapter) CCIPReceiver() []byte {
+func (a *EVMAdapter) receiverAddr() []byte {
 	for _, typeStr := range []datastore.ContractType{"CCIPReceiver", "TestReceiver"} {
 		receiverAddr, err := a.getAddress(typeStr)
 		if err == nil {
@@ -239,6 +240,14 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 		if !errors.Is(err, ErrNoAddressFound) {
 			panic(err)
 		}
+	}
+	return nil
+}
+
+func (a *EVMAdapter) CCIPReceiver() []byte {
+	result := a.receiverAddr()
+	if result != nil {
+		return result
 	}
 	// Fallback because receiver is not found in a.state for devenv. TODO investigate why and remove fallback
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
@@ -257,7 +266,28 @@ func (a *EVMAdapter) InvalidAddresses() [][]byte {
 }
 
 func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error {
-	t.Skip(errors.ErrUnsupported.Error())
+	receiverAddrBytes := a.receiverAddr()
+	if receiverAddrBytes == nil {
+		t.Skip("no receiver address found")
+		return nil
+	}
+	receiverAddr := common.BytesToAddress(receiverAddrBytes)
+
+	receiver, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(receiverAddr, a.Client)
+	if err != nil {
+		return fmt.Errorf("failed to create MaybeRevertMessageReceiver instance: %w", err)
+	}
+
+	tx, err := receiver.SetRevert(a.DeployerKey, rejectAll)
+	if err != nil {
+		return fmt.Errorf("failed to call SetRevert: %w", err)
+	}
+
+	_, err = a.Chain.Confirm(tx)
+	if err != nil {
+		return fmt.Errorf("failed to confirm SetRevert tx: %w", err)
+	}
+
 	return nil
 }
 
