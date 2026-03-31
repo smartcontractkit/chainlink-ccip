@@ -9,11 +9,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // Based on unfinished implementation at https://github.com/smartcontractkit/chainlink/blob/f0432dc777d33b83a621da2b042657601d5db8b6/integration-tests/smoke/ccip/canonical/types/types.go
