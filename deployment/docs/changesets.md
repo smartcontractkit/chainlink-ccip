@@ -266,7 +266,7 @@ Sets per-token transfer fee configurations on the FeeQuoter for each source-dest
 
 **Constructor:**
 ```go
-func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeInput]
+func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput]
 ```
 
 **Input:**

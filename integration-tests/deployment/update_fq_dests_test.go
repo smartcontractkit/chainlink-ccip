@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
-	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -33,17 +33,7 @@ func TestUpdateFeeQuoterDestsV1_6_0(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Register adapters
-	evmAdapter := evmseqV1_6_0.EVMAdapter{}
-	deployRegistry := deploy.GetRegistry()
-	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, &evmadaptersV1_0_0.EVMDeployer{})
-
-	feesRegistry := fees.GetRegistry()
-	evmFeesAdapter := evmadaptersV1_6_0.NewFeesAdapter(&evmAdapter)
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilyEVM, v1_6_0, evmFeesAdapter)
-
 	mcmsRegistry := changesets.GetRegistry()
-	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &evmadaptersV1_0_0.EVMMCMSReader{})
 
 	// Deploy contracts
 	chainInput := make(map[uint64]deploy.ContractDeploymentConfigPerChain)
@@ -58,7 +48,7 @@ func TestUpdateFeeQuoterDestsV1_6_0(t *testing.T) {
 			GasForCallExactCheck:                    uint16(5000),
 		}
 	}
-	out, err := deploy.DeployContracts(deployRegistry).Apply(*e, deploy.ContractDeploymentConfig{
+	out, err := deploy.DeployContracts(deploy.GetRegistry()).Apply(*e, deploy.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
 	})
@@ -86,6 +76,9 @@ func TestUpdateFeeQuoterDestsV1_6_0(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read the initial on-chain config set by ConnectChains
+	evmAdapter := evmseqV1_6_0.EVMAdapter{}
+	evmFeesAdapter := evmadaptersV1_6_0.NewFeesAdapter(&evmAdapter)
+
 	initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, src, dst)
 	require.NoError(t, err)
 	require.True(t, initialCfg.IsEnabled)
@@ -102,7 +95,7 @@ func TestUpdateFeeQuoterDestsV1_6_0(t *testing.T) {
 	})
 
 	_, err = fees.
-		UpdateFeeQuoterDests(feesRegistry, mcmsRegistry).
+		UpdateFeeQuoterDests().
 		Apply(*e, fees.UpdateFeeQuoterDestsInput{
 			Version: v1_6_0,
 			MCMS:    mcms.Input{},

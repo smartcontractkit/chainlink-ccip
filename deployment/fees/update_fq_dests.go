@@ -17,7 +17,9 @@ import (
 // UpdateFeeQuoterDests creates a changeset that updates FeeQuoter destination chain configs
 // with upsert semantics. For each destination, it reads the current on-chain config (or uses
 // defaults if none exists), applies the user's override function, and writes the result.
-func UpdateFeeQuoterDests(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateFeeQuoterDestsInput] {
+func UpdateFeeQuoterDests() cldf.ChangeSetV2[UpdateFeeQuoterDestsInput] {
+	feeRegistry := GetRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	return cldf.CreateChangeSet(makeFQDestsApply(feeRegistry, mcmsRegistry), makeFQDestsVerify(feeRegistry))
 }
 

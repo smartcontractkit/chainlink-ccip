@@ -36,7 +36,9 @@ type SetTokenTransferFeeInput struct {
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
-func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeInput] {
+func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput] {
+	feeRegistry := GetRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	return cldf.CreateChangeSet(makeApply(feeRegistry, mcmsRegistry), makeVerify(feeRegistry, mcmsRegistry))
 }
 
