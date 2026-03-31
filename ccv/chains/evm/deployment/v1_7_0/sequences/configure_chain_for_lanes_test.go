@@ -1,7 +1,6 @@
 package sequences_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -30,6 +29,8 @@ import (
 )
 
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
+func boolPtr(v bool) *bool { return &v }
 
 type deployedContracts struct {
 	router                    string
@@ -119,7 +120,7 @@ func buildConfigureChainForLanesInput(
 		},
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:    true,
+				AllowTrafficFrom:    boolPtr(true),
 				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
 				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultExecutor:     local.executor,
@@ -136,8 +137,7 @@ func buildConfigureChainForLanesInput(
 					DefaultTxGasLimit:           200_000,
 					NetworkFeeUSDCents:          10,
 					ChainFamilySelector:         evmFamilySelector,
-					LinkFeeMultiplierPercent:    90,
-					USDPerUnitGas:               big.NewInt(1e6),
+					LinkFeeMultiplierPercent:     90,
 				},
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
@@ -541,7 +541,7 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 
 	input := buildConfigureChainForLanesInput(local, chainSelector, remoteAContracts, remoteA)
 	input.RemoteChains[remoteB] = changesetadapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:    true,
+		AllowTrafficFrom:    boolPtr(true),
 		OnRamps:             [][]byte{common.HexToAddress(remoteBContracts.onRamp).Bytes()},
 		OffRamp:             common.HexToAddress(remoteBContracts.offRamp).Bytes(),
 		DefaultExecutor:     local.executor,
@@ -557,9 +557,8 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 			DefaultTokenDestGasOverhead: 100_000,
 			DefaultTxGasLimit:           250_000,
 			NetworkFeeUSDCents:          20,
-			ChainFamilySelector:         evmFamilySelector,
-			LinkFeeMultiplierPercent:    90,
-			USDPerUnitGas:               big.NewInt(2e6),
+			ChainFamilySelector:      evmFamilySelector,
+			LinkFeeMultiplierPercent: 90,
 		},
 		ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 			USDCentsFee: 100,
@@ -755,7 +754,7 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 		OffRamp:       local.offRamp,
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:    true,
+				AllowTrafficFrom:    boolPtr(true),
 				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
 				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultInboundCCVs:  []string{local.committeeVerifier},
@@ -870,68 +869,6 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 		"with OverrideExistingConfig=true, FeeQuoter config should be updated")
 }
 
-func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T) {
-	chainSelector := chainsel.TEST_90000001.Selector
-	remoteSelector := chainsel.TEST_90000002.Selector
-
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
-	)
-	require.NoError(t, err)
-
-	local := deployChain(t, e, chainSelector)
-	remote := deployChain(t, e, remoteSelector)
-
-	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
-	gasPrice := big.NewInt(5e6)
-	rc := input.RemoteChains[remoteSelector]
-	rc.FeeQuoterDestChainConfig.USDPerUnitGas = gasPrice
-	input.RemoteChains[remoteSelector] = rc
-
-	firstReport, err := operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureChainForLanes, e.BlockChains, input,
-	)
-	require.NoError(t, err)
-
-	evmChain := e.BlockChains.EVMChains()[chainSelector]
-	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-
-	gasPriceReport, err := operations.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, 0, gasPrice.Cmp(gasPriceReport.Output.Value), "gas price should be set after first run")
-
-	secondReport, err := operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureChainForLanes, e.BlockChains, input,
-	)
-	require.NoError(t, err)
-
-	assert.Less(t, len(secondReport.ExecutionReports), len(firstReport.ExecutionReports),
-		"second run with same gas price should execute fewer operations")
-
-	inputNoGas := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
-	rc = inputNoGas.RemoteChains[remoteSelector]
-	rc.FeeQuoterDestChainConfig.USDPerUnitGas = nil
-	inputNoGas.RemoteChains[remoteSelector] = rc
-
-	_, err = operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureChainForLanes, e.BlockChains, inputNoGas,
-	)
-	require.NoError(t, err)
-
-	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	gasPriceAfterNil, err := operations.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, 0, gasPrice.Cmp(gasPriceAfterNil.Output.Value),
-		"gas price should remain unchanged when USDPerUnitGas is nil")
-}
-
 func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
 	chainSelector := chainsel.TEST_90000001.Selector
 	remoteSelector := chainsel.TEST_90000002.Selector
@@ -1010,3 +947,105 @@ func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
 	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.Router.Hex(),
 		"CommitteeVerifier remote config should reference the TestRouter")
 }
+
+func TestConfigureChainForLanes_AllowTrafficFromFalseDisablesTraffic(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	enabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	require.NotNil(t, enabledInput.RemoteChains[remoteChainSelector].AllowTrafficFrom)
+	require.True(t, *enabledInput.RemoteChains[remoteChainSelector].AllowTrafficFrom,
+		"precondition: buildConfigureChainForLanesInput sets AllowTrafficFrom=true")
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, enabledInput,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	require.True(t, srcCfgEnabled.Output.IsEnabled, "traffic should be enabled after first run")
+
+	disabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	rc := disabledInput.RemoteChains[remoteChainSelector]
+	rc.AllowTrafficFrom = boolPtr(false)
+	disabledInput.RemoteChains[remoteChainSelector] = rc
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, disabledInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.False(t, srcCfgDisabled.Output.IsEnabled,
+		"AllowTrafficFrom=false should disable traffic on the OffRamp source config")
+}
+
+func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	disabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	rc := disabledInput.RemoteChains[remoteChainSelector]
+	rc.AllowTrafficFrom = boolPtr(false)
+	disabledInput.RemoteChains[remoteChainSelector] = rc
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, disabledInput,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	require.False(t, srcCfgDisabled.Output.IsEnabled, "traffic should be disabled after first run")
+
+	enabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, enabledInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.True(t, srcCfgEnabled.Output.IsEnabled,
+		"AllowTrafficFrom=true should re-enable traffic on the OffRamp source config")
+}
+

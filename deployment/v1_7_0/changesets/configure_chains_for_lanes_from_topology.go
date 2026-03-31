@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 	"slices"
+	"strconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -121,11 +122,12 @@ func ConfigureChainsForLanesFromTopology(
 
 	apply := func(e deployment.Environment, cfg ConfigureChainsForLanesFromTopologyConfig) (deployment.ChangesetOutput, error) {
 		// ── Phase 1: Enrichment ──────────────────────────────────────────────────
-		// Pre-fetch signing keys for NOPs that don't already have one in the
-		// topology. We scope the JD call to only the chain families actually
-		// referenced by cfg.Chains to avoid unnecessary network traffic.
+		// Pre-fetch signing keys only for NOPs that are actually referenced as
+		// committee signers. Executor-only NOPs are excluded to avoid unnecessary
+		// JD calls that could fail if those NOPs don't exist in the node registry.
 		targetFamilies := deriveFamiliesFromChains(cfg.Chains)
-		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, cfg.Topology.NOPTopology.NOPs, targetFamilies)
+		committeeNOPs := filterNOPsToCommitteeMembers(cfg.Topology.NOPTopology, cfg.Chains)
+		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, targetFamilies)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
 		}
@@ -409,9 +411,37 @@ func resolveLocalContractsForTopologyChangeset(
 	return resolved, nil
 }
 
+// filterNOPsToCommitteeMembers returns only the NOPs whose aliases appear in at least one
+// committee ChainConfig referenced by the input chains' CommitteeVerifiers. This prevents
+// fetching signing keys for executor-only NOPs that will never be used as committee signers.
+func filterNOPsToCommitteeMembers(nopTopology *offchain.NOPTopology, chains []PartialChainConfig) []offchain.NOPConfig {
+	committeeAliases := make(map[string]struct{})
+	for _, chainCfg := range chains {
+		for _, cv := range chainCfg.CommitteeVerifiers {
+			committee, ok := nopTopology.Committees[cv.CommitteeQualifier]
+			if !ok {
+				continue
+			}
+			for remoteSelector := range cv.RemoteChains {
+				chainKey := strconv.FormatUint(remoteSelector, 10)
+				if chainCommittee, ok := committee.ChainConfigs[chainKey]; ok {
+					for _, alias := range chainCommittee.NOPAliases {
+						committeeAliases[alias] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+	filtered := make([]offchain.NOPConfig, 0, len(committeeAliases))
+	for _, nop := range nopTopology.NOPs {
+		if _, ok := committeeAliases[nop.Alias]; ok {
+			filtered = append(filtered, nop)
+		}
+	}
+	return filtered
+}
+
 // deriveFamiliesFromChains extracts the unique chain families referenced by the input chains.
-// This is used to scope the JD signing key fetch to only the families that will actually be
-// configured, avoiding unnecessary network calls for irrelevant families.
 func deriveFamiliesFromChains(chains []PartialChainConfig) []string {
 	seen := make(map[string]struct{})
 	for _, c := range chains {

@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"fmt"
-	"math/big"
 	"sync"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -53,14 +52,13 @@ type FeeQuoterDestChainConfig struct {
 	DefaultTokenFeeUSDCents     uint16
 	DefaultTokenDestGasOverhead uint32
 	DefaultTxGasLimit           uint32
-	NetworkFeeUSDCents          uint16
-	LinkFeeMultiplierPercent    uint8
-	USDPerUnitGas               *big.Int
+	NetworkFeeUSDCents       uint16
+	LinkFeeMultiplierPercent uint8
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
 type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
-	AllowTrafficFrom          bool
+	AllowTrafficFrom          *bool
 	OnRamps                   []RemoteContract
 	OffRamp                   RemoteContract
 	DefaultInboundCCVs        []LocalContract

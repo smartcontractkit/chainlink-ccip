@@ -616,6 +616,122 @@ func TestConfigureChainsForLanesFromTopology_AcceptsAnyRouterAddress(t *testing.
 	assert.Equal(t, "0xtest-router", evmAdapter.inputs[0].Router)
 }
 
+func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeNOPs(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	mockOffchain := &jdMockOffchain{
+		listNodesFn: func(_ context.Context, _ *nodev1.ListNodesRequest, _ ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
+			return &nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+				{Id: "node-1", Name: "committee-nop-1"},
+				{Id: "node-2", Name: "committee-nop-2"},
+			}}, nil
+		},
+		listNodeChainConfigsFn: func(_ context.Context, _ *nodev1.ListNodeChainConfigsRequest, _ ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
+			return &nodev1.ListNodeChainConfigsResponse{
+				ChainConfigs: []*nodev1.ChainConfig{
+					{
+						NodeId: "node-1",
+						Chain:  &nodev1.Chain{Type: nodev1.ChainType_CHAIN_TYPE_EVM},
+						Ocr2Config: &nodev1.OCR2Config{
+							OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{OnchainSigningAddress: "0xsigner-1"},
+						},
+					},
+					{
+						NodeId: "node-2",
+						Chain:  &nodev1.Chain{Type: nodev1.ChainType_CHAIN_TYPE_EVM},
+						Ocr2Config: &nodev1.OCR2Config{
+							OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{OnchainSigningAddress: "0xsigner-2"},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, mockOffchain)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xrouter", "Router"))
+	addAddress(t, ds, testRef(localSelector, "0xonramp", "OnRamp"))
+	addAddress(t, ds, testRef(localSelector, "0xfeequoter", "FeeQuoter"))
+	addAddress(t, ds, testRef(localSelector, "0xofframp", "OffRamp"))
+	addAddress(t, ds, testRef(localSelector, "0xexecutor", "Executor"))
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
+	addAddress(t, ds, testRef(remoteSelector, "0xremote-onramp", "OnRamp"))
+	addAddress(t, ds, testRef(remoteSelector, "0xremote-offramp", "OffRamp"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {
+				testRef(localSelector, "0xverifier", "CommitteeVerifier"),
+				testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"),
+			},
+		},
+	})
+
+	evmAdapter := &mockChainFamilyAdapter{addressPrefix: "evm:"}
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: &offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "committee-nop-1"},
+					{Alias: "committee-nop-2"},
+					{Alias: "executor-only-nop"},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {
+								NOPAliases: []string{"committee-nop-1", "committee-nop-2"},
+								Threshold:  2,
+							},
+						},
+					},
+				},
+			},
+		},
+		Chains: []changesets.PartialChainConfig{
+			{
+				ChainSelector: localSelector,
+				Router:        testRef(localSelector, "0xrouter", "Router"),
+				OnRamp:        testRef(localSelector, "0xonramp", "OnRamp"),
+				FeeQuoter:     testRef(localSelector, "0xfeequoter", "FeeQuoter"),
+				OffRamp:       testRef(localSelector, "0xofframp", "OffRamp"),
+				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+					{
+						CommitteeQualifier: "default",
+						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {},
+						},
+					},
+				},
+				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+					remoteSelector: {
+						OnRamps:         []datastore.AddressRef{testRef(remoteSelector, "0xremote-onramp", "OnRamp")},
+						OffRamp:         testRef(remoteSelector, "0xremote-offramp", "OffRamp"),
+						DefaultExecutor: testRef(localSelector, "0xexecutor", "Executor"),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err,
+		"should succeed because JD only needs to know about committee NOPs, not executor-only NOPs")
+	require.Len(t, evmAdapter.inputs, 1)
+	assert.ElementsMatch(t,
+		[]string{"0xsigner-1", "0xsigner-2"},
+		evmAdapter.inputs[0].CommitteeVerifiers[0].RemoteChains[remoteSelector].SignatureConfig.Signers,
+	)
+}
+
 func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 	localSelector := chainsel.TEST_90000001.Selector
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
