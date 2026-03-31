@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -61,6 +62,19 @@ func CreateBasicCommitteeVerifierRemoteChainConfig() lanes.CommitteeVerifierRemo
 		GasForVerification: 50_000,
 		PayloadSizeBytes:   6*64 + 2*32,
 		SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+			Signers:   []string{common.HexToAddress("0x01").String()},
+			Threshold: 1,
+		},
+	}
+}
+
+func AdapterCommitteeVerifierRemoteChainConfig() changesetadapters.CommitteeVerifierRemoteChainConfig {
+	return changesetadapters.CommitteeVerifierRemoteChainConfig{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        50,
+		GasForVerification: 50_000,
+		PayloadSizeBytes:   6*64 + 2*32,
+		SignatureConfig: changesetadapters.CommitteeVerifierSignatureQuorumConfig{
 			Signers:   []string{common.HexToAddress("0x01").String()},
 			Threshold: 1,
 		},

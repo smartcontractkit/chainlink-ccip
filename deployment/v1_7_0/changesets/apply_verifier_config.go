@@ -123,7 +123,10 @@ func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry) deployment.C
 			return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports, DataStore: manageReport.Output.DataStore}, nil
 		}
 
-		signingKeysByNOP := fetchSigningKeysForNOPs(e, cfg.Topology.NOPTopology.NOPs)
+		signingKeysByNOP, err := fetchSigningKeysForNOPs(e, cfg.Topology.NOPTopology.NOPs)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
+		}
 
 		nopsToValidate := cfg.TargetNOPs
 		if len(nopsToValidate) == 0 {
@@ -346,20 +349,41 @@ committeeVerifierConfig = """
 	return jobSpecs, scope, nil
 }
 
-func fetchSigningKeysForNOPs(e deployment.Environment, nops []offchain.NOPConfig) fetch_signing_keys.SigningKeysByNOP {
+func fetchSigningKeysForNOPs(e deployment.Environment, nops []offchain.NOPConfig) (fetch_signing_keys.SigningKeysByNOP, error) {
+	return fetchSigningKeysForNOPsFiltered(e, nops, func(nop offchain.NOPConfig) bool {
+		return nop.SignerAddressByFamily == nil || nop.SignerAddressByFamily[chainsel.FamilyEVM] == ""
+	})
+}
+
+func fetchSigningKeysForNOPsByFamilies(e deployment.Environment, nops []offchain.NOPConfig, families []string) (fetch_signing_keys.SigningKeysByNOP, error) {
+	return fetchSigningKeysForNOPsFiltered(e, nops, func(nop offchain.NOPConfig) bool {
+		for _, family := range families {
+			if nop.SignerAddressByFamily == nil || nop.SignerAddressByFamily[family] == "" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func fetchSigningKeysForNOPsFiltered(
+	e deployment.Environment,
+	nops []offchain.NOPConfig,
+	include func(offchain.NOPConfig) bool,
+) (fetch_signing_keys.SigningKeysByNOP, error) {
 	if e.Offchain == nil {
-		return nil
+		return nil, nil
 	}
 
 	aliases := make([]string, 0, len(nops))
 	for _, nop := range nops {
-		if nop.SignerAddressByFamily == nil || nop.SignerAddressByFamily[chainsel.FamilyEVM] == "" {
+		if include(nop) {
 			aliases = append(aliases, nop.Alias)
 		}
 	}
 
 	if len(aliases) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	report, err := operations.ExecuteOperation(
@@ -375,11 +399,10 @@ func fetchSigningKeysForNOPs(e deployment.Environment, nops []offchain.NOPConfig
 		},
 	)
 	if err != nil {
-		e.Logger.Warnw("Failed to fetch signing keys from JD", "error", err)
-		return nil
+		return nil, fmt.Errorf("failed to fetch signing keys from JD for NOPs %v: %w", aliases, err)
 	}
 
-	return report.Output.SigningKeysByNOP
+	return report.Output.SigningKeysByNOP, nil
 }
 
 func convertNOPsToVerifierInput(

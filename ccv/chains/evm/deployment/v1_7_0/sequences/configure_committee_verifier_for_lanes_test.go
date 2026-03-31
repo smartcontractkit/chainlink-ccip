@@ -6,12 +6,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -45,11 +47,11 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 						committeeVerifierResolver = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
+				remoteChainSelector := chainsel.TEST_90000002.Selector
 				return sequences.ConfigureCommitteeVerifierAsSourceInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -62,8 +64,8 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 								Version: semver.MustParse("2.0.0"),
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -85,12 +87,12 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 						committeeVerifierResolver = addr.Address
 					}
 				}
-				remoteChainSelector1 := uint64(4356164186791070119)
-				remoteChainSelector2 := uint64(4949039107694359620)
+				remoteChainSelector1 := chainsel.TEST_90000002.Selector
+				remoteChainSelector2 := chainsel.TEST_90000003.Selector
 				return sequences.ConfigureCommitteeVerifierAsSourceInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -103,9 +105,9 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 								Version: semver.MustParse("2.0.0"),
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-							remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector1: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
+							remoteChainSelector2: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -127,14 +129,14 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 						committeeVerifierResolver = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
-				config := testsetup.CreateBasicCommitteeVerifierRemoteChainConfig()
+				remoteChainSelector := chainsel.TEST_90000002.Selector
+				config := testsetup.AdapterCommitteeVerifierRemoteChainConfig()
 				config.AllowlistEnabled = true
 				config.AddedAllowlistedSenders = []string{common.HexToAddress("0x10").Hex(), common.HexToAddress("0x11").Hex()}
 				return sequences.ConfigureCommitteeVerifierAsSourceInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -147,7 +149,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 								Version: semver.MustParse("2.0.0"),
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: config,
 						},
 					},
@@ -158,7 +160,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			chainSelector := uint64(5009297550715157269)
+			chainSelector := chainsel.TEST_90000001.Selector
 			e, err := environment.New(t.Context(),
 				environment.WithEVMSimulated(t, []uint64{chainSelector}),
 			)
@@ -250,10 +252,10 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 						committeeVerifierResolver = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
+				remoteChainSelector := chainsel.TEST_90000002.Selector
 				return sequences.ConfigureCommitteeVerifierAsDestInput{
 					ChainSelector: chainReport.Input.ChainSelector,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -266,8 +268,8 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 								Version: semver.MustParse("2.0.0"),
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -286,11 +288,11 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 						committeeVerifierResolver = addr.Address
 					}
 				}
-				remoteChainSelector1 := uint64(4356164186791070119)
-				remoteChainSelector2 := uint64(4949039107694359620)
+				remoteChainSelector1 := chainsel.TEST_90000002.Selector
+				remoteChainSelector2 := chainsel.TEST_90000003.Selector
 				return sequences.ConfigureCommitteeVerifierAsDestInput{
 					ChainSelector: chainReport.Input.ChainSelector,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -303,9 +305,9 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 								Version: semver.MustParse("2.0.0"),
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-							remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector1: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
+							remoteChainSelector2: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -315,7 +317,7 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			chainSelector := uint64(5009297550715157269)
+			chainSelector := chainsel.TEST_90000001.Selector
 			e, err := environment.New(t.Context(),
 				environment.WithEVMSimulated(t, []uint64{chainSelector}),
 			)
@@ -421,11 +423,11 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 						committeeVerifier = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
+				remoteChainSelector := chainsel.TEST_90000002.Selector
 				return sequences.ConfigureCommitteeVerifierAsSourceInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -433,8 +435,8 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 								Version: committee_verifier.Version,
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -454,11 +456,11 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 						committeeVerifier = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
+				remoteChainSelector := chainsel.TEST_90000002.Selector
 				return sequences.ConfigureCommitteeVerifierAsSourceInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -471,8 +473,8 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 								Version: router.Version,
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -483,7 +485,7 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			chainSelector := uint64(5009297550715157269)
+			chainSelector := chainsel.TEST_90000001.Selector
 			e, err := environment.New(t.Context(),
 				environment.WithEVMSimulated(t, []uint64{chainSelector}),
 			)
@@ -543,10 +545,10 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 						committeeVerifier = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
+				remoteChainSelector := chainsel.TEST_90000002.Selector
 				return sequences.ConfigureCommitteeVerifierAsDestInput{
 					ChainSelector: chainReport.Input.ChainSelector,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -554,8 +556,8 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 								Version: committee_verifier.Version,
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -575,10 +577,10 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 						committeeVerifier = addr.Address
 					}
 				}
-				remoteChainSelector := uint64(4356164186791070119)
+				remoteChainSelector := chainsel.TEST_90000002.Selector
 				return sequences.ConfigureCommitteeVerifierAsDestInput{
 					ChainSelector: chainReport.Input.ChainSelector,
-					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -591,8 +593,8 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 								Version: router.Version,
 							},
 						},
-						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+							remoteChainSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -603,7 +605,7 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			chainSelector := uint64(5009297550715157269)
+			chainSelector := chainsel.TEST_90000001.Selector
 			e, err := environment.New(t.Context(),
 				environment.WithEVMSimulated(t, []uint64{chainSelector}),
 			)

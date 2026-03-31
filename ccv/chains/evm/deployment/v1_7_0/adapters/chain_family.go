@@ -2,8 +2,10 @@ package adapters
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -18,19 +20,27 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
 // ChainFamilyAdapter is the adapter for chains of the EVM family.
 type ChainFamilyAdapter struct{}
 
+var _ ccvadapters.ChainFamily = (*ChainFamilyAdapter)(nil)
+
 // ConfigureLaneLegAsSource returns the sequence for configuring a chain of the EVM family as a source chain for CCIP lanes.
-func (c *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsSource
 }
 
 // ConfigureLaneLegAsDest returns the sequence for configuring a chain of the EVM family as a destination chain for CCIP lanes.
-func (c *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsDest
+}
+
+// ConfigureChainForLanes returns the sequence for configuring an EVM chain for multiple remote lanes.
+func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvadapters.ConfigureChainForLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+	return sequences.ConfigureChainForLanes
 }
 
 func (a *ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -69,7 +79,7 @@ func (a *ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector 
 	return addr, nil
 }
 
-func (c *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, chain.BlockChains] {
 	return evm_sequences.DisableRemoteChainSequence
 }
 
@@ -95,6 +105,19 @@ func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector
 		return nil, err
 	}
 	return addr, nil
+}
+
+// AddressRefToBytes returns the byte representation of an EVM address ref.
+// It validates the hex string and rejects zero addresses.
+func (a *ChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
+	if !common.IsHexAddress(ref.Address) {
+		return nil, fmt.Errorf("invalid EVM address %q in ref %s/%s", ref.Address, ref.Type, ref.Version)
+	}
+	addr := common.HexToAddress(ref.Address)
+	if addr == (common.Address{}) {
+		return nil, fmt.Errorf("zero address in ref %s/%s", ref.Type, ref.Version)
+	}
+	return addr.Bytes(), nil
 }
 
 // evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
