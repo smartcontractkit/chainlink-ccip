@@ -602,18 +602,18 @@ func (a *SVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	return new(big.Int).SetUint64(uint64(balance)), nil
 }
 
-func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
+func (a *SVMAdapter) GetTokenExpansionConfig() (*tokensapi.TokenExpansionInputPerChain, error) {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.PublicKey().String()
 	receiverBytes := a.CCIPReceiver()
 	receiver := solana.PublicKeyFromBytes(receiverBytes).String()
 	registryAddr, err := a.GetRegistryAddress()
 	if err != nil {
-		return tokensapi.TokenExpansionInputPerChain{}
+		return nil, fmt.Errorf("failed to get registry address: %w", err)
 	}
 
 	preMintAmount := uint64(1_000_000) // pre-mint 1 million tokens
-	return tokensapi.TokenExpansionInputPerChain{
+	return &tokensapi.TokenExpansionInputPerChain{
 		TokenPoolVersion: cciputils.Version_1_6_0,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               DefaultTokenDecimals,
@@ -639,7 +639,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			},
 			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 		},
-	}
+	}, nil
 }
 
 func (a *SVMAdapter) GetRegistryAddress() (string, error) {

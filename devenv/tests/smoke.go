@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -20,11 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
-
-var supportedTokenFamilies = map[string]bool{
-	chainsel.FamilyEVM:    true,
-	chainsel.FamilySolana: true,
-}
 
 func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
 	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
@@ -110,14 +106,18 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
 
-			_, fromSupported := supportedTokenFamilies[fromImpl.Family()]
-			_, toSupported := supportedTokenFamilies[toImpl.Family()]
-			if !fromSupported || !toSupported {
-				t.Skip("Token transfers not supported on " + laneTag)
+			fromImplTokenExpansionConfig, err := fromImpl.GetTokenExpansionConfig()
+			if errors.Is(err, errors.ErrUnsupported) {
+				t.Skip("source chain does not support token transfers")
 			}
-
-			srcChainSel, srcTokenCfg := fromImpl.ChainSelector(), fromImpl.GetTokenExpansionConfig().DeployTokenInput
-			dstChainSel, dstTokenCfg := toImpl.ChainSelector(), toImpl.GetTokenExpansionConfig().DeployTokenInput
+			require.NoError(t, err)
+			srcChainSel, srcTokenCfg := fromImpl.ChainSelector(), fromImplTokenExpansionConfig.DeployTokenInput
+			toImplTokenExpansionConfig, err := toImpl.GetTokenExpansionConfig()
+			if errors.Is(err, errors.ErrUnsupported) {
+				t.Skip("destination chain does not support token transfers")
+			}
+			require.NoError(t, err)
+			dstChainSel, dstTokenCfg := toImpl.ChainSelector(), toImplTokenExpansionConfig.DeployTokenInput
 
 			srcTokenFilterDS := datastore.AddressRef{ChainSelector: srcChainSel, Qualifier: srcTokenCfg.Symbol, Type: datastore.ContractType(srcTokenCfg.Type)}
 			srcTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, srcTokenFilterDS, srcChainSel, datastore_utils.FullRef)

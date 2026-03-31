@@ -475,17 +475,17 @@ func (a *EVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	return balance, nil
 }
 
-func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
+func (a *EVMAdapter) GetTokenExpansionConfig() (*tokensapi.TokenExpansionInputPerChain, error) {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.From.Hex()
 	deci := uint8(18)
 	registryAddr, err := a.GetRegistryAddress()
 	if err != nil {
-		return tokensapi.TokenExpansionInputPerChain{}
+		return nil, fmt.Errorf("failed to get registry address: %w", err)
 	}
 
 	preMintAmount := uint64(1_000_000) // pre-mint 1 million tokens
-	return tokensapi.TokenExpansionInputPerChain{
+	return &tokensapi.TokenExpansionInputPerChain{
 		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
@@ -511,7 +511,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			},
 			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 		},
-	}
+	}, nil
 }
 
 func (a *EVMAdapter) GetRegistryAddress() (string, error) {

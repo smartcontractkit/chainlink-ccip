@@ -146,7 +146,8 @@ type TestAdapter interface {
 
 	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing
 	// cross-chain token transfers.
-	GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain
+	// If Token Transfers are not supported for that chain family, return nil and https://pkg.go.dev/errors#ErrUnsupported.
+	GetTokenExpansionConfig() (*tokensapi.TokenExpansionInputPerChain, error)
 
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
 	GetRegistryAddress() (string, error)
