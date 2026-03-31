@@ -26,6 +26,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
+	pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_token_pool"
+	lr_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/lock_release_token_pool"
 )
 
 var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
@@ -85,6 +87,7 @@ func TestDeployTokenAndPool(t *testing.T) {
 		isLockRelease      bool
 		expectedErr        string
 		rateLimitAdminZero bool // when true, set RegistryAddress from chain and RateLimitAdmin zero to exercise getRateLimitAdminFromActivePool (no active pool for new token)
+		reuseExistingToken bool // when true, deploy a token first and pass its address via ConstructorArgs.Token
 	}{
 		{
 			desc:               "happy path - burn mint token pool",
@@ -103,6 +106,11 @@ func TestDeployTokenAndPool(t *testing.T) {
 			isLockRelease:      false,
 			expectedErr:        "",
 			rateLimitAdminZero: true,
+		},
+		{
+			desc:               "reuse existing token - deploys only pool and grants roles",
+			isLockRelease:      false,
+			reuseExistingToken: true,
 		},
 	}
 	for _, test := range tests {
@@ -150,7 +158,26 @@ func TestDeployTokenAndPool(t *testing.T) {
 				input.DeployTokenPoolInput.RateLimitAdmin = common.Address{}
 			}
 
-			// Deploy token and token pool
+			var preDeployedTokenAddr common.Address
+			if test.reuseExistingToken {
+				deployTokenReport, err := operations.ExecuteOperation(
+					e.OperationsBundle,
+					burn_mint_erc20_with_drip.Deploy,
+					e.BlockChains.EVMChains()[chainSel],
+					contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+						ChainSelector:  chainSel,
+						TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
+						Args: burn_mint_erc20_with_drip.ConstructorArgs{
+							Name:   "TEST",
+							Symbol: "TEST",
+						},
+					},
+				)
+				require.NoError(t, err, "Pre-deploying token should not error")
+				preDeployedTokenAddr = common.HexToAddress(deployTokenReport.Output.Address)
+				input.DeployTokenPoolInput.ConstructorArgs.Token = preDeployedTokenAddr
+			}
+
 			poolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				tokens.DeployTokenAndPool,
@@ -166,29 +193,51 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.Len(t, poolReport.Output.BatchOps, 1, "Expected 1 batch operation in output")
 			require.Len(t, poolReport.Output.BatchOps[0].Transactions, 0, "Expected 0 transactions in batch operation")
 
-			tokenAddress := poolReport.Output.Addresses[0].Address
-			poolAddress := poolReport.Output.Addresses[1].Address
+			var tokenAddress string
+			var poolAddress string
 
-			if test.isLockRelease {
+			if test.reuseExistingToken {
+				require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output (pool, hooks) when reusing token")
+				tokenAddress = preDeployedTokenAddr.Hex()
+				poolAddress = poolReport.Output.Addresses[0].Address
+			} else if test.isLockRelease {
 				// Lock release token pool returns 4 addresses: token, pool, hooks, lockBox
 				require.Len(t, poolReport.Output.Addresses, 4, "Expected 4 addresses in output (token, pool, hooks, lockBox)")
+				tokenAddress = poolReport.Output.Addresses[0].Address
+				poolAddress = poolReport.Output.Addresses[1].Address
 			} else {
 				// Burn mint token pool returns 3 addresses: token, pool, hooks
 				require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (token, pool, hooks)")
+				tokenAddress = poolReport.Output.Addresses[0].Address
+				poolAddress = poolReport.Output.Addresses[1].Address
 			}
 
 			// Check token metadata
 			token, err := token_bindings.NewBurnMintERC20WithDrip(common.HexToAddress(tokenAddress), e.BlockChains.EVMChains()[chainSel].Client)
-			require.NoError(t, err, "NewBurnMintERC677 should not error")
+			require.NoError(t, err, "NewBurnMintERC20WithDrip should not error")
 			name, err := token.Name(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "Name should not error")
-			require.Equal(t, input.DeployTokenPoolInput.TokenSymbol, name, "Expected token name to be the same as the deployed token")
+			require.Equal(t, input.DeployTokenPoolInput.TokenSymbol, name, "Expected token name to match")
 			symbol, err := token.Symbol(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "Symbol should not error")
-			require.Equal(t, input.DeployTokenPoolInput.TokenSymbol, symbol, "Expected token symbol to be the same as the deployed token")
+			require.Equal(t, input.DeployTokenPoolInput.TokenSymbol, symbol, "Expected token symbol to match")
 			decimals, err := token.Decimals(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "Decimals should not error")
 			require.Equal(t, uint8(18), decimals, "Expected token decimals to be 18")
+
+			var poolToken common.Address
+			if test.isLockRelease {
+				pool, err := lr_pool_bindings.NewLockReleaseTokenPool(common.HexToAddress(poolAddress), e.BlockChains.EVMChains()[chainSel].Client)
+				require.NoError(t, err, "NewLockReleaseTokenPool should not error")
+				poolToken, err = pool.GetToken(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
+				require.NoError(t, err, "GetToken should not error")
+			} else {
+				pool, err := pool_bindings.NewBurnMintTokenPool(common.HexToAddress(poolAddress), e.BlockChains.EVMChains()[chainSel].Client)
+				require.NoError(t, err, "NewBurnMintTokenPool should not error")
+				poolToken, err = pool.GetToken(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
+				require.NoError(t, err, "GetToken should not error")
+			}
+			require.Equal(t, common.HexToAddress(tokenAddress), poolToken, "Expected pool's token to match the expected token address")
 
 			// For burn mint token pools, check mint and burn roles
 			// Check token minters
@@ -213,7 +262,7 @@ func TestDeployTokenAndPool(t *testing.T) {
 			for addr, amount := range input.Accounts {
 				balance, err := token.BalanceOf(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, addr)
 				require.NoError(t, err, "BalanceOf should not error")
-				require.Equal(t, amount, balance, "Expected balance of account %s to be the same as the deployed token", addr)
+				require.Equal(t, amount, balance, "Expected balance of account %s to match", addr)
 			}
 		})
 	}

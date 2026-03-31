@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -29,17 +31,17 @@ type ChainFamilyAdapter struct{}
 var _ ccvadapters.ChainFamily = (*ChainFamilyAdapter)(nil)
 
 // ConfigureLaneLegAsSource returns the sequence for configuring a chain of the EVM family as a source chain for CCIP lanes.
-func (a *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsSource
 }
 
 // ConfigureLaneLegAsDest returns the sequence for configuring a chain of the EVM family as a destination chain for CCIP lanes.
-func (a *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsDest
 }
 
 // ConfigureChainForLanes returns the sequence for configuring an EVM chain for multiple remote lanes.
-func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvadapters.ConfigureChainForLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvadapters.ConfigureChainForLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureChainForLanes
 }
 
@@ -79,7 +81,36 @@ func (a *ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector 
 	return addr, nil
 }
 
-func (a *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *ChainFamilyAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) ([]byte, error) {
+	onRampAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(onramp.ContractType),
+		Version:       onramp.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find onramp address for chain selector %d: %w", chainSelector, err)
+	}
+
+	chain := chains.EVMChains()[chainSelector]
+
+	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
+	}
+
+	dynamicConfig, err := onrampContract.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to call GetDynamicConfig on onramp contract for chain selector %d: %w", chainSelector, err)
+	}
+
+	fqAddress := dynamicConfig.FeeQuoter
+	if fqAddress == (common.Address{}) {
+		return nil, fmt.Errorf("fee quoter address is zero in onramp dynamic config for chain selector %d", chainSelector)
+	}
+	return common.Address(fqAddress).Bytes(), nil
+}
+
+func (a *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return evm_sequences.DisableRemoteChainSequence
 }
 

@@ -38,7 +38,12 @@ type LaneAdapter interface {
 // to report the FeeQuoter contract version for a chain (e.g. 1.6.x vs 2.0.x).
 // When set, it is used to choose the correct FeeQuoter operations in update_lanes.
 type FeeQuoterVersionProvider interface {
-	GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64) (*semver.Version, error)
+	GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64, chains cldf_chain.BlockChains) (*semver.Version, error)
+}
+
+// DynamicFeeQuoter is an optional interface that LaneAdapters can implement to dynamically retrieve the FeeQuoter.
+type DynamicFeeQuoter interface {
+	GetFQAddressDynamic(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) ([]byte, error)
 }
 
 // TokenPriceProvider is an optional interface that LaneAdapters can implement
