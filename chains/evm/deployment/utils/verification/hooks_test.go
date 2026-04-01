@@ -66,6 +66,42 @@ func newDomainWithExplorerNetwork(t *testing.T, chainSelector uint64, explorerUR
 	return dom
 }
 
+// newDomainWithTwoEVMSourcifyNetworks writes domain config with two mainnet EVM networks (e.g. Ethereum
+// and Polygon) sharing the same Sourcify explorer URL (typically an httptest server).
+func newDomainWithTwoEVMSourcifyNetworks(t *testing.T, explorerURL string, chainSelectorA, chainSelectorB uint64) domain.Domain {
+	t.Helper()
+
+	dom := domain.NewDomain(t.TempDir(), "test")
+	require.NoError(t, os.MkdirAll(dom.ConfigNetworksDirPath(), 0o755))
+
+	networkYAML := fmt.Sprintf(`networks:
+  - type: mainnet
+    chain_selector: %d
+    block_explorer:
+      type: sourcify
+      url: %q
+    rpcs:
+      - http_url: http://127.0.0.1:8545
+  - type: mainnet
+    chain_selector: %d
+    block_explorer:
+      type: sourcify
+      url: %q
+    rpcs:
+      - http_url: http://127.0.0.1:8545
+`, chainSelectorA, explorerURL, chainSelectorB, explorerURL)
+	require.NoError(t, os.WriteFile(dom.ConfigNetworksFilePath("networks.yaml"), []byte(networkYAML), 0o600))
+
+	domainYAML := fmt.Sprintf(`environments:
+  %s:
+    network_types:
+      - mainnet
+`, verificationHookEnv)
+	require.NoError(t, os.WriteFile(dom.ConfigDomainFilePath(), []byte(domainYAML), 0o600))
+
+	return dom
+}
+
 func writeEnvDatastoreWithRefs(t *testing.T, dom domain.Domain, refs []datastore.AddressRef) {
 	t.Helper()
 
@@ -516,11 +552,102 @@ func TestRequireVerified_PreHook_Sourcify_ExplorerError(t *testing.T) {
 	require.ErrorContains(t, err, "failed to check verification status")
 }
 
-func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies(t *testing.T) {
+// TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_EVMSourcifyEndToEnd registers the EVM
+// verifier once, requests two EVM chain selectors in the same family, and asserts a single pre-hook
+// verifies contracts on both chains against a mock Sourcify server (same pattern as
+// TestRequireVerified_PreHook_Sourcify_AlreadyVerified).
+func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_EVMSourcifyEndToEnd(t *testing.T) {
+	registerMyContractV1(t)
 	hooks.ResetContractVerificationRegistryForTest()
-	r := hooks.GetContractVerificationRegistry()
-	r.Register(chainsel.FamilyEVM, &EVMContractInputsProvider{})
+	hooks.GetContractVerificationRegistry().Register(chainsel.FamilyEVM, testEVMVerifier())
 
+	var sourcifyCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sourcifyCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "full"})
+	}))
+	t.Cleanup(server.Close)
+
+	eth := chainsel.ETHEREUM_MAINNET
+	poly := chainsel.POLYGON_MAINNET
+	dom := newDomainWithTwoEVMSourcifyNetworks(t, server.URL, eth.Selector, poly.Selector)
+
+	refs := []datastore.AddressRef{
+		{
+			ChainSelector: eth.Selector,
+			Type:            "MyContract",
+			Version:         semver.MustParse("1.0.0"),
+			Address:         "0x0000000000000000000000000000000000000001",
+		},
+		{
+			ChainSelector: poly.Selector,
+			Type:            "MyContract",
+			Version:         semver.MustParse("1.0.0"),
+			Address:         "0x0000000000000000000000000000000000000002",
+		},
+	}
+	writeEnvDatastoreWithRefs(t, dom, refs)
+
+	preHooks := hooks.RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom,
+		[]uint64{eth.Selector, poly.Selector}, nil)
+	require.Len(t, preHooks, 1, "two EVM selectors share one chain family → one pre-hook")
+	require.Equal(t, hooks.RequireVerifiedEnvContractsHookName, preHooks[0].Name)
+
+	err := preHooks[0].Func(t.Context(), changeset.PreHookParams{
+		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
+	})
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, sourcifyCalls, 2, "each chain’s contract should hit the explorer")
+}
+
+// TestVerifyDeployedContractsPostHookForMultipleChainFamilies_EVMSourcifyEndToEnd uses the registry
+// multifamily post-hook with two EVM selectors; contracts are already reported verified by the mock
+// Sourcify server so the hook completes without submission errors.
+func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_EVMSourcifyEndToEnd(t *testing.T) {
+	registerMyContractV1(t)
+	hooks.ResetContractVerificationRegistryForTest()
+	hooks.GetContractVerificationRegistry().Register(chainsel.FamilyEVM, testEVMVerifier())
+
+	var sourcifyCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sourcifyCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "full"})
+	}))
+	t.Cleanup(server.Close)
+
+	eth := chainsel.ETHEREUM_MAINNET
+	poly := chainsel.POLYGON_MAINNET
+	dom := newDomainWithTwoEVMSourcifyNetworks(t, server.URL, eth.Selector, poly.Selector)
+
+	mds := datastore.NewMemoryDataStore()
+	require.NoError(t, mds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: eth.Selector,
+		Type:            "MyContract",
+		Version:         semver.MustParse("1.0.0"),
+		Address:         "0x0000000000000000000000000000000000000001",
+	}))
+	require.NoError(t, mds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: poly.Selector,
+		Type:            "MyContract",
+		Version:         semver.MustParse("1.0.0"),
+		Address:         "0x0000000000000000000000000000000000000002",
+	}))
+
+	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom,
+		[]uint64{eth.Selector, poly.Selector})
+	require.Len(t, postHooks, 1, "two EVM selectors share one chain family → one post-hook")
+	require.Equal(t, hooks.VerifyDeployedContractsHookName, postHooks[0].Name)
+
+	err := postHooks[0].Func(t.Context(), changeset.PostHookParams{
+		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
+		Output: cldf.ChangesetOutput{
+			DataStore: mds,
+		},
+	})
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, sourcifyCalls, 2, "post-hook should check verification per chain")
 }
 
 func mkdirAllAndWrite(t *testing.T, path string) error {
