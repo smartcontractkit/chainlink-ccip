@@ -83,10 +83,14 @@ type ConfigureChainForLanesInput struct {
 	AllowOnrampOverride bool
 	Router              string
 	OnRamp              string
-	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
-	FeeQuoter          string
-	OffRamp            string
-	RemoteChains       map[uint64]RemoteChainConfig[[]byte, string]
+	CommitteeVerifiers  []CommitteeVerifierConfig[datastore.AddressRef]
+	FeeQuoter           string
+	OffRamp             string
+	RemoteChains        map[uint64]RemoteChainConfig[[]byte, string]
+	// FamilyExtras holds chain-family-specific configuration passed through
+	// from the changeset. Each family adapter's sequence is responsible for
+	// interpreting this map. All values must be serializable.
+	FamilyExtras map[string]any
 }
 
 // ChainFamily is a configurable chain family for chain-centric lane setup.

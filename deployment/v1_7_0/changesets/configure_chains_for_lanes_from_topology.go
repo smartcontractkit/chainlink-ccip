@@ -66,6 +66,10 @@ type PartialChainConfig struct {
 	UseTestRouter      bool
 	CommitteeVerifiers []CommitteeVerifierInputConfig
 	RemoteChains       map[uint64]PartialRemoteChainConfig
+	// FamilyExtras holds chain-family-specific configuration that the generic
+	// changeset passes through opaquely to the family adapter's sequence.
+	// All values must be serializable.
+	FamilyExtras map[string]any
 }
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
@@ -82,6 +86,7 @@ type enrichedChainConfig struct {
 	UseTestRouter      bool
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
 	RemoteChains       map[uint64]PartialRemoteChainConfig
+	FamilyExtras       map[string]any
 }
 
 // ConfigureChainsForLanesFromTopology is the canonical changeset for configuring CCIP 2.0
@@ -203,6 +208,7 @@ func ConfigureChainsForLanesFromTopology(
 				UseTestRouter:      chainCfg.UseTestRouter,
 				CommitteeVerifiers: committeeVerifiers,
 				RemoteChains:       chainCfg.RemoteChains,
+				FamilyExtras:       chainCfg.FamilyExtras,
 			})
 		}
 
@@ -312,11 +318,12 @@ func applyConfigureChains(
 			ChainSelector:       chainCfg.ChainSelector,
 			AllowOnrampOverride: chainCfg.UseTestRouter,
 			Router:              routerAddr,
-			OnRamp:             fmt.Sprintf("0x%x", onRampBytes),
-			CommitteeVerifiers: committeeVerifiers,
-			FeeQuoter:          fmt.Sprintf("0x%x", feeQuoterBytes),
-			OffRamp:            fmt.Sprintf("0x%x", offRampBytes),
-			RemoteChains:       remoteChains,
+			OnRamp:              fmt.Sprintf("0x%x", onRampBytes),
+			CommitteeVerifiers:  committeeVerifiers,
+			FeeQuoter:           fmt.Sprintf("0x%x", feeQuoterBytes),
+			OffRamp:             fmt.Sprintf("0x%x", offRampBytes),
+			RemoteChains:        remoteChains,
+			FamilyExtras:        chainCfg.FamilyExtras,
 		})
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chainCfg.ChainSelector, err)
