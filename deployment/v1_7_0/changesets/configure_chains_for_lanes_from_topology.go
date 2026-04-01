@@ -63,7 +63,6 @@ type PartialRemoteChainConfig struct {
 // destination) is supported naturally.
 type PartialChainConfig struct {
 	ChainSelector      uint64
-	UseTestRouter      bool
 	CommitteeVerifiers []CommitteeVerifierInputConfig
 	RemoteChains       map[uint64]PartialRemoteChainConfig
 	// FamilyExtras holds chain-family-specific configuration that the generic
@@ -73,9 +72,10 @@ type PartialChainConfig struct {
 }
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
-	Topology *offchain.EnvironmentTopology
-	Chains   []PartialChainConfig
-	MCMS     mcms.Input
+	Topology      *offchain.EnvironmentTopology
+	Chains        []PartialChainConfig
+	MCMS          mcms.Input
+	UseTestRouter bool
 }
 
 // enrichedChainConfig is the internal representation of a chain config after the
@@ -83,7 +83,6 @@ type ConfigureChainsForLanesFromTopologyConfig struct {
 // but carries fully populated CommitteeVerifierConfig (with signers/threshold filled in).
 type enrichedChainConfig struct {
 	ChainSelector      uint64
-	UseTestRouter      bool
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
 	RemoteChains       map[uint64]PartialRemoteChainConfig
 	FamilyExtras       map[string]any
@@ -205,14 +204,13 @@ func ConfigureChainsForLanesFromTopology(
 
 			chains = append(chains, enrichedChainConfig{
 				ChainSelector:      chainCfg.ChainSelector,
-				UseTestRouter:      chainCfg.UseTestRouter,
 				CommitteeVerifiers: committeeVerifiers,
 				RemoteChains:       chainCfg.RemoteChains,
 				FamilyExtras:       chainCfg.FamilyExtras,
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.MCMS)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.MCMS, cfg.UseTestRouter)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -235,6 +233,7 @@ func applyConfigureChains(
 	mcmsRegistry *changesetscore.MCMSReaderRegistry,
 	chains []enrichedChainConfig,
 	mcmsInput mcms.Input,
+	useTestRouter bool,
 ) (deployment.ChangesetOutput, error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -252,7 +251,7 @@ func applyConfigureChains(
 		}
 
 		var routerAddr string
-		if chainCfg.UseTestRouter {
+		if useTestRouter {
 			routerBytes, rErr := adapter.GetTestRouter(e.DataStore, chainCfg.ChainSelector)
 			if rErr != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve test router on chain %d: %w", chainCfg.ChainSelector, rErr)
@@ -316,7 +315,7 @@ func applyConfigureChains(
 		// ── Phase 3: Dispatch ──────────────────────────────────────────────
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
 			ChainSelector:       chainCfg.ChainSelector,
-			AllowOnrampOverride: chainCfg.UseTestRouter,
+			AllowOnrampOverride: useTestRouter,
 			Router:              routerAddr,
 			OnRamp:              fmt.Sprintf("0x%x", onRampBytes),
 			CommitteeVerifiers:  committeeVerifiers,

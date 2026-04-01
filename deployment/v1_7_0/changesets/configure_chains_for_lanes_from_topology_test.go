@@ -629,10 +629,10 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 				},
 			},
 		},
+		UseTestRouter: true,
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				UseTestRouter: true,
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
 				},
@@ -698,10 +698,10 @@ func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(
 				},
 			},
 		},
+		UseTestRouter: false,
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				UseTestRouter: false,
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
 				},

@@ -1211,3 +1211,101 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 		"second run should skip gas price update since value is already set")
 }
 
+func TestConfigureChainForLanes_RejectsOnRampRouterDowngrade(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	input.AllowOnrampOverride = true
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err, "first run with prod router should succeed")
+
+	downgradeInput := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	downgradeInput.Router = localWithTest.testRouter
+	downgradeInput.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, downgradeInput,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OnRamp")
+	assert.Contains(t, err.Error(), "refusing to overwrite")
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.onRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, common.HexToAddress(localWithTest.router), onRampCfg.Output.Router,
+		"OnRamp router should still point to the prod router after rejected downgrade")
+}
+
+func TestConfigureChainForLanes_RejectsOffRampRouterDowngrade(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	prodRouter := common.HexToAddress(localWithTest.router)
+
+	// Pre-configure only the OffRamp source chain config with the prod router.
+	// The OnRamp is left unconfigured so its router is zero — the OnRamp check
+	// passes, and the OffRamp check is what triggers the guard.
+	_, err = operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		offramp.ApplySourceChainConfigUpdates, evmChain,
+		contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(localWithTest.offRamp),
+			Args: []offramp.SourceChainConfigArgs{{
+				Router:              prodRouter,
+				SourceChainSelector: remoteSelector,
+				IsEnabled:           true,
+				OnRamps:             [][]byte{common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32)},
+			}},
+		},
+	)
+	require.NoError(t, err)
+
+	downgradeInput := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	downgradeInput.Router = localWithTest.testRouter
+	downgradeInput.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, downgradeInput,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OffRamp")
+	assert.Contains(t, err.Error(), "refusing to overwrite")
+
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	offRampCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.offRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, prodRouter, offRampCfg.Output.Router,
+		"OffRamp router should still point to the prod router after rejected downgrade")
+}
+
