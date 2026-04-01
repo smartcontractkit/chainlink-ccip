@@ -454,13 +454,11 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 	if desired.AddressBytesLength == 0 {
 		desired.AddressBytesLength = current.AddressBytesLength
 	}
-	desiredDefaultCCVs := desired.DefaultCCVs
-	if len(desiredDefaultCCVs) == 0 {
-		desiredDefaultCCVs = current.DefaultCCVs
+	if len(desired.DefaultCCVs) == 0 {
+		desired.DefaultCCVs = current.DefaultCCVs
 	}
-	desiredLaneMandatedCCVs := desired.LaneMandatedCCVs
-	if len(desiredLaneMandatedCCVs) == 0 {
-		desiredLaneMandatedCCVs = current.LaneMandatedCCVs
+	if len(desired.LaneMandatedCCVs) == 0 {
+		desired.LaneMandatedCCVs = current.LaneMandatedCCVs
 	}
 
 	if current.Router != desired.Router || current.DefaultExecutor != desired.DefaultExecutor ||
@@ -470,8 +468,8 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 		current.TokenNetworkFeeUSDCents != desired.TokenNetworkFeeUSDCents ||
 		current.BaseExecutionGasCost != desired.BaseExecutionGasCost ||
 		current.AddressBytesLength != desired.AddressBytesLength ||
-		!UnorderedSliceEqual(current.DefaultCCVs, desiredDefaultCCVs, func(x, y common.Address) bool { return x == y }) ||
-		!UnorderedSliceEqual(current.LaneMandatedCCVs, desiredLaneMandatedCCVs, func(x, y common.Address) bool { return x == y }) {
+		!UnorderedSliceEqual(current.DefaultCCVs, desired.DefaultCCVs, func(x, y common.Address) bool { return x == y }) ||
+		!UnorderedSliceEqual(current.LaneMandatedCCVs, desired.LaneMandatedCCVs, func(x, y common.Address) bool { return x == y }) {
 		onRampArgs = append(onRampArgs, desired)
 	}
 	return onRampArgs, nil
