@@ -34,26 +34,61 @@ type MigrateHybridPoolRemoteInput struct {
 	RemoteTokenAddress   common.Address
 }
 
-var migrationSetPool = evm_contract.NewWrite(evm_contract.WriteParams[
-	tar_ops.SetPoolArgs,
-	*token_admin_registry.TokenAdminRegistry,
-]{
-	Name:         "migration:token-admin-registry:set-pool",
-	Version:      tar_ops.Version,
-	Description:  "Proposal-only setPool for token-pool migration",
-	ContractType: tar_ops.ContractType,
-	ContractABI:  token_admin_registry.TokenAdminRegistryABI,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
-	IsAllowedCaller: evm_contract.NoCallersAllowed[
-		*token_admin_registry.TokenAdminRegistry,
-		tar_ops.SetPoolArgs,
-	],
-	Validate: func(tar_ops.SetPoolArgs) error { return nil },
-	CallContract: func(
-		c *token_admin_registry.TokenAdminRegistry,
-		opts *bind.TransactOpts,
-		args tar_ops.SetPoolArgs,
-	) (*types.Transaction, error) {
+// Migration-specific operation wrappers with NoCallersAllowed to guarantee all writes
+// are collected for a single atomic MCMS proposal rather than executed directly.
+
+var migrationAddRemotePool = evm_contract.NewWrite(evm_contract.WriteParams[hybrid_pool_ops.AddRemotePoolArgs, *hybrid_pool_binding.HybridWithExternalMinterTokenPool]{
+	Name:            "migration:hybrid-pool:add-remote-pool",
+	Version:         hybrid_pool_ops.Version,
+	Description:     "Proposal-only addRemotePool for token-pool migration",
+	ContractType:    hybrid_pool_ops.ContractType,
+	ContractABI:     hybrid_pool_binding.HybridWithExternalMinterTokenPoolABI,
+	NewContract:     hybrid_pool_binding.NewHybridWithExternalMinterTokenPool,
+	IsAllowedCaller: evm_contract.NoCallersAllowed[*hybrid_pool_binding.HybridWithExternalMinterTokenPool, hybrid_pool_ops.AddRemotePoolArgs],
+	Validate:        func(hybrid_pool_ops.AddRemotePoolArgs) error { return nil },
+	CallContract: func(c *hybrid_pool_binding.HybridWithExternalMinterTokenPool, opts *bind.TransactOpts, args hybrid_pool_ops.AddRemotePoolArgs) (*types.Transaction, error) {
+		return c.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var migrationRemoveRemotePool = evm_contract.NewWrite(evm_contract.WriteParams[hybrid_pool_ops.RemoveRemotePoolArgs, *hybrid_pool_binding.HybridWithExternalMinterTokenPool]{
+	Name:            "migration:hybrid-pool:remove-remote-pool",
+	Version:         hybrid_pool_ops.Version,
+	Description:     "Proposal-only removeRemotePool for token-pool migration",
+	ContractType:    hybrid_pool_ops.ContractType,
+	ContractABI:     hybrid_pool_binding.HybridWithExternalMinterTokenPoolABI,
+	NewContract:     hybrid_pool_binding.NewHybridWithExternalMinterTokenPool,
+	IsAllowedCaller: evm_contract.NoCallersAllowed[*hybrid_pool_binding.HybridWithExternalMinterTokenPool, hybrid_pool_ops.RemoveRemotePoolArgs],
+	Validate:        func(hybrid_pool_ops.RemoveRemotePoolArgs) error { return nil },
+	CallContract: func(c *hybrid_pool_binding.HybridWithExternalMinterTokenPool, opts *bind.TransactOpts, args hybrid_pool_ops.RemoveRemotePoolArgs) (*types.Transaction, error) {
+		return c.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var migrationUpdateGroups = evm_contract.NewWrite(evm_contract.WriteParams[hybrid_pool_ops.UpdateGroupsArgs, *hybrid_pool_binding.HybridWithExternalMinterTokenPool]{
+	Name:            "migration:hybrid-pool:update-groups",
+	Version:         hybrid_pool_ops.Version,
+	Description:     "Proposal-only updateGroups for token-pool migration",
+	ContractType:    hybrid_pool_ops.ContractType,
+	ContractABI:     hybrid_pool_binding.HybridWithExternalMinterTokenPoolABI,
+	NewContract:     hybrid_pool_binding.NewHybridWithExternalMinterTokenPool,
+	IsAllowedCaller: evm_contract.NoCallersAllowed[*hybrid_pool_binding.HybridWithExternalMinterTokenPool, hybrid_pool_ops.UpdateGroupsArgs],
+	Validate:        func(hybrid_pool_ops.UpdateGroupsArgs) error { return nil },
+	CallContract: func(c *hybrid_pool_binding.HybridWithExternalMinterTokenPool, opts *bind.TransactOpts, args hybrid_pool_ops.UpdateGroupsArgs) (*types.Transaction, error) {
+		return c.UpdateGroups(opts, args.GroupUpdates)
+	},
+})
+
+var migrationSetPool = evm_contract.NewWrite(evm_contract.WriteParams[tar_ops.SetPoolArgs, *token_admin_registry.TokenAdminRegistry]{
+	Name:            "migration:token-admin-registry:set-pool",
+	Version:         tar_ops.Version,
+	Description:     "Proposal-only setPool for token-pool migration",
+	ContractType:    tar_ops.ContractType,
+	ContractABI:     token_admin_registry.TokenAdminRegistryABI,
+	NewContract:     token_admin_registry.NewTokenAdminRegistry,
+	IsAllowedCaller: evm_contract.NoCallersAllowed[*token_admin_registry.TokenAdminRegistry, tar_ops.SetPoolArgs],
+	Validate:        func(tar_ops.SetPoolArgs) error { return nil },
+	CallContract: func(c *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args tar_ops.SetPoolArgs) (*types.Transaction, error) {
 		return c.SetPool(opts, args.TokenAddress, args.TokenPoolAddress)
 	},
 })
@@ -111,7 +146,7 @@ var MigrateHybridPoolRemote = cldf_ops.NewSequence(
 		}
 
 		if !newPresent {
-			addReport, err := cldf_ops.ExecuteOperation(b, hybrid_pool_ops.AddRemotePool, hubChain, evm_contract.FunctionInput[hybrid_pool_ops.AddRemotePoolArgs]{
+			addReport, err := cldf_ops.ExecuteOperation(b, migrationAddRemotePool, hubChain, evm_contract.FunctionInput[hybrid_pool_ops.AddRemotePoolArgs]{
 				ChainSelector: input.HubChainSelector,
 				Address:       input.HubPoolAddress,
 				Args: hybrid_pool_ops.AddRemotePoolArgs{
@@ -126,7 +161,7 @@ var MigrateHybridPoolRemote = cldf_ops.NewSequence(
 		}
 
 		if oldPresent {
-			removeReport, err := cldf_ops.ExecuteOperation(b, hybrid_pool_ops.RemoveRemotePool, hubChain, evm_contract.FunctionInput[hybrid_pool_ops.RemoveRemotePoolArgs]{
+			removeReport, err := cldf_ops.ExecuteOperation(b, migrationRemoveRemotePool, hubChain, evm_contract.FunctionInput[hybrid_pool_ops.RemoveRemotePoolArgs]{
 				ChainSelector: input.HubChainSelector,
 				Address:       input.HubPoolAddress,
 				Args: hybrid_pool_ops.RemoveRemotePoolArgs{
@@ -149,7 +184,7 @@ var MigrateHybridPoolRemote = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to read hub group for remote chain %d: %w", input.RemoteChainSelector, err)
 		}
 		if groupReport.Output != input.TargetGroup {
-			updateReport, err := cldf_ops.ExecuteOperation(b, hybrid_pool_ops.UpdateGroups, hubChain, evm_contract.FunctionInput[hybrid_pool_ops.UpdateGroupsArgs]{
+			updateReport, err := cldf_ops.ExecuteOperation(b, migrationUpdateGroups, hubChain, evm_contract.FunctionInput[hybrid_pool_ops.UpdateGroupsArgs]{
 				ChainSelector: input.HubChainSelector,
 				Address:       input.HubPoolAddress,
 				Args: hybrid_pool_ops.UpdateGroupsArgs{

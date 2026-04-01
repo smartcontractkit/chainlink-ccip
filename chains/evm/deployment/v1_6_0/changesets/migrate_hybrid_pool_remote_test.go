@@ -8,13 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
 	burn_mint_with_external_minter_token_pool_bindings "github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/burn_mint_with_external_minter_token_pool"
 	hybrid_with_external_minter_token_pool_bindings "github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/hybrid_with_external_minter_token_pool"
 	token_governor_bindings "github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	v1_6_0_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
 	v1_6_0_burn_mint_with_external_minter_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/burn_mint_with_external_minter_token_pool"
 	v1_6_0_hybrid_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/hybrid_with_external_minter_token_pool"
@@ -111,7 +111,8 @@ func newMigrateHybridPoolRemoteFixtureWithPreMint(t *testing.T, remotePreMint *b
 		common.HexToAddress("0x0000000000000000000000000000000000000022"),
 	)
 	require.NoError(t, err)
-	confirmTx(t, hubChain, tx, err)
+	_, err = hubChain.Confirm(tx)
+	require.NoError(t, err)
 
 	oldRemotePoolAddress, tx, _, err := lock_release_token_pool_bindings.DeployLockReleaseTokenPool(
 		remoteChain.DeployerKey,
@@ -124,7 +125,8 @@ func newMigrateHybridPoolRemoteFixtureWithPreMint(t *testing.T, remotePreMint *b
 		common.HexToAddress("0x0000000000000000000000000000000000000022"),
 	)
 	require.NoError(t, err)
-	confirmTx(t, remoteChain, tx, err)
+	_, err = remoteChain.Confirm(tx)
+	require.NoError(t, err)
 
 	newRemotePoolAddress, tx, _, err := burn_mint_with_external_minter_token_pool_bindings.DeployBurnMintWithExternalMinterTokenPool(
 		remoteChain.DeployerKey,
@@ -137,16 +139,22 @@ func newMigrateHybridPoolRemoteFixtureWithPreMint(t *testing.T, remotePreMint *b
 		common.HexToAddress("0x0000000000000000000000000000000000000022"),
 	)
 	require.NoError(t, err)
-	confirmTx(t, remoteChain, tx, err)
+	_, err = remoteChain.Confirm(tx)
+	require.NoError(t, err)
 
 	remoteTARAddress, tx, remoteTAR, err := token_admin_registry_bindings.DeployTokenAdminRegistry(remoteChain.DeployerKey, remoteChain.Client)
 	require.NoError(t, err)
-	confirmTx(t, remoteChain, tx, err)
+	_, err = remoteChain.Confirm(tx)
+	require.NoError(t, err)
 
 	tx, err = remoteTAR.ProposeAdministrator(remoteChain.DeployerKey, remoteTokenAddress, remoteChain.DeployerKey.From)
-	confirmTx(t, remoteChain, tx, err)
+	require.NoError(t, err)
+	_, err = remoteChain.Confirm(tx)
+	require.NoError(t, err)
 	tx, err = remoteTAR.AcceptAdminRole(remoteChain.DeployerKey, remoteTokenAddress)
-	confirmTx(t, remoteChain, tx, err)
+	require.NoError(t, err)
+	_, err = remoteChain.Confirm(tx)
+	require.NoError(t, err)
 
 	reader := &migrateHybridPoolRemoteMockReader{
 		timelockByChain: map[uint64]string{
@@ -160,6 +168,16 @@ func newMigrateHybridPoolRemoteFixtureWithPreMint(t *testing.T, remotePreMint *b
 	}
 	registry := &core_changesets.MCMSReaderRegistry{}
 	registry.RegisterMCMSReader(chainsel.FamilyEVM, reader)
+
+	// Register the TAR in the datastore so the changeset can resolve it.
+	ds := cldf_datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(cldf_datastore.AddressRef{
+		ChainSelector: remoteSelector,
+		Type:          cldf_datastore.ContractType(tar_ops.ContractType),
+		Version:       tar_ops.Version,
+		Address:       remoteTARAddress.Hex(),
+	}))
+	e.DataStore = ds.Seal()
 
 	return &migrateHybridPoolRemoteFixture{
 		env:                  e,
@@ -195,7 +213,8 @@ func deployTokenAndGovernor(t *testing.T, chain evm.Chain, symbolSuffix string, 
 		preMintCopy,
 	)
 	require.NoError(t, err)
-	confirmTx(t, chain, tx, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
 
 	tokenGovernorAddress, tx, _, err := token_governor_bindings.DeployTokenGovernor(
 		chain.DeployerKey,
@@ -205,15 +224,10 @@ func deployTokenAndGovernor(t *testing.T, chain evm.Chain, symbolSuffix string, 
 		chain.DeployerKey.From,
 	)
 	require.NoError(t, err)
-	confirmTx(t, chain, tx, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
 
 	return tokenAddress, tokenGovernorAddress
-}
-
-func confirmTx(t *testing.T, chain evm.Chain, tx *types.Transaction, callErr error) {
-	t.Helper()
-	_, err := cldf.ConfirmIfNoError(chain, tx, callErr)
-	require.NoError(t, err)
 }
 
 func (f *migrateHybridPoolRemoteFixture) changeset(registry *core_changesets.MCMSReaderRegistry) cldf.ChangeSetV2[v1_6_0_changesets.MigrateHybridPoolRemoteConfig] {
@@ -223,14 +237,12 @@ func (f *migrateHybridPoolRemoteFixture) changeset(registry *core_changesets.MCM
 func (f *migrateHybridPoolRemoteFixture) validConfig(targetGroup uint8) v1_6_0_changesets.MigrateHybridPoolRemoteConfig {
 	return v1_6_0_changesets.MigrateHybridPoolRemoteConfig{
 		HubChainSelector:     f.hubSelector,
-		HubPoolAddress:       f.hubPoolAddress.Hex(),
+		HubPoolAddress:       f.hubPoolAddress,
 		RemoteChainSelector:  f.remoteSelector,
-		NewRemotePoolAddress: f.newRemotePoolAddress.Hex(),
-		OldRemotePoolAddress: f.oldRemotePoolAddress.Hex(),
-		RemoteChainSupply:    new(big.Int).Set(f.remoteChainSupply),
+		NewRemotePoolAddress: f.newRemotePoolAddress,
+		OldRemotePoolAddress: f.oldRemotePoolAddress,
 		TargetGroup:          targetGroup,
-		RemoteTARAddress:     f.remoteTARAddress.Hex(),
-		RemoteTokenAddress:   f.remoteTokenAddress.Hex(),
+		RemoteTokenAddress:   f.remoteTokenAddress,
 		MCMS: mcms.Input{
 			TimelockAction: mcms_types.TimelockActionSchedule,
 			ValidUntil:     uint32(time.Now().UTC().Add(24 * time.Hour).Unix()),
@@ -267,7 +279,9 @@ func (f *migrateHybridPoolRemoteFixture) addHubRemotePool(t *testing.T, pool com
 				},
 			},
 		)
-		confirmTx(t, f.hubChain, tx, err)
+		require.NoError(t, err)
+		_, err = f.hubChain.Confirm(tx)
+		require.NoError(t, err)
 		return
 	}
 
@@ -276,44 +290,17 @@ func (f *migrateHybridPoolRemoteFixture) addHubRemotePool(t *testing.T, pool com
 		f.remoteSelector,
 		common.LeftPadBytes(pool.Bytes(), 32),
 	)
-	confirmTx(t, f.hubChain, tx, err)
+	require.NoError(t, err)
+	_, err = f.hubChain.Confirm(tx)
+	require.NoError(t, err)
 }
 
 func (f *migrateHybridPoolRemoteFixture) setTARPool(t *testing.T, pool common.Address) {
 	t.Helper()
 	tx, err := f.remoteTAR.SetPool(f.remoteChain.DeployerKey, f.remoteTokenAddress, pool)
-	confirmTx(t, f.remoteChain, tx, err)
-}
-
-func (f *migrateHybridPoolRemoteFixture) addRawHubRemotePool(t *testing.T, pool common.Address) {
-	t.Helper()
-	tx, err := f.hubPool.AddRemotePool(
-		f.hubChain.DeployerKey,
-		f.remoteSelector,
-		common.LeftPadBytes(pool.Bytes(), 32),
-	)
-	confirmTx(t, f.hubChain, tx, err)
-}
-
-func (f *migrateHybridPoolRemoteFixture) currentHubRemotePools(t *testing.T) [][]byte {
-	t.Helper()
-	remotePools, err := f.hubPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, f.remoteSelector)
 	require.NoError(t, err)
-	return remotePools
-}
-
-func (f *migrateHybridPoolRemoteFixture) currentHubGroup(t *testing.T) uint8 {
-	t.Helper()
-	group, err := f.hubPool.GetGroup(&bind.CallOpts{Context: t.Context()}, f.remoteSelector)
+	_, err = f.remoteChain.Confirm(tx)
 	require.NoError(t, err)
-	return group
-}
-
-func (f *migrateHybridPoolRemoteFixture) currentTARPool(t *testing.T) common.Address {
-	t.Helper()
-	cfg, err := f.remoteTAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, f.remoteTokenAddress)
-	require.NoError(t, err)
-	return cfg.TokenPool
 }
 
 func TestMigrateHybridPoolRemote_VerifyPreconditions_Valid(t *testing.T) {
@@ -331,25 +318,11 @@ func TestMigrateHybridPoolRemote_VerifyPreconditions_InvalidInputs(t *testing.T)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 	cs := fixture.changeset(fixture.registry)
 
-	t.Run("invalid hub pool address", func(t *testing.T) {
-		cfg := fixture.validConfig(0)
-		cfg.HubPoolAddress = "not-an-address"
-		err := cs.VerifyPreconditions(*fixture.env, cfg)
-		require.ErrorContains(t, err, "hubPoolAddress is not a valid hex address")
-	})
-
 	t.Run("old equals new pool address", func(t *testing.T) {
 		cfg := fixture.validConfig(0)
 		cfg.OldRemotePoolAddress = cfg.NewRemotePoolAddress
 		err := cs.VerifyPreconditions(*fixture.env, cfg)
 		require.ErrorContains(t, err, "must be different")
-	})
-
-	t.Run("nil remote chain supply", func(t *testing.T) {
-		cfg := fixture.validConfig(0)
-		cfg.RemoteChainSupply = nil
-		err := cs.VerifyPreconditions(*fixture.env, cfg)
-		require.ErrorContains(t, err, "remote chain supply must be provided")
 	})
 
 	t.Run("invalid target group", func(t *testing.T) {
@@ -364,25 +337,108 @@ func TestMigrateHybridPoolRemote_VerifyPreconditions_InvalidInputs(t *testing.T)
 		err := cs.VerifyPreconditions(*fixture.env, cfg)
 		require.ErrorContains(t, err, "must be different")
 	})
+
+	t.Run("zero hub pool address", func(t *testing.T) {
+		cfg := fixture.validConfig(0)
+		cfg.HubPoolAddress = common.Address{}
+		err := cs.VerifyPreconditions(*fixture.env, cfg)
+		require.ErrorContains(t, err, "hub pool address cannot be the zero address")
+	})
 }
 
-func TestMigrateHybridPoolRemote_VerifyPreconditions_MissingMCMSRef(t *testing.T) {
-	fixture := newMigrateHybridPoolRemoteFixture(t)
-	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
-
-	badReader := &migrateHybridPoolRemoteMockReader{
-		timelockByChain: fixture.reader.timelockByChain,
-		mcmByChain: map[uint64]string{
-			fixture.hubSelector: fixture.reader.mcmByChain[fixture.hubSelector],
+func TestMigrateHybridPoolRemote_VerifyPreconditions_OnChainStateChecks(t *testing.T) {
+	tests := []struct {
+		name         string
+		mutateConfig func(*v1_6_0_changesets.MigrateHybridPoolRemoteConfig, *migrateHybridPoolRemoteFixture)
+		expectedErr  string
+	}{
+		{
+			name: "hub pool type and version mismatch",
+			mutateConfig: func(cfg *v1_6_0_changesets.MigrateHybridPoolRemoteConfig, f *migrateHybridPoolRemoteFixture) {
+				cfg.HubPoolAddress = f.hubTokenAddress
+			},
+			expectedErr: "failed to read typeAndVersion for hub pool",
 		},
 	}
-	badRegistry := &core_changesets.MCMSReaderRegistry{}
-	badRegistry.RegisterMCMSReader(chainsel.FamilyEVM, badReader)
 
-	cs := fixture.changeset(badRegistry)
-	err := cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0))
-	require.ErrorContains(t, err, "missing MCMS for remote chain")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newMigrateHybridPoolRemoteFixture(t)
+			fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
+			fixture.setTARPool(t, fixture.oldRemotePoolAddress)
+
+			cs := fixture.changeset(fixture.registry)
+			cfg := fixture.validConfig(0)
+			tt.mutateConfig(&cfg, fixture)
+			err := cs.VerifyPreconditions(*fixture.env, cfg)
+			require.ErrorContains(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestMigrateHybridPoolRemote_VerifyPreconditions_MCMSReaderErrors(t *testing.T) {
+	tests := []struct {
+		name         string
+		makeReader   func(*migrateHybridPoolRemoteFixture) *migrateHybridPoolRemoteMockReader
+		expectedErrs []string
+	}{
+		{
+			name: "missing remote MCMS ref",
+			makeReader: func(f *migrateHybridPoolRemoteFixture) *migrateHybridPoolRemoteMockReader {
+				return &migrateHybridPoolRemoteMockReader{
+					timelockByChain: f.reader.timelockByChain,
+					mcmByChain: map[uint64]string{
+						f.hubSelector: f.reader.mcmByChain[f.hubSelector],
+					},
+				}
+			},
+			expectedErrs: []string{"missing MCMS for remote chain"},
+		},
+		{
+			name: "hub owner mismatch",
+			makeReader: func(f *migrateHybridPoolRemoteFixture) *migrateHybridPoolRemoteMockReader {
+				return &migrateHybridPoolRemoteMockReader{
+					timelockByChain: map[uint64]string{
+						f.hubSelector:    common.HexToAddress("0x0000000000000000000000000000000000000c01").Hex(),
+						f.remoteSelector: f.reader.timelockByChain[f.remoteSelector],
+					},
+					mcmByChain: f.reader.mcmByChain,
+				}
+			},
+			expectedErrs: []string{"owner", "does not match timelock"},
+		},
+		{
+			name: "TAR admin mismatch",
+			makeReader: func(f *migrateHybridPoolRemoteFixture) *migrateHybridPoolRemoteMockReader {
+				return &migrateHybridPoolRemoteMockReader{
+					timelockByChain: map[uint64]string{
+						f.hubSelector:    f.reader.timelockByChain[f.hubSelector],
+						f.remoteSelector: common.HexToAddress("0x0000000000000000000000000000000000000d01").Hex(),
+					},
+					mcmByChain: f.reader.mcmByChain,
+				}
+			},
+			expectedErrs: []string{"TAR administrator", "does not match timelock"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newMigrateHybridPoolRemoteFixture(t)
+			fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
+			fixture.setTARPool(t, fixture.oldRemotePoolAddress)
+
+			badReader := tt.makeReader(fixture)
+			badRegistry := &core_changesets.MCMSReaderRegistry{}
+			badRegistry.RegisterMCMSReader(chainsel.FamilyEVM, badReader)
+
+			cs := fixture.changeset(badRegistry)
+			err := cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0))
+			for _, expected := range tt.expectedErrs {
+				require.ErrorContains(t, err, expected)
+			}
+		})
+	}
 }
 
 func TestMigrateHybridPoolRemote_VerifyPreconditions_UnsupportedRemoteChainOnHub(t *testing.T) {
@@ -397,90 +453,20 @@ func TestMigrateHybridPoolRemote_VerifyPreconditions_UnsupportedRemoteChainOnHub
 func TestMigrateHybridPoolRemote_VerifyPreconditions_UnexpectedHubRemotePool(t *testing.T) {
 	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.addRawHubRemotePool(t, common.HexToAddress("0x0000000000000000000000000000000000000abc"))
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
 
+	tx, err := fixture.hubPool.AddRemotePool(
+		fixture.hubChain.DeployerKey,
+		fixture.remoteSelector,
+		common.LeftPadBytes(common.HexToAddress("0x0000000000000000000000000000000000000abc").Bytes(), 32),
+	)
+	require.NoError(t, err)
+	_, err = fixture.hubChain.Confirm(tx)
+	require.NoError(t, err)
+
 	cs := fixture.changeset(fixture.registry)
-	err := cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0))
+	err = cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0))
 	require.ErrorContains(t, err, "unexpected pool")
-}
-
-func TestMigrateHybridPoolRemote_VerifyPreconditions_HubPoolTypeAndVersionMismatch(t *testing.T) {
-	fixture := newMigrateHybridPoolRemoteFixture(t)
-	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
-
-	cs := fixture.changeset(fixture.registry)
-	cfg := fixture.validConfig(0)
-	cfg.HubPoolAddress = fixture.hubTokenAddress.Hex()
-	err := cs.VerifyPreconditions(*fixture.env, cfg)
-	require.ErrorContains(t, err, "failed to read typeAndVersion for hub pool")
-}
-
-func TestMigrateHybridPoolRemote_VerifyPreconditions_HubOwnerMismatch(t *testing.T) {
-	fixture := newMigrateHybridPoolRemoteFixture(t)
-	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
-
-	badReader := &migrateHybridPoolRemoteMockReader{
-		timelockByChain: map[uint64]string{
-			fixture.hubSelector:    common.HexToAddress("0x0000000000000000000000000000000000000c01").Hex(),
-			fixture.remoteSelector: fixture.reader.timelockByChain[fixture.remoteSelector],
-		},
-		mcmByChain: fixture.reader.mcmByChain,
-	}
-	badRegistry := &core_changesets.MCMSReaderRegistry{}
-	badRegistry.RegisterMCMSReader(chainsel.FamilyEVM, badReader)
-
-	cs := fixture.changeset(badRegistry)
-	err := cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0))
-	require.ErrorContains(t, err, "owner")
-	require.ErrorContains(t, err, "does not match timelock")
-}
-
-func TestMigrateHybridPoolRemote_VerifyPreconditions_TARAdminMismatch(t *testing.T) {
-	fixture := newMigrateHybridPoolRemoteFixture(t)
-	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
-
-	badReader := &migrateHybridPoolRemoteMockReader{
-		timelockByChain: map[uint64]string{
-			fixture.hubSelector:    fixture.reader.timelockByChain[fixture.hubSelector],
-			fixture.remoteSelector: common.HexToAddress("0x0000000000000000000000000000000000000d01").Hex(),
-		},
-		mcmByChain: fixture.reader.mcmByChain,
-	}
-	badRegistry := &core_changesets.MCMSReaderRegistry{}
-	badRegistry.RegisterMCMSReader(chainsel.FamilyEVM, badReader)
-
-	cs := fixture.changeset(badRegistry)
-	err := cs.VerifyPreconditions(*fixture.env, fixture.validConfig(0))
-	require.ErrorContains(t, err, "TAR administrator")
-	require.ErrorContains(t, err, "does not match timelock")
-}
-
-func TestMigrateHybridPoolRemote_VerifyPreconditions_SupplyMismatch(t *testing.T) {
-	fixture := newMigrateHybridPoolRemoteFixture(t)
-	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
-
-	cs := fixture.changeset(fixture.registry)
-	cfg := fixture.validConfig(1)
-	cfg.RemoteChainSupply = big.NewInt(1)
-	err := cs.VerifyPreconditions(*fixture.env, cfg)
-	require.ErrorContains(t, err, "does not match remote token totalSupply")
-}
-
-func TestMigrateHybridPoolRemote_VerifyPreconditions_SupplyMismatch_WhenGroupAlreadyTarget(t *testing.T) {
-	fixture := newMigrateHybridPoolRemoteFixture(t)
-	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
-	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
-
-	cs := fixture.changeset(fixture.registry)
-	cfg := fixture.validConfig(0)
-	cfg.RemoteChainSupply = big.NewInt(1)
-	err := cs.VerifyPreconditions(*fixture.env, cfg)
-	require.ErrorContains(t, err, "does not match remote token totalSupply")
 }
 
 func TestMigrateHybridPoolRemote_VerifyPreconditions_LockedTokensBound(t *testing.T) {
@@ -510,26 +496,35 @@ func TestMigrateHybridPoolRemote_Apply_FreshState_ProposalOnly(t *testing.T) {
 	txCounts := txCountByChain(out.MCMSTimelockProposals[0].Operations)
 	require.Equal(t, 3, txCounts[fixture.hubSelector])
 	require.Equal(t, 1, txCounts[fixture.remoteSelector])
-	require.True(t, hasAddressRefWithTypeVersion(
-		out.DataStore,
+	sealedDS := out.DataStore.Seal()
+	require.True(t, v1_6_0_changesets.AddressRefExistsWithTypeVersion(
+		sealedDS,
 		fixture.hubSelector,
 		fixture.hubPoolAddress,
 		cldf_datastore.ContractType(v1_6_0_hybrid_pool_ops.ContractType),
-		v1_6_0_hybrid_pool_ops.Version.String(),
+		v1_6_0_hybrid_pool_ops.Version,
 	))
-	require.True(t, hasAddressRefWithTypeVersion(
-		out.DataStore,
+	require.True(t, v1_6_0_changesets.AddressRefExistsWithTypeVersion(
+		sealedDS,
 		fixture.remoteSelector,
 		fixture.newRemotePoolAddress,
 		cldf_datastore.ContractType(v1_6_0_burn_mint_with_external_minter_token_pool_ops.ContractType),
-		v1_6_0_burn_mint_with_external_minter_token_pool_ops.Version.String(),
+		v1_6_0_burn_mint_with_external_minter_token_pool_ops.Version,
 	))
 
 	// Proposal-only writes should not mutate state during Apply.
-	require.Equal(t, uint8(0), fixture.currentHubGroup(t))
-	require.True(t, containsPoolBytes(fixture.currentHubRemotePools(t), common.LeftPadBytes(fixture.oldRemotePoolAddress.Bytes(), 32)))
-	require.False(t, containsPoolBytes(fixture.currentHubRemotePools(t), common.LeftPadBytes(fixture.newRemotePoolAddress.Bytes(), 32)))
-	require.Equal(t, fixture.oldRemotePoolAddress, fixture.currentTARPool(t))
+	group, err := fixture.hubPool.GetGroup(&bind.CallOpts{Context: t.Context()}, fixture.remoteSelector)
+	require.NoError(t, err)
+	require.Equal(t, uint8(0), group)
+
+	remotePools, err := fixture.hubPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, fixture.remoteSelector)
+	require.NoError(t, err)
+	require.True(t, containsPoolBytes(remotePools, common.LeftPadBytes(fixture.oldRemotePoolAddress.Bytes(), 32)))
+	require.False(t, containsPoolBytes(remotePools, common.LeftPadBytes(fixture.newRemotePoolAddress.Bytes(), 32)))
+
+	tarCfg, err := fixture.remoteTAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, fixture.remoteTokenAddress)
+	require.NoError(t, err)
+	require.Equal(t, fixture.oldRemotePoolAddress, tarCfg.TokenPool)
 }
 
 func TestMigrateHybridPoolRemote_Apply_PartialState(t *testing.T) {
@@ -564,10 +559,19 @@ func TestMigrateHybridPoolRemote_Apply_AlreadyComplete_NoProposal(t *testing.T) 
 	out, err := cs.Apply(*fixture.env, cfg)
 	require.NoError(t, err)
 	require.Len(t, out.MCMSTimelockProposals, 0)
-	require.Equal(t, uint8(0), fixture.currentHubGroup(t))
-	require.True(t, containsPoolBytes(fixture.currentHubRemotePools(t), common.LeftPadBytes(fixture.newRemotePoolAddress.Bytes(), 32)))
-	require.False(t, containsPoolBytes(fixture.currentHubRemotePools(t), common.LeftPadBytes(fixture.oldRemotePoolAddress.Bytes(), 32)))
-	require.Equal(t, fixture.newRemotePoolAddress, fixture.currentTARPool(t))
+
+	group, err := fixture.hubPool.GetGroup(&bind.CallOpts{Context: t.Context()}, fixture.remoteSelector)
+	require.NoError(t, err)
+	require.Equal(t, uint8(0), group)
+
+	remotePools, err := fixture.hubPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, fixture.remoteSelector)
+	require.NoError(t, err)
+	require.True(t, containsPoolBytes(remotePools, common.LeftPadBytes(fixture.newRemotePoolAddress.Bytes(), 32)))
+	require.False(t, containsPoolBytes(remotePools, common.LeftPadBytes(fixture.oldRemotePoolAddress.Bytes(), 32)))
+
+	tarCfg, err := fixture.remoteTAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, fixture.remoteTokenAddress)
+	require.NoError(t, err)
+	require.Equal(t, fixture.newRemotePoolAddress, tarCfg.TokenPool)
 }
 
 func txCountByChain(ops []mcms_types.BatchOperation) map[uint64]int {
@@ -576,25 +580,6 @@ func txCountByChain(ops []mcms_types.BatchOperation) map[uint64]int {
 		out[uint64(op.ChainSelector)] += len(op.Transactions)
 	}
 	return out
-}
-
-func hasAddressRefWithTypeVersion(
-	ds cldf_datastore.MutableDataStore,
-	chainSelector uint64,
-	address common.Address,
-	expectedType cldf_datastore.ContractType,
-	expectedVersion string,
-) bool {
-	refs := ds.Addresses().Filter(
-		cldf_datastore.AddressRefByChainSelector(chainSelector),
-		cldf_datastore.AddressRefByAddress(address.Hex()),
-	)
-	for _, ref := range refs {
-		if ref.Type == expectedType && ref.Version != nil && ref.Version.String() == expectedVersion {
-			return true
-		}
-	}
-	return false
 }
 
 func containsPoolBytes(pools [][]byte, target []byte) bool {
