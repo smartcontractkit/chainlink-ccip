@@ -98,10 +98,10 @@ type enrichedChainConfig struct {
 //     look up CommitteeVerifier contract addresses from the registry, and derive the
 //     signature quorum config (signers + threshold) from the topology's NOP membership.
 //  2. Resolution — convert datastore.AddressRef pointers into resolved addresses. Remote
-//     contract addresses (OnRamp, OffRamp on the remote chain) are converted to []byte
-//     via the remote chain family adapter's AddressRefToBytes, which handles cross-family
-//     encoding (e.g. EVM 20-byte vs Solana 32-byte). Local contracts are resolved to
-//     string addresses.
+//     contract addresses (OnRamp, OffRamp on the remote chain) are resolved via the remote
+//     chain family adapter (e.g. GetOnRampAddress / GetOffRampAddress), which handles any
+//     required cross-family encoding (e.g. EVM 20-byte vs Solana 32-byte). Local contracts
+//     are resolved to string addresses.
 //  3. Dispatch — delegate to the chain family adapter's ConfigureChainForLanes sequence,
 //     which performs the actual on-chain writes (idempotent, ordered, router-last).
 //
