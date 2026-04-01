@@ -23,6 +23,7 @@ type TopologyCommitteePopulator struct {
 
 	signingKeysOnce sync.Once
 	signingKeys     fetch_signing_keys.SigningKeysByNOP
+	signingKeysErr  error
 }
 
 // NewTopologyCommitteePopulator creates a populator that encapsulates the
@@ -50,12 +51,19 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 	if r.contractRegistry == nil {
 		return nil, fmt.Errorf("TopologyCommitteePopulator: contractRegistry must not be nil")
 	}
-	var signingKeysErr error
 	r.signingKeysOnce.Do(func() {
-		r.signingKeys, signingKeysErr = fetchSigningKeysForNOPsByFamilies(e, r.topology.NOPTopology.NOPs, []string{chainsel.FamilyEVM})
+		var allSelectors []uint64
+		for _, committee := range r.topology.NOPTopology.Committees {
+			sels, err := getCommitteeChainSelectors(committee)
+			if err == nil {
+				allSelectors = append(allSelectors, sels...)
+			}
+		}
+		families := deriveFamiliesFromSelectors(allSelectors)
+		r.signingKeys, r.signingKeysErr = fetchSigningKeysForNOPsByFamilies(e, r.topology.NOPTopology.NOPs, families)
 	})
-	if signingKeysErr != nil {
-		return nil, fmt.Errorf("failed to fetch signing keys: %w", signingKeysErr)
+	if r.signingKeysErr != nil {
+		return nil, fmt.Errorf("failed to fetch signing keys: %w", r.signingKeysErr)
 	}
 
 	result := make([]lanes.CommitteeVerifierConfig[datastore.AddressRef], 0, len(inputs))

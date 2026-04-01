@@ -447,17 +447,10 @@ func filterNOPsToCommitteeMembers(nopTopology *offchain.NOPTopology, chains []Pa
 	return filtered
 }
 
-// deriveFamiliesFromChains extracts the unique chain families referenced by the input chains.
 func deriveFamiliesFromChains(chains []PartialChainConfig) []string {
-	seen := make(map[string]struct{})
+	selectors := make([]uint64, 0, len(chains))
 	for _, c := range chains {
-		if family, err := chainsel.GetSelectorFamily(c.ChainSelector); err == nil {
-			seen[family] = struct{}{}
-		}
+		selectors = append(selectors, c.ChainSelector)
 	}
-	families := make([]string, 0, len(seen))
-	for f := range seen {
-		families = append(families, f)
-	}
-	return families
+	return deriveFamiliesFromSelectors(selectors)
 }

@@ -2,7 +2,7 @@ package changesets
 
 // Internal tests for package-private helpers that cannot be reached from the
 // external _test package (convertTopologyMonitoring, mustDecodeHex,
-// signerFromJDIfMissing, fetchSigningKeysForNOPs, fetchSigningKeysForNOPsByFamilies).
+// signerFromJDIfMissing, fetchSigningKeysForNOPsByFamilies, deriveFamiliesFromSelectors).
 
 import (
 	"context"
@@ -90,17 +90,16 @@ func TestSignerFromJDIfMissing_NotFoundInJD(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// ---- fetchSigningKeysForNOPs ----
+// ---- fetchSigningKeysForNOPsByFamilies ----
 
-func TestFetchSigningKeysForNOPs_NilOffchain_ReturnsNil(t *testing.T) {
+func TestFetchSigningKeysForNOPsByFamilies_NilOffchain_ReturnsNil(t *testing.T) {
 	e := deployment.Environment{}
-	result, err := fetchSigningKeysForNOPs(e, []offchain.NOPConfig{{Alias: "nop1"}})
+	result, err := fetchSigningKeysForNOPsByFamilies(e, []offchain.NOPConfig{{Alias: "nop1"}}, []string{chainsel.FamilyEVM})
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
 
-func TestFetchSigningKeysForNOPs_AllSignersPresent_ReturnsNil(t *testing.T) {
-	// All NOPs already have an EVM signer → aliases list is empty → return nil.
+func TestFetchSigningKeysForNOPsByFamilies_AllSignersPresent_ReturnsNil(t *testing.T) {
 	lggr := logger.Test(t)
 	bundle := cldf_ops.NewBundle(
 		func() context.Context { return context.Background() },
@@ -116,13 +115,11 @@ func TestFetchSigningKeysForNOPs_AllSignersPresent_ReturnsNil(t *testing.T) {
 		{Alias: "nop1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xabc"}},
 		{Alias: "nop2", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xdef"}},
 	}
-	result, err := fetchSigningKeysForNOPs(e, nops)
+	result, err := fetchSigningKeysForNOPsByFamilies(e, nops, []string{chainsel.FamilyEVM})
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
 
-// jdMockOffchain overrides ListNodes and ListNodeChainConfigs so the JD code path
-// in fetchSigningKeysForNOPs can be exercised without a real JD server.
 type jdMockOffchain struct {
 	internalStubOffchain
 	listNodesFn            func(context.Context, *nodev1.ListNodesRequest, ...grpc.CallOption) (*nodev1.ListNodesResponse, error)
@@ -137,8 +134,7 @@ func (m *jdMockOffchain) ListNodeChainConfigs(ctx context.Context, in *nodev1.Li
 	return m.listNodeChainConfigsFn(ctx, in, opts...)
 }
 
-func TestFetchSigningKeysForNOPs_CallsJD_WhenSignerMissing(t *testing.T) {
-	// NOP without an EVM signer triggers the JD lookup path.
+func TestFetchSigningKeysForNOPsByFamilies_CallsJD_WhenSignerMissing(t *testing.T) {
 	lggr := logger.Test(t)
 	bundle := cldf_ops.NewBundle(
 		func() context.Context { return context.Background() },
@@ -177,10 +173,10 @@ func TestFetchSigningKeysForNOPs_CallsJD_WhenSignerMissing(t *testing.T) {
 	}
 
 	nops := []offchain.NOPConfig{
-		{Alias: "nop1"}, // no EVM signer → triggers JD fetch
+		{Alias: "nop1"},
 	}
 
-	result, err := fetchSigningKeysForNOPs(e, nops)
+	result, err := fetchSigningKeysForNOPsByFamilies(e, nops, []string{chainsel.FamilyEVM})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Contains(t, result, "nop1")
@@ -288,4 +284,19 @@ func TestSignerAddressForNOPAlias_FallsBackToJDWhenTopologyMissing(t *testing.T)
 	result, err := signerAddressForNOPAlias(e, topology, "nop1", chainsel.FamilyEVM, "test-committee", 1, jdKeys)
 	require.NoError(t, err)
 	assert.Equal(t, jdSigner, result, "should fall back to JD key when topology signer is absent")
+}
+
+// ---- deriveFamiliesFromSelectors ----
+
+func TestDeriveFamiliesFromSelectors_DeduplicatesAndIgnoresInvalid(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+
+	families := deriveFamiliesFromSelectors([]uint64{sel1, sel2, 0xDEAD})
+	assert.ElementsMatch(t, []string{chainsel.FamilyEVM}, families)
+}
+
+func TestDeriveFamiliesFromSelectors_EmptyInput(t *testing.T) {
+	families := deriveFamiliesFromSelectors(nil)
+	assert.Empty(t, families)
 }
