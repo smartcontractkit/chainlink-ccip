@@ -788,8 +788,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		srcSel := srcAdapter.ChainSelector()
 
 		for _, dstAdapter := range adp {
-			_, err := dstAdapter.GetTokenExpansionConfig() // TBD: This was commented 1 month ago. Is there any problem if do the insertion bellow for a dstSel that doesn't support Token Transfers?
-			if err != nil && !errors.Is(err, errors.ErrUnsupported) {
+			if _, err := dstAdapter.GetTokenExpansionConfig(); errors.Is(err, errors.ErrUnsupported) {
 				continue
 			}
 			dstSel := dstAdapter.ChainSelector()
