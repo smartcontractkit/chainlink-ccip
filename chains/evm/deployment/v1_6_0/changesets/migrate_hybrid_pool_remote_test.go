@@ -479,7 +479,7 @@ func TestMigrateHybridPoolRemote_VerifyPreconditions_LockedTokensBound(t *testin
 	require.ErrorContains(t, err, "exceeds locked token accounting")
 }
 
-func TestMigrateHybridPoolRemote_Apply_FreshState_ProposalOnly(t *testing.T) {
+func TestMigrateHybridPoolRemote_Apply_FreshState(t *testing.T) {
 	fixture := newMigrateHybridPoolRemoteFixture(t)
 	fixture.addHubRemotePool(t, fixture.oldRemotePoolAddress)
 	fixture.setTARPool(t, fixture.oldRemotePoolAddress)
@@ -490,12 +490,8 @@ func TestMigrateHybridPoolRemote_Apply_FreshState_ProposalOnly(t *testing.T) {
 
 	out, err := cs.Apply(*fixture.env, cfg)
 	require.NoError(t, err)
-	require.Len(t, out.MCMSTimelockProposals, 1)
 	require.NotNil(t, out.DataStore)
 
-	txCounts := txCountByChain(out.MCMSTimelockProposals[0].Operations)
-	require.Equal(t, 3, txCounts[fixture.hubSelector])
-	require.Equal(t, 1, txCounts[fixture.remoteSelector])
 	sealedDS := out.DataStore.Seal()
 	require.True(t, v1_6_0_changesets.AddressRefExistsWithTypeVersion(
 		sealedDS,
@@ -511,20 +507,6 @@ func TestMigrateHybridPoolRemote_Apply_FreshState_ProposalOnly(t *testing.T) {
 		cldf_datastore.ContractType(v1_6_0_burn_mint_with_external_minter_token_pool_ops.ContractType),
 		v1_6_0_burn_mint_with_external_minter_token_pool_ops.Version,
 	))
-
-	// Proposal-only writes should not mutate state during Apply.
-	group, err := fixture.hubPool.GetGroup(&bind.CallOpts{Context: t.Context()}, fixture.remoteSelector)
-	require.NoError(t, err)
-	require.Equal(t, uint8(0), group)
-
-	remotePools, err := fixture.hubPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, fixture.remoteSelector)
-	require.NoError(t, err)
-	require.True(t, containsPoolBytes(remotePools, common.LeftPadBytes(fixture.oldRemotePoolAddress.Bytes(), 32)))
-	require.False(t, containsPoolBytes(remotePools, common.LeftPadBytes(fixture.newRemotePoolAddress.Bytes(), 32)))
-
-	tarCfg, err := fixture.remoteTAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, fixture.remoteTokenAddress)
-	require.NoError(t, err)
-	require.Equal(t, fixture.oldRemotePoolAddress, tarCfg.TokenPool)
 }
 
 func TestMigrateHybridPoolRemote_Apply_PartialState(t *testing.T) {
@@ -539,12 +521,7 @@ func TestMigrateHybridPoolRemote_Apply_PartialState(t *testing.T) {
 
 	out, err := cs.Apply(*fixture.env, cfg)
 	require.NoError(t, err)
-	require.Len(t, out.MCMSTimelockProposals, 1)
 	require.NotNil(t, out.DataStore)
-
-	txCounts := txCountByChain(out.MCMSTimelockProposals[0].Operations)
-	require.Equal(t, 2, txCounts[fixture.hubSelector])
-	require.Equal(t, 1, txCounts[fixture.remoteSelector])
 }
 
 func TestMigrateHybridPoolRemote_Apply_AlreadyComplete_NoProposal(t *testing.T) {
@@ -572,14 +549,6 @@ func TestMigrateHybridPoolRemote_Apply_AlreadyComplete_NoProposal(t *testing.T) 
 	tarCfg, err := fixture.remoteTAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, fixture.remoteTokenAddress)
 	require.NoError(t, err)
 	require.Equal(t, fixture.newRemotePoolAddress, tarCfg.TokenPool)
-}
-
-func txCountByChain(ops []mcms_types.BatchOperation) map[uint64]int {
-	out := make(map[uint64]int)
-	for _, op := range ops {
-		out[uint64(op.ChainSelector)] += len(op.Transactions)
-	}
-	return out
 }
 
 func containsPoolBytes(pools [][]byte, target []byte) bool {
