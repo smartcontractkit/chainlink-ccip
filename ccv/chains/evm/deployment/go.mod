@@ -17,7 +17,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260319162701-d96a00a71caf
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260331203127-b8dc0a6b85c5
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260319162701-d96a00a71caf
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260319162701-d96a00a71caf
@@ -234,7 +234,7 @@ require (
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2 // indirect
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260213025045-83535910e2c0 // indirect
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260401133118-aad694b37bb3 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
