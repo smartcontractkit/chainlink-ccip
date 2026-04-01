@@ -1283,6 +1283,7 @@ func TestConfigureChainForLanes_RejectsOffRampRouterDowngrade(t *testing.T) {
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           true,
 				OnRamps:             [][]byte{common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32)},
+				DefaultCCVs:         []common.Address{common.HexToAddress(localWithTest.committeeVerifier)},
 			}},
 		},
 	)
