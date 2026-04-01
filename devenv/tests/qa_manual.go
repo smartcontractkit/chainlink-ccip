@@ -108,6 +108,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 				setReceiverRejectAll := func(rejectAll bool) {
 					err := lane.dest.SetReceiverRejectAll(t.Context(), t, rejectAll)
 					require.NoError(t, err)
+					isRejectAll = rejectAll
 					t.Cleanup(func() {
 						if !isRejectAll {
 							return
@@ -198,12 +199,12 @@ func sendMsgRequireErrorOnDestChain(t *testing.T, fromImpl, toImpl ccip.CCIP16Pr
 	seqNr, messageID, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
 	require.NoError(t, err, "sendMsgRequireErrorOnDestChain failed to send message")
 	t.Logf("sendMsgRequireErrorOnDestChain got messageID: %s", messageID)
-	if err == nil {
-		require.NoError(t, err)
-		seqNrUint := ccipocr3.SeqNum(seqNr)
-		seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
-		toImpl.ValidateCommit(t, fromImpl.ChainSelector(), &startBlock, seqNumRange)
-		toImpl.ValidateExecFails(t, fromImpl.ChainSelector(), &startBlock, []uint64{seqNr})
-	}
+
+	require.NoError(t, err)
+	seqNrUint := ccipocr3.SeqNum(seqNr)
+	seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
+	toImpl.ValidateCommit(t, fromImpl.ChainSelector(), &startBlock, seqNumRange)
+	toImpl.ValidateExecFails(t, fromImpl.ChainSelector(), &startBlock, []uint64{seqNr})
+
 	return seqNr, messageID
 }

@@ -243,7 +243,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				t.Skip("TON expects a well-formatted BOC or BuildMessage will fail")
 			}
 			if toImpl.Family() == chainsel.FamilyEVM {
-				t.Skip("Any->EVM still supports uses default extraArgs when empty.")
+				t.Skip("Any->EVM still uses default extraArgs when empty.")
 			}
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{

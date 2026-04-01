@@ -387,9 +387,9 @@ func (a *EVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, s
 		offRampAddress,
 		a.Client)
 	require.NoError(t, err)
-	seqNrsMaped := make([]uint64, len(seqNrs))
+	seqNrsMapped := make([]uint64, len(seqNrs))
 	for i, seqNr := range seqNrs {
-		seqNrsMaped[i] = uint64(seqNr)
+		seqNrsMapped[i] = uint64(seqNr)
 	}
 	executionStates, err := ConfirmExecWithSeqNrs(
 		t,
@@ -397,7 +397,7 @@ func (a *EVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, s
 		a.Chain,
 		offRamp,
 		startBlock,
-		seqNrsMaped,
+		seqNrsMapped,
 	)
 	require.NoError(t, err)
 	return executionStates
@@ -410,9 +410,9 @@ func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, star
 		offRampAddress,
 		a.Client)
 	require.NoError(t, err)
-	seqNrsMaped := make([]uint64, len(seqNrs))
+	seqNrsMapped := make([]uint64, len(seqNrs))
 	for i, seqNr := range seqNrs {
-		seqNrsMaped[i] = uint64(seqNr)
+		seqNrsMapped[i] = uint64(seqNr)
 	}
 	executionStates, err := ConfirmExecWithSeqNrs(
 		t,
@@ -420,7 +420,7 @@ func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, star
 		a.Chain,
 		offRamp,
 		startBlock,
-		seqNrsMaped,
+		seqNrsMapped,
 	)
 	require.NoError(t, err)
 	for _, seqNr := range seqNrs {

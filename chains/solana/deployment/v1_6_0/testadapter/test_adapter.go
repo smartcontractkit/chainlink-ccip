@@ -357,7 +357,7 @@ func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rej
 	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
 	// Set reject all flag in receiver to force reverts
 	deployer := a.Chain.DeployerKey
-	ix, err := test_ccip_receiver.NewSetRejectAllInstruction(true, receiverTargetAccountPDA, deployer.PublicKey()).ValidateAndBuild()
+	ix, err := test_ccip_receiver.NewSetRejectAllInstruction(rejectAll, receiverTargetAccountPDA, deployer.PublicKey()).ValidateAndBuild()
 	if err != nil {
 		return err
 	}
@@ -472,9 +472,9 @@ func (a *SVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, s
 	}
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
-	seqNrsMaped := make([]uint64, len(seqNrs))
+	seqNrsMapped := make([]uint64, len(seqNrs))
 	for i, seqNr := range seqNrs {
-		seqNrsMaped[i] = uint64(seqNr)
+		seqNrsMapped[i] = uint64(seqNr)
 	}
 	executionStates, err := confirmExecWithSeqNrsSol(
 		t,
@@ -482,7 +482,7 @@ func (a *SVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, s
 		a.Chain,
 		offRampAddress,
 		startSlot,
-		seqNrsMaped,
+		seqNrsMapped,
 	)
 	require.NoError(t, err)
 	return executionStates
