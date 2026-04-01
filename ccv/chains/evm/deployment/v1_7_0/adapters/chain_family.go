@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
@@ -134,6 +135,25 @@ func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *ChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:      datastore.ContractType(sequences.ExecutorProxyType),
+		Qualifier: qualifier,
+		Version:   executor.Version,
+	}, chainSelector, toAddress)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve executor proxy (qualifier %q) on chain %d: %w", qualifier, chainSelector, err)
+	}
+	if !common.IsHexAddress(addr) {
+		return "", fmt.Errorf("resolved executor proxy address %q is not a valid hex address (qualifier %q, chain %d)", addr, qualifier, chainSelector)
+	}
+	if common.HexToAddress(addr) == (common.Address{}) {
+		return "", fmt.Errorf("resolved executor proxy address is zero (qualifier %q, chain %d)", qualifier, chainSelector)
 	}
 	return addr, nil
 }

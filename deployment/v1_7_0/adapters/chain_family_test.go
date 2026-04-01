@@ -33,6 +33,30 @@ func (m *mockChainFamily) AddressRefToBytes(ref datastore.AddressRef) ([]byte, e
 	return []byte(ref.Address), nil
 }
 
+func (m *mockChainFamily) GetOnRampAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockChainFamily) GetOffRampAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockChainFamily) GetFQAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockChainFamily) GetRouterAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockChainFamily) GetTestRouter(_ datastore.DataStore, _ uint64) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockChainFamily) ResolveExecutor(_ datastore.DataStore, _ uint64, _ string) (string, error) {
+	return "", nil
+}
+
 func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {
 	registry := adapters.NewChainFamilyRegistry()
 	adapter := &mockChainFamily{}

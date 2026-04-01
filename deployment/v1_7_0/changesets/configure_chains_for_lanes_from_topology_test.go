@@ -33,6 +33,8 @@ type mockChainFamilyAdapter struct {
 	addressPrefix string
 	inputs        []adapters.ConfigureChainForLanesInput
 	err           error
+	addresses     map[uint64]map[string][]byte
+	executors     map[uint64]map[string]string
 }
 
 func (m *mockChainFamilyAdapter) ConfigureChainForLanes() *cldf_ops.Sequence[adapters.ConfigureChainForLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -52,6 +54,48 @@ func (m *mockChainFamilyAdapter) ConfigureChainForLanes() *cldf_ops.Sequence[ada
 
 func (m *mockChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
 	return []byte(m.addressPrefix + ref.Address), nil
+}
+
+func (m *mockChainFamilyAdapter) GetOnRampAddress(_ datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return m.getAddress(chainSelector, "OnRamp")
+}
+
+func (m *mockChainFamilyAdapter) GetOffRampAddress(_ datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return m.getAddress(chainSelector, "OffRamp")
+}
+
+func (m *mockChainFamilyAdapter) GetFQAddress(_ datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return m.getAddress(chainSelector, "FeeQuoter")
+}
+
+func (m *mockChainFamilyAdapter) GetRouterAddress(_ datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return m.getAddress(chainSelector, "Router")
+}
+
+func (m *mockChainFamilyAdapter) GetTestRouter(_ datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return m.getAddress(chainSelector, "TestRouter")
+}
+
+func (m *mockChainFamilyAdapter) ResolveExecutor(_ datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	if m.executors != nil {
+		if byQualifier, ok := m.executors[chainSelector]; ok {
+			if addr, ok := byQualifier[qualifier]; ok {
+				return addr, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("executor not found for chain %d qualifier %q", chainSelector, qualifier)
+}
+
+func (m *mockChainFamilyAdapter) getAddress(chainSelector uint64, contractType string) ([]byte, error) {
+	if m.addresses != nil {
+		if byType, ok := m.addresses[chainSelector]; ok {
+			if addr, ok := byType[contractType]; ok {
+				return addr, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("address not found for chain %d type %s", chainSelector, contractType)
 }
 
 type stubOffchain struct {
@@ -114,6 +158,14 @@ func testRef(chainSelector uint64, address string, contractType datastore.Contra
 	}
 }
 
+func newMockAdapter(prefix string, chainAddresses map[uint64]map[string][]byte, executors map[uint64]map[string]string) *mockChainFamilyAdapter {
+	return &mockChainFamilyAdapter{
+		addressPrefix: prefix,
+		addresses:     chainAddresses,
+		executors:     executors,
+	}
+}
+
 func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.T) {
 	localSelector := chainsel.TEST_90000001.Selector
 	remoteEVM := chainsel.TEST_90000002.Selector
@@ -121,17 +173,8 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
 	ds := datastore.NewMemoryDataStore()
-	addAddress(t, ds, testRef(localSelector, "0xrouter", "Router"))
-	addAddress(t, ds, testRef(localSelector, "0xonramp", "OnRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xfeequoter", "FeeQuoter"))
-	addAddress(t, ds, testRef(localSelector, "0xofframp", "OffRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xexecutor", "Executor"))
 	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
 	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
-	addAddress(t, ds, testRef(remoteEVM, "0xremote-evm-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(remoteEVM, "0xremote-evm-offramp", "OffRamp"))
-	addAddress(t, ds, testRef(remoteSolana, "solana-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(remoteSolana, "solana-offramp", "OffRamp"))
 	env.DataStore = ds.Seal()
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
@@ -144,8 +187,26 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 		},
 	})
 
-	localAdapter := &mockChainFamilyAdapter{addressPrefix: "local:"}
-	remoteSolanaAdapter := &mockChainFamilyAdapter{addressPrefix: "sol:"}
+	localAdapter := newMockAdapter("local:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router":    {0xaa, 0x01},
+			"OnRamp":    {0xbb, 0x02},
+			"FeeQuoter": {0xcc, 0x03},
+			"OffRamp":   {0xdd, 0x04},
+		},
+		remoteEVM: {
+			"OnRamp":  {0xee, 0x11},
+			"OffRamp": {0xee, 0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	remoteSolanaAdapter := newMockAdapter("sol:", map[uint64]map[string][]byte{
+		remoteSolana: {
+			"OnRamp":  {0xff, 0x11},
+			"OffRamp": {0xff, 0x22},
+		},
+	}, nil)
 	registry := adapters.NewChainFamilyRegistry()
 	registry.RegisterChainFamily(chainsel.FamilyEVM, localAdapter)
 	registry.RegisterChainFamily(chainsel.FamilySolana, remoteSolanaAdapter)
@@ -172,10 +233,6 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				Router:        testRef(localSelector, "0xrouter", "Router"),
-				OnRamp:        testRef(localSelector, "0xonramp", "OnRamp"),
-				FeeQuoter:     testRef(localSelector, "0xfeequoter", "FeeQuoter"),
-				OffRamp:       testRef(localSelector, "0xofframp", "OffRamp"),
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -185,22 +242,16 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					remoteEVM: {
-						OnRamps:                 []datastore.AddressRef{testRef(remoteEVM, "0xremote-evm-onramp", "OnRamp")},
-						OffRamp:                 testRef(remoteEVM, "0xremote-evm-offramp", "OffRamp"),
-						DefaultExecutor:         testRef(localSelector, "0xexecutor", "Executor"),
-						DefaultInboundCCVs:      []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
-						LaneMandatedInboundCCVs: []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
-						DefaultOutboundCCVs:     []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
-						LaneMandatedOutboundCCVs: []datastore.AddressRef{
-							testRef(localSelector, "0xverifier", "CommitteeVerifier"),
-						},
+						DefaultExecutorQualifier: "default",
+						DefaultInboundCCVs:       []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+						LaneMandatedInboundCCVs:  []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+						DefaultOutboundCCVs:      []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+						LaneMandatedOutboundCCVs: []datastore.AddressRef{testRef(localSelector, "0xverifier", "CommitteeVerifier")},
 					},
 					remoteSolana: {
-						OnRamps:         []datastore.AddressRef{testRef(remoteSolana, "solana-onramp", "OnRamp")},
-						OffRamp:         testRef(remoteSolana, "solana-offramp", "OffRamp"),
-						DefaultExecutor: testRef(localSelector, "0xexecutor", "Executor"),
+						DefaultExecutorQualifier: "default",
 					},
 				},
 			},
@@ -212,15 +263,15 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 	assert.Empty(t, remoteSolanaAdapter.inputs, "remote Solana adapter should not be called directly; it is only used for address conversion")
 
 	input := localAdapter.inputs[0]
-	assert.Equal(t, "0xrouter", input.Router)
-	assert.Equal(t, "0xonramp", input.OnRamp)
-	assert.Equal(t, "0xfeequoter", input.FeeQuoter)
-	assert.Equal(t, "0xofframp", input.OffRamp)
+	assert.Equal(t, "0xaa01", input.Router)
+	assert.Equal(t, "0xbb02", input.OnRamp)
+	assert.Equal(t, "0xcc03", input.FeeQuoter)
+	assert.Equal(t, "0xdd04", input.OffRamp)
 	require.Len(t, input.RemoteChains, 2)
-	assert.Equal(t, []byte("local:0xremote-evm-offramp"), input.RemoteChains[remoteEVM].OffRamp)
-	assert.Equal(t, []byte("sol:solana-offramp"), input.RemoteChains[remoteSolana].OffRamp)
-	assert.Equal(t, []byte("local:0xremote-evm-onramp"), input.RemoteChains[remoteEVM].OnRamps[0])
-	assert.Equal(t, []byte("sol:solana-onramp"), input.RemoteChains[remoteSolana].OnRamps[0])
+	assert.Equal(t, []byte{0xee, 0x22}, input.RemoteChains[remoteEVM].OffRamp)
+	assert.Equal(t, []byte{0xff, 0x22}, input.RemoteChains[remoteSolana].OffRamp)
+	assert.Equal(t, []byte{0xee, 0x11}, input.RemoteChains[remoteEVM].OnRamps[0])
+	assert.Equal(t, []byte{0xff, 0x11}, input.RemoteChains[remoteSolana].OnRamps[0])
 	assert.Equal(t, "0xexecutor", input.RemoteChains[remoteEVM].DefaultExecutor)
 	assert.Equal(t, []string{"0xverifier"}, input.RemoteChains[remoteEVM].DefaultInboundCCVs)
 	require.Len(t, input.CommitteeVerifiers, 1)
@@ -253,15 +304,8 @@ func TestConfigureChainsForLanesFromTopology_JDFallback(t *testing.T) {
 
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, mockOffchain)
 	ds := datastore.NewMemoryDataStore()
-	addAddress(t, ds, testRef(localSelector, "0xrouter", "Router"))
-	addAddress(t, ds, testRef(localSelector, "0xonramp", "OnRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xfeequoter", "FeeQuoter"))
-	addAddress(t, ds, testRef(localSelector, "0xofframp", "OffRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xexecutor", "Executor"))
 	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
 	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
-	addAddress(t, ds, testRef(remoteSelector, "remote-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(remoteSelector, "remote-offramp", "OffRamp"))
 	env.DataStore = ds.Seal()
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
@@ -274,8 +318,16 @@ func TestConfigureChainsForLanesFromTopology_JDFallback(t *testing.T) {
 		},
 	})
 
-	localAdapter := &mockChainFamilyAdapter{addressPrefix: "local:"}
-	remoteAdapter := &mockChainFamilyAdapter{addressPrefix: "sol:"}
+	localAdapter := newMockAdapter("local:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	remoteAdapter := newMockAdapter("sol:", map[uint64]map[string][]byte{
+		remoteSelector: {"OnRamp": {0x11}, "OffRamp": {0x22}},
+	}, nil)
 	registry := adapters.NewChainFamilyRegistry()
 	registry.RegisterChainFamily(chainsel.FamilyEVM, localAdapter)
 	registry.RegisterChainFamily(chainsel.FamilySolana, remoteAdapter)
@@ -298,10 +350,6 @@ func TestConfigureChainsForLanesFromTopology_JDFallback(t *testing.T) {
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				Router:        testRef(localSelector, "0xrouter", "Router"),
-				OnRamp:        testRef(localSelector, "0xonramp", "OnRamp"),
-				FeeQuoter:     testRef(localSelector, "0xfeequoter", "FeeQuoter"),
-				OffRamp:       testRef(localSelector, "0xofframp", "OffRamp"),
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -310,11 +358,9 @@ func TestConfigureChainsForLanesFromTopology_JDFallback(t *testing.T) {
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					remoteSelector: {
-						OnRamps:         []datastore.AddressRef{testRef(remoteSelector, "remote-onramp", "OnRamp")},
-						OffRamp:         testRef(remoteSelector, "remote-offramp", "OffRamp"),
-						DefaultExecutor: testRef(localSelector, "0xexecutor", "Executor"),
+						DefaultExecutorQualifier: "default",
 					},
 				},
 			},
@@ -340,9 +386,10 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerAfterJDFallback(t *tes
 		},
 	})
 
+	emptyAdapter := newMockAdapter("", nil, nil)
 	registry := adapters.NewChainFamilyRegistry()
-	registry.RegisterChainFamily(chainsel.FamilyEVM, &mockChainFamilyAdapter{})
-	registry.RegisterChainFamily(chainsel.FamilySolana, &mockChainFamilyAdapter{})
+	registry.RegisterChainFamily(chainsel.FamilyEVM, emptyAdapter)
+	registry.RegisterChainFamily(chainsel.FamilySolana, emptyAdapter)
 
 	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
 	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
@@ -377,15 +424,8 @@ func TestConfigureChainsForLanesFromTopology_MissingRemoteAdapter(t *testing.T) 
 	remoteSelector := chainsel.SOLANA_DEVNET.Selector
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
 	ds := datastore.NewMemoryDataStore()
-	addAddress(t, ds, testRef(localSelector, "0xrouter", "Router"))
-	addAddress(t, ds, testRef(localSelector, "0xonramp", "OnRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xfeequoter", "FeeQuoter"))
-	addAddress(t, ds, testRef(localSelector, "0xofframp", "OffRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xexecutor", "Executor"))
 	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
 	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
-	addAddress(t, ds, testRef(remoteSelector, "remote-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(remoteSelector, "remote-offramp", "OffRamp"))
 	env.DataStore = ds.Seal()
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
@@ -398,8 +438,15 @@ func TestConfigureChainsForLanesFromTopology_MissingRemoteAdapter(t *testing.T) 
 		},
 	})
 
+	localAdapter := newMockAdapter("", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
 	registry := adapters.NewChainFamilyRegistry()
-	registry.RegisterChainFamily(chainsel.FamilyEVM, &mockChainFamilyAdapter{})
+	registry.RegisterChainFamily(chainsel.FamilyEVM, localAdapter)
 
 	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
 	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
@@ -419,18 +466,12 @@ func TestConfigureChainsForLanesFromTopology_MissingRemoteAdapter(t *testing.T) 
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				Router:        testRef(localSelector, "0xrouter", "Router"),
-				OnRamp:        testRef(localSelector, "0xonramp", "OnRamp"),
-				FeeQuoter:     testRef(localSelector, "0xfeequoter", "FeeQuoter"),
-				OffRamp:       testRef(localSelector, "0xofframp", "OffRamp"),
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					remoteSelector: {
-						OnRamps:         []datastore.AddressRef{testRef(remoteSelector, "remote-onramp", "OnRamp")},
-						OffRamp:         testRef(remoteSelector, "remote-offramp", "OffRamp"),
-						DefaultExecutor: testRef(localSelector, "0xexecutor", "Executor"),
+						DefaultExecutorQualifier: "default",
 					},
 				},
 			},
@@ -448,15 +489,8 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 	env := newConfigureChainsTestEnv(t, []uint64{chainA, chainB}, nil)
 	ds := datastore.NewMemoryDataStore()
 	for _, sel := range []uint64{chainA, chainB} {
-		addAddress(t, ds, testRef(sel, fmt.Sprintf("0xrouter-%d", sel), "Router"))
-		addAddress(t, ds, testRef(sel, fmt.Sprintf("0xonramp-%d", sel), "OnRamp"))
-		addAddress(t, ds, testRef(sel, fmt.Sprintf("0xfeequoter-%d", sel), "FeeQuoter"))
-		addAddress(t, ds, testRef(sel, fmt.Sprintf("0xofframp-%d", sel), "OffRamp"))
-		addAddress(t, ds, testRef(sel, fmt.Sprintf("0xexecutor-%d", sel), "Executor"))
 		addAddress(t, ds, testRef(sel, fmt.Sprintf("0xverifier-%d", sel), "CommitteeVerifier"))
 	}
-	addAddress(t, ds, testRef(sharedDest, "0xdest-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(sharedDest, "0xdest-offramp", "OffRamp"))
 	env.DataStore = ds.Seal()
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
@@ -467,7 +501,20 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 		},
 	})
 
-	evmAdapter := &mockChainFamilyAdapter{addressPrefix: "evm:"}
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		chainA: {
+			"Router": {0xa1}, "OnRamp": {0xa2}, "FeeQuoter": {0xa3}, "OffRamp": {0xa4},
+		},
+		chainB: {
+			"Router": {0xb1}, "OnRamp": {0xb2}, "FeeQuoter": {0xb3}, "OffRamp": {0xb4},
+		},
+		sharedDest: {
+			"OnRamp": {0xd1}, "OffRamp": {0xd2},
+		},
+	}, map[uint64]map[string]string{
+		chainA: {"default": fmt.Sprintf("0xexecutor-%d", chainA)},
+		chainB: {"default": fmt.Sprintf("0xexecutor-%d", chainB)},
+	})
 	registry := adapters.NewChainFamilyRegistry()
 	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
 
@@ -491,18 +538,12 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: chainA,
-				Router:        testRef(chainA, fmt.Sprintf("0xrouter-%d", chainA), "Router"),
-				OnRamp:        testRef(chainA, fmt.Sprintf("0xonramp-%d", chainA), "OnRamp"),
-				FeeQuoter:     testRef(chainA, fmt.Sprintf("0xfeequoter-%d", chainA), "FeeQuoter"),
-				OffRamp:       testRef(chainA, fmt.Sprintf("0xofframp-%d", chainA), "OffRamp"),
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{sharedDest: {}}},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
-						OnRamps:                []datastore.AddressRef{testRef(sharedDest, "0xdest-onramp", "OnRamp")},
-						OffRamp:                testRef(sharedDest, "0xdest-offramp", "OffRamp"),
-						DefaultExecutor:        testRef(chainA, fmt.Sprintf("0xexecutor-%d", chainA), "Executor"),
+						DefaultExecutorQualifier: "default",
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{MaxDataBytes: 1000},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 100, Enabled: true},
 					},
@@ -510,18 +551,12 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 			},
 			{
 				ChainSelector: chainB,
-				Router:        testRef(chainB, fmt.Sprintf("0xrouter-%d", chainB), "Router"),
-				OnRamp:        testRef(chainB, fmt.Sprintf("0xonramp-%d", chainB), "OnRamp"),
-				FeeQuoter:     testRef(chainB, fmt.Sprintf("0xfeequoter-%d", chainB), "FeeQuoter"),
-				OffRamp:       testRef(chainB, fmt.Sprintf("0xofframp-%d", chainB), "OffRamp"),
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{sharedDest: {}}},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
-						OnRamps:                []datastore.AddressRef{testRef(sharedDest, "0xdest-onramp", "OnRamp")},
-						OffRamp:                testRef(sharedDest, "0xdest-offramp", "OffRamp"),
-						DefaultExecutor:        testRef(chainB, fmt.Sprintf("0xexecutor-%d", chainB), "Executor"),
+						DefaultExecutorQualifier: "default",
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{MaxDataBytes: 2000},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 200, Enabled: true},
 					},
@@ -547,20 +582,13 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 	assert.Equal(t, uint16(200), inputB.RemoteChains[sharedDest].ExecutorDestChainConfig.USDCentsFee)
 }
 
-func TestConfigureChainsForLanesFromTopology_AcceptsAnyRouterAddress(t *testing.T) {
+func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *testing.T) {
 	localSelector := chainsel.TEST_90000001.Selector
 	remoteSelector := chainsel.TEST_90000002.Selector
 
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
 	ds := datastore.NewMemoryDataStore()
-	addAddress(t, ds, testRef(localSelector, "0xtest-router", "Router"))
-	addAddress(t, ds, testRef(localSelector, "0xonramp", "OnRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xfeequoter", "FeeQuoter"))
-	addAddress(t, ds, testRef(localSelector, "0xofframp", "OffRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xexecutor", "Executor"))
 	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
-	addAddress(t, ds, testRef(remoteSelector, "0xremote-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(remoteSelector, "0xremote-offramp", "OffRamp"))
 	env.DataStore = ds.Seal()
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
@@ -570,7 +598,17 @@ func TestConfigureChainsForLanesFromTopology_AcceptsAnyRouterAddress(t *testing.
 		},
 	})
 
-	evmAdapter := &mockChainFamilyAdapter{addressPrefix: "evm:"}
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0xaa, 0x01}, "TestRouter": {0xbb, 0x99},
+			"OnRamp": {0xaa, 0x02}, "FeeQuoter": {0xaa, 0x03}, "OffRamp": {0xaa, 0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0xcc, 0x01}, "OffRamp": {0xcc, 0x02},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
 	registry := adapters.NewChainFamilyRegistry()
 	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
 
@@ -594,18 +632,13 @@ func TestConfigureChainsForLanesFromTopology_AcceptsAnyRouterAddress(t *testing.
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				Router:        testRef(localSelector, "0xtest-router", "Router"),
-				OnRamp:        testRef(localSelector, "0xonramp", "OnRamp"),
-				FeeQuoter:     testRef(localSelector, "0xfeequoter", "FeeQuoter"),
-				OffRamp:       testRef(localSelector, "0xofframp", "OffRamp"),
+				UseTestRouter: true,
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					remoteSelector: {
-						OnRamps:         []datastore.AddressRef{testRef(remoteSelector, "0xremote-onramp", "OnRamp")},
-						OffRamp:         testRef(remoteSelector, "0xremote-offramp", "OffRamp"),
-						DefaultExecutor: testRef(localSelector, "0xexecutor", "Executor"),
+						DefaultExecutorQualifier: "default",
 					},
 				},
 			},
@@ -613,7 +646,75 @@ func TestConfigureChainsForLanesFromTopology_AcceptsAnyRouterAddress(t *testing.
 	})
 	require.NoError(t, err)
 	require.Len(t, evmAdapter.inputs, 1)
-	assert.Equal(t, "0xtest-router", evmAdapter.inputs[0].Router)
+	assert.Equal(t, "0xbb99", evmAdapter.inputs[0].Router)
+}
+
+func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+		},
+	})
+
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0xaa, 0x01}, "TestRouter": {0xbb, 0x99},
+			"OnRamp": {0xaa, 0x02}, "FeeQuoter": {0xaa, 0x03}, "OffRamp": {0xaa, 0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0xcc, 0x01}, "OffRamp": {0xcc, 0x02},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: &offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						},
+					},
+				},
+			},
+		},
+		Chains: []changesets.PartialChainConfig{
+			{
+				ChainSelector: localSelector,
+				UseTestRouter: false,
+				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
+				},
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+					remoteSelector: {
+						DefaultExecutorQualifier: "default",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, evmAdapter.inputs, 1)
+	assert.Equal(t, "0xaa01", evmAdapter.inputs[0].Router,
+		"with UseTestRouter=false and both routers in the datastore, the standard Router should be selected")
 }
 
 func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeNOPs(t *testing.T) {
@@ -651,15 +752,8 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, mockOffchain)
 	ds := datastore.NewMemoryDataStore()
-	addAddress(t, ds, testRef(localSelector, "0xrouter", "Router"))
-	addAddress(t, ds, testRef(localSelector, "0xonramp", "OnRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xfeequoter", "FeeQuoter"))
-	addAddress(t, ds, testRef(localSelector, "0xofframp", "OffRamp"))
-	addAddress(t, ds, testRef(localSelector, "0xexecutor", "Executor"))
 	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
 	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
-	addAddress(t, ds, testRef(remoteSelector, "0xremote-onramp", "OnRamp"))
-	addAddress(t, ds, testRef(remoteSelector, "0xremote-offramp", "OffRamp"))
 	env.DataStore = ds.Seal()
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
@@ -672,7 +766,16 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 		},
 	})
 
-	evmAdapter := &mockChainFamilyAdapter{addressPrefix: "evm:"}
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0x11}, "OffRamp": {0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
 	registry := adapters.NewChainFamilyRegistry()
 	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
 
@@ -701,10 +804,6 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
-				Router:        testRef(localSelector, "0xrouter", "Router"),
-				OnRamp:        testRef(localSelector, "0xonramp", "OnRamp"),
-				FeeQuoter:     testRef(localSelector, "0xfeequoter", "FeeQuoter"),
-				OffRamp:       testRef(localSelector, "0xofframp", "OffRamp"),
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
@@ -713,11 +812,9 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					remoteSelector: {
-						OnRamps:         []datastore.AddressRef{testRef(remoteSelector, "0xremote-onramp", "OnRamp")},
-						OffRamp:         testRef(remoteSelector, "0xremote-offramp", "OffRamp"),
-						DefaultExecutor: testRef(localSelector, "0xexecutor", "Executor"),
+						DefaultExecutorQualifier: "default",
 					},
 				},
 			},
@@ -734,6 +831,7 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 
 func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
 	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
 	cs := changesets.ConfigureChainsForLanesFromTopology(
 		adapters.NewCommitteeVerifierContractRegistry(),
@@ -741,7 +839,34 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 		changesetscore.GetRegistry(),
 	)
 
-	err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "topology is required")
+	t.Run("missing topology", func(t *testing.T) {
+		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "topology is required")
+	})
+
+	t.Run("empty DefaultExecutorQualifier rejected", func(t *testing.T) {
+		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+			Topology: &offchain.EnvironmentTopology{
+				NOPTopology: &offchain.NOPTopology{
+					NOPs: []offchain.NOPConfig{{Alias: "nop-1"}},
+					Committees: map[string]offchain.CommitteeConfig{
+						"default": {Qualifier: "default", ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						}},
+					},
+				},
+			},
+			Chains: []changesets.PartialChainConfig{
+				{
+					ChainSelector: localSelector,
+					RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+						remoteSelector: {DefaultExecutorQualifier: ""},
+					},
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DefaultExecutorQualifier is required")
+	})
 }

@@ -36,19 +36,36 @@ type CommitteeVerifierInputConfig struct {
 	RemoteChains       map[uint64]CommitteeVerifierRemoteChainConfig
 }
 
-// PartialChainConfig describes the desired state for a single local chain. "Partial" because
-// the user supplies datastore.AddressRef pointers, not resolved addresses — the changeset
-// resolves them at apply time. Each chain can reference a different set of remote chains, so
-// per-source/dest configuration (e.g. different fee quoter parameters per destination) is
-// supported naturally.
+// PartialRemoteChainConfig is the user-facing input for a single remote chain. Contract
+// addresses that can be derived from the datastore (remote OnRamp/OffRamp, local Executor)
+// are resolved automatically — the user only provides the executor qualifier and lane-specific
+// configuration values.
+type PartialRemoteChainConfig struct {
+	AllowTrafficFrom          *bool
+	DefaultExecutorQualifier  string
+	DefaultInboundCCVs        []datastore.AddressRef
+	LaneMandatedInboundCCVs   []datastore.AddressRef
+	DefaultOutboundCCVs       []datastore.AddressRef
+	LaneMandatedOutboundCCVs  []datastore.AddressRef
+	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfig
+	ExecutorDestChainConfig   adapters.ExecutorDestChainConfig
+	AddressBytesLength        uint8
+	BaseExecutionGasCost      uint32
+	TokenReceiverAllowed      *bool
+	MessageNetworkFeeUSDCents uint16
+	TokenNetworkFeeUSDCents   uint16
+}
+
+// PartialChainConfig describes the desired state for a single local chain. Well-known contract
+// addresses (Router, OnRamp, FeeQuoter, OffRamp) are resolved automatically from the
+// datastore via the chain family adapter. Each chain can reference a different set of remote
+// chains, so per-source/dest configuration (e.g. different fee quoter parameters per
+// destination) is supported naturally.
 type PartialChainConfig struct {
 	ChainSelector      uint64
-	Router             datastore.AddressRef
-	OnRamp             datastore.AddressRef
+	UseTestRouter      bool
 	CommitteeVerifiers []CommitteeVerifierInputConfig
-	FeeQuoter          datastore.AddressRef
-	OffRamp            datastore.AddressRef
-	RemoteChains       map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
+	RemoteChains       map[uint64]PartialRemoteChainConfig
 }
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
@@ -62,12 +79,9 @@ type ConfigureChainsForLanesFromTopologyConfig struct {
 // but carries fully populated CommitteeVerifierConfig (with signers/threshold filled in).
 type enrichedChainConfig struct {
 	ChainSelector      uint64
-	Router             datastore.AddressRef
-	OnRamp             datastore.AddressRef
+	UseTestRouter      bool
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
-	FeeQuoter          datastore.AddressRef
-	OffRamp            datastore.AddressRef
-	RemoteChains       map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
+	RemoteChains       map[uint64]PartialRemoteChainConfig
 }
 
 // ConfigureChainsForLanesFromTopology is the canonical changeset for configuring CCIP 2.0
@@ -115,6 +129,11 @@ func ConfigureChainsForLanesFromTopology(
 		for _, chainCfg := range cfg.Chains {
 			if !slices.Contains(e.BlockChains.ListChainSelectors(), chainCfg.ChainSelector) {
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
+			}
+			for remoteSelector, remoteCfg := range chainCfg.RemoteChains {
+				if remoteCfg.DefaultExecutorQualifier == "" {
+					return fmt.Errorf("DefaultExecutorQualifier is required for remote chain %d on local chain %d", remoteSelector, chainCfg.ChainSelector)
+				}
 			}
 		}
 		return nil
@@ -181,11 +200,8 @@ func ConfigureChainsForLanesFromTopology(
 
 			chains = append(chains, enrichedChainConfig{
 				ChainSelector:      chainCfg.ChainSelector,
-				Router:             chainCfg.Router,
-				OnRamp:             chainCfg.OnRamp,
+				UseTestRouter:      chainCfg.UseTestRouter,
 				CommitteeVerifiers: committeeVerifiers,
-				FeeQuoter:          chainCfg.FeeQuoter,
-				OffRamp:            chainCfg.OffRamp,
 				RemoteChains:       chainCfg.RemoteChains,
 			})
 		}
@@ -198,9 +214,10 @@ func ConfigureChainsForLanesFromTopology(
 
 // applyConfigureChains performs Phase 2 (resolution) and Phase 3 (dispatch).
 //
-// Resolution: all datastore.AddressRef inputs are resolved to concrete addresses. Remote
-// contracts are resolved via the remote family's AddressRefToBytes for cross-family encoding.
-// Local contracts are resolved to their string address.
+// Resolution: well-known local contracts (Router, OnRamp, FeeQuoter, OffRamp) are resolved
+// automatically from the datastore via the chain family adapter. Remote contracts (OnRamp,
+// OffRamp) are resolved via the remote family adapter. The Executor is resolved per-lane
+// using the ExecutorQualifier.
 //
 // Dispatch: for each chain, the resolved config is passed to the family adapter's
 // ConfigureChainForLanes sequence. The sequence produces BatchOps (MCMS proposal
@@ -219,22 +236,41 @@ func applyConfigureChains(
 
 	for _, chainCfg := range chains {
 		// ── Phase 2: Resolution ──────────────────────────────────────────────
-		// Resolve local contract refs to their on-chain addresses via the datastore.
-		router, err := datastore_utils.FindAndFormatRef(e.DataStore, chainCfg.Router, chainCfg.ChainSelector, datastore_utils.FullRef)
+		family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve router ref on chain with selector %d: %w", chainCfg.ChainSelector, err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainCfg.ChainSelector, err)
 		}
-		onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chainCfg.OnRamp, chainCfg.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp ref on chain with selector %d: %w", chainCfg.ChainSelector, err)
+		adapter, ok := chainFamilyRegistry.GetChainFamily(family)
+		if !ok {
+			return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for chain family %q", family)
 		}
-		feeQuoter, err := datastore_utils.FindAndFormatRef(e.DataStore, chainCfg.FeeQuoter, chainCfg.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve feeQuoter ref on chain with selector %d: %w", chainCfg.ChainSelector, err)
+
+		var routerAddr string
+		if chainCfg.UseTestRouter {
+			routerBytes, rErr := adapter.GetTestRouter(e.DataStore, chainCfg.ChainSelector)
+			if rErr != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve test router on chain %d: %w", chainCfg.ChainSelector, rErr)
+			}
+			routerAddr = fmt.Sprintf("0x%x", routerBytes)
+		} else {
+			routerBytes, rErr := adapter.GetRouterAddress(e.DataStore, chainCfg.ChainSelector)
+			if rErr != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve router on chain %d: %w", chainCfg.ChainSelector, rErr)
+			}
+			routerAddr = fmt.Sprintf("0x%x", routerBytes)
 		}
-		offRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chainCfg.OffRamp, chainCfg.ChainSelector, datastore_utils.FullRef)
+
+		onRampBytes, err := adapter.GetOnRampAddress(e.DataStore, chainCfg.ChainSelector)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve offRamp ref on chain with selector %d: %w", chainCfg.ChainSelector, err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp on chain %d: %w", chainCfg.ChainSelector, err)
+		}
+		feeQuoterBytes, err := adapter.GetFQAddress(e.DataStore, chainCfg.ChainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve feeQuoter on chain %d: %w", chainCfg.ChainSelector, err)
+		}
+		offRampBytes, err := adapter.GetOffRampAddress(e.DataStore, chainCfg.ChainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve offRamp on chain %d: %w", chainCfg.ChainSelector, err)
 		}
 
 		committeeVerifiers := make([]adapters.CommitteeVerifierConfig[datastore.AddressRef], len(chainCfg.CommitteeVerifiers))
@@ -253,19 +289,6 @@ func applyConfigureChains(
 			}
 		}
 
-		family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainCfg.ChainSelector, err)
-		}
-		adapter, ok := chainFamilyRegistry.GetChainFamily(family)
-		if !ok {
-			return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for chain family %q", family)
-		}
-
-		// Remote contract addresses (OnRamps, OffRamp) are resolved to []byte via the
-		// remote chain family's AddressRefToBytes, which handles cross-family encoding
-		// (e.g. EVM 20-byte vs Solana 32-byte). Local contracts are resolved to their
-		// string address via the datastore.
 		remoteChains := make(map[uint64]adapters.RemoteChainConfig[[]byte, string], len(chainCfg.RemoteChains))
 		for remoteSelector, remoteChainCfg := range chainCfg.RemoteChains {
 			remoteFamily, err := chainsel.GetSelectorFamily(remoteSelector)
@@ -277,7 +300,7 @@ func applyConfigureChains(
 				return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for remote chain family %q", remoteFamily)
 			}
 
-			convertedRemoteConfig, err := convertRemoteChainConfigForTopologyChangeset(e, chainCfg.ChainSelector, remoteSelector, remoteAdapter, remoteChainCfg)
+			convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteSelector, err)
 			}
@@ -285,14 +308,13 @@ func applyConfigureChains(
 		}
 
 		// ── Phase 3: Dispatch ──────────────────────────────────────────────
-		// Delegate to the family-specific sequence which owns all on-chain writes.
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
 			ChainSelector:      chainCfg.ChainSelector,
-			Router:             router.Address,
-			OnRamp:             onRamp.Address,
+			Router:             routerAddr,
+			OnRamp:             fmt.Sprintf("0x%x", onRampBytes),
 			CommitteeVerifiers: committeeVerifiers,
-			FeeQuoter:          feeQuoter.Address,
-			OffRamp:            offRamp.Address,
+			FeeQuoter:          fmt.Sprintf("0x%x", feeQuoterBytes),
+			OffRamp:            fmt.Sprintf("0x%x", offRampBytes),
 			RemoteChains:       remoteChains,
 		})
 		if err != nil {
@@ -319,24 +341,56 @@ func applyConfigureChains(
 		Build(mcmsInput)
 }
 
-// convertRemoteChainConfigForTopologyChangeset transforms a remote chain config from
-// datastore.AddressRef form (user input) to the resolved form expected by the sequence:
-//   - Remote contracts (OnRamp, OffRamp) → []byte via the remote family adapter's
-//     AddressRefToBytes, so cross-family encoding is handled transparently.
-//   - Local contracts (Executor, CCVs) → string address via the environment datastore.
-//
-// This separation exists because remote contract addresses are stored on-chain as raw bytes
-// (the local chain has no knowledge of the remote chain's address format), while local
-// contracts are always addressed by their native string representation.
-func convertRemoteChainConfigForTopologyChangeset(
+// resolveRemoteChainConfig resolves a PartialRemoteChainConfig into the form expected by the
+// sequence. Remote contracts (OnRamp, OffRamp) are resolved via the remote chain's adapter.
+// Local contracts (Executor, CCVs) are resolved from the local chain's datastore/adapter.
+func resolveRemoteChainConfig(
 	e deployment.Environment,
-	chainSelector uint64,
+	localAdapter adapters.ChainFamily,
+	remoteAdapter adapters.ChainFamily,
+	localChainSelector uint64,
 	remoteChainSelector uint64,
-	remoteChainAdapter adapters.ChainFamily,
-	inCfg adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef],
+	inCfg PartialRemoteChainConfig,
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
-	outCfg := adapters.RemoteChainConfig[[]byte, string]{
+	remoteOnRampBytes, err := remoteAdapter.GetOnRampAddress(e.DataStore, remoteChainSelector)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve remote onRamp on chain %d: %w", remoteChainSelector, err)
+	}
+	remoteOffRampBytes, err := remoteAdapter.GetOffRampAddress(e.DataStore, remoteChainSelector)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve remote offRamp on chain %d: %w", remoteChainSelector, err)
+	}
+	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, inCfg.DefaultExecutorQualifier)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", inCfg.DefaultExecutorQualifier, localChainSelector, err)
+	}
+
+	defaultInboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.DefaultInboundCCVs)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, err
+	}
+	laneMandatedInboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.LaneMandatedInboundCCVs)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, err
+	}
+	defaultOutboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.DefaultOutboundCCVs)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, err
+	}
+	laneMandatedOutboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.LaneMandatedOutboundCCVs)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, err
+	}
+
+	return adapters.RemoteChainConfig[[]byte, string]{
 		AllowTrafficFrom:          inCfg.AllowTrafficFrom,
+		OnRamps:                   [][]byte{remoteOnRampBytes},
+		OffRamp:                   remoteOffRampBytes,
+		DefaultExecutor:           executorAddr,
+		DefaultInboundCCVs:        defaultInboundCCVs,
+		LaneMandatedInboundCCVs:   laneMandatedInboundCCVs,
+		DefaultOutboundCCVs:       defaultOutboundCCVs,
+		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  inCfg.FeeQuoterDestChainConfig,
 		ExecutorDestChainConfig:   inCfg.ExecutorDestChainConfig,
 		AddressBytesLength:        inCfg.AddressBytesLength,
@@ -344,55 +398,7 @@ func convertRemoteChainConfigForTopologyChangeset(
 		TokenReceiverAllowed:      inCfg.TokenReceiverAllowed,
 		MessageNetworkFeeUSDCents: inCfg.MessageNetworkFeeUSDCents,
 		TokenNetworkFeeUSDCents:   inCfg.TokenNetworkFeeUSDCents,
-	}
-
-	remoteOnRamps := make([][]byte, 0, len(inCfg.OnRamps))
-	for _, onRampRef := range inCfg.OnRamps {
-		resolvedOnRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, onRampRef, remoteChainSelector, remoteChainAdapter.AddressRefToBytes)
-		if err != nil {
-			return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve onRamp ref on remote chain with selector %d: %w", remoteChainSelector, err)
-		}
-		remoteOnRamps = append(remoteOnRamps, resolvedOnRamp)
-	}
-	outCfg.OnRamps = remoteOnRamps
-
-	offRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.OffRamp, remoteChainSelector, remoteChainAdapter.AddressRefToBytes)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve offRamp ref on remote chain with selector %d: %w", remoteChainSelector, err)
-	}
-	outCfg.OffRamp = offRamp
-
-	executor, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.DefaultExecutor, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor ref on chain with selector %d: %w", chainSelector, err)
-	}
-	outCfg.DefaultExecutor = executor.Address
-
-	defaultInboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, chainSelector, inCfg.DefaultInboundCCVs)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
-	}
-	outCfg.DefaultInboundCCVs = defaultInboundCCVs
-
-	laneMandatedInboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, chainSelector, inCfg.LaneMandatedInboundCCVs)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
-	}
-	outCfg.LaneMandatedInboundCCVs = laneMandatedInboundCCVs
-
-	defaultOutboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, chainSelector, inCfg.DefaultOutboundCCVs)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
-	}
-	outCfg.DefaultOutboundCCVs = defaultOutboundCCVs
-
-	laneMandatedOutboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, chainSelector, inCfg.LaneMandatedOutboundCCVs)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
-	}
-	outCfg.LaneMandatedOutboundCCVs = laneMandatedOutboundCCVs
-
-	return outCfg, nil
+	}, nil
 }
 
 func resolveLocalContractsForTopologyChangeset(

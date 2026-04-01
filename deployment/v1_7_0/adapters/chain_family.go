@@ -89,9 +89,18 @@ type ConfigureChainForLanesInput struct {
 }
 
 // ChainFamily is a configurable chain family for chain-centric lane setup.
+// It provides both the lane configuration sequence and contract resolution
+// methods so that callers don't need to construct datastore.AddressRef manually
+// for well-known contract types (OnRamp, OffRamp, FeeQuoter, Router, Executor).
 type ChainFamily interface {
 	ConfigureChainForLanes() *cldf_ops.Sequence[ConfigureChainForLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error)
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.
