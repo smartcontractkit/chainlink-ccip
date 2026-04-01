@@ -1050,6 +1050,126 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *tes
 		"AllowTrafficFrom=true should re-enable traffic on the OffRamp source config")
 }
 
+func TestConfigureChainForLanes_RejectsOnRampOverwriteWhenNotAllowed(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	dummyOnRamp := common.HexToAddress(local.router)
+	_, err = operations.ExecuteOperation(b, router.ApplyRampUpdates, evmChain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(local.router),
+		Args: router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{{DestChainSelector: remoteSelector, OnRamp: dummyOnRamp}},
+		},
+	})
+	require.NoError(t, err)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	input.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to overwrite")
+	assert.Contains(t, err.Error(), "AllowOnrampOverride is false")
+
+	b2 := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampReport, err := operations.ExecuteOperation(b2, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(local.router), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, dummyOnRamp, onRampReport.Output,
+		"router onRamp should be unchanged after rejected overwrite")
+}
+
+func TestConfigureChainForLanes_OverwritesOnRampWhenAllowed(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	dummyOnRamp := common.HexToAddress(localWithTest.testRouter)
+	_, err = operations.ExecuteOperation(b, router.ApplyRampUpdates, evmChain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(localWithTest.testRouter),
+		Args: router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{{DestChainSelector: remoteSelector, OnRamp: dummyOnRamp}},
+		},
+	})
+	require.NoError(t, err)
+
+	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	input.Router = localWithTest.testRouter
+	input.AllowOnrampOverride = true
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	b2 := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampReport, err := operations.ExecuteOperation(b2, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.testRouter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, localWithTest.onRamp, onRampReport.Output.Hex(),
+		"test router onRamp should be overwritten to the 2.0 onRamp when AllowOnrampOverride is true")
+}
+
+func TestConfigureChainForLanes_AllowsFirstTimeWriteWithoutOverrideFlag(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	input.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampReport, err := operations.ExecuteOperation(b, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(local.router), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, local.onRamp, onRampReport.Output.Hex(),
+		"router onRamp should be set on first write even with AllowOnrampOverride=false")
+}
+
 func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T) {
 	chainSelector := chainsel.TEST_90000001.Selector
 	remoteChainSelector := chainsel.TEST_90000002.Selector

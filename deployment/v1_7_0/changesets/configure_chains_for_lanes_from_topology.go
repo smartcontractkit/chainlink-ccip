@@ -309,8 +309,9 @@ func applyConfigureChains(
 
 		// ── Phase 3: Dispatch ──────────────────────────────────────────────
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-			ChainSelector:      chainCfg.ChainSelector,
-			Router:             routerAddr,
+			ChainSelector:       chainCfg.ChainSelector,
+			AllowOnrampOverride: chainCfg.UseTestRouter,
+			Router:              routerAddr,
 			OnRamp:             fmt.Sprintf("0x%x", onRampBytes),
 			CommitteeVerifiers: committeeVerifiers,
 			FeeQuoter:          fmt.Sprintf("0x%x", feeQuoterBytes),

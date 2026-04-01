@@ -52,15 +52,9 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 		return nil, fmt.Errorf("TopologyCommitteePopulator: contractRegistry must not be nil")
 	}
 	r.signingKeysOnce.Do(func() {
-		var allSelectors []uint64
-		for _, committee := range r.topology.NOPTopology.Committees {
-			sels, err := getCommitteeChainSelectors(committee)
-			if err == nil {
-				allSelectors = append(allSelectors, sels...)
-			}
-		}
-		families := deriveFamiliesFromSelectors(allSelectors)
-		r.signingKeys, r.signingKeysErr = fetchSigningKeysForNOPsByFamilies(e, r.topology.NOPTopology.NOPs, families)
+		r.signingKeys, r.signingKeysErr = fetchSigningKeysForNOPsFiltered(e, r.topology.NOPTopology.NOPs, func(_ offchain.NOPConfig) bool {
+			return true
+		})
 	})
 	if r.signingKeysErr != nil {
 		return nil, fmt.Errorf("failed to fetch signing keys: %w", r.signingKeysErr)

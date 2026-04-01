@@ -57,6 +57,33 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return seqtypes.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
+		// When AllowOnrampOverride is false, refuse to replace an existing onRamp
+		// with a different address. This prevents accidental overwrites of prod
+		// router mappings — use the migration changeset for that.
+		if !input.AllowOnrampOverride {
+			for remoteSelector := range input.RemoteChains {
+				existing, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(input.Router),
+					Args:          remoteSelector,
+				})
+				if err != nil {
+					return seqtypes.OnChainOutput{}, fmt.Errorf(
+						"failed to read onRamp for dest %d from Router(%s): %w",
+						remoteSelector, input.Router, err,
+					)
+				}
+				if existing.Output != (common.Address{}) && existing.Output != common.HexToAddress(input.OnRamp) {
+					return seqtypes.OnChainOutput{}, fmt.Errorf(
+						"router %s already has onRamp %s for dest chain %d; "+
+							"refusing to overwrite with %s (AllowOnrampOverride is false) -- "+
+							"use the migration changeset to update router mappings",
+						input.Router, existing.Output.Hex(), remoteSelector, input.OnRamp,
+					)
+				}
+			}
+		}
+
 		// ── Phase 1: Collect desired state per remote chain ──────────────────────
 		// For each remote chain we build the desired args for every contract.
 		// The "maybe" helpers read on-chain state and only append when a diff exists

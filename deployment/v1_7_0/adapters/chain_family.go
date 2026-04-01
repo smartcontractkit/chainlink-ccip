@@ -79,9 +79,10 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 
 // ConfigureChainForLanesInput is the input for the chain-centric lane configuration sequence.
 type ConfigureChainForLanesInput struct {
-	ChainSelector      uint64
-	Router             string
-	OnRamp             string
+	ChainSelector       uint64
+	AllowOnrampOverride bool
+	Router              string
+	OnRamp              string
 	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
 	FeeQuoter          string
 	OffRamp            string
