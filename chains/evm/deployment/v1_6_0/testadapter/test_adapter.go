@@ -16,19 +16,22 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"github.com/xssnick/tonutils-go/tlb"
+
+	// "github.com/xssnick/tonutils-go/tlb" Temporarily disabled TON
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
+	// ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp" Temporarily disabled TON
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
@@ -72,9 +75,15 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	}
 }
 
+var ErrNoAddressFound = errors.New("no address found")
+
 func (a *EVMAdapter) getAddress(ty datastore.ContractType) (common.Address, error) {
 	addr, err := a.state.GetAddress(ty)
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "expected to find exactly 1 ref with criteria") &&
+			strings.HasSuffix(err.Error(), ", found 0") {
+			return common.Address{}, ErrNoAddressFound
+		}
 		return common.Address{}, fmt.Errorf("failed to get %v address: %w", ty, err)
 	}
 	return common.HexToAddress(addr), nil
@@ -110,13 +119,15 @@ func (a *EVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 	}, nil
 }
 
-func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, error) {
+func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 
+	messageID := ""
+
 	msg, ok := m.(router.ClientEVM2AnyMessage)
 	if !ok {
-		return 0, errors.New("expected router.ClientEVM2AnyMessage")
+		return 0, messageID, errors.New("expected router.ClientEVM2AnyMessage")
 	}
 	// case chainsel.FamilyTon:
 	// 	receiverAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
@@ -143,43 +154,43 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	defer func() { sender.Value = nil }()
 	rAddr, err := a.getAddress(datastore.ContractType("Router"))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get router address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get router address: %w", err)
 	}
 	r, err := router.NewRouter(
 		rAddr,
 		a.Client)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create router instance: %w", err)
+		return 0, messageID, fmt.Errorf("failed to create router instance: %w", err)
 	}
 	onRampAddr, err := r.GetOnRamp(nil, destChainSelector)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get onramp address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get onramp address: %w", err)
 	}
 	onRamp, err := onramp.NewOnRamp(
 		onRampAddr,
 		a.Client)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create onramp instance: %w", err)
+		return 0, messageID, fmt.Errorf("failed to create onramp instance: %w", err)
 	}
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
 	// TODO: why?
 	// err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.EVMChains()[src])
 	// if err != nil {
-	// 	return 0, fmt.Errorf("failed to update prices: %w", err)
+	// 	return 0,"", fmt.Errorf("failed to update prices: %w", err)
 	// }
 
 	var retryCount int
 	for {
 		fee, err := r.GetFee(&bind.CallOpts{Context: ctx}, destChainSelector, msg)
 		if err != nil {
-			return 0, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
+			return 0, messageID, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
 		}
 
 		sender.Value = fee
 
 		tx, err := r.CcipSend(sender, destChainSelector, msg)
 		if err != nil {
-			return 0, fmt.Errorf("failed to send CCIP message: %w", err)
+			return 0, messageID, fmt.Errorf("failed to send CCIP message: %w", err)
 		}
 
 		blockNum, err := a.Confirm(tx)
@@ -194,13 +205,13 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 				// It is configured in the CCIPSendReqConfig.
 				// This retry was originally added to solve transient failure in end to end tests
 				if retryCount >= 5 {
-					return 0, fmt.Errorf("failed to confirm CCIP message after %d retries: %w", retryCount, deployment.MaybeDataErr(err))
+					return 0, messageID, fmt.Errorf("failed to confirm CCIP message after %d retries: %w", retryCount, deployment.MaybeDataErr(err))
 				}
 				retryCount++
 				continue
 			}
 
-			return 0, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
+			return 0, messageID, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
 		}
 		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 			Start:   blockNum,
@@ -208,25 +219,77 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 			Context: ctx,
 		}, []uint64{destChainSelector}, []uint64{})
 		if err != nil {
-			return 0, fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
+			return 0, messageID, fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
 		}
 
 		if !it.Next() {
-			return 0, fmt.Errorf("no CCIP message sent event found")
+			return 0, messageID, fmt.Errorf("no CCIP message sent event found")
 		}
+		messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 
-		messageID := hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
-		return it.Event.SequenceNumber, nil
+		return it.Event.SequenceNumber, messageID, nil
 	}
 }
 
+func (a *EVMAdapter) receiverAddr() []byte {
+	for _, typeStr := range []datastore.ContractType{"CCIPReceiver", "TestReceiver"} {
+		receiverAddr, err := a.getAddress(typeStr)
+		if err == nil {
+			return common.LeftPadBytes(receiverAddr.Bytes(), 32)
+		}
+		if !errors.Is(err, ErrNoAddressFound) {
+			panic(err)
+		}
+	}
+	return nil
+}
+
 func (a *EVMAdapter) CCIPReceiver() []byte {
+	result := a.receiverAddr()
+	if result != nil {
+		return result
+	}
+	// Fallback because receiver is not found in a.state for devenv. TODO investigate why and remove fallback
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
-func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
-	return errors.ErrUnsupported
+func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
+	// Return the deployer's wallet address as the EOA receiver for testing purposes.
+	return common.LeftPadBytes(a.DeployerKey.From.Bytes(), 32)
+}
+
+func (a *EVMAdapter) InvalidAddresses() [][]byte {
+	return [][]byte{
+		[]byte{99}, // invalid address
+		common.LeftPadBytes(common.Address{}.Bytes(), 32), // evm zero address
+	}
+}
+
+func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error {
+	receiverAddrBytes := a.receiverAddr()
+	if receiverAddrBytes == nil {
+		t.Skip("no receiver address found")
+		return nil
+	}
+	receiverAddr := common.BytesToAddress(receiverAddrBytes)
+
+	receiver, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(receiverAddr, a.Client)
+	if err != nil {
+		return fmt.Errorf("failed to create MaybeRevertMessageReceiver instance: %w", err)
+	}
+
+	tx, err := receiver.SetRevert(a.DeployerKey, rejectAll)
+	if err != nil {
+		return fmt.Errorf("failed to call SetRevert: %w", err)
+	}
+
+	_, err = a.Chain.Confirm(tx)
+	if err != nil {
+		return fmt.Errorf("failed to confirm SetRevert tx: %w", err)
+	}
+
+	return nil
 }
 
 func (a *EVMAdapter) NativeFeeToken() string {
@@ -256,29 +319,34 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		return nil, nil
 	case chain_selectors.FamilyTon:
 		// TODO: maybe for 1.6 we should look up the source adapter and use a 1.6 method to encode? would be good to avoid other chain SDKs
-		extraArgs := ton_onramp.GenericExtraArgsV2{
-			GasLimit:                 big.NewInt(1000000),
-			AllowOutOfOrderExecution: true,
-		}
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgGasLimit:
-				extraArgs.GasLimit = opt.Value.(*big.Int)
-			case testadapters.ExtraArgOOO:
-				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
-			default:
-				// unsupported arg
-			}
-		}
-		extraArgsCell, err := tlb.ToCell(extraArgs)
-		if err != nil {
-			return nil, err
-		}
-		return extraArgsCell.ToBOC(), nil
+		panic("Temporarily disabled TON")
+		// extraArgs := ton_onramp.GenericExtraArgsV2{
+		// 	GasLimit:                 big.NewInt(1000000),
+		// 	AllowOutOfOrderExecution: true,
+		// }
+		// for _, opt := range opts {
+		// 	switch opt.Name {
+		// 	case testadapters.ExtraArgGasLimit:
+		// 		extraArgs.GasLimit = opt.Value.(*big.Int)
+		// 	case testadapters.ExtraArgOOO:
+		// 		extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
+		// 	default:
+		// 		// unsupported arg
+		// 	}
+		// }
+		// extraArgsCell, err := tlb.ToCell(extraArgs)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// return extraArgsCell.ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
 	}
+}
+
+func (a *EVMAdapter) LowGasLimit() *big.Int {
+	return big.NewInt(1)
 }
 
 func (a *EVMAdapter) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
@@ -312,23 +380,55 @@ func (a *EVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBl
 	require.NoError(t, err)
 }
 
-func (a *EVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (executionStates map[uint64]int) {
+func (a *EVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(
 		offRampAddress,
 		a.Client)
 	require.NoError(t, err)
-	executionStates, err = ConfirmExecWithSeqNrs(
+	seqNrsMapped := make([]uint64, len(seqNrs))
+	for i, seqNr := range seqNrs {
+		seqNrsMapped[i] = uint64(seqNr)
+	}
+	executionStates, err := ConfirmExecWithSeqNrs(
 		t,
 		sourceSelector,
 		a.Chain,
 		offRamp,
 		startBlock,
-		seqNrs,
+		seqNrsMapped,
 	)
 	require.NoError(t, err)
 	return executionStates
+}
+
+func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) {
+	offRampAddress, err := a.getAddress("OffRamp")
+	require.NoError(t, err)
+	offRamp, err := offramp.NewOffRamp(
+		offRampAddress,
+		a.Client)
+	require.NoError(t, err)
+	seqNrsMapped := make([]uint64, len(seqNrs))
+	for i, seqNr := range seqNrs {
+		seqNrsMapped[i] = uint64(seqNr)
+	}
+	executionStates, err := ConfirmExecWithSeqNrs(
+		t,
+		sourceSelector,
+		a.Chain,
+		offRamp,
+		startBlock,
+		seqNrsMapped,
+	)
+	require.NoError(t, err)
+	for _, seqNr := range seqNrs {
+		state, ok := executionStates[seqNr]
+		require.True(t, ok, "no execution state found for seqNr %d", seqNr)
+		require.Equal(t, int(commonutils.EXECUTION_STATE_FAILURE), state,
+			"expected execution state FAILURE for seqNr %d, got %s", seqNr, commonutils.ExecutionStateToString(uint8(state)))
+	}
 }
 
 func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {
@@ -405,17 +505,17 @@ func (a *EVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	return balance, nil
 }
 
-func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
+func (a *EVMAdapter) GetTokenExpansionConfig() (*tokensapi.TokenExpansionInputPerChain, error) {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.From.Hex()
 	deci := uint8(18)
 	registryAddr, err := a.GetRegistryAddress()
 	if err != nil {
-		return tokensapi.TokenExpansionInputPerChain{}
+		return nil, fmt.Errorf("failed to get registry address: %w", err)
 	}
 
 	preMintAmount := uint64(1_000_000) // pre-mint 1 million tokens
-	return tokensapi.TokenExpansionInputPerChain{
+	return &tokensapi.TokenExpansionInputPerChain{
 		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
@@ -441,7 +541,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			},
 			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 		},
-	}
+	}, nil
 }
 
 func (a *EVMAdapter) GetRegistryAddress() (string, error) {
@@ -554,8 +654,13 @@ func ConfirmCommitWithExpectedSeqNumRange(
 
 			// Need to do this because the subscription sometimes fails to get the event.
 			t.Logf("Creating FilterCommitReportAccepted iterator for offramp %s", offRamp.Address().String())
+			filterStart := uint64(0)
+			if startBlock != nil {
+				filterStart = *startBlock
+			}
 			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
 				Context: t.Context(),
+				Start:   filterStart,
 			})
 			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
 			if err != nil {
@@ -688,4 +793,13 @@ func ConfirmExecWithSeqNrs(
 			return nil, fmt.Errorf("subscription error: %w", subErr)
 		}
 	}
+}
+
+func (a *EVMAdapter) CurrentBlock(t *testing.T) uint64 {
+	header, err := a.Chain.Client.HeaderByNumber(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("failed to get current block header: %v", err)
+	}
+	blockNum := header.Number.Uint64()
+	return blockNum
 }

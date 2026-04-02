@@ -19,6 +19,8 @@ import (
 	"github.com/rs/zerolog"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -27,7 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -46,7 +49,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
 	ccipevm "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
 
 var (
@@ -776,15 +778,17 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	// and the configurations for their cross-chain interactions. We deploy one token and token pool per chain, and configure them to be transferable to each other.
 	dply := map[uint64]tokensapi.TokenExpansionInputPerChain{}
 	for _, srcAdapter := range adp {
-		srcCfg := srcAdapter.GetTokenExpansionConfig()
-		srcSel := srcAdapter.ChainSelector()
-		srcFamily := srcAdapter.Family()
-		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
-			continue // only EVM and Solana are supported for token transfers in 1.6
+		srcCfg, err := srcAdapter.GetTokenExpansionConfig()
+		if err != nil {
+			if errors.Is(err, errors.ErrUnsupported) {
+				continue
+			}
+			return nil, fmt.Errorf("getting token expansion config for source adapter with selector %d: %w", srcAdapter.ChainSelector(), err)
 		}
+		srcSel := srcAdapter.ChainSelector()
 
 		for _, dstAdapter := range adp {
-			// dstCfg := dstAdapter.GetTokenExpansionConfig()
+			// dstCfg := dstAdapter.GetTokenExpansionConfig() // TBD: This was commented 1 month ago. Is there any problem if do the insertion bellow for a dstSel that doesn't support Token Transfers?
 			dstSel := dstAdapter.ChainSelector()
 
 			if srcSel != dstSel {
@@ -808,7 +812,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				}
 			}
 		}
-		dply[srcSel] = srcCfg
+		dply[srcSel] = *srcCfg
 	}
 
 	// Deploy one token and its corresponding token pool for all the input chains.
@@ -828,7 +832,13 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 	// Allow the router to withdraw a sensible amount of tokens from the account that will be transferring tokens.
 	for _, adapter := range adp {
-		teConfig := adapter.GetTokenExpansionConfig()
+		teConfig, err := adapter.GetTokenExpansionConfig()
+		if err != nil {
+			if errors.Is(err, errors.ErrUnsupported) {
+				continue
+			}
+			return nil, fmt.Errorf("getting token expansion config for adapter with selector %d: %w", adapter.ChainSelector(), err)
+		}
 		selector := adapter.ChainSelector()
 
 		oneToken := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(teConfig.DeployTokenInput.Decimals)), nil)
@@ -857,7 +867,13 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			if dst.ChainSelector() == selector {
 				continue
 			}
-			dstTeConfig := dst.GetTokenExpansionConfig()
+			dstTeConfig, err := dst.GetTokenExpansionConfig()
+			if err != nil {
+				if errors.Is(err, errors.ErrUnsupported) {
+					continue
+				}
+				return nil, fmt.Errorf("getting token expansion config for adapter with selector %d: %w", dst.ChainSelector(), err)
+			}
 			dstTokenRef := datastore.AddressRef{
 				Type:          datastore.ContractType(dstTeConfig.DeployTokenInput.Type),
 				Qualifier:     dstTeConfig.DeployTokenInput.Symbol,
