@@ -104,6 +104,10 @@ type DeployTokenPoolInput struct {
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
 	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
+	// ThresholdForAdditionalCCVs is the transfer amount (in base units, as a decimal string)
+	// above which additional CCVs are required. Applicable to EVM 2.0.0+ token pools.
+	// If empty or "0", no threshold is set.
+	ThresholdForAdditionalCCVs string `yaml:"thresholdForAdditionalCCVs,omitempty" json:"thresholdForAdditionalCCVs,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore

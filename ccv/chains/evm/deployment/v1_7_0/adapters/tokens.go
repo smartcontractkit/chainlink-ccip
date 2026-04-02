@@ -117,6 +117,16 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 			}
 
+			// Parse threshold for additional CCVs
+			threshold := big.NewInt(0)
+			if input.ThresholdForAdditionalCCVs != "" {
+				var ok bool
+				threshold, ok = new(big.Int).SetString(input.ThresholdForAdditionalCCVs, 10)
+				if !ok {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdForAdditionalCCVs %q: must be a decimal integer string", input.ThresholdForAdditionalCCVs)
+				}
+			}
+
 			// Resolve token address
 			var tokenAddr string
 			if input.TokenRef != nil && input.TokenRef.Address != "" {
@@ -197,7 +207,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				TokenPoolType:    datastore.ContractType(input.PoolType),
 				TokenPoolVersion: input.TokenPoolVersion,
 				TokenSymbol:      qualifier,
-				ThresholdAmountForAdditionalCCVs: big.NewInt(0),
+				ThresholdAmountForAdditionalCCVs: threshold,
 				ConstructorArgs: evm_tokens.ConstructorArgs{
 					Token:    common.HexToAddress(tokenAddr),
 					Decimals: tokenDecimals,
