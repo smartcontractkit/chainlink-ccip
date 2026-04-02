@@ -25,7 +25,7 @@ require (
 	github.com/smartcontractkit/mcms v0.37.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.19.0
-	google.golang.org/grpc v1.79.2
+	google.golang.org/grpc v1.79.3
 )
 
 require (
