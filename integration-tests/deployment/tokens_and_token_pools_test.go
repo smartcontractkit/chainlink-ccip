@@ -319,11 +319,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate TokenExpansion", func(t *testing.T) {
 			for _, data := range evmTestData {
 				// Verify that we can find the timelock address in the datastore
-				timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore,
-					datastore.AddressRef{Type: datastore.ContractType(common_utils.RBACTimelock)},
-					data.Chain.Selector,
-					datastore_utils.FullRef,
-				)
+				evmReaderMCMS, ok := mcmsRegistry.GetMCMSReader(chainsel.FamilyEVM)
+				require.True(t, ok)
+				timelockRef, err := evmReaderMCMS.GetTimelockRef(*env, data.Chain.Selector, mcms.Input{Qualifier: cciputils.CLLQualifier})
 				require.NoError(t, err)
 
 				// Get max supply and pre-mint
@@ -360,9 +358,16 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)
 
+				// Verify that timelock got the default role
+				admRole, err := tokn.DEFAULTADMINROLE(&bind.CallOpts{Context: t.Context()})
+				require.NoError(t, err)
+				hasRole, err := tokn.HasRole(&bind.CallOpts{Context: t.Context()}, admRole, common.HexToAddress(timelockRef.Address))
+				require.NoError(t, err)
+				require.True(t, hasRole, fmt.Sprintf("expected timelock %q to have default admin role on token", timelockRef.Address))
+
 				// Verify max supply and pre-mint
 				require.Equal(t, 0, maxSupply.Cmp(supply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), supply.String()))
-				require.Equal(t, 0, preMint.Cmp(preMint), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), balance.String()))
+				require.Equal(t, 0, preMint.Cmp(balance), fmt.Sprintf("expected pre-mint %q to match actual pre-mint %q", preMint.String(), balance.String()))
 
 				// Query EVM token pool info from chain
 				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})

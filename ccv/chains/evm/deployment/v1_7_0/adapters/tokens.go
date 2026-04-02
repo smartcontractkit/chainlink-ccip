@@ -3,6 +3,7 @@ package adapters
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
 
 var _ tokens.TokenAdapter = &TokenAdapter{}
@@ -85,10 +87,33 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 		ChainSelector: chainSelector,
 		Address:       common.HexToAddress(poolRef.Address),
 	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w", poolRef.Address, chain, err)
+	if err == nil {
+		return getTokenDecimalsReport.Output, nil
 	}
-	return getTokenDecimalsReport.Output, nil
+	poolErr := err
+
+	// Fallback to fetch token's decimals directly, this is useful for proxy pools like USDCTokenPoolProxy which does not expose the GetTokenDecimals function.
+	tokenAddr := common.BytesToAddress(token)
+	if tokenAddr.Cmp(common.Address{}) == 0 {
+		getTokenReport, getTokErr := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(poolRef.Address),
+		})
+		if getTokErr != nil {
+			return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w", poolRef.Address, chain, poolErr)
+		}
+		tokenAddr = getTokenReport.Output
+	}
+
+	tokenContract, newErr := erc20.NewERC20(tokenAddr, chain.Client)
+	if newErr != nil {
+		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w; failed to bind erc20 at token %s: %w", poolRef.Address, chain, poolErr, tokenAddr.Hex(), newErr)
+	}
+	decimals, erc20Err := tokenContract.Decimals(&bind.CallOpts{Context: e.GetContext()})
+	if erc20Err != nil {
+		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w; erc20.decimals on token %s also failed: %w", poolRef.Address, chain, poolErr, tokenAddr.Hex(), erc20Err)
+	}
+	return decimals, nil
 }
 
 func (t *TokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {

@@ -1,19 +1,21 @@
 package sequences_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	cldfevm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
-	"github.com/stretchr/testify/require"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -22,410 +24,475 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
-	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	onramp2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
-func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
-	tests := []struct {
-		desc string
-	}{
-		{
-			desc: "valid input",
+var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
+func boolPtr(v bool) *bool { return &v }
+
+type deployedContracts struct {
+	router                    string
+	onRamp                    string
+	feeQuoter                 string
+	offRamp                   string
+	committeeVerifier         string
+	committeeVerifierResolver string
+	executor                  string
+}
+
+func deployChain(
+	t *testing.T,
+	e *deployment.Environment,
+	chainSelector uint64,
+) deployedContracts {
+	t.Helper()
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+	create2Ref, err := contract.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, evmChain,
+		contract.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+			ChainSelector:  chainSelector,
+			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{evmChain.DeployerKey.From}},
+		}, nil,
+	)
+	require.NoError(t, err)
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle, sequences.DeployChainContracts, evmChain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:    chainSelector,
+			CREATE2Factory:   common.HexToAddress(create2Ref.Address),
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
 		},
+	)
+	require.NoError(t, err)
+
+	var out deployedContracts
+	for _, addr := range report.Output.Addresses {
+		switch addr.Type {
+		case datastore.ContractType(router.ContractType):
+			out.router = addr.Address
+		case datastore.ContractType(onramp.ContractType):
+			out.onRamp = addr.Address
+		case datastore.ContractType(fee_quoter.ContractType):
+			out.feeQuoter = addr.Address
+		case datastore.ContractType(offramp.ContractType):
+			out.offRamp = addr.Address
+		case datastore.ContractType(committee_verifier.ContractType):
+			out.committeeVerifier = addr.Address
+		case datastore.ContractType(sequences.ExecutorProxyType):
+			if addr.Qualifier == "default" {
+				out.executor = addr.Address
+			}
+		case datastore.ContractType(sequences.CommitteeVerifierResolverType):
+			out.committeeVerifierResolver = addr.Address
+		}
 	}
+	return out
+}
 
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			chainSelector := uint64(5009297550715157269)
-			remoteChainSelector := uint64(4356164186791070119)
-			e, err := environment.New(t.Context(),
-				environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
-			)
-			require.NoError(t, err, "Failed to create environment")
-			require.NotNil(t, e, "Environment should be created")
-			evmChain := e.BlockChains.EVMChains()[chainSelector]
-			evmChain2 := e.BlockChains.EVMChains()[remoteChainSelector]
-
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
-				Args: create2_factory.ConstructorArgs{
-					AllowList: []common.Address{evmChain.DeployerKey.From},
+func buildConfigureChainForLanesInput(
+	local deployedContracts,
+	localSelector uint64,
+	remote deployedContracts,
+	remoteSelector uint64,
+) changesetadapters.ConfigureChainForLanesInput {
+	return changesetadapters.ConfigureChainForLanesInput{
+		ChainSelector: localSelector,
+		Router:        local.router,
+		OnRamp:        local.onRamp,
+		FeeQuoter:     local.feeQuoter,
+		OffRamp:       local.offRamp,
+		CommitteeVerifiers: []changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
+			{
+				CommitteeVerifier: []datastore.AddressRef{
+					{Address: local.committeeVerifier, Type: datastore.ContractType(committee_verifier.ContractType), Version: committee_verifier.Version},
+					{Address: local.committeeVerifierResolver, Type: datastore.ContractType(sequences.CommitteeVerifierResolverType), Version: semver.MustParse("2.0.0")},
 				},
-			}, nil)
-			require.NoError(t, err, "Failed to deploy CREATE2Factory")
-
-			deploymentReport, err := operations.ExecuteSequence(
-				e.OperationsBundle,
-				sequences.DeployChainContracts,
-				evmChain,
-				sequences.DeployChainContractsInput{
-					ChainSelector:    chainSelector,
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-					ContractParams:   testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned: true,
+				RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+					remoteSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 				},
-			)
-			require.NoError(t, err, "ExecuteSequence should not error")
-
-			var routerAddress string
-			var onRampAddr string
-			var feeQuoterAddr string
-			var offRampAddr string
-			var committeeVerifierAddr string
-			var committeeVerifierResolverAddr string
-			var executorAddr string
-			for _, addr := range deploymentReport.Output.Addresses {
-				switch addr.Type {
-				case datastore.ContractType(router.ContractType):
-					routerAddress = addr.Address
-				case datastore.ContractType(onramp.ContractType):
-					onRampAddr = addr.Address
-				case datastore.ContractType(fee_quoter.ContractType):
-					feeQuoterAddr = addr.Address
-				case datastore.ContractType(offramp.ContractType):
-					offRampAddr = addr.Address
-				case datastore.ContractType(committee_verifier.ContractType):
-					committeeVerifierAddr = addr.Address
-				case datastore.ContractType(sequences.ExecutorProxyType):
-					executorAddr = addr.Address
-				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
-					committeeVerifierResolverAddr = addr.Address
-				}
-			}
-
-			create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  remoteChainSelector,
-				Args: create2_factory.ConstructorArgs{
-					AllowList: []common.Address{evmChain2.DeployerKey.From},
+			},
+		},
+		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
+			remoteSelector: {
+				AllowTrafficFrom:    boolPtr(true),
+				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
+				DefaultExecutor:     local.executor,
+				DefaultInboundCCVs:  []string{local.committeeVerifier},
+				DefaultOutboundCCVs: []string{local.committeeVerifier},
+				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                30_000,
+					MaxPerMsgGasLimit:           3_000_000,
+					DestGasOverhead:             300_000,
+					DefaultTokenFeeUSDCents:     25,
+					DestGasPerPayloadByteBase:   16,
+					DefaultTokenDestGasOverhead: 90_000,
+					DefaultTxGasLimit:           200_000,
+					NetworkFeeUSDCents:          10,
+					ChainFamilySelector:         evmFamilySelector,
+					LinkFeeMultiplierPercent:     90,
 				},
-			}, nil)
-			require.NoError(t, err, "Failed to deploy CREATE2Factory")
-
-			deploymentReport, err = operations.ExecuteSequence(
-				e.OperationsBundle,
-				sequences.DeployChainContracts,
-				evmChain2,
-				sequences.DeployChainContractsInput{
-					ChainSelector:    remoteChainSelector,
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-					ContractParams:   testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned: true,
+				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
+					USDCentsFee: 50,
+					Enabled:     true,
 				},
-			)
-			require.NoError(t, err, "ExecuteSequence should not error")
-			var remoteRouterAddress string
-			var remoteOnRampAddr string
-			var remoteFeeQuoterAddr string
-			var remoteOffRampAddr string
-			var remoteCommitteeVerifierAddr string
-			var remoteCommitteeVerifierResolverAddr string
-			var remoteExecutorAddr string
-			for _, addr := range deploymentReport.Output.Addresses {
-				switch addr.Type {
-				case datastore.ContractType(router.ContractType):
-					remoteRouterAddress = addr.Address
-				case datastore.ContractType(onramp.ContractType):
-					remoteOnRampAddr = addr.Address
-				case datastore.ContractType(fee_quoter.ContractType):
-					remoteFeeQuoterAddr = addr.Address
-				case datastore.ContractType(offramp.ContractType):
-					remoteOffRampAddr = addr.Address
-				case datastore.ContractType(committee_verifier.ContractType):
-					remoteCommitteeVerifierAddr = addr.Address
-				case datastore.ContractType(sequences.ExecutorProxyType):
-					remoteExecutorAddr = addr.Address
-				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
-					remoteCommitteeVerifierResolverAddr = addr.Address
-				}
-			}
-
-			committeeVerifiers := []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{
-						{
-							Address: committeeVerifierAddr,
-							Type:    datastore.ContractType(committee_verifier.ContractType),
-							Version: committee_verifier.Version,
-						},
-						{
-							Address: committeeVerifierResolverAddr,
-							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-							Version: committee_verifier.Version,
-						},
-					},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-					},
-				},
-			}
-
-			remoteCommitteeVerifiers := []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{
-						{
-							Address: remoteCommitteeVerifierAddr,
-							Type:    datastore.ContractType(committee_verifier.ContractType),
-							Version: committee_verifier.Version,
-						},
-						{
-							Address: remoteCommitteeVerifierResolverAddr,
-							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-							Version: committee_verifier.Version,
-						},
-					},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						chainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-					},
-				},
-			}
-
-			localChainDef := &lanes.ChainDefinition{
-				Selector:           chainSelector,
-				Router:             common.HexToAddress(routerAddress).Bytes(),
-				OnRamp:             common.HexToAddress(onRampAddr).Bytes(),
-				FeeQuoter:          common.HexToAddress(feeQuoterAddr).Bytes(),
-				OffRamp:            common.HexToAddress(offRampAddr).Bytes(),
-				CommitteeVerifiers: committeeVerifiers,
-				DefaultInboundCCVs: []datastore.AddressRef{{
-					Address: committeeVerifierAddr,
-				}},
-				DefaultOutboundCCVs: []datastore.AddressRef{{
-					Address: committeeVerifierAddr,
-				}},
-				DefaultExecutor: datastore.AddressRef{
-					Address: executorAddr,
-				},
-			}
-
-			remoteChainDef := &lanes.ChainDefinition{
-				Selector:           remoteChainSelector,
-				Router:             common.HexToAddress(remoteRouterAddress).Bytes(),
-				OnRamp:             common.HexToAddress(remoteOnRampAddr).Bytes(),
-				FeeQuoter:          common.HexToAddress(remoteFeeQuoterAddr).Bytes(),
-				OffRamp:            common.HexToAddress(remoteOffRampAddr).Bytes(),
-				CommitteeVerifiers: remoteCommitteeVerifiers,
-				DefaultOutboundCCVs: []datastore.AddressRef{
-					{Address: remoteCommitteeVerifierAddr},
-				},
-				DefaultInboundCCVs: []datastore.AddressRef{
-					{Address: remoteCommitteeVerifierAddr},
-				},
-				DefaultExecutor:          datastore.AddressRef{Address: remoteExecutorAddr},
-				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
-				ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
-				AddressBytesLength:       20,
-				BaseExecutionGasCost:     80_000,
-			}
-
-			freshBundle := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-
-			// Configure lane leg as source: sets up OnRamp, FeeQuoter, Executor, Router onRamp, CommitteeVerifier
-			_, err = operations.ExecuteSequence(
-				freshBundle,
-				sequences.ConfigureLaneLegAsSource,
-				e.BlockChains,
-				lanes.UpdateLanesInput{
-					Source: localChainDef,
-					Dest:   remoteChainDef,
-				},
-			)
-			require.NoError(t, err, "ConfigureLaneLegAsSource should not error")
-
-			// Configure lane leg as dest: sets up OffRamp, Router offRamp, CommitteeVerifier
-			_, err = operations.ExecuteSequence(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				sequences.ConfigureLaneLegAsDest,
-				e.BlockChains,
-				lanes.UpdateLanesInput{
-					Source: remoteChainDef,
-					Dest:   localChainDef,
-				},
-			)
-			require.NoError(t, err, "ConfigureLaneLegAsDest should not error")
-
-			// Check onRamps on router
-			onRampOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          remoteChainSelector,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, onRampAddr, onRampOnRouter.Output.Hex(), "OnRamp address on router should match OnRamp address")
-
-			// Check offRamps on router
-			offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          nil,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Len(t, offRampsOnRouter.Output, 1, "There should be one OffRamp on the router for the remote chain")
-			require.Equal(t, offRampAddr, offRampsOnRouter.Output[0].OffRamp.Hex(), "OffRamp address on router should match OffRamp address")
-
-			// Check sourceChainConfig on OffRamp
-			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(offRampAddr),
-				Args:          remoteChainSelector,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, common.LeftPadBytes(remoteChainDef.OnRamp, 32), sourceChainConfig.Output.OnRamps[0], "OnRamp in source chain config should match OnRamp address")
-			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
-			require.Equal(t, committeeVerifierAddr, sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitteeVerifier address")
-			require.True(t, sourceChainConfig.Output.IsEnabled, "IsEnabled in source chain config should be true")
-			require.Equal(t, routerAddress, sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
-
-			// Check destChainConfig on OnRamp
-			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(onRampAddr),
-				Args:          remoteChainSelector,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, routerAddress, destChainConfig.Output.Router.Hex(), "Router in dest chain config should match Router address")
-			require.Equal(t, remoteChainDef.OffRamp, destChainConfig.Output.OffRamp, "OffRamp in dest chain config should match CCIPMessageDest")
-			require.Equal(t, executorAddr, destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
-			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
-			require.Equal(t, committeeVerifierAddr, destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
-
-			// Check destChainConfig on CommitteeVerifier
-			committeeVerifierRemoteChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
-				Args:          remoteChainSelector,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
-			require.False(t, committeeVerifierRemoteChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
-
-			// Check signature quorum on CommitteeVerifier
-			signatureQuorumReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
-				Args:          remoteChainSelector,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, uint8(1), signatureQuorumReport.Output.Threshold, "Threshold in CommitteeVerifier signature config should be 1")
-			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
-
-			// Check outbound implementation on CommitteeVerifierResolver
-			boundResolver, err := versioned_verifier_resolver_latest.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolverAddr), evmChain.Client)
-			require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
-			outboundImpl, err := boundResolver.GetOutboundImplementation(&bind.CallOpts{Context: t.Context()}, remoteChainSelector, []byte{})
-			require.NoError(t, err, "GetOutboundImplementation should not error")
-			require.Equal(t, committeeVerifierAddr, outboundImpl.Hex(), "Outbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
-
-			// Check inbound implementation on CommitteeVerifierResolver
-			versionTagReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.VersionTag, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			inboundImpl, err := boundResolver.GetInboundImplementation(&bind.CallOpts{Context: t.Context()}, versionTagReport.Output[:])
-			require.NoError(t, err, "GetInboundImplementationForVersion should not error")
-			require.Equal(t, committeeVerifierAddr, inboundImpl.Hex(), "Inbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
-
-			// Check dest chains on Executor
-			executorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(executorAddr),
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Len(t, executorDestChains.Output, 1, "There should be one dest chain on Executor")
-			expectedExecConfig := testsetup.CreateBasicExecutorDestChainConfig()
-			gotExecConfig := executorDestChains.Output[0].Config
-			require.Equal(t, remoteChainSelector, executorDestChains.Output[0].DestChainSelector, "Dest chain selector on Executor should match remote chain selector")
-			require.Equal(t, expectedExecConfig.USDCentsFee, gotExecConfig.UsdCentsFee, "UsdCentsFee in Executor dest chain config should match")
-			require.True(t, gotExecConfig.Enabled, "Dest chain selector on Executor should be enabled")
-
-			/////////////////////////////////////////
-			// Try sending CCIP message /////////////
-			/////////////////////////////////////////
-
-			_, tx, msgHasher, err := message_hasher.DeployMessageHasher(evmChain.DeployerKey, evmChain.Client)
-			require.NoError(t, err, "Failed to deploy MessageHasher")
-			_, err = evmChain.Confirm(tx)
-			require.NoError(t, err, "Failed to confirm MessageHasher deployment")
-
-			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
-				&bind.CallOpts{Context: t.Context()},
-				message_hasher.ExtraArgsCodecGenericExtraArgsV3{
-					GasLimit:           80_000,
-					BlockConfirmations: 0,
-					Ccvs:               []common.Address{common.HexToAddress(committeeVerifierResolverAddr)},
-					CcvArgs:            [][]byte{{}},
-					Executor:           common.HexToAddress(executorAddr),
-					ExecutorArgs:       []byte{},
-					TokenReceiver:      []byte{},
-					TokenArgs:          []byte{},
-				},
-			)
-			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")
-
-			ccipSendArgs := router.CCIPSendArgs{
-				DestChainSelector: remoteChainSelector,
-				EVM2AnyMessage: router.EVM2AnyMessage{
-					Receiver:     common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
-					Data:         []byte{},
-					TokenAmounts: []router.EVMTokenAmount{},
-					ExtraArgs:    extraArgs,
-				},
-			}
-
-			fee, err := operations.ExecuteOperation(e.OperationsBundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          ccipSendArgs,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-
-			ccipSendArgs.Value = fee.Output
-			_, err = operations.ExecuteOperation(e.OperationsBundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          ccipSendArgs,
-			})
-			require.NoError(t, err, "ExecuteOperation should not error")
-		})
+				AddressBytesLength:   20,
+				BaseExecutionGasCost: 80_000,
+			},
+		},
 	}
 }
 
-// TestMaybeAddRouterOnRampsAddsConfigArg verifies the expected output of MaybeAddRouterOnRampsAddsConfigArg
-// for TestRouter true and TestRouter false when the router has no onRamp for dest, and after ConfigureLaneLegAsSource.
-func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
-	remoteChainSelector := uint64(4356164186791070119)
+func assertOnChainState(
+	t *testing.T,
+	b operations.Bundle,
+	evmChain cldfevm.Chain,
+	local deployedContracts,
+	remote deployedContracts,
+	remoteChainSelector uint64,
+) {
+	t.Helper()
+
+	onRampOnRouter, err := operations.ExecuteOperation(b, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.router), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, local.onRamp, onRampOnRouter.Output.Hex())
+
+	offRampsOnRouter, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.router),
+	})
+	require.NoError(t, err)
+	require.Len(t, offRampsOnRouter.Output, 1)
+	assert.Equal(t, local.offRamp, offRampsOnRouter.Output[0].OffRamp.Hex())
+
+	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.True(t, srcCfg.Output.IsEnabled)
+	assert.Equal(t, local.router, srcCfg.Output.Router.Hex())
+	assert.Len(t, srcCfg.Output.OnRamps, 1)
+	assert.Equal(t, common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32), srcCfg.Output.OnRamps[0])
+	assert.Len(t, srcCfg.Output.DefaultCCVs, 1)
+	assert.Equal(t, local.committeeVerifier, srcCfg.Output.DefaultCCVs[0].Hex())
+
+	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.onRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, local.router, destCfg.Output.Router.Hex())
+	assert.Equal(t, common.HexToAddress(remote.offRamp).Bytes(), destCfg.Output.OffRamp)
+	assert.Equal(t, local.executor, destCfg.Output.DefaultExecutor.Hex())
+	assert.Len(t, destCfg.Output.DefaultCCVs, 1)
+	assert.Equal(t, local.committeeVerifier, destCfg.Output.DefaultCCVs[0].Hex())
+
+	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
+	})
+	require.NoError(t, err)
+	require.Len(t, executorDestChains.Output, 1)
+	assert.Equal(t, remoteChainSelector, executorDestChains.Output[0].DestChainSelector)
+	assert.Equal(t, uint16(50), executorDestChains.Output[0].Config.UsdCentsFee)
+	assert.True(t, executorDestChains.Output[0].Config.Enabled)
+
+	fqDestCfg, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.True(t, fqDestCfg.Output.IsEnabled)
+	assert.Equal(t, uint32(30_000), fqDestCfg.Output.MaxDataBytes)
+	assert.Equal(t, uint32(3_000_000), fqDestCfg.Output.MaxPerMsgGasLimit)
+	assert.Equal(t, uint32(300_000), fqDestCfg.Output.DestGasOverhead)
+	assert.Equal(t, evmFamilySelector, fqDestCfg.Output.ChainFamilySelector)
+
+	verifierRemoteCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, local.router, verifierRemoteCfg.Output.Router.Hex())
+	assert.False(t, verifierRemoteCfg.Output.AllowlistEnabled)
+}
+
+func TestConfigureChainForLanes_ConfiguresSingleRemoteChainEndToEnd(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
 	)
 	require.NoError(t, err)
-	evmChain := e.BlockChains.EVMChains()[chainSelector]
-	evmChain2 := e.BlockChains.EVMChains()[remoteChainSelector]
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
-		Args: create2_factory.ConstructorArgs{
-			AllowList: []common.Address{evmChain.DeployerKey.From},
-		},
-	}, nil)
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
 	require.NoError(t, err)
 
-	deploymentReport, err := operations.ExecuteSequence(
-		e.OperationsBundle,
-		sequences.DeployChainContracts,
-		evmChain,
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	assertOnChainState(t, testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, local, remote, remoteChainSelector)
+}
+
+func TestConfigureChainForLanes_Idempotent(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+
+	firstReport, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	assertOnChainState(t, testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, local, remote, remoteChainSelector)
+
+	secondReport, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	assertOnChainState(t, testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, local, remote, remoteChainSelector)
+	assert.Less(t, len(secondReport.ExecutionReports), len(firstReport.ExecutionReports),
+		"second invocation should execute fewer operations (idempotent skip)")
+}
+
+func TestConfigureChainForLanes_AddingNewLaneDoesNotAffectExistingLane(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteA := chainsel.TEST_90000002.Selector
+	remoteB := chainsel.TEST_90000003.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteA, remoteB}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remoteAContracts := deployChain(t, e, remoteA)
+	remoteBContracts := deployChain(t, e, remoteB)
+
+	inputA := buildConfigureChainForLanesInput(local, chainSelector, remoteAContracts, remoteA)
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, inputA,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	snapshotLaneA := captureLaneState(t, b, evmChain, local, remoteAContracts, remoteA)
+
+	inputB := buildConfigureChainForLanesInput(local, chainSelector, remoteBContracts, remoteB)
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, inputB,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	snapshotLaneAAfter := captureLaneA(t, b, evmChain, local, remoteAContracts, remoteA)
+	assert.Equal(t, snapshotLaneA, snapshotLaneAAfter, "lane A config must be identical after adding lane B")
+
+	snapshotLaneB := captureLaneState(t, b, evmChain, local, remoteBContracts, remoteB)
+	assert.True(t, snapshotLaneB.offRampSourceEnabled, "lane B OffRamp source should be enabled")
+	assert.Equal(t, local.router, snapshotLaneB.onRampDestRouter, "lane B OnRamp should reference the router")
+	assert.Equal(t, local.router, snapshotLaneB.verifierRouter, "lane B verifier should reference the router")
+	assert.True(t, snapshotLaneB.feeQuoterEnabled, "lane B FeeQuoter should be enabled")
+	assert.True(t, snapshotLaneB.executorEnabled, "lane B executor should be enabled")
+
+	offRampsOnRouter, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.router),
+	})
+	require.NoError(t, err)
+	assert.Len(t, offRampsOnRouter.Output, 2, "router should have offramps for both lanes")
+}
+
+type laneSnapshot struct {
+	offRampSourceEnabled bool
+	offRampRouter        string
+	offRampOnRamps       [][]byte
+	offRampDefaultCCVs   []common.Address
+
+	onRampDestRouter    string
+	onRampOffRamp       []byte
+	onRampDefaultExec   string
+	onRampDefaultCCVs   []common.Address
+	onRampAddrBytes     uint8
+	onRampBaseGas       uint32
+	onRampMsgFeeUSD     uint16
+	onRampTokenFeeUSD   uint16
+	onRampTokenReceiver bool
+
+	feeQuoterEnabled    bool
+	feeQuoterMaxData    uint32
+	feeQuoterMaxGas     uint32
+	feeQuoterGasOvhd    uint32
+	feeQuoterFamily     [4]byte
+	feeQuoterNetFee     uint16
+	feeQuoterLinkMult   uint8
+	feeQuoterDefTokFee  uint16
+	feeQuoterDefTokGas  uint32
+	feeQuoterDefTxGas   uint32
+	feeQuoterGasPerByte uint8
+
+	executorEnabled bool
+	executorFee     uint16
+
+	verifierRouter           string
+	verifierAllowlistEnabled bool
+	verifierAllowedSenders   []common.Address
+	verifierFeeUSDCents      uint16
+	verifierGasForVerify     uint32
+	verifierPayloadSize      uint32
+	verifierSigners          []common.Address
+	verifierThreshold        uint8
+}
+
+func captureLaneState(
+	t *testing.T,
+	b operations.Bundle,
+	evmChain cldfevm.Chain,
+	local deployedContracts,
+	remote deployedContracts,
+	remoteSelector uint64,
+) laneSnapshot {
+	t.Helper()
+	var s laneSnapshot
+
+	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	s.offRampSourceEnabled = srcCfg.Output.IsEnabled
+	s.offRampRouter = srcCfg.Output.Router.Hex()
+	s.offRampOnRamps = srcCfg.Output.OnRamps
+	s.offRampDefaultCCVs = srcCfg.Output.DefaultCCVs
+
+	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.onRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	s.onRampDestRouter = destCfg.Output.Router.Hex()
+	s.onRampOffRamp = destCfg.Output.OffRamp
+	s.onRampDefaultExec = destCfg.Output.DefaultExecutor.Hex()
+	s.onRampDefaultCCVs = destCfg.Output.DefaultCCVs
+	s.onRampAddrBytes = destCfg.Output.AddressBytesLength
+	s.onRampBaseGas = destCfg.Output.BaseExecutionGasCost
+	s.onRampMsgFeeUSD = destCfg.Output.MessageNetworkFeeUSDCents
+	s.onRampTokenFeeUSD = destCfg.Output.TokenNetworkFeeUSDCents
+	s.onRampTokenReceiver = destCfg.Output.TokenReceiverAllowed
+
+	fqCfg, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	s.feeQuoterEnabled = fqCfg.Output.IsEnabled
+	s.feeQuoterMaxData = fqCfg.Output.MaxDataBytes
+	s.feeQuoterMaxGas = fqCfg.Output.MaxPerMsgGasLimit
+	s.feeQuoterGasOvhd = fqCfg.Output.DestGasOverhead
+	s.feeQuoterFamily = fqCfg.Output.ChainFamilySelector
+	s.feeQuoterNetFee = fqCfg.Output.NetworkFeeUSDCents
+	s.feeQuoterLinkMult = fqCfg.Output.LinkFeeMultiplierPercent
+	s.feeQuoterDefTokFee = fqCfg.Output.DefaultTokenFeeUSDCents
+	s.feeQuoterDefTokGas = fqCfg.Output.DefaultTokenDestGasOverhead
+	s.feeQuoterDefTxGas = fqCfg.Output.DefaultTxGasLimit
+	s.feeQuoterGasPerByte = fqCfg.Output.DestGasPerPayloadByteBase
+
+	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
+	})
+	require.NoError(t, err)
+	for _, dc := range executorDestChains.Output {
+		if dc.DestChainSelector == remoteSelector {
+			s.executorEnabled = dc.Config.Enabled
+			s.executorFee = dc.Config.UsdCentsFee
+			break
+		}
+	}
+
+	verifierCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	s.verifierRouter = verifierCfg.Output.Router.Hex()
+	s.verifierAllowlistEnabled = verifierCfg.Output.AllowlistEnabled
+	s.verifierAllowedSenders = verifierCfg.Output.AllowedSendersList
+
+	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.GetFee, evmChain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier),
+		Args: committee_verifier.GetFeeArgs{DestChainSelector: remoteSelector},
+	})
+	require.NoError(t, err)
+	s.verifierFeeUSDCents = verifierFee.Output.FeeUSDCents
+	s.verifierGasForVerify = verifierFee.Output.GasForVerification
+	s.verifierPayloadSize = verifierFee.Output.PayloadSizeBytes
+
+	sigCfg, err := operations.ExecuteOperation(b, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	s.verifierSigners = sigCfg.Output.Signers
+	s.verifierThreshold = sigCfg.Output.Threshold
+
+	return s
+}
+
+// captureLaneA is an alias that makes the test read naturally.
+var captureLaneA = captureLaneState
+
+type deployedContractsWithTestRouter struct {
+	deployedContracts
+	testRouter string
+}
+
+func deployChainWithTestRouter(
+	t *testing.T,
+	e *deployment.Environment,
+	chainSelector uint64,
+) deployedContractsWithTestRouter {
+	t.Helper()
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+	create2Ref, err := contract.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, evmChain,
+		contract.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+			ChainSelector:  chainSelector,
+			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{evmChain.DeployerKey.From}},
+		}, nil,
+	)
+	require.NoError(t, err)
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle, sequences.DeployChainContracts, evmChain,
 		sequences.DeployChainContractsInput{
 			ChainSelector:    chainSelector,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			CREATE2Factory:   common.HexToAddress(create2Ref.Address),
 			ContractParams:   testsetup.CreateBasicContractParams(),
 			DeployerKeyOwned: true,
 			DeployTestRouter: true,
@@ -433,255 +500,813 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var testRouterAddress, routerAddress, onRampAddr, feeQuoterAddr, offRampAddr, committeeVerifierAddr, committeeVerifierResolverAddr, executorAddr string
-	for _, addr := range deploymentReport.Output.Addresses {
+	var out deployedContractsWithTestRouter
+	for _, addr := range report.Output.Addresses {
 		switch addr.Type {
 		case datastore.ContractType(router.ContractType):
-			routerAddress = addr.Address
+			out.router = addr.Address
 		case datastore.ContractType(router.TestRouterContractType):
-			testRouterAddress = addr.Address
+			out.testRouter = addr.Address
 		case datastore.ContractType(onramp.ContractType):
-			onRampAddr = addr.Address
+			out.onRamp = addr.Address
 		case datastore.ContractType(fee_quoter.ContractType):
-			feeQuoterAddr = addr.Address
+			out.feeQuoter = addr.Address
 		case datastore.ContractType(offramp.ContractType):
-			offRampAddr = addr.Address
+			out.offRamp = addr.Address
 		case datastore.ContractType(committee_verifier.ContractType):
-			committeeVerifierAddr = addr.Address
+			out.committeeVerifier = addr.Address
 		case datastore.ContractType(sequences.ExecutorProxyType):
-			executorAddr = addr.Address
+			if addr.Qualifier == "default" {
+				out.executor = addr.Address
+			}
 		case datastore.ContractType(sequences.CommitteeVerifierResolverType):
-			committeeVerifierResolverAddr = addr.Address
+			out.committeeVerifierResolver = addr.Address
 		}
 	}
-
-	create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  remoteChainSelector,
-		Args: create2_factory.ConstructorArgs{
-			AllowList: []common.Address{evmChain2.DeployerKey.From},
-		},
-	}, nil)
-	require.NoError(t, err)
-
-	deploymentReport, err = operations.ExecuteSequence(
-		e.OperationsBundle,
-		sequences.DeployChainContracts,
-		evmChain2,
-		sequences.DeployChainContractsInput{
-			ChainSelector:    remoteChainSelector,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
-			DeployTestRouter: true,
-		},
-	)
-	require.NoError(t, err)
-
-	var remoteTestRouterAddr, remoteRouterAddress, remoteOnRampAddr, remoteFeeQuoterAddr, remoteOffRampAddr, remoteCommitteeVerifierAddr, remoteCommitteeVerifierResolverAddr, remoteExecutorAddr string
-	for _, addr := range deploymentReport.Output.Addresses {
-		switch addr.Type {
-		case datastore.ContractType(router.ContractType):
-			remoteRouterAddress = addr.Address
-		case datastore.ContractType(router.TestRouterContractType):
-			remoteTestRouterAddr = addr.Address
-		case datastore.ContractType(onramp.ContractType):
-			remoteOnRampAddr = addr.Address
-		case datastore.ContractType(fee_quoter.ContractType):
-			remoteFeeQuoterAddr = addr.Address
-		case datastore.ContractType(offramp.ContractType):
-			remoteOffRampAddr = addr.Address
-		case datastore.ContractType(committee_verifier.ContractType):
-			remoteCommitteeVerifierAddr = addr.Address
-		case datastore.ContractType(sequences.ExecutorProxyType):
-			remoteExecutorAddr = addr.Address
-		case datastore.ContractType(sequences.CommitteeVerifierResolverType):
-			remoteCommitteeVerifierResolverAddr = addr.Address
-		}
-	}
-
-	committeeVerifiers := []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-		{
-			CommitteeVerifier: []datastore.AddressRef{
-				{Address: committeeVerifierAddr, Type: datastore.ContractType(committee_verifier.ContractType), Version: committee_verifier.Version},
-				{Address: committeeVerifierResolverAddr, Type: datastore.ContractType(sequences.CommitteeVerifierResolverType), Version: committee_verifier.Version},
-			},
-			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-				remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-			},
-		},
-	}
-	remoteCommitteeVerifiers := []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-		{
-			CommitteeVerifier: []datastore.AddressRef{
-				{Address: remoteCommitteeVerifierAddr, Type: datastore.ContractType(committee_verifier.ContractType), Version: committee_verifier.Version},
-				{Address: remoteCommitteeVerifierResolverAddr, Type: datastore.ContractType(sequences.CommitteeVerifierResolverType), Version: committee_verifier.Version},
-			},
-			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-				chainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-			},
-		},
-	}
-
-	localChainDef := &lanes.ChainDefinition{
-		Selector:            chainSelector,
-		Router:              common.HexToAddress(routerAddress).Bytes(),
-		OnRamp:              common.HexToAddress(onRampAddr).Bytes(),
-		FeeQuoter:           common.HexToAddress(feeQuoterAddr).Bytes(),
-		OffRamp:             common.HexToAddress(offRampAddr).Bytes(),
-		CommitteeVerifiers:  committeeVerifiers,
-		DefaultInboundCCVs:  []datastore.AddressRef{{Address: committeeVerifierAddr}},
-		DefaultOutboundCCVs: []datastore.AddressRef{{Address: committeeVerifierAddr}},
-		DefaultExecutor:     datastore.AddressRef{Address: executorAddr},
-	}
-	remoteChainDef := &lanes.ChainDefinition{
-		Selector:                 remoteChainSelector,
-		Router:                   common.HexToAddress(remoteRouterAddress).Bytes(),
-		OnRamp:                   common.HexToAddress(remoteOnRampAddr).Bytes(),
-		FeeQuoter:                common.HexToAddress(remoteFeeQuoterAddr).Bytes(),
-		OffRamp:                  common.HexToAddress(remoteOffRampAddr).Bytes(),
-		CommitteeVerifiers:       remoteCommitteeVerifiers,
-		DefaultOutboundCCVs:      []datastore.AddressRef{{Address: remoteCommitteeVerifierAddr}},
-		DefaultInboundCCVs:       []datastore.AddressRef{{Address: remoteCommitteeVerifierAddr}},
-		DefaultExecutor:          datastore.AddressRef{Address: remoteExecutorAddr},
-		FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
-		ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
-		AddressBytesLength:       20,
-		BaseExecutionGasCost:     80_000,
-	}
-
-	input := lanes.UpdateLanesInput{
-		Source: localChainDef,
-		Dest:   remoteChainDef,
-	}
-	t.Run("TestRouter_true_router_has_no_onRamp", func(t *testing.T) {
-		input.TestRouter = true
-		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
-		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
-		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
-		require.NoError(t, err)
-		require.Len(t, onRampAdds, 1, "when router has no onRamp for dest, TestRouter true should return one OnRamp to add")
-		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
-		require.Equal(t, common.HexToAddress(onRampAddr), onRampAdds[0].OnRamp)
-	})
-
-	t.Run("TestRouter_false_router_has_no_onRamp", func(t *testing.T) {
-		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-		input.TestRouter = false
-		localChainDef.Router = common.HexToAddress(routerAddress).Bytes()
-		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
-		require.NoError(t, err)
-		require.Len(t, onRampAdds, 1, "when router has no onRamp for dest, TestRouter false should return one OnRamp to add")
-		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
-		require.Equal(t, common.HexToAddress(onRampAddr), onRampAdds[0].OnRamp)
-	})
-
-	t.Run("router_has_1.6_onRamp", func(t *testing.T) {
-		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-		input.TestRouter = false
-		localChainDef.Router = common.HexToAddress(routerAddress).Bytes()
-		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
-		// add an onramp with version 1.6.0
-		// deploy onramp 1.6.0
-		out, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), onramp2.Deploy, evmChain, contract_utils.DeployInput[onramp2.ConstructorArgs]{
-			ChainSelector:  chainSelector,
-			TypeAndVersion: onramp2.TypeAndVersion,
-			Args: onramp2.ConstructorArgs{
-				StaticConfig: onramp2.StaticConfig{
-					ChainSelector:      chainSelector,
-					RmnRemote:          utils.RandomAddress(),
-					NonceManager:       utils.RandomAddress(),
-					TokenAdminRegistry: utils.RandomAddress(),
-				},
-				DynamicConfig: onramp2.DynamicConfig{
-					FeeQuoter:     utils.RandomAddress(),
-					FeeAggregator: utils.RandomAddress(),
-				},
-			},
-		})
-		require.NoError(t, err)
-		deployedOnRampAddr := common.HexToAddress(out.Output.Address)
-		// add this onramp to the router
-		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(routerAddress),
-			Args: router.ApplyRampsUpdatesArgs{
-				OnRampUpdates: []router.OnRamp{
-					{
-						DestChainSelector: remoteChainSelector,
-						OnRamp:            deployedOnRampAddr,
-					},
-				},
-			},
-		})
-		require.NoError(t, err)
-		b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
-		require.NoError(t, err)
-		require.Empty(t, onRampAdds, "when router has prev version onRamp for dest, TestRouter false should return no adds")
-		input.TestRouter = true
-		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
-		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
-
-		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(testRouterAddress),
-			Args: router.ApplyRampsUpdatesArgs{
-				OnRampUpdates: []router.OnRamp{
-					{
-						DestChainSelector: remoteChainSelector,
-						OnRamp:            deployedOnRampAddr,
-					},
-				},
-			},
-		})
-		onRampAdds, err = sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
-		require.NoError(t, err)
-		require.Len(t, onRampAdds, 1, "when router has prev version onRamp for dest, TestRouter false should return one OnRamp to add")
-		require.Equal(t, remoteChainSelector, onRampAdds[0].DestChainSelector)
-		require.Equal(t, common.HexToAddress(onRampAddr), onRampAdds[0].OnRamp)
-	})
-
-	t.Run("TestRouter_true_router_already_has_onRamp", func(t *testing.T) {
-		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-		input.TestRouter = true
-		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
-		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
-		_, err = operations.ExecuteSequence(
-			testsetup.BundleWithFreshReporter(e.OperationsBundle),
-			sequences.ConfigureLaneLegAsSource,
-			e.BlockChains,
-			lanes.UpdateLanesInput{
-				Source:     localChainDef,
-				Dest:       remoteChainDef,
-				TestRouter: true,
-			},
-		)
-		require.NoError(t, err)
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
-		require.NoError(t, err)
-		require.Empty(t, onRampAdds, "when router already has same onRamp for dest, TestRouter true should return no adds")
-	})
-
-	t.Run("TestRouter_false_router_already_has_onRamp", func(t *testing.T) {
-		b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-		input.TestRouter = false
-		localChainDef.Router = common.HexToAddress(routerAddress).Bytes()
-		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
-		_, err = operations.ExecuteSequence(
-			testsetup.BundleWithFreshReporter(e.OperationsBundle),
-			sequences.ConfigureLaneLegAsSource,
-			e.BlockChains,
-			lanes.UpdateLanesInput{
-				Source: localChainDef,
-				Dest:   remoteChainDef,
-			},
-		)
-		require.NoError(t, err)
-		onRampAdds, err := sequences.MaybeAddRouterOnRampsAddsConfigArg(b, evmChain, input)
-		require.NoError(t, err)
-		require.Empty(t, onRampAdds, "when router already has same onRamp for dest, TestRouter false should return no adds")
-	})
+	return out
 }
+
+func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteA := chainsel.TEST_90000002.Selector
+	remoteB := chainsel.TEST_90000003.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteA, remoteB}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remoteAContracts := deployChain(t, e, remoteA)
+	remoteBContracts := deployChain(t, e, remoteB)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remoteAContracts, remoteA)
+	input.RemoteChains[remoteB] = changesetadapters.RemoteChainConfig[[]byte, string]{
+		AllowTrafficFrom:    boolPtr(true),
+		OnRamps:             [][]byte{common.HexToAddress(remoteBContracts.onRamp).Bytes()},
+		OffRamp:             common.HexToAddress(remoteBContracts.offRamp).Bytes(),
+		DefaultExecutor:     local.executor,
+		DefaultInboundCCVs:  []string{local.committeeVerifier},
+		DefaultOutboundCCVs: []string{local.committeeVerifier},
+		FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
+			IsEnabled:                   true,
+			MaxDataBytes:                50_000,
+			MaxPerMsgGasLimit:           5_000_000,
+			DestGasOverhead:             400_000,
+			DefaultTokenFeeUSDCents:     30,
+			DestGasPerPayloadByteBase:   16,
+			DefaultTokenDestGasOverhead: 100_000,
+			DefaultTxGasLimit:           250_000,
+			NetworkFeeUSDCents:          20,
+			ChainFamilySelector:      evmFamilySelector,
+			LinkFeeMultiplierPercent: 90,
+		},
+		ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
+			USDCentsFee: 100,
+			Enabled:     true,
+		},
+		AddressBytesLength:   20,
+		BaseExecutionGasCost: 80_000,
+	}
+	input.CommitteeVerifiers[0].RemoteChains[remoteB] = testsetup.AdapterCommitteeVerifierRemoteChainConfig()
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	offRampsOnRouter, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.router),
+	})
+	require.NoError(t, err)
+	assert.Len(t, offRampsOnRouter.Output, 2)
+
+	for _, remoteSelector := range []uint64{remoteA, remoteB} {
+		srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+			ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteSelector,
+		})
+		require.NoError(t, err)
+		assert.True(t, srcCfg.Output.IsEnabled, "source chain config for %d should be enabled", remoteSelector)
+	}
+
+	fqDestA, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteA,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(30_000), fqDestA.Output.MaxDataBytes)
+
+	fqDestB, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteB,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(50_000), fqDestB.Output.MaxDataBytes)
+
+	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
+	})
+	require.NoError(t, err)
+	assert.Len(t, executorDestChains.Output, 2)
+}
+
+func TestConfigureChainForLanes_CommitteeVerifierSignatureConfigUpdate(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteA := chainsel.TEST_90000002.Selector
+	remoteB := chainsel.TEST_90000003.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteA, remoteB}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remoteAContracts := deployChain(t, e, remoteA)
+	remoteBContracts := deployChain(t, e, remoteB)
+
+	signerA := common.HexToAddress("0xA1")
+	signerB := common.HexToAddress("0xB1")
+	signerB2 := common.HexToAddress("0xB2")
+
+	inputA := buildConfigureChainForLanesInput(local, chainSelector, remoteAContracts, remoteA)
+	cvCfgA := testsetup.AdapterCommitteeVerifierRemoteChainConfig()
+	cvCfgA.SignatureConfig.Signers = []string{signerA.Hex()}
+	cvCfgA.SignatureConfig.Threshold = 1
+	inputA.CommitteeVerifiers[0].RemoteChains[remoteA] = cvCfgA
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, inputA,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	snapshotA := captureLaneState(t, b, evmChain, local, remoteAContracts, remoteA)
+	require.Len(t, snapshotA.verifierSigners, 1)
+	assert.Equal(t, signerA, snapshotA.verifierSigners[0])
+	assert.Equal(t, uint8(1), snapshotA.verifierThreshold)
+
+	inputB := buildConfigureChainForLanesInput(local, chainSelector, remoteBContracts, remoteB)
+	cvCfgB := testsetup.AdapterCommitteeVerifierRemoteChainConfig()
+	cvCfgB.SignatureConfig.Signers = []string{signerB.Hex(), signerB2.Hex()}
+	cvCfgB.SignatureConfig.Threshold = 2
+	inputB.CommitteeVerifiers[0].RemoteChains[remoteB] = cvCfgB
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, inputB,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	snapshotAAfter := captureLaneState(t, b, evmChain, local, remoteAContracts, remoteA)
+	assert.Equal(t, snapshotA, snapshotAAfter, "lane A signature config must be unchanged after adding lane B")
+
+	snapshotBAfter := captureLaneState(t, b, evmChain, local, remoteBContracts, remoteB)
+	assert.Len(t, snapshotBAfter.verifierSigners, 2)
+	assert.Equal(t, uint8(2), snapshotBAfter.verifierThreshold)
+}
+
+func TestConfigureChainForLanes_CommitteeVerifierAllowlistUpdates(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	sender1 := common.HexToAddress("0xAAA1")
+	sender2 := common.HexToAddress("0xAAA2")
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	cvCfg := testsetup.AdapterCommitteeVerifierRemoteChainConfig()
+	cvCfg.AllowlistEnabled = true
+	cvCfg.AddedAllowlistedSenders = []string{sender1.Hex(), sender2.Hex()}
+	input.CommitteeVerifiers[0].RemoteChains[remoteSelector] = cvCfg
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	snap1 := captureLaneState(t, b, evmChain, local, remote, remoteSelector)
+	assert.True(t, snap1.verifierAllowlistEnabled)
+	assert.Len(t, snap1.verifierAllowedSenders, 2)
+
+	input2 := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	cvCfg2 := testsetup.AdapterCommitteeVerifierRemoteChainConfig()
+	cvCfg2.AllowlistEnabled = true
+	cvCfg2.RemovedAllowlistedSenders = []string{sender1.Hex()}
+	input2.CommitteeVerifiers[0].RemoteChains[remoteSelector] = cvCfg2
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input2,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	snap2 := captureLaneState(t, b, evmChain, local, remote, remoteSelector)
+	assert.True(t, snap2.verifierAllowlistEnabled)
+	require.Len(t, snap2.verifierAllowedSenders, 1)
+	assert.Equal(t, sender2, snap2.verifierAllowedSenders[0])
+}
+
+func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	fullInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, fullInput,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	snapshotBefore := captureLaneState(t, b, evmChain, local, remote, remoteSelector)
+
+	partialInput := changesetadapters.ConfigureChainForLanesInput{
+		ChainSelector: chainSelector,
+		Router:        local.router,
+		OnRamp:        local.onRamp,
+		FeeQuoter:     local.feeQuoter,
+		OffRamp:       local.offRamp,
+		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
+			remoteSelector: {
+				AllowTrafficFrom:    boolPtr(true),
+				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
+				DefaultInboundCCVs:  []string{local.committeeVerifier},
+				DefaultOutboundCCVs: []string{local.committeeVerifier},
+				BaseExecutionGasCost: 120_000,
+				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
+					OverrideExistingConfig: true,
+					DestGasOverhead:        500_000,
+				},
+				DefaultExecutor: local.executor,
+				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
+					USDCentsFee: 50,
+					Enabled:     true,
+				},
+			},
+		},
+	}
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, partialInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	snapshotAfter := captureLaneState(t, b, evmChain, local, remote, remoteSelector)
+
+	assert.Equal(t, uint32(120_000), snapshotAfter.onRampBaseGas, "BaseExecutionGasCost should be updated")
+	assert.Equal(t, uint32(500_000), snapshotAfter.feeQuoterGasOvhd, "FeeQuoter DestGasOverhead should be updated")
+
+	assert.Equal(t, snapshotBefore.offRampSourceEnabled, snapshotAfter.offRampSourceEnabled)
+	assert.Equal(t, snapshotBefore.offRampRouter, snapshotAfter.offRampRouter)
+	assert.Equal(t, snapshotBefore.onRampDestRouter, snapshotAfter.onRampDestRouter)
+	assert.Equal(t, snapshotBefore.onRampAddrBytes, snapshotAfter.onRampAddrBytes)
+	assert.Equal(t, snapshotBefore.feeQuoterMaxData, snapshotAfter.feeQuoterMaxData)
+	assert.Equal(t, snapshotBefore.feeQuoterMaxGas, snapshotAfter.feeQuoterMaxGas)
+	assert.Equal(t, snapshotBefore.feeQuoterFamily, snapshotAfter.feeQuoterFamily)
+	assert.Equal(t, snapshotBefore.feeQuoterNetFee, snapshotAfter.feeQuoterNetFee)
+	assert.Equal(t, snapshotBefore.feeQuoterDefTokFee, snapshotAfter.feeQuoterDefTokFee)
+	assert.Equal(t, snapshotBefore.feeQuoterDefTokGas, snapshotAfter.feeQuoterDefTokGas)
+	assert.Equal(t, snapshotBefore.feeQuoterDefTxGas, snapshotAfter.feeQuoterDefTxGas)
+	assert.Equal(t, snapshotBefore.executorEnabled, snapshotAfter.executorEnabled)
+	assert.Equal(t, snapshotBefore.executorFee, snapshotAfter.executorFee)
+}
+
+func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	initialInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, initialInput,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	fqBefore, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(30_000), fqBefore.Output.MaxDataBytes)
+
+	noOverrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	rc := noOverrideInput.RemoteChains[remoteSelector]
+	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = false
+	rc.FeeQuoterDestChainConfig.MaxDataBytes = 99_000
+	noOverrideInput.RemoteChains[remoteSelector] = rc
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, noOverrideInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	fqAfterNoOverride, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(30_000), fqAfterNoOverride.Output.MaxDataBytes,
+		"with OverrideExistingConfig=false, an already-enabled FeeQuoter config should not be updated")
+
+	overrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	rc = overrideInput.RemoteChains[remoteSelector]
+	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = true
+	rc.FeeQuoterDestChainConfig.MaxDataBytes = 99_000
+	overrideInput.RemoteChains[remoteSelector] = rc
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, overrideInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	fqAfterOverride, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(99_000), fqAfterOverride.Output.MaxDataBytes,
+		"with OverrideExistingConfig=true, FeeQuoter config should be updated")
+}
+
+func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	require.NotEmpty(t, localWithTest.testRouter, "TestRouter should be deployed")
+	require.NotEqual(t, localWithTest.router, localWithTest.testRouter,
+		"TestRouter and Router should be different addresses")
+
+	remote := deployChain(t, e, remoteSelector)
+
+	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	input.Router = localWithTest.testRouter
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	onRampOnTestRouter, err := operations.ExecuteOperation(b, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.testRouter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, localWithTest.onRamp, onRampOnTestRouter.Output.Hex(),
+		"TestRouter should have OnRamp wired")
+
+	offRampsOnTestRouter, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.testRouter),
+	})
+	require.NoError(t, err)
+	require.Len(t, offRampsOnTestRouter.Output, 1)
+	assert.Equal(t, localWithTest.offRamp, offRampsOnTestRouter.Output[0].OffRamp.Hex(),
+		"TestRouter should have OffRamp wired")
+
+	onRampOnProdRouter, err := operations.ExecuteOperation(b, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.router), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, common.Address{}, onRampOnProdRouter.Output,
+		"production Router should NOT have OnRamp wired")
+
+	offRampsOnProdRouter, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.router),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, offRampsOnProdRouter.Output,
+		"production Router should NOT have OffRamps wired")
+
+	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.offRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, localWithTest.testRouter, srcCfg.Output.Router.Hex(),
+		"OffRamp source config should reference the TestRouter")
+
+	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.onRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, localWithTest.testRouter, destCfg.Output.Router.Hex(),
+		"OnRamp dest config should reference the TestRouter")
+
+	verifierCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.committeeVerifier), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.Router.Hex(),
+		"CommitteeVerifier remote config should reference the TestRouter")
+}
+
+func TestConfigureChainForLanes_AllowTrafficFromFalseDisablesTraffic(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	enabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	require.NotNil(t, enabledInput.RemoteChains[remoteChainSelector].AllowTrafficFrom)
+	require.True(t, *enabledInput.RemoteChains[remoteChainSelector].AllowTrafficFrom,
+		"precondition: buildConfigureChainForLanesInput sets AllowTrafficFrom=true")
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, enabledInput,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	require.True(t, srcCfgEnabled.Output.IsEnabled, "traffic should be enabled after first run")
+
+	disabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	rc := disabledInput.RemoteChains[remoteChainSelector]
+	rc.AllowTrafficFrom = boolPtr(false)
+	disabledInput.RemoteChains[remoteChainSelector] = rc
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, disabledInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.False(t, srcCfgDisabled.Output.IsEnabled,
+		"AllowTrafficFrom=false should disable traffic on the OffRamp source config")
+}
+
+func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	disabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	rc := disabledInput.RemoteChains[remoteChainSelector]
+	rc.AllowTrafficFrom = boolPtr(false)
+	disabledInput.RemoteChains[remoteChainSelector] = rc
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, disabledInput,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	require.False(t, srcCfgDisabled.Output.IsEnabled, "traffic should be disabled after first run")
+
+	enabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, enabledInput,
+	)
+	require.NoError(t, err)
+
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.True(t, srcCfgEnabled.Output.IsEnabled,
+		"AllowTrafficFrom=true should re-enable traffic on the OffRamp source config")
+}
+
+func TestConfigureChainForLanes_RejectsOnRampOverwriteWhenNotAllowed(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	dummyOnRamp := common.HexToAddress(local.router)
+	_, err = operations.ExecuteOperation(b, router.ApplyRampUpdates, evmChain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(local.router),
+		Args: router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{{DestChainSelector: remoteSelector, OnRamp: dummyOnRamp}},
+		},
+	})
+	require.NoError(t, err)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	input.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to overwrite")
+	assert.Contains(t, err.Error(), "AllowOnrampOverride is false")
+
+	b2 := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampReport, err := operations.ExecuteOperation(b2, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(local.router), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, dummyOnRamp, onRampReport.Output,
+		"router onRamp should be unchanged after rejected overwrite")
+}
+
+func TestConfigureChainForLanes_OverwritesOnRampWhenAllowed(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	dummyOnRamp := common.HexToAddress(localWithTest.testRouter)
+	_, err = operations.ExecuteOperation(b, router.ApplyRampUpdates, evmChain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(localWithTest.testRouter),
+		Args: router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{{DestChainSelector: remoteSelector, OnRamp: dummyOnRamp}},
+		},
+	})
+	require.NoError(t, err)
+
+	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	input.Router = localWithTest.testRouter
+	input.AllowOnrampOverride = true
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	b2 := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampReport, err := operations.ExecuteOperation(b2, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.testRouter), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, localWithTest.onRamp, onRampReport.Output.Hex(),
+		"test router onRamp should be overwritten to the 2.0 onRamp when AllowOnrampOverride is true")
+}
+
+func TestConfigureChainForLanes_AllowsFirstTimeWriteWithoutOverrideFlag(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
+	input.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampReport, err := operations.ExecuteOperation(b, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(local.router), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, local.onRamp, onRampReport.Output.Hex(),
+		"router onRamp should be set on first write even with AllowOnrampOverride=false")
+}
+
+func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+	)
+	require.NoError(t, err)
+
+	local := deployChain(t, e, chainSelector)
+	remote := deployChain(t, e, remoteChainSelector)
+
+	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+	rc := input.RemoteChains[remoteChainSelector]
+	rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(42_000)
+	input.RemoteChains[remoteChainSelector] = rc
+
+	report1, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	gasPrice, err := operations.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteChainSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, big.NewInt(42_000), gasPrice.Output.Value, "gas price should be 42000 after first run")
+
+	report2, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err)
+	assert.Less(t, len(report2.ExecutionReports), len(report1.ExecutionReports),
+		"second run should skip gas price update since value is already set")
+}
+
+func TestConfigureChainForLanes_RejectsOnRampRouterDowngrade(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	input.AllowOnrampOverride = true
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, input,
+	)
+	require.NoError(t, err, "first run with prod router should succeed")
+
+	downgradeInput := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	downgradeInput.Router = localWithTest.testRouter
+	downgradeInput.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, downgradeInput,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OnRamp")
+	assert.Contains(t, err.Error(), "refusing to overwrite")
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	onRampCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.onRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, common.HexToAddress(localWithTest.router), onRampCfg.Output.Router,
+		"OnRamp router should still point to the prod router after rejected downgrade")
+}
+
+func TestConfigureChainForLanes_RejectsOffRampRouterDowngrade(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
+	)
+	require.NoError(t, err)
+
+	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
+	remote := deployChain(t, e, remoteSelector)
+
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+	prodRouter := common.HexToAddress(localWithTest.router)
+
+	// Pre-configure only the OffRamp source chain config with the prod router.
+	// The OnRamp is left unconfigured so its router is zero — the OnRamp check
+	// passes, and the OffRamp check is what triggers the guard.
+	_, err = operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		offramp.ApplySourceChainConfigUpdates, evmChain,
+		contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(localWithTest.offRamp),
+			Args: []offramp.SourceChainConfigArgs{{
+				Router:              prodRouter,
+				SourceChainSelector: remoteSelector,
+				IsEnabled:           true,
+				OnRamps:             [][]byte{common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32)},
+				DefaultCCVs:         []common.Address{common.HexToAddress(localWithTest.committeeVerifier)},
+			}},
+		},
+	)
+	require.NoError(t, err)
+
+	downgradeInput := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
+	downgradeInput.Router = localWithTest.testRouter
+	downgradeInput.AllowOnrampOverride = false
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		sequences.ConfigureChainForLanes, e.BlockChains, downgradeInput,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OffRamp")
+	assert.Contains(t, err.Error(), "refusing to overwrite")
+
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	offRampCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.offRamp), Args: remoteSelector,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, prodRouter, offRampCfg.Output.Router,
+		"OffRamp router should still point to the prod router after rejected downgrade")
+}
+
