@@ -460,6 +460,6 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 
 replace (
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
-	github.com/prometheus/common => github.com/prometheus/common v0.62.0
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.20.0
+	github.com/prometheus/common => github.com/prometheus/common v0.62.0
 )
