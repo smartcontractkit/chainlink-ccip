@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -24,17 +23,17 @@ import (
 func TestConfigurePool(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(tokenAndPoolReport operations.SequenceReport[tokens.DeployTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput
+		makeInput   func(chainSel uint64, result deployedTokenAndPool) tokens.ConfigureTokenPoolInput
 		expectedErr string
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(tokenAndPoolReport operations.SequenceReport[tokens.DeployTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput {
+			makeInput: func(chainSel uint64, result deployedTokenAndPool) tokens.ConfigureTokenPoolInput {
 				threshold := big.NewInt(123)
 				return tokens.ConfigureTokenPoolInput{
-					ChainSelector:                    tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
-					TokenPoolAddress:                 common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
-					AdvancedPoolHooks:                common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address),
+					ChainSelector:                    chainSel,
+					TokenPoolAddress:                 result.TokenPoolAddress,
+					AdvancedPoolHooks:                result.AdvancedHooksAddress,
 					RouterAddress:                    common.HexToAddress("0x09"),
 					ThresholdAmountForAdditionalCCVs: threshold,
 					RateLimitAdmin:                   common.HexToAddress("0x10"),
@@ -75,16 +74,10 @@ func TestConfigurePool(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Deploy token and token pool
-			tokenAndPoolReport, err := operations.ExecuteSequence(
-				e.OperationsBundle,
-				tokens.DeployTokenAndPool,
-				e.BlockChains.EVMChains()[chainSel],
-				basicDeployTokenAndPoolInput(chainReport, false),
-			)
-			require.NoError(t, err, "ExecuteSequence should not error")
+			result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
 
 			// Configure token pool
-			input := test.makeInput(tokenAndPoolReport)
+			input := test.makeInput(chainSel, result)
 			configureReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				tokens.ConfigureTokenPool,

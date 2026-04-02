@@ -223,15 +223,9 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Deploy token and token pool
-			tokenAndPoolReport, err := operations.ExecuteSequence(
-				e.OperationsBundle,
-				tokens.DeployTokenAndPool,
-				e.BlockChains.EVMChains()[chainSel],
-				basicDeployTokenAndPoolInput(chainReport, false),
-			)
-			require.NoError(t, err, "ExecuteSequence should not error")
-			tokenPoolAddress := common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address)
-			advancedPoolHooksAddress := common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address)
+			result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+			tokenPoolAddress := result.TokenPoolAddress
+			advancedPoolHooksAddress := result.AdvancedHooksAddress
 
 			firstPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 			_, err = operations.ExecuteSequence(
@@ -320,15 +314,9 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	require.NotEqual(t, common.Address{}, routerAddress, "Router address should be set")
 
 	// Deploy 2.0.0 token A + pool A (new pool we will configure with import)
-	tokenAndPoolReportA, err := operations.ExecuteSequence(
-		e.OperationsBundle,
-		tokens.DeployTokenAndPool,
-		e.BlockChains.EVMChains()[chainSel],
-		basicDeployTokenAndPoolInput(chainReport, false),
-	)
-	require.NoError(t, err, "ExecuteSequence DeployTokenAndPool should not error")
-	poolAAddress := common.HexToAddress(tokenAndPoolReportA.Output.Addresses[1].Address)
-	advancedPoolHooksA := common.HexToAddress(tokenAndPoolReportA.Output.Addresses[2].Address)
+	resultA := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+	poolAAddress := resultA.TokenPoolAddress
+	advancedPoolHooksA := resultA.AdvancedHooksAddress
 
 	// Deploy 1.6.1 token B + pool B (will be the "active" pool in registry for import)
 	legacyInput := chains_v161.DeployTokenAndPoolInput{

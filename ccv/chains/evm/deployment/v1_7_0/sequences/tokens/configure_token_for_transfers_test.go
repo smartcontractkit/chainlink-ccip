@@ -64,17 +64,10 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NoError(t, err, "ExecuteSequence should not error")
 
 		// Deploy token and token pool
-		tokenAndPoolReport, err := operations.ExecuteSequence(
-			e.OperationsBundle,
-			tokens.DeployTokenAndPool,
-			e.BlockChains.EVMChains()[chainSel],
-			basicDeployTokenAndPoolInput(chainReport, false),
-		)
-		require.NoError(t, err, "ExecuteSequence should not error")
-		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
+		result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
 
-		tokenAddress := tokenAndPoolReport.Output.Addresses[0].Address
-		tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
+		tokenAddress := result.TokenAddress.Hex()
+		tokenPoolAddress := result.TokenPoolAddress.Hex()
 
 		// Find token admin registry address
 		var tokenAdminRegistryAddress string
@@ -222,16 +215,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 
-		tokenAndPoolReport, err := operations.ExecuteSequence(
-			e.OperationsBundle,
-			tokens.DeployTokenAndPool,
-			e.BlockChains.EVMChains()[chainSel],
-			basicDeployTokenAndPoolInput(chainReport, false),
-		)
-		require.NoError(t, err, "ExecuteSequence should not error")
-		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
+		result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
 
-		tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
+		tokenPoolAddress := result.TokenPoolAddress.Hex()
 
 		var tokenAdminRegistryAddress string
 		for _, addr := range chainReport.Output.Addresses {
@@ -244,7 +230,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,
-			TokenAddress:     tokenAndPoolReport.Output.Addresses[0].Address,
+			TokenAddress:     result.TokenAddress.Hex(),
 			TokenPoolAddress: tokenPoolAddress,
 			RemoteChains: map[uint64]tokens_core.RemoteChainConfig[[]byte, string]{
 				remoteChainSel: {
