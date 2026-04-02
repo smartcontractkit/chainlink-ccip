@@ -280,8 +280,7 @@ func getFilteredAddressRefsForVerification(l logger.Logger, ds datastore.DataSto
 			}
 			ref := ds.Addresses().Filter(filterFns...)
 			if len(ref) == 0 {
-				l.Warnf("require verified pre-hook: no address ref found for filter criteria %+v, skipping", refsToVerify[i])
-				continue
+				return nil, fmt.Errorf("require verified pre-hook: no address ref found for filter criteria %+v", refsToVerify[i])
 			}
 			for _, r := range ref {
 				err := newDs.Addresses().Add(r)
@@ -296,7 +295,7 @@ func getFilteredAddressRefsForVerification(l logger.Logger, ds datastore.DataSto
 }
 
 // IterateVerifiers walks filtered networks and address refs, builds a verifier per ref
-// when NeedsVerification returns true, and runs step for each (with a short delay between steps).
+// when NeedsVerification returns true, and runs step for each.
 func IterateVerifiers(
 	ctx context.Context,
 	ds datastore.DataStore,

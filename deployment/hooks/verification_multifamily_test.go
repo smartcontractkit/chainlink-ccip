@@ -20,7 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
 )
 
-// stubContractVerification implements hooks.ContractVerification[any] with no-op behavior so
+// stubContractVerification implements hooks.ContractVerification with no-op behavior so
 // post/pre hooks exit quickly (empty network list, skip every network).
 type stubContractVerification struct {
 	filterErr error
