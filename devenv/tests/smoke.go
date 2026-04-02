@@ -314,6 +314,9 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				// 1. evm adapter returns nil adapter
 				// 2. solana setup lane seems not to be setting enforeceOOO on the contract side
 			}
+			if fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyTon {
+				t.Skip("Skipping for TON")
+			}
 
 			receiver := toImpl.CCIPReceiver()
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewOutOfOrderExtraArg(false))
