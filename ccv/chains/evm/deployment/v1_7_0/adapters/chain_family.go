@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
@@ -22,19 +23,27 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
 // ChainFamilyAdapter is the adapter for chains of the EVM family.
 type ChainFamilyAdapter struct{}
 
+var _ ccvadapters.ChainFamily = (*ChainFamilyAdapter)(nil)
+
 // ConfigureLaneLegAsSource returns the sequence for configuring a chain of the EVM family as a source chain for CCIP lanes.
-func (c *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsSource
 }
 
 // ConfigureLaneLegAsDest returns the sequence for configuring a chain of the EVM family as a destination chain for CCIP lanes.
-func (c *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
+func (a *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsDest
+}
+
+// ConfigureChainForLanes returns the sequence for configuring an EVM chain for multiple remote lanes.
+func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvadapters.ConfigureChainForLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
+	return sequences.ConfigureChainForLanes
 }
 
 func (a *ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -102,7 +111,7 @@ func (a *ChainFamilyAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSe
 	return common.Address(fqAddress).Bytes(), nil
 }
 
-func (c *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
+func (a *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return evm_sequences.DisableRemoteChainSequence
 }
 
@@ -128,6 +137,38 @@ func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector
 		return nil, err
 	}
 	return addr, nil
+}
+
+func (a *ChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:      datastore.ContractType(sequences.ExecutorProxyType),
+		Qualifier: qualifier,
+		Version:   executor.Version,
+	}, chainSelector, toAddress)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve executor proxy (qualifier %q) on chain %d: %w", qualifier, chainSelector, err)
+	}
+	if !common.IsHexAddress(addr) {
+		return "", fmt.Errorf("resolved executor proxy address %q is not a valid hex address (qualifier %q, chain %d)", addr, qualifier, chainSelector)
+	}
+	if common.HexToAddress(addr) == (common.Address{}) {
+		return "", fmt.Errorf("resolved executor proxy address is zero (qualifier %q, chain %d)", qualifier, chainSelector)
+	}
+	return addr, nil
+}
+
+// AddressRefToBytes returns the byte representation of an EVM address ref.
+// It validates the hex string and rejects zero addresses.
+func (a *ChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
+	if !common.IsHexAddress(ref.Address) {
+		return nil, fmt.Errorf("invalid EVM address %q in ref %s/%s", ref.Address, ref.Type, ref.Version)
+	}
+	addr := common.HexToAddress(ref.Address)
+	if addr == (common.Address{}) {
+		return nil, fmt.Errorf("zero address in ref %s/%s", ref.Type, ref.Version)
+	}
+	return addr.Bytes(), nil
 }
 
 // evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
