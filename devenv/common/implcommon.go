@@ -788,6 +788,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		srcSel := srcAdapter.ChainSelector()
 
 		for _, dstAdapter := range adp {
+			if _, err := dstAdapter.GetTokenExpansionConfig(); errors.Is(err, errors.ErrUnsupported) {
+				continue
+			}
 			dstSel := dstAdapter.ChainSelector()
 			// Skip destinations that don't support token expansion, otherwise
 			// the source will reference a remote chain selector with no matching
