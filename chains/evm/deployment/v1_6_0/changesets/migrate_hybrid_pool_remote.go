@@ -29,12 +29,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var supportedOldPoolTypeAndVersions = map[string]struct{}{
-	v1_5_1_lock_release_token_pool_ops.TypeAndVersion.String(): {},
-}
-
-var expectedNewPoolTypeAndVersion = v1_6_0_burn_mint_with_external_minter_token_pool_ops.TypeAndVersion.String()
-
 type MigrateHybridPoolRemoteConfig struct {
 	HubChainSelector     uint64         `json:"hubChainSelector" yaml:"hubChainSelector"`
 	HubPoolAddress       common.Address `json:"hubPoolAddress" yaml:"hubPoolAddress"`
@@ -80,29 +74,6 @@ func makeVerifyMigrateHybridPoolRemote(
 		}
 		if cfg.RemoteTokenAddress == (common.Address{}) {
 			return fmt.Errorf("remote token address cannot be the zero address")
-		}
-
-		hubFamily, err := chain_selectors.GetSelectorFamily(cfg.HubChainSelector)
-		if err != nil {
-			return fmt.Errorf("invalid hub chain selector %d: %w", cfg.HubChainSelector, err)
-		}
-		if hubFamily != chain_selectors.FamilyEVM {
-			return fmt.Errorf("hub chain selector %d is not an EVM chain", cfg.HubChainSelector)
-		}
-
-		remoteFamily, err := chain_selectors.GetSelectorFamily(cfg.RemoteChainSelector)
-		if err != nil {
-			return fmt.Errorf("invalid remote chain selector %d: %w", cfg.RemoteChainSelector, err)
-		}
-		if remoteFamily != chain_selectors.FamilyEVM {
-			return fmt.Errorf("remote chain selector %d is not an EVM chain", cfg.RemoteChainSelector)
-		}
-
-		if !e.BlockChains.Exists(cfg.HubChainSelector) {
-			return fmt.Errorf("chain with selector %d does not exist", cfg.HubChainSelector)
-		}
-		if !e.BlockChains.Exists(cfg.RemoteChainSelector) {
-			return fmt.Errorf("chain with selector %d does not exist", cfg.RemoteChainSelector)
 		}
 
 		hubChain, ok := e.BlockChains.EVMChains()[cfg.HubChainSelector]
@@ -355,9 +326,22 @@ func makeApplyMigrateHybridPoolRemote(
 			return cldf.ChangesetOutput{}, err
 		}
 
+		hubChain, ok := e.BlockChains.EVMChains()[cfg.HubChainSelector]
+		if !ok {
+			return cldf.ChangesetOutput{}, fmt.Errorf("hub chain selector %d is not configured as an EVM chain", cfg.HubChainSelector)
+		}
 		remoteChain, ok := e.BlockChains.EVMChains()[cfg.RemoteChainSelector]
 		if !ok {
 			return cldf.ChangesetOutput{}, fmt.Errorf("remote chain selector %d is not configured as an EVM chain", cfg.RemoteChainSelector)
+		}
+
+		hubPool, err := hybrid_with_external_minter_token_pool_bindings.NewHybridWithExternalMinterTokenPool(cfg.HubPoolAddress, hubChain.Client)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to bind hub pool %s on chain %d: %w", cfg.HubPoolAddress, cfg.HubChainSelector, err)
+		}
+		hubTokenAddress, err := hubPool.GetToken(&bind.CallOpts{Context: e.GetContext()})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to read token from hub pool %s on chain %d: %w", cfg.HubPoolAddress, cfg.HubChainSelector, err)
 		}
 
 		remoteToken, err := erc20.NewERC20(cfg.RemoteTokenAddress, remoteChain.Client)
@@ -397,6 +381,7 @@ func makeApplyMigrateHybridPoolRemote(
 				Type:          cldf_datastore.ContractType(v1_6_0_hybrid_pool_ops.ContractType),
 				Version:       v1_6_0_hybrid_pool_ops.Version,
 				Address:       cfg.HubPoolAddress.Hex(),
+				Qualifier:     hubTokenAddress.Hex(),
 			}); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to persist hub pool ref %s on chain %d: %w", cfg.HubPoolAddress, cfg.HubChainSelector, err)
 			}
@@ -413,6 +398,7 @@ func makeApplyMigrateHybridPoolRemote(
 				Type:          cldf_datastore.ContractType(v1_6_0_burn_mint_with_external_minter_token_pool_ops.ContractType),
 				Version:       v1_6_0_burn_mint_with_external_minter_token_pool_ops.Version,
 				Address:       cfg.NewRemotePoolAddress.Hex(),
+				Qualifier:     cfg.RemoteTokenAddress.Hex(),
 			}); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to persist new remote pool ref %s on chain %d: %w", cfg.NewRemotePoolAddress, cfg.RemoteChainSelector, err)
 			}
@@ -451,33 +437,24 @@ func verifyTypeAndVersion(
 	refs := ds.Addresses().Filter(
 		cldf_datastore.AddressRefByChainSelector(chainSelector),
 		cldf_datastore.AddressRefByAddress(address.Hex()),
+		cldf_datastore.AddressRefByType(expectedType),
+		cldf_datastore.AddressRefByVersion(expectedVersion),
 	)
-	for _, ref := range refs {
-		if ref.Type == expectedType && ref.Version != nil && ref.Version.Equal(expectedVersion) {
-			return nil
-		}
-		if ref.Type != "" || ref.Version != nil {
-			return fmt.Errorf(
-				"%s %s on chain %d has datastore ref type=%s version=%s, expected type=%s version=%s",
-				label, address, chainSelector,
-				ref.Type, ref.Version,
-				expectedType, expectedVersion,
-			)
-		}
+	if len(refs) > 0 {
+		return nil
 	}
-	if len(refs) == 0 {
-		contractType, version, err := evm_utils.TypeAndVersion(address, backend)
-		if err != nil {
-			return fmt.Errorf("failed to read typeAndVersion for %s %s on chain %d: %w", label, address, chainSelector, err)
-		}
-		actual := fmt.Sprintf("%s %s", contractType, version.String())
-		expected := fmt.Sprintf("%s %s", expectedType, expectedVersion.String())
-		if actual != expected {
-			return fmt.Errorf(
-				"unexpected typeAndVersion %q for %s %s on chain %d, expected %q",
-				actual, label, address, chainSelector, expected,
-			)
-		}
+
+	contractType, version, err := evm_utils.TypeAndVersion(address, backend)
+	if err != nil {
+		return fmt.Errorf("failed to read typeAndVersion for %s %s on chain %d: %w", label, address, chainSelector, err)
+	}
+	actual := fmt.Sprintf("%s %s", contractType, version.String())
+	expected := fmt.Sprintf("%s %s", expectedType, expectedVersion.String())
+	if actual != expected {
+		return fmt.Errorf(
+			"unexpected typeAndVersion %q for %s %s on chain %d, expected %q",
+			actual, label, address, chainSelector, expected,
+		)
 	}
 	return nil
 }
@@ -489,16 +466,12 @@ func AddressRefExistsWithTypeVersion(
 	expectedType cldf_datastore.ContractType,
 	expectedVersion *semver.Version,
 ) bool {
-	refs := ds.Addresses().Filter(
+	return len(ds.Addresses().Filter(
 		cldf_datastore.AddressRefByChainSelector(chainSelector),
 		cldf_datastore.AddressRefByAddress(address.Hex()),
-	)
-	for _, ref := range refs {
-		if ref.Type == expectedType && ref.Version != nil && ref.Version.Equal(expectedVersion) {
-			return true
-		}
-	}
-	return false
+		cldf_datastore.AddressRefByType(expectedType),
+		cldf_datastore.AddressRefByVersion(expectedVersion),
+	)) > 0
 }
 
 func bytesAddressMatches(encoded []byte, expectedAddress common.Address) bool {

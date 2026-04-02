@@ -2,6 +2,7 @@ package sequences
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -37,7 +38,7 @@ var MigrateHybridPoolRemote = cldf_ops.NewSequence(
 	"Migrates a remote chain token pool from lock-release to burn-mint on a hybrid hub pool",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input MigrateHybridPoolRemoteInput) (sequences.OnChainOutput, error) {
 		if input.RemoteChainSupply == nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("RemoteChainSupply must not be nil")
+			return sequences.OnChainOutput{}, errors.New("RemoteChainSupply must not be nil")
 		}
 
 		hubChain, ok := chains.EVMChains()[input.HubChainSelector]
