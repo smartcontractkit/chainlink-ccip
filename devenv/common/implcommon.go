@@ -86,7 +86,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	// Directory needs to exist at ../contracts/build relative to chainlink-ccip/devenv for TON
 	contractVersion := os.Getenv("DEPLOY_CONTRACT_VERSION")
 	if contractVersion == "" {
-		contractVersion = "a60d19e33dc8" // Jan 5, 2026 commit hash
+		contractVersion = "054376f21418" // Feb 19, 2026 commit hash
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
@@ -788,8 +788,13 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		srcSel := srcAdapter.ChainSelector()
 
 		for _, dstAdapter := range adp {
-			// dstCfg := dstAdapter.GetTokenExpansionConfig() // TBD: This was commented 1 month ago. Is there any problem if do the insertion bellow for a dstSel that doesn't support Token Transfers?
 			dstSel := dstAdapter.ChainSelector()
+			// Skip destinations that don't support token expansion, otherwise
+			// the source will reference a remote chain selector with no matching
+			// entry in the top-level config map.
+			if _, err := dstAdapter.GetTokenExpansionConfig(); err != nil {
+				continue
+			}
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
