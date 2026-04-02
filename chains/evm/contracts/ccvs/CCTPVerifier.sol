@@ -6,6 +6,7 @@ import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
+import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
@@ -57,7 +58,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice Parameters for _depositForBurn (stack too deep measure).
   struct DepositForBurnParams {
     bytes32 messageId; // The message ID of the CCIP message.
-    uint32 finality; // The finality of the CCIP message.
     uint32 finalityThreshold; // The CCTP finality threshold.
   }
 
@@ -241,13 +241,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       decodedReceiver = Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver);
     }
 
-    DepositForBurnParams memory params = DepositForBurnParams({
-      messageId: messageId, finality: uint32(message.finality), finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
-    });
+    DepositForBurnParams memory params =
+      DepositForBurnParams({messageId: messageId, finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD});
 
     // The maximum fee, taken on destination, is a portion of the total amount transferred.
     uint256 maxFee = 0;
-    if (params.finality != 0) {
+    if (message.finality != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
       params.finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
 
       if (verifierArgs.length > 0) {
