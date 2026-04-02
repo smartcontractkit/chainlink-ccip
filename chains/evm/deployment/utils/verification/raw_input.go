@@ -5,15 +5,15 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var contractMetadata = map[cldf.ContractType]map[semver.Version]rawContractInfo{}
+var contractMetadata = map[cldf.ContractType]map[string]rawContractInfo{}
 
 // RegisterContractMetadataForTest seeds contractMetadata so NeedsVerification and
 // LoadSolidityContractMetadata succeed in tests. Not for production use.
-func RegisterContractMetadataForTest(contractType cldf.ContractType, version semver.Version, solidityStandardJSON string, bytecode string, name string) {
+func RegisterContractMetadataForTest(contractType cldf.ContractType, version *semver.Version, solidityStandardJSON string, bytecode string, name string) {
 	if contractMetadata[contractType] == nil {
-		contractMetadata[contractType] = map[semver.Version]rawContractInfo{}
+		contractMetadata[contractType] = map[string]rawContractInfo{}
 	}
-	contractMetadata[contractType][version] = rawContractInfo{
+	contractMetadata[contractType][version.String()] = rawContractInfo{
 		SolidityStandardJSONInput: solidityStandardJSON,
 		Bytecode:                  bytecode,
 		Name:                      name,

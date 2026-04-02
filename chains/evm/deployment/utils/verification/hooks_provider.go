@@ -31,7 +31,10 @@ func (p *EVMContractInputsProvider) NeedsVerification(ref datastore.AddressRef) 
 	contractType := cldf.ContractType(ref.Type)
 	version := ref.Version
 	if versionedMetadata, versionedMetadataExists := contractMetadata[contractType]; versionedMetadataExists {
-		if _, versionExists := versionedMetadata[*version]; versionExists {
+		if version == nil {
+			return false
+		}
+		if _, versionExists := versionedMetadata[version.String()]; versionExists {
 			return true
 		}
 	}
@@ -96,7 +99,7 @@ func (e *EVMContractInputsProvider) GetInputs(contractType datastore.ContractTyp
 	if version == nil {
 		return evm.SolidityContractMetadata{}, nil
 	}
-	meta, err := LoadSolidityContractMetadata(cldf.ContractType(contractType), *version)
+	meta, err := LoadSolidityContractMetadata(cldf.ContractType(contractType), version)
 	if err != nil {
 		return evm.SolidityContractMetadata{}, err
 	}
@@ -121,13 +124,13 @@ type rawContractInfo struct {
 // LoadSolidityContractMetadata loads the metadata for a contract type and version, including the standard JSON input, bytecode, and name.
 func LoadSolidityContractMetadata(
 	contractType cldf.ContractType,
-	version semver.Version,
+	version *semver.Version,
 ) (evm.SolidityContractMetadata, error) {
 	contract, ok := contractMetadata[contractType]
 	if !ok {
 		return evm.SolidityContractMetadata{}, fmt.Errorf("no contract found for type %s", contractType)
 	}
-	contractWithVersion, ok := contract[version]
+	contractWithVersion, ok := contract[version.String()]
 	if !ok {
 		return evm.SolidityContractMetadata{}, fmt.Errorf("no contract found for type %s with version %s", contractType, version)
 	}

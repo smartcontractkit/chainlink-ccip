@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -562,8 +563,11 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_EVMSourcifyE
 	hooks.GetContractVerificationRegistry().Register(chainsel.FamilyEVM, testEVMVerifier())
 
 	var sourcifyCalls int
+	var mu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		sourcifyCalls++
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "full"})
 	}))
@@ -576,15 +580,15 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_EVMSourcifyE
 	refs := []datastore.AddressRef{
 		{
 			ChainSelector: eth.Selector,
-			Type:            "MyContract",
-			Version:         semver.MustParse("1.0.0"),
-			Address:         "0x0000000000000000000000000000000000000001",
+			Type:          "MyContract",
+			Version:       semver.MustParse("1.0.0"),
+			Address:       "0x0000000000000000000000000000000000000001",
 		},
 		{
 			ChainSelector: poly.Selector,
-			Type:            "MyContract",
-			Version:         semver.MustParse("1.0.0"),
-			Address:         "0x0000000000000000000000000000000000000002",
+			Type:          "MyContract",
+			Version:       semver.MustParse("1.0.0"),
+			Address:       "0x0000000000000000000000000000000000000002",
 		},
 	}
 	writeEnvDatastoreWithRefs(t, dom, refs)
@@ -610,8 +614,11 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_EVMSourcifyEndT
 	hooks.GetContractVerificationRegistry().Register(chainsel.FamilyEVM, testEVMVerifier())
 
 	var sourcifyCalls int
+	var mu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		sourcifyCalls++
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "full"})
 	}))
@@ -624,15 +631,15 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_EVMSourcifyEndT
 	mds := datastore.NewMemoryDataStore()
 	require.NoError(t, mds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: eth.Selector,
-		Type:            "MyContract",
-		Version:         semver.MustParse("1.0.0"),
-		Address:         "0x0000000000000000000000000000000000000001",
+		Type:          "MyContract",
+		Version:       semver.MustParse("1.0.0"),
+		Address:       "0x0000000000000000000000000000000000000001",
 	}))
 	require.NoError(t, mds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: poly.Selector,
-		Type:            "MyContract",
-		Version:         semver.MustParse("1.0.0"),
-		Address:         "0x0000000000000000000000000000000000000002",
+		Type:          "MyContract",
+		Version:       semver.MustParse("1.0.0"),
+		Address:       "0x0000000000000000000000000000000000000002",
 	}))
 
 	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom,
