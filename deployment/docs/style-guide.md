@@ -1,3 +1,8 @@
+---
+title: Changeset Style Guide
+sidebar_label: Changeset Style Guide
+sidebar_position: 8
+---
 # Changeset Style Guide
 
 This guide turns recurring review feedback into a practical reference for writing and reviewing changesets.
@@ -216,13 +221,13 @@ type ConfigureRegistryInput struct {
 }
 
 // ✅ BETTER: resolve the address internally at runtime
-func (a *EVMAdapter) ConfigureRegistry() error {
+func (a *EVMAdapter) ConfigureRegistry(input ConfigureRegistryInput) error {
   tokenAdminRegistryAddress, err := a.GetTokenAdminRegistryAddress(
     input.ExistingDataStore,
-    chain.Selector,
+    input.Selector,
   )
   if err != nil {
-    return fmt.Errorf("failed to get TAR address for chain %d: %w", chain.Selector, err)
+    return fmt.Errorf("failed to get TAR address for chain %d: %w", input.Selector, err)
   }
 
   // ...
@@ -333,7 +338,7 @@ func verifyConfigUpdate(e *cldf.Environment) error {
   if err != nil { /* handle error */ }
 
   bundle := operations.NewBundle(
-    func() context.Context { return context.Background() },
+    e.GetContext,
     e.Logger,
     operations.NewMemoryReporter(),
   )
@@ -518,3 +523,4 @@ Before sending a changeset for review, verify each of the following:
 This guide exists to make changesets safer to operate, easier to review, and more consistent across the repo.
 
 When a rule here conflicts with clear local conventions, prefer consistency unless doing so would compromise correctness, safety, or operability.
+
