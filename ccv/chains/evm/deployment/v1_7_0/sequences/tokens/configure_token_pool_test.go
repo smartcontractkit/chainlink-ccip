@@ -23,12 +23,12 @@ import (
 func TestConfigurePool(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(chainSel uint64, result deployedTokenAndPool) tokens.ConfigureTokenPoolInput
+		makeInput   func(chainSel uint64, result tokenExpansionResult) tokens.ConfigureTokenPoolInput
 		expectedErr string
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(chainSel uint64, result deployedTokenAndPool) tokens.ConfigureTokenPoolInput {
+			makeInput: func(chainSel uint64, result tokenExpansionResult) tokens.ConfigureTokenPoolInput {
 				threshold := big.NewInt(123)
 				return tokens.ConfigureTokenPoolInput{
 					ChainSelector:                    chainSel,
@@ -73,8 +73,8 @@ func TestConfigurePool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 
-			// Deploy token and token pool
-			result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+			// Deploy token and token pool via TokenExpansion
+			result := deployTokenAndPoolViaExpansion(t, e, chainSel, chainReport.Output.Addresses)
 
 			// Configure token pool
 			input := test.makeInput(chainSel, result)

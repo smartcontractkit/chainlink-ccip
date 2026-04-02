@@ -14,10 +14,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -63,21 +65,19 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 
-		// Deploy token and token pool
-		result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+		// Deploy token and token pool via TokenExpansion
+		result := deployTokenAndPoolViaExpansion(t, e, chainSel, chainReport.Output.Addresses)
 
 		tokenAddress := result.TokenAddress.Hex()
 		tokenPoolAddress := result.TokenPoolAddress.Hex()
 
-		// Find token admin registry address
-		var tokenAdminRegistryAddress string
-		for _, addr := range chainReport.Output.Addresses {
-			if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
-				tokenAdminRegistryAddress = addr.Address
-				break
-			}
-		}
-		require.NotEmpty(t, tokenAdminRegistryAddress, "Token admin registry address should be found")
+		// Find token admin registry address from datastore
+		tokenAdminRegistryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: chainSel,
+			Type:          datastore.ContractType(token_admin_registry.ContractType),
+		}, chainSel, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err, "Token admin registry should exist in datastore")
+		tokenAdminRegistryAddress := tokenAdminRegistryAddr.Hex()
 
 		// Prepare input for configuring token for transfers
 		input := tokens_core.ConfigureTokenForTransfersInput{
@@ -215,18 +215,16 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 
-		result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+		result := deployTokenAndPoolViaExpansion(t, e, chainSel, chainReport.Output.Addresses)
 
 		tokenPoolAddress := result.TokenPoolAddress.Hex()
 
-		var tokenAdminRegistryAddress string
-		for _, addr := range chainReport.Output.Addresses {
-			if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
-				tokenAdminRegistryAddress = addr.Address
-				break
-			}
-		}
-		require.NotEmpty(t, tokenAdminRegistryAddress, "Token admin registry address should be found")
+		tokenAdminRegistryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: chainSel,
+			Type:          datastore.ContractType(token_admin_registry.ContractType),
+		}, chainSel, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err, "Token admin registry should exist in datastore")
+		tokenAdminRegistryAddress := tokenAdminRegistryAddr.Hex()
 
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,

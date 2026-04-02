@@ -2,180 +2,106 @@ package tokens_test
 
 import (
 	"math/big"
-	"strings"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
 
-type deployedTokenAndPool struct {
+type tokenExpansionResult struct {
 	TokenAddress         common.Address
 	TokenPoolAddress     common.Address
 	AdvancedHooksAddress common.Address
-	Addresses            []datastore.AddressRef
 }
 
-// deployTokenAndPoolForTest deploys a token and its associated pool using individual
-// operations/sequences, replicating the state that the composite DeployTokenAndPool
-// sequence used to produce: token deployed, pool deployed, mint/burn roles granted
-// to the pool, initial supply minted, deployer roles revoked.
-func deployTokenAndPoolForTest(
+// deployTokenAndPoolViaExpansion uses TokenExpansion to deploy a test token and burn-mint token pool.
+// It populates the environment's DataStore with the chain report addresses, calls TokenExpansion,
+// and merges the output back into the environment's DataStore.
+func deployTokenAndPoolViaExpansion(
 	t *testing.T,
-	bundle operations.Bundle,
-	chain evm.Chain,
-	chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput],
-	isLockRelease bool,
-) deployedTokenAndPool {
+	e *deployment.Environment,
+	chainSel uint64,
+	chainReportAddresses []datastore.AddressRef,
+) tokenExpansionResult {
 	t.Helper()
 
-	chainSel := chainReport.Input.ChainSelector
-
-	var rmnProxyAddress common.Address
-	var routerAddress common.Address
-	for _, addr := range chainReport.Output.Addresses {
-		if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
-			rmnProxyAddress = common.HexToAddress(addr.Address)
-		}
-		if addr.Type == datastore.ContractType(router.ContractType) {
-			routerAddress = common.HexToAddress(addr.Address)
-		}
+	ds := datastore.NewMemoryDataStore()
+	for _, addr := range chainReportAddresses {
+		require.NoError(t, ds.Addresses().Add(addr))
 	}
+	e.DataStore = ds.Seal()
 
-	// 1. Deploy token
-	deployTokenReport, err := operations.ExecuteOperation(bundle, burn_mint_erc20_with_drip.Deploy, chain, contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-		ChainSelector:  chainSel,
-		TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
-		Args: burn_mint_erc20_with_drip.ConstructorArgs{
-			Name:   "TEST",
-			Symbol: "TEST",
-		},
-	})
-	require.NoError(t, err, "Failed to deploy token")
-	tokenAddress := common.HexToAddress(deployTokenReport.Output.Address)
-	tokenRef := deployTokenReport.Output
-	tokenRef.Qualifier = "TEST"
+	preMint := uint64(1_000)
+	deployer := e.BlockChains.EVMChains()[chainSel].DeployerKey.From
 
-	// 2. Deploy pool
-	poolInput := tokens.DeployTokenPoolInput{
-		ChainSel:                         chainSel,
-		TokenSymbol:                      "TEST",
-		RateLimitAdmin:                   common.HexToAddress("0x01"),
-		ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
-		FeeAggregator:                    common.HexToAddress("0x03"),
-		ConstructorArgs: tokens.ConstructorArgs{
-			Token:    tokenAddress,
-			Decimals: 18,
-			RMNProxy: rmnProxyAddress,
-			Router:   routerAddress,
-		},
-		AdvancedPoolHooksConfig: tokens.AdvancedPoolHooksConfig{
-			Allowlist:         nil,
-			PolicyEngine:      common.Address{},
-			AuthorizedCallers: nil,
-		},
-	}
-	if isLockRelease {
-		poolInput.TokenPoolType = datastore.ContractType(lock_release_token_pool.ContractType)
-		poolInput.TokenPoolVersion = lock_release_token_pool.Version
-	} else {
-		poolInput.TokenPoolType = datastore.ContractType(burn_mint_token_pool.ContractType)
-		poolInput.TokenPoolVersion = burn_mint_token_pool.Version
-	}
-
-	var poolReport operations.SequenceReport[tokens.DeployTokenPoolInput, seq_core.OnChainOutput]
-	if isLockRelease {
-		poolReport, err = operations.ExecuteSequence(bundle, tokens.DeployLockReleaseTokenPool, chain, poolInput)
-	} else {
-		poolReport, err = operations.ExecuteSequence(bundle, tokens.DeployBurnMintTokenPool, chain, poolInput)
-	}
-	require.NoError(t, err, "Failed to deploy token pool")
-
-	// Find the token pool address
-	var tokenPoolAddress common.Address
-	for _, addr := range poolReport.Output.Addresses {
-		if strings.Contains(string(addr.Type), "TokenPool") {
-			tokenPoolAddress = common.HexToAddress(addr.Address)
-			break
-		}
-	}
-	require.NotEqual(t, common.Address{}, tokenPoolAddress, "Token pool address should be found")
-
-	// 3. Grant mint/burn roles to the pool
-	_, err = operations.ExecuteOperation(bundle, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain, contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       tokenAddress,
-		Args:          tokenPoolAddress,
-	})
-	require.NoError(t, err, "Failed to grant mint and burn roles to token pool")
-
-	// 4. Grant mint/burn to deployer, mint initial supply, then revoke
-	_, err = operations.ExecuteOperation(bundle, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain, contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       tokenAddress,
-		Args:          chain.DeployerKey.From,
-	})
-	require.NoError(t, err, "Failed to grant mint and burn roles to deployer")
-
-	accounts := map[common.Address]*big.Int{
-		common.HexToAddress("0x01"): big.NewInt(500_000),
-		common.HexToAddress("0x02"): big.NewInt(500_000),
-	}
-	for account, amount := range accounts {
-		_, err = operations.ExecuteOperation(bundle, burn_mint_erc20_with_drip.Mint, chain, contract_utils.FunctionInput[burn_mint_erc20_with_drip.MintArgs]{
-			ChainSelector: chainSel,
-			Address:       tokenAddress,
-			Args: burn_mint_erc20_with_drip.MintArgs{
-				Account: account,
-				Amount:  amount,
+	out, err := tokenscore.TokenExpansion().Apply(*e, tokenscore.TokenExpansionInput{
+		ChainAdapterVersion: semver.MustParse("2.0.0"),
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokenscore.TokenExpansionInputPerChain{
+			chainSel: {
+				TokenPoolVersion:      burn_mint_token_pool.Version,
+				SkipOwnershipTransfer: true,
+				DeployTokenInput: &tokenscore.DeployTokenInput{
+					Name:          "TEST",
+					Symbol:        "TEST",
+					Decimals:      18,
+					PreMint:       &preMint,
+					ExternalAdmin: deployer.Hex(),
+					CCIPAdmin:     deployer.Hex(),
+					Type:          bnm_drip_v1_0.ContractType,
+				},
+				DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
+					PoolType:           string(burn_mint_token_pool.ContractType),
+					TokenPoolQualifier: "TEST",
+				},
 			},
-		})
-		require.NoError(t, err, "Failed to mint tokens")
-	}
-
-	_, err = operations.ExecuteOperation(bundle, burn_mint_erc20_with_drip.RevokeMintRole, chain, contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       tokenAddress,
-		Args:          chain.DeployerKey.From,
+		},
 	})
-	require.NoError(t, err, "Failed to revoke mint role from deployer")
+	require.NoError(t, err, "TokenExpansion should succeed")
 
-	_, err = operations.ExecuteOperation(bundle, burn_mint_erc20_with_drip.RevokeBurnRole, chain, contract_utils.FunctionInput[common.Address]{
+	require.NoError(t, ds.Merge(out.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: chainSel,
-		Address:       tokenAddress,
-		Args:          chain.DeployerKey.From,
-	})
-	require.NoError(t, err, "Failed to revoke burn role from deployer")
+		Type:          datastore.ContractType(bnm_drip_v1_0.ContractType),
+		Qualifier:     "TEST",
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "Token should exist in datastore after TokenExpansion")
 
-	// Build return: addresses in same order as old DeployTokenAndPool (token=0, pool=1, hooks=2, ...)
-	allAddresses := []datastore.AddressRef{tokenRef}
-	allAddresses = append(allAddresses, poolReport.Output.Addresses...)
+	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
+		Version:       burn_mint_token_pool.Version,
+		Qualifier:     "TEST",
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "Token pool should exist in datastore after TokenExpansion")
 
-	var advancedHooksAddress common.Address
-	if len(poolReport.Output.Addresses) >= 2 {
-		advancedHooksAddress = common.HexToAddress(poolReport.Output.Addresses[1].Address)
-	}
+	hooksAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(advanced_pool_hooks.ContractType),
+		Version:       advanced_pool_hooks.Version,
+		Qualifier:     "TEST",
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "Advanced pool hooks should exist in datastore after TokenExpansion")
 
-	return deployedTokenAndPool{
-		TokenAddress:         tokenAddress,
-		TokenPoolAddress:     tokenPoolAddress,
-		AdvancedHooksAddress: advancedHooksAddress,
-		Addresses:            allAddresses,
+	return tokenExpansionResult{
+		TokenAddress:         tokenAddr,
+		TokenPoolAddress:     poolAddr,
+		AdvancedHooksAddress: hooksAddr,
 	}
 }

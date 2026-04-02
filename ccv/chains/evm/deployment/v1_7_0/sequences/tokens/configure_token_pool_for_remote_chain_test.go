@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -16,6 +17,7 @@ import (
 	chains_v161_burn_mint "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -222,8 +224,8 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 
-			// Deploy token and token pool
-			result := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+			// Deploy token and token pool via TokenExpansion
+			result := deployTokenAndPoolViaExpansion(t, e, chainSel, chainReport.Output.Addresses)
 			tokenPoolAddress := result.TokenPoolAddress
 			advancedPoolHooksAddress := result.AdvancedHooksAddress
 
@@ -298,25 +300,26 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")
 
-	var registryAddress, rmnProxyAddress, routerAddress common.Address
-	for _, addr := range chainReport.Output.Addresses {
-		switch addr.Type {
-		case datastore.ContractType(token_admin_registry.ContractType):
-			registryAddress = common.HexToAddress(addr.Address)
-		case datastore.ContractType(rmn_proxy.ContractType):
-			rmnProxyAddress = common.HexToAddress(addr.Address)
-		case datastore.ContractType(router.ContractType):
-			routerAddress = common.HexToAddress(addr.Address)
-		}
-	}
-	require.NotEqual(t, common.Address{}, registryAddress, "TokenAdminRegistry address should be set")
-	require.NotEqual(t, common.Address{}, rmnProxyAddress, "RMN proxy address should be set")
-	require.NotEqual(t, common.Address{}, routerAddress, "Router address should be set")
-
-	// Deploy 2.0.0 token A + pool A (new pool we will configure with import)
-	resultA := deployTokenAndPoolForTest(t, e.OperationsBundle, e.BlockChains.EVMChains()[chainSel], chainReport, false)
+	// Deploy 2.0.0 token A + pool A via TokenExpansion (also populates env datastore with chain contracts)
+	resultA := deployTokenAndPoolViaExpansion(t, e, chainSel, chainReport.Output.Addresses)
 	poolAAddress := resultA.TokenPoolAddress
 	advancedPoolHooksA := resultA.AdvancedHooksAddress
+
+	registryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(token_admin_registry.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "TokenAdminRegistry should exist in datastore")
+	rmnProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(rmn_proxy.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "RMN proxy should exist in datastore")
+	routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "Router should exist in datastore")
 
 	// Deploy 1.6.1 token B + pool B (will be the "active" pool in registry for import)
 	legacyInput := chains_v161.DeployTokenAndPoolInput{
