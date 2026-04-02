@@ -7,9 +7,8 @@ import (
 
 var contractMetadata = map[cldf.ContractType]map[string]rawContractInfo{}
 
-// RegisterContractMetadataForTest seeds contractMetadata so NeedsVerification and
-// LoadSolidityContractMetadata succeed in tests. Not for production use.
-func RegisterContractMetadataForTest(contractType cldf.ContractType, version *semver.Version, solidityStandardJSON string, bytecode string, name string) {
+// RegisterContractMetadata seeds contractMetadata
+func RegisterContractMetadata(contractType cldf.ContractType, version *semver.Version, solidityStandardJSON string, bytecode string, name string) {
 	if contractMetadata[contractType] == nil {
 		contractMetadata[contractType] = map[string]rawContractInfo{}
 	}

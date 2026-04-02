@@ -278,6 +278,10 @@ func getFilteredAddressRefsForVerification(l logger.Logger, ds datastore.DataSto
 			if refsToVerify[i].Qualifier != "" {
 				filterFns = append(filterFns, datastore.AddressRefByQualifier(refsToVerify[i].Qualifier))
 			}
+			if len(filterFns) == 0 {
+				return nil, fmt.Errorf("require verified pre-hook: invalid filter criteria %+v: "+
+					"at least one field must be specified to filter address refs for verification", refsToVerify[i])
+			}
 			ref := ds.Addresses().Filter(filterFns...)
 			if len(ref) == 0 {
 				return nil, fmt.Errorf("require verified pre-hook: no address ref found for filter criteria %+v", refsToVerify[i])
