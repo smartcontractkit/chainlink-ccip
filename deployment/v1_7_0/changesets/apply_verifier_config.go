@@ -123,7 +123,12 @@ func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry) deployment.C
 			return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports, DataStore: manageReport.Output.DataStore}, nil
 		}
 
-		signingKeysByNOP := fetchSigningKeysForNOPs(e, cfg.Topology.NOPTopology.NOPs)
+		committeeNOPs := filterNOPsByAliases(cfg.Topology.NOPTopology.NOPs, getCommitteeNOPAliases(committee))
+		families := deriveFamiliesFromSelectors(selectors)
+		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, families)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
+		}
 
 		nopsToValidate := cfg.TargetNOPs
 		if len(nopsToValidate) == 0 {
@@ -346,20 +351,49 @@ committeeVerifierConfig = """
 	return jobSpecs, scope, nil
 }
 
-func fetchSigningKeysForNOPs(e deployment.Environment, nops []offchain.NOPConfig) fetch_signing_keys.SigningKeysByNOP {
+func deriveFamiliesFromSelectors(selectors []uint64) []string {
+	seen := make(map[string]struct{})
+	for _, sel := range selectors {
+		if family, err := chainsel.GetSelectorFamily(sel); err == nil {
+			seen[family] = struct{}{}
+		}
+	}
+	families := make([]string, 0, len(seen))
+	for f := range seen {
+		families = append(families, f)
+	}
+	return families
+}
+
+func fetchSigningKeysForNOPsByFamilies(e deployment.Environment, nops []offchain.NOPConfig, families []string) (fetch_signing_keys.SigningKeysByNOP, error) {
+	return fetchSigningKeysForNOPsFiltered(e, nops, func(nop offchain.NOPConfig) bool {
+		for _, family := range families {
+			if nop.SignerAddressByFamily == nil || nop.SignerAddressByFamily[family] == "" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func fetchSigningKeysForNOPsFiltered(
+	e deployment.Environment,
+	nops []offchain.NOPConfig,
+	include func(offchain.NOPConfig) bool,
+) (fetch_signing_keys.SigningKeysByNOP, error) {
 	if e.Offchain == nil {
-		return nil
+		return nil, nil
 	}
 
 	aliases := make([]string, 0, len(nops))
 	for _, nop := range nops {
-		if nop.SignerAddressByFamily == nil || nop.SignerAddressByFamily[chainsel.FamilyEVM] == "" {
+		if include(nop) {
 			aliases = append(aliases, nop.Alias)
 		}
 	}
 
 	if len(aliases) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	report, err := operations.ExecuteOperation(
@@ -375,11 +409,10 @@ func fetchSigningKeysForNOPs(e deployment.Environment, nops []offchain.NOPConfig
 		},
 	)
 	if err != nil {
-		e.Logger.Warnw("Failed to fetch signing keys from JD", "error", err)
-		return nil
+		return nil, fmt.Errorf("failed to fetch signing keys from JD for NOPs %v: %w", aliases, err)
 	}
 
-	return report.Output.SigningKeysByNOP
+	return report.Output.SigningKeysByNOP, nil
 }
 
 func convertNOPsToVerifierInput(
@@ -434,6 +467,20 @@ func convertTopologyCommittee(committee offchain.CommitteeConfig) verifierCommit
 		NOPAliases:      shared.ConvertStringToNopAliases(getCommitteeNOPAliases(committee)),
 		ChainNOPAliases: chainNOPAliases,
 	}
+}
+
+func filterNOPsByAliases(nops []offchain.NOPConfig, aliases []string) []offchain.NOPConfig {
+	aliasSet := make(map[string]struct{}, len(aliases))
+	for _, a := range aliases {
+		aliasSet[a] = struct{}{}
+	}
+	filtered := make([]offchain.NOPConfig, 0, len(aliases))
+	for _, nop := range nops {
+		if _, ok := aliasSet[nop.Alias]; ok {
+			filtered = append(filtered, nop)
+		}
+	}
+	return filtered
 }
 
 func getCommitteeNOPAliases(committee offchain.CommitteeConfig) []string {

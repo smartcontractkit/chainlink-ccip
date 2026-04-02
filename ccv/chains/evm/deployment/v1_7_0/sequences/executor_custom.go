@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -16,7 +16,7 @@ var ExecutorProxyType cldf_deployment.ContractType = "ExecutorProxy"
 
 type ExecutorRemoteChainConfigArgs struct {
 	DestChainSelector uint64
-	Config            lanes.ExecutorDestChainConfig
+	Config            adapters.ExecutorDestChainConfig
 }
 
 type ExecutorApplyDestChainUpdatesArgs struct {

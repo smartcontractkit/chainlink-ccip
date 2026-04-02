@@ -23,6 +23,7 @@ type TopologyCommitteePopulator struct {
 
 	signingKeysOnce sync.Once
 	signingKeys     fetch_signing_keys.SigningKeysByNOP
+	signingKeysErr  error
 }
 
 // NewTopologyCommitteePopulator creates a populator that encapsulates the
@@ -38,6 +39,7 @@ func NewTopologyCommitteePopulator(
 	}
 }
 
+// Deprecated: Use ConfigureChainsForLanesFromTopology this is the canonical way to configure lanes for 2.0
 func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 	e deployment.Environment,
 	chainSelector uint64,
@@ -50,8 +52,13 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 		return nil, fmt.Errorf("TopologyCommitteePopulator: contractRegistry must not be nil")
 	}
 	r.signingKeysOnce.Do(func() {
-		r.signingKeys = fetchSigningKeysForNOPs(e, r.topology.NOPTopology.NOPs)
+		r.signingKeys, r.signingKeysErr = fetchSigningKeysForNOPsFiltered(e, r.topology.NOPTopology.NOPs, func(_ offchain.NOPConfig) bool {
+			return true
+		})
 	})
+	if r.signingKeysErr != nil {
+		return nil, fmt.Errorf("failed to fetch signing keys: %w", r.signingKeysErr)
+	}
 
 	result := make([]lanes.CommitteeVerifierConfig[datastore.AddressRef], 0, len(inputs))
 	for _, input := range inputs {
@@ -74,7 +81,10 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 				FeeUSDCents:               rc.FeeUSDCents,
 				GasForVerification:        rc.GasForVerification,
 				PayloadSizeBytes:          rc.PayloadSizeBytes,
-				SignatureConfig:           *signatureConfig,
+				SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+					Signers:   signatureConfig.Signers,
+					Threshold: signatureConfig.Threshold,
+				},
 			}
 		}
 
@@ -107,7 +117,7 @@ func getSignatureConfigForLane(
 	localSelector uint64,
 	remoteSelector uint64,
 	signingKeysByNOP fetch_signing_keys.SigningKeysByNOP,
-) (*lanes.CommitteeVerifierSignatureQuorumConfig, error) {
+) (*adapters.CommitteeVerifierSignatureQuorumConfig, error) {
 	committee, ok := topology.NOPTopology.Committees[committeeQualifier]
 	if !ok {
 		return nil, fmt.Errorf("committee %q not found", committeeQualifier)
@@ -132,7 +142,7 @@ func getSignatureConfigForLane(
 		signers = append(signers, signer)
 	}
 
-	return &lanes.CommitteeVerifierSignatureQuorumConfig{
+	return &adapters.CommitteeVerifierSignatureQuorumConfig{
 		Threshold: chainCfg.Threshold,
 		Signers:   signers,
 	}, nil
