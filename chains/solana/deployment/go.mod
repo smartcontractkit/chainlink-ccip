@@ -29,6 +29,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260401133118-aad694b37bb3
 	github.com/smartcontractkit/mcms v0.36.0
 	github.com/stretchr/testify v1.11.1
 )
@@ -39,7 +40,6 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/creachadair/jrpc2 v1.2.0 // indirect
 	github.com/creachadair/mds v0.13.4 // indirect
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260401133118-aad694b37bb3 // indirect
 	github.com/stellar/go-stellar-sdk v0.1.0 // indirect
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
@@ -216,7 +216,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	github.com/xssnick/tonutils-go v1.14.1 // indirect
+	github.com/xssnick/tonutils-go v1.14.1
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zksync-sdk/zksync2-go v1.1.1-0.20250620124214-2c742ee399c6 // indirect
 	go.mongodb.org/mongo-driver v1.17.2 // indirect
