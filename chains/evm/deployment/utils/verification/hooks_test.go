@@ -37,7 +37,7 @@ func testEVMVerifier() *EVMContractInputsProvider {
 func registerMyContractV1(t *testing.T) {
 	t.Helper()
 	solidityJSON := `{"language":"Solidity","sources":{"MyContract.sol":{"content":"pragma solidity 0.8.19; contract MyContract {}"}},"settings":{}}`
-	RegisterContractMetadataForTest(cldf.ContractType("MyContract"), *semver.MustParse("1.0.0"), solidityJSON, "0x00", "MyContract")
+	RegisterContractMetadataForTest(cldf.ContractType("MyContract"), semver.MustParse("1.0.0"), solidityJSON, "0x00", "MyContract")
 }
 
 func newDomainWithExplorerNetwork(t *testing.T, chainSelector uint64, explorerURL, blockExplorerType string) domain.Domain {
@@ -268,7 +268,7 @@ func TestIterateContractVerifiers_NoAPIKeyRecordsVerifierError(t *testing.T) {
 }
 
 func TestIterateContractVerifiers_BuildInputsError(t *testing.T) {
-	RegisterContractMetadataForTest(cldf.ContractType("BadJSONContract"), *semver.MustParse("1.0.0"), "{not-json", "0x", "BadJSONContract")
+	RegisterContractMetadataForTest(cldf.ContractType("BadJSONContract"), semver.MustParse("1.0.0"), "{not-json", "0x", "BadJSONContract")
 
 	chain, ok := chainsel.ChainBySelector(chainsel.ETHEREUM_MAINNET.Selector)
 	require.True(t, ok)

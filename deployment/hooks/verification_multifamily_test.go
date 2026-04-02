@@ -2,6 +2,7 @@ package hooks_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -140,6 +141,26 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_FuncRuns(t *tes
 	require.NoError(t, err)
 }
 
+func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_FuncRunsWithChangesetParams(t *testing.T) {
+	hooks.ResetContractVerificationRegistryForTest()
+	r := hooks.GetContractVerificationRegistry()
+	r.Register(chainsel.FamilyEVM, &stubContractVerification{})
+
+	dom := domain.NewDomain(t.TempDir(), "test")
+	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{chainsel.ETHEREUM_MAINNET.Selector})
+	require.Len(t, postHooks, 1)
+
+	err := postHooks[0].Func(t.Context(), changeset.PostHookParams{
+		Env:          changeset.HookEnv{Name: "staging", Logger: logger.Test(t)},
+		ChangesetKey: "test-changeset",
+		Config:       map[string]any{"foo": "bar"},
+		Output: cldf.ChangesetOutput{
+			DataStore: datastore.NewMemoryDataStore(),
+		},
+	})
+	require.NoError(t, err)
+}
+
 func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_DedupesSameFamily(t *testing.T) {
 	hooks.ResetContractVerificationRegistryForTest()
 	r := hooks.GetContractVerificationRegistry()
@@ -233,17 +254,12 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PassesRefsTo
 
 	dom := domain.NewDomain(t.TempDir(), "test")
 	envName := "hooktest"
-	envDir := dom.EnvDir(envName)
-	require.NoError(t, os.MkdirAll(envDir.DataStoreDirPath(), 0o755))
-	require.NoError(t, os.WriteFile(envDir.AddressRefsFilePath(), []byte("[]"), 0o600))
-	require.NoError(t, os.WriteFile(envDir.ChainMetadataFilePath(), []byte("[]"), 0o600))
-	require.NoError(t, os.WriteFile(envDir.ContractMetadataFilePath(), []byte("[]"), 0o600))
-	require.NoError(t, os.WriteFile(envDir.EnvMetadataFilePath(), []byte("null"), 0o600))
 
 	refs := []datastore.AddressRef{{
 		Type:    "C",
 		Version: nil,
 	}}
+	writeEnvDatastoreWithRefs(t, envName, dom, refs)
 	preHooks := hooks.RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom, []uint64{
 		chainsel.ETHEREUM_MAINNET.Selector,
 		chainsel.SOLANA_MAINNET.Selector,
@@ -257,4 +273,18 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PassesRefsTo
 		})
 		require.NoError(t, err)
 	}
+}
+
+func writeEnvDatastoreWithRefs(t *testing.T, env string, dom domain.Domain, refs []datastore.AddressRef) {
+	t.Helper()
+
+	envDir := dom.EnvDir(env)
+	require.NoError(t, os.MkdirAll(envDir.DataStoreDirPath(), 0o755))
+
+	refsJSON, err := json.Marshal(refs)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(envDir.AddressRefsFilePath(), refsJSON, 0o600))
+	require.NoError(t, os.WriteFile(envDir.ChainMetadataFilePath(), []byte("[]"), 0o600))
+	require.NoError(t, os.WriteFile(envDir.ContractMetadataFilePath(), []byte("[]"), 0o600))
+	require.NoError(t, os.WriteFile(envDir.EnvMetadataFilePath(), []byte("null"), 0o600))
 }
