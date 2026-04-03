@@ -49,7 +49,10 @@ var UpgradeChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.6.0"),
 	"Upgrades deployed Solana CCIP programs in place via BPF Loader Upgradeable",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deployapi.ContractUpgradeConfigWithAddress) (sequences.OnChainOutput, error) {
-		chain := chains.SolanaChains()[input.ChainSelector]
+		chain, ok := chains.SolanaChains()[input.ChainSelector]
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("solana chain selector %d not found in environment", input.ChainSelector)
+		}
 
 		addresses := make([]datastore.AddressRef, 0)
 		allBatchOps := make([]mcmsTypes.BatchOperation, 0)
@@ -57,7 +60,7 @@ var UpgradeChainContracts = cldf_ops.NewSequence(
 		timelockSignerPDA := utils.GetTimelockSignerPDA(
 			input.ExistingAddresses,
 			input.ChainSelector,
-			"cll",
+			common_utils.CLLQualifier,
 		)
 
 		for _, contractType := range input.Contracts {
@@ -146,12 +149,19 @@ func upgradeProgram(
 	upgradeIxn := utils.GenerateUpgradeInstruction(programID, bufferAddress, chain.DeployerKey.PublicKey(), upgradeAuthority)
 	closeIxn := utils.GenerateCloseBufferInstruction(bufferAddress, chain.DeployerKey.PublicKey(), upgradeAuthority)
 
-	// Execute directly if deployer owns it, otherwise wrap in MCMS proposal
-	if upgradeAuthority != timelockSignerPDA {
+	if upgradeAuthority == chain.DeployerKey.PublicKey() {
 		if err := chain.Confirm([]solana.Instruction{upgradeIxn, closeIxn}); err != nil {
 			return nil, fmt.Errorf("failed to confirm upgrade: %w", err)
 		}
 		return nil, nil
+	}
+	if upgradeAuthority != timelockSignerPDA {
+		return nil, fmt.Errorf(
+			"unsupported upgrade authority %s: expected deployer %s for direct execution or timelock signer PDA %s for MCMS",
+			upgradeAuthority.String(),
+			chain.DeployerKey.PublicKey().String(),
+			timelockSignerPDA.String(),
+		)
 	}
 
 	batchOp, err := utils.BuildMCMSBatchOperation(

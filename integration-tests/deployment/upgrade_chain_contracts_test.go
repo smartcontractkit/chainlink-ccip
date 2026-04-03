@@ -208,11 +208,12 @@ func TestUpgradeChainContracts(t *testing.T) {
 			require.Equal(t, fqAddr, addr.Address, "FeeQuoter should be upgraded in place")
 		case offrampops.ContractType:
 			offRampCount++
+			require.Equal(t, offRampAddr, addr.Address, "OffRamp should be upgraded in place")
 		}
 	}
 	require.Equal(t, 1, routerCount, "Should have exactly one Router")
 	require.Equal(t, 1, fqCount, "Should have exactly one FeeQuoter")
-	require.GreaterOrEqual(t, offRampCount, 1, "Should have at least one OffRamp")
+	require.Equal(t, 1, offRampCount, "Should have exactly one OffRamp")
 }
 
 // TestDeployWithDownloadedArtifacts tests the preloaded artifact path
