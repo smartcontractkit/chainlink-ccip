@@ -105,7 +105,7 @@ flowchart LR
 	chainlink-ccip/devenv --> chainlink-ccip/chains/evm/deployment
 	chainlink-ccip/devenv --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/devenv href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-ccip/integration-tests --> chainlink-ccip/chains/evm/deployment
+	chainlink-ccip/integration-tests --> chainlink-ccip/ccv/chains/evm/deployment
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/integration-tests href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-common --> chainlink-common/pkg/chipingress
