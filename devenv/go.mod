@@ -458,8 +458,4 @@ replace github.com/ebitengine/purego v0.8.2 => github.com/ebitengine/purego v0.8
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250528121202-292529af39df
 
-replace (
-	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.20.0
-	github.com/prometheus/common => github.com/prometheus/common v0.62.0
-)
+replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
