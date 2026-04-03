@@ -47,15 +47,40 @@ var (
 		chain_selectors.FamilyAptos: big.NewInt(15e11),
 		chain_selectors.FamilySui:   big.NewInt(15e11),
 	}
-	getNetworkFeeUSDCents = func(chainSelector uint64) uint16 {
-		if chainSelector == chain_selectors.ETHEREUM_MAINNET.Selector ||
-			chainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector ||
-			chainSelector == chain_selectors.ETHEREUM_TESTNET_HOODI.Selector {
-			return 50
-		}
-		return 10
-	}
 )
+
+func isEthChain(chainSelector uint64) bool {
+	return chainSelector == chain_selectors.ETHEREUM_MAINNET.Selector ||
+		chainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector ||
+		chainSelector == chain_selectors.ETHEREUM_TESTNET_HOODI.Selector
+}
+
+// getNetworkFeeUSDCents returns the network fee in USDCents based on the source and remote chain.
+// If either chain is an Ethereum chain, it returns a higher fee of 50 USDCents, otherwise it returns 10 USDCents.
+// This value might be wrong in prev versions of the fee quoter,
+// but we want to set it to a reasonable default for the new fee quoter.
+func getNetworkFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
+	if isEthChain(sourceChain) || isEthChain(remoteChain) {
+		return 50
+	}
+	return 10
+}
+
+// getDefaultTokenFeeUSDCents returns the default token fee in USDCents based on the source and remote chain.
+// This value might be wrong in prev versions of the fee quoter, but we want to set it to a reasonable default for the new fee quoter.
+func getDefaultTokenFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
+	destFamily, _ := chain_selectors.GetSelectorFamily(remoteChain)
+	if destFamily == chain_selectors.FamilySolana {
+		return 35
+	}
+	if isEthChain(remoteChain) {
+		return 150
+	}
+	if isEthChain(sourceChain) {
+		return 50
+	}
+	return 25
+}
 
 type FeeQuoterUpdate struct {
 	ChainSelector                 uint64
@@ -352,10 +377,10 @@ var (
 						DestGasOverhead:             destChainConfig.DestGasOverhead,
 						DestGasPerPayloadByteBase:   destChainConfig.DestGasPerPayloadByteBase,
 						ChainFamilySelector:         destChainConfig.ChainFamilySelector,
-						DefaultTokenFeeUSDCents:     destChainConfig.DefaultTokenFeeUSDCents,
+						DefaultTokenFeeUSDCents:     getDefaultTokenFeeUSDCents(input.ChainSelector, remoteChain),
 						DefaultTokenDestGasOverhead: destChainConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           destChainConfig.DefaultTxGasLimit,
-						NetworkFeeUSDCents:          getNetworkFeeUSDCents(remoteChain),
+						NetworkFeeUSDCents:          getNetworkFeeUSDCents(input.ChainSelector, remoteChain),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
@@ -564,10 +589,10 @@ var (
 						DestGasOverhead:             onRampCfg.DynamicConfig.DestGasOverhead,
 						DestGasPerPayloadByteBase:   uint8(onRampCfg.DynamicConfig.DestGasPerPayloadByte),
 						ChainFamilySelector:         chainFamilySelector,
-						DefaultTokenFeeUSDCents:     onRampCfg.DynamicConfig.DefaultTokenFeeUSDCents,
+						DefaultTokenFeeUSDCents:     getDefaultTokenFeeUSDCents(input.ChainSelector, onRampCfg.RemoteChainSelector),
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
-						NetworkFeeUSDCents:          getNetworkFeeUSDCents(onRampCfg.RemoteChainSelector),
+						NetworkFeeUSDCents:          getNetworkFeeUSDCents(input.ChainSelector, onRampCfg.RemoteChainSelector),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				})
