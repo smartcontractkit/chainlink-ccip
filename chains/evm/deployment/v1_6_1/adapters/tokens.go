@@ -104,6 +104,9 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			result.Addresses = append(result.Addresses, out.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
 
+			if input.TokenRef == nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("TokenRef must be set for pool deployment on chain %d", input.ChainSelector)
+			}
 			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector}
 			if input.TokenRef.Address != "" {
 				toknFilterDS.Address = input.TokenRef.Address

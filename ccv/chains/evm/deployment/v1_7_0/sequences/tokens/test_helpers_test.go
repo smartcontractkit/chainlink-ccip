@@ -20,7 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
+var thresholdAmountForAdditionalCCVs = big.NewInt(1_000_000_000_000_000_000)
 
 type tokenExpansionResult struct {
 	TokenAddress         common.Address
