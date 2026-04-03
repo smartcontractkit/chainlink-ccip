@@ -10,6 +10,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -199,9 +200,11 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMN proxy in datastore for chain %d: %w", input.ChainSelector, err)
 			}
 
-			// Convert string allowlist to common.Address
 			var allowlist []common.Address
 			for _, addr := range input.Allowlist {
+				if !common.IsHexAddress(addr) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist address: %s", addr)
+				}
 				allowlist = append(allowlist, common.HexToAddress(addr))
 			}
 
@@ -545,7 +548,7 @@ func isBurnMintPoolType(poolType deployment.ContractType) bool {
 // isLockReleasePoolType returns true for 2.0.0 lock/release pool types.
 func isLockReleasePoolType(poolType deployment.ContractType) bool {
 	return poolType == cciputils.LockReleaseTokenPool ||
-		poolType == deployment.ContractType("SiloedLockReleaseTokenPool")
+		poolType == siloed_lock_release_token_pool.ContractType
 }
 
 // isBurnMintTokenType returns true for EVM burn/mint token types that support role management.
