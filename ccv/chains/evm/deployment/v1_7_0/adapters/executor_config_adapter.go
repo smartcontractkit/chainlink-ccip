@@ -3,6 +3,8 @@ package adapters
 import (
 	"fmt"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	execcontract "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	offrampoperations "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
@@ -27,10 +29,15 @@ func (a *EVMExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qua
 	seen := make(map[uint64]struct{}, len(refs))
 	chains := make([]uint64, 0, len(refs))
 	for _, ref := range refs {
-		if _, exists := seen[ref.ChainSelector]; !exists {
-			seen[ref.ChainSelector] = struct{}{}
-			chains = append(chains, ref.ChainSelector)
+		if _, exists := seen[ref.ChainSelector]; exists {
+			continue
 		}
+		family, err := chainsel.GetSelectorFamily(ref.ChainSelector)
+		if err != nil || family != chainsel.FamilyEVM {
+			continue
+		}
+		seen[ref.ChainSelector] = struct{}{}
+		chains = append(chains, ref.ChainSelector)
 	}
 	return chains
 }
