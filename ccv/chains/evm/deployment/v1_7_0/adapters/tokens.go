@@ -31,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
@@ -577,7 +576,7 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 		return tokens.TokenTransferFeeConfig{}, errors.New("pool address cannot be the zero address")
 	}
 
-	report, err := operations.ExecuteOperation(
+	report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
 		token_pool.GetTokenTransferFeeConfig,
 		chain,
