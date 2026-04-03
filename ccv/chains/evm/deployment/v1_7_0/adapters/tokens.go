@@ -31,11 +31,15 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
 
-var _ tokens.TokenAdapter = &TokenAdapter{}
+var (
+	_ tokens.TokenFeeAdapter = &TokenAdapter{}
+	_ tokens.TokenAdapter    = &TokenAdapter{}
+)
 
 // TokenAdapter is the adapter for EVM tokens using 2.0.0 token pools.
 type TokenAdapter struct{}
@@ -203,10 +207,10 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 
 			// Build internal deploy input
 			internalInput := evm_tokens.DeployTokenPoolInput{
-				ChainSel:         input.ChainSelector,
-				TokenPoolType:    datastore.ContractType(input.PoolType),
-				TokenPoolVersion: input.TokenPoolVersion,
-				TokenSymbol:      qualifier,
+				ChainSel:                         input.ChainSelector,
+				TokenPoolType:                    datastore.ContractType(input.PoolType),
+				TokenPoolVersion:                 input.TokenPoolVersion,
+				TokenSymbol:                      qualifier,
 				ThresholdAmountForAdditionalCCVs: threshold,
 				ConstructorArgs: evm_tokens.ConstructorArgs{
 					Token:    common.HexToAddress(tokenAddr),
@@ -547,4 +551,53 @@ func isLockReleasePoolType(poolType deployment.ContractType) bool {
 // isBurnMintTokenType returns true for EVM burn/mint token types that support role management.
 func isBurnMintTokenType(typ datastore.ContractType) bool {
 	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
+}
+
+func (t *TokenAdapter) SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.SetTokenPoolTokenTransferFeeConfig
+}
+
+func (t *TokenAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) tokens.TokenTransferFeeConfig {
+	return tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
+}
+
+func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (tokens.TokenTransferFeeConfig, error) {
+	chain, ok := e.BlockChains.EVMChains()[src]
+	if !ok {
+		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("chain with selector %d not defined", src)
+	}
+
+	args := token_pool.GetTokenTransferFeeConfigArgs{DestChainSelector: dst}
+	if !common.IsHexAddress(poolAddress) {
+		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("invalid pool address: %s", poolAddress)
+	}
+
+	addr := common.HexToAddress(poolAddress)
+	if addr == (common.Address{}) {
+		return tokens.TokenTransferFeeConfig{}, errors.New("pool address cannot be the zero address")
+	}
+
+	report, err := operations.ExecuteOperation(
+		e.OperationsBundle,
+		token_pool.GetTokenTransferFeeConfig,
+		chain,
+		contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: src,
+			Address:       addr,
+			Args:          args,
+		},
+	)
+	if err != nil {
+		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("failed to get on-chain token transfer fee config for pool %s on chain selector %d for dest chain selector %d: %w", poolAddress, src, dst, err)
+	}
+
+	return tokens.TokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: report.Output.DefaultBlockConfirmationsTransferFeeBps,
+		CustomFinalityTransferFeeBps:  report.Output.CustomBlockConfirmationsTransferFeeBps,
+		DefaultFinalityFeeUSDCents:    report.Output.DefaultBlockConfirmationsFeeUSDCents,
+		CustomFinalityFeeUSDCents:     report.Output.CustomBlockConfirmationsFeeUSDCents,
+		DestBytesOverhead:             report.Output.DestBytesOverhead,
+		DestGasOverhead:               report.Output.DestGasOverhead,
+		IsEnabled:                     report.Output.IsEnabled,
+	}, nil
 }

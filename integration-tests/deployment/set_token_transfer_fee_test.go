@@ -13,7 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
+	evmadaptersV1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -25,16 +28,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
-	// Define alias for v1.6.0
-	v1_6_0, err := semver.NewVersion("1.6.0")
-	require.NoError(t, err)
-
 	// Define source and destination chain selectors
 	src := chainsel.SOLANA_DEVNET.Selector
 	dst := chainsel.TEST_90000002.Selector
@@ -64,8 +66,8 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	feesRegistry := fees.GetRegistry()
 	evmFeesAdapter := evmadaptersV1_6_0.NewFeesAdapter(&evmAdapter)
 	solFeesAdapter := soladaptersV1_6_0.NewFeesAdapter(&solAdapter)
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilySolana, v1_6_0, solFeesAdapter)
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilyEVM, v1_6_0, evmFeesAdapter)
+	feesRegistry.RegisterFeeAdapter(chainsel.FamilySolana, utils.Version_1_6_0, solFeesAdapter)
+	feesRegistry.RegisterFeeAdapter(chainsel.FamilyEVM, utils.Version_1_6_0, evmFeesAdapter)
 
 	// Configure MCMS registry
 	mcmsRegistry := changesets.GetRegistry()
@@ -76,8 +78,8 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{
-			src: NewDefaultDeploymentConfigForSolana(v1_6_0),
-			dst: NewDefaultDeploymentConfigForEVM(v1_6_0),
+			src: NewDefaultDeploymentConfigForSolana(utils.Version_1_6_0),
+			dst: NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0),
 		},
 	})
 	require.NoError(t, err)
@@ -109,7 +111,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	_, err = fees.
 		SetTokenTransferFee(feesRegistry, mcmsRegistry).
 		Apply(*env, fees.SetTokenTransferFeeInput{
-			Version: v1_6_0,
+			Version: utils.Version_1_6_0,
 			MCMS:    mcms.Input{},
 			Args: []fees.TokenTransferFeeForSrc{
 				{
@@ -182,7 +184,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	_, err = fees.
 		SetTokenTransferFee(feesRegistry, mcmsRegistry).
 		Apply(*env, fees.SetTokenTransferFeeInput{
-			Version: v1_6_0,
+			Version: utils.Version_1_6_0,
 			MCMS:    mcms.Input{},
 			Args: []fees.TokenTransferFeeForSrc{
 				{
@@ -231,12 +233,6 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 }
 
 func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
-	// Define alias for v1.6.0 & v2.0.0
-	v1_6_0, err := semver.NewVersion("1.6.0")
-	require.NoError(t, err)
-	v2_0_0, err := semver.NewVersion("2.0.0")
-	require.NoError(t, err)
-
 	src := chainsel.TEST_90000002.Selector
 	dst := chainsel.TEST_90000001.Selector
 
@@ -258,7 +254,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 
 	for _, chainSel := range chains {
 		chainInput[chainSel] = deploy.ContractDeploymentConfigPerChain{
-			Version: v1_6_0,
+			Version: utils.Version_1_6_0,
 			// FEE QUOTER CONFIG
 			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
@@ -269,8 +265,8 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 			GasForCallExactCheck:                    uint16(5000),
 		}
 		fqInput[chainSel] = deploy.UpdateFeeQuoterInputPerChain{
-			FeeQuoterVersion: v2_0_0,
-			RampsVersion:     v1_6_0,
+			FeeQuoterVersion: utils.Version_2_0_0,
+			RampsVersion:     utils.Version_1_6_0,
 		}
 	}
 	out, err := deploy.DeployContracts(dReg).Apply(*e, deploy.ContractDeploymentConfig{
@@ -291,7 +287,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
-				Version: v1_6_0,
+				Version: utils.Version_1_6_0,
 				ChainA:  chain1,
 				ChainB:  chain2,
 			},
@@ -359,7 +355,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	out, err = fees.
 		SetTokenTransferFee(feesRegistry, mcmsRegistry).
 		Apply(*e, fees.SetTokenTransferFeeInput{
-			Version: v2_0_0,
+			Version: utils.Version_2_0_0,
 			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
 			Args: []fees.TokenTransferFeeForSrc{
 				{
@@ -430,7 +426,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	out, err = fees.
 		SetTokenTransferFee(feesRegistry, mcmsRegistry).
 		Apply(*e, fees.SetTokenTransferFeeInput{
-			Version: v2_0_0,
+			Version: utils.Version_2_0_0,
 			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
 			Args: []fees.TokenTransferFeeForSrc{
 				{
@@ -479,4 +475,183 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	dstCfg, err = evmFeesAdapterV2_0.GetOnchainTokenTransferFeeConfig(*e, dst, src, dstLinkRef.Address)
 	require.NoError(t, err)
 	require.False(t, dstCfg.IsEnabled)
+}
+
+func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
+	// Define EVM chains
+	evmChainSelA := chainsel.TEST_90000001.Selector
+	evmChainSelB := chainsel.TEST_90000002.Selector
+
+	// Setup test environment
+	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{evmChainSelA, evmChainSelB}))
+	require.NoError(t, err)
+
+	// Configure deployment registry
+	deployRegistry := deploy.GetRegistry()
+	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, &evmadaptersV1_0_0.EVMDeployer{})
+	chainsToDeploy := map[uint64]deploy.ContractDeploymentConfigPerChain{
+		evmChainSelA: NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0),
+		evmChainSelB: NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0),
+	}
+
+	// Deploy contracts
+	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{Chains: chainsToDeploy, MCMS: mcms.Input{}})
+	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
+
+	// Deploy MCMS and transfer ownership
+	DeployMCMS(t, env, evmChainSelA, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, env, evmChainSelB, []string{common_utils.CLLQualifier})
+	EVMTransferOwnership(t, env, evmChainSelA)
+	EVMTransferOwnership(t, env, evmChainSelB)
+
+	// Define a full pool mesh between EVM chains A and B
+	tokenExpansionInput := map[uint64]tokens.TokenExpansionInputPerChain{
+		evmChainSelA: {
+			TokenPoolVersion: utils.Version_2_0_0,
+			DeployTokenInput: &tokens.DeployTokenInput{
+				Type:     bnmERC20ops.ContractType,
+				Decimals: 18,
+				Symbol:   "TEST_TOKEN_B",
+				Name:     "Test Token B",
+				PreMint:  nil, // no pre-mint
+				Supply:   nil, // unlimited
+			},
+			DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+				PoolType: common_utils.BurnMintTokenPool.String(),
+			},
+			TokenTransferConfig: &tokens.TokenTransferConfig{
+				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					evmChainSelB: {
+						DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+							IsEnabled: false,
+						},
+					},
+				},
+			},
+		},
+		evmChainSelB: {
+			TokenPoolVersion: utils.Version_2_0_0,
+			DeployTokenInput: &tokens.DeployTokenInput{
+				Type:     bnmERC20ops.ContractType,
+				Decimals: 18,
+				Symbol:   "TEST_TOKEN_B",
+				Name:     "Test Token B",
+				PreMint:  nil, // no pre-mint
+				Supply:   nil, // unlimited
+			},
+			DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+				PoolType: common_utils.BurnMintTokenPool.String(),
+			},
+			TokenTransferConfig: &tokens.TokenTransferConfig{
+				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					evmChainSelA: {
+						DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+							IsEnabled: false,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Deploy the pool mesh
+	output, err = tokens.TokenExpansion().Apply(*env, tokens.TokenExpansionInput{
+		TokenExpansionInputPerChain: tokenExpansionInput,
+		ChainAdapterVersion:         utils.Version_2_0_0,
+		MCMS:                        NewDefaultInputForMCMS("Token Expansion"),
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
+
+	// Fetch the pool addresses from the datastore
+	fltrA := datastore.AddressRef{Type: datastore.ContractType(tokenExpansionInput[evmChainSelA].DeployTokenPoolInput.PoolType), Version: tokenExpansionInput[evmChainSelA].DeployTokenPoolInput.TokenPoolVersion}
+	poolA, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrA, evmChainSelA, datastore_utils_evm.ToEVMAddress)
+	require.NoError(t, err)
+	fltrB := datastore.AddressRef{Type: datastore.ContractType(tokenExpansionInput[evmChainSelB].DeployTokenPoolInput.PoolType), Version: tokenExpansionInput[evmChainSelB].DeployTokenPoolInput.TokenPoolVersion}
+	poolB, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrB, evmChainSelB, datastore_utils_evm.ToEVMAddress)
+	require.NoError(t, err)
+
+	// Set the token pool token transfer fee config on all pools
+	output, err = tokens.
+		SetTokenTransferFee().
+		Apply(*env, tokens.SetTokenTransferFeeInput{
+			Version: utils.Version_2_0_0,
+			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
+			Args: []tokens.TokenTransferFeeForSrc{
+				{
+					Selector: evmChainSelA,
+					TokenPools: []tokens.TokenTransferFeeForPool{
+						{
+							PoolAddress: poolA.Hex(),
+							Destinations: []tokens.TokenTransferFeeForDst{
+								{
+									IsReset:  false,
+									Selector: evmChainSelB,
+									Settings: tokens.UnresolvedTokenTransferFeeArgs{
+										DestGasOverhead: tokens.TokenTransferFeeValue[uint32]{
+											Value: 150_000,
+											Valid: true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Selector: evmChainSelB,
+					TokenPools: []tokens.TokenTransferFeeForPool{
+						{
+							PoolAddress: poolB.Hex(),
+							Destinations: []tokens.TokenTransferFeeForDst{
+								{
+									IsReset:  false,
+									Selector: evmChainSelA,
+									Settings: tokens.UnresolvedTokenTransferFeeArgs{
+										DestGasOverhead: tokens.TokenTransferFeeValue[uint32]{
+											Value: 150_000,
+											Valid: true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// Get the v2.0 token adapter
+	tokensV2 := evmadaptersV1_7_0.TokenAdapter{}
+	defaults := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelA, evmChainSelB)
+
+	// Reset the operation cache
+	env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
+
+	// Query the on-chain config for both pools
+	cfgA, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolA.Hex(), evmChainSelA, evmChainSelB)
+	require.NoError(t, err)
+	cfgB, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolB.Hex(), evmChainSelB, evmChainSelA)
+	require.NoError(t, err)
+
+	// Confirm that the configs for A match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgA.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgA.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgA.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgA.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaults.DestBytesOverhead, cfgA.DestBytesOverhead)
+	require.Equal(t, uint32(150_000), cfgA.DestGasOverhead)
+	require.True(t, cfgA.IsEnabled)
+
+	// Confirm that the configs for B match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgB.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgB.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgB.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgB.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaults.DestBytesOverhead, cfgB.DestBytesOverhead)
+	require.Equal(t, uint32(150_000), cfgB.DestGasOverhead)
+	require.True(t, cfgB.IsEnabled)
 }

@@ -8,12 +8,15 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -26,6 +29,24 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		evmChain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
+		}
+
+		registryAddress := common.Address{}
+		if input.RegistryAddress != "" {
+			registryAddress = common.HexToAddress(input.RegistryAddress)
+		} else {
+			filter := datastore.AddressRef{
+				Type:          datastore.ContractType(tar_ops.ContractType),
+				ChainSelector: evmChain.Selector,
+				Version:       tar_ops.Version,
+			}
+
+			addr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, filter, evmChain.Selector, datastore_utils_evm.ToEVMAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find registry address in datastore: %w", err)
+			}
+
+			registryAddress = addr
 		}
 
 		var tokenAddress common.Address
@@ -53,10 +74,9 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("TimelockAddress is required when liquidity migration is requested")
 			}
 
-			registryAddr := common.HexToAddress(input.RegistryAddress)
 			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, tar_ops.GetTokenConfig, evmChain, evm_contract.FunctionInput[common.Address]{
 				ChainSelector: input.ChainSelector,
-				Address:       registryAddr,
+				Address:       registryAddress,
 				Args:          tokenAddress,
 			})
 			if err != nil {
@@ -134,7 +154,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			TokenPoolAddress:  tokenPoolAddress,
 			AdvancedPoolHooks: advancedPoolHooksAddress.Output,
 			RemoteChains:      input.RemoteChains,
-			RegistryAddress:   common.HexToAddress(input.RegistryAddress),
+			RegistryAddress:   registryAddress,
 			TokenAddress:      tokenAddress,
 		})
 		if err != nil {
@@ -148,7 +168,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			TokenAddress:              tokenAddress,
 			TokenPoolAddress:          registryTokenPoolAddress,
 			ExternalAdmin:             common.HexToAddress(input.ExternalAdmin),
-			TokenAdminRegistryAddress: common.HexToAddress(input.RegistryAddress),
+			TokenAdminRegistryAddress: registryAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to register token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
