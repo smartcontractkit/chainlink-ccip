@@ -14,10 +14,10 @@ import (
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	tpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	evm_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
-	tpOpsV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
-	tpV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
+	tpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
+	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
+	v1_6_0_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -31,16 +31,83 @@ import (
 
 var _ tokensapi.TokenAdapter = &TokenAdapter{}
 
-// TokenAdapter handles EVM token pools at version 1.6.1.
+// TokenAdapter handles EVM token pools at version 1.5.1.
 // It embeds EVMTokenBase for shared methods and defines all pool-specific
-// methods using only v1.6.1 bindings -- no version switches.
+// methods using only v1.5.1 bindings -- no version switches.
 type TokenAdapter struct {
 	evm1_0_0.EVMTokenBase
 }
 
-// ConfigureTokenForTransfersSequence returns the v1.6.1-specific sequence.
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return evm_seq.ConfigureTokenForTransfers
+	return cldf_ops.NewSequence(
+		"evm-v1.5.1-adapter:configure-token-for-transfers",
+		tpOps.Version,
+		"Configure a v1.5.1 token pool for cross-chain transfers on an EVM chain",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+			if !common.IsHexAddress(input.TokenPoolAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("token pool address %q is not a valid hex address", input.TokenPoolAddress)
+			}
+
+			tpAddr := common.HexToAddress(input.TokenPoolAddress)
+			if tpAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, errors.New("token pool address is zero address")
+			}
+
+			externalAdmin := common.Address{}
+			if input.ExternalAdmin != "" {
+				if !common.IsHexAddress(input.ExternalAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("external admin address %q is not a valid hex address", input.ExternalAdmin)
+				}
+				externalAdmin = common.HexToAddress(input.ExternalAdmin)
+			}
+
+			tarAddress, err := getTokenAdminRegistryAddress(input.ExistingDataStore, input.ChainSelector, &t.EVMTokenBase)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
+			}
+
+			tokenAddress, err := getTokenFromPool(b, chain, tpAddr)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from pool at %s: %w", tpAddr, err)
+			}
+
+			configureReport, err := cldf_ops.ExecuteSequence(b,
+				tpSeq.ConfigureTokenPoolForRemoteChains, chain,
+				tpSeq.ConfigureTokenPoolForRemoteChainsInput{
+					TokenPoolAddress: tpAddr,
+					TokenPoolVersion: tpOps.Version,
+					RemoteChains:     input.RemoteChains,
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for transfers on chain %d: %w", input.ChainSelector, err)
+			}
+			result.Addresses = append(result.Addresses, configureReport.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, configureReport.Output.BatchOps...)
+
+			registerReport, err := cldf_ops.ExecuteSequence(b,
+				tarseq.RegisterToken, chain,
+				tarseq.RegisterTokenInput{
+					ChainSelector:             input.ChainSelector,
+					TokenAdminRegistryAddress: tarAddress,
+					TokenPoolAddress:          tpAddr,
+					ExternalAdmin:             externalAdmin,
+					TokenAddress:              tokenAddress,
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token on chain %d: %w", input.ChainSelector, err)
+			}
+			result.Addresses = append(result.Addresses, registerReport.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, registerReport.Output.BatchOps...)
+
+			return result, nil
+		})
 }
 
 func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
@@ -93,9 +160,9 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 		return 0, errors.New("token pool address is zero address")
 	}
 
-	pool, err := tpV1_6_1.NewTokenPool(tpAddr, chain.Client)
+	pool, err := token_pool.NewTokenPool(tpAddr, chain.Client)
 	if err != nil {
-		return 0, fmt.Errorf("failed to instantiate token pool v1.6.1 contract: %w", err)
+		return 0, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
 	}
 
 	return pool.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
@@ -103,9 +170,9 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 
 func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"evm-v1.6.1-adapter:set-token-pool-rate-limits",
-		tpOpsV1_6_1.Version,
-		"Set rate limits for a v1.6.1 token pool on an EVM chain",
+		"evm-v1.5.1-adapter:set-token-pool-rate-limits",
+		tpOps.Version,
+		"Set rate limits for a v1.5.1 token pool on an EVM chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			chain, ok := chains.EVMChains()[input.ChainSelector]
@@ -144,17 +211,17 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPR
 			}
 
 			report, err := cldf_ops.ExecuteOperation(b,
-				tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
-				evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
+				tpOps.SetChainRateLimiterConfig, chain,
+				evm_contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
 					ChainSelector: chain.Selector,
 					Address:       tokenPoolAddr,
-					Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
-						OutboundConfig: tpOpsV1_6_1.Config{
+					Args: tpOps.SetChainRateLimiterConfigArgs{
+						OutboundRateLimitConfig: token_pool.RateLimiterConfig{
 							IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
 							Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
 							Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
 						},
-						InboundConfig: tpOpsV1_6_1.Config{
+						InboundRateLimitConfig: token_pool.RateLimiterConfig{
 							IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
 							Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
 							Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
@@ -177,9 +244,9 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPR
 
 func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"evm-v1.6.1-adapter:manual-registration",
-		tpOpsV1_6_1.Version,
-		"Manually register a token and token pool on EVM chains using v1.6.1 pools",
+		"evm-v1.5.1-adapter:manual-registration",
+		tpOps.Version,
+		"Manually register a token and token pool on EVM chains using v1.5.1 pools",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ManualRegistrationSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
@@ -261,11 +328,11 @@ func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualR
 
 func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"evm-v1.6.1-adapter:deploy-token-pool-for-token",
-		tpOpsV1_6_1.Version,
-		"Deploy a v1.6.1 token pool for a token on an EVM chain",
+		"evm-v1.5.1-adapter:deploy-token-pool-for-token",
+		tpOps.Version,
+		"Deploy a v1.5.1 token pool for a token on an EVM chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
-			out, err := cldf_ops.ExecuteSequence(b, tpOps.DeployTokenPool, chains, input)
+			out, err := cldf_ops.ExecuteSequence(b, v1_6_0_seq.DeployTokenPool, chains, input)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token pool on chain %d: %w", input.ChainSelector, err)
 			}
@@ -341,26 +408,26 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.De
 	)
 }
 
-// getTokenFromPool calls GetToken on a v1.6.1 token pool to derive the token address.
+// getTokenFromPool calls GetToken on a v1.5.1 token pool to derive the token address.
 func getTokenFromPool(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
 	res, err := cldf_ops.ExecuteOperation(b,
-		tpOpsV1_6_1.GetToken, chain,
+		tpOps.GetToken, chain,
 		evm_contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 		},
 	)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get token address via GetToken v1.6.1 operation: %w", err)
+		return common.Address{}, fmt.Errorf("failed to get token address via GetToken v1.5.1 operation: %w", err)
 	}
 	return res.Output, nil
 }
 
-// getTokenPoolAdmins returns the owner and rate limit admin of a v1.6.1 token pool.
+// getTokenPoolAdmins returns the owner and rate limit admin of a v1.5.1 token pool.
 func getTokenPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (poolOwner common.Address, rlAdmin common.Address, err error) {
-	pool, err := tpV1_6_1.NewTokenPool(poolAddr, chain.Client)
+	pool, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 	if err != nil {
-		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate token pool v1.6.1 contract: %w", err)
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
 	}
 
 	poolOwner, err = pool.Owner(&bind.CallOpts{Context: ctx})

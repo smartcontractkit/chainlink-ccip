@@ -12,6 +12,7 @@ import (
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
@@ -19,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	evm16seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -34,11 +34,11 @@ import (
 
 var _ tokens.TokenAdapter = &TokenAdapter{}
 
-// TokenAdapter is the adapter for EVM tokens using 2.0.0 token pools.
-// It embeds the v1.6.0 EVMAdapter (which itself embeds EVMTokenBase) and
-// overrides only the methods that differ for 2.0.0 pools.
+// TokenAdapter handles EVM token pools at version 2.0.0.
+// It embeds EVMTokenBase for shared methods and defines all pool-specific
+// methods using only v2.0.0 bindings -- no version switches.
 type TokenAdapter struct {
-	evm16seq.EVMAdapter
+	evm1_0_0.EVMTokenBase
 }
 
 // ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 2.0.0 token pool.

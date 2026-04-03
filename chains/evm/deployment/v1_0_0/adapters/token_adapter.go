@@ -19,8 +19,12 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+var _ tokensapi.TokenAdapter = &EVMTokenBase{}
+
 // EVMTokenBase provides version-agnostic EVM token adapter methods that are
 // shared across all pool versions (v1.5.1, v1.6.0, v1.6.1, v2.0.0).
+// It is also registered at v1.0.0 so callers that only need token deployment
+// can obtain a valid adapter without importing a pool-version package.
 type EVMTokenBase struct{}
 
 func (a *EVMTokenBase) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
@@ -126,5 +130,33 @@ func (a *EVMTokenBase) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAu
 }
 
 func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+// Pool-specific stubs -- these are overridden by per-version adapters (v1.5.1, v1.6.1, v2.0.0).
+// EVMTokenBase is registered at v1.0.0 so callers that only need token deployment (DeployToken,
+// DeployTokenVerify) can obtain a valid adapter without importing a pool-version package.
+
+func (a *EVMTokenBase) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) DeriveTokenAddress(_ deployment.Environment, _ uint64, _ datastore.AddressRef) ([]byte, error) {
+	return nil, fmt.Errorf("DeriveTokenAddress is not implemented on EVMTokenBase; use a pool-version adapter")
+}
+
+func (a *EVMTokenBase) DeriveTokenDecimals(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ []byte) (uint8, error) {
+	return 0, fmt.Errorf("DeriveTokenDecimals is not implemented on EVMTokenBase; use a pool-version adapter")
+}
+
+func (a *EVMTokenBase) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }

@@ -26,29 +26,19 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func init() {
 	v := semver.MustParse("1.6.0")
-	// Use a single EVMAdapter instance so the shared transferOwnershipAdapter state is used by
-	// both InitializeTimelockAddress and SequenceTransferOwnershipViaMCMS.
 	evmAdapter := &EVMAdapter{transferOwnershipAdapter: &evm1_0_0.EVMTransferOwnershipAdapter{}}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
 	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, evmAdapter)
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
-	// 1.5.1 token pools use the same abstract TokenPool; use the 1.6.0 adapter for config/transfers.
-	v151 := semver.MustParse("1.5.1")
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v151, evmAdapter)
 }
 
 type EVMAdapter struct {
-	evm1_0_0.EVMTokenBase
-	// transferOwnershipAdapter is shared so InitializeTimelockAddress populates the same instance
-	// used by SequenceTransferOwnershipViaMCMS / SequenceAcceptOwnership.
 	transferOwnershipAdapter *evm1_0_0.EVMTransferOwnershipAdapter
 }
 
