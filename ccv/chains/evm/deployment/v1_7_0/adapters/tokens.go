@@ -12,7 +12,6 @@ import (
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
-	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
@@ -22,12 +21,9 @@ import (
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	evm16seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
-	ownershipAdapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -39,16 +35,15 @@ import (
 var _ tokens.TokenAdapter = &TokenAdapter{}
 
 // TokenAdapter is the adapter for EVM tokens using 2.0.0 token pools.
-type TokenAdapter struct{}
+// It embeds the v1.6.0 EVMAdapter (which itself embeds EVMTokenBase) and
+// overrides only the methods that differ for 2.0.0 pools.
+type TokenAdapter struct {
+	evm16seq.EVMAdapter
+}
 
 // ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 2.0.0 token pool.
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.ConfigureTokenForTransfers
-}
-
-// AddressRefToBytes returns an EVM address reference as an EVM address.
-func (t *TokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return common.HexToAddress(ref.Address).Bytes(), nil
 }
 
 // DeriveTokenAddress derives the token address from a token pool reference, returning it as an EVM address.
@@ -68,39 +63,6 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 	return t.AddressRefToBytes(datastore.AddressRef{
 		Address: getTokenReport.Output.Hex(),
 	})
-}
-
-func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, chain.BlockChains] {
-	return evm16seq.DeployToken
-}
-
-func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, input tokens.DeployTokenInput) error {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-		ChainSelector: input.ChainSelector,
-		Type:          datastore.ContractType(input.Type),
-		Qualifier:     input.Symbol,
-	}, input.ChainSelector, datastore_utils.FullRef)
-	if err == nil {
-		e.OperationsBundle.Logger.Info("Token already deployed at address:", tokenAddr.Address)
-		return nil
-	}
-
-	if err := evmutils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
-		return err
-	}
-	if err := evmutils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
-		return err
-	}
-
-	if input.Decimals > 18 {
-		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
-	}
-
-	if input.PreMint != nil && input.Supply != nil && *input.Supply != 0 && *input.PreMint > *input.Supply {
-		return fmt.Errorf("pre-mint amount cannot be greater than max supply, got pre-mint %d and supply %d", *input.PreMint, *input.Supply)
-	}
-
-	return nil
 }
 
 func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -286,11 +248,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 	)
 }
 
-func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	return nil
-}
-
 func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
@@ -327,10 +284,6 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w; erc20.decimals on token %s also failed: %w", poolRef.Address, evmChain, poolErr, tokenAddr.Hex(), erc20Err)
 	}
 	return decimals, nil
-}
-
-func (t *TokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
-	return tokenPool, nil
 }
 
 func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
@@ -475,55 +428,6 @@ func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegi
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to manually register token on chain %d: %w", evmChain.Selector, err)
-			}
-
-			return result, nil
-		})
-}
-
-func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
-	return cldf_ops.NewSequence(
-		"evm-2.0-adapter:update-authorities",
-		cciputils.Version_2_0_0,
-		"Transfer token pool ownership to timelock on EVM chain",
-		func(b cldf_ops.Bundle, e *deployment.Environment, input tokens.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
-			evmChain, ok := e.BlockChains.EVMChains()[input.ChainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-			}
-
-			timelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(cciputils.RBACTimelock),
-				ChainSelector: evmChain.Selector,
-				Qualifier:     cciputils.CLLQualifier,
-			}, evmChain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock for chain %d: %w", input.ChainSelector, err)
-			}
-
-			adapter := &ownershipAdapters.EVMTransferOwnershipAdapter{}
-			if err := adapter.InitializeTimelockAddress(*e, mcms.Input{Qualifier: cciputils.CLLQualifier}); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize timelock address: %w", err)
-			}
-
-			ownershipInput := deployapi.TransferOwnershipPerChainInput{
-				ChainSelector: evmChain.Selector,
-				CurrentOwner:  evmChain.DeployerKey.From.Hex(),
-				ProposedOwner: timelockRef.Address,
-				ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
-			}
-
-			var result sequences.OnChainOutput
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				adapter.SequenceTransferOwnershipViaMCMS(), ownershipInput, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership on chain %d: %w", input.ChainSelector, err)
-			}
-
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				adapter.SequenceAcceptOwnership(), ownershipInput, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership on chain %d: %w", input.ChainSelector, err)
 			}
 
 			return result, nil

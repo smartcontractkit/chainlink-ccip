@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
@@ -22,11 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tpV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tpV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
-	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -140,14 +137,6 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 		})
 }
 
-func (a *EVMAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	if !common.IsHexAddress(ref.Address) {
-		return nil, fmt.Errorf("address %q is not a valid hex address", ref.Address)
-	}
-
-	return common.HexToAddress(ref.Address).Bytes(), nil
-}
-
 func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
@@ -221,11 +210,6 @@ func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector
 	}
 
 	return pool.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
-}
-
-func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
-	// For EVM chains, the token pool address is not derived from the token address, so we can return the token pool address as is.
-	return tokenPool, nil
 }
 
 func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -432,42 +416,6 @@ func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualReg
 
 			return result, nil
 		})
-}
-
-func (a *EVMAdapter) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return DeployToken
-}
-
-func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, input tokensapi.DeployTokenInput) error {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-		ChainSelector: input.ChainSelector,
-		Type:          datastore.ContractType(input.Type),
-		Qualifier:     input.Symbol,
-	}, input.ChainSelector, datastore_utils.FullRef)
-	if err == nil {
-		e.OperationsBundle.Logger.Info("Token already deployed at address:", tokenAddr.Address)
-		return nil
-	}
-
-	// Validate EVM addresses from chain-agnostic input
-	if err := utils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
-		return err
-	}
-	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
-		return err
-	}
-
-	// ensuring that decimals is not more than 18
-	if input.Decimals > 18 {
-		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
-	}
-
-	// Pre-mint amount can't be greater than the max supply (note: a nil or zero supply means uncapped supply, so we only enforce this check if supply is non-nil and non-zero)
-	if input.PreMint != nil && input.Supply != nil && *input.Supply != 0 && *input.PreMint > *input.Supply {
-		return fmt.Errorf("pre-mint amount cannot be greater than max supply, got pre-mint %d and supply %d", *input.PreMint, *input.Supply)
-	}
-
-	return nil
 }
 
 func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -763,65 +711,3 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	return common.BytesToAddress(addrBytes), nil
 }
 
-func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
-	return cldf_ops.NewSequence(
-		"evm-adapter:update-authorities",
-		tarops.Version,
-		"Update authorities for a token and token pool on EVM Chain",
-		func(b cldf_ops.Bundle, e *deployment.Environment, input tokensapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
-			var result sequences.OnChainOutput
-			chain, ok := e.BlockChains.EVMChains()[input.ChainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-			}
-
-			filter := datastore.AddressRef{
-				Type:          datastore.ContractType(cciputils.RBACTimelock),
-				ChainSelector: chain.Selector,
-				Qualifier:     cciputils.CLLQualifier,
-			}
-
-			timelockAddr, err := datastore_utils.FindAndFormatRef(
-				e.DataStore,
-				filter,
-				chain.Selector,
-				datastore_utils.FullRef,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
-			}
-
-			err = a.InitializeTimelockAddress(*e, mcms.Input{Qualifier: cciputils.CLLQualifier})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize timelock address for chain %d: %w", input.ChainSelector, err)
-			}
-
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				a.SequenceTransferOwnershipViaMCMS(),
-				deployops.TransferOwnershipPerChainInput{
-					ChainSelector: chain.Selector,
-					CurrentOwner:  chain.DeployerKey.From.Hex(),
-					ProposedOwner: timelockAddr.Address,
-					ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
-				}, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership to proposed owner on chain %d: %w", input.ChainSelector, err)
-			}
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				a.SequenceAcceptOwnership(),
-				deployops.TransferOwnershipPerChainInput{
-					ChainSelector: chain.Selector,
-					CurrentOwner:  chain.DeployerKey.From.Hex(),
-					ProposedOwner: timelockAddr.Address,
-					ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
-				}, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership on chain %d: %w", input.ChainSelector, err)
-			}
-			return result, nil
-		})
-}
-
-func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}

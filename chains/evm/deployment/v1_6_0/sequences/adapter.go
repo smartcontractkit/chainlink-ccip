@@ -46,6 +46,7 @@ func init() {
 }
 
 type EVMAdapter struct {
+	evm1_0_0.EVMTokenBase
 	// transferOwnershipAdapter is shared so InitializeTimelockAddress populates the same instance
 	// used by SequenceTransferOwnershipViaMCMS / SequenceAcceptOwnership.
 	transferOwnershipAdapter *evm1_0_0.EVMTransferOwnershipAdapter
