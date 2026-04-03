@@ -72,12 +72,7 @@ func (r *ContractVerificationRegistry) Register(family string, provider Contract
 	}
 }
 
-func (r *ContractVerificationRegistry) Get(chainSelector uint64) (ContractVerification, bool) {
-	family, err := chain_selectors.GetSelectorFamily(chainSelector)
-	if err != nil {
-		return nil, false
-	}
-
+func (r *ContractVerificationRegistry) Get(family string) (ContractVerification, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -85,18 +80,21 @@ func (r *ContractVerificationRegistry) Get(chainSelector uint64) (ContractVerifi
 	return provider, ok
 }
 
-func VerifyDeployedContractsPostHookForMultipleChainFamilies(dom domain.Domain, chainSelectors []uint64) []changeset.PostHook {
+// VerifyDeployedContractsPostHookForMultipleChainFamilies returns a slice of post-apply hooks that verifies deployed contracts using chain-family verifiers (e.g. EVM).
+// If multiple chain selectors from the same family are provided, only one hook will be returned for that family to avoid redundant verification.
+// The hooks will verify all contracts in the datastore created by changeset output
+// The addresses should match the criteria defined by the verifier's NeedsVerification and ForEachNetwork methods, for each network supported by the verifier's FilterNetworks method.
+func VerifyDeployedContractsPostHookForMultipleChainFamilies(dom domain.Domain, chainFamilies []string) []changeset.PostHook {
 	postHooksByFamily := make(map[string]changeset.PostHook)
-	for _, selector := range chainSelectors {
-		family, err := chain_selectors.GetSelectorFamily(selector)
-		if err != nil {
-			panic(fmt.Sprintf("invalid chain selector %d: %v", selector, err))
+	for _, family := range chainFamilies {
+		if !isSelectorFamilySupported(family) {
+			panic(fmt.Sprintf("unsupported chain family %s for contract verification hook", family))
 		}
 		_, exists := postHooksByFamily[family]
 		if !exists {
-			verifier, ok := GetContractVerificationRegistry().Get(selector)
+			verifier, ok := GetContractVerificationRegistry().Get(family)
 			if !ok {
-				panic(fmt.Sprintf("no contract verification provider registered for chain selector %d", selector))
+				panic(fmt.Sprintf("no contract verification provider registered for chain family %s", family))
 			}
 
 			postHook := verifyDeployedContractsPostHook(dom, verifier)
@@ -116,25 +114,30 @@ func NewVerifyDeployedContractsPostHook(dom domain.Domain, verifier ContractVeri
 }
 
 // NewRequireVerifiedEnvContractsPreHook returns a pre-apply hook that requires contracts to already be verified on block explorers.
-func NewRequireVerifiedEnvContractsPreHook(dom domain.Domain, verifier ContractVerification, refsToVerify []datastore.AddressRef) changeset.PreHook {
-	return requireVerifiedEnvContractsPreHook(dom, verifier, refsToVerify)
+func NewRequireVerifiedEnvContractsPreHook(dom domain.Domain, verifier ContractVerification, refsToVerify []datastore.AddressRef, selectors []uint64) changeset.PreHook {
+	return requireVerifiedEnvContractsPreHook(dom, verifier, refsToVerify, selectors)
 }
 
 func RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom domain.Domain, chainSelectors []uint64, refsToVerify []datastore.AddressRef) []changeset.PreHook {
 	preHooksByFamily := make(map[string]changeset.PreHook)
+	chainselectorsByFamily := make(map[string][]uint64)
+	// group chain selectors by family to avoid redundant pre-hooks for multiple chains of the same family
 	for _, selector := range chainSelectors {
 		family, err := chain_selectors.GetSelectorFamily(selector)
 		if err != nil {
 			panic(fmt.Sprintf("invalid chain selector %d: %v", selector, err))
 		}
+		chainselectorsByFamily[family] = append(chainselectorsByFamily[family], selector)
+	}
+	for family, selectors := range chainselectorsByFamily {
 		_, exists := preHooksByFamily[family]
 		if !exists {
-			verifier, ok := GetContractVerificationRegistry().Get(selector)
+			verifier, ok := GetContractVerificationRegistry().Get(family)
 			if !ok {
-				panic(fmt.Sprintf("no contract verification provider registered for chain selector %d", selector))
+				panic(fmt.Sprintf("no contract verification provider registered for chain family %s", family))
 			}
 
-			preHook := requireVerifiedEnvContractsPreHook(dom, verifier, refsToVerify)
+			preHook := requireVerifiedEnvContractsPreHook(dom, verifier, refsToVerify, selectors)
 			preHooksByFamily[family] = preHook
 		}
 	}
@@ -163,6 +166,7 @@ func requireVerifiedEnvContractsPreHook(
 	dom domain.Domain,
 	verifier ContractVerification,
 	refsToVerify []datastore.AddressRef,
+	selectors []uint64,
 ) changeset.PreHook {
 	return changeset.PreHook{
 		HookDefinition: changeset.HookDefinition{
@@ -170,7 +174,7 @@ func requireVerifiedEnvContractsPreHook(
 			FailurePolicy: changeset.Abort,
 			Timeout:       5 * time.Minute,
 		},
-		Func: requireVerifiedEnvContracts(dom, verifier, refsToVerify),
+		Func: requireVerifiedEnvContracts(dom, verifier, refsToVerify, selectors),
 	}
 }
 
@@ -222,12 +226,25 @@ func requireVerifiedEnvContracts(
 	dom domain.Domain,
 	verifier ContractVerification,
 	refsToVerify []datastore.AddressRef,
+	selectors []uint64,
 ) changeset.PreHookFunc {
 	return func(ctx context.Context, params changeset.PreHookParams) error {
 		ds, err := dom.EnvDir(params.Env.Name).DataStore()
 		if err != nil {
 			return fmt.Errorf("require verified pre-hook: load datastore: %w", err)
 		}
+		// filter networks with selective chain selectors; if this fails, return an error to log the failure and skip verification.
+		newDs := datastore.NewMemoryDataStore()
+		for _, selector := range selectors {
+			networkRefs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(selector))
+			for _, ref := range networkRefs {
+				err := newDs.Addresses().Add(ref)
+				if err != nil {
+					return fmt.Errorf("require verified pre-hook: failed to add address ref %+v to filtered datastore: %w", ref, err)
+				}
+			}
+		}
+		ds = newDs.Seal()
 
 		networkCfg, err := verifier.FilterNetworks(params.Env.Name, dom, params.Env.Logger)
 		if err != nil {
@@ -263,20 +280,26 @@ func getFilteredAddressRefsForVerification(l logger.Logger, ds datastore.DataSto
 		newDs := datastore.NewMemoryDataStore()
 		for i := range refsToVerify {
 			var filterFns []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]
+			var criteria []string
 			if refsToVerify[i].Type != "" {
 				filterFns = append(filterFns, datastore.AddressRefByType(refsToVerify[i].Type))
+				criteria = append(criteria, fmt.Sprintf("type=%s", refsToVerify[i].Type))
 			}
 			if refsToVerify[i].Version != nil {
 				filterFns = append(filterFns, datastore.AddressRefByVersion(refsToVerify[i].Version))
+				criteria = append(criteria, fmt.Sprintf("version=%s", refsToVerify[i].Version.String()))
 			}
 			if refsToVerify[i].Address != "" {
 				filterFns = append(filterFns, datastore.AddressRefByAddress(refsToVerify[i].Address))
+				criteria = append(criteria, fmt.Sprintf("address=%s", refsToVerify[i].Address))
 			}
 			if refsToVerify[i].ChainSelector != 0 {
 				filterFns = append(filterFns, datastore.AddressRefByChainSelector(refsToVerify[i].ChainSelector))
+				criteria = append(criteria, fmt.Sprintf("chainSelector=%d", refsToVerify[i].ChainSelector))
 			}
 			if refsToVerify[i].Qualifier != "" {
 				filterFns = append(filterFns, datastore.AddressRefByQualifier(refsToVerify[i].Qualifier))
+				criteria = append(criteria, fmt.Sprintf("qualifier=%s", refsToVerify[i].Qualifier))
 			}
 			if len(filterFns) == 0 {
 				return nil, fmt.Errorf("require verified pre-hook: invalid filter criteria %+v: "+
@@ -284,7 +307,7 @@ func getFilteredAddressRefsForVerification(l logger.Logger, ds datastore.DataSto
 			}
 			ref := ds.Addresses().Filter(filterFns...)
 			if len(ref) == 0 {
-				return nil, fmt.Errorf("require verified pre-hook: no address ref found for filter criteria %+v", refsToVerify[i])
+				return nil, fmt.Errorf("require verified pre-hook: no address ref found for filter criteria %v", criteria)
 			}
 			for _, r := range ref {
 				err := newDs.Addresses().Add(r)
@@ -376,4 +399,16 @@ func IterateVerifiers(
 func ResetContractVerificationRegistryForTest() {
 	singletonContractVerificationRegistry = newContractVerificationRegistry()
 	onceContractVerificationRegistry = sync.Once{}
+}
+
+func isSelectorFamilySupported(family string) bool {
+	switch family {
+	case chain_selectors.FamilyEVM, chain_selectors.FamilySolana, chain_selectors.FamilyStarknet,
+		chain_selectors.FamilyCosmos, chain_selectors.FamilyAptos, chain_selectors.FamilySui,
+		chain_selectors.FamilyTron, chain_selectors.FamilyTon, chain_selectors.FamilyCanton,
+		chain_selectors.FamilyStellar:
+		return true
+	default:
+		return false
+	}
 }

@@ -127,7 +127,7 @@ func TestVerifyDeployedContractsPostHook_Definition(t *testing.T) {
 
 func TestRequireVerifiedEnvContractsPreHook_Definition(t *testing.T) {
 	registerMyContractV1(t)
-	h := hooks.NewRequireVerifiedEnvContractsPreHook(domain.Domain{}, testEVMVerifier(), nil)
+	h := hooks.NewRequireVerifiedEnvContractsPreHook(domain.Domain{}, testEVMVerifier(), nil, []uint64{})
 	require.Equal(t, hooks.RequireVerifiedEnvContractsHookName, h.Name)
 	require.Equal(t, changeset.Abort, h.FailurePolicy)
 	require.NotNil(t, h.Func)
@@ -177,7 +177,7 @@ func TestRequireVerified_PreHook_DataStoreError(t *testing.T) {
 	// datastore dir is missing, so loading it should error
 	// existing datastore is needed for the pre-hook
 	dom := domain.NewDomain(t.TempDir(), "test")
-	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil)
+	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil, []uint64{})
 	err := h.Func(t.Context(), changeset.PreHookParams{
 		Env: changeset.HookEnv{Name: "staging", Logger: logger.Test(t)},
 	})
@@ -188,7 +188,7 @@ func TestRequireVerified_PreHook_DataStoreError(t *testing.T) {
 func TestRequireVerified_PreHook_LoadNetworksError(t *testing.T) {
 	registerMyContractV1(t)
 	dom := domain.NewDomain(t.TempDir(), "test")
-	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil)
+	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil, nil)
 	envDir := dom.EnvDir("staging")
 	// now there is a datastore, but no network config, so loading networks should error
 	require.NoError(t, mkdirAllAndWrite(t, envDir.AddressRefsFilePath()))
@@ -420,7 +420,7 @@ func TestRequireVerified_PreHook_Sourcify_NotVerified(t *testing.T) {
 		Address:       "0x0000000000000000000000000000000000000001",
 	}})
 
-	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil)
+	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil, []uint64{chainsel.HEDERA_MAINNET.Selector})
 	err := h.Func(t.Context(), changeset.PreHookParams{
 		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
 	})
@@ -449,14 +449,14 @@ func TestRequireVerified_PreHook_Sourcify_AlreadyVerified(t *testing.T) {
 		Address:       "0x0000000000000000000000000000000000000001",
 	}
 	writeEnvDatastoreWithRefs(t, dom, []datastore.AddressRef{ref})
-	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), []datastore.AddressRef{ref})
+	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), []datastore.AddressRef{ref}, []uint64{chain.Selector})
 	err := h.Func(t.Context(), changeset.PreHookParams{
 		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
 	})
 	require.NoError(t, err)
 	require.True(t, called, "Explorer should be queried for verification status even if ref is in verified list, to avoid false positives")
 	called = false
-	h = hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil)
+	h = hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil, []uint64{chain.Selector})
 	err = h.Func(t.Context(), changeset.PreHookParams{
 		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
 	})
@@ -545,7 +545,7 @@ func TestRequireVerified_PreHook_Sourcify_ExplorerError(t *testing.T) {
 		Address:       "0x0000000000000000000000000000000000000001",
 	}})
 
-	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil)
+	h := hooks.NewRequireVerifiedEnvContractsPreHook(dom, testEVMVerifier(), nil, []uint64{chainsel.HEDERA_MAINNET.Selector})
 	err := h.Func(t.Context(), changeset.PreHookParams{
 		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
 	})
@@ -643,7 +643,7 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_EVMSourcifyEndT
 	}))
 
 	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom,
-		[]uint64{eth.Selector, poly.Selector})
+		[]string{chainsel.FamilyEVM})
 	require.Len(t, postHooks, 1, "two EVM selectors share one chain family → one post-hook")
 	require.Equal(t, hooks.VerifyDeployedContractsHookName, postHooks[0].Name)
 

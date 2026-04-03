@@ -56,9 +56,8 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_DedupesSameFami
 	r.Register(chainsel.FamilyEVM, &stubContractVerification{})
 
 	dom := domain.NewDomain(t.TempDir(), "test")
-	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{
-		chainsel.ETHEREUM_MAINNET.Selector,
-		chainsel.POLYGON_MAINNET.Selector,
+	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{
+		chainsel.FamilyEVM,
 	})
 	require.Len(t, postHooks, 1, "EVM chains share one family; expect one post hook")
 	require.Equal(t, hooks.VerifyDeployedContractsHookName, postHooks[0].Name)
@@ -72,9 +71,9 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_OneHookPerDisti
 	r.Register(chainsel.FamilySolana, &stubContractVerification{})
 
 	dom := domain.NewDomain(t.TempDir(), "test")
-	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{
-		chainsel.ETHEREUM_MAINNET.Selector,
-		chainsel.SOLANA_MAINNET.Selector,
+	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{
+		chainsel.FamilyEVM,
+		chainsel.FamilySolana,
 	})
 	require.Len(t, postHooks, 2)
 	for _, h := range postHooks {
@@ -88,9 +87,9 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_PanicsWhenProvi
 
 	dom := domain.NewDomain(t.TempDir(), "test")
 	require.PanicsWithValue(t,
-		"no contract verification provider registered for chain selector 5009297550715157269",
+		"no contract verification provider registered for chain family evm",
 		func() {
-			_ = hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{chainsel.ETHEREUM_MAINNET.Selector})
+			_ = hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{chainsel.FamilyEVM})
 		},
 	)
 }
@@ -102,11 +101,11 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_PanicsWhenSomeP
 
 	dom := domain.NewDomain(t.TempDir(), "test")
 	require.PanicsWithValue(t,
-		fmt.Sprintf("no contract verification provider registered for chain selector %d", chainsel.SOLANA_MAINNET.Selector),
+		fmt.Sprintf("no contract verification provider registered for chain family solana"),
 		func() {
-			_ = hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{
-				chainsel.ETHEREUM_MAINNET.Selector,
-				chainsel.SOLANA_MAINNET.Selector, // solana provider not registered
+			_ = hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{
+				chainsel.FamilyEVM,
+				chainsel.FamilySolana, // solana provider not registered
 			})
 		},
 	)
@@ -119,7 +118,7 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_PanicsOnUnknown
 
 	dom := domain.NewDomain(t.TempDir(), "test")
 	require.Panics(t, func() {
-		_ = hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{9999999999999999999})
+		_ = hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{"unsupported"})
 	})
 }
 
@@ -129,7 +128,7 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_FuncRuns(t *tes
 	r.Register(chainsel.FamilyEVM, &stubContractVerification{})
 
 	dom := domain.NewDomain(t.TempDir(), "test")
-	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{chainsel.ETHEREUM_MAINNET.Selector})
+	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{chainsel.FamilyEVM})
 	require.Len(t, postHooks, 1)
 
 	err := postHooks[0].Func(t.Context(), changeset.PostHookParams{
@@ -147,7 +146,7 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_FuncRunsWithCha
 	r.Register(chainsel.FamilyEVM, &stubContractVerification{})
 
 	dom := domain.NewDomain(t.TempDir(), "test")
-	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []uint64{chainsel.ETHEREUM_MAINNET.Selector})
+	postHooks := hooks.VerifyDeployedContractsPostHookForMultipleChainFamilies(dom, []string{chainsel.FamilyEVM})
 	require.Len(t, postHooks, 1)
 
 	err := postHooks[0].Func(t.Context(), changeset.PostHookParams{
@@ -199,7 +198,7 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PanicsWhenPr
 
 	dom := domain.NewDomain(t.TempDir(), "test")
 	require.PanicsWithValue(t,
-		"no contract verification provider registered for chain selector 5009297550715157269",
+		"no contract verification provider registered for chain family evm",
 		func() {
 			_ = hooks.RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom, []uint64{chainsel.ETHEREUM_MAINNET.Selector}, nil)
 		},
@@ -213,7 +212,7 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PanicsWhenSo
 
 	dom := domain.NewDomain(t.TempDir(), "test")
 	require.PanicsWithValue(t,
-		fmt.Sprintf("no contract verification provider registered for chain selector %d", chainsel.SOLANA_MAINNET.Selector),
+		fmt.Sprintf("no contract verification provider registered for chain family solana"),
 		func() {
 			_ = hooks.RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom, []uint64{
 				chainsel.ETHEREUM_MAINNET.Selector,
@@ -255,18 +254,32 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PassesRefsTo
 	dom := domain.NewDomain(t.TempDir(), "test")
 	envName := "hooktest"
 
-	refs := []datastore.AddressRef{{
+	refsInput := []datastore.AddressRef{{
 		Type:    "C",
 		Version: nil,
 	}}
+	refs := []datastore.AddressRef{
+		{
+			ChainSelector: chainsel.ETHEREUM_MAINNET.Selector,
+			Type:          "C",
+			Version:       nil,
+			Address:       "0x0000000000000000000000000000000000000001",
+		},
+		{
+			ChainSelector: chainsel.SOLANA_MAINNET.Selector,
+			Type:          "C",
+			Version:       nil,
+			Address:       "0x0000000000000000000000000000000000000002",
+		},
+	}
 	writeEnvDatastoreWithRefs(t, envName, dom, refs)
 	preHooks := hooks.RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom, []uint64{
 		chainsel.ETHEREUM_MAINNET.Selector,
 		chainsel.SOLANA_MAINNET.Selector,
-	}, refs)
+	}, refsInput)
 	require.Len(t, preHooks, 2)
 
-	// Both family hooks should accept the same refs slice without error (empty datastore matches no refs after filter).
+	// Both family hooks should accept the same refs slice without error.
 	for _, h := range preHooks {
 		err := h.Func(t.Context(), changeset.PreHookParams{
 			Env: changeset.HookEnv{Name: envName, Logger: logger.Test(t)},
