@@ -13,6 +13,9 @@ replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../../dep
 
 replace github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../../../../chains/evm/deployment
 
+// Pin prometheus/client_golang to v1.23.0 to avoid docker networking issues with v1.23.2
+replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.23.0
+
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.17.1

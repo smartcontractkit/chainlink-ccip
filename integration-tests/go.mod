@@ -333,3 +333,6 @@ require (
 
 // gotron-sdk is not longer maintained
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
+
+// Pin prometheus/client_golang to v1.23.0 to avoid docker networking issues with v1.23.2
+replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.23.0
