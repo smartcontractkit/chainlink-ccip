@@ -17,7 +17,7 @@ type ApplyDestChainConfigSequenceInput struct {
 
 // DestChainConfigForDst represents a destination chain config override for a single destination.
 // Override is a functional option that mutates the base config (read from on-chain or defaults).
-// If Override is nil, the existing on-chain config is re-applied as-is (noop).
+// If Override is nil, the existing on-chain config is re-applied as-is (idempotent re-apply).
 type DestChainConfigForDst struct {
 	Selector uint64                                  `json:"selector" yaml:"selector"`
 	Override *lanes.FeeQuoterDestChainConfigOverride `json:"-" yaml:"-"`
