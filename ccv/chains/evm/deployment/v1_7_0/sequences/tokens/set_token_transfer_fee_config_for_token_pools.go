@@ -14,8 +14,8 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-var SetTokenPoolTokenTransferFeeConfig = operations.NewSequence(
-	"SetTokenPoolTokenTransferFeeConfig",
+var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
+	"set-token-transfer-fee-config-for-token-pools",
 	utils.Version_2_0_0,
 	"Sets token transfer fee configs for token pools. Takes a map of pool address to a map of dest chain selector to fee config (or nil to disable the fee config for that dest).",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input tokens.SetTokenTransferFeeSequenceInput) (sequences.OnChainOutput, error) {

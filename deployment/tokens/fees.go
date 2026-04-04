@@ -14,36 +14,15 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-// TokenTransferFeeValue represents a value that may or may not be explicitly set.
-type TokenTransferFeeValue[T any] struct {
-	// If set to false (the default), then `Value` will be autofilled from
-	// on-chain data if it exists. If no on-chain data exists for it, then
-	// a pre-selected sensible default will be used as a fallback
-	Valid bool `json:"valid" yaml:"valid"`
-
-	// This only has an effect when `Valid` is set to true. If this is the
-	// case, then the provided value will overwrite existing on-chain data
-	Value T `json:"value" yaml:"value"`
-}
-
-// Infer returns the contained value if `Valid` is true; otherwise, it returns the provided fallback.
-func (cfg TokenTransferFeeValue[T]) Infer(fallback T) T {
-	if cfg.Valid {
-		return cfg.Value
-	}
-
-	return fallback
-}
-
 // UnresolvedTokenTransferFeeArgs allows for partial specification of token transfer fee configurations.
 type UnresolvedTokenTransferFeeArgs struct {
-	DefaultFinalityTransferFeeBps TokenTransferFeeValue[uint16] `json:"defaultFinalityTransferFeeBps" yaml:"defaultFinalityTransferFeeBps"`
-	CustomFinalityTransferFeeBps  TokenTransferFeeValue[uint16] `json:"customFinalityTransferFeeBps" yaml:"customFinalityTransferFeeBps"`
-	DefaultFinalityFeeUSDCents    TokenTransferFeeValue[uint32] `json:"defaultFinalityFeeUSDCents" yaml:"defaultFinalityFeeUSDCents"`
-	CustomFinalityFeeUSDCents     TokenTransferFeeValue[uint32] `json:"customFinalityFeeUSDCents" yaml:"customFinalityFeeUSDCents"`
-	DestBytesOverhead             TokenTransferFeeValue[uint32] `json:"destBytesOverhead" yaml:"destBytesOverhead"`
-	DestGasOverhead               TokenTransferFeeValue[uint32] `json:"destGasOverhead" yaml:"destGasOverhead"`
-	IsEnabled                     TokenTransferFeeValue[bool]   `json:"isEnabled" yaml:"isEnabled"`
+	DefaultFinalityTransferFeeBps utils.Optional[uint16] `json:"defaultFinalityTransferFeeBps" yaml:"defaultFinalityTransferFeeBps"`
+	CustomFinalityTransferFeeBps  utils.Optional[uint16] `json:"customFinalityTransferFeeBps" yaml:"customFinalityTransferFeeBps"`
+	DefaultFinalityFeeUSDCents    utils.Optional[uint32] `json:"defaultFinalityFeeUSDCents" yaml:"defaultFinalityFeeUSDCents"`
+	CustomFinalityFeeUSDCents     utils.Optional[uint32] `json:"customFinalityFeeUSDCents" yaml:"customFinalityFeeUSDCents"`
+	DestBytesOverhead             utils.Optional[uint32] `json:"destBytesOverhead" yaml:"destBytesOverhead"`
+	DestGasOverhead               utils.Optional[uint32] `json:"destGasOverhead" yaml:"destGasOverhead"`
+	IsEnabled                     utils.Optional[bool]   `json:"isEnabled" yaml:"isEnabled"`
 }
 
 // Infer fills in any unset fields in the unresolved configuration using the provided fallback values.
@@ -70,8 +49,9 @@ type TokenTransferFeeForDst struct {
 // chain selector. This allows the user to set multiple destination chain configurations for the same token
 // pool address without repeating the pool address for each one.
 type TokenTransferFeeForPool struct {
-	Destinations []TokenTransferFeeForDst `json:"destinations" yaml:"destinations"`
-	PoolAddress  string                   `json:"poolAddress" yaml:"poolAddress"`
+	MinBlockConfirmations utils.Optional[uint16]   `json:"minBlockConfirmations" yaml:"minBlockConfirmations"`
+	Destinations          []TokenTransferFeeForDst `json:"destinations" yaml:"destinations"`
+	PoolAddress           string                   `json:"poolAddress" yaml:"poolAddress"`
 }
 
 // TokenTransferFeeForSrc organizes token transfer fee configurations by source chain selector, then by pool
@@ -167,33 +147,55 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 				return deployment.ChangesetOutput{}, fmt.Errorf("adapter for chain family %s and version %s does not implement TokenFeeAdapter", srcChainFam, cfg.Version.String())
 			}
 
-			settings := map[string]map[uint64]*TokenTransferFeeConfig{}
+			feeConfigSettings := map[string]map[uint64]*TokenTransferFeeConfig{}
+			minBlocksSettings := map[string]uint16{}
 			for _, pool := range src.TokenPools {
-				settings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
+				feeConfigSettings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
 				for _, dst := range pool.Destinations {
 					if args, err := inferTokenTransferFeeArgs(feesAdapter, e, pool.PoolAddress, src.Selector, dst.Selector, dst); err != nil {
 						return deployment.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for src %d, dst %d, and pool %s: %w", src.Selector, dst.Selector, pool.PoolAddress, err)
 					} else {
-						settings[pool.PoolAddress][dst.Selector] = args
+						feeConfigSettings[pool.PoolAddress][dst.Selector] = args
 					}
+				}
+				if pool.MinBlockConfirmations.Valid {
+					minBlocksSettings[pool.PoolAddress] = pool.MinBlockConfirmations.Value
 				}
 			}
 
-			report, err := cldf_ops.ExecuteSequence(
-				e.OperationsBundle,
-				feesAdapter.SetTokenTransferFee(&e),
-				e.BlockChains,
-				SetTokenTransferFeeSequenceInput{
-					Selector: src.Selector,
-					Settings: settings,
-				},
-			)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetTokenTransferFee operation for src %d: %w", src.Selector, err)
+			if len(minBlocksSettings) > 0 {
+				minBlocksReport, err := cldf_ops.ExecuteSequence(
+					e.OperationsBundle,
+					feesAdapter.SetMinBlockConfirmations(&e),
+					e.BlockChains,
+					SetMinBlockConfirmationsSequenceInput{
+						Selector: src.Selector,
+						Settings: minBlocksSettings,
+					},
+				)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetMinBlockConfirmations operation for src %d: %w", src.Selector, err)
+				}
+				batchOps = append(batchOps, minBlocksReport.Output.BatchOps...)
+				reports = append(reports, minBlocksReport.ExecutionReports...)
 			}
 
-			batchOps = append(batchOps, report.Output.BatchOps...)
-			reports = append(reports, report.ExecutionReports...)
+			if len(feeConfigSettings) > 0 {
+				feeConfigsReport, err := cldf_ops.ExecuteSequence(
+					e.OperationsBundle,
+					feesAdapter.SetTokenTransferFee(&e),
+					e.BlockChains,
+					SetTokenTransferFeeSequenceInput{
+						Selector: src.Selector,
+						Settings: feeConfigSettings,
+					},
+				)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetTokenTransferFee operation for src %d: %w", src.Selector, err)
+				}
+				batchOps = append(batchOps, feeConfigsReport.Output.BatchOps...)
+				reports = append(reports, feeConfigsReport.ExecutionReports...)
+			}
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).

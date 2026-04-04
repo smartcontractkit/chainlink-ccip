@@ -14,7 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmadaptersV1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
@@ -124,7 +126,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: fees.TokenTransferFeeValue[uint32]{
+										DestGasOverhead: common_utils.Optional[uint32]{
 											Value: 120_000,
 											Valid: true,
 										},
@@ -144,7 +146,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: dstLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: fees.TokenTransferFeeValue[uint32]{
+										DestGasOverhead: common_utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -368,7 +370,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: fees.TokenTransferFeeValue[uint32]{
+										DestGasOverhead: common_utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -388,7 +390,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 									Address: dstLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: fees.TokenTransferFeeValue[uint32]{
+										DestGasOverhead: common_utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -485,6 +487,12 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	// Setup test environment
 	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{evmChainSelA, evmChainSelB}))
 	require.NoError(t, err)
+
+	// Get chains
+	evmChainA, ok := env.BlockChains.EVMChains()[evmChainSelA]
+	require.True(t, ok)
+	evmChainB, ok := env.BlockChains.EVMChains()[evmChainSelB]
+	require.True(t, ok)
 
 	// Configure deployment registry
 	deployRegistry := deploy.GetRegistry()
@@ -583,13 +591,14 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					Selector: evmChainSelA,
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
-							PoolAddress: poolA.Hex(),
+							PoolAddress:           poolA.Hex(),
+							MinBlockConfirmations: common_utils.Optional[uint16]{Value: 12, Valid: true},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
 									Selector: evmChainSelB,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: tokens.TokenTransferFeeValue[uint32]{
+										DestGasOverhead: common_utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -603,13 +612,14 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					Selector: evmChainSelB,
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
-							PoolAddress: poolB.Hex(),
+							PoolAddress:           poolB.Hex(),
+							MinBlockConfirmations: common_utils.Optional[uint16]{Value: 12, Valid: false},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
 									Selector: evmChainSelA,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: tokens.TokenTransferFeeValue[uint32]{
+										DestGasOverhead: common_utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -636,6 +646,22 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	require.NoError(t, err)
 	cfgB, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolB.Hex(), evmChainSelB, evmChainSelA)
 	require.NoError(t, err)
+
+	// Check minBlockConfirmations for pool A
+	reportA, err := operations.ExecuteOperation(
+		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainA,
+		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelA, Address: poolA, Args: struct{}{}},
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint16(12), reportA.Output)
+
+	// Check minBlockConfirmations for pool B
+	reportB, err := operations.ExecuteOperation(
+		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainB,
+		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelB, Address: poolB, Args: struct{}{}},
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint16(0), reportB.Output)
 
 	// Confirm that the configs for A match what was set, and that sensible defaults are applied for fields that were not set
 	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgA.DefaultFinalityTransferFeeBps)

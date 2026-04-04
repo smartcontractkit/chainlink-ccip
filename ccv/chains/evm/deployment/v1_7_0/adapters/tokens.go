@@ -555,8 +555,12 @@ func isBurnMintTokenType(typ datastore.ContractType) bool {
 	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
 }
 
+func (t *TokenAdapter) SetMinBlockConfirmations(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetMinBlockConfirmationsSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.SetMinBlockConfirmationsForTokenPools
+}
+
 func (t *TokenAdapter) SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
-	return evm_tokens.SetTokenPoolTokenTransferFeeConfig
+	return evm_tokens.SetTokenTransferFeeConfigForTokenPools
 }
 
 func (t *TokenAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) tokens.TokenTransferFeeConfig {
