@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	adapter := &TokenAdapter{}
+	adapter := NewTokenAdapter()
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(
 		chain_selectors.FamilyEVM,
 		semver.MustParse("1.6.0"),

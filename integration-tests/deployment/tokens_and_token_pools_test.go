@@ -389,8 +389,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Decimals, dec)
 				require.Equal(t, tokAddress, tok)
 
-				// Verify that DeriveTokenAddress works as expected
-				derived, err := evmAdapter.DeriveTokenAddress(*env, data.Chain.Selector, datastore.AddressRef{
+				// Verify that DeriveTokenAddress works as expected via token adapter registry
+				evmTokenAdapter, adapterOk := tokensapi.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, v1_5_1)
+				require.True(t, adapterOk, "v1.5.1 EVM token adapter should be registered")
+				derived, err := evmTokenAdapter.DeriveTokenAddress(*env, data.Chain.Selector, datastore.AddressRef{
 					ChainSelector: data.Chain.Selector,
 					Qualifier:     data.TokenPoolQualifier,
 					Type:          datastore.ContractType(evmTokenPoolType),

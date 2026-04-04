@@ -12,6 +12,6 @@ func init() {
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(
 		chain_selectors.FamilyEVM,
 		semver.MustParse("1.5.1"),
-		&TokenAdapter{},
+		NewTokenAdapter(),
 	)
 }
