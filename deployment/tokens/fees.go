@@ -38,7 +38,7 @@ func (cfg UnresolvedTokenTransferFeeArgs) Infer(fallbacks TokenTransferFeeConfig
 	}
 }
 
-// TokenTransferFeeConfig defines the standardized configuration for token transfer fees for all chain families.
+// TokenTransferFeeForDst defines the standardized configuration for token transfer fees for all chain families.
 type TokenTransferFeeForDst struct {
 	Settings UnresolvedTokenTransferFeeArgs `json:"settings" yaml:"settings"`
 	Selector uint64                         `json:"selector" yaml:"selector"`
@@ -87,10 +87,10 @@ func setTokenTransferFeeVerify() func(deployment.Environment, SetTokenTransferFe
 			for j, pool := range src.TokenPools {
 				trimmed := strings.TrimSpace(pool.PoolAddress)
 				if trimmed == "" {
-					return fmt.Errorf("empty pool address at args[%d].settings[%d] (src=%d)", i, j, src.Selector)
+					return fmt.Errorf("empty pool address at args[%d].tokenPools[%d] (src=%d)", i, j, src.Selector)
 				}
-				if exists := seenPools.Add(pool.PoolAddress); exists {
-					return fmt.Errorf("duplicate pool address at args[%d].settings[%d] (src=%d): %s", i, j, src.Selector, pool.PoolAddress)
+				if exists := seenPools.Add(trimmed); exists {
+					return fmt.Errorf("duplicate pool address at args[%d].tokenPools[%d] (src=%d): %s", i, j, src.Selector, pool.PoolAddress)
 				}
 
 				updateSet := utils.NewSet[string]()
@@ -98,24 +98,24 @@ func setTokenTransferFeeVerify() func(deployment.Environment, SetTokenTransferFe
 				seenDests := utils.NewSet[uint64]()
 				for k, dst := range pool.Destinations {
 					if exists := seenDests.Add(dst.Selector); exists {
-						return fmt.Errorf("duplicate dst chain selector at args[%d].settings[%d].settings[%d] (src=%d): %d", i, j, k, src.Selector, dst.Selector)
+						return fmt.Errorf("duplicate dst chain selector at args[%d].tokenPools[%d].destinations[%d] (src=%d): %d", i, j, k, src.Selector, dst.Selector)
 					}
 					if src.Selector == dst.Selector {
-						return fmt.Errorf("src and dst chain selectors cannot be the same at args[%d].settings[%d].settings[%d] (src=%d)", i, j, k, src.Selector)
+						return fmt.Errorf("src and dst chain selectors cannot be the same at args[%d].tokenPools[%d].destinations[%d] (src=%d)", i, j, k, src.Selector)
 					}
 					if addr := pool.PoolAddress; dst.IsReset {
 						if updateSet.Has(addr) {
 							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
 						}
 						if exists := resetsSet.Add(addr); exists {
-							return fmt.Errorf("duplicate reset for address at (src=%d,dst=%d) args[%d].settings[%d].settings[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
+							return fmt.Errorf("duplicate reset for address at (src=%d,dst=%d) args[%d].tokenPools[%d].destinations[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
 						}
 					} else {
 						if resetsSet.Has(addr) {
 							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
 						}
 						if exists := updateSet.Add(addr); exists {
-							return fmt.Errorf("duplicate update for address at (src=%d,dst=%d) args[%d].settings[%d].settings[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
+							return fmt.Errorf("duplicate update for address at (src=%d,dst=%d) args[%d].tokenPools[%d].destinations[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
 						}
 					}
 				}

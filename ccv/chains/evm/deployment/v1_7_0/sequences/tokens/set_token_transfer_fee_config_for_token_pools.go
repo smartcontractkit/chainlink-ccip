@@ -73,7 +73,7 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 					},
 				)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute token_pool.ApplyTokenTransferFeeConfigUpdatesArgs on %s: %w", chain.String(), err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute token_pool.ApplyTokenTransferFeeConfigUpdates on %s: %w", chain.String(), err)
 				}
 
 				writes = append(writes, report.Output)

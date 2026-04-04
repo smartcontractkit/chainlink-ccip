@@ -32,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -126,7 +125,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: common_utils.Optional[uint32]{
+										DestGasOverhead: utils.Optional[uint32]{
 											Value: 120_000,
 											Valid: true,
 										},
@@ -146,7 +145,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: dstLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: common_utils.Optional[uint32]{
+										DestGasOverhead: utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -297,8 +296,8 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	// Deploy MCMS
-	DeployMCMS(t, e, src, []string{common_utils.CLLQualifier})
-	DeployMCMS(t, e, dst, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, e, src, []string{utils.CLLQualifier})
+	DeployMCMS(t, e, dst, []string{utils.CLLQualifier})
 	// Reset bundle so second ConnectChains runs without cached executions.
 	bundle := operations.NewBundle(
 		func() context.Context { return context.Background() },
@@ -370,7 +369,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: common_utils.Optional[uint32]{
+										DestGasOverhead: utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -390,7 +389,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 									Address: dstLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: common_utils.Optional[uint32]{
+										DestGasOverhead: utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -508,8 +507,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	MergeAddresses(t, env, output.DataStore)
 
 	// Deploy MCMS and transfer ownership
-	DeployMCMS(t, env, evmChainSelA, []string{common_utils.CLLQualifier})
-	DeployMCMS(t, env, evmChainSelB, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, env, evmChainSelA, []string{utils.CLLQualifier})
+	DeployMCMS(t, env, evmChainSelB, []string{utils.CLLQualifier})
 	EVMTransferOwnership(t, env, evmChainSelA)
 	EVMTransferOwnership(t, env, evmChainSelB)
 
@@ -526,7 +525,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 				Supply:   nil, // unlimited
 			},
 			DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
-				PoolType: common_utils.BurnMintTokenPool.String(),
+				PoolType: utils.BurnMintTokenPool.String(),
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -549,7 +548,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 				Supply:   nil, // unlimited
 			},
 			DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
-				PoolType: common_utils.BurnMintTokenPool.String(),
+				PoolType: utils.BurnMintTokenPool.String(),
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -592,13 +591,13 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolA.Hex(),
-							MinBlockConfirmations: common_utils.Optional[uint16]{Value: 12, Valid: true},
+							MinBlockConfirmations: utils.Optional[uint16]{Value: 12, Valid: true},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
 									Selector: evmChainSelB,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: common_utils.Optional[uint32]{
+										DestGasOverhead: utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
@@ -613,13 +612,13 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolB.Hex(),
-							MinBlockConfirmations: common_utils.Optional[uint16]{Value: 12, Valid: false},
+							MinBlockConfirmations: utils.Optional[uint16]{Value: 12, Valid: false},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
 									Selector: evmChainSelA,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: common_utils.Optional[uint32]{
+										DestGasOverhead: utils.Optional[uint32]{
 											Value: 150_000,
 											Valid: true,
 										},
