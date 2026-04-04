@@ -42,9 +42,29 @@ func NewTokenAdapter() *TokenAdapter {
 	}
 }
 
-// ConfigureTokenForTransfersSequence returns the v1.6.1-specific sequence.
+// ConfigureTokenForTransfersSequence wraps the v1.6.1 pre-built sequence,
+// resolving the TAR address from the datastore when the caller leaves
+// RegistryAddress empty (the top-level changeset relies on adapters for this).
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return evm_seq.ConfigureTokenForTransfers
+	return cldf_ops.NewSequence(
+		"evm-v1.6.1-adapter:configure-token-for-transfers",
+		tpOpsV1_6_1.Version,
+		"Configure a v1.6.1 token pool for cross-chain transfers on an EVM chain",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
+			if input.RegistryAddress == "" {
+				tarAddr, err := evm1_0_0.GetTokenAdminRegistryAddress(input.ExistingDataStore, input.ChainSelector, &t.EVMTokenBase)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve TAR address for chain %d: %w", input.ChainSelector, err)
+				}
+				input.RegistryAddress = tarAddr.Hex()
+			}
+
+			report, err := cldf_ops.ExecuteSequence(b, evm_seq.ConfigureTokenForTransfers, chains, input)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			return report.Output, nil
+		})
 }
 
 // poolOpsV161 implements PoolOps using v1.6.1 bindings.

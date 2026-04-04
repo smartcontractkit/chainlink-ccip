@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
 	burn_mint_token_pool_v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -65,8 +65,11 @@ func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, 
 }
 
 func TestTokenAdapter(t *testing.T) {
+	// v1.6.1 adapter is registered by its init() via the blank import of v1_7_0/adapters
+	// (which transitively triggers v1_6_1/adapters init). No manual registration needed.
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
-	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
+	_, ok := tokenAdapterRegistry.GetTokenAdapter("evm", semver.MustParse("1.6.1"))
+	require.True(t, ok, "v1.6.1 EVM token adapter should be registered")
 
 	tests := []struct {
 		desc               string
