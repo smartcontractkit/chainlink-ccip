@@ -1,8 +1,8 @@
 package changesets
 
 import (
+	"errors"
 	"fmt"
-	"slices"
 	"sort"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -17,7 +17,6 @@ type GenerateIndexerConfigInput struct {
 	CommitteeVerifierNameToQualifier map[string]string
 	CCTPVerifierNameToQualifier      map[string]string
 	LombardVerifierNameToQualifier   map[string]string
-	ChainSelectors                   []uint64
 }
 
 func GenerateIndexerConfig(registry *adapters.IndexerConfigRegistry) deployment.ChangeSetV2[GenerateIndexerConfigInput] {
@@ -30,22 +29,11 @@ func GenerateIndexerConfig(registry *adapters.IndexerConfigRegistry) deployment.
 			len(cfg.LombardVerifierNameToQualifier) == 0 {
 			return fmt.Errorf("at least one verifier name to qualifier mapping is required")
 		}
-		envSelectors := e.BlockChains.ListChainSelectors()
-		for _, s := range cfg.ChainSelectors {
-			if !slices.Contains(envSelectors, s) {
-				return fmt.Errorf("selector %d is not available in environment", s)
-			}
-		}
 		return nil
 	}
 
 	apply := func(e deployment.Environment, cfg GenerateIndexerConfigInput) (deployment.ChangesetOutput, error) {
-		selectors := cfg.ChainSelectors
-		if len(selectors) == 0 {
-			selectors = e.BlockChains.ListChainSelectors()
-		}
-
-		verifierMap, err := buildIndexerVerifierMap(e.DataStore, registry, selectors, cfg)
+		verifierMap, err := buildIndexerVerifierMap(e.DataStore, registry, e.BlockChains.ListChainSelectors(), cfg)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -108,6 +96,10 @@ func collectVerifierAddresses(
 	qualifier string,
 	kind adapters.VerifierKind,
 ) ([]string, error) {
+	if !registry.HasAdapters() {
+		return nil, fmt.Errorf("no indexer config adapter registered")
+	}
+
 	seen := make(map[string]bool)
 	var addresses []string
 
@@ -119,6 +111,10 @@ func collectVerifierAddresses(
 
 		addrs, err := adapter.ResolveVerifierAddresses(ds, sel, qualifier, kind)
 		if err != nil {
+			var missingErr *adapters.MissingIndexerVerifierAddressesError
+			if errors.As(err, &missingErr) {
+				continue
+			}
 			return nil, fmt.Errorf("chain %d: %w", sel, err)
 		}
 
@@ -128,6 +124,10 @@ func collectVerifierAddresses(
 				addresses = append(addresses, addr)
 			}
 		}
+	}
+
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("no deployed %s verifier addresses found for qualifier %q", kind, qualifier)
 	}
 
 	return addresses, nil

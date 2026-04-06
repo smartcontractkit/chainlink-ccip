@@ -12,9 +12,9 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {TokenPoolSetup} from "../../pools/TokenPool/TokenPoolSetup.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   BurnMintTokenPool internal s_pool;
@@ -32,7 +32,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
       address(s_mockRMNRemote),
       address(s_sourceRouter)
     );
-    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
+    CrossChainToken(address(s_token)).grantMintAndBurnRoles(address(s_pool));
     _applyChainUpdates(address(s_pool));
 
     s_offRamp = new OffRampHelper(

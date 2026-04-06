@@ -43,6 +43,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		result.BatchOps = append(result.BatchOps, fqOut.Output.BatchOps...)
 
 		// Add Router
+		// Allowlist controls who on this chain can send outbound messages.
 		routerOut, err := operations.ExecuteOperation(b, routerops.ConnectChains, chains.SolanaChains()[input.Source.Selector], routerops.ConnectChainsParams{
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
@@ -75,8 +76,6 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
 			RemoteChainSelector: input.Source.Selector,
-			AllowlistEnabled:    input.Source.AllowListEnabled,
-			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to add OffRamp to Router: %w", err)
@@ -86,10 +85,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Source.Selector,
-			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OnRamp,
-			EnabledAsSource:     !input.IsDisabled,
+			RemoteChainSelector:       input.Source.Selector,
+			OffRamp:                   offRampAddress,
+			SourceOnRamp:              input.Source.OnRamp,
+			EnabledAsSource:           !input.IsDisabled,
 			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {

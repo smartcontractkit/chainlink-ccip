@@ -3,13 +3,13 @@ package changesets_test
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strconv"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -18,44 +18,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 )
-
-// lanesTest_MockReader was previously in configure_chains_for_lanes_test.go
-type lanesTest_MockReader struct{}
-
-func (m *lanesTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, _ mcms.Input) (mcms_types.ChainMetadata, error) {
-	return mcms_types.ChainMetadata{
-		MCMAddress:      "0xMCM",
-		StartingOpCount: 42,
-	}, nil
-}
-
-func (m *lanesTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
-	return datastore.AddressRef{
-		ChainSelector: selector,
-		Address:       "0xTimelock",
-		Type:          "Timelock",
-		Version:       semver.MustParse("1.0.0"),
-	}, nil
-}
-
-func (m *lanesTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
-	return datastore.AddressRef{
-		ChainSelector: selector,
-		Address:       "0xMCM",
-		Type:          "MCM",
-		Version:       semver.MustParse("1.0.0"),
-	}, nil
-}
 
 var _ adapters.CommitteeVerifierContractAdapter = (*mockCommitteeVerifierContractAdapter)(nil)
 
@@ -80,73 +49,7 @@ func (m *mockCommitteeVerifierContractAdapter) ResolveCommitteeVerifierContracts
 	return contracts, nil
 }
 
-var _ lanes.LaneAdapter = (*mockLaneAdapter)(nil)
-
-type mockLaneAdapter struct {
-	sequenceErr error
-}
-
-func (m *mockLaneAdapter) ConfigureLaneLegAsSource() *cldf_ops.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"mock-configure-lane-leg-as-source",
-		semver.MustParse("2.0.0"),
-		"Mock source sequence",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
-			if m.sequenceErr != nil {
-				return sequences.OnChainOutput{}, m.sequenceErr
-			}
-			return sequences.OnChainOutput{
-				BatchOps: []mcms_types.BatchOperation{},
-			}, nil
-		},
-	)
-}
-
-func (m *mockLaneAdapter) ConfigureLaneLegAsDest() *cldf_ops.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"mock-configure-lane-leg-as-dest",
-		semver.MustParse("2.0.0"),
-		"Mock dest sequence",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
-			if m.sequenceErr != nil {
-				return sequences.OnChainOutput{}, m.sequenceErr
-			}
-			return sequences.OnChainOutput{
-				BatchOps: []mcms_types.BatchOperation{},
-			}, nil
-		},
-	)
-}
-
-func (m *mockLaneAdapter) GetOnRampAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
-	return []byte("0xOnRamp"), nil
-}
-
-func (m *mockLaneAdapter) GetOffRampAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
-	return []byte("0xOffRamp"), nil
-}
-
-func (m *mockLaneAdapter) GetRouterAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
-	return []byte("0xRouter"), nil
-}
-
-func (m *mockLaneAdapter) GetFQAddress(_ datastore.DataStore, _ uint64) ([]byte, error) {
-	return []byte("0xFeeQuoter"), nil
-}
-
-func (m *mockLaneAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
-	return lanes.DefaultFeeQuoterDestChainConfig(false, chainsel.ETHEREUM_MAINNET.Selector)
-}
-
-func (m *mockLaneAdapter) GetDefaultGasPrice() *big.Int {
-	return big.NewInt(2e12)
-}
-
-func (m *mockLaneAdapter) DisableRemoteChain() *cldf_ops.Sequence[lanes.DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}
-
-func newCommitteeVerifierTestEnv(t *testing.T, selectors []uint64) deployment.Environment {
+func newResolverTestEnv(t *testing.T, selectors []uint64) deployment.Environment {
 	t.Helper()
 	lggr := logger.Test(t)
 	chains := make(map[uint64]cldf_chain.BlockChain, len(selectors))
@@ -162,24 +65,6 @@ func newCommitteeVerifierTestEnv(t *testing.T, selectors []uint64) deployment.En
 			Type:          "Router",
 			Version:       semver.MustParse("1.0.0"),
 		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel,
-			Address:       "0xOnRamp" + strconv.FormatUint(sel, 10),
-			Type:          "OnRamp",
-			Version:       semver.MustParse("1.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel,
-			Address:       "0xFeeQuoter" + strconv.FormatUint(sel, 10),
-			Type:          "FeeQuoter",
-			Version:       semver.MustParse("1.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel,
-			Address:       "0xOffRamp" + strconv.FormatUint(sel, 10),
-			Type:          "OffRamp",
-			Version:       semver.MustParse("1.0.0"),
-		}))
 	}
 
 	return deployment.Environment{
@@ -195,163 +80,43 @@ func newCommitteeVerifierTestEnv(t *testing.T, selectors []uint64) deployment.En
 	}
 }
 
-func newCommitteeVerifierTestEnvWithContracts(t *testing.T, selectors []uint64, verifierAddr, resolverAddr string) deployment.Environment {
-	t.Helper()
-	lggr := logger.Test(t)
-	chains := make(map[uint64]cldf_chain.BlockChain, len(selectors))
-	for _, sel := range selectors {
-		chains[sel] = cldfevm.Chain{Selector: sel}
-	}
-
-	ds := datastore.NewMemoryDataStore()
-	for _, sel := range selectors {
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: "0xRouter" + strconv.FormatUint(sel, 10),
-			Type: "Router", Version: semver.MustParse("1.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: "0xOnRamp" + strconv.FormatUint(sel, 10),
-			Type: "OnRamp", Version: semver.MustParse("1.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: "0xFeeQuoter" + strconv.FormatUint(sel, 10),
-			Type: "FeeQuoter", Version: semver.MustParse("1.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: "0xOffRamp" + strconv.FormatUint(sel, 10),
-			Type: "OffRamp", Version: semver.MustParse("1.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: verifierAddr, Qualifier: "default",
-			Type: "CommitteeVerifier", Version: semver.MustParse("2.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: resolverAddr, Qualifier: "default",
-			Type: "CommitteeVerifierResolver", Version: semver.MustParse("2.0.0"),
-		}))
-		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-			ChainSelector: sel, Address: "0xExec",
-			Type: "Executor", Version: semver.MustParse("1.0.0"),
-		}))
-	}
-
-	return deployment.Environment{
-		Name:        "test",
-		BlockChains: cldf_chain.NewBlockChains(chains),
-		DataStore:   ds.Seal(),
-		Logger:      lggr,
-		OperationsBundle: cldf_ops.NewBundle(
-			func() context.Context { return context.Background() },
-			lggr,
-			cldf_ops.NewMemoryReporter(),
-		),
-	}
-}
-
-func TestConfigureChainsForLanesFromTopology_Validation(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-
-	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
-	laneRegistry := lanes.GetLaneAdapterRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
-
-	tests := []struct {
-		name        string
-		input       changesets.ConfigureChainsForLanesFromTopologyConfig
-		errContains string
-	}{
-		{
-			name:        "nil topology returns error",
-			input:       changesets.ConfigureChainsForLanesFromTopologyConfig{},
-			errContains: "topology is required",
-		},
-		{
-			name: "empty committees returns error",
-			input: changesets.ConfigureChainsForLanesFromTopologyConfig{
-				Topology: &offchain.EnvironmentTopology{
-					NOPTopology: &offchain.NOPTopology{
-						NOPs:       []offchain.NOPConfig{{Alias: "nop-1"}},
-						Committees: map[string]offchain.CommitteeConfig{},
-					},
-				},
-			},
-			errContains: "no committees defined in topology",
-		},
-		{
-			name: "unknown chain selector returns error",
-			input: changesets.ConfigureChainsForLanesFromTopologyConfig{
-				Topology: &offchain.EnvironmentTopology{
-					NOPTopology: &offchain.NOPTopology{
-						NOPs: []offchain.NOPConfig{{Alias: "nop-1"}},
-						Committees: map[string]offchain.CommitteeConfig{
-							"default": {Qualifier: "default"},
-						},
-					},
-				},
-				Chains: []changesets.PartialChainConfig{
-					{ChainSelector: 9999},
-				},
-			},
-			errContains: "chain selector 9999 is not available in environment",
-		},
-	}
-
-	env := newCommitteeVerifierTestEnv(t, []uint64{sel1})
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := cs.VerifyPreconditions(env, tc.input)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.errContains)
-		})
-	}
-}
-
-func TestConfigureChainsForLanesFromTopology_AdapterNotRegistered(t *testing.T) {
+func TestTopologyCommitteePopulator_AdapterNotRegistered(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
-	laneRegistry := lanes.GetLaneAdapterRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
-	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
-
-	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
-		Topology: &offchain.EnvironmentTopology{
-			NOPTopology: &offchain.NOPTopology{
-				NOPs: []offchain.NOPConfig{
-					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
-				},
-				Committees: map[string]offchain.CommitteeConfig{
-					"default": {
-						Qualifier: "default",
-						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
-						},
-					},
-				},
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
 			},
-		},
-		Chains: []changesets.PartialChainConfig{
-			{
-				ChainSelector: sel1,
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
-					{
-						CommitteeQualifier: "default",
-						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-							sel2: {GasForVerification: 100000},
-						},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
 					},
 				},
 			},
 		},
 	})
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "default",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {GasForVerification: 100000},
+			},
+		},
+	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no committee verifier contract adapter registered")
+	assert.Contains(t, err.Error(), "no committee verifier contract adapter")
 }
 
-func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T) {
+func TestTopologyCommitteePopulator_AddressResolutionFails(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -359,38 +124,30 @@ func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T
 	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
 		resolveErr: fmt.Errorf("contract not deployed"),
 	})
-	laneRegistry := lanes.GetLaneAdapterRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
-	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
-
-	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
-		Topology: &offchain.EnvironmentTopology{
-			NOPTopology: &offchain.NOPTopology{
-				NOPs: []offchain.NOPConfig{
-					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
-				},
-				Committees: map[string]offchain.CommitteeConfig{
-					"default": {
-						Qualifier: "default",
-						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
-						},
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
 					},
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
-			{
-				ChainSelector: sel1,
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
-					{
-						CommitteeQualifier: "default",
-						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-							sel2: {GasForVerification: 100000},
-						},
-					},
-				},
+	})
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "default",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {GasForVerification: 100000},
 			},
 		},
 	})
@@ -398,7 +155,7 @@ func TestConfigureChainsForLanesFromTopology_AddressResolutionFails(t *testing.T
 	assert.Contains(t, err.Error(), "contract not deployed")
 }
 
-func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
+func TestTopologyCommitteePopulator_MissingSignerForNOP(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -407,42 +164,33 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
 		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
 			fmt.Sprintf("%d:default", sel1): {
 				{Address: "0xVerifier1", ChainSelector: sel1, Qualifier: "default"},
-				{Address: "0xResolver1", ChainSelector: sel1, Qualifier: "default"},
 			},
 		},
 	})
-	laneRegistry := lanes.GetLaneAdapterRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
 
-	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
-
-	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
-		Topology: &offchain.EnvironmentTopology{
-			NOPTopology: &offchain.NOPTopology{
-				NOPs: []offchain.NOPConfig{
-					{Alias: "nop-1"},
-				},
-				Committees: map[string]offchain.CommitteeConfig{
-					"default": {
-						Qualifier: "default",
-						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
-						},
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1"},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
 					},
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
-			{
-				ChainSelector: sel1,
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
-					{
-						CommitteeQualifier: "default",
-						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-							sel2: {GasForVerification: 100000},
-						},
-					},
-				},
+	})
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "default",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {GasForVerification: 100000},
 			},
 		},
 	})
@@ -450,7 +198,41 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerForNOP(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing signer_address")
 }
 
-func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) {
+func TestTopologyCommitteePopulator_CommitteeNotFound(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{},
+	})
+
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {Qualifier: "default"},
+			},
+		},
+	})
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+
+	_, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "nonexistent",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {},
+			},
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `committee "nonexistent" not found`)
+}
+
+func TestTopologyCommitteePopulator_PopulatesSuccessfully(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -467,130 +249,112 @@ func TestConfigureChainsForLanesFromTopology_ResolvesAndDelegates(t *testing.T) 
 		},
 	})
 
-	laneRegistry := lanes.GetLaneAdapterRegistry()
-	if _, ok := laneRegistry.GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0")); !ok {
-		laneRegistry.RegisterLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockLaneAdapter{})
-	}
-
-	mcmsReg := cs_core.GetRegistry()
-	mcmsReg.RegisterMCMSReader("evm", &lanesTest_MockReader{})
-
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, mcmsReg)
-
-	env := newCommitteeVerifierTestEnvWithContracts(t, []uint64{sel1, sel2}, verifierAddr, resolverAddr)
-
-	output, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
-		Topology: &offchain.EnvironmentTopology{
-			NOPTopology: &offchain.NOPTopology{
-				NOPs: []offchain.NOPConfig{
-					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
-					{Alias: "nop-2", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner2"}},
-				},
-				Committees: map[string]offchain.CommitteeConfig{
-					"default": {
-						Qualifier: "default",
-						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1", "nop-2"}, Threshold: 2},
-						},
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
+				{Alias: "nop-2", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner2"}},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1", "nop-2"}, Threshold: 2},
 					},
 				},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
-			{
-				ChainSelector: sel1,
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
-					{
-						CommitteeQualifier: "default",
-						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-							sel2: {
-								AllowlistEnabled:   true,
-								GasForVerification: 100000,
-								FeeUSDCents:        50,
-								PayloadSizeBytes:   1024,
-							},
-						},
-					},
-				},
-				DefaultExecutor: datastore.AddressRef{
-					ChainSelector: sel1,
-					Type:          "Executor",
-					Version:       semver.MustParse("1.0.0"),
-				},
-				FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-					IsEnabled:    true,
-					MaxDataBytes: 50000,
-				},
-				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-					Enabled: true,
-				},
-				AddressBytesLength:   20,
-				BaseExecutionGasCost: 80000,
-				RemoteChains: map[uint64]lanes.ChainDefinition{
-					sel2: {
-						Selector: sel2,
-						DefaultExecutor: datastore.AddressRef{
-							ChainSelector: sel2,
-							Type:          "Executor",
-							Version:       semver.MustParse("1.0.0"),
-						},
-						FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-							IsEnabled:    true,
-							MaxDataBytes: 50000,
-						},
-						ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-							Enabled: true,
-						},
-						AddressBytesLength:   20,
-						BaseExecutionGasCost: 80000,
-					},
+	})
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+
+	result, err := populator.PopulateCommitteeConfig(env, sel1, []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "default",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {
+					AllowlistEnabled:   true,
+					GasForVerification: 100000,
+					FeeUSDCents:        50,
+					PayloadSizeBytes:   1024,
 				},
 			},
 		},
-		MCMS: mcms.Input{},
 	})
 	require.NoError(t, err)
-	assert.NotNil(t, output.DataStore)
+	require.Len(t, result, 1)
+
+	cv := result[0]
+	require.Len(t, cv.CommitteeVerifier, 2)
+	assert.Equal(t, verifierAddr, cv.CommitteeVerifier[0].Address)
+	assert.Equal(t, resolverAddr, cv.CommitteeVerifier[1].Address)
+
+	rc, ok := cv.RemoteChains[sel2]
+	require.True(t, ok)
+	assert.True(t, rc.AllowlistEnabled)
+	assert.Equal(t, uint32(100000), rc.GasForVerification)
+	assert.Equal(t, uint16(50), rc.FeeUSDCents)
+	assert.Equal(t, uint32(1024), rc.PayloadSizeBytes)
+	assert.Equal(t, uint8(2), rc.SignatureConfig.Threshold)
+	assert.ElementsMatch(t, []string{"0xSigner1", "0xSigner2"}, rc.SignatureConfig.Signers)
 }
 
-func TestConfigureChainsForLanesFromTopology_CommitteeNotFound(t *testing.T) {
+func TestTopologyCommitteePopulator_SigningKeyErrorPersistedAcrossCalls(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
 	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
 	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
-		contractsByChainAndQualifier: map[string][]datastore.AddressRef{},
-	})
-	laneRegistry := lanes.GetLaneAdapterRegistry()
-	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, laneRegistry, nil)
-
-	env := newCommitteeVerifierTestEnv(t, []uint64{sel1, sel2})
-
-	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
-		Topology: &offchain.EnvironmentTopology{
-			NOPTopology: &offchain.NOPTopology{
-				NOPs: []offchain.NOPConfig{
-					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xSigner1"}},
-				},
-				Committees: map[string]offchain.CommitteeConfig{
-					"default": {Qualifier: "default"},
-				},
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", sel1): {
+				{Address: "0xVerifier1", ChainSelector: sel1, Qualifier: "default"},
 			},
 		},
-		Chains: []changesets.PartialChainConfig{
-			{
-				ChainSelector: sel1,
-				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
-					{
-						CommitteeQualifier: "nonexistent",
-						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-							sel2: {},
-						},
+	})
+
+	mockOffchain := &jdMockOffchain{
+		listNodesFn: func(_ context.Context, _ *nodev1.ListNodesRequest, _ ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
+			return nil, fmt.Errorf("JD unavailable")
+		},
+		listNodeChainConfigsFn: func(_ context.Context, _ *nodev1.ListNodeChainConfigsRequest, _ ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
+			return nil, fmt.Errorf("JD unavailable")
+		},
+	}
+
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1"},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
 					},
 				},
 			},
 		},
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), `committee "nonexistent" not found`)
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+	env.Offchain = mockOffchain
+	env.NodeIDs = []string{"node-1"}
+
+	inputs := []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "default",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {GasForVerification: 100000},
+			},
+		},
+	}
+
+	_, err1 := populator.PopulateCommitteeConfig(env, sel1, inputs)
+	require.Error(t, err1, "first call should fail because JD is unavailable")
+	assert.Contains(t, err1.Error(), "failed to fetch signing keys")
+
+	_, err2 := populator.PopulateCommitteeConfig(env, sel1, inputs)
+	require.Error(t, err2, "second call must also fail with the persisted error")
+	assert.Contains(t, err2.Error(), "failed to fetch signing keys")
 }

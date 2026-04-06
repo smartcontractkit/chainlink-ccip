@@ -2,7 +2,10 @@ package ccip
 
 import (
 	"context"
+	// Temporarily disabled TON
 	// "encoding/hex"
+	// "fmt"
+
 	"errors"
 	"os"
 	"path/filepath"
@@ -12,12 +15,15 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider/rpcclient"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+
+	// Temporarily disabled TON
 	// "github.com/xssnick/tonutils-go/address"
 	// "github.com/xssnick/tonutils-go/tlb"
 	// "github.com/xssnick/tonutils-go/ton/wallet"
@@ -27,17 +33,20 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
+
+	// Temporarily disabled TON
 	// cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
 	// testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
-	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
+
+	// ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
 
 	// Register test adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/testadapter"
-	_ "github.com/smartcontractkit/chainlink-ton/deployment/testadapter"
+	// _ "github.com/smartcontractkit/chainlink-ton/deployment/testadapter"
 )
 
 type initOptions struct {
@@ -164,7 +173,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			}
 			providers = append(providers, p)
 		} else if b.Type == "ton" {
-			panic("TON support temporarily disabled")
+			panic("Temporarily disabled TON")
 			// chainID := b.ChainID
 			// rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
 
@@ -260,7 +269,8 @@ func NewCCIPImplFromNetwork(family string, chainID string) (CCIP16ProductConfigu
 	case chainsel.FamilyAptos:
 		panic("implement Aptos")
 	case chainsel.FamilyTon:
-		return ccipTon.NewEmptyCCIP16TON(networkInfo), nil
+		panic("Temporarily disabled TON")
+		// return ccipTon.NewEmptyCCIP16TON(networkInfo), nil
 	default:
 		return nil, errors.New("unsupported devenv chain family " + family)
 	}

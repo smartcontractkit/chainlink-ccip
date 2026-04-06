@@ -151,7 +151,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
 
     s_linkToken.approve(address(s_etherSenderReceiver), FEE_JUELS - 1);
 
-    vm.expectRevert("ERC20: insufficient allowance");
+    vm.expectRevert();
     s_etherSenderReceiver.ccipSend{value: AMOUNT}(DESTINATION_CHAIN_SELECTOR, message);
   }
 

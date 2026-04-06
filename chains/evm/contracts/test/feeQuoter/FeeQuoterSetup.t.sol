@@ -16,16 +16,16 @@ contract FeeQuoterSetup is TokenSetup {
   address internal constant CUSTOM_TOKEN = address(12345);
   address internal constant CUSTOM_TOKEN_2 = address(bytes20(keccak256("CUSTOM_TOKEN_2")));
 
-  uint32 internal constant MAX_DATA_SIZE = 30_000;
+  uint32 internal constant MAX_DATA_SIZE = 32_000;
   uint16 internal constant MAX_TOKENS_LENGTH = 1;
-  uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
+  uint32 internal constant MAX_GAS_LIMIT = 15_000_000;
 
   uint8 internal constant LINK_FEE_MULTIPLIER_PERCENT = 90; // 10% discount
 
   // OnRamp
   uint96 internal constant MAX_MSG_FEES_JUELS = 1_000e18;
-  uint32 internal constant DEST_GAS_OVERHEAD = 300_000;
-  uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_BASE = 16;
+  uint32 internal constant DEST_GAS_OVERHEAD = 100_000;
+  uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_BASE = 20;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
   uint8 internal constant EVM_ADDRESS_LENGTH = 20;

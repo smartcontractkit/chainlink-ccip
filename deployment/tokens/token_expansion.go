@@ -10,7 +10,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -41,11 +40,11 @@ type TokenExpansionInputPerChain struct {
 }
 
 type DeployTokenInput struct {
-	Name     string   `yaml:"name" json:"name"`
-	Symbol   string   `yaml:"symbol" json:"symbol"`
-	Decimals uint8    `yaml:"decimals" json:"decimals"`
-	Supply   *big.Int `yaml:"supply" json:"supply"`
-	PreMint  *big.Int `yaml:"preMint" json:"preMint"`
+	Name     string  `yaml:"name" json:"name"`
+	Symbol   string  `yaml:"symbol" json:"symbol"`
+	Decimals uint8   `yaml:"decimals" json:"decimals"`
+	Supply   *uint64 `yaml:"supply,string" json:"supply,string"`
+	PreMint  *uint64 `yaml:"preMint,string" json:"preMint,string"`
 	// Customer admin who will be granted admin rights on the token
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
 	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`
@@ -178,30 +177,33 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenInput.ExistingDataStore = e.DataStore
 				deployTokenInput.ChainSelector = selector
 
-				// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
+				// If token is deployed by CLL, set CCIP admin as RBACTimelock by default.
 				// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
 				// and we may not be able to register the token by CLL in that case.
-				if deployTokenInput.CCIPAdmin == "" {
-					filter := datastore.AddressRef{
-						Type:          datastore.ContractType(utils.RBACTimelock),
-						ChainSelector: deployTokenInput.ChainSelector,
-						Qualifier:     utils.CLLQualifier,
+				//
+				// External admin defaults to timelock admin if not provided - please take note
+				// that the timelock ref is lazy loaded from the datastore. This is intentional
+				// as some tests may not setup MCMS so querying the timelock ref in those cases
+				// will cause an error.
+				if deployTokenInput.CCIPAdmin == "" || deployTokenInput.ExternalAdmin == "" {
+					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
 					}
-
-					timelockAddr, err := datastore_utils.FindAndFormatRef(
-						deployTokenInput.ExistingDataStore,
-						filter,
-						deployTokenInput.ChainSelector,
-						datastore_utils.FullRef,
-					)
+					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf(
-							"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
-							deployTokenInput.ChainSelector, utils.CLLQualifier, err,
-						)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
 					}
-
-					deployTokenInput.CCIPAdmin = timelockAddr.Address
+					if datastore_utils.IsAddressRefEmpty(timelockRef) {
+						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default CCIP admin address", selector)
+					} else {
+						if deployTokenInput.ExternalAdmin == "" {
+							deployTokenInput.ExternalAdmin = timelockRef.Address
+						}
+						if deployTokenInput.CCIPAdmin == "" {
+							deployTokenInput.CCIPAdmin = timelockRef.Address
+						}
+					}
 				}
 				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
 				if err != nil {
@@ -393,4 +395,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
+	return new(big.Int).Mul(amount, new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil))
 }

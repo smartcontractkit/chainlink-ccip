@@ -3,6 +3,7 @@ package sequences
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -21,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
 func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokenapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -467,7 +470,12 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				}
 				var premint uint64 = 0
 				if input.PreMint != nil {
-					premint = input.PreMint.Uint64()
+					value := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
+					if !value.IsUint64() {
+						return sequences.OnChainOutput{}, fmt.Errorf("pre-mint amount is too large after scaling by decimals: %s", value.String())
+					}
+
+					premint = value.Uint64()
 				}
 				deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
 					ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
@@ -718,4 +726,3 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokenapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
-
