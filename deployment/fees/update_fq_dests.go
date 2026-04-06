@@ -3,7 +3,6 @@ package fees
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -109,8 +108,7 @@ func makeFQDestsApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get FQ contract ref for src %d, dst %d: %w", src.Selector, dst.Selector, err)
 				}
 
-				v := fqRef.Version
-				lookupVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()))
+				lookupVersion := utils.StripPatchVersion(fqRef.Version)
 
 				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
 				if !exists {
