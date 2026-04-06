@@ -1,7 +1,9 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -47,6 +49,17 @@ func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 	}
 }
 
+// tokenSupportsPreMint returns true if the token type supports pre-minting tokens to the deployer
+// address during deployment.
+func tokenSupportsPreMint(tokenType deployment.ContractType) bool {
+	switch tokenType {
+	case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType:
+		return true
+	default:
+		return false
+	}
+}
+
 var DeployToken = cldf_ops.NewSequence(
 	"deploy-token",
 	common_utils.Version_1_0_0,
@@ -58,6 +71,19 @@ var DeployToken = cldf_ops.NewSequence(
 		var err error
 		var tokenRef datastore.AddressRef
 		qualifier := input.Symbol
+
+		// Default max supply is 0 (i.e. unlimited supply)
+		maxSupply := big.NewInt(0)
+		if input.Supply != nil {
+			maxSupply = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.Supply), input.Decimals)
+		}
+
+		// Default pre-mint amount is 0 (i.e. don't pre mint any tokens)
+		preMint := big.NewInt(0)
+		if input.PreMint != nil {
+			preMint = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
+		}
+
 		switch input.Type {
 		case erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, erc20.Deploy, chain, contract.DeployInput[erc20.ConstructorArgs]{
@@ -81,8 +107,8 @@ var DeployToken = cldf_ops.NewSequence(
 					Name:      input.Name,
 					Symbol:    input.Symbol,
 					Decimals:  input.Decimals,
-					MaxSupply: input.Supply,
-					PreMint:   input.PreMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
+					MaxSupply: maxSupply,
+					PreMint:   preMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
 				},
 				Qualifier: &qualifier,
 			}, nil)
@@ -98,8 +124,8 @@ var DeployToken = cldf_ops.NewSequence(
 					Name:      input.Name,
 					Symbol:    input.Symbol,
 					Decimals:  input.Decimals,
-					MaxSupply: input.Supply,
-					PreMint:   input.PreMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
+					MaxSupply: maxSupply,
+					PreMint:   preMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
 				},
 				Qualifier: &qualifier,
 			}, nil)
@@ -111,13 +137,41 @@ var DeployToken = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type: %s", input.Type)
 		}
 
+		tokenAddr := common.HexToAddress(tokenRef.Address)
 		addresses = append(addresses, tokenRef)
 
+		// If senders are provided and token supports pre-minting, transfer the pre-minted tokens from the deployer to the first sender in the list
+		if tokenSupportsPreMint(input.Type) && preMint.Cmp(big.NewInt(0)) > 0 && len(input.Senders) > 0 {
+			firstSender := input.Senders[0]
+			if !common.IsHexAddress(firstSender) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid sender address: %s", firstSender)
+			}
+			tokReceiver := common.HexToAddress(firstSender)
+			if tokReceiver == (common.Address{}) {
+				return sequences.OnChainOutput{}, errors.New("refusing to transfer pre-minted tokens to the zero address")
+			}
+			if len(input.Senders) > 1 {
+				b.Logger.Warnf("Multiple senders provided but only the first one (%s) will receive the pre-minted tokens", tokReceiver.Hex())
+			}
+			transferReport, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
+				ChainSelector: chain.Selector,
+				Address:       tokenAddr,
+				Args: erc20.TransferArgs{
+					Receiver: tokReceiver,
+					Amount:   preMint,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer pre-minted tokens to sender %s: %w", tokReceiver.Hex(), err)
+			}
+			writes = append(writes, transferReport.Output)
+		}
+
 		// set CCIP admin to the provided address
-		if tokenSupportsCCIPAdmin(input.Type) {
+		if input.CCIPAdmin != "" && tokenSupportsCCIPAdmin(input.Type) {
 			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
 				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(tokenRef.Address),
+				Address:       tokenAddr,
 				Args:          input.CCIPAdmin,
 			})
 			if err != nil {
@@ -125,10 +179,11 @@ var DeployToken = cldf_ops.NewSequence(
 			}
 			writes = append(writes, setCCIPAdminReport.Output)
 		}
+
 		// Grant admin role to external admin if provided and token supports it
 		if input.ExternalAdmin != "" && tokenSupportsAdminRole(input.Type) {
 			// Read the default admin role
-			token, err := bnm_erc20_bindings.NewBurnMintERC20(common.HexToAddress(tokenRef.Address), chain.Client)
+			token, err := bnm_erc20_bindings.NewBurnMintERC20(tokenAddr, chain.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
 			}
@@ -140,7 +195,7 @@ var DeployToken = cldf_ops.NewSequence(
 			// Grant admin role to the external admin
 			grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
 				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(tokenRef.Address),
+				Address:       tokenAddr,
 				Args: burn_mint_erc20.RoleAssignment{
 					Role: role,
 					To:   common.HexToAddress(input.ExternalAdmin),

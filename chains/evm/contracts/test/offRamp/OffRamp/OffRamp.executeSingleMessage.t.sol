@@ -17,8 +17,9 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
@@ -51,7 +52,21 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     uint256 amount = 100;
     address pool = makeAddr("pool");
     address sourceToken = makeAddr("sourceToken");
-    address destToken = address(new BurnMintERC20("destToken", "destToken", 18, 0, 0));
+    address destToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "destToken",
+          symbol: "destToken",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
     address tokenReceiver = makeAddr("tokenReceiver");
 
     (
@@ -78,7 +93,21 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address pool = makeAddr("pool");
     uint256 amount = 100;
     address sourceToken = makeAddr("sourceToken");
-    address destToken = address(new BurnMintERC20("destToken", "destToken", 18, 0, 0));
+    address destToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "destToken",
+          symbol: "destToken",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     (
       MessageV1Codec.MessageV1 memory message,
@@ -103,7 +132,21 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     uint256 amount = 100;
     address pool = makeAddr("pool");
     address sourceToken = makeAddr("sourceToken");
-    address destToken = address(new BurnMintERC20("destToken", "destToken", 18, 0, 0));
+    address destToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "destToken",
+          symbol: "destToken",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
     address tokenReceiver = makeAddr("tokenReceiver");
 
     (

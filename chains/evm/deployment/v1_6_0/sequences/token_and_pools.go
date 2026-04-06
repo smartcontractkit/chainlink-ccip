@@ -1,15 +1,16 @@
 package sequences
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -18,12 +19,9 @@ import (
 	tpSeqV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	tpOpsV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	tpSeqV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences/token_pool"
-
-	// NOTE: both v1.5.1 and v1.6.1 token pool contracts inherit from the same abstract v1.5.1
-	// TokenPool.sol contract so we can still use the 1.5.1 bindings to read all onchain state
-	// between these two versions.
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
-
+	tpV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	tpV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -50,9 +48,6 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 			}
 			if !common.IsHexAddress(input.TokenPoolAddress) {
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address %q is not a valid hex address", input.TokenPoolAddress)
-			}
-			if !common.IsHexAddress(input.RegistryAddress) {
-				return sequences.OnChainOutput{}, fmt.Errorf("registry address %q is not a valid hex address", input.RegistryAddress)
 			}
 
 			tpAddr := common.HexToAddress(input.TokenPoolAddress)
@@ -203,11 +198,29 @@ func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector
 		return 0, errors.New("token pool address is zero address")
 	}
 
-	tp, err := token_pool.NewTokenPool(tpAddr, chain.Client)
-	if err != nil {
-		return 0, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+	type TokenPoolDecimalReader interface {
+		GetTokenDecimals(*bind.CallOpts) (uint8, error)
 	}
-	return tp.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
+
+	var pool TokenPoolDecimalReader
+	switch addrRef.Version.String() {
+	case tpOpsV1_5_1.Version.String():
+		if tp, err := tpV1_5_1.NewTokenPool(tpAddr, chain.Client); err != nil {
+			return 0, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+		} else {
+			pool = tp
+		}
+	case tpOpsV1_6_1.Version.String():
+		if tp, err := tpV1_6_1.NewTokenPool(tpAddr, chain.Client); err != nil {
+			return 0, fmt.Errorf("failed to instantiate token pool v1.6.1 contract: %w", err)
+		} else {
+			pool = tp
+		}
+	default:
+		return 0, fmt.Errorf("unsupported token pool version %s for token pool at address %q on chain selector %d", addrRef.Version.String(), tpAddr.Hex(), addrRef.ChainSelector)
+	}
+
+	return pool.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
 }
 
 func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
@@ -227,6 +240,44 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
+			// NOTE: the top level changeset will fully populate `input.TokenPoolRef` BEFORE calling this sequence,
+			// so we can safely assume all its fields will be accounted for and avoid re-querying the datastore. We
+			// use `AddressRefToBytes(*)` as a shortcut to avoid writing the same `common.IsHexAddress` followed by
+			// `common.HexToAddress` boilerplate.
+			tokenPoolAddrBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+			}
+			tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
+			if tokenPoolAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
+			}
+
+			// NOTE: there are certain situations where we don't have access to change the rate limits (e.g. the customer is the
+			// pool owner and rate limit admin). In these cases, we should NOT attempt to set the rate limit or generate an MCMS
+			// batch since we know for certain that the transaction will fail. Instead, we log a warning and skip the rate limit
+			// configuration for that chain (which effectively turns this into a no-op).
+			if input.SkipIfMissingPermissions {
+				timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
+				timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chain.Selector, err)
+				}
+				poolOwner, rlAdmin, err := a.GetTokenPoolAdmins(b.GetContext(), &chain, input.TokenPoolRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool admins for token pool ref (%+v) on chain %d: %w", input.TokenPoolRef, chain.Selector, err)
+				}
+				isRateLimitAdmin := rlAdmin == timelockAddr || rlAdmin == chain.DeployerKey.From
+				isPoolOwner := poolOwner == timelockAddr || poolOwner == chain.DeployerKey.From
+				if !isRateLimitAdmin && !isPoolOwner {
+					b.Logger.Warnf(
+						"Timelock address %q and deployer address %q are not the owner or rate limit admin for token pool at address %q on chain selector %d. Skipping rate limiter config for this chain.",
+						timelockAddr.Hex(), chain.DeployerKey.From.Hex(), tokenPoolAddr.Hex(), chain.Selector,
+					)
+					return sequences.OnChainOutput{}, nil
+				}
+			}
+
 			var output evm_contract.WriteOutput
 			switch input.TokenPoolRef.Version.String() {
 			case tpOpsV1_5_1.Version.String():
@@ -234,7 +285,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 					tpOpsV1_5_1.SetChainRateLimiterConfig, chain,
 					evm_contract.FunctionInput[tpOpsV1_5_1.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
-						Address:       common.HexToAddress(input.TokenPoolRef.Address),
+						Address:       tokenPoolAddr,
 						Args: tpOpsV1_5_1.SetChainRateLimiterConfigArgs{
 							OutboundRateLimitConfig: token_pool.RateLimiterConfig{
 								IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
@@ -258,7 +309,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 					tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
 					evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
-						Address:       common.HexToAddress(input.TokenPoolRef.Address),
+						Address:       tokenPoolAddr,
 						Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
 							OutboundConfig: tpOpsV1_6_1.Config{
 								IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
@@ -405,16 +456,15 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, input tokensapi
 	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
 		return err
 	}
+
 	// ensuring that decimals is not more than 18
 	if input.Decimals > 18 {
 		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
 	}
-	// ensuring that supply and pre-mint are not negative
-	if input.Supply != nil && input.Supply.Cmp(big.NewInt(0)) < 0 {
-		return fmt.Errorf("token supply cannot be negative, got %v", *input.Supply)
-	}
-	if input.PreMint != nil && input.PreMint.Cmp(big.NewInt(0)) < 0 {
-		return fmt.Errorf("token pre-mint cannot be negative, got %v", *input.PreMint)
+
+	// Pre-mint amount can't be greater than the max supply (note: a nil or zero supply means uncapped supply, so we only enforce this check if supply is non-nil and non-zero)
+	if input.PreMint != nil && input.Supply != nil && *input.Supply != 0 && *input.PreMint > *input.Supply {
+		return fmt.Errorf("pre-mint amount cannot be greater than max supply, got pre-mint %d and supply %d", *input.PreMint, *input.Supply)
 	}
 
 	return nil
@@ -603,6 +653,52 @@ func (a *EVMAdapter) GetTokenAddressFromFullTokenPoolRef(b cldf_ops.Bundle, chai
 			populatedTokenPoolRef.Version.String(), tokenPoolAddress.Hex(), populatedTokenPoolRef.ChainSelector,
 		)
 	}
+}
+
+func (a *EVMAdapter) GetTokenPoolAdmins(ctx context.Context, chain *evm.Chain, ref datastore.AddressRef) (poolOwner common.Address, rlAdmin common.Address, err error) {
+	type TokenPoolAdminReader interface {
+		GetRateLimitAdmin(*bind.CallOpts) (common.Address, error)
+		Owner(*bind.CallOpts) (common.Address, error)
+	}
+
+	addrBytes, err := a.AddressRefToBytes(ref)
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	addr := common.BytesToAddress(addrBytes)
+	if addr == (common.Address{}) {
+		return common.Address{}, common.Address{}, fmt.Errorf("token pool address for ref (%+v) is zero address", ref)
+	}
+
+	var pool TokenPoolAdminReader
+	switch ref.Version.String() {
+	case tpOpsV1_5_1.Version.String():
+		if tp, err := tpV1_5_1.NewTokenPool(addr, chain.Client); err != nil {
+			return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+		} else {
+			pool = tp
+		}
+	case tpOpsV1_6_1.Version.String():
+		if tp, err := tpV1_6_1.NewTokenPool(addr, chain.Client); err != nil {
+			return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate token pool v1.6.1 contract: %w", err)
+		} else {
+			pool = tp
+		}
+	default:
+		return common.Address{}, common.Address{}, fmt.Errorf("unsupported token pool version %s for token pool at address %q on chain selector %d", ref.Version.String(), addr.Hex(), ref.ChainSelector)
+	}
+
+	poolOwner, err = pool.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to get owner of token pool at address %q on chain %d: %w", addr.Hex(), chain.Selector, err)
+	}
+	rlAdmin, err = pool.GetRateLimitAdmin(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to get rate limit admin of token pool at address %q on chain %d: %w", addr.Hex(), chain.Selector, err)
+	}
+
+	return poolOwner, rlAdmin, nil
 }
 
 func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.AddressRef) (common.Address, error) {

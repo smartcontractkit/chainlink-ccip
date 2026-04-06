@@ -6,8 +6,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -20,20 +20,26 @@ import (
 type ConfigureCommitteeVerifierAsSourceInput struct {
 	ChainSelector uint64
 	Router        string
-	lanes.CommitteeVerifierConfig[datastore.AddressRef]
+	adapters.CommitteeVerifierConfig[datastore.AddressRef]
 }
 
 type ConfigureCommitteeVerifierAsDestInput struct {
 	ChainSelector uint64
-	lanes.CommitteeVerifierConfig[datastore.AddressRef]
+	adapters.CommitteeVerifierConfig[datastore.AddressRef]
 }
 
 func extractCommitteeVerifierAddresses(refs []datastore.AddressRef, chainSelector uint64) (verifier string, resolver string, err error) {
 	for _, addr := range refs {
 		switch addr.Type {
 		case datastore.ContractType(committee_verifier.ContractType):
+			if verifier != "" {
+				return "", "", fmt.Errorf("duplicate committee verifier contract on chain %d", chainSelector)
+			}
 			verifier = addr.Address
 		case datastore.ContractType(CommitteeVerifierResolverType):
+			if resolver != "" {
+				return "", "", fmt.Errorf("duplicate committee verifier resolver contract on chain %d", chainSelector)
+			}
 			resolver = addr.Address
 		}
 	}
@@ -48,6 +54,7 @@ func extractCommitteeVerifierAddresses(refs []datastore.AddressRef, chainSelecto
 
 // ConfigureCommitteeVerifierAsSource configures outbound CommitteeVerifier settings for remote chains:
 // remote chain config (router, fees, allowlist flag), allowlist updates, and outbound resolver implementation.
+// Deprecated: Use ConfigureChainForLanes from the ChainFamilyAdapter instead this is the canonical way to configure lanes for 2.0. This will be unexported in the future to be used internally only.
 var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 	"configure-committee-verifier-as-source",
 	semver.MustParse("2.0.0"),
@@ -111,16 +118,19 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				}
 			}
 
-			toAdd, toRemove := makeAllowlistUpdates(currRemote.AllowedSendersList, remoteConfig.AddedAllowlistedSenders, remoteConfig.RemovedAllowlistedSenders)
-			if len(toAdd) > 0 || len(toRemove) > 0 {
-				allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
-					AllowlistEnabled:          remoteConfig.AllowlistEnabled,
-					AddedAllowlistedSenders:   toAdd,
-					RemovedAllowlistedSenders: toRemove,
-					DestChainSelector:         remoteSelector,
-				})
-			}
+		toAdd, toRemove, err := makeAllowlistUpdates(currRemote.AllowedSendersList, remoteConfig.AddedAllowlistedSenders, remoteConfig.RemovedAllowlistedSenders)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
 		}
+		if len(toAdd) > 0 || len(toRemove) > 0 {
+			allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
+				AllowlistEnabled:          remoteConfig.AllowlistEnabled,
+				AddedAllowlistedSenders:   toAdd,
+				RemovedAllowlistedSenders: toRemove,
+				DestChainSelector:         remoteSelector,
+			})
+		}
+	}
 
 		// Build outbound implementation args only for remotes where on-chain verifier differs (idempotent).
 		currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{
@@ -193,6 +203,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 // ConfigureCommitteeVerifierAsDest configures inbound CommitteeVerifier settings for remote chains:
 // signature config (signers, threshold) and inbound resolver implementation.
+// Deprecated: Use ConfigureChainForLanes from the ChainFamilyAdapter instead this is the canonical way to configure lanes for 2.0. This will be unexported in the future to be used internally only.
 var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 	"configure-committee-verifier-as-dest",
 	semver.MustParse("2.0.0"),
@@ -299,17 +310,23 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 
 // makeAllowlistUpdates returns the adds and removes to apply so the allowlist becomes (current ∪ added) \ removed.
 // It takes the current on-chain allowlist and the config's added/removed sender lists (hex addresses).
-func makeAllowlistUpdates(current []common.Address, added, removed []string) (toAdd, toRemove []common.Address) {
+func makeAllowlistUpdates(current []common.Address, added, removed []string) (toAdd, toRemove []common.Address, err error) {
 	curSet := make(map[common.Address]struct{}, len(current))
 	for _, a := range current {
 		curSet[a] = struct{}{}
 	}
 	addedSet := make(map[common.Address]struct{}, len(added))
 	for _, s := range added {
+		if !common.IsHexAddress(s) {
+			return nil, nil, fmt.Errorf("invalid hex address in added allowlist: %q", s)
+		}
 		addedSet[common.HexToAddress(s)] = struct{}{}
 	}
 	removedSet := make(map[common.Address]struct{}, len(removed))
 	for _, s := range removed {
+		if !common.IsHexAddress(s) {
+			return nil, nil, fmt.Errorf("invalid hex address in removed allowlist: %q", s)
+		}
 		removedSet[common.HexToAddress(s)] = struct{}{}
 	}
 	desiredSet := make(map[common.Address]struct{})
@@ -327,5 +344,5 @@ func makeAllowlistUpdates(current []common.Address, added, removed []string) (to
 	}
 	toAdd = AddressesNotIn(desired, current)
 	toRemove = AddressesNotIn(current, desired)
-	return toAdd, toRemove
+	return toAdd, toRemove, nil
 }

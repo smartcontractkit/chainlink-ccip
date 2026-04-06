@@ -59,6 +59,24 @@ func newAggregatorConfigRegistry() *adapters.AggregatorConfigRegistry {
 	return &adapters.AggregatorConfigRegistry{}
 }
 
+func newTopologyForCommittee(qualifier string, selectors []uint64) *offchain.EnvironmentTopology {
+	chainConfigs := make(map[string]offchain.ChainCommitteeConfig, len(selectors))
+	for _, sel := range selectors {
+		chainConfigs[strconv.FormatUint(sel, 10)] = offchain.ChainCommitteeConfig{}
+	}
+
+	return &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			Committees: map[string]offchain.CommitteeConfig{
+				qualifier: {
+					Qualifier:    qualifier,
+					ChainConfigs: chainConfigs,
+				},
+			},
+		},
+	}
+}
+
 func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
@@ -86,13 +104,41 @@ func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 			errContains: "committee qualifier is required",
 		},
 		{
-			name: "unknown chain selector",
+			name: "missing topology",
 			input: changesets.GenerateAggregatorConfigInput{
 				ServiceIdentifier:  "agg",
 				CommitteeQualifier: "default",
-				ChainSelectors:     []uint64{9999},
 			},
-			errContains: "selector 9999 is not available in environment",
+			errContains: "topology is required",
+		},
+		{
+			name: "missing nop topology",
+			input: changesets.GenerateAggregatorConfigInput{
+				ServiceIdentifier:  "agg",
+				CommitteeQualifier: "default",
+				Topology:           &offchain.EnvironmentTopology{},
+			},
+			errContains: "NOP topology is required",
+		},
+		{
+			name: "missing committee in topology",
+			input: changesets.GenerateAggregatorConfigInput{
+				ServiceIdentifier:  "agg",
+				CommitteeQualifier: "default",
+				Topology: &offchain.EnvironmentTopology{
+					NOPTopology: &offchain.NOPTopology{Committees: map[string]offchain.CommitteeConfig{}},
+				},
+			},
+			errContains: `committee "default" not found in topology`,
+		},
+		{
+			name: "topology chain missing from environment",
+			input: changesets.GenerateAggregatorConfigInput{
+				ServiceIdentifier:  "agg",
+				CommitteeQualifier: "default",
+				Topology:           newTopologyForCommittee("default", []uint64{sel1, 9999}),
+			},
+			errContains: `committee "default" references chain selector 9999 which is not available in environment`,
 		},
 	}
 
@@ -112,6 +158,7 @@ func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 func TestGenerateAggregatorConfig_BuildsCorrectConfig(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
+	sel3 := chainsel.TEST_90000003.Selector
 
 	sel1Str := strconv.FormatUint(sel1, 10)
 	sel2Str := strconv.FormatUint(sel2, 10)
@@ -157,14 +204,14 @@ func TestGenerateAggregatorConfig_BuildsCorrectConfig(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 	env := deployment.Environment{
 		DataStore:   ds.Seal(),
-		BlockChains: newTestBlockChains([]uint64{sel1, sel2}),
+		BlockChains: newTestBlockChains([]uint64{sel1, sel2, sel3}),
 	}
 
 	cs := changesets.GenerateAggregatorConfig(registry)
 	output, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
-		ChainSelectors:     []uint64{sel1, sel2},
+		Topology:           newTopologyForCommittee(qualifier, []uint64{sel1, sel2}),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, output.DataStore)
@@ -210,7 +257,7 @@ func TestGenerateAggregatorConfig_ScanError(t *testing.T) {
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: "default",
-		ChainSelectors:     []uint64{sel1},
+		Topology:           newTopologyForCommittee("default", []uint64{sel1}),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "scan failed")
@@ -247,7 +294,7 @@ func TestGenerateAggregatorConfig_ResolveAddressError(t *testing.T) {
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
-		ChainSelectors:     []uint64{sel1},
+		Topology:           newTopologyForCommittee(qualifier, []uint64{sel1}),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "address not found")
@@ -271,10 +318,10 @@ func TestGenerateAggregatorConfig_CommitteeNotFound(t *testing.T) {
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: "default",
-		ChainSelectors:     []uint64{sel1},
+		Topology:           newTopologyForCommittee("default", []uint64{sel1}),
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `committee "default" not found`)
+	assert.Contains(t, err.Error(), `committee "default" not found in deployed verifier state`)
 }
 
 func TestGenerateAggregatorConfig_DuplicateSourceChainAcrossDestinationsSucceeds(t *testing.T) {
@@ -336,7 +383,7 @@ func TestGenerateAggregatorConfig_DuplicateSourceChainAcrossDestinationsSucceeds
 	output, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
-		ChainSelectors:     []uint64{destChainA, destChainB, sourceChain},
+		Topology:           newTopologyForCommittee(qualifier, []uint64{destChainA, destChainB, sourceChain}),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, output.DataStore)
@@ -389,7 +436,7 @@ func TestGenerateAggregatorConfig_DuplicateQualifierOnSameChainFails(t *testing.
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
-		ChainSelectors:     []uint64{sel1},
+		Topology:           newTopologyForCommittee(qualifier, []uint64{sel1}),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple committee verifiers with qualifier")
@@ -408,7 +455,7 @@ func TestGenerateAggregatorConfig_MissingAdapterForFamily(t *testing.T) {
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: "default",
-		ChainSelectors:     []uint64{sel1},
+		Topology:           newTopologyForCommittee("default", []uint64{sel1}),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no offchain config adapter registered")

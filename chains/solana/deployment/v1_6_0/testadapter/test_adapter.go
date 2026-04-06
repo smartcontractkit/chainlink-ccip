@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -131,44 +132,46 @@ func (a *SVMAdapter) getAddress(ty datastore.ContractType) (solana.PublicKey, er
 
 // TODO: contractType constants should be extracted from core
 
-func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, error) {
+func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 
+	messageID := ""
+
 	msg, ok := m.(ccip_router.SVM2AnyMessage)
 	if !ok {
-		return 0, errors.New("expected ccip_router.SVM2AnyMessage")
+		return 0, messageID, errors.New("expected ccip_router.SVM2AnyMessage")
 	}
 
 	routerID, err := a.getAddress(datastore.ContractType("Router"))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get router address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get router address: %w", err)
 	}
 	fqID, err := a.getAddress(datastore.ContractType("FeeQuoter"))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get fee quoter address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
 	rmnAddr, err := a.getAddress(datastore.ContractType("RMNRemote"))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get RMNRemote address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get RMNRemote address: %w", err)
 	}
 	linkAddr, err := a.getAddress(datastore.ContractType("LINK"))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get LINK address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get LINK address: %w", err)
 	}
 	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
 	}
 	// lnrPool, err := a.getAddress(datastore.ContractType("LockReleaseTokenPool"))
 	// if err != nil {
-	// 	return 0, fmt.Errorf("failed to get LockReleaseTokenPool address: %w", err)
+	// 	return 0, messageID,fmt.Errorf("failed to get LockReleaseTokenPool address: %w", err)
 	// }
 	ccip_router.SetProgramID(routerID)
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
 	// err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.SolanaChains()[src])
 	// if err != nil {
-	// 	return 0, fmt.Errorf("failed to update prices: %w", err)
+	// 	return 0, messageID,fmt.Errorf("failed to update prices: %w", err)
 	// }
 
 	feeToken := solana.SolMint
@@ -229,14 +232,14 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 		tokenPool, err := tokens.NewTokenPool(DefaultTokenProgram, bnmPool, tokenPubKey)
 		if err != nil {
-			return 0, err
+			return 0, messageID, err
 		}
 
 		// Set the token pool's lookup table address
 		var tokenAdminRegistry ccip_common.TokenAdminRegistry
 		err = solcommon.GetAccountDataBorshInto(ctx, a.Client, tokenPool.AdminRegistryPDA, solconfig.DefaultCommitment, &tokenAdminRegistry)
 		if err != nil {
-			return 0, err
+			return 0, messageID, err
 		}
 
 		tokenPool.PoolLookupTable = tokenAdminRegistry.LookupTable
@@ -245,26 +248,26 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 		chainPDA, _, err := tokens.TokenPoolChainConfigPDA(destChainSelector, tokenPubKey, bnmPool)
 		if err != nil {
-			return 0, err
+			return 0, messageID, err
 		}
 
 		tokenPool.Chain[destChainSelector] = chainPDA
 
 		billingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(destChainSelector, tokenPubKey, fqID)
 		if err != nil {
-			return 0, err
+			return 0, messageID, err
 		}
 
 		tokenPool.Billing[destChainSelector] = billingPDA
 
 		userTokenAccount, _, err := tokens.FindAssociatedTokenAddress(DefaultTokenProgram, tokenPubKey, sender.PublicKey())
 		if err != nil {
-			return 0, err
+			return 0, messageID, err
 		}
 
 		tokenMetas, tokenAddressTables, err := tokens.ParseTokenLookupTableWithChain(ctx, a.Client, tokenPool, userTokenAccount, destChainSelector)
 		if err != nil {
-			return 0, err
+			return 0, messageID, err
 		}
 
 		tokenIndexes = append(tokenIndexes, byte(len(base.AccountMetaSlice)-requiredAccounts))
@@ -276,11 +279,11 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 	tempIx, err := base.ValidateAndBuild()
 	if err != nil {
-		return 0, err
+		return 0, messageID, err
 	}
 	ixData, err := tempIx.Data()
 	if err != nil {
-		return 0, fmt.Errorf("failed to extract data payload from router ccip send instruction: %w", err)
+		return 0, messageID, fmt.Errorf("failed to extract data payload from router ccip send instruction: %w", err)
 	}
 	ix := solana.NewInstruction(routerID, tempIx.Accounts(), ixData)
 
@@ -289,7 +292,7 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	ixs := []solana.Instruction{ix}
 	result, err := solcommon.SendAndConfirmWithLookupTables(ctx, a.Client, ixs, *sender, solconfig.DefaultCommitment, addressTables, solcommon.AddComputeUnitLimit(400_000))
 	if err != nil {
-		return 0, fmt.Errorf("failed to send and confirm transaction: %w", err)
+		return 0, messageID, fmt.Errorf("failed to send and confirm transaction: %w", err)
 	}
 
 	// check CCIP event
@@ -297,11 +300,12 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	printEvents := true
 	err = solcommon.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, printEvents)
 	if err != nil {
-		return 0, err
+		return 0, messageID, err
 	}
+	messageID = common.Bytes2Hex(ccipMessageSentEvent.Message.Header.MessageId[:])
 
 	if len(msg.TokenAmounts) != len(ccipMessageSentEvent.Message.TokenAmounts) {
-		return 0, errors.New("token amounts mismatch")
+		return 0, messageID, errors.New("token amounts mismatch")
 	}
 
 	// TODO: fee bumping?
@@ -316,7 +320,7 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	}
 
 	l.Info().Msgf("CCIP message (id %s) sent from chain selector %d to chain selector %d tx %s seqNum %d nonce %d sender %s",
-		common.Bytes2Hex(ccipMessageSentEvent.Message.Header.MessageId[:]),
+		messageID,
 		a.Selector,
 		destChainSelector,
 		transactionID,
@@ -324,7 +328,7 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		ccipMessageSentEvent.Message.Header.Nonce,
 		ccipMessageSentEvent.Message.Sender.String(),
 	)
-	return ccipMessageSentEvent.SequenceNumber, nil
+	return ccipMessageSentEvent.SequenceNumber, messageID, nil
 }
 
 func (a *SVMAdapter) CCIPReceiver() []byte {
@@ -335,7 +339,17 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 	return receiver.Bytes()
 }
 
-func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
+func (a *SVMAdapter) EOAReceiver(t *testing.T) []byte {
+	t.Skip("Not implemented")
+	return nil
+}
+
+func (a *SVMAdapter) InvalidAddresses() [][]byte {
+	// GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contracts
+	return make([][]byte, 0)
+}
+
+func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error {
 	receiverProgram, err := a.getAddress("TestReceiver")
 	if err != nil {
 		return err
@@ -343,7 +357,7 @@ func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) e
 	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
 	// Set reject all flag in receiver to force reverts
 	deployer := a.Chain.DeployerKey
-	ix, err := test_ccip_receiver.NewSetRejectAllInstruction(true, receiverTargetAccountPDA, deployer.PublicKey()).ValidateAndBuild()
+	ix, err := test_ccip_receiver.NewSetRejectAllInstruction(rejectAll, receiverTargetAccountPDA, deployer.PublicKey()).ValidateAndBuild()
 	if err != nil {
 		return err
 	}
@@ -412,6 +426,10 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 	}
 }
 
+func (a *SVMAdapter) LowGasLimit() *big.Int {
+	return big.NewInt(1)
+}
+
 func (a *SVMAdapter) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
 	chainSelectorLE := solcommon.Uint64ToLE(a.Selector)
 	routerAddress, err := a.getAddress(datastore.ContractType("Router"))
@@ -447,23 +465,55 @@ func (a *SVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBl
 	require.NoError(t, err)
 }
 
-func (a *SVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (executionStates map[uint64]int) {
+func (a *SVMAdapter) ValidateExecSucceeds(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
 	var startSlot uint64
 	if startBlock != nil {
 		startSlot = *startBlock
 	}
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
-	executionStates, err = confirmExecWithSeqNrsSol(
+	seqNrsMapped := make([]uint64, len(seqNrs))
+	for i, seqNr := range seqNrs {
+		seqNrsMapped[i] = uint64(seqNr)
+	}
+	executionStates, err := confirmExecWithSeqNrsSol(
 		t,
 		sourceSelector,
 		a.Chain,
 		offRampAddress,
 		startSlot,
-		seqNrs,
+		seqNrsMapped,
 	)
 	require.NoError(t, err)
 	return executionStates
+}
+
+func (a *SVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) {
+	var startSlot uint64
+	if startBlock != nil {
+		startSlot = *startBlock
+	}
+	offRampAddress, err := a.getAddress("OffRamp")
+	require.NoError(t, err)
+	seqNrsMaped := make([]uint64, len(seqNrs))
+	for i, seqNr := range seqNrs {
+		seqNrsMaped[i] = uint64(seqNr)
+	}
+	executionStates, err := confirmExecWithSeqNrsSol(
+		t,
+		sourceSelector,
+		a.Chain,
+		offRampAddress,
+		startSlot,
+		seqNrsMaped,
+	)
+	require.NoError(t, err)
+	for _, seqNr := range seqNrs {
+		state, ok := executionStates[seqNr]
+		require.True(t, ok, "no execution state found for seqNr %d", seqNr)
+		require.Equal(t, int(ccip_offramp.Failure_MessageExecutionState), state,
+			"expected execution state FAILURE for seqNr %d, got state %d", seqNr, state)
+	}
 }
 
 func (a *SVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {
@@ -552,28 +602,26 @@ func (a *SVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	return new(big.Int).SetUint64(uint64(balance)), nil
 }
 
-func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
+func (a *SVMAdapter) GetTokenExpansionConfig() (*tokensapi.TokenExpansionInputPerChain, error) {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.PublicKey().String()
 	receiverBytes := a.CCIPReceiver()
 	receiver := solana.PublicKeyFromBytes(receiverBytes).String()
 	registryAddr, err := a.GetRegistryAddress()
 	if err != nil {
-		return tokensapi.TokenExpansionInputPerChain{}
+		return nil, fmt.Errorf("failed to get registry address: %w", err)
 	}
 
-	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(DefaultTokenDecimals)), nil)
-	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
-
-	return tokensapi.TokenExpansionInputPerChain{
+	preMintAmount := uint64(1_000_000) // pre-mint 1 million tokens
+	return &tokensapi.TokenExpansionInputPerChain{
 		TokenPoolVersion: cciputils.Version_1_6_0,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               DefaultTokenDecimals,
 			Symbol:                 "TEST_TOKEN_" + suffix,
 			Name:                   "TEST TOKEN " + suffix,
 			Type:                   DefaultTokenType,
-			Supply:                 big.NewInt(0),             // unlimited supply
-			PreMint:                mintAmnt,                  // pre-mint some tokens for transfers
+			Supply:                 nil,                       // unlimited supply
+			PreMint:                &preMintAmount,            // pre-mint some tokens for transfers
 			Senders:                []string{admin, receiver}, // use deployer as sender
 			ExternalAdmin:          "",                        // not needed for tests
 			DisableFreezeAuthority: false,                     // don't revoke freeze authority after token creation
@@ -591,7 +639,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			},
 			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 		},
-	}
+	}, nil
 }
 
 func (a *SVMAdapter) GetRegistryAddress() (string, error) {
@@ -828,6 +876,13 @@ func GetMessageStatesWithSeqNrsSol(
 				dest.Selector, offrampAddress.String(), srcSelector, expectedSeqNrs)
 		}
 	}
+}
+
+func (a *SVMAdapter) CurrentBlock(t *testing.T) uint64 {
+	// TBD I am not sure if this is correct
+	out, err := a.Client.GetSlot(t.Context(), solrpc.CommitmentFinalized)
+	require.NoError(t, err)
+	return out
 }
 
 // ConfirmExecWithSeqNrsSol waits for an execution state change on the destination Solana chain with the expected

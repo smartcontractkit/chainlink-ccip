@@ -6,10 +6,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -116,11 +117,13 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 
 		// CCTPVerifierResolver: set outbound implementation per remote chain
 		outboundImpls := buildVerifierResolverOutboundArgs(input, cctpVerifierAddress)
-		w, err := applyVerifierResolverOutboundWrites(b, chain, common.HexToAddress(refs.CCTPVerifierResolver.Address), outboundImpls)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+		if len(outboundImpls) > 0 {
+			w, err := applyVerifierResolverOutboundWrites(b, chain, common.HexToAddress(refs.CCTPVerifierResolver.Address), outboundImpls)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, w...)
 		}
-		writes = append(writes, w...)
 
 		// USDCTokenPoolProxy: lock/burn mechanism per remote chain
 		remoteSelectors, mechanisms, err := buildUSDCTokenPoolProxyMechanismArgs(input)
@@ -128,7 +131,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		if len(remoteSelectors) > 0 {
-			w, err = applyUSDCTokenPoolProxyMechanismWrites(b, chain, common.HexToAddress(refs.USDCTokenPoolProxy.Address), remoteSelectors, mechanisms)
+			w, err := applyUSDCTokenPoolProxyMechanismWrites(b, chain, common.HexToAddress(refs.USDCTokenPoolProxy.Address), remoteSelectors, mechanisms)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -140,11 +143,13 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		w, err = applyCCTPVerifierWrites(b, chain, cctpVerifierAddress, verifierSetDomainArgs, verifierRemoteChainConfigArgs)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+		if len(verifierSetDomainArgs) > 0 {
+			w, err := applyCCTPVerifierWrites(b, chain, cctpVerifierAddress, verifierSetDomainArgs, verifierRemoteChainConfigArgs)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, w...)
 		}
-		writes = append(writes, w...)
 
 		// CCTP V2 token pool: set domains
 		cctpV2DomainUpdates, err := buildCCTPV2PoolDomainUpdates(dep, input)
@@ -152,7 +157,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		if len(cctpV2DomainUpdates) > 0 {
-			w, err = applyCCTPV2PoolSetDomainsWrites(b, chain, common.HexToAddress(refs.CCTPV2TokenPool.Address), cctpV2DomainUpdates)
+			w, err := applyCCTPV2PoolSetDomainsWrites(b, chain, common.HexToAddress(refs.CCTPV2TokenPool.Address), cctpV2DomainUpdates)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -166,7 +171,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			if refs.CCTPV1TokenPool.Address == "" {
 				return sequences.OnChainOutput{}, fmt.Errorf("CCTP V1 token pool ref is required when configuring CCTP V1 lanes on chain %d", input.ChainSelector)
 			}
-			w, err = applyCCTPV1PoolSetDomainsWrites(b, chain, common.HexToAddress(refs.CCTPV1TokenPool.Address), cctpV1DomainUpdates)
+			w, err := applyCCTPV1PoolSetDomainsWrites(b, chain, common.HexToAddress(refs.CCTPV1TokenPool.Address), cctpV1DomainUpdates)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -185,6 +190,9 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Configure remote chains on CCTP V2 token pool (1.6.1 sequence)
 		cctpV2TokenPoolAddress := common.HexToAddress(refs.CCTPV2TokenPool.Address)
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
+			if !isV2Mechanism(input.RemoteChains[remoteChainSelector].LockOrBurnMechanism) {
+				continue
+			}
 			report, err := cldf_ops.ExecuteSequence(b, v1_6_1_tokens.ConfigureTokenPoolForRemoteChain, chain, v1_6_1_tokens.ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,
 				TokenPoolAddress:    cctpV2TokenPoolAddress,
@@ -223,6 +231,13 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 
 		// Configure token for transfers (CCTP-through-CCV pool; registration is done once)
+		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
+		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
+			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism != mechanismCCTPV2WithCCV {
+				continue
+			}
+			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
+		}
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:            input.ChainSelector,
 			TokenAddress:             input.USDCToken,
@@ -230,7 +245,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
 			MinFinalityValue:         1,
-			RemoteChains:             remoteChainConfigs,
+			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)
@@ -359,7 +374,10 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 // buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver (one per remote chain).
 func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanesInput, cctpVerifierAddress common.Address) []versioned_verifier_resolver.OutboundImplementationArgs {
 	out := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
-	for remoteChainSelector := range input.RemoteChains {
+	for remoteChainSelector, remoteChain := range input.RemoteChains {
+		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
+			continue
+		}
 		out = append(out, versioned_verifier_resolver.OutboundImplementationArgs{
 			DestChainSelector: remoteChainSelector,
 			Verifier:          cctpVerifierAddress,
@@ -391,6 +409,9 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
 		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
+		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -438,6 +459,9 @@ func buildCCTPV2PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
 		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
+		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -592,4 +616,8 @@ func convertMechanismToUint8(mechanism string) (uint8, error) {
 	default:
 		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", mechanismCCTPV1, mechanismCCTPV2, mechanismLockRelease, mechanismCCTPV2WithCCV, mechanism)
 	}
+}
+
+func isV2Mechanism(mechanism string) bool {
+	return mechanism == mechanismCCTPV2 || mechanism == mechanismCCTPV2WithCCV
 }

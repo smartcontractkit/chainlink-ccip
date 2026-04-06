@@ -45,9 +45,6 @@ func newIndexerConfigRegistry() *adapters.IndexerConfigRegistry {
 }
 
 func TestGenerateIndexerConfig_Validation(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-	sel2 := chainsel.TEST_90000002.Selector
-
 	registry := newIndexerConfigRegistry()
 	cs := changesets.GenerateIndexerConfig(registry)
 
@@ -70,20 +67,9 @@ func TestGenerateIndexerConfig_Validation(t *testing.T) {
 			},
 			errContains: "at least one verifier name to qualifier mapping is required",
 		},
-		{
-			name: "unknown chain selector returns error",
-			input: changesets.GenerateIndexerConfigInput{
-				ServiceIdentifier:                "indexer",
-				CommitteeVerifierNameToQualifier: map[string]string{"v1": "default"},
-				ChainSelectors:                   []uint64{9999},
-			},
-			errContains: "selector 9999 is not available in environment",
-		},
 	}
 
-	env := deployment.Environment{
-		BlockChains: newTestBlockChains([]uint64{sel1, sel2}),
-	}
+	env := deployment.Environment{}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -128,7 +114,6 @@ func TestGenerateIndexerConfig_BuildsCorrectConfigAcrossChains(t *testing.T) {
 		ServiceIdentifier:                "test-indexer",
 		CommitteeVerifierNameToQualifier: map[string]string{"committee": "default"},
 		CCTPVerifierNameToQualifier:      map[string]string{"cctp": "cctp-q"},
-		ChainSelectors:                   []uint64{sel1, sel2},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, output.DataStore)
@@ -178,7 +163,6 @@ func TestGenerateIndexerConfig_DeduplicatesAddressesAcrossChains(t *testing.T) {
 	output, err := cs.Apply(env, changesets.GenerateIndexerConfigInput{
 		ServiceIdentifier:                "test-indexer",
 		CommitteeVerifierNameToQualifier: map[string]string{"committee": "default"},
-		ChainSelectors:                   []uint64{sel1, sel2},
 	})
 	require.NoError(t, err)
 
@@ -194,13 +178,20 @@ func TestGenerateIndexerConfig_AdapterErrorPropagates(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
 	mock := &mockIndexerConfigAdapter{
+		addressesByChainAndKind: map[uint64]map[adapters.VerifierKind]map[string][]string{
+			sel1: {
+				adapters.CommitteeVerifierKind: {"default": {"0x1111111111111111111111111111111111111111"}},
+			},
+		},
 		resolveErr: fmt.Errorf("datastore unavailable"),
 	}
 
 	registry := newIndexerConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
+	ds := datastore.NewMemoryDataStore()
 	env := deployment.Environment{
+		DataStore:   ds.Seal(),
 		BlockChains: newTestBlockChains([]uint64{sel1}),
 	}
 
@@ -208,32 +199,30 @@ func TestGenerateIndexerConfig_AdapterErrorPropagates(t *testing.T) {
 	_, err := cs.Apply(env, changesets.GenerateIndexerConfigInput{
 		ServiceIdentifier:                "test-indexer",
 		CommitteeVerifierNameToQualifier: map[string]string{"committee": "default"},
-		ChainSelectors:                   []uint64{sel1},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "datastore unavailable")
 }
 
-func TestGenerateIndexerConfig_MissingAdapterForFamilyReturnsError(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-
+func TestGenerateIndexerConfig_MissingAdapterReturnsError(t *testing.T) {
 	registry := newIndexerConfigRegistry()
 
+	ds := datastore.NewMemoryDataStore()
 	env := deployment.Environment{
-		BlockChains: newTestBlockChains([]uint64{sel1}),
+		DataStore:   ds.Seal(),
+		BlockChains: newTestBlockChains([]uint64{chainsel.TEST_90000001.Selector}),
 	}
 
 	cs := changesets.GenerateIndexerConfig(registry)
 	_, err := cs.Apply(env, changesets.GenerateIndexerConfigInput{
 		ServiceIdentifier:                "test-indexer",
 		CommitteeVerifierNameToQualifier: map[string]string{"committee": "default"},
-		ChainSelectors:                   []uint64{sel1},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no indexer config adapter registered")
 }
 
-func TestGenerateIndexerConfig_HandlesEmptyAddressesFromSomeChains(t *testing.T) {
+func TestGenerateIndexerConfig_IgnoresUndeployedEnvChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -243,9 +232,6 @@ func TestGenerateIndexerConfig_HandlesEmptyAddressesFromSomeChains(t *testing.T)
 		addressesByChainAndKind: map[uint64]map[adapters.VerifierKind]map[string][]string{
 			sel1: {
 				adapters.CommitteeVerifierKind: {"default": {addr1}},
-			},
-			sel2: {
-				adapters.CommitteeVerifierKind: {"default": nil},
 			},
 		},
 	}
@@ -263,7 +249,6 @@ func TestGenerateIndexerConfig_HandlesEmptyAddressesFromSomeChains(t *testing.T)
 	output, err := cs.Apply(env, changesets.GenerateIndexerConfigInput{
 		ServiceIdentifier:                "test-indexer",
 		CommitteeVerifierNameToQualifier: map[string]string{"committee": "default"},
-		ChainSelectors:                   []uint64{sel1, sel2},
 	})
 	require.NoError(t, err)
 
@@ -274,39 +259,23 @@ func TestGenerateIndexerConfig_HandlesEmptyAddressesFromSomeChains(t *testing.T)
 	assert.Equal(t, []string{addr1}, cfg.Verifiers[0].IssuerAddresses)
 }
 
-func TestGenerateIndexerConfig_DefaultsToAllChainSelectors(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-
-	addr1 := "0x1111111111111111111111111111111111111111"
-
-	mock := &mockIndexerConfigAdapter{
-		addressesByChainAndKind: map[uint64]map[adapters.VerifierKind]map[string][]string{
-			sel1: {
-				adapters.LombardVerifierKind: {"lombard-q": {addr1}},
-			},
-		},
-	}
-
+func TestGenerateIndexerConfig_NoDeployedChainsForQualifierReturnsError(t *testing.T) {
 	registry := newIndexerConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, &mockIndexerConfigAdapter{
+		addressesByChainAndKind: map[uint64]map[adapters.VerifierKind]map[string][]string{},
+	})
 
 	ds := datastore.NewMemoryDataStore()
 	env := deployment.Environment{
 		DataStore:   ds.Seal(),
-		BlockChains: newTestBlockChains([]uint64{sel1}),
+		BlockChains: newTestBlockChains([]uint64{chainsel.TEST_90000001.Selector}),
 	}
 
 	cs := changesets.GenerateIndexerConfig(registry)
-	output, err := cs.Apply(env, changesets.GenerateIndexerConfigInput{
-		ServiceIdentifier:              "test-indexer",
-		LombardVerifierNameToQualifier: map[string]string{"lombard": "lombard-q"},
+	_, err := cs.Apply(env, changesets.GenerateIndexerConfigInput{
+		ServiceIdentifier:                "test-indexer",
+		CommitteeVerifierNameToQualifier: map[string]string{"committee": "default"},
 	})
-	require.NoError(t, err)
-
-	cfg, err := offchain.GetIndexerConfig(output.DataStore.Seal(), "test-indexer")
-	require.NoError(t, err)
-
-	require.Len(t, cfg.Verifiers, 1)
-	assert.Equal(t, "lombard", cfg.Verifiers[0].Name)
-	assert.Equal(t, []string{addr1}, cfg.Verifiers[0].IssuerAddresses)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `failed to resolve addresses for verifier "committee" (qualifier "default"): no deployed committee verifier addresses found for qualifier "default"`)
 }
