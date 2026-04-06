@@ -13,7 +13,7 @@ import (
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
-	v1_6_0_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	v1_5_1_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -38,7 +38,7 @@ func NewTokenAdapter() *TokenAdapter {
 	return &TokenAdapter{
 		EVMPoolAdapter: evm1_0_0.EVMPoolAdapter{
 			Ops:                &poolOpsV151{},
-			DeployTokenPoolSeq: v1_6_0_seq.DeployTokenPool,
+			DeployTokenPoolSeq: v1_5_1_seq.DeployTokenPool,
 		},
 	}
 }
