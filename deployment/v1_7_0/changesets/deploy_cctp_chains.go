@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -71,17 +72,28 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 			if !chainCfg.USDCType.IsValid() {
 				return fmt.Errorf("invalid CCTP type for chain %d: %s", chainSel, chainCfg.USDCType)
 			}
-			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
+			family, err := chain_selectors.GetSelectorFamily(chainSel)
+			if err != nil {
 				return err
 			}
-			if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
-				return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
-			}
-			if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
-				return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
+			if family == chain_selectors.FamilySolana {
+				if chainCfg.USDCToken == "" {
+					return fmt.Errorf("invalid USDCToken for Solana chain %d", chainSel)
+				}
+				if _, err := solana.PublicKeyFromBase58(chainCfg.USDCToken); err != nil {
+					return fmt.Errorf("invalid USDCToken for Solana chain %d", chainSel)
+				}
+			} else {
+				if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
+					return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
+				}
+				if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
+					return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
+				}
 			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
-				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
+				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+				if err != nil {
 					return err
 				}
 				remoteChainCfg, ok := cfg.Chains[remoteChainSelector]
@@ -90,6 +102,12 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 				}
 				if _, ok := remoteChainCfg.RemoteChains[chainSel]; !ok {
 					return fmt.Errorf("chain %d has remote %d but chain %d does not define a remote chain config for %d (each remote must point back to the current chain)", chainSel, remoteChainSelector, remoteChainSelector, chainSel)
+				}
+				if family == chain_selectors.FamilySolana || remoteFamily == chain_selectors.FamilySolana {
+					mechanism := chainCfg.RemoteChains[remoteChainSelector].LockOrBurnMechanism
+					if mechanism != "CCTP_V1" {
+						return fmt.Errorf("solana lanes only support CCTP_V1, got %q for chain %d -> %d", mechanism, chainSel, remoteChainSelector)
+					}
 				}
 			}
 		}
