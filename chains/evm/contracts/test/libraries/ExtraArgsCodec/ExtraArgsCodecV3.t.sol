@@ -29,7 +29,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   }
 
   function test_GetBasicEncodedExtraArgsV3_ReturnsCorrectLength() public pure {
-    bytes memory encoded = ExtraArgsCodec._getBasicEncodedExtraArgsV3(GAS_LIMIT, 12);
+    bytes memory encoded = ExtraArgsCodec._getBasicEncodedExtraArgsV3BlockDepth(GAS_LIMIT, 12);
     assertEq(encoded.length, ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
 
     bytes4 tag;

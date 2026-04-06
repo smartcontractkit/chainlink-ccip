@@ -77,7 +77,7 @@ contract MockRouterTest is TokenSetup {
   }
 
   function test_ccipSendWithGenericExtraArgsV3() public {
-    message.extraArgs = ExtraArgsCodec._getBasicEncodedExtraArgsV3(500_000, 0);
+    message.extraArgs = ExtraArgsCodec._getBasicEncodedExtraArgsV3BlockDepth(500_000, uint16(0));
     mockRouter.ccipSend{value: 0.1 ether}(MOCK_CHAIN_SELECTOR, message);
   }
 
