@@ -13,11 +13,24 @@ type Optional[T any] struct {
 	Value T `json:"value" yaml:"value"`
 }
 
-// Infer returns the contained value if `Valid` is true; otherwise, it returns the provided fallback.
-func (o Optional[T]) Infer(fallback T) T {
+// NewOptional creates a new Optional with the provided value and sets Valid to true.
+func NewOptional[T any](value T) Optional[T] {
+	return Optional[T]{
+		Value: value,
+		Valid: true,
+	}
+}
+
+// GetOrDefault returns the contained value if `Valid` is true; otherwise, it returns the provided fallback.
+func (o Optional[T]) GetOrDefault(fallback T) T {
 	if o.Valid {
 		return o.Value
 	}
 
 	return fallback
+}
+
+// Get returns the contained value and a boolean indicating whether it is valid.
+func (o Optional[T]) Get() (T, bool) {
+	return o.Value, o.Valid
 }

@@ -25,16 +25,16 @@ type UnresolvedTokenTransferFeeArgs struct {
 	IsEnabled                     utils.Optional[bool]   `json:"isEnabled" yaml:"isEnabled"`
 }
 
-// Infer fills in any unset fields in the unresolved configuration using the provided fallback values.
-func (cfg UnresolvedTokenTransferFeeArgs) Infer(fallbacks TokenTransferFeeConfig) *TokenTransferFeeConfig {
+// Resolve fills in any unset fields in the unresolved configuration using the provided fallback values.
+func (cfg UnresolvedTokenTransferFeeArgs) Resolve(fallbacks TokenTransferFeeConfig) *TokenTransferFeeConfig {
 	return &TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: cfg.DefaultFinalityTransferFeeBps.Infer(fallbacks.DefaultFinalityTransferFeeBps),
-		CustomFinalityTransferFeeBps:  cfg.CustomFinalityTransferFeeBps.Infer(fallbacks.CustomFinalityTransferFeeBps),
-		DefaultFinalityFeeUSDCents:    cfg.DefaultFinalityFeeUSDCents.Infer(fallbacks.DefaultFinalityFeeUSDCents),
-		CustomFinalityFeeUSDCents:     cfg.CustomFinalityFeeUSDCents.Infer(fallbacks.CustomFinalityFeeUSDCents),
-		DestBytesOverhead:             cfg.DestBytesOverhead.Infer(fallbacks.DestBytesOverhead),
-		DestGasOverhead:               cfg.DestGasOverhead.Infer(fallbacks.DestGasOverhead),
-		IsEnabled:                     cfg.IsEnabled.Infer(fallbacks.IsEnabled),
+		DefaultFinalityTransferFeeBps: cfg.DefaultFinalityTransferFeeBps.GetOrDefault(fallbacks.DefaultFinalityTransferFeeBps),
+		CustomFinalityTransferFeeBps:  cfg.CustomFinalityTransferFeeBps.GetOrDefault(fallbacks.CustomFinalityTransferFeeBps),
+		DefaultFinalityFeeUSDCents:    cfg.DefaultFinalityFeeUSDCents.GetOrDefault(fallbacks.DefaultFinalityFeeUSDCents),
+		CustomFinalityFeeUSDCents:     cfg.CustomFinalityFeeUSDCents.GetOrDefault(fallbacks.CustomFinalityFeeUSDCents),
+		DestBytesOverhead:             cfg.DestBytesOverhead.GetOrDefault(fallbacks.DestBytesOverhead),
+		DestGasOverhead:               cfg.DestGasOverhead.GetOrDefault(fallbacks.DestGasOverhead),
+		IsEnabled:                     cfg.IsEnabled.GetOrDefault(fallbacks.IsEnabled),
 	}
 }
 
@@ -158,8 +158,8 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 						feeConfigSettings[pool.PoolAddress][dst.Selector] = args
 					}
 				}
-				if pool.MinBlockConfirmations.Valid {
-					minBlocksSettings[pool.PoolAddress] = pool.MinBlockConfirmations.Value
+				if minBlockConfirmations, ok := pool.MinBlockConfirmations.Get(); ok {
+					minBlocksSettings[pool.PoolAddress] = minBlockConfirmations
 				}
 			}
 
@@ -226,7 +226,7 @@ func inferTokenTransferFeeArgs(adapter TokenFeeAdapter, e deployment.Environment
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and pool %s is not set on-chain; using adapter defaults: %+v", src, dst, poolAddress, fallbacks)
 	}
 
-	return cfg.Settings.Infer(fallbacks), nil
+	return cfg.Settings.Resolve(fallbacks), nil
 }
 
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeConfig)) TokenTransferFeeConfig {

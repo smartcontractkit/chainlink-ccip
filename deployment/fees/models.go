@@ -28,14 +28,14 @@ type UnresolvedTokenTransferFeeArgs struct {
 	IsEnabled         utils.Optional[bool]   `json:"isEnabled" yaml:"isEnabled"`
 }
 
-// Infer fills in any unset fields in the unresolved configuration using the provided fallback values.
-func (cfg UnresolvedTokenTransferFeeArgs) Infer(fallbacks TokenTransferFeeArgs) *TokenTransferFeeArgs {
+// Resolve fills in any unset fields in the unresolved configuration using the provided fallback values.
+func (cfg UnresolvedTokenTransferFeeArgs) Resolve(fallbacks TokenTransferFeeArgs) *TokenTransferFeeArgs {
 	return &TokenTransferFeeArgs{
-		DestBytesOverhead: cfg.DestBytesOverhead.Infer(fallbacks.DestBytesOverhead),
-		DestGasOverhead:   cfg.DestGasOverhead.Infer(fallbacks.DestGasOverhead),
-		MinFeeUSDCents:    cfg.MinFeeUSDCents.Infer(fallbacks.MinFeeUSDCents),
-		MaxFeeUSDCents:    cfg.MaxFeeUSDCents.Infer(fallbacks.MaxFeeUSDCents),
-		IsEnabled:         cfg.IsEnabled.Infer(fallbacks.IsEnabled),
-		DeciBps:           cfg.DeciBps.Infer(fallbacks.DeciBps),
+		DestBytesOverhead: cfg.DestBytesOverhead.GetOrDefault(fallbacks.DestBytesOverhead),
+		DestGasOverhead:   cfg.DestGasOverhead.GetOrDefault(fallbacks.DestGasOverhead),
+		MinFeeUSDCents:    cfg.MinFeeUSDCents.GetOrDefault(fallbacks.MinFeeUSDCents),
+		MaxFeeUSDCents:    cfg.MaxFeeUSDCents.GetOrDefault(fallbacks.MaxFeeUSDCents),
+		IsEnabled:         cfg.IsEnabled.GetOrDefault(fallbacks.IsEnabled),
+		DeciBps:           cfg.DeciBps.GetOrDefault(fallbacks.DeciBps),
 	}
 }

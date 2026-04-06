@@ -129,8 +129,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				}
 
 				// Normalize fee contract version to major.minor.0 for adapter lookup, as patch versions should not affect compatibility
-				v := feeContractRef.Version
-				lookupVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()))
+				lookupVersion := utils.StripPatchVersion(feeContractRef.Version)
 
 				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
 				if !exists {
@@ -207,5 +206,5 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
-	return cfg.FeeArgs.Infer(fallbacks), nil
+	return cfg.FeeArgs.Resolve(fallbacks), nil
 }

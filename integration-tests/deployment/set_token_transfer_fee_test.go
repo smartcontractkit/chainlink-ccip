@@ -125,10 +125,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.Optional[uint32]{
-											Value: 120_000,
-											Valid: true,
-										},
+										DestGasOverhead: utils.NewOptional(uint32(150_000)),
 									},
 								},
 							},
@@ -145,10 +142,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: dstLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.Optional[uint32]{
-											Value: 150_000,
-											Valid: true,
-										},
+										DestGasOverhead: utils.NewOptional(uint32(150_000)),
 									},
 								},
 							},
@@ -369,10 +363,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.Optional[uint32]{
-											Value: 150_000,
-											Valid: true,
-										},
+										DestGasOverhead: utils.NewOptional(uint32(150_000)),
 									},
 								},
 							},
@@ -389,10 +380,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 									Address: dstLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.Optional[uint32]{
-											Value: 150_000,
-											Valid: true,
-										},
+										DestGasOverhead: utils.NewOptional(uint32(150_000)),
 									},
 								},
 							},
@@ -591,16 +579,13 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolA.Hex(),
-							MinBlockConfirmations: utils.Optional[uint16]{Value: 12, Valid: true},
+							MinBlockConfirmations: utils.NewOptional(uint16(12)),
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
 									Selector: evmChainSelB,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.Optional[uint32]{
-											Value: 150_000,
-											Valid: true,
-										},
+										DestGasOverhead: utils.NewOptional(uint32(150_000)),
 									},
 								},
 							},
@@ -618,10 +603,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 									IsReset:  false,
 									Selector: evmChainSelA,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.Optional[uint32]{
-											Value: 150_000,
-											Valid: true,
-										},
+										DestGasOverhead: utils.NewOptional(uint32(150_000)),
 									},
 								},
 							},
