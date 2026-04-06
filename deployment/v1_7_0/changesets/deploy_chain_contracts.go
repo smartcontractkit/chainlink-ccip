@@ -179,6 +179,16 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				}
 			}
 
+			if feeAgg, ok := cfg.Cfg.Topology.GetFeeAggregator(sel); ok {
+				input.ContractParams.OnRamp.FeeAggregator = feeAgg
+				for i := range input.ContractParams.CommitteeVerifiers {
+					input.ContractParams.CommitteeVerifiers[i].FeeAggregator = feeAgg
+				}
+				for i := range input.ContractParams.Executors {
+					input.ContractParams.Executors[i].DynamicConfig.FeeAggregator = feeAgg
+				}
+			}
+
 			e.Logger.Infow(
 				"Deploying chain contracts with topology-derived committee verifiers",
 				"chain", sel,
@@ -254,13 +264,8 @@ func BuildCommitteeVerifierParams(
 			return nil, fmt.Errorf("committee %q has nil VerifierVersion", qualifier)
 		}
 
-		if chainCfg.FeeAggregator == "" {
-			return nil, fmt.Errorf("committee %q: FeeAggregator is required", qualifier)
-		}
-
 		params = append(params, adapters.CommitteeVerifierDeployParams{
 			Version:          committee.VerifierVersion,
-			FeeAggregator:    chainCfg.FeeAggregator,
 			AllowlistAdmin:   chainCfg.AllowlistAdmin,
 			StorageLocations: committee.StorageLocations,
 			Qualifier:        qualifier,

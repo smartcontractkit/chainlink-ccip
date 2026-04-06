@@ -18,11 +18,12 @@ import (
 // from the datastore. This serves as the single source of truth for the desired state of both off-chain
 // (job specs) and on-chain (committee contracts) configuration.
 type EnvironmentTopology struct {
-	IndexerAddress []string                      `toml:"indexer_address"`
-	PyroscopeURL   string                        `toml:"pyroscope_url"`
-	Monitoring     MonitoringConfig              `toml:"monitoring"`
-	NOPTopology    *NOPTopology                  `toml:"nop_topology"`
-	ExecutorPools  map[string]ExecutorPoolConfig `toml:"executor_pools"`
+	IndexerAddress  []string                      `toml:"indexer_address"`
+	PyroscopeURL    string                        `toml:"pyroscope_url"`
+	FeeAggregators  map[string]string             `toml:"fee_aggregators,omitempty"`
+	Monitoring      MonitoringConfig              `toml:"monitoring"`
+	NOPTopology     *NOPTopology                  `toml:"nop_topology"`
+	ExecutorPools   map[string]ExecutorPoolConfig  `toml:"executor_pools"`
 }
 
 // NOPTopology defines the node operator structure and committee membership.
@@ -107,7 +108,6 @@ type CommitteeConfig struct {
 type ChainCommitteeConfig struct {
 	NOPAliases     []string `toml:"nop_aliases"`
 	Threshold      uint8    `toml:"threshold"`
-	FeeAggregator  string   `toml:"fee_aggregator,omitempty"`
 	AllowlistAdmin string   `toml:"allowlist_admin,omitempty"`
 }
 
@@ -202,6 +202,19 @@ func (c *EnvironmentTopology) Validate() error {
 			return fmt.Errorf("duplicate indexer_address found: %q", addr)
 		}
 		addressSet[addr] = struct{}{}
+	}
+
+	for chainKey, addr := range c.FeeAggregators {
+		parsed, err := strconv.ParseUint(chainKey, 10, 64)
+		if err != nil {
+			return fmt.Errorf("fee_aggregators has invalid chain selector key %q: %w", chainKey, err)
+		}
+		if chainKey != strconv.FormatUint(parsed, 10) {
+			return fmt.Errorf("fee_aggregators key %q must be canonical (use %q)", chainKey, strconv.FormatUint(parsed, 10))
+		}
+		if addr == "" {
+			return fmt.Errorf("fee_aggregators has empty address for chain selector %q", chainKey)
+		}
 	}
 
 	if err := c.NOPTopology.Validate(); err != nil {
@@ -299,6 +312,14 @@ func (p *ExecutorPoolConfig) Validate(poolName string, topology *NOPTopology) er
 		}
 	}
 	return nil
+}
+
+func (c *EnvironmentTopology) GetFeeAggregator(chainSelector uint64) (string, bool) {
+	if c == nil || c.FeeAggregators == nil {
+		return "", false
+	}
+	addr, ok := c.FeeAggregators[strconv.FormatUint(chainSelector, 10)]
+	return addr, ok && addr != ""
 }
 
 func (c *EnvironmentTopology) GetNOPsForPool(poolName string) ([]string, error) {
