@@ -39,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
@@ -60,6 +61,8 @@ func init() {
 	ccvadapters.GetIndexerConfigRegistry().Register(chainsel.FamilyEVM, &EVMIndexerConfigAdapter{})
 	ccvadapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyEVM, &EVMAggregatorConfigAdapter{})
 	ccvadapters.GetTokenVerifierConfigRegistry().Register(chainsel.FamilyEVM, &EVMTokenVerifierConfigAdapter{})
+
+	tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())
 }
 
 func registerContractVerificationMetadata(v *semver.Version) {
