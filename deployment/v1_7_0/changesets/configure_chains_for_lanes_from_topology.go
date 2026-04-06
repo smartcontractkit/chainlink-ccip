@@ -72,11 +72,10 @@ type PartialChainConfig struct {
 }
 
 type ConfigureChainsForLanesFromTopologyConfig struct {
-	Topology            *offchain.EnvironmentTopology
-	Chains              []PartialChainConfig
-	MCMS                mcms.Input
-	UseTestRouter       bool
-	AllowOnrampOverride bool
+	Topology      *offchain.EnvironmentTopology
+	Chains        []PartialChainConfig
+	MCMS          mcms.Input
+	UseTestRouter bool
 }
 
 // enrichedChainConfig is the internal representation of a chain config after the
@@ -211,7 +210,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.MCMS, cfg.UseTestRouter, cfg.AllowOnrampOverride)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.MCMS, cfg.UseTestRouter)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -235,7 +234,6 @@ func applyConfigureChains(
 	chains []enrichedChainConfig,
 	mcmsInput mcms.Input,
 	useTestRouter bool,
-	allowOnrampOverride bool,
 ) (deployment.ChangesetOutput, error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -317,7 +315,7 @@ func applyConfigureChains(
 		// ── Phase 3: Dispatch ──────────────────────────────────────────────
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
 			ChainSelector:       chainCfg.ChainSelector,
-			AllowOnrampOverride: allowOnrampOverride,
+			AllowOnrampOverride: useTestRouter,
 			Router:              routerAddr,
 			OnRamp:              fmt.Sprintf("0x%x", onRampBytes),
 			CommitteeVerifiers:  committeeVerifiers,
