@@ -181,7 +181,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		if err != nil {
 			return 0, messageID, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
 		}
-		if msg.FeeToken == (common.Address{}) {
+		if msg.FeeToken == (common.Address{}) || msg.FeeToken == common.HexToAddress(a.NativeFeeToken()) {
 			sender.Value = fee
 		} else {
 			err := a.AllowRouterToWithdrawTokens(ctx, msg.FeeToken.Hex(), new(big.Int).Add(fee, fee)) // approve 2x the fee to be safe
