@@ -109,15 +109,23 @@ func VerifyDeployedContractsPostHookForMultipleChainFamilies(dom domain.Domain, 
 }
 
 // NewVerifyDeployedContractsPostHook returns a post-apply hook that verifies deployed contracts using a single chain-family verifier (e.g. EVM).
+// The hook will verify all contracts in the datastore created by changeset output
+// The addresses should match the criteria defined by the verifier's NeedsVerification and ForEachNetwork methods, for each network supported by the verifier's FilterNetworks method.
 func NewVerifyDeployedContractsPostHook(dom domain.Domain, verifier ContractVerification) changeset.PostHook {
 	return verifyDeployedContractsPostHook(dom, verifier)
 }
 
 // NewRequireVerifiedEnvContractsPreHook returns a pre-apply hook that requires contracts to already be verified on block explorers.
+// The hook will check all contracts in the datastore for given selectors and address refs before changeset execution, and
+// fail if any contract that matches the criteria defined by the verifier's NeedsVerification and ForEachNetwork methods is not verified on explorers.
 func NewRequireVerifiedEnvContractsPreHook(dom domain.Domain, verifier ContractVerification, refsToVerify []datastore.AddressRef, selectors []uint64) changeset.PreHook {
 	return requireVerifiedEnvContractsPreHook(dom, verifier, refsToVerify, selectors)
 }
 
+// RequireVerifiedEnvContractsPreHookForMultipleChainFamilies returns a slice of pre-apply hooks that requires contracts to already be verified on block explorers, using chain-family verifiers (e.g. EVM).
+// If multiple chain selectors from the same family are provided, only one hook will be returned for that family to avoid redundant verification.
+// The hooks will check all contracts in the datastore for given selectors and address refs before changeset execution, and
+// fail if any contract that matches the criteria defined by the verifier's NeedsVerification and ForEachNetwork methods is not verified on explorers.
 func RequireVerifiedEnvContractsPreHookForMultipleChainFamilies(dom domain.Domain, chainSelectors []uint64, refsToVerify []datastore.AddressRef) []changeset.PreHook {
 	preHooksByFamily := make(map[string]changeset.PreHook)
 	chainselectorsByFamily := make(map[string][]uint64)

@@ -11,15 +11,6 @@ import (
 
 	mcmsbindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	versioned_verifier_resolverops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
-	cctp_through_ccv_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	cctp_verifierops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
-	committee_verifierops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
-	executorops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
-	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/mock_receiver"
-	usdc_token_pool_proxyops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	token_admin_registry_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -28,6 +19,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	rmn_remoteops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -53,22 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
-	burn_from_mint_token_pool_v2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_from_mint_token_pool"
-	burn_mint_token_pool_v2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_token_pool"
-	burn_mint_with_lock_release_flag_token_pool_v2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_with_lock_release_flag_token_pool"
-	burn_with_from_mint_token_pool_v2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_with_from_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
-	v2_0_0_fee_quoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
-	lock_release_token_pool_v2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
-	offramp_2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
-	v2_0_0_onramp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -85,7 +61,6 @@ func RegisterContractMetadata(contractType cldf.ContractType, version *semver.Ve
 }
 
 var (
-	Version2_0_0 = semver.MustParse("2.0.0").String()
 	Version1_0_0 = semver.MustParse("1.0.0").String()
 	Version1_2_0 = semver.MustParse("1.2.0").String()
 	Version1_5_0 = semver.MustParse("1.5.0").String()
@@ -94,13 +69,6 @@ var (
 	Version1_6_1 = semver.MustParse("1.6.1").String()
 	Version1_6_2 = semver.MustParse("1.6.2").String()
 	Version1_6_3 = semver.MustParse("1.6.3").String()
-)
-
-const (
-// TODO: Must be defined here because we currently can't import chainlink-ccip/ccv/chains/evm/deployment
-// from the develop branch without causing import issues within this domain.
-// Ideally we import contract types from the ops packages (i.e. chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/...).
-
 )
 
 // contracts maps type & version of a contract to its corresponding standard JSON input, name, and bytecode.
@@ -166,12 +134,6 @@ var (
 				bytecode:                  fee_quoter.FeeQuoterBin,
 				name:                      "contracts/FeeQuoter.sol:FeeQuoter",
 			},
-
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: v2_0_0_fee_quoter.SolidityStandardInput,
-				bytecode:                  v2_0_0_fee_quoter.FeeQuoterBin,
-				name:                      "contracts/FeeQuoter.sol:FeeQuoter",
-			},
 		},
 		ccip_homeops.ContractType: {
 			Version1_6_0: rawContractInfo{
@@ -193,21 +155,11 @@ var (
 				bytecode:                  onramp.OnRampBin,
 				name:                      "contracts/onRamp/OnRamp.sol:OnRamp",
 			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: v2_0_0_onramp.SolidityStandardInput,
-				bytecode:                  v2_0_0_onramp.OnRampBin,
-				name:                      "contracts/onRamp/OnRamp.sol:OnRamp",
-			},
 		},
 		offrampops.ContractType: {
 			Version1_6_0: rawContractInfo{
 				solidityStandardJSONInput: offramp.SolidityStandardInput,
 				bytecode:                  offramp.OffRampBin,
-				name:                      "contracts/offRamp/OffRamp.sol:OffRamp",
-			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: offramp_2_0_0.SolidityStandardInput,
-				bytecode:                  offramp_2_0_0.OffRampBin,
 				name:                      "contracts/offRamp/OffRamp.sol:OffRamp",
 			},
 		},
@@ -234,21 +186,11 @@ var (
 				bytecode:                  v1_6_1_BurnMintTokenPool.BurnMintTokenPoolBin,
 				name:                      "contracts/pools/BurnMintTokenPool.sol:BurnMintTokenPool",
 			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: burn_mint_token_pool_v2_0_0.SolidityStandardInput,
-				bytecode:                  burn_mint_token_pool_v2_0_0.BurnMintTokenPoolBin,
-				name:                      "contracts/pools/BurnMintTokenPool.sol:BurnMintTokenPool",
-			},
 		},
 		utils.BurnWithFromMintTokenPool: {
 			Version1_5_1: rawContractInfo{
 				solidityStandardJSONInput: burn_with_from_mint_token_pool.SolidityStandardInput,
 				bytecode:                  burn_with_from_mint_token_pool.BurnWithFromMintTokenPoolBin,
-				name:                      "contracts/pools/BurnWithFromMintTokenPool.sol:BurnWithFromMintTokenPool",
-			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: burn_with_from_mint_token_pool_v2_0_0.SolidityStandardInput,
-				bytecode:                  burn_with_from_mint_token_pool_v2_0_0.BurnWithFromMintTokenPoolBin,
 				name:                      "contracts/pools/BurnWithFromMintTokenPool.sol:BurnWithFromMintTokenPool",
 			},
 		},
@@ -258,21 +200,11 @@ var (
 				bytecode:                  burn_mint_with_lock_release_flag_token_pool.BurnMintWithLockReleaseFlagTokenPoolBin,
 				name:                      "contracts/pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol:BurnMintWithLockReleaseFlagTokenPool",
 			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: burn_mint_with_lock_release_flag_token_pool_v2_0_0.SolidityStandardInput,
-				bytecode:                  burn_mint_with_lock_release_flag_token_pool_v2_0_0.BurnMintWithLockReleaseFlagTokenPoolBin,
-				name:                      "contracts/pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol:BurnMintWithLockReleaseFlagTokenPool",
-			},
 		},
 		utils.BurnFromMintTokenPool: {
 			Version1_5_1: rawContractInfo{
 				solidityStandardJSONInput: burn_from_mint_token_pool.SolidityStandardInput,
 				bytecode:                  burn_from_mint_token_pool.BurnFromMintTokenPoolBin,
-				name:                      "contracts/pools/BurnFromMintTokenPool.sol:BurnFromMintTokenPool",
-			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: burn_from_mint_token_pool_v2_0_0.SolidityStandardInput,
-				bytecode:                  burn_from_mint_token_pool_v2_0_0.BurnFromMintTokenPoolBin,
 				name:                      "contracts/pools/BurnFromMintTokenPool.sol:BurnFromMintTokenPool",
 			},
 		},
@@ -285,11 +217,6 @@ var (
 			Version1_6_1: rawContractInfo{
 				solidityStandardJSONInput: v1_6_1_LockReleaseTokenPool.SolidityStandardInput,
 				bytecode:                  v1_6_1_LockReleaseTokenPool.LockReleaseTokenPoolBin,
-				name:                      "contracts/pools/LockReleaseTokenPool.sol:LockReleaseTokenPool",
-			},
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: lock_release_token_pool_v2_0_0.SolidityStandardInput,
-				bytecode:                  lock_release_token_pool_v2_0_0.LockReleaseTokenPoolBin,
 				name:                      "contracts/pools/LockReleaseTokenPool.sol:LockReleaseTokenPool",
 			},
 		},
@@ -343,69 +270,6 @@ var (
 				solidityStandardJSONInput: hybrid_with_external_minter_token_pool.SolidityStandardInput,
 				bytecode:                  hybrid_with_external_minter_token_pool.HybridWithExternalMinterTokenPoolBin,
 				name:                      "contracts/stablecoin-governor/HybridWithExternalMinterTokenPool.sol:HybridWithExternalMinterTokenPool",
-			},
-		},
-		versioned_verifier_resolverops.CommitteeVerifierResolverType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: versioned_verifier_resolver.SolidityStandardInput,
-				bytecode:                  versioned_verifier_resolver.VersionedVerifierResolverBin,
-				name:                      "contracts/ccvs/VersionedVerifierResolver.sol:VersionedVerifierResolver",
-			},
-		},
-		versioned_verifier_resolverops.CCTPVerifierResolverType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: versioned_verifier_resolver.SolidityStandardInput,
-				bytecode:                  versioned_verifier_resolver.VersionedVerifierResolverBin,
-				name:                      "contracts/ccvs/VersionedVerifierResolver.sol:VersionedVerifierResolver",
-			},
-		},
-		cctp_verifierops.ContractType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: cctp_verifier.SolidityStandardInput,
-				bytecode:                  cctp_verifier.CCTPVerifierBin,
-				name:                      "contracts/ccvs/CCTPVerifier.sol:CCTPVerifier",
-			},
-		},
-		cctp_through_ccv_token_pool_ops.ContractType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: cctp_through_ccv_token_pool.SolidityStandardInput,
-				bytecode:                  cctp_through_ccv_token_pool.CCTPThroughCCVTokenPoolBin,
-				name:                      "contracts/pools/USDC/CCTPThroughCCVTokenPool.sol:CCTPThroughCCVTokenPool",
-			},
-		},
-		usdc_token_pool_proxyops.ContractType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: usdc_token_pool_proxy.SolidityStandardInput,
-				bytecode:                  usdc_token_pool_proxy.USDCTokenPoolProxyBin,
-				name:                      "contracts/pools/USDC/USDCTokenPoolProxy.sol:USDCTokenPoolProxy",
-			},
-		},
-		mock_receiver.ContractType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: mock_receiver_v2.SolidityStandardInput,
-				bytecode:                  mock_receiver_v2.MockReceiverV2Bin,
-				name:                      "contracts/test/mocks/MockReceiverV2.sol:MockReceiverV2",
-			},
-		},
-		executorops.ContractType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: executor.SolidityStandardInput,
-				bytecode:                  executor.ExecutorBin,
-				name:                      "contracts/executor/Executor.sol:Executor",
-			},
-		},
-		seq1_7.ExecutorProxyType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: proxy.SolidityStandardInput,
-				bytecode:                  proxy.ProxyBin,
-				name:                      "contracts/Proxy.sol:Proxy",
-			},
-		},
-		committee_verifierops.ContractType: {
-			Version2_0_0: rawContractInfo{
-				solidityStandardJSONInput: committee_verifier.SolidityStandardInput,
-				bytecode:                  committee_verifier.CommitteeVerifierBin,
-				name:                      "contracts/ccvs/CommitteeVerifier.sol:CommitteeVerifier",
 			},
 		},
 		utils.LinkToken: {
