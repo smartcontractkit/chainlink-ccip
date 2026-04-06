@@ -87,9 +87,6 @@ func (r *ContractVerificationRegistry) Get(family string) (ContractVerification,
 func VerifyDeployedContractsPostHookForMultipleChainFamilies(dom domain.Domain, chainFamilies []string) []changeset.PostHook {
 	postHooksByFamily := make(map[string]changeset.PostHook)
 	for _, family := range chainFamilies {
-		if !isSelectorFamilySupported(family) {
-			panic(fmt.Sprintf("unsupported chain family %s for contract verification hook", family))
-		}
 		_, exists := postHooksByFamily[family]
 		if !exists {
 			verifier, ok := GetContractVerificationRegistry().Get(family)
@@ -409,16 +406,4 @@ func IterateVerifiers(
 func ResetContractVerificationRegistryForTest() {
 	singletonContractVerificationRegistry = newContractVerificationRegistry()
 	onceContractVerificationRegistry = sync.Once{}
-}
-
-func isSelectorFamilySupported(family string) bool {
-	switch family {
-	case chain_selectors.FamilyEVM, chain_selectors.FamilySolana, chain_selectors.FamilyStarknet,
-		chain_selectors.FamilyCosmos, chain_selectors.FamilyAptos, chain_selectors.FamilySui,
-		chain_selectors.FamilyTron, chain_selectors.FamilyTon, chain_selectors.FamilyCanton,
-		chain_selectors.FamilyStellar:
-		return true
-	default:
-		return false
-	}
 }
