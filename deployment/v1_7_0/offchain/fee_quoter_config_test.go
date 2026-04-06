@@ -203,6 +203,61 @@ func TestFeeQuoterTopology_ResolveFeeQuoterConfigForLane(t *testing.T) {
 			}(),
 		},
 		{
+			name: "source_chain_defaults overrides dest for network and default token fee",
+			topology: &FeeQuoterTopology{
+				FamilyDefaults: map[string]FeeQuoterDefaultConfig{
+					chainsel.FamilyEVM: evmDefault(),
+				},
+				DestChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					selectorKey(evmSelector2): {
+						NetworkFeeUSDCents:      ptr(uint16(50)),
+						DefaultTokenFeeUSDCents: ptr(uint16(40)),
+					},
+				},
+				SourceChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					selectorKey(evmSelector1): {
+						NetworkFeeUSDCents:      ptr(uint16(77)),
+						DefaultTokenFeeUSDCents: ptr(uint16(88)),
+					},
+				},
+			},
+			srcSelector:  evmSelector1,
+			destSelector: evmSelector2,
+			expected: func() FeeQuoterDefaultConfig {
+				c := evmDefault()
+				c.NetworkFeeUSDCents = 77
+				c.DefaultTokenFeeUSDCents = 88
+				return c
+			}(),
+		},
+		{
+			name: "lane override wins over source_chain_defaults for same field",
+			topology: &FeeQuoterTopology{
+				FamilyDefaults: map[string]FeeQuoterDefaultConfig{
+					chainsel.FamilyEVM: evmDefault(),
+				},
+				SourceChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					selectorKey(evmSelector1): {
+						NetworkFeeUSDCents: ptr(uint16(77)),
+					},
+				},
+				LaneDefaults: map[string]map[string]*FeeQuoterOverrideConfig{
+					selectorKey(evmSelector1): {
+						selectorKey(evmSelector2): {
+							NetworkFeeUSDCents: ptr(uint16(99)),
+						},
+					},
+				},
+			},
+			srcSelector:  evmSelector1,
+			destSelector: evmSelector2,
+			expected: func() FeeQuoterDefaultConfig {
+				c := evmDefault()
+				c.NetworkFeeUSDCents = 99
+				return c
+			}(),
+		},
+		{
 			name: "lane override without dest chain override",
 			topology: &FeeQuoterTopology{
 				FamilyDefaults: map[string]FeeQuoterDefaultConfig{
@@ -241,6 +296,31 @@ func TestFeeQuoterTopology_ResolveFeeQuoterConfigForLane(t *testing.T) {
 			srcSelector:  evmSelector3,
 			destSelector: evmSelector2,
 			expected:     evmDefault(),
+		},
+		{
+			name: "different src selector does not pick up source_chain_defaults",
+			topology: &FeeQuoterTopology{
+				FamilyDefaults: map[string]FeeQuoterDefaultConfig{
+					chainsel.FamilyEVM: evmDefault(),
+				},
+				DestChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					selectorKey(evmSelector2): {
+						NetworkFeeUSDCents: ptr(uint16(50)),
+					},
+				},
+				SourceChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					selectorKey(evmSelector1): {
+						NetworkFeeUSDCents: ptr(uint16(77)),
+					},
+				},
+			},
+			srcSelector:  evmSelector3,
+			destSelector: evmSelector2,
+			expected: func() FeeQuoterDefaultConfig {
+				c := evmDefault()
+				c.NetworkFeeUSDCents = 50
+				return c
+			}(),
 		},
 		{
 			name: "missing family default returns error",
@@ -345,7 +425,19 @@ func TestFeeQuoterTopology_Validate(t *testing.T) {
 					"not-a-number": {},
 				},
 			},
-			expectErr: "invalid chain selector key",
+			expectErr: "fee_quoter.dest_chain_defaults",
+		},
+		{
+			name: "invalid source chain selector key rejected",
+			topology: &FeeQuoterTopology{
+				FamilyDefaults: map[string]FeeQuoterDefaultConfig{
+					chainsel.FamilyEVM: validDefault,
+				},
+				SourceChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					"not-a-number": {},
+				},
+			},
+			expectErr: "fee_quoter.source_chain_defaults",
 		},
 		{
 			name: "invalid lane source key rejected",
@@ -383,6 +475,9 @@ func TestFeeQuoterTopology_Validate(t *testing.T) {
 				},
 				DestChainDefaults: map[string]*FeeQuoterOverrideConfig{
 					"12345": {MaxDataBytes: ptr(uint32(50_000))},
+				},
+				SourceChainDefaults: map[string]*FeeQuoterOverrideConfig{
+					"11111": {NetworkFeeUSDCents: ptr(uint16(15))},
 				},
 				LaneDefaults: map[string]map[string]*FeeQuoterOverrideConfig{
 					"12345": {

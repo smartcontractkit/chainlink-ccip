@@ -725,6 +725,95 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 		"UseTestRouter=true should set AllowOnrampOverride=true on sequence input")
 }
 
+func TestConfigureChainsForLanesFromTopology_OverrideExistingFeeQuoterConfig_propagatesToSequenceInput(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	tests := []struct {
+		name               string
+		overrideExisting   bool
+		wantOverrideConfig bool
+	}{
+		{
+			name:               "true sets FeeQuoterDestChainConfig.OverrideExistingConfig on sequence input",
+			overrideExisting:   true,
+			wantOverrideConfig: true,
+		},
+		{
+			name:               "false leaves FeeQuoterDestChainConfig.OverrideExistingConfig false",
+			overrideExisting:   false,
+			wantOverrideConfig: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+			ds := datastore.NewMemoryDataStore()
+			addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+			env.DataStore = ds.Seal()
+
+			committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+			committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+				contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+					fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+				},
+			})
+
+			evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+				localSelector: {
+					"Router": {0xaa, 0x01}, "OnRamp": {0xaa, 0x02}, "FeeQuoter": {0xaa, 0x03}, "OffRamp": {0xaa, 0x04},
+				},
+				remoteSelector: {
+					"OnRamp": {0xcc, 0x01}, "OffRamp": {0xcc, 0x02},
+				},
+			}, map[uint64]map[string]string{
+				localSelector: {"default": "0xexecutor"},
+			})
+			registry := adapters.NewChainFamilyRegistry()
+			registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+			cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+			_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+				Topology: &offchain.EnvironmentTopology{
+					NOPTopology: &offchain.NOPTopology{
+						NOPs: []offchain.NOPConfig{
+							{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+						},
+						Committees: map[string]offchain.CommitteeConfig{
+							"default": {
+								Qualifier: "default",
+								ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+									fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+								},
+							},
+						},
+					},
+					FeeQuoter: testFeeQuoterTopologyEVM(),
+				},
+				Chains: []changesets.PartialChainConfig{
+					{
+						ChainSelector: localSelector,
+						CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+							{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
+						},
+						RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+							remoteSelector: {
+								DefaultExecutorQualifier:        "default",
+								OverrideExistingFeeQuoterConfig: tc.overrideExisting,
+							},
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			require.Len(t, evmAdapter.inputs, 1)
+			fq := evmAdapter.inputs[0].RemoteChains[remoteSelector].FeeQuoterDestChainConfig
+			assert.Equal(t, tc.wantOverrideConfig, fq.OverrideExistingConfig)
+		})
+	}
+}
+
 func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(t *testing.T) {
 	localSelector := chainsel.TEST_90000001.Selector
 	remoteSelector := chainsel.TEST_90000002.Selector

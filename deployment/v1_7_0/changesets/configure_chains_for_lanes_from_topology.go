@@ -41,7 +41,9 @@ type CommitteeVerifierInputConfig struct {
 // PartialRemoteChainConfig is the user-facing input for a single remote chain. Contract
 // addresses that can be derived from the datastore (remote OnRamp/OffRamp, local Executor)
 // are resolved automatically — the user only provides the executor qualifier and lane-specific
-// configuration values.
+// configuration values. Fee quoter numeric fields come from EnvironmentTopology.FeeQuoter;
+// OverrideExistingFeeQuoterConfig is the only fee-quoter knob here: when true, the on-chain
+// sequence may replace an existing dest-chain row instead of skipping it.
 type PartialRemoteChainConfig struct {
 	AllowTrafficFrom                *bool
 	DefaultExecutorQualifier        string

@@ -25,8 +25,8 @@ type FeeQuoterDefaultConfig struct {
 	USDPerUnitGas               int64  `toml:"usd_per_unit_gas"`
 }
 
-// FeeQuoterOverrideConfig is a partial fee quoter configuration used for dest-chain-level
-// and lane-level overrides. Nil pointer fields inherit from the lower-priority level.
+// FeeQuoterOverrideConfig is a partial fee quoter configuration used for dest-chain-level,
+// source-chain-level, and lane-level overrides. Nil pointer fields inherit from the lower-priority level.
 type FeeQuoterOverrideConfig struct {
 	IsEnabled                   *bool   `toml:"is_enabled,omitempty"`
 	MaxDataBytes                *uint32 `toml:"max_data_bytes,omitempty"`
@@ -84,18 +84,33 @@ func (c FeeQuoterDefaultConfig) ApplyOverride(o *FeeQuoterOverrideConfig) FeeQuo
 }
 
 // FeeQuoterTopology groups the hierarchical fee quoter configuration.
-// Resolution priority: family default (lowest) → dest chain override → lane override (highest).
+// Resolution priority: family default (lowest) → dest chain → source chain → lane (highest).
+//
+// When resolving a lane (local/source chain S → remote/destination chain D), the merged config is
+// built for configuring D on S's FeeQuoter. Use dest_chain_defaults for values shared by every
+// source that talks to D. Use source_chain_defaults for values that apply to every lane from S
+// (e.g. NetworkFeeUSDCents, DefaultTokenFeeUSDCents) and must override dest for that source.
+// Use lane_defaults for the most specific S→D-only tweaks.
 type FeeQuoterTopology struct {
-	FamilyDefaults    map[string]FeeQuoterDefaultConfig              `toml:"family_defaults"`
-	DestChainDefaults map[string]*FeeQuoterOverrideConfig            `toml:"dest_chain_defaults"`
-	LaneDefaults      map[string]map[string]*FeeQuoterOverrideConfig `toml:"lane_defaults"`
+	FamilyDefaults map[string]FeeQuoterDefaultConfig `toml:"family_defaults"`
+	// DestChainDefaults is keyed by destination chain selector (decimal string). The same entry
+	// applies to every lane whose remote chain is that selector, before source_chain_defaults and
+	// lane_defaults.
+	DestChainDefaults map[string]*FeeQuoterOverrideConfig `toml:"dest_chain_defaults"`
+	// SourceChainDefaults is keyed by source (local) chain selector (decimal string). Applies to
+	// every lane originating from that source; overrides dest_chain_defaults for the same field.
+	SourceChainDefaults map[string]*FeeQuoterOverrideConfig `toml:"source_chain_defaults"`
+	// LaneDefaults is keyed by source (local) chain selector, then destination chain selector.
+	// Overrides source_chain_defaults and dest_chain_defaults for the matching S→D lane.
+	LaneDefaults map[string]map[string]*FeeQuoterOverrideConfig `toml:"lane_defaults"`
 }
 
 // ResolveFeeQuoterConfigForLane resolves the fee quoter configuration for a specific lane
 // by layering overrides on top of the family default:
 //  1. Family default (all fields required, keyed by family name)
 //  2. Dest chain override (partial, keyed by dest chain selector)
-//  3. Lane override (partial, keyed by src→dest chain selector pair)
+//  3. Source chain override (partial, keyed by source chain selector; wins over dest for same field)
+//  4. Lane override (partial, keyed by src→dest chain selector pair)
 func (t *FeeQuoterTopology) ResolveFeeQuoterConfigForLane(srcSelector, destSelector uint64) (FeeQuoterDefaultConfig, error) {
 	if t == nil {
 		return FeeQuoterDefaultConfig{}, fmt.Errorf("fee quoter topology is nil")
@@ -117,6 +132,10 @@ func (t *FeeQuoterTopology) ResolveFeeQuoterConfigForLane(srcSelector, destSelec
 	}
 
 	srcKey := strconv.FormatUint(srcSelector, 10)
+	if srcOverride, ok := t.SourceChainDefaults[srcKey]; ok {
+		familyDefault = familyDefault.ApplyOverride(srcOverride)
+	}
+
 	if lanesByDest, ok := t.LaneDefaults[srcKey]; ok {
 		if laneOverride, ok := lanesByDest[destKey]; ok {
 			familyDefault = familyDefault.ApplyOverride(laneOverride)
@@ -154,6 +173,12 @@ func (t *FeeQuoterTopology) Validate() error {
 	for key := range t.DestChainDefaults {
 		if _, err := strconv.ParseUint(key, 10, 64); err != nil {
 			return fmt.Errorf("fee_quoter.dest_chain_defaults has invalid chain selector key %q: %w", key, err)
+		}
+	}
+
+	for key := range t.SourceChainDefaults {
+		if _, err := strconv.ParseUint(key, 10, 64); err != nil {
+			return fmt.Errorf("fee_quoter.source_chain_defaults has invalid chain selector key %q: %w", key, err)
 		}
 	}
 
