@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -350,57 +351,6 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 	return evm_tokens.MigrateLockReleasePoolLiquidity
 }
 
-// poolOpsV200 implements PoolOps using v2.0.0 token pool bindings.
-// Only GetToken and Version are called at runtime (by the inherited
-// DeriveTokenAddress and ManualRegistration); the other methods are
-// stubs because the v2.0.0 adapter overrides the methods that use them.
-type poolOpsV200 struct{}
-
-func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.Address) (common.Address, error) {
-	res, err := cldf_ops.ExecuteOperation(b,
-		token_pool.GetToken, ch,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: ch.Selector,
-			Address:       poolAddr,
-		},
-	)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("GetToken v2.0.0: %w", err)
-	}
-	return res.Output, nil
-}
-
-func (p *poolOpsV200) GetTokenDecimals(_ context.Context, _ evm.Chain, _ common.Address) (uint8, error) {
-	return 0, errors.New("poolOpsV200.GetTokenDecimals: not used; v2.0.0 adapter overrides DeriveTokenDecimals")
-}
-
-func (p *poolOpsV200) GetPoolAdmins(_ context.Context, _ *evm.Chain, _ common.Address) (common.Address, common.Address, error) {
-	return common.Address{}, common.Address{}, errors.New("poolOpsV200.GetPoolAdmins: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
-}
-
-func (p *poolOpsV200) SetRateLimiterConfig(_ cldf_ops.Bundle, _ evm.Chain, _ common.Address, _ uint64, _, _ tokens.RateLimiterConfig) (contract.WriteOutput, error) {
-	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimiterConfig: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
-}
-
-func (p *poolOpsV200) Version() *semver.Version {
-	return cciputils.Version_2_0_0
-}
-
-func isBurnMintPoolType(poolType deployment.ContractType) bool {
-	return poolType == cciputils.BurnMintTokenPool ||
-		poolType == cciputils.BurnFromMintTokenPool ||
-		poolType == cciputils.BurnWithFromMintTokenPool
-}
-
-func isLockReleasePoolType(poolType deployment.ContractType) bool {
-	return poolType == cciputils.LockReleaseTokenPool ||
-		poolType == siloed_lock_release_token_pool.ContractType
-}
-
-func isBurnMintTokenType(typ datastore.ContractType) bool {
-	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
-}
-
 func (t *TokenAdapter) SetMinBlockConfirmations(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetMinBlockConfirmationsSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.SetMinBlockConfirmationsForTokenPools
 }
@@ -452,4 +402,55 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 		DestGasOverhead:               report.Output.DestGasOverhead,
 		IsEnabled:                     report.Output.IsEnabled,
 	}, nil
+}
+
+// poolOpsV200 implements PoolOps using v2.0.0 token pool bindings.
+// Only GetToken and Version are called at runtime (by the inherited
+// DeriveTokenAddress and ManualRegistration); the other methods are
+// stubs because the v2.0.0 adapter overrides the methods that use them.
+type poolOpsV200 struct{}
+
+func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.Address) (common.Address, error) {
+	res, err := cldf_ops.ExecuteOperation(b,
+		token_pool.GetToken, ch,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: ch.Selector,
+			Address:       poolAddr,
+		},
+	)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("GetToken v2.0.0: %w", err)
+	}
+	return res.Output, nil
+}
+
+func (p *poolOpsV200) GetTokenDecimals(_ context.Context, _ evm.Chain, _ common.Address) (uint8, error) {
+	return 0, errors.New("poolOpsV200.GetTokenDecimals: not used; v2.0.0 adapter overrides DeriveTokenDecimals")
+}
+
+func (p *poolOpsV200) GetPoolAdmins(_ context.Context, _ *evm.Chain, _ common.Address) (common.Address, common.Address, error) {
+	return common.Address{}, common.Address{}, errors.New("poolOpsV200.GetPoolAdmins: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+}
+
+func (p *poolOpsV200) SetRateLimiterConfig(_ cldf_ops.Bundle, _ evm.Chain, _ common.Address, _ uint64, _, _ tokens.RateLimiterConfig) (contract.WriteOutput, error) {
+	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimiterConfig: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+}
+
+func (p *poolOpsV200) Version() *semver.Version {
+	return cciputils.Version_2_0_0
+}
+
+func isBurnMintPoolType(poolType deployment.ContractType) bool {
+	return poolType == cciputils.BurnMintTokenPool ||
+		poolType == cciputils.BurnFromMintTokenPool ||
+		poolType == cciputils.BurnWithFromMintTokenPool
+}
+
+func isLockReleasePoolType(poolType deployment.ContractType) bool {
+	return poolType == cciputils.LockReleaseTokenPool ||
+		poolType == siloed_lock_release_token_pool.ContractType
+}
+
+func isBurnMintTokenType(typ datastore.ContractType) bool {
+	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
 }

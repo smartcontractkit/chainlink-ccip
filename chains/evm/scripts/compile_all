@@ -76,6 +76,9 @@ function getOptimizations() {
       "SiloedUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
         ;;
+      "CrossChainPoolToken")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+        ;;
     esac
 
     echo "$optimize_runs_override"
@@ -96,13 +99,12 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
-compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
 compileContract rmn/RMNRemote
 compileContract rmn/RMNProxy
 
 if [ "$ZKSYNC" != "true" ]; then
   compileContract CREATE2Factory
-  compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
+  compileContract TokenPoolFactory
 fi
 
 # Pools
@@ -120,8 +122,11 @@ compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 compileContract pools/USDC/CCTPThroughCCVTokenPool
 compileContract pools/Lombard/LombardTokenPool
+compileContract pools/CrossChainPoolToken
 compileContract pools/AdvancedPoolHooks
 compileContract pools/extractors/AdvancedPoolHooksExtractor
+
+compileContract tokens/CrossChainToken
 
 # Test helpers
 compileContract test/helpers/USDCReaderTester
