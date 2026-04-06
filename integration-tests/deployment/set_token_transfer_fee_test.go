@@ -125,7 +125,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 									Address: srcLinkRef.Address,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.NewOptional(uint32(150_000)),
+										DestGasOverhead: utils.NewOptional(uint32(120_000)),
 									},
 								},
 							},
