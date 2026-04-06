@@ -93,8 +93,6 @@ func setTokenTransferFeeVerify() func(deployment.Environment, SetTokenTransferFe
 					return fmt.Errorf("duplicate pool address at args[%d].tokenPools[%d] (src=%d): %s", i, j, src.Selector, pool.PoolAddress)
 				}
 
-				updateSet := utils.NewSet[string]()
-				resetsSet := utils.NewSet[string]()
 				seenDests := utils.NewSet[uint64]()
 				for k, dst := range pool.Destinations {
 					if exists := seenDests.Add(dst.Selector); exists {
@@ -102,21 +100,6 @@ func setTokenTransferFeeVerify() func(deployment.Environment, SetTokenTransferFe
 					}
 					if src.Selector == dst.Selector {
 						return fmt.Errorf("src and dst chain selectors cannot be the same at args[%d].tokenPools[%d].destinations[%d] (src=%d)", i, j, k, src.Selector)
-					}
-					if addr := pool.PoolAddress; dst.IsReset {
-						if updateSet.Has(addr) {
-							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
-						}
-						if exists := resetsSet.Add(addr); exists {
-							return fmt.Errorf("duplicate reset for address at (src=%d,dst=%d) args[%d].tokenPools[%d].destinations[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
-						}
-					} else {
-						if resetsSet.Has(addr) {
-							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
-						}
-						if exists := updateSet.Add(addr); exists {
-							return fmt.Errorf("duplicate update for address at (src=%d,dst=%d) args[%d].tokenPools[%d].destinations[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
-						}
 					}
 				}
 			}
@@ -140,7 +123,7 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 			}
 			poolAdapter, exists := poolRegistry.GetTokenAdapter(srcChainFam, cfg.Version)
 			if !exists {
-				return deployment.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcChainFam, cfg.Version.String())
+				return deployment.ChangesetOutput{}, fmt.Errorf("no TokenFeeAdapter found for chain family %s and version %s", srcChainFam, cfg.Version.String())
 			}
 			feesAdapter, ok := poolAdapter.(TokenFeeAdapter)
 			if !ok {

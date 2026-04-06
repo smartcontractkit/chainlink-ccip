@@ -470,15 +470,18 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	// Define EVM chains
 	evmChainSelA := chainsel.TEST_90000001.Selector
 	evmChainSelB := chainsel.TEST_90000002.Selector
+	evmChainSelC := chainsel.TEST_90000003.Selector
 
 	// Setup test environment
-	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{evmChainSelA, evmChainSelB}))
+	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{evmChainSelA, evmChainSelB, evmChainSelC}))
 	require.NoError(t, err)
 
 	// Get chains
 	evmChainA, ok := env.BlockChains.EVMChains()[evmChainSelA]
 	require.True(t, ok)
 	evmChainB, ok := env.BlockChains.EVMChains()[evmChainSelB]
+	require.True(t, ok)
+	evmChainC, ok := env.BlockChains.EVMChains()[evmChainSelC]
 	require.True(t, ok)
 
 	// Configure deployment registry
@@ -487,6 +490,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	chainsToDeploy := map[uint64]deploy.ContractDeploymentConfigPerChain{
 		evmChainSelA: NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0),
 		evmChainSelB: NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0),
+		evmChainSelC: NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0),
 	}
 
 	// Deploy contracts
@@ -497,10 +501,12 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	// Deploy MCMS and transfer ownership
 	DeployMCMS(t, env, evmChainSelA, []string{utils.CLLQualifier})
 	DeployMCMS(t, env, evmChainSelB, []string{utils.CLLQualifier})
+	DeployMCMS(t, env, evmChainSelC, []string{utils.CLLQualifier})
 	EVMTransferOwnership(t, env, evmChainSelA)
 	EVMTransferOwnership(t, env, evmChainSelB)
+	EVMTransferOwnership(t, env, evmChainSelC)
 
-	// Define a full pool mesh between EVM chains A and B
+	// Define a full pool mesh between all EVM chains
 	tokenExpansionInput := map[uint64]tokens.TokenExpansionInputPerChain{
 		evmChainSelA: {
 			TokenPoolVersion: utils.Version_2_0_0,
@@ -517,11 +523,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelB: {
-						DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
-							IsEnabled: false,
-						},
-					},
+					evmChainSelB: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelC: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
 				},
 			},
 		},
@@ -540,11 +543,28 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelA: {
-						DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
-							IsEnabled: false,
-						},
-					},
+					evmChainSelA: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelC: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+				},
+			},
+		},
+		evmChainSelC: {
+			TokenPoolVersion: utils.Version_2_0_0,
+			DeployTokenInput: &tokens.DeployTokenInput{
+				Type:     bnmERC20ops.ContractType,
+				Decimals: 18,
+				Symbol:   "TEST_TOKEN_C",
+				Name:     "Test Token C",
+				PreMint:  nil, // no pre-mint
+				Supply:   nil, // unlimited
+			},
+			DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+				PoolType: utils.BurnMintTokenPool.String(),
+			},
+			TokenTransferConfig: &tokens.TokenTransferConfig{
+				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					evmChainSelA: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelB: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
 				},
 			},
 		},
@@ -566,6 +586,9 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	fltrB := datastore.AddressRef{Type: datastore.ContractType(tokenExpansionInput[evmChainSelB].DeployTokenPoolInput.PoolType), Version: tokenExpansionInput[evmChainSelB].DeployTokenPoolInput.TokenPoolVersion}
 	poolB, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrB, evmChainSelB, datastore_utils_evm.ToEVMAddress)
 	require.NoError(t, err)
+	fltrC := datastore.AddressRef{Type: datastore.ContractType(tokenExpansionInput[evmChainSelC].DeployTokenPoolInput.PoolType), Version: tokenExpansionInput[evmChainSelC].DeployTokenPoolInput.TokenPoolVersion}
+	poolC, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrC, evmChainSelC, datastore_utils_evm.ToEVMAddress)
+	require.NoError(t, err)
 
 	// Set the token pool token transfer fee config on all pools
 	output, err = tokens.
@@ -585,7 +608,14 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 									IsReset:  false,
 									Selector: evmChainSelB,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.NewOptional(uint32(150_000)),
+										DefaultFinalityTransferFeeBps: utils.NewOptional(uint16(100)),
+									},
+								},
+								{
+									IsReset:  false,
+									Selector: evmChainSelC,
+									Settings: tokens.UnresolvedTokenTransferFeeArgs{
+										CustomFinalityTransferFeeBps: utils.NewOptional(uint16(10)),
 									},
 								},
 							},
@@ -603,7 +633,41 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 									IsReset:  false,
 									Selector: evmChainSelA,
 									Settings: tokens.UnresolvedTokenTransferFeeArgs{
-										DestGasOverhead: utils.NewOptional(uint32(150_000)),
+										DefaultFinalityFeeUSDCents: utils.NewOptional(uint32(200)),
+									},
+								},
+								{
+									IsReset:  false,
+									Selector: evmChainSelC,
+									Settings: tokens.UnresolvedTokenTransferFeeArgs{
+										CustomFinalityFeeUSDCents: utils.NewOptional(uint32(20)),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Selector: evmChainSelC,
+					TokenPools: []tokens.TokenTransferFeeForPool{
+						{
+							PoolAddress:           poolC.Hex(),
+							MinBlockConfirmations: utils.NewOptional(uint16(0)),
+							Destinations: []tokens.TokenTransferFeeForDst{
+								{
+									IsReset:  false,
+									Selector: evmChainSelA,
+									Settings: tokens.UnresolvedTokenTransferFeeArgs{
+										DestBytesOverhead: utils.NewOptional(uint32(100_000)),
+										DestGasOverhead:   utils.NewOptional(uint32(10_000)),
+									},
+								},
+								{
+									IsReset:  false,
+									Selector: evmChainSelB,
+									Settings: tokens.UnresolvedTokenTransferFeeArgs{
+										DestBytesOverhead: utils.NewOptional(uint32(200_000)),
+										DestGasOverhead:   utils.NewOptional(uint32(20_000)),
 									},
 								},
 							},
@@ -622,12 +686,6 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	// Reset the operation cache
 	env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
 
-	// Query the on-chain config for both pools
-	cfgA, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolA.Hex(), evmChainSelA, evmChainSelB)
-	require.NoError(t, err)
-	cfgB, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolB.Hex(), evmChainSelB, evmChainSelA)
-	require.NoError(t, err)
-
 	// Check minBlockConfirmations for pool A
 	reportA, err := operations.ExecuteOperation(
 		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainA,
@@ -644,21 +702,79 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), reportB.Output)
 
-	// Confirm that the configs for A match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgA.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgA.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgA.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgA.CustomFinalityFeeUSDCents)
-	require.Equal(t, defaults.DestBytesOverhead, cfgA.DestBytesOverhead)
-	require.Equal(t, uint32(150_000), cfgA.DestGasOverhead)
-	require.True(t, cfgA.IsEnabled)
+	// Check minBlockConfirmations for pool C
+	reportC, err := operations.ExecuteOperation(
+		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainC,
+		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelC, Address: poolC, Args: struct{}{}},
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint16(0), reportC.Output)
 
-	// Confirm that the configs for B match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgB.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgB.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgB.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgB.CustomFinalityFeeUSDCents)
-	require.Equal(t, defaults.DestBytesOverhead, cfgB.DestBytesOverhead)
-	require.Equal(t, uint32(150_000), cfgB.DestGasOverhead)
-	require.True(t, cfgB.IsEnabled)
+	// Query the on-chain config for both pools
+	cfgAB, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolA.Hex(), evmChainSelA, evmChainSelB)
+	require.NoError(t, err)
+	cfgAC, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolA.Hex(), evmChainSelA, evmChainSelC)
+	require.NoError(t, err)
+	cfgBA, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolB.Hex(), evmChainSelB, evmChainSelA)
+	require.NoError(t, err)
+	cfgBC, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolB.Hex(), evmChainSelB, evmChainSelC)
+	require.NoError(t, err)
+	cfgCA, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolC.Hex(), evmChainSelC, evmChainSelA)
+	require.NoError(t, err)
+	cfgCB, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolC.Hex(), evmChainSelC, evmChainSelB)
+	require.NoError(t, err)
+
+	// Confirm that the configs for A->B match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, uint16(100), cfgAB.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgAB.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgAB.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgAB.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaults.DestBytesOverhead, cfgAB.DestBytesOverhead)
+	require.Equal(t, defaults.DestGasOverhead, cfgAB.DestGasOverhead)
+	require.True(t, cfgAB.IsEnabled)
+
+	// Confirm that the configs for A->C match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgAC.DefaultFinalityTransferFeeBps)
+	require.Equal(t, uint16(10), cfgAC.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgAC.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgAC.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaults.DestBytesOverhead, cfgAC.DestBytesOverhead)
+	require.Equal(t, defaults.DestGasOverhead, cfgAC.DestGasOverhead)
+	require.True(t, cfgAC.IsEnabled)
+
+	// Confirm that the configs for B->A match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgBA.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgBA.CustomFinalityTransferFeeBps)
+	require.Equal(t, uint32(200), cfgBA.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgBA.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaults.DestBytesOverhead, cfgBA.DestBytesOverhead)
+	require.Equal(t, defaults.DestGasOverhead, cfgBA.DestGasOverhead)
+	require.True(t, cfgBA.IsEnabled)
+
+	// Confirm that the configs for B->C match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgBC.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgBC.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgBC.DefaultFinalityFeeUSDCents)
+	require.Equal(t, uint32(20), cfgBC.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaults.DestBytesOverhead, cfgBC.DestBytesOverhead)
+	require.Equal(t, defaults.DestGasOverhead, cfgBC.DestGasOverhead)
+	require.True(t, cfgBC.IsEnabled)
+
+	// Confirm that the configs for C->A match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgCA.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgCA.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgCA.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgCA.CustomFinalityFeeUSDCents)
+	require.Equal(t, uint32(100_000), cfgCA.DestBytesOverhead)
+	require.Equal(t, uint32(10_000), cfgCA.DestGasOverhead)
+	require.True(t, cfgCA.IsEnabled)
+
+	// Confirm that the configs for C->B match what was set, and that sensible defaults are applied for fields that were not set
+	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgCB.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgCB.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgCB.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgCB.CustomFinalityFeeUSDCents)
+	require.Equal(t, uint32(200_000), cfgCB.DestBytesOverhead)
+	require.Equal(t, uint32(20_000), cfgCB.DestGasOverhead)
+	require.True(t, cfgCB.IsEnabled)
 }
