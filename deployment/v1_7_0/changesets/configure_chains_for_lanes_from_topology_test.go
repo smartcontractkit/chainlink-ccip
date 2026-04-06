@@ -22,12 +22,67 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 )
+
+func init() {
+	utils.RegisterChainFamilySelector(chainsel.FamilyEVM, [4]byte{0x28, 0x12, 0xd5, 0x2c})
+	utils.RegisterChainFamilySelector(chainsel.FamilySolana, [4]byte{0x1e, 0x10, 0xbd, 0xc4})
+}
+
+func testEvmFeeQuoterDefault() offchain.FeeQuoterDefaultConfig {
+	return offchain.FeeQuoterDefaultConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    90,
+		USDPerUnitGas:               1_000_000,
+	}
+}
+
+func testSolanaFeeQuoterDefault() offchain.FeeQuoterDefaultConfig {
+	return offchain.FeeQuoterDefaultConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    90,
+		USDPerUnitGas:               4_000_000_000_000,
+	}
+}
+
+func testFeeQuoterTopologyEVM() *offchain.FeeQuoterTopology {
+	return &offchain.FeeQuoterTopology{
+		FamilyDefaults: map[string]offchain.FeeQuoterDefaultConfig{
+			chainsel.FamilyEVM: testEvmFeeQuoterDefault(),
+		},
+	}
+}
+
+func testFeeQuoterTopologyMultiFamily() *offchain.FeeQuoterTopology {
+	return &offchain.FeeQuoterTopology{
+		FamilyDefaults: map[string]offchain.FeeQuoterDefaultConfig{
+			chainsel.FamilyEVM:    testEvmFeeQuoterDefault(),
+			chainsel.FamilySolana: testSolanaFeeQuoterDefault(),
+		},
+	}
+}
 
 type mockChainFamilyAdapter struct {
 	addressPrefix string
@@ -229,6 +284,7 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 					},
 				},
 			},
+			FeeQuoter: testFeeQuoterTopologyMultiFamily(),
 		},
 		Chains: []changesets.PartialChainConfig{
 			{
@@ -346,6 +402,7 @@ func TestConfigureChainsForLanesFromTopology_JDFallback(t *testing.T) {
 					},
 				},
 			},
+			FeeQuoter: testFeeQuoterTopologyMultiFamily(),
 		},
 		Chains: []changesets.PartialChainConfig{
 			{
@@ -462,6 +519,7 @@ func TestConfigureChainsForLanesFromTopology_MissingRemoteAdapter(t *testing.T) 
 					},
 				},
 			},
+			FeeQuoter: testFeeQuoterTopologyMultiFamily(),
 		},
 		Chains: []changesets.PartialChainConfig{
 			{
@@ -518,6 +576,22 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 	registry := adapters.NewChainFamilyRegistry()
 	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
 
+	maxDataBytesA := uint32(1000)
+	maxDataBytesB := uint32(2000)
+	fqTopology := &offchain.FeeQuoterTopology{
+		FamilyDefaults: map[string]offchain.FeeQuoterDefaultConfig{
+			chainsel.FamilyEVM: testEvmFeeQuoterDefault(),
+		},
+		LaneDefaults: map[string]map[string]*offchain.FeeQuoterOverrideConfig{
+			fmt.Sprintf("%d", chainA): {
+				fmt.Sprintf("%d", sharedDest): {MaxDataBytes: &maxDataBytesA},
+			},
+			fmt.Sprintf("%d", chainB): {
+				fmt.Sprintf("%d", sharedDest): {MaxDataBytes: &maxDataBytesB},
+			},
+		},
+	}
+
 	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
 	output, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
 		Topology: &offchain.EnvironmentTopology{
@@ -534,6 +608,7 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 					},
 				},
 			},
+			FeeQuoter: fqTopology,
 		},
 		Chains: []changesets.PartialChainConfig{
 			{
@@ -544,7 +619,6 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
 						DefaultExecutorQualifier: "default",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{MaxDataBytes: 1000},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 100, Enabled: true},
 					},
 				},
@@ -557,7 +631,6 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
 						DefaultExecutorQualifier: "default",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{MaxDataBytes: 2000},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 200, Enabled: true},
 					},
 				},
@@ -628,6 +701,7 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 					},
 				},
 			},
+			FeeQuoter: testFeeQuoterTopologyEVM(),
 		},
 		UseTestRouter: true,
 		Chains: []changesets.PartialChainConfig{
@@ -697,6 +771,7 @@ func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(
 					},
 				},
 			},
+			FeeQuoter: testFeeQuoterTopologyEVM(),
 		},
 		UseTestRouter: false,
 		Chains: []changesets.PartialChainConfig{
@@ -804,6 +879,7 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 					},
 				},
 			},
+			FeeQuoter: testFeeQuoterTopologyEVM(),
 		},
 		Chains: []changesets.PartialChainConfig{
 			{
@@ -872,5 +948,30 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "DefaultExecutorQualifier is required")
+	})
+
+	t.Run("fee_quoter topology required when RemoteChains is non-empty", func(t *testing.T) {
+		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+			Topology: &offchain.EnvironmentTopology{
+				NOPTopology: &offchain.NOPTopology{
+					NOPs: []offchain.NOPConfig{{Alias: "nop-1"}},
+					Committees: map[string]offchain.CommitteeConfig{
+						"default": {Qualifier: "default", ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						}},
+					},
+				},
+			},
+			Chains: []changesets.PartialChainConfig{
+				{
+					ChainSelector: localSelector,
+					RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+						remoteSelector: {DefaultExecutorQualifier: "default"},
+					},
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "fee_quoter topology is required when configuring remote chains")
 	})
 }

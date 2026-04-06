@@ -2,10 +2,12 @@ package changesets
 
 import (
 	"fmt"
+	"math/big"
 	"slices"
 	"strconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -41,19 +43,19 @@ type CommitteeVerifierInputConfig struct {
 // are resolved automatically — the user only provides the executor qualifier and lane-specific
 // configuration values.
 type PartialRemoteChainConfig struct {
-	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  string
-	DefaultInboundCCVs        []datastore.AddressRef
-	LaneMandatedInboundCCVs   []datastore.AddressRef
-	DefaultOutboundCCVs       []datastore.AddressRef
-	LaneMandatedOutboundCCVs  []datastore.AddressRef
-	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfig
-	ExecutorDestChainConfig   adapters.ExecutorDestChainConfig
-	AddressBytesLength        uint8
-	BaseExecutionGasCost      uint32
-	TokenReceiverAllowed      *bool
-	MessageNetworkFeeUSDCents uint16
-	TokenNetworkFeeUSDCents   uint16
+	AllowTrafficFrom                *bool
+	DefaultExecutorQualifier        string
+	DefaultInboundCCVs              []datastore.AddressRef
+	LaneMandatedInboundCCVs         []datastore.AddressRef
+	DefaultOutboundCCVs             []datastore.AddressRef
+	LaneMandatedOutboundCCVs        []datastore.AddressRef
+	OverrideExistingFeeQuoterConfig bool
+	ExecutorDestChainConfig         adapters.ExecutorDestChainConfig
+	AddressBytesLength              uint8
+	BaseExecutionGasCost            uint32
+	TokenReceiverAllowed            *bool
+	MessageNetworkFeeUSDCents       uint16
+	TokenNetworkFeeUSDCents         uint16
 }
 
 // PartialChainConfig describes the desired state for a single local chain. Well-known contract
@@ -130,15 +132,22 @@ func ConfigureChainsForLanesFromTopology(
 		if len(cfg.Chains) == 0 {
 			return fmt.Errorf("at least one chain must be specified")
 		}
+		hasRemoteChains := false
 		for _, chainCfg := range cfg.Chains {
 			if !slices.Contains(e.BlockChains.ListChainSelectors(), chainCfg.ChainSelector) {
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
+			}
+			if len(chainCfg.RemoteChains) > 0 {
+				hasRemoteChains = true
 			}
 			for remoteSelector, remoteCfg := range chainCfg.RemoteChains {
 				if remoteCfg.DefaultExecutorQualifier == "" {
 					return fmt.Errorf("DefaultExecutorQualifier is required for remote chain %d on local chain %d", remoteSelector, chainCfg.ChainSelector)
 				}
 			}
+		}
+		if hasRemoteChains && cfg.Topology.FeeQuoter == nil {
+			return fmt.Errorf("fee_quoter topology is required when configuring remote chains")
 		}
 		return nil
 	}
@@ -210,7 +219,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.MCMS, cfg.UseTestRouter)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.Topology, cfg.MCMS, cfg.UseTestRouter)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -232,6 +241,7 @@ func applyConfigureChains(
 	chainFamilyRegistry *adapters.ChainFamilyRegistry,
 	mcmsRegistry *changesetscore.MCMSReaderRegistry,
 	chains []enrichedChainConfig,
+	topology *offchain.EnvironmentTopology,
 	mcmsInput mcms.Input,
 	useTestRouter bool,
 ) (deployment.ChangesetOutput, error) {
@@ -305,7 +315,7 @@ func applyConfigureChains(
 				return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for remote chain family %q", remoteFamily)
 			}
 
-			convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg)
+			convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg, topology)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteSelector, err)
 			}
@@ -358,6 +368,7 @@ func resolveRemoteChainConfig(
 	localChainSelector uint64,
 	remoteChainSelector uint64,
 	inCfg PartialRemoteChainConfig,
+	topology *offchain.EnvironmentTopology,
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	remoteOnRampBytes, err := remoteAdapter.GetOnRampAddress(e.DataStore, remoteChainSelector)
 	if err != nil {
@@ -389,6 +400,12 @@ func resolveRemoteChainConfig(
 		return adapters.RemoteChainConfig[[]byte, string]{}, err
 	}
 
+	fqCfg, err := topology.ResolveFeeQuoterConfigForLane(localChainSelector, remoteChainSelector)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve fee quoter config for lane %d -> %d: %w", localChainSelector, remoteChainSelector, err)
+	}
+	adapterFQCfg := topologyFeeQuoterToAdapter(fqCfg, remoteChainSelector, inCfg.OverrideExistingFeeQuoterConfig)
+
 	return adapters.RemoteChainConfig[[]byte, string]{
 		AllowTrafficFrom:          inCfg.AllowTrafficFrom,
 		OnRamps:                   [][]byte{remoteOnRampBytes},
@@ -398,7 +415,7 @@ func resolveRemoteChainConfig(
 		LaneMandatedInboundCCVs:   laneMandatedInboundCCVs,
 		DefaultOutboundCCVs:       defaultOutboundCCVs,
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
-		FeeQuoterDestChainConfig:  inCfg.FeeQuoterDestChainConfig,
+		FeeQuoterDestChainConfig:  adapterFQCfg,
 		ExecutorDestChainConfig:   inCfg.ExecutorDestChainConfig,
 		AddressBytesLength:        inCfg.AddressBytesLength,
 		BaseExecutionGasCost:      inCfg.BaseExecutionGasCost,
@@ -406,6 +423,28 @@ func resolveRemoteChainConfig(
 		MessageNetworkFeeUSDCents: inCfg.MessageNetworkFeeUSDCents,
 		TokenNetworkFeeUSDCents:   inCfg.TokenNetworkFeeUSDCents,
 	}, nil
+}
+
+func topologyFeeQuoterToAdapter(
+	cfg offchain.FeeQuoterDefaultConfig,
+	destSelector uint64,
+	overrideExisting bool,
+) adapters.FeeQuoterDestChainConfig {
+	return adapters.FeeQuoterDestChainConfig{
+		OverrideExistingConfig:      overrideExisting,
+		IsEnabled:                   cfg.IsEnabled,
+		MaxDataBytes:                cfg.MaxDataBytes,
+		MaxPerMsgGasLimit:           cfg.MaxPerMsgGasLimit,
+		DestGasOverhead:             cfg.DestGasOverhead,
+		DestGasPerPayloadByteBase:   cfg.DestGasPerPayloadByteBase,
+		ChainFamilySelector:         utils.GetSelectorHex(destSelector),
+		DefaultTokenFeeUSDCents:     cfg.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead: cfg.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           cfg.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          cfg.NetworkFeeUSDCents,
+		LinkFeeMultiplierPercent:    cfg.LinkFeeMultiplierPercent,
+		USDPerUnitGas:               big.NewInt(cfg.USDPerUnitGas),
+	}
 }
 
 func resolveLocalContractsForTopologyChangeset(

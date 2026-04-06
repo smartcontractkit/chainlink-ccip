@@ -23,6 +23,7 @@ type EnvironmentTopology struct {
 	Monitoring     MonitoringConfig              `toml:"monitoring"`
 	NOPTopology    *NOPTopology                  `toml:"nop_topology"`
 	ExecutorPools  map[string]ExecutorPoolConfig `toml:"executor_pools"`
+	FeeQuoter      *FeeQuoterTopology            `toml:"fee_quoter"`
 }
 
 // NOPTopology defines the node operator structure and committee membership.
@@ -214,6 +215,12 @@ func (c *EnvironmentTopology) Validate() error {
 		}
 	}
 
+	if c.FeeQuoter != nil {
+		if err := c.FeeQuoter.Validate(); err != nil {
+			return fmt.Errorf("fee_quoter validation failed: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -299,6 +306,15 @@ func (p *ExecutorPoolConfig) Validate(poolName string, topology *NOPTopology) er
 		}
 	}
 	return nil
+}
+
+// ResolveFeeQuoterConfigForLane resolves the fully-merged fee quoter configuration for the
+// given lane by delegating to the FeeQuoterTopology's layered override logic.
+func (c *EnvironmentTopology) ResolveFeeQuoterConfigForLane(srcSelector, destSelector uint64) (FeeQuoterDefaultConfig, error) {
+	if c.FeeQuoter == nil {
+		return FeeQuoterDefaultConfig{}, fmt.Errorf("fee_quoter topology is not configured")
+	}
+	return c.FeeQuoter.ResolveFeeQuoterConfigForLane(srcSelector, destSelector)
 }
 
 func (c *EnvironmentTopology) GetNOPsForPool(poolName string) ([]string, error) {
