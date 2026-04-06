@@ -241,18 +241,20 @@ func requireVerifiedEnvContracts(
 		if err != nil {
 			return fmt.Errorf("require verified pre-hook: load datastore: %w", err)
 		}
-		// filter networks with selective chain selectors; if this fails, return an error to log the failure and skip verification.
-		newDs := datastore.NewMemoryDataStore()
-		for _, selector := range selectors {
-			networkRefs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(selector))
-			for _, ref := range networkRefs {
-				err := newDs.Addresses().Add(ref)
-				if err != nil {
-					return fmt.Errorf("require verified pre-hook: failed to add address ref %+v to filtered datastore: %w", ref, err)
+		// Filter networks with selective chain selectors; if this fails, return an error and fail the pre-hook.
+		if len(selectors) > 0 {
+			newDs := datastore.NewMemoryDataStore()
+			for _, selector := range selectors {
+				networkRefs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(selector))
+				for _, ref := range networkRefs {
+					err := newDs.Addresses().Add(ref)
+					if err != nil {
+						return fmt.Errorf("require verified pre-hook: failed to add address ref %+v to filtered datastore: %w", ref, err)
+					}
 				}
 			}
+			ds = newDs.Seal()
 		}
-		ds = newDs.Seal()
 
 		networkCfg, err := verifier.FilterNetworks(params.Env.Name, dom, params.Env.Logger)
 		if err != nil {

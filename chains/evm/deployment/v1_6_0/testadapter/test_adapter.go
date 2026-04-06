@@ -188,6 +188,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 			if err != nil {
 				return 0, messageID, fmt.Errorf("failed to approve tokens for fee: %w", err)
 			}
+			sender.Value = nil
 		}
 		for i, ta := range msg.TokenAmounts {
 			if ta.Token != (common.Address{}) {
