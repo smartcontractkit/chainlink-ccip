@@ -188,7 +188,6 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 			if err != nil {
 				return 0, messageID, fmt.Errorf("failed to approve tokens for fee: %w", err)
 			}
-			sender.Value = nil
 		}
 		for i, ta := range msg.TokenAmounts {
 			if ta.Token != (common.Address{}) {
@@ -238,6 +237,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 
 		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
+		sender.Value = nil
 		return it.Event.SequenceNumber, messageID, nil
 	}
 }
