@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import {IGetCCIPAdmin} from "../interfaces/IGetCCIPAdmin.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+
+import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+
+/// @notice A basic ERC20 that has no burn/mint functions.
+/// @dev If this contract is deployed with a pre-mint of 0, it is effectively useless as no mint functionality is
+/// exposed.
+contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "BaseERC20 2.0.0";
+  }
+
+  error CannotRenounceCCIPAdmin();
+  error MaxSupplyExceeded(uint256 supplyAfterMint, uint256 maxSupply);
+  error OnlyCCIPAdmin();
+  error PreMintAddressNotSet();
+  error PreMintRecipientSetWithZeroPreMint(address preMintRecipient);
+
+  /// @notice Emitted when the CCIPAdmin role is transferred to a new address.
+  /// @param previousAdmin The address of the previous CCIPAdmin.
+  /// @param newAdmin The address of the new CCIPAdmin.
+  event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
+
+  /// @param name The name of the token
+  /// @param symbol The symbol of the token
+  /// @param maxSupply_ The maximum supply of the token, 0 if unlimited
+  /// @param preMint The amount of tokens to mint upon construction. Must be zero, or preMintRecipient must be set.
+  /// NOTE: the base version of this contract does not support minting additional tokens after deployment, so this
+  /// should be set to the full supply.
+  /// @param preMintRecipient The address to receive the pre-mint amount. Must be non-zero if preMint is non-zero.
+  /// @param decimals The number of decimals the token uses
+  /// @param ccipAdmin The initial CCIPAdmin. If set to address(0), the deployer will be set as the initial CCIPAdmin.
+  struct ConstructorParams {
+    string name;
+    string symbol;
+    uint256 maxSupply;
+    uint256 preMint;
+    address preMintRecipient;
+    uint8 decimals;
+    address ccipAdmin;
+  }
+
+  /// @dev The number of decimals for the token
+  uint8 internal immutable i_decimals;
+
+  /// @dev The maximum supply of the token, 0 if unlimited
+  uint256 internal immutable i_maxSupply;
+
+  /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers.
+  address internal s_ccipAdmin;
+
+  constructor(
+    ConstructorParams memory args
+  ) ERC20(args.name, args.symbol) {
+    i_decimals = args.decimals;
+    i_maxSupply = args.maxSupply;
+
+    // Mint the initial supply to the preMintRecipient, saving gas by not calling if the mint amount is zero.
+    if (args.preMint != 0) {
+      if (args.preMintRecipient == address(0)) revert PreMintAddressNotSet();
+
+      _mint(args.preMintRecipient, args.preMint);
+    } else if (args.preMintRecipient != address(0)) {
+      revert PreMintRecipientSetWithZeroPreMint(args.preMintRecipient);
+    }
+
+    _setCCIPAdmin(args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin);
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public view virtual returns (bool) {
+    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId
+      || interfaceId == type(IERC20Metadata).interfaceId || interfaceId == type(IERC165).interfaceId;
+  }
+
+  // ================================================================
+  // │                            ERC20                             │
+  // ================================================================
+
+  /// @notice Returns the number of decimals for this token.
+  /// @return _decimals The number of decimals for this token.
+  function decimals() public view virtual override returns (uint8 _decimals) {
+    return i_decimals;
+  }
+
+  /// @notice Returns the max supply of the token, 0 if unlimited.
+  /// @return _maxSupply The max supply of the token, 0 if unlimited.
+  function maxSupply() public view virtual returns (uint256 _maxSupply) {
+    return i_maxSupply;
+  }
+
+  /// @inheritdoc ERC20
+  /// @dev Uses OZ ERC20 _approve to disallow approving for address(0).
+  /// @dev Disallows approving for address(this).
+  function _approve(
+    address owner,
+    address spender,
+    uint256 value,
+    bool emitEvent
+  ) internal virtual override {
+    if (spender == address(this)) revert ERC20InvalidSpender(spender);
+
+    super._approve(owner, spender, value, emitEvent);
+  }
+
+  /// @inheritdoc ERC20
+  /// @dev This check applies to transfer, minting, and burning.
+  /// @dev Disallows transferring/minting to address(this).
+  function _update(
+    address from,
+    address to,
+    uint256 value
+  ) internal virtual override {
+    if (to == address(this)) revert ERC20InvalidReceiver(to);
+
+    // Update first, then check the total supply.
+    super._update(from, to, value);
+
+    // If `from` is address(0), this is a mint, so we need to check the total supply against the max supply.
+    if (from == address(0)) {
+      _assertMaxSupply();
+    }
+  }
+
+  /// @notice Asserts that the total supply does not exceed the max supply. Reverts if it does.
+  function _assertMaxSupply() internal view virtual {
+    if (i_maxSupply != 0) {
+      uint256 supply = totalSupply();
+      if (supply > i_maxSupply) {
+        revert MaxSupplyExceeded(supply, i_maxSupply);
+      }
+    }
+  }
+
+  // ================================================================
+  // │                            Roles                             │
+  // ================================================================
+
+  /// @notice Gets the current CCIPAdmin.
+  /// @return ccipAdmin The address of the current CCIPAdmin.
+  function getCCIPAdmin() external view virtual returns (address ccipAdmin) {
+    return s_ccipAdmin;
+  }
+
+  /// @notice Transfers the CCIPAdmin role to a new address.
+  /// @param newAdmin The address of the new CCIPAdmin. Setting this to address(0) is not allowed.
+  /// @dev The BaseERC20 has no notion of ownership, so this function can be called by the CCIP admin. Tokens expanding
+  /// from this base contract can choose to restrict this function to other roles instead.
+  function setCCIPAdmin(
+    address newAdmin
+  ) external virtual {
+    if (msg.sender != s_ccipAdmin) {
+      revert OnlyCCIPAdmin();
+    }
+
+    if (newAdmin == address(0)) revert CannotRenounceCCIPAdmin();
+
+    _setCCIPAdmin(newAdmin);
+  }
+
+  /// @dev Internal function to set the CCIPAdmin, emits an event with the previous and new admin.
+  /// @param newAdmin The address of the new CCIPAdmin.
+  function _setCCIPAdmin(
+    address newAdmin
+  ) internal virtual {
+    address currentAdmin = s_ccipAdmin;
+
+    s_ccipAdmin = newAdmin;
+
+    emit CCIPAdminTransferred(currentAdmin, newAdmin);
+  }
+}
