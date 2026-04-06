@@ -629,7 +629,8 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 				},
 			},
 		},
-		UseTestRouter: true,
+		UseTestRouter:       true,
+		AllowOnrampOverride: true,
 		Chains: []changesets.PartialChainConfig{
 			{
 				ChainSelector: localSelector,
@@ -648,7 +649,7 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 	require.Len(t, evmAdapter.inputs, 1)
 	assert.Equal(t, "0xbb99", evmAdapter.inputs[0].Router)
 	assert.True(t, evmAdapter.inputs[0].AllowOnrampOverride,
-		"UseTestRouter=true should set AllowOnrampOverride=true on sequence input")
+		"AllowOnrampOverride=true should be forwarded to the sequence input")
 }
 
 func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(t *testing.T) {
@@ -718,7 +719,7 @@ func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(
 	assert.Equal(t, "0xaa01", evmAdapter.inputs[0].Router,
 		"with UseTestRouter=false and both routers in the datastore, the standard Router should be selected")
 	assert.False(t, evmAdapter.inputs[0].AllowOnrampOverride,
-		"UseTestRouter=false should set AllowOnrampOverride=false on sequence input")
+		"AllowOnrampOverride defaults to false when not explicitly set")
 }
 
 func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeNOPs(t *testing.T) {
