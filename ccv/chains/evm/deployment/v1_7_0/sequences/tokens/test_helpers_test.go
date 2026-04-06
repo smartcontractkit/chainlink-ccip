@@ -67,7 +67,7 @@ func deployTokenAndPoolViaExpansion(
 				DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
 					PoolType:                       string(burn_mint_token_pool.ContractType),
 					TokenPoolQualifier:             "TEST",
-					ThresholdForAdditionalCCVs: thresholdAmountForAdditionalCCVs.String(),
+					ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs.String(),
 				},
 			},
 		},

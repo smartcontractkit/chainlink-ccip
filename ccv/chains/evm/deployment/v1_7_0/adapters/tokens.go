@@ -79,11 +79,11 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			}
 
 			threshold := big.NewInt(0)
-			if input.ThresholdForAdditionalCCVs != "" {
+			if input.ThresholdAmountForAdditionalCCVs != "" {
 				var ok bool
-				threshold, ok = new(big.Int).SetString(input.ThresholdForAdditionalCCVs, 10)
+				threshold, ok = new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10)
 				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdForAdditionalCCVs %q: must be a decimal integer string", input.ThresholdForAdditionalCCVs)
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs %q: must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
 				}
 			}
 
