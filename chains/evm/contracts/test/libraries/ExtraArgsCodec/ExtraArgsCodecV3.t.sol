@@ -28,8 +28,8 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     });
   }
 
-  function test_GetBasicEncodedExtraArgsV3_ReturnsCorrectLength() public pure {
-    bytes memory encoded = ExtraArgsCodec._getBasicEncodedExtraArgsV3(GAS_LIMIT, 12);
+  function test__getBasicEncodedExtraArgsV3_ReturnsCorrectLength() public pure {
+    bytes memory encoded = ExtraArgsCodec._getBasicEncodedExtraArgsV3BlockDepth(GAS_LIMIT, 12);
     assertEq(encoded.length, ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
 
     bytes4 tag;
@@ -37,6 +37,11 @@ contract ExtraArgsCodecV3_Test is BaseTest {
       tag := mload(add(encoded, 32))
     }
     assertEq(tag, ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG);
+  }
+
+  function test__getBasicEncodedExtraArgsV3FastConfirmationRule() public pure {
+    bytes memory encoded = ExtraArgsCodec._getBasicEncodedExtraArgsV3FastConfirmationRule(GAS_LIMIT);
+    assertEq(encoded, ExtraArgsCodec._getBasicEncodedExtraArgsV3(GAS_LIMIT, FinalityCodec.WAIT_FOR_SAFE_FLAG));
   }
 
   function test__decodeGenericExtraArgsV3_Basic() public view {

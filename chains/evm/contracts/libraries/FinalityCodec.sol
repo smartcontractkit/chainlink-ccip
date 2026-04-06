@@ -76,11 +76,10 @@ library FinalityCodec {
     if (encodedFinality == WAIT_FOR_FINALITY_FLAG) {
       return;
     }
-    uint32 finality = uint32(encodedFinality);
-    bool hasBlockDepth = (finality & uint32(MAX_BLOCK_DEPTH)) != 0;
+    bool hasBlockDepth = encodedFinality & BLOCK_DEPTH_MASK != 0;
     uint256 activeModes = hasBlockDepth ? 1 : 0; // If it has depth, it counts as one active mode.
 
-    uint32 flags = finality >> BLOCK_DEPTH_BITS;
+    uint32 flags = uint32(encodedFinality) >> BLOCK_DEPTH_BITS;
     if (flags != 0) {
       for (uint256 i = 0; i < 16; ++i) {
         if ((flags & (1 << i)) != 0) {
@@ -112,9 +111,6 @@ library FinalityCodec {
 
     // If any of the flags match, the request is allowed only when it has no depth field (flag-only request).
     if (((requestedFinality >> BLOCK_DEPTH_BITS) & (allowedFinality >> BLOCK_DEPTH_BITS)) != 0) {
-      if (uint32(requestedFinality & BLOCK_DEPTH_MASK) != 0) {
-        revert InvalidRequestedFinality(requestedFinality, allowedFinality);
-      }
       return;
     }
     // Otherwise, it must be block-depth based.

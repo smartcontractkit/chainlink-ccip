@@ -115,15 +115,37 @@ library ExtraArgsCodec {
     bytes tokenArgs;
   }
 
+  /// @notice Creates a basic encoded GenericExtraArgsV3 with only gasLimit and finality config set.
+  /// @param gasLimit The gas limit for the callback on the destination chain.
+  /// @param finalityConfig The finality config, encoded via `FinalityCodec`.
+  /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
+  function _getBasicEncodedExtraArgsV3(
+    uint32 gasLimit,
+    bytes4 finalityConfig
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, finalityConfig, bytes7(0));
+  }
+
   /// @notice Creates a basic encoded GenericExtraArgsV3 with only gasLimit and block-depth finality set.
   /// @param gasLimit The gas limit for the callback on the destination chain.
   /// @param blockDepth Block depth encoded via `FinalityCodec._encodeBlockDepth` (no upper flag bits).
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
-  function _getBasicEncodedExtraArgsV3(
+  function _getBasicEncodedExtraArgsV3BlockDepth(
     uint32 gasLimit,
     uint16 blockDepth
   ) internal pure returns (bytes memory) {
-    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, FinalityCodec._encodeBlockDepth(blockDepth), bytes7(0));
+    return _getBasicEncodedExtraArgsV3(gasLimit, FinalityCodec._encodeBlockDepth(blockDepth));
+  }
+
+  /// @notice Creates a basic encoded GenericExtraArgsV3 with a given gasLimit and the Fast Confirmation Rule as
+  /// the finality config. The Fast Confirmation Rule is a special finality config that signals to wait for the `safe`
+  /// tag.
+  /// @param gasLimit The gas limit for the callback on the destination chain.
+  /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
+  function _getBasicEncodedExtraArgsV3FastConfirmationRule(
+    uint32 gasLimit
+  ) internal pure returns (bytes memory) {
+    return _getBasicEncodedExtraArgsV3(gasLimit, FinalityCodec.WAIT_FOR_SAFE_FLAG);
   }
 
   enum SVMTokenReceiverUsage {
