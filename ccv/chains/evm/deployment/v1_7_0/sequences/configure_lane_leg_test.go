@@ -303,8 +303,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
-			require.False(t, committeeVerifierRemoteChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
+			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.RemoteChainConfig.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
+			require.False(t, committeeVerifierRemoteChainConfig.Output.RemoteChainConfig.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
 
 			// Check signature quorum on CommitteeVerifier
 			signatureQuorumReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
@@ -358,14 +358,14 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
 				&bind.CallOpts{Context: t.Context()},
 				message_hasher.ExtraArgsCodecGenericExtraArgsV3{
-					GasLimit:           80_000,
-					BlockConfirmations: 0,
-					Ccvs:               []common.Address{common.HexToAddress(committeeVerifierResolverAddr)},
-					CcvArgs:            [][]byte{{}},
-					Executor:           common.HexToAddress(executorAddr),
-					ExecutorArgs:       []byte{},
-					TokenReceiver:      []byte{},
-					TokenArgs:          []byte{},
+					GasLimit:                80_000,
+					RequestedFinalityConfig: [4]byte{0x00, 0x00, 0x00, 0x00},
+					Ccvs:                    []common.Address{common.HexToAddress(committeeVerifierResolverAddr)},
+					CcvArgs:                 [][]byte{{}},
+					Executor:                common.HexToAddress(executorAddr),
+					ExecutorArgs:            []byte{},
+					TokenReceiver:           []byte{},
+					TokenArgs:               []byte{},
 				},
 			)
 			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")

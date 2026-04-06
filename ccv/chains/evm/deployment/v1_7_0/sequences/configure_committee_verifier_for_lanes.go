@@ -5,13 +5,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -76,13 +77,16 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			desiredRemoteChainArg := committee_verifier.RemoteChainConfigArgs{
-				Router:                common.HexToAddress(input.Router),
-				RemoteChainSelector:   remoteSelector,
-				AllowlistEnabled:      remoteConfig.AllowlistEnabled,
-				FeeUSDCents:           remoteConfig.FeeUSDCents,
-				GasForVerification:    remoteConfig.GasForVerification,
-				PayloadSizeBytes:      remoteConfig.PayloadSizeBytes,
-				AllowedFinalityConfig: remoteConfig.AllowedFinalityConfig,
+				Router:              common.HexToAddress(input.Router),
+				RemoteChainSelector: remoteSelector,
+				AllowlistEnabled:    remoteConfig.AllowlistEnabled,
+				FeeUSDCents:         remoteConfig.FeeUSDCents,
+				GasForVerification:  remoteConfig.GasForVerification,
+				// TODO : standardise payload size
+				PayloadSizeBytes: uint16(remoteConfig.PayloadSizeBytes),
+				// TODO : pass in correct value. Is AllowedFinalityConfig valid for all chain types
+				// although this will be removed in future in preference of configure_committee_verifier_for_lanes.go
+				AllowedFinalityConfig: [4]byte{0x00, 0x01, 0x00, 0x01},
 			}
 			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
@@ -118,19 +122,19 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				}
 			}
 
-		toAdd, toRemove, err := makeAllowlistUpdates(currRemote.AllowedSendersList, remoteConfig.AddedAllowlistedSenders, remoteConfig.RemovedAllowlistedSenders)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
+			toAdd, toRemove, err := makeAllowlistUpdates(currRemote.AllowedSendersList, remoteConfig.AddedAllowlistedSenders, remoteConfig.RemovedAllowlistedSenders)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
+			}
+			if len(toAdd) > 0 || len(toRemove) > 0 {
+				allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
+					AllowlistEnabled:          remoteConfig.AllowlistEnabled,
+					AddedAllowlistedSenders:   toAdd,
+					RemovedAllowlistedSenders: toRemove,
+					DestChainSelector:         remoteSelector,
+				})
+			}
 		}
-		if len(toAdd) > 0 || len(toRemove) > 0 {
-			allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
-				AllowlistEnabled:          remoteConfig.AllowlistEnabled,
-				AddedAllowlistedSenders:   toAdd,
-				RemovedAllowlistedSenders: toRemove,
-				DestChainSelector:         remoteSelector,
-			})
-		}
-	}
 
 		// Build outbound implementation args only for remotes where on-chain verifier differs (idempotent).
 		currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -86,8 +87,7 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 				FeeUSDCents:               rc.FeeUSDCents,
 				GasForVerification:        rc.GasForVerification,
 				PayloadSizeBytes:          rc.PayloadSizeBytes,
-				AllowedFinalityConfig:     remoteChainConfig.AllowedFinalityConfig,
-						SignatureConfig:           lanes.CommitteeVerifierSignatureQuorumConfig{
+				SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
 					Signers:   signatureConfig.Signers,
 					Threshold: signatureConfig.Threshold,
 				},
