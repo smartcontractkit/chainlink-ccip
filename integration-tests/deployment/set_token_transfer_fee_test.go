@@ -681,7 +681,6 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 
 	// Get the v2.0 token adapter
 	tokensV2 := evmadaptersV1_7_0.TokenAdapter{}
-	defaults := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelA, evmChainSelB)
 
 	// Reset the operation cache
 	env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
@@ -725,55 +724,61 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm that the configs for A->B match what was set, and that sensible defaults are applied for fields that were not set
+	defaultsAB := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelA, evmChainSelB)
 	require.Equal(t, uint16(100), cfgAB.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgAB.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgAB.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgAB.CustomFinalityFeeUSDCents)
-	require.Equal(t, defaults.DestBytesOverhead, cfgAB.DestBytesOverhead)
-	require.Equal(t, defaults.DestGasOverhead, cfgAB.DestGasOverhead)
+	require.Equal(t, defaultsAB.CustomFinalityTransferFeeBps, cfgAB.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaultsAB.DefaultFinalityFeeUSDCents, cfgAB.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaultsAB.CustomFinalityFeeUSDCents, cfgAB.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaultsAB.DestBytesOverhead, cfgAB.DestBytesOverhead)
+	require.Equal(t, defaultsAB.DestGasOverhead, cfgAB.DestGasOverhead)
 	require.True(t, cfgAB.IsEnabled)
 
 	// Confirm that the configs for A->C match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgAC.DefaultFinalityTransferFeeBps)
+	defaultsAC := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelA, evmChainSelC)
+	require.Equal(t, defaultsAC.DefaultFinalityTransferFeeBps, cfgAC.DefaultFinalityTransferFeeBps)
 	require.Equal(t, uint16(10), cfgAC.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgAC.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgAC.CustomFinalityFeeUSDCents)
-	require.Equal(t, defaults.DestBytesOverhead, cfgAC.DestBytesOverhead)
-	require.Equal(t, defaults.DestGasOverhead, cfgAC.DestGasOverhead)
+	require.Equal(t, defaultsAC.DefaultFinalityFeeUSDCents, cfgAC.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaultsAC.CustomFinalityFeeUSDCents, cfgAC.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaultsAC.DestBytesOverhead, cfgAC.DestBytesOverhead)
+	require.Equal(t, defaultsAC.DestGasOverhead, cfgAC.DestGasOverhead)
 	require.True(t, cfgAC.IsEnabled)
 
 	// Confirm that the configs for B->A match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgBA.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgBA.CustomFinalityTransferFeeBps)
+	defaultsBA := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelB, evmChainSelA)
+	require.Equal(t, defaultsBA.DefaultFinalityTransferFeeBps, cfgBA.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaultsBA.CustomFinalityTransferFeeBps, cfgBA.CustomFinalityTransferFeeBps)
 	require.Equal(t, uint32(200), cfgBA.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgBA.CustomFinalityFeeUSDCents)
-	require.Equal(t, defaults.DestBytesOverhead, cfgBA.DestBytesOverhead)
-	require.Equal(t, defaults.DestGasOverhead, cfgBA.DestGasOverhead)
+	require.Equal(t, defaultsBA.CustomFinalityFeeUSDCents, cfgBA.CustomFinalityFeeUSDCents)
+	require.Equal(t, defaultsBA.DestBytesOverhead, cfgBA.DestBytesOverhead)
+	require.Equal(t, defaultsBA.DestGasOverhead, cfgBA.DestGasOverhead)
 	require.True(t, cfgBA.IsEnabled)
 
 	// Confirm that the configs for B->C match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgBC.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgBC.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgBC.DefaultFinalityFeeUSDCents)
+	defaultsBC := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelB, evmChainSelC)
+	require.Equal(t, defaultsBC.DefaultFinalityTransferFeeBps, cfgBC.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaultsBC.CustomFinalityTransferFeeBps, cfgBC.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaultsBC.DefaultFinalityFeeUSDCents, cfgBC.DefaultFinalityFeeUSDCents)
 	require.Equal(t, uint32(20), cfgBC.CustomFinalityFeeUSDCents)
-	require.Equal(t, defaults.DestBytesOverhead, cfgBC.DestBytesOverhead)
-	require.Equal(t, defaults.DestGasOverhead, cfgBC.DestGasOverhead)
+	require.Equal(t, defaultsBC.DestBytesOverhead, cfgBC.DestBytesOverhead)
+	require.Equal(t, defaultsBC.DestGasOverhead, cfgBC.DestGasOverhead)
 	require.True(t, cfgBC.IsEnabled)
 
 	// Confirm that the configs for C->A match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgCA.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgCA.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgCA.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgCA.CustomFinalityFeeUSDCents)
+	defaultsCA := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelC, evmChainSelA)
+	require.Equal(t, defaultsCA.DefaultFinalityTransferFeeBps, cfgCA.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaultsCA.CustomFinalityTransferFeeBps, cfgCA.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaultsCA.DefaultFinalityFeeUSDCents, cfgCA.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaultsCA.CustomFinalityFeeUSDCents, cfgCA.CustomFinalityFeeUSDCents)
 	require.Equal(t, uint32(100_000), cfgCA.DestBytesOverhead)
 	require.Equal(t, uint32(10_000), cfgCA.DestGasOverhead)
 	require.True(t, cfgCA.IsEnabled)
 
 	// Confirm that the configs for C->B match what was set, and that sensible defaults are applied for fields that were not set
-	require.Equal(t, defaults.DefaultFinalityTransferFeeBps, cfgCB.DefaultFinalityTransferFeeBps)
-	require.Equal(t, defaults.CustomFinalityTransferFeeBps, cfgCB.CustomFinalityTransferFeeBps)
-	require.Equal(t, defaults.DefaultFinalityFeeUSDCents, cfgCB.DefaultFinalityFeeUSDCents)
-	require.Equal(t, defaults.CustomFinalityFeeUSDCents, cfgCB.CustomFinalityFeeUSDCents)
+	defaultsCB := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(evmChainSelC, evmChainSelB)
+	require.Equal(t, defaultsCB.DefaultFinalityTransferFeeBps, cfgCB.DefaultFinalityTransferFeeBps)
+	require.Equal(t, defaultsCB.CustomFinalityTransferFeeBps, cfgCB.CustomFinalityTransferFeeBps)
+	require.Equal(t, defaultsCB.DefaultFinalityFeeUSDCents, cfgCB.DefaultFinalityFeeUSDCents)
+	require.Equal(t, defaultsCB.CustomFinalityFeeUSDCents, cfgCB.CustomFinalityFeeUSDCents)
 	require.Equal(t, uint32(200_000), cfgCB.DestBytesOverhead)
 	require.Equal(t, uint32(20_000), cfgCB.DestGasOverhead)
 	require.True(t, cfgCB.IsEnabled)

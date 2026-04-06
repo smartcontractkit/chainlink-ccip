@@ -133,16 +133,18 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 			feeConfigSettings := map[string]map[uint64]*TokenTransferFeeConfig{}
 			minBlocksSettings := map[string]uint16{}
 			for _, pool := range src.TokenPools {
-				feeConfigSettings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
-				for _, dst := range pool.Destinations {
-					if args, err := inferTokenTransferFeeArgs(feesAdapter, e, pool.PoolAddress, src.Selector, dst.Selector, dst); err != nil {
-						return deployment.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for src %d, dst %d, and pool %s: %w", src.Selector, dst.Selector, pool.PoolAddress, err)
-					} else {
-						feeConfigSettings[pool.PoolAddress][dst.Selector] = args
-					}
-				}
 				if minBlockConfirmations, ok := pool.MinBlockConfirmations.Get(); ok {
 					minBlocksSettings[pool.PoolAddress] = minBlockConfirmations
+				}
+				if len(pool.Destinations) > 0 {
+					feeConfigSettings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
+					for _, dst := range pool.Destinations {
+						if args, err := inferTokenTransferFeeArgs(feesAdapter, e, pool.PoolAddress, src.Selector, dst.Selector, dst); err != nil {
+							return deployment.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for src %d, dst %d, and pool %s: %w", src.Selector, dst.Selector, pool.PoolAddress, err)
+						} else {
+							feeConfigSettings[pool.PoolAddress][dst.Selector] = args
+						}
+					}
 				}
 			}
 
