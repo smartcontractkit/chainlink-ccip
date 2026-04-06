@@ -24,9 +24,6 @@ import (
 	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
-// tokenSupportsAdminRole returns true if the token type supports AccessControl admin roles.
-// ERC20 is the basic token without role management.
-// BurnMint tokens inherit from AccessControl and support role management.
 func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
@@ -37,8 +34,6 @@ func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 	}
 }
 
-// tokenSupportsCCIPAdmin returns true if the token type supports AccessControl CCIP admin roles.
-// ERC20 is the basic token without role management.
 func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
@@ -49,8 +44,6 @@ func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 	}
 }
 
-// tokenSupportsPreMint returns true if the token type supports pre-minting tokens to the deployer
-// address during deployment.
 func tokenSupportsPreMint(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType:
@@ -72,13 +65,11 @@ var DeployToken = cldf_ops.NewSequence(
 		var tokenRef datastore.AddressRef
 		qualifier := input.Symbol
 
-		// Default max supply is 0 (i.e. unlimited supply)
 		maxSupply := big.NewInt(0)
 		if input.Supply != nil {
 			maxSupply = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.Supply), input.Decimals)
 		}
 
-		// Default pre-mint amount is 0 (i.e. don't pre mint any tokens)
 		preMint := big.NewInt(0)
 		if input.PreMint != nil {
 			preMint = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
@@ -108,7 +99,7 @@ var DeployToken = cldf_ops.NewSequence(
 					Symbol:    input.Symbol,
 					Decimals:  input.Decimals,
 					MaxSupply: maxSupply,
-					PreMint:   preMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
+					PreMint:   preMint,
 				},
 				Qualifier: &qualifier,
 			}, nil)
@@ -125,7 +116,7 @@ var DeployToken = cldf_ops.NewSequence(
 					Symbol:    input.Symbol,
 					Decimals:  input.Decimals,
 					MaxSupply: maxSupply,
-					PreMint:   preMint, // pre-mint given amount to deployer address. Not advised to use against mainnet.
+					PreMint:   preMint,
 				},
 				Qualifier: &qualifier,
 			}, nil)
@@ -140,7 +131,6 @@ var DeployToken = cldf_ops.NewSequence(
 		tokenAddr := common.HexToAddress(tokenRef.Address)
 		addresses = append(addresses, tokenRef)
 
-		// If senders are provided and token supports pre-minting, transfer the pre-minted tokens from the deployer to the first sender in the list
 		if tokenSupportsPreMint(input.Type) && preMint.Cmp(big.NewInt(0)) > 0 && len(input.Senders) > 0 {
 			firstSender := input.Senders[0]
 			if !common.IsHexAddress(firstSender) {
@@ -167,7 +157,6 @@ var DeployToken = cldf_ops.NewSequence(
 			writes = append(writes, transferReport.Output)
 		}
 
-		// set CCIP admin to the provided address
 		if input.CCIPAdmin != "" && tokenSupportsCCIPAdmin(input.Type) {
 			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
 				ChainSelector: chain.Selector,
@@ -180,9 +169,7 @@ var DeployToken = cldf_ops.NewSequence(
 			writes = append(writes, setCCIPAdminReport.Output)
 		}
 
-		// Grant admin role to external admin if provided and token supports it
 		if input.ExternalAdmin != "" && tokenSupportsAdminRole(input.Type) {
-			// Read the default admin role
 			token, err := bnm_erc20_bindings.NewBurnMintERC20(tokenAddr, chain.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
@@ -192,7 +179,6 @@ var DeployToken = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role constant: %w", err)
 			}
 
-			// Grant admin role to the external admin
 			grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
 				ChainSelector: chain.Selector,
 				Address:       tokenAddr,

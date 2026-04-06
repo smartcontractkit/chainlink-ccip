@@ -1,10 +1,12 @@
 package adapters
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -12,24 +14,19 @@ import (
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
-	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	evm16seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
-	ownershipAdapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -41,69 +38,29 @@ var (
 	_ tokens.TokenAdapter    = &TokenAdapter{}
 )
 
-// TokenAdapter is the adapter for EVM tokens using 2.0.0 token pools.
-type TokenAdapter struct{}
+// TokenAdapter handles EVM token pools at version 2.0.0.
+// It embeds EVMPoolAdapter for shared methods (DeriveTokenAddress,
+// ManualRegistration) and overrides the methods that have genuinely
+// different v2.0.0 logic (DeriveTokenDecimals with ERC20 fallback,
+// SetTokenPoolRateLimits with batch/custom finality, DeployTokenPoolForToken
+// with its own deploy sequences).
+type TokenAdapter struct {
+	evm1_0_0.EVMPoolAdapter
+}
+
+// NewTokenAdapter constructs a v2.0.0 TokenAdapter with pre-wired PoolOps.
+// DeployTokenPoolSeq is nil because DeployTokenPoolForToken is fully overridden.
+func NewTokenAdapter() *TokenAdapter {
+	return &TokenAdapter{
+		EVMPoolAdapter: evm1_0_0.EVMPoolAdapter{
+			Ops: &poolOpsV200{},
+		},
+	}
+}
 
 // ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 2.0.0 token pool.
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.ConfigureTokenForTransfers
-}
-
-// AddressRefToBytes returns an EVM address reference as an EVM address.
-func (t *TokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return common.HexToAddress(ref.Address).Bytes(), nil
-}
-
-// DeriveTokenAddress derives the token address from a token pool reference, returning it as an EVM address.
-func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
-	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-	if !ok {
-		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
-	}
-	getTokenReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       common.HexToAddress(poolRef.Address),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", poolRef.Address, evmChain, err)
-	}
-
-	return t.AddressRefToBytes(datastore.AddressRef{
-		Address: getTokenReport.Output.Hex(),
-	})
-}
-
-func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, chain.BlockChains] {
-	return evm16seq.DeployToken
-}
-
-func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, input tokens.DeployTokenInput) error {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-		ChainSelector: input.ChainSelector,
-		Type:          datastore.ContractType(input.Type),
-		Qualifier:     input.Symbol,
-	}, input.ChainSelector, datastore_utils.FullRef)
-	if err == nil {
-		e.OperationsBundle.Logger.Info("Token already deployed at address:", tokenAddr.Address)
-		return nil
-	}
-
-	if err := evmutils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
-		return err
-	}
-	if err := evmutils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
-		return err
-	}
-
-	if input.Decimals > 18 {
-		return fmt.Errorf("EVM tokens cannot have more than 18 decimals, got %d", input.Decimals)
-	}
-
-	if input.PreMint != nil && input.Supply != nil && *input.Supply != 0 && *input.PreMint > *input.Supply {
-		return fmt.Errorf("pre-mint amount cannot be greater than max supply, got pre-mint %d and supply %d", *input.PreMint, *input.Supply)
-	}
-
-	return nil
 }
 
 func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -121,7 +78,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 			}
 
-			// Parse threshold for additional CCVs
 			threshold := big.NewInt(0)
 			if input.ThresholdForAdditionalCCVs != "" {
 				var ok bool
@@ -131,7 +87,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				}
 			}
 
-			// Resolve token address
 			var tokenAddr string
 			if input.TokenRef != nil && input.TokenRef.Address != "" {
 				tokenAddr = input.TokenRef.Address
@@ -157,7 +112,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				qualifier = tokenAddr
 			}
 
-			// Skip if pool already exists in datastore
 			matches := input.ExistingDataStore.Addresses().Filter(
 				datastore.AddressRefByType(datastore.ContractType(input.PoolType)),
 				datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -173,7 +127,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, nil
 			}
 
-			// Get token decimals
 			tokenContract, err := erc20.NewERC20(common.HexToAddress(tokenAddr), evmChain.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind ERC20 at %s: %w", tokenAddr, err)
@@ -183,7 +136,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get decimals for token at %s: %w", tokenAddr, err)
 			}
 
-			// Find router and RMN proxy from datastore
 			routerRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: input.ChainSelector,
 				Type:          datastore.ContractType(router.ContractType),
@@ -207,7 +159,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				allowlist = append(allowlist, common.HexToAddress(addr))
 			}
 
-			// Build internal deploy input
 			internalInput := evm_tokens.DeployTokenPoolInput{
 				ChainSel:                         input.ChainSelector,
 				TokenPoolType:                    datastore.ContractType(input.PoolType),
@@ -225,7 +176,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				},
 			}
 
-			// Dispatch based on pool type
 			poolType := deployment.ContractType(input.PoolType)
 			var deployOutput sequences.OnChainOutput
 
@@ -250,14 +200,12 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			result.Addresses = append(result.Addresses, deployOutput.Addresses...)
 			result.BatchOps = append(result.BatchOps, deployOutput.BatchOps...)
 
-			// Grant mint/burn roles if the token is a BurnMint type and the pool is BurnMint
 			if isBurnMintPoolType(poolType) && len(deployOutput.Addresses) >= 1 {
 				toknRef, lookupErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 					ChainSelector: input.ChainSelector,
 					Address:       tokenAddr,
 				}, input.ChainSelector, datastore_utils.FullRef)
 				if lookupErr == nil && isBurnMintTokenType(toknRef.Type) {
-					// The first address in pool deploy output is the token pool
 					poolRef := deployOutput.Addresses[0]
 					poolAddr := common.HexToAddress(poolRef.Address)
 					if poolAddr == (common.Address{}) {
@@ -289,12 +237,9 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 	)
 }
 
-func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	return nil
-}
-
-func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
+// DeriveTokenDecimals has v2.0.0-specific logic: it falls back to ERC20.Decimals()
+// when the pool's GetTokenDecimals fails (e.g., proxy pools like USDCTokenPoolProxy).
+func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, tokenBytes []byte) (uint8, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -308,8 +253,7 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 	}
 	poolErr := err
 
-	// Fallback to fetch token's decimals directly, this is useful for proxy pools like USDCTokenPoolProxy which does not expose the GetTokenDecimals function.
-	tokenAddr := common.BytesToAddress(token)
+	tokenAddr := common.BytesToAddress(tokenBytes)
 	if tokenAddr.Cmp(common.Address{}) == 0 {
 		getTokenReport, getTokErr := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
 			ChainSelector: chainSelector,
@@ -332,10 +276,8 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 	return decimals, nil
 }
 
-func (t *TokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
-	return tokenPool, nil
-}
-
+// SetTokenPoolRateLimits has v2.0.0-specific logic: batch call with both
+// default and custom finality rate limits.
 func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-2.0-adapter:set-token-pool-rate-limits",
@@ -356,7 +298,6 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref %+v is zero", input.TokenPoolRef)
 			}
 
-			// 2.0.0 pools support separate default/custom finality rate limits via a batch call
 			args := []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector:      input.RemoteChainSelector,
@@ -405,152 +346,57 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 		})
 }
 
-func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"evm-2.0-adapter:manual-registration",
-		cciputils.Version_2_0_0,
-		"Manually register a token on the TokenAdminRegistry for EVM with 2.0.0 token pools",
-		func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.ManualRegistrationSequenceInput) (sequences.OnChainOutput, error) {
-			evmChain, ok := chains.EVMChains()[input.ChainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-			}
-
-			// Find token admin registry
-			tarRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(tarops.ContractType),
-				ChainSelector: evmChain.Selector,
-				Version:       tarops.Version,
-			}, evmChain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find TAR on chain %d: %w", evmChain.Selector, err)
-			}
-			tarAddr := common.HexToAddress(tarRef.Address)
-
-			// Resolve token address from TokenRef, with fallback to pool
-			tokenRef := input.TokenRef
-			if tokenRef.Address == "" {
-				if found, findErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, evmChain.Selector, datastore_utils.FullRef); findErr == nil {
-					tokenRef = found
-				} else {
-					b.Logger.Warnf("token address could not be resolved using TokenRef (%+v): %v; falling back to TokenPoolRef", tokenRef, findErr)
-					poolRef, poolErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, evmChain.Selector, datastore_utils.FullRef)
-					if poolErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token pool ref (%+v): %w", input.TokenPoolRef, poolErr)
-					}
-					tokenAddrReport, getErr := cldf_ops.ExecuteOperation(b, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(poolRef.Address),
-					})
-					if getErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to derive token address from pool %s: %w", poolRef.Address, getErr)
-					}
-					tokenRef = datastore.AddressRef{
-						ChainSelector: evmChain.Selector,
-						Address:       tokenAddrReport.Output.Hex(),
-					}
-				}
-			}
-
-			tokenAddr := common.HexToAddress(tokenRef.Address)
-			if tokenAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("resolved token address is zero for ref %+v", tokenRef)
-			}
-
-			if !common.IsHexAddress(input.ProposedOwner) {
-				return sequences.OnChainOutput{}, fmt.Errorf("proposed owner address %q is not a valid hex address", input.ProposedOwner)
-			}
-			proposedOwner := common.HexToAddress(input.ProposedOwner)
-			if proposedOwner == (common.Address{}) {
-				return sequences.OnChainOutput{}, errors.New("proposed owner address cannot be the zero address")
-			}
-
-			var result sequences.OnChainOutput
-			result, err = sequences.RunAndMergeSequence(b, chains,
-				tarseq.ManualRegistrationSequence,
-				tarseq.ManualRegistrationSequenceInput{
-					AdminAddress:  proposedOwner,
-					ChainSelector: evmChain.Selector,
-					TokenAddress:  tokenAddr,
-					Address:       tarAddr,
-				},
-				result,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to manually register token on chain %d: %w", evmChain.Selector, err)
-			}
-
-			return result, nil
-		})
-}
-
-func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
-	return cldf_ops.NewSequence(
-		"evm-2.0-adapter:update-authorities",
-		cciputils.Version_2_0_0,
-		"Transfer token pool ownership to timelock on EVM chain",
-		func(b cldf_ops.Bundle, e *deployment.Environment, input tokens.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
-			evmChain, ok := e.BlockChains.EVMChains()[input.ChainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-			}
-
-			timelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(cciputils.RBACTimelock),
-				ChainSelector: evmChain.Selector,
-				Qualifier:     cciputils.CLLQualifier,
-			}, evmChain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock for chain %d: %w", input.ChainSelector, err)
-			}
-
-			adapter := &ownershipAdapters.EVMTransferOwnershipAdapter{}
-			if err := adapter.InitializeTimelockAddress(*e, mcms.Input{Qualifier: cciputils.CLLQualifier}); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize timelock address: %w", err)
-			}
-
-			ownershipInput := deployapi.TransferOwnershipPerChainInput{
-				ChainSelector: evmChain.Selector,
-				CurrentOwner:  evmChain.DeployerKey.From.Hex(),
-				ProposedOwner: timelockRef.Address,
-				ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
-			}
-
-			var result sequences.OnChainOutput
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				adapter.SequenceTransferOwnershipViaMCMS(), ownershipInput, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership on chain %d: %w", input.ChainSelector, err)
-			}
-
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				adapter.SequenceAcceptOwnership(), ownershipInput, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership on chain %d: %w", input.ChainSelector, err)
-			}
-
-			return result, nil
-		})
-}
-
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.MigrateLockReleasePoolLiquidity
 }
 
-// isBurnMintPoolType returns true for 2.0.0 burn/mint pool types.
+// poolOpsV200 implements PoolOps using v2.0.0 token pool bindings.
+// Only GetToken and Version are called at runtime (by the inherited
+// DeriveTokenAddress and ManualRegistration); the other methods are
+// stubs because the v2.0.0 adapter overrides the methods that use them.
+type poolOpsV200 struct{}
+
+func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.Address) (common.Address, error) {
+	res, err := cldf_ops.ExecuteOperation(b,
+		token_pool.GetToken, ch,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: ch.Selector,
+			Address:       poolAddr,
+		},
+	)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("GetToken v2.0.0: %w", err)
+	}
+	return res.Output, nil
+}
+
+func (p *poolOpsV200) GetTokenDecimals(_ context.Context, _ evm.Chain, _ common.Address) (uint8, error) {
+	return 0, errors.New("poolOpsV200.GetTokenDecimals: not used; v2.0.0 adapter overrides DeriveTokenDecimals")
+}
+
+func (p *poolOpsV200) GetPoolAdmins(_ context.Context, _ *evm.Chain, _ common.Address) (common.Address, common.Address, error) {
+	return common.Address{}, common.Address{}, errors.New("poolOpsV200.GetPoolAdmins: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+}
+
+func (p *poolOpsV200) SetRateLimiterConfig(_ cldf_ops.Bundle, _ evm.Chain, _ common.Address, _ uint64, _, _ tokens.RateLimiterConfig) (contract.WriteOutput, error) {
+	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimiterConfig: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+}
+
+func (p *poolOpsV200) Version() *semver.Version {
+	return cciputils.Version_2_0_0
+}
+
 func isBurnMintPoolType(poolType deployment.ContractType) bool {
 	return poolType == cciputils.BurnMintTokenPool ||
 		poolType == cciputils.BurnFromMintTokenPool ||
 		poolType == cciputils.BurnWithFromMintTokenPool
 }
 
-// isLockReleasePoolType returns true for 2.0.0 lock/release pool types.
 func isLockReleasePoolType(poolType deployment.ContractType) bool {
 	return poolType == cciputils.LockReleaseTokenPool ||
 		poolType == siloed_lock_release_token_pool.ContractType
 }
 
-// isBurnMintTokenType returns true for EVM burn/mint token types that support role management.
 func isBurnMintTokenType(typ datastore.ContractType) bool {
 	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
 }
