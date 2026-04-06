@@ -9,7 +9,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -129,13 +128,8 @@ func TestEVMTokenDeployments(t *testing.T) {
 				expectedPreMintReceiver = common.HexToAddress(tc.sender)
 			}
 
-			// Get the EVM token adapter and execute the DeployToken sequence directly
-			tokenAdapterRegistry := tokensapi.GetTokenAdapterRegistry()
-			evmAdapter, exists := tokenAdapterRegistry.GetTokenAdapter(chain_selectors.FamilyEVM, utils.Version_1_6_0)
-			require.True(t, exists, "EVM token adapter should be registered")
-
 			tokenInput.ExistingDataStore = e.DataStore
-			deployTokenSeq := evmAdapter.DeployToken()
+			deployTokenSeq := DeployToken
 			require.NotNil(t, deployTokenSeq, "DeployToken sequence should not be nil")
 
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, deployTokenSeq, e.BlockChains, tokenInput)
