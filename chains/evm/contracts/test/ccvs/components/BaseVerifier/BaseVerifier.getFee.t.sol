@@ -18,11 +18,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_WithWaitForSafeFlag() public {
-    // Configure chain to allow the WAIT_FOR_SAFE flag.
-    BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
-    configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    configs[0].allowedFinalityConfig = FinalityCodec.WAIT_FOR_SAFE_FLAG;
-    s_baseVerifier.applyRemoteChainConfigUpdates(configs);
+    s_baseVerifier.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_SAFE_FLAG);
 
     Client.EVM2AnyMessage memory message;
     (uint256 feeUSDCents,,) = s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec.WAIT_FOR_SAFE_FLAG);
@@ -30,11 +26,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_WithAllowedBlockDepth() public {
-    // Configure chain to allow up to block depth 10.
-    BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
-    configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    configs[0].allowedFinalityConfig = FinalityCodec._encodeBlockDepth(10);
-    s_baseVerifier.applyRemoteChainConfigUpdates(configs);
+    s_baseVerifier.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(10));
 
     Client.EVM2AnyMessage memory message;
     // Request 10 blocks — meets the minimum of 10 (requesting at least the minimum is allowed).
@@ -44,11 +36,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   }
 
   function test_getFee_RevertWhen_BlockDepthBelowMinimum() public {
-    // Configure chain to require at least block depth 10.
-    BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
-    configs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    configs[0].allowedFinalityConfig = FinalityCodec._encodeBlockDepth(10);
-    s_baseVerifier.applyRemoteChainConfigUpdates(configs);
+    s_baseVerifier.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(10));
 
     Client.EVM2AnyMessage memory message;
     // Request 5 blocks — below the minimum of 10.

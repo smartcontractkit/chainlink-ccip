@@ -9,7 +9,6 @@ import {LombardVerifier} from "../../ccvs/LombardVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
-import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
@@ -75,8 +74,7 @@ contract e2e_lombard is OnRampSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
     s_sourceCommitteeVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
 
@@ -139,8 +137,7 @@ contract e2e_lombard is OnRampSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
     s_destLombardVerifier.applyRemoteChainConfigUpdates(lombardSourceConfig);
 
