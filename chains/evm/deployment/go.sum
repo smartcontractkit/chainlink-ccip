@@ -743,6 +743,7 @@ github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 h1:FJAFgXS9
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10/go.mod h1:oiDa54M0FwxevWwyAX773lwdWvFYYlYHHQV1LQ5HpWY=
 github.com/smartcontractkit/chainlink-deployments-framework v0.93.0 h1:FzwtFJmasVhALpKvWZn+zOOlgty7cw2K70dzvjQIAKg=
 github.com/smartcontractkit/chainlink-deployments-framework v0.93.0/go.mod h1:XTN/14+Ch8/+q+sdIastZWO/n9ID+ZnxKWD/aLqLDLw=
+github.com/smartcontractkit/chainlink-deployments-framework v0.94.0 h1:z+8phMpBzPXGzPhOOl+AtRJt9vj/y9pU6ZB6/xZ4qa8=
 github.com/smartcontractkit/chainlink-deployments-framework v0.94.0/go.mod h1:J0ITsNrymaQzLYXHr1mbS7cS0nBD7lJI6bCLVa3j4Po=
 github.com/smartcontractkit/chainlink-evm v0.3.3 h1:JqwyJEtnNEUaoQQPoOBTT4sn2lpdIZHtf0Hr0M60YDw=
 github.com/smartcontractkit/chainlink-evm v0.3.3/go.mod h1:q0ZBvaoisNaqC8NcMYWNPTjee88nQktDEeJMQHq3hVI=
@@ -781,6 +782,7 @@ github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d h1:LokA9Po
 github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d/go.mod h1:Acy3BTBxou83ooMESLO90s8PKSu7RvLCzwSTbxxfOK0=
 github.com/smartcontractkit/mcms v0.37.0 h1:h3tqQhVdLezyHOuPsGcknPFLlZlXpOHTchwlfO3D9s8=
 github.com/smartcontractkit/mcms v0.37.0/go.mod h1:7YqJPR8w9GiO1L/JjjTrwlSwAZ7i3J7cgOcu88PqtvU=
+github.com/smartcontractkit/mcms v0.39.0 h1:ORIpFZnNj24FQUZCktnZCNMUpNmd4kz15/Vddrk/LXc=
 github.com/smartcontractkit/mcms v0.39.0/go.mod h1:7YqJPR8w9GiO1L/JjjTrwlSwAZ7i3J7cgOcu88PqtvU=
 github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 h1:+jumHNA0Wrelhe64i8F6HNlS8pkoyMv5sreGx2Ry5Rw=
 github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8/go.mod h1:3n1Cwaq1E1/1lhQhtRK2ts/ZwZEhjcQeJQ1RuC6Q/8U=
