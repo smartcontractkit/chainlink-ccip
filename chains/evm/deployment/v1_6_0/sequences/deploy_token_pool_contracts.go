@@ -16,11 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	v1_5_1_burn_from_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/burn_from_mint_token_pool"
-	v1_5_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/burn_mint_token_pool"
-	v1_5_1_burn_to_address_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/burn_to_address_mint_token_pool"
-	v1_5_1_burn_with_from_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/burn_with_from_mint_token_pool"
-	v1_5_1_lock_release_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/lock_release_token_pool"
 	v1_6_0_burn_mint_with_external_minter_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/burn_mint_with_external_minter_token_pool"
 	v1_6_0_hybrid_with_external_minter_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/hybrid_with_external_minter_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
@@ -307,94 +302,6 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}, nil)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy HybridWithExternalMinterTokenPool v1.6.0: %w", err)
-			}
-
-		// v1.5.1 pools
-		case v1_5_1_burn_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_mint_token_pool.ConstructorArgs]{
-				TypeAndVersion: v1_5_1_burn_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
-				Args: v1_5_1_burn_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr),
-					LocalTokenDecimals: tokenDecimal,
-					Allowlist:          allowlist,
-					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
-					Router:             common.HexToAddress(routerAddr.Address),
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintTokenPool v1.5.1: %w", err)
-			}
-
-		case v1_5_1_burn_from_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_from_mint_token_pool.ConstructorArgs]{
-				TypeAndVersion: v1_5_1_burn_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
-				Args: v1_5_1_burn_from_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr),
-					LocalTokenDecimals: tokenDecimal,
-					Allowlist:          allowlist,
-					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
-					Router:             common.HexToAddress(routerAddr.Address),
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnFromMintTokenPool v1.5.1: %w", err)
-			}
-
-		case v1_5_1_burn_to_address_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_to_address_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_to_address_mint_token_pool.ConstructorArgs]{
-				TypeAndVersion: v1_5_1_burn_to_address_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
-				Args: v1_5_1_burn_to_address_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr),
-					LocalTokenDecimals: tokenDecimal,
-					Allowlist:          allowlist,
-					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
-					Router:             common.HexToAddress(routerAddr.Address),
-					BurnAddress:        common.HexToAddress(input.BurnAddress),
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnToAddressMintTokenPool v1.5.1: %w", err)
-			}
-
-		case v1_5_1_burn_with_from_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_with_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_with_from_mint_token_pool.ConstructorArgs]{
-				TypeAndVersion: v1_5_1_burn_with_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
-				Args: v1_5_1_burn_with_from_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr),
-					LocalTokenDecimals: tokenDecimal,
-					Allowlist:          allowlist,
-					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
-					Router:             common.HexToAddress(routerAddr.Address),
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnWithFromMintTokenPool v1.5.1: %w", err)
-			}
-
-		case v1_5_1_lock_release_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_lock_release_token_pool.ConstructorArgs]{
-				TypeAndVersion: v1_5_1_lock_release_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
-				Args: v1_5_1_lock_release_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr),
-					LocalTokenDecimals: tokenDecimal,
-					Allowlist:          allowlist,
-					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
-					AcceptLiquidity:    *input.AcceptLiquidity,
-					Router:             common.HexToAddress(routerAddr.Address),
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LockReleaseTokenPool v1.5.1: %w", err)
 			}
 
 		default:

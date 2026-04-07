@@ -104,6 +104,11 @@ type DeployTokenPoolInput struct {
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
 	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
+	// ThresholdAmountForAdditionalCCVs is the transfer amount (in base units, as a decimal string)
+	// above which additional CCVs are required. Matches AdvancedPoolHooks'
+	// thresholdAmountForAdditionalCCVs. Applicable to EVM 2.0.0+ token pools.
+	// If empty or "0", no threshold is set.
+	ThresholdAmountForAdditionalCCVs string `yaml:"thresholdAmountForAdditionalCCVs,omitempty" json:"thresholdAmountForAdditionalCCVs,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -128,9 +133,13 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 			if err != nil {
 				return fmt.Errorf("not a valid selector: %v", err)
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			adapterVersion := input.TokenPoolVersion
+			if adapterVersion == nil {
+				adapterVersion = cfg.ChainAdapterVersion
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
 			if !exists {
-				return fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+				return fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
 			}
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
@@ -164,9 +173,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			adapterVersion := input.TokenPoolVersion
+			if adapterVersion == nil {
+				adapterVersion = cfg.ChainAdapterVersion
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
 			}
 
 			// deploy token
@@ -227,30 +240,19 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			}
 
 			if input.DeployTokenPoolInput != nil {
-				refToConnect := tokenRef
-				providedRef := input.DeployTokenPoolInput.TokenRef
-				if refToConnect == nil && providedRef == nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot deploy token pool without token address", selector)
-				} else if refToConnect != nil && providedRef != nil {
-					// cross check the deployed token address with the provided token ref address
-					if refToConnect.Address != providedRef.Address {
-						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, providedRef.Address)
-					}
-					if refToConnect.Qualifier != providedRef.Qualifier {
-						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, providedRef.Qualifier)
-					}
-				} else if refToConnect == nil {
-					// if token is not deployed by this changeset but token ref is provided, use the provided token ref
-					refToConnect = input.DeployTokenPoolInput.TokenRef
+				newTokenRef, err := datastore_utils.MergeRefs(
+					tokenRef,
+					input.DeployTokenPoolInput.TokenRef,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
+				tokenRef = &newTokenRef
 				// deploy token pool
 				tmpDatastore = datastore.NewMemoryDataStore()
-				deployTokenPoolInput := DeployTokenPoolInput{
-					TokenRef:           refToConnect,
-					TokenPoolVersion:   input.TokenPoolVersion,
-					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
-					PoolType:           input.DeployTokenPoolInput.PoolType,
-				}
+				deployTokenPoolInput := *input.DeployTokenPoolInput
+				deployTokenPoolInput.TokenRef = tokenRef
+				deployTokenPoolInput.TokenPoolVersion = input.TokenPoolVersion
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector
 				deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
@@ -349,9 +351,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			adapterVersion := cfg.TokenExpansionInputPerChain[selector].TokenPoolVersion
+			if adapterVersion == nil {
+				adapterVersion = cfg.ChainAdapterVersion
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
 			}
 			fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenPoolRef, selector, datastore_utils.FullRef)
 			if err != nil {

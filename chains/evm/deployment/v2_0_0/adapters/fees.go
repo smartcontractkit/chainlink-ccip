@@ -7,9 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	evmseq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -178,6 +180,85 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdates operation: %w", err)
 			}
+
+			return result, nil
+		},
+	)
+}
+
+func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig {
+	return a.evm.GetFeeQuoterDestChainConfig()
+}
+
+func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error) {
+	chain, ok := e.BlockChains.EVMChains()[src]
+	if !ok {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("chain with selector %d not defined", src)
+	}
+
+	fqRef, err := a.GetFeeContractRef(e, src, dst)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
+	}
+
+	fqAddr := common.HexToAddress(fqRef.Address)
+	fq, err := fqops.NewFeeQuoterContract(fqAddr, chain.Client)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to instantiate FeeQuoter 2.0 contract at %s on chain %d: %w", fqAddr.Hex(), src, err)
+	}
+
+	onchain, err := fq.GetDestChainConfig(&bind.CallOpts{Context: e.GetContext()}, dst)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get dest chain config from FeeQuoter 2.0 at %s for src %d, dst %d: %w", fqAddr.Hex(), src, dst, err)
+	}
+
+	return evmseq16.ReverseTranslateFQV2(onchain), nil
+}
+
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"ApplyDestChainConfigUpdatesV2",
+		semver.MustParse("2.0.0"),
+		"Applies FeeQuoter 2.0 destination chain config updates",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.ApplyDestChainConfigSequenceInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+
+			evmChain, ok := chains.EVMChains()[input.Selector]
+			if !ok {
+				return result, fmt.Errorf("chain with selector %d not defined", input.Selector)
+			}
+
+			fqRef, err := a.GetFeeContractRef(e, input.Selector, 0)
+			if err != nil {
+				return result, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", input.Selector, err)
+			}
+			fqAddr := common.HexToAddress(fqRef.Address)
+
+			args := make([]fqops.DestChainConfigArgs, 0, len(input.Settings))
+			for dst, cfg := range input.Settings {
+				args = append(args, fqops.DestChainConfigArgs{
+					DestChainSelector: dst,
+					DestChainConfig:   evmseq16.TranslateFQtoV2(cfg),
+				})
+			}
+
+			report, err := operations.ExecuteOperation(
+				b, fqops.ApplyDestChainConfigUpdates, evmChain,
+				contract.FunctionInput[[]fqops.DestChainConfigArgs]{
+					ChainSelector: evmChain.Selector,
+					Address:       fqAddr,
+					Args:          args,
+				},
+			)
+			if err != nil {
+				return result, fmt.Errorf("failed to apply dest chain config updates on FeeQuoter 2.0 for chain %d: %w", input.Selector, err)
+			}
+
+			batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+			if err != nil {
+				return result, fmt.Errorf("failed to create batch operation from writes for chain %d: %w", input.Selector, err)
+			}
+			result.BatchOps = append(result.BatchOps, batch)
 
 			return result, nil
 		},

@@ -26,13 +26,29 @@ const (
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
 	RMNHome                    cldf.ContractType = "RMNHome"
-	BurnMintTokenPool          cldf.ContractType = "BurnMintTokenPool"
-	LockReleaseTokenPool       cldf.ContractType = "LockReleaseTokenPool"
 	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
 	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
 	FeeQuoter                  cldf.ContractType = "FeeQuoter"
+	RegistryModule             cldf.ContractType = "RegistryModuleOwnerCustom"
+	EVMSignerRegistry          cldf.ContractType = "SignerRegistry"
+
+	// Pools
+	TokenPoolFactory                    cldf.ContractType = "TokenPoolFactory"
+	LinkToken                           cldf.ContractType = "LinkToken"
+	FactoryBurnMintERC20Token           cldf.ContractType = "FactoryBurnMintERC20Token"
+	ERC677TokenHelper                   cldf.ContractType = "ERC677TokenHelper"
+	USDCTokenPool                       cldf.ContractType = "USDCTokenPool"
+	CCTPMessageTransmitterProxy         cldf.ContractType = "CCTPMessageTransmitterProxy"
+	HybridLockReleaseUSDCTokenPool      cldf.ContractType = "HybridLockReleaseUSDCTokenPool"
+	BurnMintWithExternalMinterTokenPool cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
+	HybridWithExternalMinterTokenPool   cldf.ContractType = "HybridWithExternalMinterTokenPool"
+	BurnMintTokenPool                   cldf.ContractType = "BurnMintTokenPool"
+	LockReleaseTokenPool                cldf.ContractType = "LockReleaseTokenPool"
+	BurnMintWithLockReleaseFlag         cldf.ContractType = "BurnMintWithLockReleaseFlag"
+	TokenGovernor                       cldf.ContractType = "TokenGovernor"
+
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
@@ -109,6 +125,9 @@ var (
 	Version_2_0_0 = semver.MustParse("2.0.0")
 )
 
+// StripPatchVersion returns a copy of the version with the patch component set
+// to 0, preserving major and minor. Useful for adapter registry lookups where
+// patch versions should not affect compatibility.
 func StripPatchVersion(version *semver.Version) *semver.Version {
 	return semver.New(version.Major(), version.Minor(), 0, version.Prerelease(), version.Metadata())
 }

@@ -15,6 +15,7 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -179,6 +180,95 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdates operation: %w", err)
+			}
+
+			return result, nil
+		},
+	)
+}
+
+func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig {
+	return a.evm.GetFeeQuoterDestChainConfig()
+}
+
+func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error) {
+	chain, ok := e.BlockChains.EVMChains()[src]
+	if !ok {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("chain with selector %d not defined", src)
+	}
+
+	fqRef, err := a.GetFeeContractRef(e, src, dst)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
+	}
+
+	fqAddr := common.HexToAddress(fqRef.Address)
+	fq, err := fee_quoter.NewFeeQuoter(fqAddr, chain.Client)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to instantiate FeeQuoter contract at %s on chain %d: %w", fqAddr.Hex(), src, err)
+	}
+
+	onchain, err := fq.GetDestChainConfig(&bind.CallOpts{Context: e.GetContext()}, dst)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get dest chain config from FeeQuoter at %s for src %d, dst %d: %w", fqAddr.Hex(), src, dst, err)
+	}
+
+	return evmseq.ReverseTranslateFQ(fqops.DestChainConfig{
+		IsEnabled:                         onchain.IsEnabled,
+		MaxNumberOfTokensPerMsg:           onchain.MaxNumberOfTokensPerMsg,
+		MaxDataBytes:                      onchain.MaxDataBytes,
+		MaxPerMsgGasLimit:                 onchain.MaxPerMsgGasLimit,
+		DestGasOverhead:                   onchain.DestGasOverhead,
+		DestGasPerPayloadByteBase:         onchain.DestGasPerPayloadByteBase,
+		DestGasPerPayloadByteHigh:         onchain.DestGasPerPayloadByteHigh,
+		DestGasPerPayloadByteThreshold:    onchain.DestGasPerPayloadByteThreshold,
+		DestDataAvailabilityOverheadGas:   onchain.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    onchain.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: onchain.DestDataAvailabilityMultiplierBps,
+		ChainFamilySelector:               onchain.ChainFamilySelector,
+		EnforceOutOfOrder:                 onchain.EnforceOutOfOrder,
+		DefaultTokenFeeUSDCents:           onchain.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead:       onchain.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:                 onchain.DefaultTxGasLimit,
+		GasMultiplierWeiPerEth:            onchain.GasMultiplierWeiPerEth,
+		GasPriceStalenessThreshold:        onchain.GasPriceStalenessThreshold,
+		NetworkFeeUSDCents:                onchain.NetworkFeeUSDCents,
+	}), nil
+}
+
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"ApplyDestChainConfigUpdates",
+		semver.MustParse("1.6.0"),
+		"Applies FeeQuoter 1.6 destination chain config updates",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.ApplyDestChainConfigSequenceInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+
+			fqRef, err := a.GetFeeContractRef(e, input.Selector, 0)
+			if err != nil {
+				return result, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", input.Selector, err)
+			}
+			fqAddr := common.HexToAddress(fqRef.Address)
+
+			args := make([]fqops.DestChainConfigArgs, 0, len(input.Settings))
+			for dst, cfg := range input.Settings {
+				args = append(args, fqops.DestChainConfigArgs{
+					DestChainSelector: dst,
+					DestChainConfig:   evmseq.TranslateFQ(cfg),
+				})
+			}
+
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				evmseq.FeeQuoterApplyDestChainConfigUpdatesSequence,
+				evmseq.FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+					Address:        fqAddr,
+					ChainSelector:  input.Selector,
+					UpdatesByChain: args,
+				},
+				result,
+			)
+			if err != nil {
+				return result, fmt.Errorf("failed to apply dest chain config updates on FeeQuoter 1.6 for chain %d: %w", input.Selector, err)
 			}
 
 			return result, nil
