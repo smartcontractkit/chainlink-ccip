@@ -7,8 +7,8 @@ import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../../libraries/Client.sol";
-
 import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
+
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
@@ -29,6 +29,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address senders);
   event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
+  event FinalityConfigSet(bytes4 allowedFinality);
 
   // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
@@ -36,7 +37,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint16 feeUSDCents; //          │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
     uint32 gasForVerification; //   │ The gas to reserve for verification of messages on the remote chain.
     uint16 payloadSizeBytes; //     │ The size of the verification payload on the remote chain.
-    bytes4 allowedFinalityConfig; //│ The finality configuration for the local chain for messages to the remote chain.
     bool allowlistEnabled; // ──────╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
@@ -46,9 +46,8 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 remoteChainSelector; // │ Remote chain selector.
     bool allowlistEnabled; //      │ True if the allowlist is enabled.
     uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this remote chain.
-    uint32 gasForVerification; // ────╮ The gas to reserve for verification of messages on the remote chain.
-    uint16 payloadSizeBytes; //       │ The size of the verification payload on the remote chain.
-    bytes4 allowedFinalityConfig; // ─╯ The finality configuration for the local chain for messages to the remote chain.
+    uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the remote chain.
+    uint16 payloadSizeBytes; // ───╯ The size of the verification payload on the remote chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -68,6 +67,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// @dev The storage locations for off-chain components to read from. Implementations of the BaseVerifier should
   /// implement a way to update this value if needed.
   string[] internal s_storageLocations;
+
+  /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`).
+  /// FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
+  bytes4 internal s_allowedFinalityConfig;
 
   constructor(
     string[] memory storageLocations,
@@ -110,6 +113,25 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     return s_storageLocations;
   }
 
+  /// @notice Gets the finality config as defined in the FinalityCodec library. This value does NOT 1:1 translate to
+  /// a block depth. The finality config contains special flags and should only be encoded/decoded using the
+  /// FinalityCodec library. Checks must happen by calling `FinalityCodec._ensureRequestedFinalityAllowed`.
+  function getAllowedFinalityConfig() public view virtual returns (bytes4 allowedFinality) {
+    return s_allowedFinalityConfig;
+  }
+
+  /// @notice Sets the finality config according to the FinalityCodec library encoding.
+  /// @param allowedFinality The finality settings allowed in this verifier, according to the FinalityCodec encoding.
+  function _setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) internal virtual {
+    // Any bytes4 value is accepted as allowedFinality; the FinalityCodec semantics are enforced when requests are
+    // checked against this value via FinalityCodec._ensureRequestedFinalityAllowed.
+    s_allowedFinalityConfig = allowedFinality;
+
+    emit FinalityConfigSet(allowedFinality);
+  }
+
   /// @notice get ChainConfig configured for the remoteChainSelector.
   /// @param remoteChainSelector The remote chain selector.
   /// @return remoteChainConfig The struct containing the remote chain settings.
@@ -130,8 +152,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
         allowlistEnabled: config.allowlistEnabled,
         feeUSDCents: config.feeUSDCents,
         gasForVerification: config.gasForVerification,
-        payloadSizeBytes: config.payloadSizeBytes,
-        allowedFinalityConfig: config.allowedFinalityConfig
+        payloadSizeBytes: config.payloadSizeBytes
       }),
       config.allowedSendersList.values()
     );
@@ -168,7 +189,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       remoteChainConfig.gasForVerification = remoteChainConfigArg.gasForVerification;
       // The payload could be zero bytes if no offchain data is required.
       remoteChainConfig.payloadSizeBytes = remoteChainConfigArg.payloadSizeBytes;
-      remoteChainConfig.allowedFinalityConfig = remoteChainConfigArg.allowedFinalityConfig;
 
       emit RemoteChainConfigSet(
         remoteChainSelector, address(remoteChainConfigArg.router), remoteChainConfig.allowlistEnabled
@@ -265,7 +285,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     if (config.router == IRouter(address(0))) {
       revert RemoteChainNotSupported(destChainSelector);
     }
-    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, config.allowedFinalityConfig);
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, getAllowedFinalityConfig());
 
     return (config.feeUSDCents, config.gasForVerification, config.payloadSizeBytes);
   }

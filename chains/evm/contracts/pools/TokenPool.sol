@@ -424,11 +424,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
 
     uint256 amount = lockOrBurnIn.amount - feeAmount;
-    // If FTF is requested, validate against the allowed and apply the custom rate limit.
     if (requestedFinality != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
-      // Use the codec to validate that the requested finality is allowed by the pool's configuration. This will revert
-      // if the requested finality is not allowed.
-      FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, s_allowedFinalityConfig);
       _consumeFastFinalityOutboundRateLimit(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount);
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount);

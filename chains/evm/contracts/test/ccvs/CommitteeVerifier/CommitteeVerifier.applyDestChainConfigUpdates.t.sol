@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
-import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {CommitteeVerifierSetup} from "./CommitteeVerifierSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -20,8 +19,7 @@ contract CommitteeVerifier_applyRemoteChainConfigUpdates is CommitteeVerifierSet
       allowlistEnabled: true,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
     vm.expectEmit();

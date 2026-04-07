@@ -85,8 +85,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
-      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE,
-      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
     s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
