@@ -10,9 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
@@ -148,12 +149,11 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			})
 
 			remoteChainConfigArgs = append(remoteChainConfigArgs, lombard_verifier.RemoteChainConfigArgs{
-				Router:                routerAddress,
-				RemoteChainSelector:   remoteChainSelector,
-				FeeUSDCents:           remoteChain.FeeUSDCents,
-				GasForVerification:    remoteChain.GasForVerification,
-				PayloadSizeBytes:      remoteChain.PayloadSizeBytes,
-				AllowedFinalityConfig: remoteChain.AllowedFinalityConfig,
+				Router:              routerAddress,
+				RemoteChainSelector: remoteChainSelector,
+				FeeUSDCents:         remoteChain.FeeUSDCents,
+				GasForVerification:  remoteChain.GasForVerification,
+				PayloadSizeBytes:    remoteChain.PayloadSizeBytes,
 			})
 
 			advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{

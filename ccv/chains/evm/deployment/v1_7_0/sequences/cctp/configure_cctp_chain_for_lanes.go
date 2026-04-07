@@ -442,12 +442,11 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 			ChainSelector:         remoteChainSelector,
 		})
 		remoteChainConfigArgs = append(remoteChainConfigArgs, cctp_verifier.RemoteChainConfigArgs{
-			Router:                routerAddress,
-			RemoteChainSelector:   remoteChainSelector,
-			FeeUSDCents:           remoteChain.FeeUSDCents,
-			GasForVerification:    remoteChain.GasForVerification,
-			PayloadSizeBytes:      remoteChain.PayloadSizeBytes,
-			AllowedFinalityConfig: remoteChain.AllowedFinalityConfig,
+			Router:              routerAddress,
+			RemoteChainSelector: remoteChainSelector,
+			FeeUSDCents:         remoteChain.FeeUSDCents,
+			GasForVerification:  remoteChain.GasForVerification,
+			PayloadSizeBytes:    remoteChain.PayloadSizeBytes,
 		})
 	}
 	return setDomainArgs, remoteChainConfigArgs, nil

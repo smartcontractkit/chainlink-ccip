@@ -77,6 +77,10 @@ func (c *LombardVerifierContract) SetRemoteAdapters(opts *bind.TransactOpts, arg
 	return c.contract.Transact(opts, "setRemoteAdapters", args)
 }
 
+func (c *LombardVerifierContract) SetAllowedFinalityConfig(opts *bind.TransactOpts, args [4]byte) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setAllowedFinalityConfig", args)
+}
+
 func (c *LombardVerifierContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "setDynamicConfig", args)
 }
@@ -377,6 +381,24 @@ var SetRemoteAdapters = contract.NewWrite(contract.WriteParams[[]RemoteAdapterAr
 		args []RemoteAdapterArgs,
 	) (*types.Transaction, error) {
 		return c.SetRemoteAdapters(opts, args)
+	},
+})
+
+var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *LombardVerifierContract]{
+	Name:            "lombard-verifier:set-allowed-finality-config",
+	Version:         Version,
+	Description:     "Calls setAllowedFinalityConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     LombardVerifierABI,
+	NewContract:     NewLombardVerifierContract,
+	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, [4]byte],
+	Validate:        func([4]byte) error { return nil },
+	CallContract: func(
+		c *LombardVerifierContract,
+		opts *bind.TransactOpts,
+		args [4]byte,
+	) (*types.Transaction, error) {
+		return c.SetAllowedFinalityConfig(opts, args)
 	},
 })
 

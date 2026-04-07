@@ -308,6 +308,8 @@ contracts:
         access: owner
       - name: setRemoteAdapters
         access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
       - name: setDynamicConfig
         access: owner
       - name: applyAllowlistUpdates
@@ -349,6 +351,8 @@ contracts:
       - name: applyAllowlistUpdates
         access: owner
       - name: updateStorageLocations
+        access: owner
+      - name: setAllowedFinalityConfig
         access: owner
       - name: withdrawFeeTokens
         access: owner

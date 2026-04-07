@@ -81,6 +81,10 @@ func (c *CCTPVerifierContract) UpdateStorageLocations(opts *bind.TransactOpts, a
 	return c.contract.Transact(opts, "updateStorageLocations", args)
 }
 
+func (c *CCTPVerifierContract) SetAllowedFinalityConfig(opts *bind.TransactOpts, args [4]byte) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setAllowedFinalityConfig", args)
+}
+
 func (c *CCTPVerifierContract) WithdrawFeeTokens(opts *bind.TransactOpts, args []common.Address) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "withdrawFeeTokens", args)
 }
@@ -359,6 +363,24 @@ var UpdateStorageLocations = contract.NewWrite(contract.WriteParams[[]string, *C
 		args []string,
 	) (*types.Transaction, error) {
 		return c.UpdateStorageLocations(opts, args)
+	},
+})
+
+var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *CCTPVerifierContract]{
+	Name:            "cctp-verifier:set-allowed-finality-config",
+	Version:         Version,
+	Description:     "Calls setAllowedFinalityConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     CCTPVerifierABI,
+	NewContract:     NewCCTPVerifierContract,
+	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, [4]byte],
+	Validate:        func([4]byte) error { return nil },
+	CallContract: func(
+		c *CCTPVerifierContract,
+		opts *bind.TransactOpts,
+		args [4]byte,
+	) (*types.Transaction, error) {
+		return c.SetAllowedFinalityConfig(opts, args)
 	},
 })
 
