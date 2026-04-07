@@ -374,6 +374,8 @@ contracts:
         access: owner
       - name: applyRemoteChainConfigUpdates
         access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
       - name: applyAllowlistUpdates
         access: owner
       - name: withdrawFeeTokens
