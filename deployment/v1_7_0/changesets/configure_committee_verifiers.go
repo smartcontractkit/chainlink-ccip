@@ -52,8 +52,12 @@ func (r *TopologyCommitteePopulator) PopulateCommitteeConfig(
 		return nil, fmt.Errorf("TopologyCommitteePopulator: contractRegistry must not be nil")
 	}
 	r.signingKeysOnce.Do(func() {
-		r.signingKeys, r.signingKeysErr = fetchSigningKeysForNOPsFiltered(e, r.topology.NOPTopology.NOPs, func(_ offchain.NOPConfig) bool {
-			return true
+		committeeNOPs := committeeNOPAliases(r.topology.NOPTopology)
+		r.signingKeys, r.signingKeysErr = fetchSigningKeysForNOPsFiltered(e, r.topology.NOPTopology.NOPs, func(nop offchain.NOPConfig) bool {
+			if _, ok := committeeNOPs[nop.Alias]; !ok {
+				return false
+			}
+			return len(nop.SignerAddressByFamily) == 0
 		})
 	})
 	if r.signingKeysErr != nil {
@@ -189,4 +193,16 @@ func signerAddressForNOPAlias(
 		"NOP %q missing signer_address for family %s on committee %q chain %d",
 		alias, localFamily, committeeQualifier, remoteSelector,
 	)
+}
+
+func committeeNOPAliases(nopTopology *offchain.NOPTopology) map[string]struct{} {
+	aliases := make(map[string]struct{})
+	for _, committee := range nopTopology.Committees {
+		for _, chainCfg := range committee.ChainConfigs {
+			for _, alias := range chainCfg.NOPAliases {
+				aliases[alias] = struct{}{}
+			}
+		}
+	}
+	return aliases
 }

@@ -46,6 +46,10 @@ import (
 	// Register test adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/testadapter"
+
+	// Register per-version token pool adapters
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	// _ "github.com/smartcontractkit/chainlink-ton/deployment/testadapter"
 )
 

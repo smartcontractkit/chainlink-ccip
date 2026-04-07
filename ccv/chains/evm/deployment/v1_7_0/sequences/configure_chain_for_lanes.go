@@ -57,12 +57,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return seqtypes.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		// When AllowOnrampOverride is false, refuse to replace existing
-		// router-related mappings with different addresses. This prevents
-		// accidental overwrites of prod router state — use the migration
-		// changeset for that. We check all three locations that store a
-		// router reference: (1) Router onRamp mapping, (2) OnRamp
-		// DestChainConfig.Router, (3) OffRamp SourceChainConfig.Router.
+		// When AllowOnrampOverride is false, refuse to replace an existing
+		// OnRamp mapping in the Router with a different OnRamp address. This
+		// prevents accidental overwrites of prod router state — use the
+		// migration changeset to swap OnRamp versions. Switching which
+		// router the OnRamp/OffRamp points to (e.g. test router to prod
+		// router promotion) is always allowed.
 		if !input.AllowOnrampOverride {
 			for remoteSelector := range input.RemoteChains {
 				existing, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
@@ -82,46 +82,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 							"refusing to overwrite with %s (AllowOnrampOverride is false) -- "+
 							"use the migration changeset to update router mappings",
 						input.Router, existing.Output.Hex(), remoteSelector, input.OnRamp,
-					)
-				}
-
-				onRampCfg, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(input.OnRamp),
-					Args:          remoteSelector,
-				})
-				if err != nil {
-					return seqtypes.OnChainOutput{}, fmt.Errorf(
-						"failed to read OnRamp(%s) dest config for chain %d: %w",
-						input.OnRamp, remoteSelector, err,
-					)
-				}
-				if onRampCfg.Output.Router != (common.Address{}) && onRampCfg.Output.Router != common.HexToAddress(input.Router) {
-					return seqtypes.OnChainOutput{}, fmt.Errorf(
-						"OnRamp(%s) dest config for chain %d already points to router %s; "+
-							"refusing to overwrite with %s (AllowOnrampOverride is false) -- "+
-							"use the migration changeset to update router references",
-						input.OnRamp, remoteSelector, onRampCfg.Output.Router.Hex(), input.Router,
-					)
-				}
-
-				offRampCfg, err := cldf_ops.ExecuteOperation(b, offramp.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(input.OffRamp),
-					Args:          remoteSelector,
-				})
-				if err != nil {
-					return seqtypes.OnChainOutput{}, fmt.Errorf(
-						"failed to read OffRamp(%s) source config for chain %d: %w",
-						input.OffRamp, remoteSelector, err,
-					)
-				}
-				if offRampCfg.Output.Router != (common.Address{}) && offRampCfg.Output.Router != common.HexToAddress(input.Router) {
-					return seqtypes.OnChainOutput{}, fmt.Errorf(
-						"OffRamp(%s) source config for chain %d already points to router %s; "+
-							"refusing to overwrite with %s (AllowOnrampOverride is false) -- "+
-							"use the migration changeset to update router references",
-						input.OffRamp, remoteSelector, offRampCfg.Output.Router.Hex(), input.Router,
 					)
 				}
 			}

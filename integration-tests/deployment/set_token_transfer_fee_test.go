@@ -60,12 +60,9 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, &evmadaptersV1_0_0.EVMDeployer{})
 	deployRegistry.RegisterDeployer(chainsel.FamilySolana, deploy.MCMSVersion, &solAdapter)
 
-	// Configure fees registry
-	feesRegistry := fees.GetRegistry()
+	// Adapters registered via init() in adapter packages
 	evmFeesAdapter := evmadaptersV1_6_0.NewFeesAdapter(&evmAdapter)
 	solFeesAdapter := soladaptersV1_6_0.NewFeesAdapter(&solAdapter)
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilySolana, v1_6_0, solFeesAdapter)
-	feesRegistry.RegisterFeeAdapter(chainsel.FamilyEVM, v1_6_0, evmFeesAdapter)
 
 	// Configure MCMS registry
 	mcmsRegistry := changesets.GetRegistry()
@@ -107,7 +104,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 
 	// Set the token transfer fee config for LINK
 	_, err = fees.
-		SetTokenTransferFee(feesRegistry, mcmsRegistry).
+		SetTokenTransferFee().
 		Apply(*env, fees.SetTokenTransferFeeInput{
 			Version: v1_6_0,
 			MCMS:    mcms.Input{},
@@ -180,7 +177,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 
 	// Now reset the configs
 	_, err = fees.
-		SetTokenTransferFee(feesRegistry, mcmsRegistry).
+		SetTokenTransferFee().
 		Apply(*env, fees.SetTokenTransferFeeInput{
 			Version: v1_6_0,
 			MCMS:    mcms.Input{},
@@ -326,10 +323,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 
-	// Configure fees registry
 	evmAdapter := evmseqV1_6_0.EVMAdapter{}
-
-	feesRegistry := fees.GetRegistry()
 	evmFeesAdapterV2_0 := evmadaptersV2_0_0.NewFeesAdapter(&evmAdapter)
 
 	// Get the address of the LINK token on the source chain
@@ -357,7 +351,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 
 	// Set the token transfer fee config for LINK
 	out, err = fees.
-		SetTokenTransferFee(feesRegistry, mcmsRegistry).
+		SetTokenTransferFee().
 		Apply(*e, fees.SetTokenTransferFeeInput{
 			Version: v2_0_0,
 			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
@@ -428,7 +422,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 
 	// Now reset the configs
 	out, err = fees.
-		SetTokenTransferFee(feesRegistry, mcmsRegistry).
+		SetTokenTransferFee().
 		Apply(*e, fees.SetTokenTransferFeeInput{
 			Version: v2_0_0,
 			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
