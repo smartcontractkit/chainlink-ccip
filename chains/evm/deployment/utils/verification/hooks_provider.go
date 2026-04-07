@@ -23,6 +23,10 @@ import (
 var _ evm.ContractInputsProvider = (*EVMContractInputsProvider)(nil)
 var _ hooks.ContractVerification = (*EVMContractInputsProvider)(nil)
 
+func init() {
+	hooks.GetContractVerificationRegistry().Register(chain_selectors.FamilyEVM, &EVMContractInputsProvider{})
+}
+
 // EVMContractInputsProvider implements hooks.ContractVerification for EVM chains:
 // it supplies Solidity metadata and builds per-address verifiers using the framework's EVM strategy.
 type EVMContractInputsProvider struct{}
@@ -116,9 +120,9 @@ func (e *EVMContractInputsProvider) GetInputs(contractType datastore.ContractTyp
 
 // RawContractInfo holds explorer verification inputs for a single contract version.
 type rawContractInfo struct {
-	SolidityStandardJSONInput string
-	Bytecode                  string
-	Name                      string
+	solidityStandardJSONInput string
+	bytecode                  string
+	name                      string
 }
 
 // LoadSolidityContractMetadata loads the metadata for a contract type and version, including the standard JSON input, bytecode, and name.
@@ -136,13 +140,13 @@ func LoadSolidityContractMetadata(
 	}
 
 	var input evm.SolidityContractMetadata
-	err := json.Unmarshal([]byte(contractWithVersion.SolidityStandardJSONInput), &input)
+	err := json.Unmarshal([]byte(contractWithVersion.solidityStandardJSONInput), &input)
 	if err != nil {
 		return evm.SolidityContractMetadata{}, fmt.Errorf("failed to unmarshal solidity standard JSON input for contract type %s: %w", contractType, err)
 	}
 	// Add remaining fields that don't exist in the standard JSON input
-	input.Bytecode = contractWithVersion.Bytecode
-	input.Name = contractWithVersion.Name
+	input.Bytecode = contractWithVersion.bytecode
+	input.Name = contractWithVersion.name
 
 	return input, nil
 }

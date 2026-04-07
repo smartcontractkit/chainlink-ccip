@@ -36,7 +36,9 @@ type SetTokenTransferFeeInput struct {
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
-func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeInput] {
+func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput] {
+	feeRegistry := GetRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	return cldf.CreateChangeSet(makeApply(feeRegistry, mcmsRegistry), makeVerify(feeRegistry, mcmsRegistry))
 }
 
@@ -128,9 +130,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
 
-				// Normalize fee contract version to major.minor.0 for adapter lookup, as patch versions should not affect compatibility
-				v := feeContractRef.Version
-				lookupVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()))
+				lookupVersion := utils.StripPatchVersion(feeContractRef.Version)
 
 				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
 				if !exists {

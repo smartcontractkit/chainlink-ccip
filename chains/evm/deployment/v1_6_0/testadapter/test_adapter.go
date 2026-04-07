@@ -28,6 +28,8 @@ import (
 
 	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/maybe_revert_message_receiver"
@@ -40,7 +42,6 @@ import (
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	commonutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffRampInterface, expectedSeqNr uint64) (offramp.OffRampSourceChainConfig, uint8) {
@@ -172,11 +173,6 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		return 0, messageID, fmt.Errorf("failed to create onramp instance: %w", err)
 	}
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
-	// TODO: why?
-	// err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.EVMChains()[src])
-	// if err != nil {
-	// 	return 0,"", fmt.Errorf("failed to update prices: %w", err)
-	// }
 
 	var retryCount int
 	for {
