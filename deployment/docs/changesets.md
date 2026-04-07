@@ -266,7 +266,7 @@ Sets per-token transfer fee configurations on the FeeQuoter for each source-dest
 
 **Constructor:**
 ```go
-func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeInput]
+func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput]
 ```
 
 **Input:**
@@ -290,6 +290,63 @@ For each token, the changeset uses a three-tier fallback:
 - Source and destination selectors cannot be the same
 - Token addresses cannot be empty
 - Same address cannot appear in both updates and resets
+
+### UpdateFeeQuoterDests
+
+Updates FeeQuoter destination chain configs with upsert semantics. For each destination, reads the current on-chain config (or uses defaults if none exists), applies the user's override function, and writes the result.
+
+**Source:** [fees/update_fq_dests.go](../fees/update_fq_dests.go)
+
+**Constructor:**
+```go
+func UpdateFeeQuoterDests() cldf.ChangeSetV2[UpdateFeeQuoterDestsInput]
+```
+
+**Input:**
+```go
+type UpdateFeeQuoterDestsInput struct {
+    Version *semver.Version
+    Args    []DestChainConfigForSrc
+    MCMS    mcms.Input
+}
+```
+
+**Config Resolution:**
+For each destination, the changeset resolves the base config via a two-tier fallback:
+1. **On-chain values** (if a dest chain config is already enabled)
+2. **Adapter defaults** (from `adapter.GetDefaultDestChainConfig()`)
+
+The user-provided `Override` function is then applied on top of the resolved base. If `Override` is nil, the base config is re-applied as-is (idempotent re-apply).
+
+**Validation:**
+- Version is required
+- No duplicate source chain selectors
+- No duplicate destination selectors within the same source
+- Source and destination selectors cannot be the same
+- A fee adapter must be registered for the chain family and version
+
+**Example:**
+```go
+override := lanes.FeeQuoterDestChainConfigOverride(func(c *lanes.FeeQuoterDestChainConfig) {
+    c.MaxDataBytes = 99_999
+})
+
+changeset := fees.UpdateFeeQuoterDests()
+output, err := changeset.Apply(env, fees.UpdateFeeQuoterDestsInput{
+    Version: semver.MustParse("1.6.0"),
+    Args: []fees.DestChainConfigForSrc{
+        {
+            Selector: srcChainSelector,
+            Settings: []fees.DestChainConfigForDst{
+                {
+                    Selector: dstChainSelector,
+                    Override: &override,
+                },
+            },
+        },
+    },
+})
+```
 
 ---
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -44,8 +43,8 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	v1_6_0_scenarios = semver.MustParse("1.6.0")
-	v1_5_1_scenarios = semver.MustParse("1.5.1")
+	v1_6_0_scenarios = cciputils.Version_1_6_0
+	v1_5_1_scenarios = cciputils.Version_1_5_1
 )
 
 // setupEVMOnlyEnv creates a 2-chain EVM test environment with core contracts,
