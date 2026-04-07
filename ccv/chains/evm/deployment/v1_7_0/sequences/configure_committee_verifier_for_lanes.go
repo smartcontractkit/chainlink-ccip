@@ -84,9 +84,6 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				GasForVerification:  remoteConfig.GasForVerification,
 				// TODO : standardise payload size
 				PayloadSizeBytes: uint16(remoteConfig.PayloadSizeBytes),
-				// TODO : pass in correct value. Is AllowedFinalityConfig valid for all chain types
-				// although this will be removed in future in preference of configure_committee_verifier_for_lanes.go
-				AllowedFinalityConfig: [4]byte{0x00, 0x01, 0x00, 0x01},
 			}
 			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
@@ -99,8 +96,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			currRemote := currentRemoteReport.Output
 
 			if currRemote.RemoteChainConfig.Router != desiredRemoteChainArg.Router ||
-				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled ||
-				currRemote.RemoteChainConfig.AllowedFinalityConfig != desiredRemoteChainArg.AllowedFinalityConfig {
+				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
 				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
