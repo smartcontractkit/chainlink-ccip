@@ -386,6 +386,54 @@ func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fqops2.DestChainConfig 
 	}
 }
 
+// ReverseTranslateFQ is the inverse of TranslateFQ: it maps the EVM v1.6 on-chain
+// DestChainConfig back to the product-level FeeQuoterDestChainConfig.
+func ReverseTranslateFQ(dc fqops.DestChainConfig) lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{
+		IsEnabled:                   dc.IsEnabled,
+		MaxDataBytes:                dc.MaxDataBytes,
+		MaxPerMsgGasLimit:           dc.MaxPerMsgGasLimit,
+		DestGasOverhead:             dc.DestGasOverhead,
+		DestGasPerPayloadByteBase:   dc.DestGasPerPayloadByteBase,
+		ChainFamilySelector:         binary.BigEndian.Uint32(dc.ChainFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     dc.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead: dc.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           dc.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          uint16(dc.NetworkFeeUSDCents),
+		V1Params: &lanes.FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           dc.MaxNumberOfTokensPerMsg,
+			DestGasPerPayloadByteHigh:         dc.DestGasPerPayloadByteHigh,
+			DestGasPerPayloadByteThreshold:    dc.DestGasPerPayloadByteThreshold,
+			DestDataAvailabilityOverheadGas:   dc.DestDataAvailabilityOverheadGas,
+			DestGasPerDataAvailabilityByte:    dc.DestGasPerDataAvailabilityByte,
+			DestDataAvailabilityMultiplierBps: dc.DestDataAvailabilityMultiplierBps,
+			EnforceOutOfOrder:                 dc.EnforceOutOfOrder,
+			GasMultiplierWeiPerEth:            dc.GasMultiplierWeiPerEth,
+			GasPriceStalenessThreshold:        dc.GasPriceStalenessThreshold,
+		},
+	}
+}
+
+// ReverseTranslateFQV2 is the inverse of TranslateFQtoV2: it maps the EVM v2.0 on-chain
+// DestChainConfig back to the product-level FeeQuoterDestChainConfig.
+func ReverseTranslateFQV2(dc fqops2.DestChainConfig) lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{
+		IsEnabled:                   dc.IsEnabled,
+		MaxDataBytes:                dc.MaxDataBytes,
+		MaxPerMsgGasLimit:           dc.MaxPerMsgGasLimit,
+		DestGasOverhead:             dc.DestGasOverhead,
+		DestGasPerPayloadByteBase:   dc.DestGasPerPayloadByteBase,
+		ChainFamilySelector:         binary.BigEndian.Uint32(dc.ChainFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     dc.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead: dc.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           dc.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          dc.NetworkFeeUSDCents,
+		V2Params: &lanes.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: dc.LinkFeeMultiplierPercent,
+		},
+	}
+}
+
 func TranslateTokenPrices(prices map[string]*big.Int) []fqops.TokenPriceUpdate {
 	var result []fqops.TokenPriceUpdate
 	for k, v := range prices {

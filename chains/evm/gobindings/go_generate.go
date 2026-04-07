@@ -12,7 +12,6 @@ package ccip
 //go:generate go run ./wrap ccip Router router
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
-//go:generate go run ./wrap ccip FactoryBurnMintERC20 factory_burn_mint_erc20
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
@@ -31,7 +30,7 @@ package ccip
 //go:generate go run ./wrap ccip BurnFromMintTokenPool burn_from_mint_token_pool
 //go:generate go run ./wrap ccip BurnWithFromMintTokenPool burn_with_from_mint_token_pool
 //go:generate go run ./wrap ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool
-
+//go:generate go run ./wrap ccip CrossChainPoolToken cross_chain_pool_token
 //go:generate go run ./wrap ccip LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./wrap ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool
 //go:generate go run ./wrap ccip ERC20LockBox erc20_lock_box
@@ -41,6 +40,8 @@ package ccip
 //go:generate go run ./wrap ccip SiloedUSDCTokenPool siloed_usdc_token_pool
 //go:generate go run ./wrap ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool
 //go:generate go run ./wrap ccip LombardTokenPool lombard_token_pool
+
+//go:generate go run ./wrap ccip CrossChainToken cross_chain_token
 
 // Helpers
 //go:generate go run ./wrap ccip MaybeRevertMessageReceiver maybe_revert_message_receiver

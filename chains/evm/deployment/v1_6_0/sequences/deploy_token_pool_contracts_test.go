@@ -105,47 +105,7 @@ func TestDeployTokenPool(t *testing.T) {
 		// NOTE: v1.6.0 external minter pools (BurnMintWithExternalMinterTokenPool, HybridWithExternalMinterTokenPool)
 		// are excluded from unit tests because they require a real minter contract (token governor) to be deployed.
 		// These pools should be tested in integration tests with proper minter contract setup.
-
-		// v1.5.1 pools (using same ContractType constants since they're identical strings)
-		{
-			name:                "BurnMintTokenPool_v1_5_1",
-			poolType:            burn_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			expectedTypeVersion: "BurnMintTokenPool 1.5.1",
-		},
-		{
-			name:                "BurnFromMintTokenPool_v1_5_1",
-			poolType:            burn_from_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			expectedTypeVersion: "BurnFromMintTokenPool 1.5.1",
-		},
-		{
-			name:                "BurnToAddressMintTokenPool_v1_5_1",
-			poolType:            burn_to_address_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			burnAddress:         "0x000000000000000000000000000000000000dead",
-			expectedTypeVersion: "BurnToAddressTokenPool 1.5.1",
-		},
-		{
-			name:                "BurnWithFromMintTokenPool_v1_5_1",
-			poolType:            burn_with_from_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			expectedTypeVersion: "BurnWithFromMintTokenPool 1.5.1",
-		},
-		{
-			name:                "LockReleaseTokenPool_v1_5_1_accept_liquidity",
-			poolType:            lock_release_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			acceptLiquidity:     boolPtr(true),
-			expectedTypeVersion: "LockReleaseTokenPool 1.5.1",
-		},
-		{
-			name:                "LockReleaseTokenPool_v1_5_1_no_liquidity",
-			poolType:            lock_release_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			acceptLiquidity:     boolPtr(false),
-			expectedTypeVersion: "LockReleaseTokenPool 1.5.1",
-		},
+		// NOTE: v1.5.1 pools are tested in chains/evm/deployment/v1_5_1/sequences/deploy_token_pool_test.go.
 	}
 
 	for _, tc := range testCases {

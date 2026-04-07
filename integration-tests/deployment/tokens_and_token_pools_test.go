@@ -22,7 +22,7 @@ import (
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
-	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -40,13 +40,15 @@ import (
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 )
 
 func TestTokensAndTokenPools(t *testing.T) {
-	// Define aliases for v1.6.0 and v1.5.1
 	v1_6_0, err := semver.NewVersion("1.6.0")
 	require.NoError(t, err)
-	v1_5_1, err := semver.NewVersion("1.5.1")
+	v1_6_1, err := semver.NewVersion("1.6.1")
 	require.NoError(t, err)
 
 	// Define chains
@@ -277,7 +279,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		// Add EVM chains to the input
 		for _, data := range evmTestData {
 			input[data.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
-				TokenPoolVersion: v1_5_1,
+				TokenPoolVersion: v1_6_1,
 				DeployTokenInput: data.Token,
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: data.TokenPoolQualifier,
@@ -386,12 +388,14 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Decimals, dec)
 				require.Equal(t, tokAddress, tok)
 
-				// Verify that DeriveTokenAddress works as expected
-				derived, err := evmAdapter.DeriveTokenAddress(*env, data.Chain.Selector, datastore.AddressRef{
+				// Verify that DeriveTokenAddress works as expected via token adapter registry
+				evmTokenAdapter, adapterOk := tokensapi.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, v1_6_1)
+				require.True(t, adapterOk, "v1.6.1 EVM token adapter should be registered")
+				derived, err := evmTokenAdapter.DeriveTokenAddress(*env, data.Chain.Selector, datastore.AddressRef{
 					ChainSelector: data.Chain.Selector,
 					Qualifier:     data.TokenPoolQualifier,
 					Type:          datastore.ContractType(evmTokenPoolType),
-					Version:       v1_5_1,
+					Version:       v1_6_1,
 				})
 				require.NoError(t, err)
 				require.Equal(t, 0, common.BytesToAddress(derived).Cmp(tokAddress))
@@ -527,7 +531,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 											ChainSelector: evmB.Chain.Selector,
 											Qualifier:     evmB.TokenPoolQualifier,
 											Type:          datastore.ContractType(evmTokenPoolType),
-											Version:       v1_5_1,
+											Version:       v1_6_1,
 										},
 									},
 								},
@@ -542,7 +546,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 									ChainSelector: evmB.Chain.Selector,
 									Qualifier:     evmB.TokenPoolQualifier,
 									Type:          datastore.ContractType(evmTokenPoolType),
-									Version:       v1_5_1,
+									Version:       v1_6_1,
 								},
 								RegistryRef: datastore.AddressRef{}, // inferred
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -884,7 +888,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: evmA.Chain.Selector,
 										Qualifier:     evmA.TokenPoolQualifier,
 										Type:          datastore.ContractType(evmTokenPoolType),
-										Version:       v1_5_1,
+										Version:       v1_6_1,
 									},
 								},
 								evmB.Chain.Selector: {
@@ -900,7 +904,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: evmB.Chain.Selector,
 										Qualifier:     evmB.TokenPoolQualifier,
 										Type:          datastore.ContractType(evmTokenPoolType),
-										Version:       v1_5_1,
+										Version:       v1_6_1,
 									},
 								},
 							},
@@ -915,7 +919,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								ChainSelector: evmA.Chain.Selector,
 								Qualifier:     evmA.TokenPoolQualifier,
 								Type:          datastore.ContractType(evmTokenPoolType),
-								Version:       v1_5_1,
+								Version:       v1_6_1,
 							},
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -947,7 +951,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								ChainSelector: evmB.Chain.Selector,
 								Qualifier:     evmB.TokenPoolQualifier,
 								Type:          datastore.ContractType(evmTokenPoolType),
-								Version:       v1_5_1,
+								Version:       v1_6_1,
 							},
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{

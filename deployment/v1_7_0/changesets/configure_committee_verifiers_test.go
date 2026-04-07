@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -17,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -295,4 +297,64 @@ func TestTopologyCommitteePopulator_PopulatesSuccessfully(t *testing.T) {
 	assert.Equal(t, uint32(1024), rc.PayloadSizeBytes)
 	assert.Equal(t, uint8(2), rc.SignatureConfig.Threshold)
 	assert.ElementsMatch(t, []string{"0xSigner1", "0xSigner2"}, rc.SignatureConfig.Signers)
+}
+
+func TestTopologyCommitteePopulator_SigningKeyErrorPersistedAcrossCalls(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", sel1): {
+				{Address: "0xVerifier1", ChainSelector: sel1, Qualifier: "default"},
+			},
+		},
+	})
+
+	mockOffchain := &jdMockOffchain{
+		listNodesFn: func(_ context.Context, _ *nodev1.ListNodesRequest, _ ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
+			return nil, fmt.Errorf("JD unavailable")
+		},
+		listNodeChainConfigsFn: func(_ context.Context, _ *nodev1.ListNodeChainConfigsRequest, _ ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
+			return nil, fmt.Errorf("JD unavailable")
+		},
+	}
+
+	populator := changesets.NewTopologyCommitteePopulator(committeeRegistry, &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1"},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						strconv.FormatUint(sel2, 10): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+					},
+				},
+			},
+		},
+	})
+
+	env := newResolverTestEnv(t, []uint64{sel1, sel2})
+	env.Offchain = mockOffchain
+	env.NodeIDs = []string{"node-1"}
+
+	inputs := []lanes.CommitteeVerifierInput{
+		{
+			CommitteeQualifier: "default",
+			RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainInput{
+				sel2: {GasForVerification: 100000},
+			},
+		},
+	}
+
+	_, err1 := populator.PopulateCommitteeConfig(env, sel1, inputs)
+	require.Error(t, err1, "first call should fail because JD is unavailable")
+	assert.Contains(t, err1.Error(), "failed to fetch signing keys")
+
+	_, err2 := populator.PopulateCommitteeConfig(env, sel1, inputs)
+	require.Error(t, err2, "second call must also fail with the persisted error")
+	assert.Contains(t, err2.Error(), "failed to fetch signing keys")
 }
