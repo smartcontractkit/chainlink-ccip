@@ -123,6 +123,16 @@ func (c *CommitteeVerifierContract) GetSignatureConfig(opts *bind.CallOpts, args
 	return *outstruct, nil
 }
 
+func (c *CommitteeVerifierContract) GetAllowedFinalityConfig(opts *bind.CallOpts) ([4]byte, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllowedFinalityConfig")
+	if err != nil {
+		var zero [4]byte
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([4]byte)).(*[4]byte), nil
+}
+
 func (c *CommitteeVerifierContract) GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 EVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFeeResult, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getFee", destChainSelector, arg1, arg2, requestedFinality)
@@ -376,6 +386,17 @@ var GetSignatureConfig = contract.NewRead(contract.ReadParams[uint64, GetSignatu
 	NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args uint64) (GetSignatureConfigResult, error) {
 		return c.GetSignatureConfig(opts, args)
+	},
+})
+
+var GetAllowedFinalityConfig = contract.NewRead(contract.ReadParams[struct{}, [4]byte, *CommitteeVerifierContract]{
+	Name:         "committee-verifier:get-allowed-finality-config",
+	Version:      Version,
+	Description:  "Calls getAllowedFinalityConfig on the contract",
+	ContractType: ContractType,
+	NewContract:  NewCommitteeVerifierContract,
+	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
+		return c.GetAllowedFinalityConfig(opts)
 	},
 })
 

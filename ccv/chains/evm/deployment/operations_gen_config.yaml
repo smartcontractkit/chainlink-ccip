@@ -368,6 +368,8 @@ contracts:
         access: public
       - name: getStorageLocations
         access: public
+      - name: getAllowedFinalityConfig
+        access: public
       - name: getFee
         access: public
 
@@ -391,6 +393,8 @@ contracts:
       - name: getDynamicConfig
         access: public
       - name: getSignatureConfig
+        access: public
+      - name: getAllowedFinalityConfig
         access: public
       - name: getFee
         access: public

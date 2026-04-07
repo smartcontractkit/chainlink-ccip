@@ -36,11 +36,6 @@ type RemoteCCTPChainConfig struct {
 	GasForVerification uint32
 	// PayloadSizeBytes is the size of the CCTP verification payload to be checked on the remote chain.
 	PayloadSizeBytes uint16
-	// AllowedFinalityConfig encodes which finality modes (block depth, safe, finality) are permitted for messages
-	// sent to this remote chain. It is stored on-chain in BaseVerifier.RemoteChainConfig.allowedFinalityConfig and
-	// validated by FinalityCodec._ensureRequestedFinalityAllowed. A zero value (the default)
-	// permits only WAIT_FOR_FINALITY_FLAG (0x00000000), which rejects any block-depth or safe requests.
-	AllowedFinalityConfig [4]byte
 	// LockOrBurnMechanism specifies the mechanism by which the CCTP message will be handled.
 	// Each chain family may interpret this string differently.
 	LockOrBurnMechanism string

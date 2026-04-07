@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	ccv_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -96,8 +95,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("token %s is not supported by token pool %s", tokenAddress, tokenPoolAddress)
 		}
 
-		// Configure finality config (skip if already set to desired value).
-		desiredFinalityConfig := ccv_sequences.BlockDepthFinalityConfig(input.MinFinalityValue)
+		desiredFinalityConfig := input.AllowedFinalityConfig.Raw()
 		currentAllowedFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,

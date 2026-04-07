@@ -9,6 +9,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	deploy_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -36,10 +37,7 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef `yaml:"registryRef" json:"registryRef"`
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] `yaml:"remoteChains" json:"remoteChains"`
-	// MinFinalityValue is the minimum finality value required by the token pool.
-	// This can be interpreted as # of block confirmations, an ID, or otherwise.
-	// Interpretation is left to each chain family.
-	MinFinalityValue uint16 `yaml:"minFinalityValue,string" json:"minFinalityValue,string"`
+	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
 	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
 	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
@@ -163,7 +161,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			TokenRef:                      token.TokenRef,
 			PoolType:                      tokenPool.Type.String(),
 			ExistingDataStore:             e.DataStore,
-			MinFinalityValue:              token.MinFinalityValue,
+			AllowedFinalityConfig:         token.AllowedFinalityConfig,
 			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
 			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
 			TimelockAddress:               timelockAddress,

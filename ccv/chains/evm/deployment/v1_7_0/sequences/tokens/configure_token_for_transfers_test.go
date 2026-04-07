@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
@@ -117,7 +118,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			},
 			ExternalAdmin:    "", // Use internal admin
 			RegistryAddress:  tokenAdminRegistryAddress,
-			MinFinalityValue: 12,
+			AllowedFinalityConfig: finality.Config{BlockDepth: 12},
 		}
 
 		// Execute the configure token for transfers sequence
@@ -149,8 +150,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		allowedFinalityConfig, err := tp.GetAllowedFinalityConfig(nil)
 		require.NoError(t, err, "Failed to get allowed finality config")
-		expectedFinalityConfig := [4]byte{0, 0, byte(input.MinFinalityValue >> 8), byte(input.MinFinalityValue)}
-		require.Equal(t, expectedFinalityConfig, allowedFinalityConfig, "Allowed finality config should match input")
+		require.Equal(t, input.AllowedFinalityConfig.Raw(), allowedFinalityConfig, "Allowed finality config should match input")
 
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityInboundRateLimiterConfig
 		customFinalityOutboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityOutboundRateLimiterConfig
@@ -277,7 +277,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		allowedFinalityConfig, err := tp.GetAllowedFinalityConfig(nil)
 		require.NoError(t, err, "Failed to get allowed finality config")
-		require.Equal(t, sequences.WaitForFinalityConfig, allowedFinalityConfig, "Allowed finality config should remain default")
+		require.Equal(t, [4]byte{}, allowedFinalityConfig, "Allowed finality config should remain default")
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel].CustomFinalityInboundRateLimiterConfig
 		customFinalityOutboundRateLimiterConfig := input.RemoteChains[remoteChainSel].CustomFinalityOutboundRateLimiterConfig
 		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel, &customFinalityInboundRateLimiterConfig, &customFinalityOutboundRateLimiterConfig)
@@ -317,14 +317,14 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 	require.Contains(t, remotePools, config.RemotePool, "Remote pool should be in the list of remote pools")
 
 	// Check inbound CCVs
-	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), sequences.WaitForFinalityConfig, []byte{}, inbound)
+	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), [4]byte{}, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs")
 	for _, ccv := range config.InboundCCVs {
 		require.Contains(t, inboundCCVs, common.HexToAddress(ccv), "Inbound CCV should be in the list of required inbound CCVs")
 	}
 
 	// Check outbound CCVs
-	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), sequences.WaitForFinalityConfig, []byte{}, outbound)
+	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), [4]byte{}, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs")
 	for _, ccv := range config.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")
