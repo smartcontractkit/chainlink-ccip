@@ -178,6 +178,12 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", chain.Selector, err)
 			}
 
+			// Token address resolution strategy:
+			// 1. If TokenRef already has an address, use it directly (skip datastore).
+			// 2. Otherwise look up the token in the datastore using TokenRef fields.
+			// 3. If step 2 fails (e.g. ambiguous or missing), fall back to reading
+			//    the token address from the on-chain token pool contract via TokenPoolRef.
+			// 4. If none of the above work, return an error.
 			tokenRef := input.TokenRef
 			if tokenRef.Address == "" {
 				if tokRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, chain.Selector, datastore_utils.FullRef); err != nil {

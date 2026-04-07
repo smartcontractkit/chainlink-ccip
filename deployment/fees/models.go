@@ -1,6 +1,42 @@
 package fees
 
-import "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+import (
+	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+)
+
+// ApplyDestChainConfigSequenceInput is the input for a chain-specific adapter sequence
+// that applies FeeQuoter destination chain config updates.
+type ApplyDestChainConfigSequenceInput struct {
+	// Selector is the source chain selector.
+	Selector uint64 `json:"selector" yaml:"selector"`
+	// Settings maps destination chain selector to its FeeQuoterDestChainConfig.
+	Settings map[uint64]lanes.FeeQuoterDestChainConfig `json:"settings" yaml:"settings"`
+}
+
+// DestChainConfigForDst represents a destination chain config override for a single destination.
+// Override is a functional option that mutates the base config (read from on-chain or defaults).
+// If Override is nil, the existing on-chain config is re-applied as-is (idempotent re-apply).
+type DestChainConfigForDst struct {
+	Selector uint64                                  `json:"selector" yaml:"selector"`
+	Override *lanes.FeeQuoterDestChainConfigOverride `json:"-" yaml:"-"`
+}
+
+// DestChainConfigForSrc represents all destination chain config updates originating from a single source.
+type DestChainConfigForSrc struct {
+	Selector uint64                  `json:"selector" yaml:"selector"`
+	Settings []DestChainConfigForDst `json:"settings" yaml:"settings"`
+}
+
+// UpdateFeeQuoterDestsInput is the top-level input for the UpdateFeeQuoterDests changeset.
+type UpdateFeeQuoterDestsInput struct {
+	// Version is the lane version used for initial adapter lookup.
+	Version *semver.Version         `json:"version" yaml:"version"`
+	Args    []DestChainConfigForSrc `json:"args" yaml:"args"`
+	MCMS    mcms.Input              `json:"mcms" yaml:"mcms"`
+}
 
 // SetTokenTransferFeeSequenceInput defines the input for setting token transfer fee configurations in a sequence.
 type SetTokenTransferFeeSequenceInput struct {
