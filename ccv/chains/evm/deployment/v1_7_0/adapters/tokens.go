@@ -14,8 +14,9 @@ import (
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
-	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -33,7 +34,10 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
 
-var _ tokens.TokenAdapter = &TokenAdapter{}
+var (
+	_ tokens.TokenFeeAdapter = &TokenAdapter{}
+	_ tokens.TokenAdapter    = &TokenAdapter{}
+)
 
 // TokenAdapter handles EVM token pools at version 2.0.0.
 // It embeds EVMPoolAdapter for shared methods (DeriveTokenAddress,
@@ -157,7 +161,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			}
 
 			internalInput := evm_tokens.DeployTokenPoolInput{
-				ChainSel:                        input.ChainSelector,
+				ChainSel:                         input.ChainSelector,
 				TokenPoolType:                    datastore.ContractType(input.PoolType),
 				TokenPoolVersion:                 input.TokenPoolVersion,
 				TokenSymbol:                      qualifier,
@@ -345,6 +349,59 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.MigrateLockReleasePoolLiquidity
+}
+
+func (t *TokenAdapter) SetMinBlockConfirmations(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetMinBlockConfirmationsSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.SetMinBlockConfirmationsForTokenPools
+}
+
+func (t *TokenAdapter) SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.SetTokenTransferFeeConfigForTokenPools
+}
+
+func (t *TokenAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) tokens.TokenTransferFeeConfig {
+	return tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
+}
+
+func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (tokens.TokenTransferFeeConfig, error) {
+	chain, ok := e.BlockChains.EVMChains()[src]
+	if !ok {
+		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("chain with selector %d not defined", src)
+	}
+
+	args := token_pool.GetTokenTransferFeeConfigArgs{DestChainSelector: dst}
+	if !common.IsHexAddress(poolAddress) {
+		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("invalid pool address: %s", poolAddress)
+	}
+
+	addr := common.HexToAddress(poolAddress)
+	if addr == (common.Address{}) {
+		return tokens.TokenTransferFeeConfig{}, errors.New("pool address cannot be the zero address")
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		token_pool.GetTokenTransferFeeConfig,
+		chain,
+		contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: src,
+			Address:       addr,
+			Args:          args,
+		},
+	)
+	if err != nil {
+		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("failed to get on-chain token transfer fee config for pool %s on chain selector %d for dest chain selector %d: %w", poolAddress, src, dst, err)
+	}
+
+	return tokens.TokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: report.Output.DefaultBlockConfirmationsTransferFeeBps,
+		CustomFinalityTransferFeeBps:  report.Output.CustomBlockConfirmationsTransferFeeBps,
+		DefaultFinalityFeeUSDCents:    report.Output.DefaultBlockConfirmationsFeeUSDCents,
+		CustomFinalityFeeUSDCents:     report.Output.CustomBlockConfirmationsFeeUSDCents,
+		DestBytesOverhead:             report.Output.DestBytesOverhead,
+		DestGasOverhead:               report.Output.DestGasOverhead,
+		IsEnabled:                     report.Output.IsEnabled,
+	}, nil
 }
 
 // poolOpsV200 implements PoolOps using v2.0.0 token pool bindings.

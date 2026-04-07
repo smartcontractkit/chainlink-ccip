@@ -3,6 +3,7 @@ package fees
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -55,43 +56,22 @@ type TokenTransferFeeArgs struct {
 
 // UnresolvedTokenTransferFeeArgs allows for partial specification of token transfer fee configurations.
 type UnresolvedTokenTransferFeeArgs struct {
-	DestBytesOverhead TokenTransferFeeValue[uint32] `json:"destBytesOverhead" yaml:"destBytesOverhead"`
-	DestGasOverhead   TokenTransferFeeValue[uint32] `json:"destGasOverhead" yaml:"destGasOverhead"`
-	MinFeeUSDCents    TokenTransferFeeValue[uint32] `json:"minFeeUSDCents" yaml:"minFeeUSDCents"`
-	MaxFeeUSDCents    TokenTransferFeeValue[uint32] `json:"maxFeeUSDCents" yaml:"maxFeeUSDCents"`
-	DeciBps           TokenTransferFeeValue[uint16] `json:"deciBps" yaml:"deciBps"`
-	IsEnabled         TokenTransferFeeValue[bool]   `json:"isEnabled" yaml:"isEnabled"`
+	DestBytesOverhead utils.Optional[uint32] `json:"destBytesOverhead" yaml:"destBytesOverhead"`
+	DestGasOverhead   utils.Optional[uint32] `json:"destGasOverhead" yaml:"destGasOverhead"`
+	MinFeeUSDCents    utils.Optional[uint32] `json:"minFeeUSDCents" yaml:"minFeeUSDCents"`
+	MaxFeeUSDCents    utils.Optional[uint32] `json:"maxFeeUSDCents" yaml:"maxFeeUSDCents"`
+	DeciBps           utils.Optional[uint16] `json:"deciBps" yaml:"deciBps"`
+	IsEnabled         utils.Optional[bool]   `json:"isEnabled" yaml:"isEnabled"`
 }
 
-// Infer fills in any unset fields in the unresolved configuration using the provided fallback values.
-func (cfg UnresolvedTokenTransferFeeArgs) Infer(fallbacks TokenTransferFeeArgs) *TokenTransferFeeArgs {
+// Resolve fills in any unset fields in the unresolved configuration using the provided fallback values.
+func (cfg UnresolvedTokenTransferFeeArgs) Resolve(fallbacks TokenTransferFeeArgs) *TokenTransferFeeArgs {
 	return &TokenTransferFeeArgs{
-		DestBytesOverhead: cfg.DestBytesOverhead.Infer(fallbacks.DestBytesOverhead),
-		DestGasOverhead:   cfg.DestGasOverhead.Infer(fallbacks.DestGasOverhead),
-		MinFeeUSDCents:    cfg.MinFeeUSDCents.Infer(fallbacks.MinFeeUSDCents),
-		MaxFeeUSDCents:    cfg.MaxFeeUSDCents.Infer(fallbacks.MaxFeeUSDCents),
-		IsEnabled:         cfg.IsEnabled.Infer(fallbacks.IsEnabled),
-		DeciBps:           cfg.DeciBps.Infer(fallbacks.DeciBps),
+		DestBytesOverhead: cfg.DestBytesOverhead.GetOrDefault(fallbacks.DestBytesOverhead),
+		DestGasOverhead:   cfg.DestGasOverhead.GetOrDefault(fallbacks.DestGasOverhead),
+		MinFeeUSDCents:    cfg.MinFeeUSDCents.GetOrDefault(fallbacks.MinFeeUSDCents),
+		MaxFeeUSDCents:    cfg.MaxFeeUSDCents.GetOrDefault(fallbacks.MaxFeeUSDCents),
+		IsEnabled:         cfg.IsEnabled.GetOrDefault(fallbacks.IsEnabled),
+		DeciBps:           cfg.DeciBps.GetOrDefault(fallbacks.DeciBps),
 	}
-}
-
-// TokenTransferFeeValue represents a value that may or may not be explicitly set.
-type TokenTransferFeeValue[T any] struct {
-	// If set to false (the default), then `Value` will be autofilled from
-	// on-chain data if it exists. If no on-chain data exists for it, then
-	// a pre-selected sensible default will be used as a fallback
-	Valid bool `json:"valid" yaml:"valid"`
-
-	// This only has an effect when `Valid` is set to true. If this is the
-	// case, then the provided value will overwrite existing on-chain data
-	Value T `json:"value" yaml:"value"`
-}
-
-// Infer returns the contained value if `Valid` is true; otherwise, it returns the provided fallback.
-func (cfg TokenTransferFeeValue[T]) Infer(fallback T) T {
-	if cfg.Valid {
-		return cfg.Value
-	}
-
-	return fallback
 }

@@ -46,49 +46,27 @@ func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cl
 	return func(_ cldf.Environment, cfg SetTokenTransferFeeInput) error {
 		seenSrc := utils.NewSet[uint64]()
 		for i, src := range cfg.Args {
-			// Disallow duplicate src selectors
 			if exists := seenSrc.Add(src.Selector); exists {
 				return fmt.Errorf("duplicate src chain selector at args[%d]: %d", i, src.Selector)
 			}
 
 			seenDst := utils.NewSet[uint64]()
 			for j, dst := range src.Settings {
-				// Disallow cyclic src/dst selectors
 				if src.Selector == dst.Selector {
 					return fmt.Errorf("src and dst chain selectors cannot be the same at args[%d].settings[%d]: %d", i, j, src.Selector)
 				}
-
-				// Disallow duplicate dst selectors within the same src
 				if exists := seenDst.Add(dst.Selector); exists {
 					return fmt.Errorf("duplicate dst chain selector at args[%d].settings[%d] (src=%d): %d", i, j, src.Selector, dst.Selector)
 				}
 
-				// Duplicate tracking
-				updateSet := utils.NewSet[string]() // Track addresses for IsReset == false
-				resetsSet := utils.NewSet[string]() // Track addresses for IsReset == true
+				seenAddresses := utils.NewSet[string]()
 				for k, entry := range dst.Settings {
-					// Disallow empty token address
 					trimmed := strings.TrimSpace(entry.Address)
 					if trimmed == "" {
 						return fmt.Errorf("empty token address at args[%d].settings[%d].settings[%d] (src=%d,dst=%d)", i, j, k, src.Selector, dst.Selector)
 					}
-
-					// Track by update vs reset to catch overlaps and duplicates
-					addr := entry.Address
-					if entry.IsReset {
-						if updateSet.Has(addr) {
-							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
-						}
-						if exists := resetsSet.Add(addr); exists {
-							return fmt.Errorf("duplicate reset for address at (src=%d,dst=%d) args[%d].settings[%d].settings[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
-						}
-					} else {
-						if resetsSet.Has(addr) {
-							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
-						}
-						if exists := updateSet.Add(addr); exists {
-							return fmt.Errorf("duplicate update for address at (src=%d,dst=%d) args[%d].settings[%d].settings[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
-						}
+					if exists := seenAddresses.Add(trimmed); exists {
+						return fmt.Errorf("duplicate token address at args[%d].settings[%d].settings[%d] (src=%d,dst=%d): %q", i, j, k, src.Selector, dst.Selector, trimmed)
 					}
 				}
 			}
@@ -207,5 +185,5 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
-	return cfg.FeeArgs.Infer(fallbacks), nil
+	return cfg.FeeArgs.Resolve(fallbacks), nil
 }
