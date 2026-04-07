@@ -28,8 +28,8 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
-	github.com/smartcontractkit/chainlink-deployments-framework v0.93.0
-	github.com/smartcontractkit/mcms v0.37.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.94.0
+	github.com/smartcontractkit/mcms v0.39.0
 	github.com/stretchr/testify v1.11.1
 )
 
