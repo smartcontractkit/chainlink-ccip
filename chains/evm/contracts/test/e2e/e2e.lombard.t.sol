@@ -9,7 +9,6 @@ import {LombardVerifier} from "../../ccvs/LombardVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
-import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
