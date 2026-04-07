@@ -47,7 +47,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.0
 	github.com/smartcontractkit/chainlink-evm v0.3.3 // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.3
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.15-0.20260407192828-071106d23ed3
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.2
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260402130133-c000dddb9c91
 	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260402130133-c000dddb9c91
