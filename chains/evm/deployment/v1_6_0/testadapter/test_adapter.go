@@ -181,7 +181,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		if err != nil {
 			return 0, messageID, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
 		}
-		if msg.FeeToken == (common.Address{}) {
+		if msg.FeeToken == (common.Address{}) || msg.FeeToken == common.HexToAddress(a.NativeFeeToken()) {
 			sender.Value = fee
 		} else {
 			err := a.AllowRouterToWithdrawTokens(ctx, msg.FeeToken.Hex(), new(big.Int).Add(fee, fee)) // approve 2x the fee to be safe
@@ -189,14 +189,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 				return 0, messageID, fmt.Errorf("failed to approve tokens for fee: %w", err)
 			}
 		}
-		for i, ta := range msg.TokenAmounts {
-			if ta.Token != (common.Address{}) {
-				err := a.AllowRouterToWithdrawTokens(ctx, ta.Token.Hex(), ta.Amount)
-				if err != nil {
-					return 0, messageID, fmt.Errorf("failed to approve tokens for transfer at index %d: %w", i, err)
-				}
-			}
-		}
+
 		tx, err := r.CcipSend(sender, destChainSelector, msg)
 		if err != nil {
 			return 0, messageID, fmt.Errorf("failed to send CCIP message: %w", err)
