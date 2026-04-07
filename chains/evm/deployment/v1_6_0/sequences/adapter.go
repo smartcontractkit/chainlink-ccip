@@ -278,7 +278,10 @@ func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelect
 		return common.Address{}, nil, fmt.Errorf("failed to find onramp address for chain selector %d: %w", chainSelector, err)
 	}
 
-	chain := chains.EVMChains()[chainSelector]
+	chain, ok := chains.EVMChains()[chainSelector]
+	if !ok {
+		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
+	}
 
 	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
