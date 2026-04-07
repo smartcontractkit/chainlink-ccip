@@ -461,7 +461,6 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
   /// @param requestedFinalityConfig The requested finality encoding (see `FinalityCodec`).
-  /// FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
@@ -480,10 +479,6 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
     if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
-      // Validate that the finality carried in the inbound message is permitted by this pool's config. This mirrors
-      // the outbound check in _validateLockOrBurn and ensures the FTF inbound rate-limit bucket is only consumed for
-      // modes the pool has explicitly enabled, even if a future OffRamp skips this check.
-      FinalityCodec._ensureRequestedFinalityAllowed(requestedFinalityConfig, s_allowedFinalityConfig);
       _consumeFastFinalityInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     } else {
       _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);

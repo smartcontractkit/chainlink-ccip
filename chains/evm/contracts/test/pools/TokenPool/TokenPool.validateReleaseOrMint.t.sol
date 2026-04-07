@@ -26,6 +26,19 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     assertEq(localAmount, AMOUNT);
   }
 
+  function test_validateReleaseOrMint_WithFtfRequestedAndFinalityOnlyConfig() public {
+    // Pool explicitly disallows FTF for the *local* chain, which does not affect remote chains. When we then send a
+    // message with a block depth of 1, it should *not* revert. The dest pool trusts the source pool and always
+    // processes the message. Since the source pool has checked the msg finality against its local chain, the dest pool
+    // does not need to do any finality checks.
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+
+    vm.startPrank(s_allowedOffRamp);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec._encodeBlockDepth(1));
+  }
+
   /// @notice When fast finality is requested but no custom bucket is configured,
   /// the fallback consumes from the default inbound bucket.
   function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
