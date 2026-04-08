@@ -16,10 +16,10 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 /// ensuring that each instance uses a non-overlapping version tag, as the version tag is included in the signed data
 /// and can therefore function as a domain separator. The committeeVerifier is designed to be used with a
 /// VersionedVerifierResolver, which will route messages to the correct verifier implementation based on the version tag
-/// included in the signed data. Using a version tag for the wrong verifier would result in a failure in the resolver,
-/// serving as additional protection against exploiting overlapping signer sets. We still highly recommend using
-/// non-overlapping signer sets regardless of version tag usage, as this would provide the strongest protection against
-/// potential signature replay attacks across different instances of the committeeVerifier.
+/// included in the signed data. Using a version tag for the wrong verifier would likely result in a failure in the
+/// resolver, serving as additional protection against exploiting overlapping signer sets. We still highly recommend
+/// using non-overlapping signer sets regardless of version tag usage, as this would provide the strongest protection
+/// against potential signature replay attacks across different instances of the committeeVerifier.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidVerifierResults();
