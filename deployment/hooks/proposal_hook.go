@@ -27,7 +27,7 @@ const PostProposalCCIPSendHookName = postProposalCCIPSendHookName
 // PostProposalCCIPSend supplies chain-family metadata used by [verifyCCIPSend] to run CCIP send smoke checks
 // after MCMS timelock execution.
 type PostProposalCCIPSend interface {
-	SkinSend(env cldf.Environment) bool
+	SkipSend(env cldf.Environment) bool
 	PreSendValidation(env cldf.Environment, srcSel uint64) error
 	SupportedFeeTokens(env cldf.Environment, srcSel uint64) ([]string, error)
 	SupportedDestinations(env cldf.Environment, srcSel uint64) ([]uint64, error)
@@ -143,7 +143,7 @@ func runPostProposalCCIPSends(
 	provider PostProposalCCIPSend,
 	srcSelectors []uint64,
 ) error {
-	if provider.SkinSend(*env) {
+	if provider.SkipSend(*env) {
 		lggr.Infof("verify-ccip-send: provider for family %s skips CCIP send, skipping send verify for selectors %v",
 			family, srcSelectors)
 		return nil

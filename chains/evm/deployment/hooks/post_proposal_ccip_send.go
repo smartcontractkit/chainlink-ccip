@@ -1,7 +1,6 @@
 package hooks
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -28,7 +27,7 @@ func init() {
 // EVMPostProposalCCIPSend provides EVM-specific discovery of CCIP lanes and fee tokens for post-proposal verify.
 type EVMPostProposalCCIPSend struct{}
 
-func (e *EVMPostProposalCCIPSend) SkinSend(env cldf.Environment) bool {
+func (e *EVMPostProposalCCIPSend) SkipSend(env cldf.Environment) bool {
 	isForked := strings.Contains(env.Name, "fork")
 	// skip sending messages if the env is not forked
 	// we only send messages in proposal forked env where there is no offchain and we have nodeIDs to execute the ccip-send through ccip plugin
@@ -48,8 +47,6 @@ func (e *EVMPostProposalCCIPSend) PreSendValidation(env cldf.Environment, srcSel
 	}
 	return nil
 }
-
-var errNoAddressFound = errors.New("no address found")
 
 func (e *EVMPostProposalCCIPSend) SupportedDestinations(env cldf.Environment, srcSel uint64) ([]uint64, error) {
 	allDests, err := e.supportedRemoteChainsWithVersions(env, srcSel)
