@@ -32,4 +32,7 @@ func init() {
 	fqReg.RegisterConfigImporterVersionResolver(chainsel.FamilyEVM, &adapters1_2.LaneVersionResolver{})
 
 	feeReg.RegisterFeeAdapter(chainsel.FamilyEVM, v, evmFeesAdapterV2_0)
+
+	feeAggReg := fees.GetFeeAggregatorRegistry()
+	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, v, NewFeeAggregatorAdapter())
 }

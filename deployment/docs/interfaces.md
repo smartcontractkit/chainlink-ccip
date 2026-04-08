@@ -22,6 +22,7 @@ Every chain family **must** implement these interfaces:
 | [LaneAdapter](#laneadapter) | `LaneAdapterRegistry` | `chainFamily-version` | [lanes/product.go](../lanes/product.go) |
 | [TokenAdapter](#tokenadapter) | `TokenAdapterRegistry` | `chainFamily-version` | [tokens/product.go](../tokens/product.go) |
 | [FeeAdapter](#feeadapter) | `FeeAdapterRegistry` | `chainFamily-version` | [fees/product.go](../fees/product.go) |
+| [FeeAggregatorAdapter](#feeaggregatoradapter) | `FeeAggregatorAdapterRegistry` | `chainFamily-version` | [fees/fee_aggregator.go](../fees/fee_aggregator.go) |
 | [MCMSReader](#mcmsreader) | `MCMSReaderRegistry` | `chainFamily` | [utils/changesets/output.go](../utils/changesets/output.go) |
 | [TransferOwnershipAdapter](#transferownershipadapter) | `TransferOwnershipAdapterRegistry` | `chainFamily-version` | [deploy/product.go](../deploy/product.go) |
 | [CurseAdapter](#curseadapter) | `CurseRegistry` | `chainFamily-version` | [fastcurse/product.go](../fastcurse/product.go) |
@@ -206,6 +207,37 @@ type FeeAdapter interface {
 **Registration:**
 ```go
 fees.GetRegistry().RegisterFeeAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), &FeesAdapter{})
+```
+
+---
+
+### FeeAggregatorAdapter
+
+Handles setting and reading the fee aggregator address on a chain. The fee aggregator is the address that receives accumulated fees. The specific on-chain mechanism varies by chain family and version:
+
+- **EVM 1.6:** Fee aggregator is stored in the OnRamp's DynamicConfig.
+- **EVM 2.0:** Fee aggregator exists on multiple contracts (OnRamp, Proxy, Executor, USDCTokenPoolProxy). The adapter dispatches to the correct on-chain operation based on contract type.
+- **Solana 1.6:** Fee aggregator is stored on the Router.
+
+The `SetFeeAggregatorSequenceInput.Contracts` field allows callers to specify exactly which contracts to update using fully-qualified `datastore.AddressRef` values. This avoids ambiguity when the datastore contains multiple versions of the same contract type. When `Contracts` is empty, the adapter falls back to its default contract (Proxy for EVM 2.0, OnRamp for EVM 1.6, Router for Solana 1.6).
+
+**Source:** [fees/fee_aggregator.go](../fees/fee_aggregator.go)
+**Registry:** `FeeAggregatorAdapterRegistry` via `fees.GetFeeAggregatorRegistry()`
+**Key:** `chainFamily-version`
+
+```go
+type FeeAggregatorAdapter interface {
+    // SetFeeAggregator returns a sequence that sets the fee aggregator address on a chain.
+    SetFeeAggregator(e Environment) *Sequence[SetFeeAggregatorSequenceInput, OnChainOutput, BlockChains]
+
+    // GetFeeAggregator reads the current fee aggregator address from on-chain state.
+    GetFeeAggregator(e Environment, chainSelector uint64) (string, error)
+}
+```
+
+**Registration:**
+```go
+fees.GetFeeAggregatorRegistry().RegisterFeeAggregatorAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), &FeeAggregatorAdapter{})
 ```
 
 ---
@@ -518,6 +550,7 @@ type TestAdapterFactory = func(env *Environment, selector uint64) TestAdapter
 | `PingPongAdapterRegistry` | `lanes.GetPingPongAdapterRegistry()` | `chainFamily-version` |
 | `TokenAdapterRegistry` | `tokens.GetTokenAdapterRegistry()` | `chainFamily-version` |
 | `FeeAdapterRegistry` | `fees.GetRegistry()` | `chainFamily-version` |
+| `FeeAggregatorAdapterRegistry` | `fees.GetFeeAggregatorRegistry()` | `chainFamily-version` |
 | `MCMSReaderRegistry` | `changesets.GetRegistry()` | `chainFamily` |
 | `CurseRegistry` | `fastcurse.GetCurseRegistry()` | `chainFamily-version` / `chainFamily` |
 | `LaneMigratorRegistry` | `deploy.GetLaneMigratorRegistry()` | `chainFamily-version` |
