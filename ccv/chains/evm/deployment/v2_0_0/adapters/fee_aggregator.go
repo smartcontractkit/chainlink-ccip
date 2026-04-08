@@ -23,7 +23,6 @@ import (
 
 var _ fees.FeeAggregatorAdapter = (*FeeAggregatorAdapter)(nil)
 
-// supportedContractTypes lists the contract types this adapter knows how to update.
 var supportedContractTypes = map[datastore.ContractType]bool{
 	datastore.ContractType(onrampops.ContractType):    true,
 	datastore.ContractType(proxyops.ContractType):     true,
@@ -114,9 +113,6 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 	)
 }
 
-// resolveRefs determines which contracts to update.
-// When input.Contracts is provided, each ref is resolved from the datastore.
-// When empty, falls back to the Proxy contract (legacy behavior).
 func (a *FeeAggregatorAdapter) resolveRefs(e cldf.Environment, input fees.SetFeeAggregatorSequenceInput) ([]datastore.AddressRef, error) {
 	if len(input.Contracts) == 0 {
 		ref, err := datastore_utils.FindAndFormatRef(
@@ -151,7 +147,6 @@ func (a *FeeAggregatorAdapter) resolveRefs(e cldf.Environment, input fees.SetFee
 	return resolved, nil
 }
 
-// setFeeAggregatorOnContract dispatches to the correct on-chain operation based on contract type.
 func setFeeAggregatorOnContract(
 	b operations.Bundle,
 	chain cldf_evm.Chain,
@@ -178,7 +173,6 @@ func setFeeAggregatorOnContract(
 	}
 }
 
-// setFeeAggregatorDirect handles contracts with a standalone setFeeAggregator(address) function.
 func setFeeAggregatorDirect(
 	b operations.Bundle,
 	chain cldf_evm.Chain,
@@ -200,7 +194,6 @@ func setFeeAggregatorDirect(
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-// setFeeAggregatorViaOnRampDynamicConfig reads the current DynamicConfig, updates FeeAggregator, and writes back.
 func setFeeAggregatorViaOnRampDynamicConfig(
 	b operations.Bundle,
 	chain cldf_evm.Chain,
@@ -235,7 +228,6 @@ func setFeeAggregatorViaOnRampDynamicConfig(
 	return []contract.WriteOutput{writeReport.Output}, nil
 }
 
-// setFeeAggregatorViaExecutorDynamicConfig reads the current DynamicConfig, updates FeeAggregator, and writes back.
 func setFeeAggregatorViaExecutorDynamicConfig(
 	b operations.Bundle,
 	chain cldf_evm.Chain,

@@ -3,7 +3,6 @@ package deployment
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -39,6 +38,7 @@ func TestSetFeeAggregatorEVM_V1_6_0(t *testing.T) {
 	mcmsRegistry := changesets.GetRegistry()
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &evmadaptersV1_0_0.EVMMCMSReader{})
 
+	// Adapter is registered via init() in the adapters package import above.
 	feeAggAdapter := evmadaptersV1_6_0.NewFeeAggregatorAdapter(&evmAdapter)
 
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
@@ -54,17 +54,12 @@ func TestSetFeeAggregatorEVM_V1_6_0(t *testing.T) {
 	chain := env.BlockChains.EVMChains()[evmSel]
 	newFeeAggregator := common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
 
-	feeAggRegistry := fees.GetFeeAggregatorRegistry()
-	feeAggRegistry.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), feeAggAdapter)
-
 	t.Run("default resolution", func(t *testing.T) {
-		// Read initial fee aggregator — deployer is the default
 		initialFeeAgg, err := feeAggAdapter.GetFeeAggregator(*env, evmSel)
 		require.NoError(t, err)
 		require.Equal(t, chain.DeployerKey.From.Hex(), common.HexToAddress(initialFeeAgg).Hex(),
 			"initially the fee aggregator should be the deployer address")
 
-		// Set via changeset without explicit contract refs (uses default resolution)
 		_, err = fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
 			Version: utils.Version_1_6_0,
 			MCMS:    mcms.Input{},
@@ -85,7 +80,6 @@ func TestSetFeeAggregatorEVM_V1_6_0(t *testing.T) {
 	t.Run("explicit contract ref", func(t *testing.T) {
 		anotherFeeAgg := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 
-		// Pass a fully-qualified AddressRef for the OnRamp
 		_, err = fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
 			Version: utils.Version_1_6_0,
 			MCMS:    mcms.Input{},
@@ -148,6 +142,7 @@ func TestSetFeeAggregatorSolana_V1_6_0(t *testing.T) {
 	deployRegistry := deploy.GetRegistry()
 	deployRegistry.RegisterDeployer(chainsel.FamilySolana, deploy.MCMSVersion, &solAdapter)
 
+	// Adapter is registered via init() in the adapters package import above.
 	feeAggAdapter := soladaptersV1_6_0.NewFeeAggregatorAdapter(&solAdapter)
 
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
@@ -160,7 +155,6 @@ func TestSetFeeAggregatorSolana_V1_6_0(t *testing.T) {
 	require.NoError(t, output.DataStore.Merge(env.DataStore))
 	env.DataStore = output.DataStore.Seal()
 
-	// Read initial fee aggregator (set during router initialization)
 	initialFeeAgg, err := feeAggAdapter.GetFeeAggregator(*env, solSel)
 	require.NoError(t, err)
 	require.NotEmpty(t, initialFeeAgg)
@@ -168,9 +162,6 @@ func TestSetFeeAggregatorSolana_V1_6_0(t *testing.T) {
 
 	chain := env.BlockChains.SolanaChains()[solSel]
 	newFeeAggregator := chain.DeployerKey.PublicKey().String()
-
-	feeAggRegistry := fees.GetFeeAggregatorRegistry()
-	feeAggRegistry.RegisterFeeAggregatorAdapter(chainsel.FamilySolana, semver.MustParse("1.6.0"), feeAggAdapter)
 
 	_, err = fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
 		Version: utils.Version_1_6_0,
