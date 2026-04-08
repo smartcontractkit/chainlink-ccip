@@ -49,17 +49,16 @@ func newPingPongAdapterRegistry() *PingPongAdapterRegistry {
 	}
 }
 
-// RegisterPingPongAdapter registers a new adapter; panics if the key already exists.
+// RegisterPingPongAdapter registers a new adapter.
 func (r *PingPongAdapterRegistry) RegisterPingPongAdapter(chainFamily string, version *semver.Version, adapter PingPongAdapter) {
 	id := newPingPongAdapterID(chainFamily, version)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("PingPongAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetPingPongAdapter looks up an adapter; the second return value tells you if it was found.
