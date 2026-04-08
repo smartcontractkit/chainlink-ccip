@@ -25,7 +25,7 @@ type feeAggregatorAdapterID string
 // On EVM 2.0, the fee aggregator is stored on the Proxy contract.
 // On Solana, the fee aggregator is stored on the Router.
 type FeeAggregatorAdapter interface {
-	SetFeeAggregator(e cldf.Environment) *cldf_ops.Sequence[SetFeeAggregatorSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetFeeAggregator(e cldf.Environment) *cldf_ops.Sequence[FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetFeeAggregator(e cldf.Environment, chainSelector uint64) (string, error)
 }
 

@@ -13,13 +13,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-// SetFeeAggregatorSequenceInput defines the per-chain input for a fee aggregator update sequence.
-type SetFeeAggregatorSequenceInput struct {
-	ChainSelector uint64                `json:"chainSelector" yaml:"chainSelector"`
-	FeeAggregator string                `json:"feeAggregator" yaml:"feeAggregator"`
-	Contracts     []datastore.AddressRef `json:"contracts,omitempty" yaml:"contracts,omitempty"`
-}
-
 // FeeAggregatorForChain represents a fee aggregator address update for a single chain.
 // When Contracts is empty the adapter uses its default contract(s).
 // When Contracts is provided, the adapter updates only the specified contracts,
@@ -98,7 +91,7 @@ func makeSetFeeAggregatorApply(registry *FeeAggregatorAdapterRegistry, mcmsRegis
 				e.OperationsBundle,
 				adapter.SetFeeAggregator(e),
 				e.BlockChains,
-				SetFeeAggregatorSequenceInput{
+				FeeAggregatorForChain{
 					ChainSelector: arg.ChainSelector,
 					FeeAggregator: arg.FeeAggregator,
 					Contracts:     arg.Contracts,

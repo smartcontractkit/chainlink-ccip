@@ -189,8 +189,10 @@ func TestSetFeeAggregator_ValidationErrors(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	cs := fees.SetFeeAggregator()
+
 	t.Run("nil version", func(t *testing.T) {
-		_, err := fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
+		err := cs.VerifyPreconditions(*env, fees.SetFeeAggregatorInput{
 			Version: nil,
 			Args: []fees.FeeAggregatorForChain{
 				{ChainSelector: evmSel, FeeAggregator: "0x1234"},
@@ -201,7 +203,7 @@ func TestSetFeeAggregator_ValidationErrors(t *testing.T) {
 	})
 
 	t.Run("empty args", func(t *testing.T) {
-		_, err := fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
+		err := cs.VerifyPreconditions(*env, fees.SetFeeAggregatorInput{
 			Version: utils.Version_1_6_0,
 			Args:    []fees.FeeAggregatorForChain{},
 		})
@@ -210,7 +212,7 @@ func TestSetFeeAggregator_ValidationErrors(t *testing.T) {
 	})
 
 	t.Run("empty fee aggregator address", func(t *testing.T) {
-		_, err := fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
+		err := cs.VerifyPreconditions(*env, fees.SetFeeAggregatorInput{
 			Version: utils.Version_1_6_0,
 			Args: []fees.FeeAggregatorForChain{
 				{ChainSelector: evmSel, FeeAggregator: ""},
@@ -221,7 +223,7 @@ func TestSetFeeAggregator_ValidationErrors(t *testing.T) {
 	})
 
 	t.Run("duplicate chain selector", func(t *testing.T) {
-		_, err := fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
+		err := cs.VerifyPreconditions(*env, fees.SetFeeAggregatorInput{
 			Version: utils.Version_1_6_0,
 			Args: []fees.FeeAggregatorForChain{
 				{ChainSelector: evmSel, FeeAggregator: "0x1234"},

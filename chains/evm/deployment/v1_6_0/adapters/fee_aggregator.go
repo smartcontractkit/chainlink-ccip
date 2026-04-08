@@ -35,6 +35,7 @@ func (a *FeeAggregatorAdapter) getOnRampRef(e cldf.Environment, chainSelector ui
 	filter := datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onrampops.ContractType),
+		Version:       onrampops.Version,
 	}
 	ref, err := datastore_utils.FindAndFormatRef(
 		e.DataStore,
@@ -73,7 +74,7 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	return dynamicCfg.FeeAggregator.Hex(), nil
 }
 
-func (a *FeeAggregatorAdapter) resolveOnRampRef(e cldf.Environment, input fees.SetFeeAggregatorSequenceInput) (datastore.AddressRef, error) {
+func (a *FeeAggregatorAdapter) resolveOnRampRef(e cldf.Environment, input fees.FeeAggregatorForChain) (datastore.AddressRef, error) {
 	if len(input.Contracts) > 0 {
 		if len(input.Contracts) != 1 {
 			return datastore.AddressRef{}, fmt.Errorf("EVM 1.6 adapter supports exactly one contract ref, got %d", len(input.Contracts))
@@ -87,12 +88,12 @@ func (a *FeeAggregatorAdapter) resolveOnRampRef(e cldf.Environment, input fees.S
 	return a.getOnRampRef(e, input.ChainSelector)
 }
 
-func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.SetFeeAggregatorSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetFeeAggregator",
 		semver.MustParse("1.6.0"),
 		"Sets the fee aggregator address on CCIP 1.6.0 OnRamp dynamic config",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.SetFeeAggregatorSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.FeeAggregatorForChain) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]

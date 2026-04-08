@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -47,6 +48,7 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 		datastore.AddressRef{
 			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(proxyops.ContractType),
+			Version:       proxyops.Version,
 		},
 		chainSelector,
 		datastore_utils.FullRef,
@@ -61,7 +63,7 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 		return "", fmt.Errorf("failed to instantiate Proxy at %s on chain %d: %w", proxyAddr.Hex(), chainSelector, err)
 	}
 
-	feeAgg, err := proxyContract.GetFeeAggregator(nil)
+	feeAgg, err := proxyContract.GetFeeAggregator(&bind.CallOpts{Context: e.GetContext()})
 	if err != nil {
 		return "", fmt.Errorf("failed to read fee aggregator from Proxy at %s on chain %d: %w", proxyAddr.Hex(), chainSelector, err)
 	}
@@ -69,12 +71,12 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	return feeAgg.Hex(), nil
 }
 
-func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.SetFeeAggregatorSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetFeeAggregator",
 		semver.MustParse("2.0.0"),
 		"Sets the fee aggregator address on CCIP 2.0.0 contracts",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.SetFeeAggregatorSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.FeeAggregatorForChain) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]
@@ -113,11 +115,11 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 	)
 }
 
-func (a *FeeAggregatorAdapter) resolveRefs(e cldf.Environment, input fees.SetFeeAggregatorSequenceInput) ([]datastore.AddressRef, error) {
+func (a *FeeAggregatorAdapter) resolveRefs(e cldf.Environment, input fees.FeeAggregatorForChain) ([]datastore.AddressRef, error) {
 	if len(input.Contracts) == 0 {
 		ref, err := datastore_utils.FindAndFormatRef(
 			e.DataStore,
-			datastore.AddressRef{Type: datastore.ContractType(proxyops.ContractType)},
+			datastore.AddressRef{Type: datastore.ContractType(proxyops.ContractType), Version: proxyops.Version},
 			input.ChainSelector,
 			datastore_utils.FullRef,
 		)

@@ -57,7 +57,7 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	return cfg.FeeAggregator.String(), nil
 }
 
-func (a *FeeAggregatorAdapter) resolveRouterPubkey(e cldf.Environment, input fees.SetFeeAggregatorSequenceInput) (solana.PublicKey, error) {
+func (a *FeeAggregatorAdapter) resolveRouterPubkey(e cldf.Environment, input fees.FeeAggregatorForChain) (solana.PublicKey, error) {
 	if len(input.Contracts) > 0 {
 		if len(input.Contracts) != 1 {
 			return solana.PublicKey{}, fmt.Errorf("Solana 1.6 adapter supports exactly one contract ref, got %d", len(input.Contracts))
@@ -70,7 +70,11 @@ func (a *FeeAggregatorAdapter) resolveRouterPubkey(e cldf.Environment, input fee
 		if err != nil {
 			return solana.PublicKey{}, fmt.Errorf("failed to resolve Router ref on chain %d: %w", input.ChainSelector, err)
 		}
-		return solana.MustPublicKeyFromBase58(resolved.Address), nil
+		routerPubkey, err := solana.PublicKeyFromBase58(resolved.Address)
+		if err != nil {
+			return solana.PublicKey{}, fmt.Errorf("failed to parse resolved Router address %q on chain %d: %w", resolved.Address, input.ChainSelector, err)
+		}
+		return routerPubkey, nil
 	}
 	routerAddr, err := a.sol.GetRouterAddress(e.DataStore, input.ChainSelector)
 	if err != nil {
@@ -79,12 +83,12 @@ func (a *FeeAggregatorAdapter) resolveRouterPubkey(e cldf.Environment, input fee
 	return solana.PublicKeyFromBytes(routerAddr), nil
 }
 
-func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.SetFeeAggregatorSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetFeeAggregator",
 		semver.MustParse("1.6.0"),
 		"Sets the fee aggregator address on Solana 1.6.0 Router",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.SetFeeAggregatorSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.FeeAggregatorForChain) (sequences.OnChainOutput, error) {
 			solChain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("solana chain not found for selector %d", input.ChainSelector)
