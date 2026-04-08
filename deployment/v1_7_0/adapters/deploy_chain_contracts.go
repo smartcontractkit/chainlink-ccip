@@ -14,6 +14,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -54,8 +55,8 @@ type FeeQuoterDeployParams struct {
 
 type ExecutorDynamicDeployConfig struct {
 	FeeAggregator         string
-	MinBlockConfirmations uint16
 	CcvAllowlistEnabled   bool
+	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
 type ExecutorDeployParams struct {
@@ -66,12 +67,12 @@ type ExecutorDeployParams struct {
 }
 
 type MockReceiverDeployParams struct {
-	Version                   *semver.Version
-	RequiredVerifiers         []datastore.AddressRef
-	OptionalVerifiers         []datastore.AddressRef
-	OptionalThreshold         uint8
-	MinimumBlockConfirmations uint16
-	Qualifier                 string
+	Version               *semver.Version
+	RequiredVerifiers     []datastore.AddressRef
+	OptionalVerifiers     []datastore.AddressRef
+	OptionalThreshold     uint8
+	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
+	Qualifier             string
 }
 
 type DeployContractParams struct {

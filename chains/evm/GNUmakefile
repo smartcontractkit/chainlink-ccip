@@ -1,12 +1,16 @@
+.PHONY: test
+test: ## Run the full Foundry test suite (always uses the `ccip` profile).
+	FOUNDRY_PROFILE=ccip forge test
+
 # Creates a gas snapshot
 # note `make snapshot` skips fuzz/fork/reverting tests.
 .PHONY: snapshot
 snapshot: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=ccip && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*"
+	FOUNDRY_PROFILE=ccip forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*"
 
 .PHONY: snapshot-diff
 snapshot-diff: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=ccip && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --diff
+	FOUNDRY_PROFILE=ccip forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --diff
 
 .PHONY: foundry
 foundry: ## Install foundry.

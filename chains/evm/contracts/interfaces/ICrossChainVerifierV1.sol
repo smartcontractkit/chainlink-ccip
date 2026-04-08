@@ -38,12 +38,12 @@ interface ICrossChainVerifierV1 is IERC165 {
   /// @param destChainSelector The destination chain selector of the message.
   /// @param message The message to be sent.
   /// @param extraArgs Opaque extra args that can be used by the fee quoter,
-  /// @param blockConfirmations The user requested number of block confirmations.
+  /// @param requestedFinalityConfig The user requested finality encoding (see `FinalityCodec`).
   function getFee(
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory message,
     bytes memory extraArgs,
-    uint16 blockConfirmations
+    bytes4 requestedFinalityConfig
   ) external view returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes);
 
   /// @notice Message sending, verifier hook.

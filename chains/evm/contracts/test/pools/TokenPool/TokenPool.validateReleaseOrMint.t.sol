@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -18,32 +20,52 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    uint256 localAmount =
+      s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     assertEq(localAmount, AMOUNT);
   }
 
-  /// @notice When custom block confirmations are requested but no custom bucket is configured,
+  function test_validateReleaseOrMint_WithFtfRequestedAndFinalityOnlyConfig() public {
+    // Pool explicitly disallows FTF for the *local* chain, which does not affect remote chains. When we then send a
+    // message with a block depth of 1, it should *not* revert. The dest pool trusts the source pool and always
+    // processes the message. Since the source pool has checked the msg finality against its local chain, the dest pool
+    // does not need to do any finality checks.
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+
+    vm.startPrank(s_allowedOffRamp);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec._encodeBlockDepth(1));
+  }
+
+  /// @notice When fast finality is requested but no custom bucket is configured,
   /// the fallback consumes from the default inbound bucket.
   function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
+    // Allow depth-2 FTF on this pool so the inbound finality check passes.
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(2));
+
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec._encodeBlockDepth(2));
 
     assertEq(localAmount, AMOUNT);
   }
 
   /// @notice When a custom inbound bucket IS configured, the custom event is emitted instead.
   function test_validateReleaseOrMint_NonZeroFinality_UsesCustomBucketWhenConfigured() public {
+    // Allow depth-2 FTF on this pool so the inbound finality check passes.
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(2));
+
     RateLimiter.Config memory customInbound = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: true,
+      fastFinality: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: customInbound
     });
@@ -52,10 +74,10 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationsInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+    emit TokenPool.FastFinalityInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
-    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec._encodeBlockDepth(2));
 
     assertEq(localAmount, AMOUNT);
   }
@@ -72,7 +94,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(s_allowedOffRamp);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test_validateReleaseOrMint_InvalidToken() public {
@@ -82,7 +104,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     releaseOrMintIn.localToken = wrongToken; // Invalid token address.
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test_validateReleaseOrMint_CursedByRMN() public {
@@ -96,7 +118,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     );
 
     vm.expectRevert(TokenPool.CursedByRMN.selector);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test_validateReleaseOrMint_InvalidOffRamp() public {
@@ -111,7 +133,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, s_allowedOffRamp));
     vm.startPrank(s_allowedOffRamp);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test_validateReleaseOrMint_InvalidSourcePool() public {
@@ -122,7 +144,7 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidSourcePoolAddress.selector, abi.encode(invalidPool)));
     vm.startPrank(s_allowedOffRamp);
-    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
+    s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function _buildReleaseOrMintIn(

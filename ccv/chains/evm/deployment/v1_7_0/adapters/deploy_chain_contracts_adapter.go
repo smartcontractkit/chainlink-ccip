@@ -288,7 +288,7 @@ func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.Ex
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
 			DynamicConfig: executor.DynamicConfig{
 				FeeAggregator:         feeAgg,
-				MinBlockConfirmations: ep.DynamicConfig.MinBlockConfirmations,
+				AllowedFinalityConfig: ep.DynamicConfig.AllowedFinalityConfig.Raw(),
 				CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,
 			},
 			Qualifier: ep.Qualifier,
@@ -301,12 +301,12 @@ func convertMockReceivers(params []ccvadapters.MockReceiverDeployParams) []seque
 	result := make([]sequences.MockReceiverParams, 0, len(params))
 	for _, mr := range params {
 		result = append(result, sequences.MockReceiverParams{
-			Version:                   mr.Version,
-			RequiredVerifiers:         mr.RequiredVerifiers,
-			OptionalVerifiers:         mr.OptionalVerifiers,
-			OptionalThreshold:         mr.OptionalThreshold,
-			MinimumBlockConfirmations: mr.MinimumBlockConfirmations,
-			Qualifier:                 mr.Qualifier,
+			Version:               mr.Version,
+			RequiredVerifiers:     mr.RequiredVerifiers,
+			OptionalVerifiers:     mr.OptionalVerifiers,
+			OptionalThreshold:     mr.OptionalThreshold,
+			AllowedFinalityConfig: mr.AllowedFinalityConfig.Raw(),
+			Qualifier:             mr.Qualifier,
 		})
 	}
 	return result

@@ -20,10 +20,10 @@ contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
     s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Verify config was set.
-    (bool allowlistEnabled, address router,) =
+    (BaseVerifier.RemoteChainConfigArgs memory config,) =
       s_baseVerifier.getRemoteChainConfig(remoteChainConfigs[0].remoteChainSelector);
-    assertEq(router, address(remoteChainConfigs[0].router));
-    assertEq(allowlistEnabled, remoteChainConfigs[0].allowlistEnabled);
+    assertEq(address(config.router), address(remoteChainConfigs[0].router));
+    assertEq(config.allowlistEnabled, remoteChainConfigs[0].allowlistEnabled);
   }
 
   // Reverts

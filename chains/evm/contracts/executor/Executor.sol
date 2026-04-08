@@ -4,8 +4,9 @@ pragma solidity ^0.8.24;
 import {IExecutor} from "../interfaces/IExecutor.sol";
 
 import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
@@ -19,7 +20,6 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   error ExceedsMaxCCVs(uint256 provided, uint256 max);
   error InvalidCCV(address ccv);
   error InvalidDestChain(uint64 destChainSelector);
-  error Executor__RequestedBlockDepthTooLow(uint16 blockConfirmationsRequested, uint16 minBlockConfirmations);
   error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
 
   event CCVAllowlistUpdated(bool enabled);
@@ -39,9 +39,10 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     RemoteChainConfig config;
   }
 
+  // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
     address feeAggregator; // ───────╮ Address to send withdrawn fees to.
-    uint16 minBlockConfirmations; // │ Minimum number of block confirmations allowed (0 = finality).
+    bytes4 allowedFinalityConfig; // │ The allowed finality config according to the `FinalityCodec` encoding.
     bool ccvAllowlistEnabled; // ────╯ Whether the CCV allowlist is enabled.
   }
 
@@ -142,15 +143,14 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(dynamicConfig);
   }
 
   /// @inheritdoc IExecutor
-  function getMinBlockConfirmations() external view virtual returns (uint16) {
-    return s_dynamicConfig.minBlockConfirmations;
+  function getAllowedFinalityConfig() external view virtual returns (bytes4) {
+    return s_dynamicConfig.allowedFinalityConfig;
   }
 
   /// @notice Returns the list of CCVs that the executor supports.
@@ -196,12 +196,12 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param blockConfirmationsRequested The requested block confirmations for the message. `0` indicates waiting for finality.
+  /// @param requestedFinality The requested finality encoding for the message.
   /// @param ccvs The CCVs that are requested on source.
   /// @return usdCentsFee The USD denominated fee for the executor.
   function getFee(
     uint64 destChainSelector,
-    uint16 blockConfirmationsRequested,
+    bytes4 requestedFinality,
     address[] calldata ccvs,
     bytes calldata, // extraArgs
     address // feeToken
@@ -210,9 +210,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     if (!remoteChainConfig.enabled) {
       revert InvalidDestChain(destChainSelector);
     }
-    if (blockConfirmationsRequested != 0 && blockConfirmationsRequested < s_dynamicConfig.minBlockConfirmations) {
-      revert Executor__RequestedBlockDepthTooLow(blockConfirmationsRequested, s_dynamicConfig.minBlockConfirmations);
-    }
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, s_dynamicConfig.allowedFinalityConfig);
 
     if (s_dynamicConfig.ccvAllowlistEnabled) {
       for (uint256 i = 0; i < ccvs.length; ++i) {

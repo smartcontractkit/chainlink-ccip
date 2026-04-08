@@ -10,6 +10,7 @@ import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.so
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
@@ -161,7 +162,7 @@ contract cctp_e2e is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: userCCVAddresses,
           ccvArgs: new bytes[](1),
-          blockConfirmations: 0,
+          requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
           gasLimit: GAS_LIMIT,
           executor: address(0),
           executorArgs: "",
