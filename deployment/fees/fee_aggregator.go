@@ -52,10 +52,9 @@ func (r *FeeAggregatorAdapterRegistry) RegisterFeeAggregatorAdapter(chainFamily 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("FeeAggregatorAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetFeeAggregatorAdapter looks up an adapter; the second return value tells you if it was found.

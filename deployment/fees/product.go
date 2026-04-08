@@ -58,10 +58,9 @@ func (r *FeeAdapterRegistry) RegisterFeeAdapter(chainFamily string, version *sem
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("FeeAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetFeeAdapter looks up an adapter; the second return value tells you if it was found.

@@ -90,10 +90,9 @@ func (r *LaneAdapterRegistry) RegisterLaneAdapter(chainFamily string, version *s
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("LaneAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 
 	if mp, ok := adapter.(ChainMetadataProvider); ok {
 		utils.RegisterChainFamilySelector(chainFamily, mp.GetChainFamilySelector())
