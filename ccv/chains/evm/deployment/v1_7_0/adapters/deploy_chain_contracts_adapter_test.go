@@ -17,6 +17,7 @@ import (
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
@@ -96,7 +97,7 @@ func dummyDeployContractParams() ccvadapters.DeployContractParams {
 				MaxCCVsPerMsg: 3,
 				DynamicConfig: ccvadapters.ExecutorDynamicDeployConfig{
 					FeeAggregator:         "0xDummyExecutorFeeAgg",
-					AllowedFinalityConfig: [4]byte{0, 0, 0, 5},
+					AllowedFinalityConfig: finality.Config{BlockDepth: 5},
 					CcvAllowlistEnabled:   true,
 				},
 				Qualifier: "dummy-exec",

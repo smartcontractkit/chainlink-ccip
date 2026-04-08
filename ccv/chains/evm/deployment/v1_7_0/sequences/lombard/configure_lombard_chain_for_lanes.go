@@ -23,6 +23,7 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -293,7 +294,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			TokenAddress:     input.Token,
 			TokenPoolAddress: tokenPoolRef.Address,
 			RegistryAddress:  tokenAdminRegistryAddressRef.Address,
-			MinFinalityValue: 0,
+			AllowedFinalityConfig: finality.Config{WaitForFinality: true},
 			RemoteChains:     remoteChainConfigs,
 		})
 		if err != nil {

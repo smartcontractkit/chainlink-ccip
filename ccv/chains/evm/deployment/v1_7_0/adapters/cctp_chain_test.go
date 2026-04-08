@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
@@ -30,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
 	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	burn_mint_with_lock_release_flag_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -621,7 +623,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Contains(t, homeCCTPV2AuthorizedCallers, homeUSDCTokenPoolProxyAddr, "USDCTokenPoolProxy should be an authorized caller on CCTP V2 token pool on home chain")
 
 	// Check USDCTokenPoolProxy required CCVs on home chain
-	homeRequiredCCVs, err := homeUSDCTokenPoolProxy.GetRequiredCCVs(nil, homeSetup.USDCToken, nonHomeChainSelector, big.NewInt(1e18), [4]byte{0, 0, 0, 1}, []byte{}, 0)
+	homeRequiredCCVs, err := homeUSDCTokenPoolProxy.GetRequiredCCVs(nil, homeSetup.USDCToken, nonHomeChainSelector, big.NewInt(1e18), finality.Config{BlockDepth: 1}.Raw(), []byte{}, 0)
 	require.NoError(t, err, "Failed to get required CCVs from USDCTokenPoolProxy on home chain")
 	require.Equal(t, []common.Address{homeCCTPVerifierResolverAddr}, homeRequiredCCVs, "Required CCVs should match on home chain")
 

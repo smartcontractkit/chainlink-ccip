@@ -7,12 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -359,7 +361,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				&bind.CallOpts{Context: t.Context()},
 				message_hasher.ExtraArgsCodecGenericExtraArgsV3{
 					GasLimit:                80_000,
-					RequestedFinalityConfig: [4]byte{0x00, 0x00, 0x00, 0x00},
+					RequestedFinalityConfig: finality.RawWaitForFinality,
 					Ccvs:                    []common.Address{common.HexToAddress(committeeVerifierResolverAddr)},
 					CcvArgs:                 [][]byte{{}},
 					Executor:                common.HexToAddress(executorAddr),

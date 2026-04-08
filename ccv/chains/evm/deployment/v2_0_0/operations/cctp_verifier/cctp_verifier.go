@@ -159,6 +159,16 @@ func (c *CCTPVerifierContract) GetStorageLocations(opts *bind.CallOpts) ([]strin
 	return *abi.ConvertType(out[0], new([]string)).(*[]string), nil
 }
 
+func (c *CCTPVerifierContract) GetAllowedFinalityConfig(opts *bind.CallOpts) ([4]byte, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllowedFinalityConfig")
+	if err != nil {
+		var zero [4]byte
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([4]byte)).(*[4]byte), nil
+}
+
 func (c *CCTPVerifierContract) GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 EVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFeeResult, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getFee", destChainSelector, arg1, arg2, requestedFinality)
@@ -465,6 +475,17 @@ var GetStorageLocations = contract.NewRead(contract.ReadParams[struct{}, []strin
 	NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) ([]string, error) {
 		return c.GetStorageLocations(opts)
+	},
+})
+
+var GetAllowedFinalityConfig = contract.NewRead(contract.ReadParams[struct{}, [4]byte, *CCTPVerifierContract]{
+	Name:         "cctp-verifier:get-allowed-finality-config",
+	Version:      Version,
+	Description:  "Calls getAllowedFinalityConfig on the contract",
+	ContractType: ContractType,
+	NewContract:  NewCCTPVerifierContract,
+	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
+		return c.GetAllowedFinalityConfig(opts)
 	},
 })
 

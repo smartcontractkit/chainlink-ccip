@@ -191,6 +191,28 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			writes = append(writes, outboundReport.Output)
 		}
 
+		if !input.AllowedFinalityConfig.IsZero() {
+			desiredFinality := input.AllowedFinalityConfig.Raw()
+			currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(committeeVerifier),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
+			}
+			if currentFinalityReport.Output != desiredFinality {
+				setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(committeeVerifier),
+					Args:          desiredFinality,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config on CommitteeVerifier on chain %s: %w", chain, err)
+				}
+				writes = append(writes, setFinalityReport.Output)
+			}
+		}
+
 		batchOps, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)

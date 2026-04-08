@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -664,7 +665,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, deployReceiverReport.Output)
 
 			// Set finality config on the MockReceiver if diff exists
-			if mockReceiverParams.AllowedFinalityConfig != WaitForFinalityConfig {
+			if mockReceiverParams.AllowedFinalityConfig != finality.RawWaitForFinality {
 				// Get the current finality config on the MockReceiver
 				finalityConfigResult, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndFinalityConfig, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndFinalityConfigArgs]{
 					ChainSelector: chain.Selector,
