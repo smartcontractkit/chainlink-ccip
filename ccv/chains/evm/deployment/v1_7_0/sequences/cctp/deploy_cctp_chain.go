@@ -116,7 +116,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				BaseVerifierArgs: cctp_verifier.BaseVerifierArgs{
 					StorageLocations: input.StorageLocations,
 					Rmn:              rmnAddress,
-					VersionTag:       verifier_tags.CCTPVerifierV2,
+					VersionTag:       verifier_tags.CCTPVerifierV2(),
 				},
 			},
 		}, existingAddresses)
