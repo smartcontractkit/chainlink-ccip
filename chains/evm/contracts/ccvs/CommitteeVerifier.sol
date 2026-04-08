@@ -27,7 +27,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error MustBeProposedStorageLocationsAdmin();
   error OnlyCallableByStorageLocationsAdmin();
-  error VersionTagCannotBeZero();
 
   event ConfigSet(DynamicConfig dynamicConfig);
   event StorageLocationsAdminTransferRequested(address indexed from, address indexed to);
@@ -41,8 +40,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "CommitteeVerifier 2.0.0";
-  /// @dev The version tag that this instance of the verifier supports.
-  bytes4 internal immutable i_versionTag;
+
   /// @dev The number of bytes allocated to encoding the verifier version.
   uint256 internal constant VERIFIER_VERSION_BYTES = 4;
   /// @dev The number of bytes allocated to encoding the signature length within the verifierResults.
@@ -61,10 +59,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     string[] memory storageLocations,
     address rmn,
     bytes4 versionTag
-  ) BaseVerifier(storageLocations, rmn) {
-    if (versionTag == bytes4(0)) revert VersionTagCannotBeZero();
-    i_versionTag = versionTag;
-
+  ) BaseVerifier(storageLocations, rmn, versionTag) {
     _setDynamicConfig(dynamicConfig);
     s_storageLocationsAdmin = msg.sender;
   }
@@ -83,7 +78,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     address senderAddress = abi.decode(message.sender, (address));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
-    return abi.encodePacked(i_versionTag);
+    return abi.encodePacked(versionTag());
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -99,7 +94,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
     // Any verifierResults submitted to this verifier should have the expected version.
     bytes4 verifierVersion = bytes4(verifierResults[:VERIFIER_VERSION_BYTES]);
-    if (verifierVersion != i_versionTag) {
+    if (verifierVersion != versionTag()) {
       revert InvalidCCVVersion(verifierVersion);
     }
 
@@ -224,11 +219,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     if (msg.sender != s_storageLocationsAdmin) revert OnlyCallableByStorageLocationsAdmin();
 
     _setStorageLocations(newLocations);
-  }
-
-  /// @notice Exposes the version tag.
-  function versionTag() public pure override returns (bytes4 tag) {
-    return i_versionTag;
   }
 
   // ================================================================

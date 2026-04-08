@@ -12,6 +12,8 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   CommitteeVerifier internal s_committeeVerifier;
   bytes4 internal s_versionTag;
 
+  bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
+
   uint256 internal constant PRIVATE_KEY_0 = 0x60b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d1;
   address internal constant MOCK_SENDER = 0x3333333333333333333333333333333333333333;
   address internal constant MOCK_RECEIVER = 0x4444444444444444444444444444444444444444;
@@ -19,8 +21,9 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_committeeVerifier =
-      new CommitteeVerifier(_createBasicDynamicConfigArgs(), s_storageLocations, address(s_mockRMNRemote));
+    s_committeeVerifier = new CommitteeVerifier(
+      _createBasicDynamicConfigArgs(), s_storageLocations, address(s_mockRMNRemote), VERSION_TAG_V2_0_0
+    );
     s_versionTag = s_committeeVerifier.versionTag();
 
     SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](1);

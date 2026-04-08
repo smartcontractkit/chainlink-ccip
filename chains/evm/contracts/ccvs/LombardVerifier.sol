@@ -80,9 +80,6 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   }
 
   string public constant typeAndVersion = "LombardVerifier 2.0.0";
-  /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
-  /// The preimage is bytes4(keccak256("LombardVerifier 2.0.0")).
-  bytes4 private constant VERSION_TAG_V2_0_0 = 0xeba55588;
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.
@@ -114,8 +111,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     DynamicConfig memory dynamicConfig,
     IBridgeV3 bridge,
     string[] memory storageLocation,
-    address rmn
-  ) BaseVerifier(storageLocation, rmn) {
+    address rmn,
+    bytes4 versionTag
+  ) BaseVerifier(storageLocation, rmn, versionTag) {
     _setDynamicConfig(dynamicConfig);
     if (address(bridge) == address(0)) {
       revert ZeroBridge();
@@ -216,7 +214,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
       amount: tokenTransfer.amount,
       destinationCaller: path.allowedCaller,
-      optionalMessage: bytes.concat(VERSION_TAG_V2_0_0, messageId)
+      optionalMessage: bytes.concat(versionTag(), messageId)
     });
 
     // Return raw bytes instead of abi.encode for gas efficiency.
@@ -236,8 +234,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     {
       bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
-      if (versionPrefix != VERSION_TAG_V2_0_0) {
-        revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
+      if (versionPrefix != versionTag()) {
+        revert InvalidCCVVersion(versionTag(), versionPrefix);
       }
     }
 
@@ -285,8 +283,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
         version := mload(add(bridgedMessage, 0x20))
         returnedMessageId := mload(add(bridgedMessage, 0x24))
       }
-      if (version != VERSION_TAG_V2_0_0) {
-        revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
+      if (version != versionTag()) {
+        revert InvalidCCVVersion(versionTag(), version);
       }
       if (returnedMessageId != messageId) {
         revert InvalidMessageId(messageId, returnedMessageId);
@@ -516,11 +514,6 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     string[] memory newLocations
   ) external onlyOwner {
     _setStorageLocations(newLocations);
-  }
-
-  /// @notice Exposes the version tag.
-  function versionTag() public pure override returns (bytes4) {
-    return VERSION_TAG_V2_0_0;
   }
 
   // ================================================================

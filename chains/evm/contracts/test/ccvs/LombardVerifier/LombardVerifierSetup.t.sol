@@ -40,7 +40,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       IBridgeV3(address(s_mockBridge)),
       s_storageLocations,
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      VERSION_TAG_V2_0_0
     );
 
     // Deploy test token and add it as a supported token.

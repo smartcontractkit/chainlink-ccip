@@ -28,6 +28,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
   uint16 internal constant BPS_DIVIDER = 10_000;
   uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
+  bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("CCTPVerifier 2.0.0"));
 
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
   uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
@@ -73,7 +74,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      VERSION_TAG_V2_0_0
     );
 
     // Apply remote chain config updates.

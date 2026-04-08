@@ -16,7 +16,8 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     CommitteeVerifier committeeVerifier = new CommitteeVerifier(
       _createDynamicConfigArgs(expectedFeeAggregator, expectedAllowlistAdmin),
       s_storageLocations,
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      VERSION_TAG_V2_0_0
     );
 
     CommitteeVerifier.DynamicConfig memory dynamicConfig = committeeVerifier.getDynamicConfig();
@@ -26,5 +27,8 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     string[] memory storageLocations = committeeVerifier.getStorageLocations();
     assertEq(storageLocations.length, 1);
     assertEq(storageLocations[0], storageLocations[0]);
+
+    assertEq(committeeVerifier.versionTag(), VERSION_TAG_V2_0_0);
+  }
   }
 }

@@ -65,7 +65,8 @@ contract e2e_lombard is OnRampSetup {
     s_sourceCommitteeVerifier = new CommitteeVerifier(
       CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}),
       new string[](0),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      bytes4(keccak256("CommitteeVerifier 2.0.0"))
     );
 
     BaseVerifier.RemoteChainConfigArgs[] memory destChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);

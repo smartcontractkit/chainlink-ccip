@@ -13,6 +13,7 @@ import {BaseVerifierTestHelper} from "../../../helpers/BaseVerifierTestHelper.so
 contract BaseVerifierSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   address internal constant ALLOWLIST_ADMIN = 0x1234567890123456789012345678901234567890;
+  bytes4 internal constant BASE_VERIFIER_TEST_VERSION_TAG = bytes4(keccak256("BaseVerifierTestHelper"));
 
   BaseVerifierTestHelper internal s_baseVerifier;
 
@@ -49,7 +50,8 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       )
     );
 
-    s_baseVerifier = new BaseVerifierTestHelper(s_storageLocations, address(s_mockRMNRemote));
+    s_baseVerifier =
+      new BaseVerifierTestHelper(s_storageLocations, address(s_mockRMNRemote), BASE_VERIFIER_TEST_VERSION_TAG);
 
     // Set up initial destination chain config.
     BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);

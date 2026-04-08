@@ -117,7 +117,8 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_verifierImpl = new CommitteeVerifier(
       CommitteeVerifier.DynamicConfig({feeAggregator: s_feeAggregator, allowlistAdmin: address(0)}),
       new string[](0),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      bytes4(keccak256("CommitteeVerifier 2.0.0"))
     );
 
     // Configure verifier for destination chain
