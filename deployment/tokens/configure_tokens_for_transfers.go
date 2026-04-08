@@ -6,16 +6,18 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // TokenTransferConfig specifies configuration for a token on one chain to enable transfers with other chains.
@@ -34,11 +36,8 @@ type TokenTransferConfig struct {
 	// Populate the reference as needed to match the desired registry.
 	RegistryRef datastore.AddressRef `yaml:"registryRef" json:"registryRef"`
 	// RemoteChains specifies the remote chains to configure on the token pool.
-	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] `yaml:"remoteChains" json:"remoteChains"`
-	// MinFinalityValue is the minimum finality value required by the token pool.
-	// This can be interpreted as # of block confirmations, an ID, or otherwise.
-	// Interpretation is left to each chain family.
-	MinFinalityValue uint16 `yaml:"minFinalityValue,string" json:"minFinalityValue,string"`
+	RemoteChains          map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] `yaml:"remoteChains" json:"remoteChains"`
+	AllowedFinalityConfig finality.Config                                                           `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
 	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
 	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
@@ -162,7 +161,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			TokenRef:                      token.TokenRef,
 			PoolType:                      tokenPool.Type.String(),
 			ExistingDataStore:             e.DataStore,
-			MinFinalityValue:              token.MinFinalityValue,
+			AllowedFinalityConfig:         token.AllowedFinalityConfig,
 			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
 			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
 			TimelockAddress:               timelockAddress,

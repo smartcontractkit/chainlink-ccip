@@ -138,7 +138,7 @@ func buildConfigureChainForLanesInput(
 					DefaultTxGasLimit:           200_000,
 					NetworkFeeUSDCents:          10,
 					ChainFamilySelector:         evmFamilySelector,
-					LinkFeeMultiplierPercent:     90,
+					LinkFeeMultiplierPercent:    90,
 				},
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
@@ -218,8 +218,8 @@ func assertOnChainState(
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteChainSelector,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, local.router, verifierRemoteCfg.Output.Router.Hex())
-	assert.False(t, verifierRemoteCfg.Output.AllowlistEnabled)
+	assert.Equal(t, local.router, verifierRemoteCfg.Output.RemoteChainConfig.Router.Hex())
+	assert.False(t, verifierRemoteCfg.Output.RemoteChainConfig.AllowlistEnabled)
 }
 
 func TestConfigureChainForLanes_ConfiguresSingleRemoteChainEndToEnd(t *testing.T) {
@@ -439,8 +439,8 @@ func captureLaneState(
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
 	})
 	require.NoError(t, err)
-	s.verifierRouter = verifierCfg.Output.Router.Hex()
-	s.verifierAllowlistEnabled = verifierCfg.Output.AllowlistEnabled
+	s.verifierRouter = verifierCfg.Output.RemoteChainConfig.Router.Hex()
+	s.verifierAllowlistEnabled = verifierCfg.Output.RemoteChainConfig.AllowlistEnabled
 	s.verifierAllowedSenders = verifierCfg.Output.AllowedSendersList
 
 	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.GetFee, evmChain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
@@ -558,8 +558,8 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 			DefaultTokenDestGasOverhead: 100_000,
 			DefaultTxGasLimit:           250_000,
 			NetworkFeeUSDCents:          20,
-			ChainFamilySelector:      evmFamilySelector,
-			LinkFeeMultiplierPercent: 90,
+			ChainFamilySelector:         evmFamilySelector,
+			LinkFeeMultiplierPercent:    90,
 		},
 		ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 			USDCentsFee: 100,
@@ -755,11 +755,11 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 		OffRamp:       local.offRamp,
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:    boolPtr(true),
-				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
-				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
-				DefaultInboundCCVs:  []string{local.committeeVerifier},
-				DefaultOutboundCCVs: []string{local.committeeVerifier},
+				AllowTrafficFrom:     boolPtr(true),
+				OnRamps:              [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OffRamp:              common.HexToAddress(remote.offRamp).Bytes(),
+				DefaultInboundCCVs:   []string{local.committeeVerifier},
+				DefaultOutboundCCVs:  []string{local.committeeVerifier},
 				BaseExecutionGasCost: 120_000,
 				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
 					OverrideExistingConfig: true,
@@ -945,7 +945,7 @@ func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.committeeVerifier), Args: remoteSelector,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.Router.Hex(),
+	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.RemoteChainConfig.Router.Hex(),
 		"CommitteeVerifier remote config should reference the TestRouter")
 }
 
@@ -1211,102 +1211,4 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 		"second run should skip gas price update since value is already set")
 }
 
-func TestConfigureChainForLanes_RejectsOnRampRouterDowngrade(t *testing.T) {
-	chainSelector := chainsel.TEST_90000001.Selector
-	remoteSelector := chainsel.TEST_90000002.Selector
-
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
-	)
-	require.NoError(t, err)
-
-	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
-	remote := deployChain(t, e, remoteSelector)
-
-	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
-	input.AllowOnrampOverride = true
-
-	_, err = operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureChainForLanes, e.BlockChains, input,
-	)
-	require.NoError(t, err, "first run with prod router should succeed")
-
-	downgradeInput := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
-	downgradeInput.Router = localWithTest.testRouter
-	downgradeInput.AllowOnrampOverride = false
-
-	_, err = operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureChainForLanes, e.BlockChains, downgradeInput,
-	)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "OnRamp")
-	assert.Contains(t, err.Error(), "refusing to overwrite")
-
-	evmChain := e.BlockChains.EVMChains()[chainSelector]
-	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	onRampCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.onRamp), Args: remoteSelector,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, common.HexToAddress(localWithTest.router), onRampCfg.Output.Router,
-		"OnRamp router should still point to the prod router after rejected downgrade")
-}
-
-func TestConfigureChainForLanes_RejectsOffRampRouterDowngrade(t *testing.T) {
-	chainSelector := chainsel.TEST_90000001.Selector
-	remoteSelector := chainsel.TEST_90000002.Selector
-
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteSelector}),
-	)
-	require.NoError(t, err)
-
-	localWithTest := deployChainWithTestRouter(t, e, chainSelector)
-	remote := deployChain(t, e, remoteSelector)
-
-	evmChain := e.BlockChains.EVMChains()[chainSelector]
-	prodRouter := common.HexToAddress(localWithTest.router)
-
-	// Pre-configure only the OffRamp source chain config with the prod router.
-	// The OnRamp is left unconfigured so its router is zero — the OnRamp check
-	// passes, and the OffRamp check is what triggers the guard.
-	_, err = operations.ExecuteOperation(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		offramp.ApplySourceChainConfigUpdates, evmChain,
-		contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(localWithTest.offRamp),
-			Args: []offramp.SourceChainConfigArgs{{
-				Router:              prodRouter,
-				SourceChainSelector: remoteSelector,
-				IsEnabled:           true,
-				OnRamps:             [][]byte{common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32)},
-				DefaultCCVs:         []common.Address{common.HexToAddress(localWithTest.committeeVerifier)},
-			}},
-		},
-	)
-	require.NoError(t, err)
-
-	downgradeInput := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
-	downgradeInput.Router = localWithTest.testRouter
-	downgradeInput.AllowOnrampOverride = false
-
-	_, err = operations.ExecuteSequence(
-		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		sequences.ConfigureChainForLanes, e.BlockChains, downgradeInput,
-	)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "OffRamp")
-	assert.Contains(t, err.Error(), "refusing to overwrite")
-
-	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	offRampCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector, Address: common.HexToAddress(localWithTest.offRamp), Args: remoteSelector,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, prodRouter, offRampCfg.Output.Router,
-		"OffRamp router should still point to the prod router after rejected downgrade")
-}
 

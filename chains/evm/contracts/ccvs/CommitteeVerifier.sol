@@ -163,6 +163,14 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
+  /// @notice Sets the finality config according to the FinalityCodec library encoding.
+  /// @param allowedFinality The finality settings allowed by this verifier.
+  function setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) external onlyOwner {
+    _setAllowedFinalityConfig(allowedFinality);
+  }
+
   /// @notice Returns the account currently authorized to manage the storage location.
   /// @return storageLocationsAdmin The active storage locations admin.
   function getStorageLocationsAdmin() external view returns (address storageLocationsAdmin) {

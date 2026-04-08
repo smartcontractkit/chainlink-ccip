@@ -19,7 +19,12 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
 
   function test_forwardToVerifier_MintRecipientFromMessage() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
-      SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, 0, address(s_USDCToken), TRANSFER_AMOUNT, s_tokenReceiver
+      SOURCE_CHAIN_SELECTOR,
+      DEST_CHAIN_SELECTOR,
+      CCIP_STANDARD_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     vm.expectEmit();
@@ -42,7 +47,12 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
 
   function test_forwardToVerifier_MintRecipientFromDomain() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
-      SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, 0, address(s_USDCToken), TRANSFER_AMOUNT, s_tokenReceiver
+      SOURCE_CHAIN_SELECTOR,
+      DEST_CHAIN_SELECTOR,
+      CCIP_STANDARD_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     // Set a custom mint recipient for the domain.
@@ -138,7 +148,12 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
 
   function test_forwardToVerifier_RevertWhen_CursedByRMN() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
-      SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, 0, address(s_USDCToken), TRANSFER_AMOUNT, s_tokenReceiver
+      SOURCE_CHAIN_SELECTOR,
+      DEST_CHAIN_SELECTOR,
+      CCIP_STANDARD_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     _setMockRMNChainCurse(message.destChainSelector, true);

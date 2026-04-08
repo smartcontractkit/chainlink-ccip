@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MessageV1CodecSetup} from "./MessageV1CodecSetup.t.sol";
 
@@ -12,7 +13,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       messageNumber: 200,
       executionGasLimit: 300000,
       ccipReceiveGasLimit: 0,
-      finality: 1000,
+      finality: FinalityCodec._encodeBlockDepth(1000),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
@@ -46,7 +47,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       messageNumber: 789,
       executionGasLimit: 400000,
       ccipReceiveGasLimit: 0,
-      finality: 2000,
+      finality: FinalityCodec._encodeBlockDepth(2000),
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
@@ -93,7 +94,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       messageNumber: type(uint64).max,
       executionGasLimit: type(uint32).max,
       ccipReceiveGasLimit: 0,
-      finality: type(uint16).max,
+      finality: bytes4(uint32(type(uint32).max)),
       ccvAndExecutorHash: bytes32(type(uint256).max),
       onRampAddress: maxLengthBytes,
       offRampAddress: maxLengthBytes,
@@ -117,7 +118,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       messageNumber: 0,
       executionGasLimit: 0,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: "",
       offRampAddress: "",
@@ -142,7 +143,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       messageNumber: 0,
       executionGasLimit: 0,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0)),
       offRampAddress: "",

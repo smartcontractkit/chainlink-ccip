@@ -215,6 +215,51 @@ func ConvertMetadataToType[T any](metadata interface{}) (T, error) {
 	return zero, fmt.Errorf("metadata is neither the expected type nor map[string]interface{}")
 }
 
+// FindLatestRef returns the AddressRef with the highest version in [minVersion, maxVersion)
+// that matches the chain selector, qualifier, and type filters from the given ref.
+// The ref's Version and Address fields must be empty (they are resolved, not filtered).
+func FindLatestRef(ds datastore.DataStore, ref datastore.AddressRef, minVersion, maxVersion *semver.Version) (datastore.AddressRef, error) {
+	if ref.Version != nil {
+		return datastore.AddressRef{}, fmt.Errorf("ref version should not be set when finding the latest address ref, got version %s", ref.Version.String())
+	}
+	if ref.Address != "" {
+		return datastore.AddressRef{}, fmt.Errorf("ref address should not be set when finding the latest address ref, got address %q", ref.Address)
+	}
+
+	filterFns := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
+	if ref.ChainSelector != 0 {
+		filterFns = append(filterFns, datastore.AddressRefByChainSelector(ref.ChainSelector))
+	}
+	if ref.Qualifier != "" {
+		filterFns = append(filterFns, datastore.AddressRefByQualifier(ref.Qualifier))
+	}
+	if ref.Type.String() != "" {
+		filterFns = append(filterFns, datastore.AddressRefByType(ref.Type))
+	}
+
+	refs := ds.Addresses().Filter(filterFns...)
+
+	var latestRef datastore.AddressRef
+	latestVer := minVersion
+	found := false
+	for _, r := range refs {
+		v := r.Version
+		if v == nil {
+			continue
+		}
+		if v.GreaterThanEqual(minVersion) && v.LessThan(maxVersion) && (!found || v.GreaterThan(latestVer)) {
+			found = true
+			latestRef = r
+			latestVer = v
+		}
+	}
+
+	if !found {
+		return datastore.AddressRef{}, fmt.Errorf("no address found for ref (%s) in version range [%s, %s)", SprintRef(ref), minVersion.String(), maxVersion.String())
+	}
+	return latestRef, nil
+}
+
 // Takes in two refs and merges them, giving precedence to non-empty fields in the first ref.
 // Returns an error if the refs are contradictory (e.g. both have non-empty but different addresses).
 func MergeRefs(ref1, ref2 *datastore.AddressRef) (datastore.AddressRef, error) {

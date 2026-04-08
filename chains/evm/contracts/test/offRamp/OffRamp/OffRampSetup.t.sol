@@ -6,6 +6,7 @@ import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageRece
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
@@ -61,9 +62,9 @@ contract OffRampSetup is BaseTest {
     s_offRamp.applySourceChainConfigUpdates(updates);
   }
 
-  /// @notice Sets up a receiver address to mock getCCVsAndMinBlockConfirmations responses and interface support.
+  /// @notice Sets up a receiver address to mock getCCVsAndFinalityConfig responses and interface support.
   /// @param receiver The receiver address to set up.
-  /// @param sourceChainSelector The source chain selector for getCCVsAndMinBlockConfirmations mock.
+  /// @param sourceChainSelector The source chain selector for getCCVsAndFinalityConfig mock.
   /// @param requiredCCVs Array of required CCV addresses.
   /// @param optionalCCVs Array of optional CCV addresses.
   /// @param optionalThreshold Threshold for optional CCVs.
@@ -96,17 +97,17 @@ contract OffRampSetup is BaseTest {
       abi.encode(true)
     );
 
-    // Mock getCCVsAndMinBlockConfirmations function.
+    // Mock getCCVsAndFinalityConfig function.
     vm.mockCall(
       receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, sourceChainSelector),
-      abi.encode(requiredCCVs, optionalCCVs, optionalThreshold, uint16(0))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, sourceChainSelector),
+      abi.encode(requiredCCVs, optionalCCVs, optionalThreshold, FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
   }
 
   /// @notice Convenience function to set up a receiver that returns empty CCVs (falls back to defaults).
   /// @param receiver The receiver address to set up.
-  /// @param sourceChainSelector The source chain selector for getCCVsAndMinBlockConfirmations mock.
+  /// @param sourceChainSelector The source chain selector for getCCVsAndFinalityConfig mock.
   function _setGetCCVsReturnData(
     address receiver,
     uint64 sourceChainSelector

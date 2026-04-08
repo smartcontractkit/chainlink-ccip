@@ -133,9 +133,13 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 			if err != nil {
 				return fmt.Errorf("not a valid selector: %v", err)
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			adapterVersion := input.TokenPoolVersion
+			if adapterVersion == nil {
+				adapterVersion = cfg.ChainAdapterVersion
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
 			if !exists {
-				return fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+				return fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
 			}
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
@@ -169,9 +173,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			adapterVersion := input.TokenPoolVersion
+			if adapterVersion == nil {
+				adapterVersion = cfg.ChainAdapterVersion
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
 			}
 
 			// deploy token
@@ -343,9 +351,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			adapterVersion := cfg.TokenExpansionInputPerChain[selector].TokenPoolVersion
+			if adapterVersion == nil {
+				adapterVersion = cfg.ChainAdapterVersion
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
 			}
 			fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenPoolRef, selector, datastore_utils.FullRef)
 			if err != nil {
