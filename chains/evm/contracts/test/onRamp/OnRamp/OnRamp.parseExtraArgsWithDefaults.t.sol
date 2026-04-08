@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -61,7 +62,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: userCCVAddresses,
       ccvArgs: userCCVArgs,
-      blockConfirmations: 0,
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: makeAddr("userExecutor"),
       executorArgs: "execArgs",
@@ -117,7 +118,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      blockConfirmations: 0,
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -209,7 +210,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      blockConfirmations: 0,
+      requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
       gasLimit: 0, // pure token transfer
       executor: s_defaultExecutor,
       executorArgs: "",

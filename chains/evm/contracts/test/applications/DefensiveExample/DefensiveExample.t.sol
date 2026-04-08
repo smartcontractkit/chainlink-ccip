@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {DefensiveExample} from "../../../applications/DefensiveExample.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -15,7 +16,7 @@ contract DefensiveExampleTest is RouterSetup {
     super.setUp();
 
     s_receiver = new DefensiveExample(s_destRouter, IERC20(s_destFeeToken));
-    s_receiver.enableChain(s_sourceChainSelector, abi.encode(""));
+    s_receiver.enableChain(s_sourceChainSelector, abi.encode(""), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   function test_Recovery() public {

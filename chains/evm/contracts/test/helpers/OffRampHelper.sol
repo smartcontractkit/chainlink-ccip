@@ -24,16 +24,16 @@ contract OffRampHelper is OffRamp {
     uint64 sourceChainSelector,
     address receiver,
     bytes memory sender,
-    uint16 messageRequestedBlockDepth
+    bytes4 messageRequestedFinality
   ) external view returns (address[] memory, address[] memory, uint8) {
-    return _getCCVsFromReceiver(sourceChainSelector, receiver, sender, messageRequestedBlockDepth);
+    return _getCCVsFromReceiver(sourceChainSelector, receiver, sender, messageRequestedFinality);
   }
 
   function getCCVsFromPool(
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
-    uint16 finality,
+    bytes4 finality,
     bytes memory extraData
   ) external view returns (address[] memory) {
     return _getCCVsFromPool(localToken, sourceChainSelector, amount, finality, extraData);
@@ -43,7 +43,7 @@ contract OffRampHelper is OffRamp {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    uint16 finality
+    bytes4 finality
   ) external returns (Client.EVMTokenAmount memory, address) {
     return _releaseOrMintSingleToken(tokenTransfer, originalSender, sourceChainSelector, finality);
   }
@@ -60,7 +60,7 @@ contract OffRampHelper is OffRamp {
     address receiver,
     bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality,
+    bytes4 finality,
     bool isTokenOnlyTransfer
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     return _getCCVsForMessage(sourceChainSelector, receiver, sender, tokenTransfer, finality, isTokenOnlyTransfer);

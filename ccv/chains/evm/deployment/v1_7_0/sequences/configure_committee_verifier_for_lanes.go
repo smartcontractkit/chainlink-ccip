@@ -5,13 +5,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -81,7 +82,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				AllowlistEnabled:    remoteConfig.AllowlistEnabled,
 				FeeUSDCents:         remoteConfig.FeeUSDCents,
 				GasForVerification:  remoteConfig.GasForVerification,
-				PayloadSizeBytes:    remoteConfig.PayloadSizeBytes,
+				// TODO : standardise payload size
+				PayloadSizeBytes: remoteConfig.PayloadSizeBytes,
 			}
 			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
@@ -93,8 +95,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			}
 			currRemote := currentRemoteReport.Output
 
-			if currRemote.Router != desiredRemoteChainArg.Router ||
-				currRemote.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
+			if currRemote.RemoteChainConfig.Router != desiredRemoteChainArg.Router ||
+				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
 				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
@@ -111,24 +113,24 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 				if currFee.FeeUSDCents != desiredRemoteChainArg.FeeUSDCents ||
 					currFee.GasForVerification != desiredRemoteChainArg.GasForVerification ||
-					currFee.PayloadSizeBytes != desiredRemoteChainArg.PayloadSizeBytes {
+					uint16(currFee.PayloadSizeBytes) != desiredRemoteChainArg.PayloadSizeBytes {
 					remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 				}
 			}
 
-		toAdd, toRemove, err := makeAllowlistUpdates(currRemote.AllowedSendersList, remoteConfig.AddedAllowlistedSenders, remoteConfig.RemovedAllowlistedSenders)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
+			toAdd, toRemove, err := makeAllowlistUpdates(currRemote.AllowedSendersList, remoteConfig.AddedAllowlistedSenders, remoteConfig.RemovedAllowlistedSenders)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
+			}
+			if len(toAdd) > 0 || len(toRemove) > 0 {
+				allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
+					AllowlistEnabled:          remoteConfig.AllowlistEnabled,
+					AddedAllowlistedSenders:   toAdd,
+					RemovedAllowlistedSenders: toRemove,
+					DestChainSelector:         remoteSelector,
+				})
+			}
 		}
-		if len(toAdd) > 0 || len(toRemove) > 0 {
-			allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
-				AllowlistEnabled:          remoteConfig.AllowlistEnabled,
-				AddedAllowlistedSenders:   toAdd,
-				RemovedAllowlistedSenders: toRemove,
-				DestChainSelector:         remoteSelector,
-			})
-		}
-	}
 
 		// Build outbound implementation args only for remotes where on-chain verifier differs (idempotent).
 		currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{
@@ -187,6 +189,28 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
 			}
 			writes = append(writes, outboundReport.Output)
+		}
+
+		if !input.AllowedFinalityConfig.IsZero() {
+			desiredFinality := input.AllowedFinalityConfig.Raw()
+			currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(committeeVerifier),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
+			}
+			if currentFinalityReport.Output != desiredFinality {
+				setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(committeeVerifier),
+					Args:          desiredFinality,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config on CommitteeVerifier on chain %s: %w", chain, err)
+				}
+				writes = append(writes, setFinalityReport.Output)
+			}
 		}
 
 		batchOps, err := contract.NewBatchOperationFromWrites(writes)

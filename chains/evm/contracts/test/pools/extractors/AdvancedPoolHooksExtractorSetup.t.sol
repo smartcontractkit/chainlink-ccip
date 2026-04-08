@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngine.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooksExtractor} from "../../../pools/extractors/AdvancedPoolHooksExtractor.sol";
 
@@ -21,7 +22,7 @@ contract AdvancedPoolHooksExtractorSetup is Test {
   uint64 internal constant REMOTE_CHAIN_SELECTOR = 123;
   uint256 internal constant AMOUNT = 100e18;
   uint256 internal constant AMOUNT_POST_FEE = 99e18;
-  uint16 internal constant BLOCK_CONFIRMATION_REQUESTED = 5;
+  bytes4 internal s_finalityConfigRequested = FinalityCodec._encodeBlockDepth(5);
   uint256 internal constant SOURCE_DENOMINATED_AMOUNT = 200e18;
 
   function setUp() public virtual {
@@ -42,7 +43,7 @@ contract AdvancedPoolHooksExtractorSetup is Test {
     return IPolicyEngine.Payload({
       selector: IAdvancedPoolHooks.preflightCheck.selector,
       sender: s_sender,
-      data: abi.encode(lockOrBurnIn, BLOCK_CONFIRMATION_REQUESTED, tokenArgs, AMOUNT_POST_FEE),
+      data: abi.encode(lockOrBurnIn, s_finalityConfigRequested, tokenArgs, AMOUNT_POST_FEE),
       context: tokenArgs
     });
   }
@@ -62,7 +63,7 @@ contract AdvancedPoolHooksExtractorSetup is Test {
     return IPolicyEngine.Payload({
       selector: IAdvancedPoolHooks.postflightCheck.selector,
       sender: s_sender,
-      data: abi.encode(releaseOrMintIn, AMOUNT, BLOCK_CONFIRMATION_REQUESTED),
+      data: abi.encode(releaseOrMintIn, AMOUNT, s_finalityConfigRequested),
       context: releaseOrMintIn.offchainTokenData
     });
   }

@@ -59,6 +59,13 @@ contract BaseVerifierTestHelper is BaseVerifier {
     _setStorageLocations(storageLocations);
   }
 
+  /// @notice Exposes the internal finality config setter for testing.
+  function setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) external {
+    _setAllowedFinalityConfig(allowedFinality);
+  }
+
   /// @notice Exposes FeeTokenHandler withdraw helper for tests.
   /// @dev This mirrors the legacy `withdrawFeeTokens` API that used to live on contracts.
   function withdrawFeeTokens(

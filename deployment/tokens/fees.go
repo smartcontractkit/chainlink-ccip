@@ -6,12 +6,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // UnresolvedTokenTransferFeeArgs allows for partial specification of token transfer fee configurations.
@@ -131,10 +133,10 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 			}
 
 			feeConfigSettings := map[string]map[uint64]*TokenTransferFeeConfig{}
-			minBlocksSettings := map[string]uint16{}
+			minBlocksSettings := map[string][4]byte{}
 			for _, pool := range src.TokenPools {
 				if minBlockConfirmations, ok := pool.MinBlockConfirmations.Get(); ok {
-					minBlocksSettings[pool.PoolAddress] = minBlockConfirmations
+					minBlocksSettings[pool.PoolAddress] = finality.Config{BlockDepth: minBlockConfirmations}.Raw()
 				}
 				if len(pool.Destinations) > 0 {
 					feeConfigSettings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
@@ -151,15 +153,15 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 			if len(minBlocksSettings) > 0 {
 				minBlocksReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle,
-					feesAdapter.SetMinBlockConfirmations(&e),
+					feesAdapter.SetAllowedFinalityConfig(&e),
 					e.BlockChains,
-					SetMinBlockConfirmationsSequenceInput{
+					SetAllowedFinalityConfigSequenceInput{
 						Selector: src.Selector,
 						Settings: minBlocksSettings,
 					},
 				)
 				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetMinBlockConfirmations operation for src %d: %w", src.Selector, err)
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetAllowedFinalityConfig operation for src %d: %w", src.Selector, err)
 				}
 				batchOps = append(batchOps, minBlocksReport.Output.BatchOps...)
 				reports = append(reports, minBlocksReport.ExecutionReports...)

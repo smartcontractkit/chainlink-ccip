@@ -508,6 +508,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
+  /// @notice Sets the finality config according to the FinalityCodec library encoding.
+  /// @param allowedFinality The finality settings allowed by this verifier.
+  function setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) external onlyOwner {
+    _setAllowedFinalityConfig(allowedFinality);
+  }
+
   /// @notice Updates the storage location identifiers.
   /// @param newLocations The new storage location identifiers.
   function updateStorageLocations(

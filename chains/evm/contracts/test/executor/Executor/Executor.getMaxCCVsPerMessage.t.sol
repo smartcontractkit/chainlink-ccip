@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
@@ -11,7 +12,7 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
 
     uint8 newMaxCCVs = INITIAL_MAX_CCVS + 5;
     Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
-      feeAggregator: FEE_AGGREGATOR, minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS, ccvAllowlistEnabled: false
+      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: s_minFinalityConfig, ccvAllowlistEnabled: false
     });
     s_executor = new Executor(newMaxCCVs, dynamicConfig);
     maxCCVs = s_executor.getMaxCCVsPerMessage();
@@ -19,8 +20,11 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
   }
 
   function test_constructor_RevertWhen_InvalidMaxPossibleCCVsPerMsg() public {
-    Executor.DynamicConfig memory dynamicConfig =
-      Executor.DynamicConfig({feeAggregator: FEE_AGGREGATOR, minBlockConfirmations: 0, ccvAllowlistEnabled: false});
+    Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
+      feeAggregator: FEE_AGGREGATOR,
+      allowedFinalityConfig: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
+      ccvAllowlistEnabled: false
+    });
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidMaxPossibleCCVsPerMsg.selector, 0));
     new Executor(0, dynamicConfig);

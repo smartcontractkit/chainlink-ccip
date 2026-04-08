@@ -11,10 +11,10 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
     IPoolV2.TokenTransferFeeConfig memory expectedFeeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultBlockConfirmationsFeeUSDCents: 100,
-      customBlockConfirmationsFeeUSDCents: 150,
-      defaultBlockConfirmationsTransferFeeBps: 123,
-      customBlockConfirmationsTransferFeeBps: 456,
+      finalityFeeUSDCents: 100,
+      fastFinalityFeeUSDCents: 150,
+      finalityTransferFeeBps: 123,
+      fastFinalityTransferFeeBps: 456,
       isEnabled: true
     });
 
@@ -57,10 +57,10 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
     IPoolV2.TokenTransferFeeConfig memory expectedFeeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
       destBytesOverhead: 64,
-      defaultBlockConfirmationsFeeUSDCents: 200,
-      customBlockConfirmationsFeeUSDCents: 250,
-      defaultBlockConfirmationsTransferFeeBps: 789,
-      customBlockConfirmationsTransferFeeBps: 999,
+      finalityFeeUSDCents: 200,
+      fastFinalityFeeUSDCents: 250,
+      finalityTransferFeeBps: 789,
+      fastFinalityTransferFeeBps: 999,
       isEnabled: true
     });
 
@@ -197,10 +197,10 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
   ) internal pure {
     assertEq(configA.destGasOverhead, configB.destGasOverhead);
     assertEq(configA.destBytesOverhead, configB.destBytesOverhead);
-    assertEq(configA.defaultBlockConfirmationsFeeUSDCents, configB.defaultBlockConfirmationsFeeUSDCents);
-    assertEq(configA.customBlockConfirmationsFeeUSDCents, configB.customBlockConfirmationsFeeUSDCents);
-    assertEq(configA.defaultBlockConfirmationsTransferFeeBps, configB.defaultBlockConfirmationsTransferFeeBps);
-    assertEq(configA.customBlockConfirmationsTransferFeeBps, configB.customBlockConfirmationsTransferFeeBps);
+    assertEq(configA.finalityFeeUSDCents, configB.finalityFeeUSDCents);
+    assertEq(configA.fastFinalityFeeUSDCents, configB.fastFinalityFeeUSDCents);
+    assertEq(configA.finalityTransferFeeBps, configB.finalityTransferFeeBps);
+    assertEq(configA.fastFinalityTransferFeeBps, configB.fastFinalityTransferFeeBps);
     assertEq(configA.isEnabled, configB.isEnabled);
   }
 }

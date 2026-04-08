@@ -5,12 +5,13 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 )
 
 // evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
@@ -158,7 +160,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 				MaxCCVsPerMsg: 10,
 				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
-					MinBlockConfirmations: 1,
+					AllowedFinalityConfig: finality.Config{BlockDepth: 1}.Raw(),
 					CcvAllowlistEnabled:   false,
 				},
 				Qualifier: "default",
@@ -168,7 +170,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 				MaxCCVsPerMsg: 10,
 				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
-					MinBlockConfirmations: 1,
+					AllowedFinalityConfig: finality.Config{BlockDepth: 1}.Raw(),
 					CcvAllowlistEnabled:   false,
 				},
 				Qualifier: "custom",

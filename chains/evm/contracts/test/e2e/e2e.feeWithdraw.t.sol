@@ -8,6 +8,7 @@ import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.so
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Executor} from "../../executor/Executor.sol";
 import {Client} from "../../libraries/Client.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -39,7 +40,6 @@ contract e2e_feeWithdrawal is OnRampSetup {
     uint256 tokenPoolBalance;
     uint256 feeAggregatorBalance;
   }
-  uint16 internal constant MIN_BLOCK_CONFIRMATIONS = 50;
 
   OffRampHelper internal s_offRamp;
   address internal s_destVerifier;
@@ -131,7 +131,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
       allowlistEnabled: false,
       feeUSDCents: uint16(VERIFIER_FEE_USD_CENTS), // $2.00 fee for verifier
       gasForVerification: VERIFIER_GAS,
-      payloadSizeBytes: VERIFIER_BYTES
+      payloadSizeBytes: uint16(VERIFIER_BYTES)
     });
     s_verifierImpl.applyRemoteChainConfigUpdates(destChainConfigs);
 
@@ -152,7 +152,9 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_executorImpl = new Executor(
       10, // maxCCVsPerMsg
       Executor.DynamicConfig({
-        feeAggregator: s_feeAggregator, minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS, ccvAllowlistEnabled: false
+        feeAggregator: s_feeAggregator,
+        allowedFinalityConfig: FinalityCodec._encodeBlockDepth(50),
+        ccvAllowlistEnabled: false
       })
     );
 
