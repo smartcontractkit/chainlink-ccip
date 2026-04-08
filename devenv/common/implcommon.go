@@ -790,16 +790,17 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		srcSel := srcAdapter.ChainSelector()
 
 		for _, dstAdapter := range adp {
-			if _, err := dstAdapter.GetTokenExpansionConfig(); errors.Is(err, errors.ErrUnsupported) {
-				continue
+			_, err := dstAdapter.GetTokenExpansionConfig()
+			if err != nil {
+				// Skip destinations that don't support token expansion, otherwise
+				// the source will reference a remote chain selector with no matching
+				// entry in the top-level config map.
+				if errors.Is(err, errors.ErrUnsupported) {
+					continue
+				}
+				return nil, fmt.Errorf("getting token expansion config for destination adapter with selector %d: %w", dstAdapter.ChainSelector(), err)
 			}
 			dstSel := dstAdapter.ChainSelector()
-			// Skip destinations that don't support token expansion, otherwise
-			// the source will reference a remote chain selector with no matching
-			// entry in the top-level config map.
-			if _, err := dstAdapter.GetTokenExpansionConfig(); err != nil {
-				continue
-			}
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{

@@ -369,7 +369,7 @@ func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rej
 		return err
 	}
 	rejectAllIx := solana.NewInstruction(receiverProgram, ix.Accounts(), ixData)
-	result, err := solcommon.SendAndConfirm(t.Context(), a.Client, []solana.Instruction{rejectAllIx}, *deployer, solconfig.DefaultCommitment)
+	result, err := solcommon.SendAndConfirm(ctx, a.Client, []solana.Instruction{rejectAllIx}, *deployer, solconfig.DefaultCommitment)
 	if err != nil {
 		return fmt.Errorf("failed to send and confirm transaction: %w", err)
 	}

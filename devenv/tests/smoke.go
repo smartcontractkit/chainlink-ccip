@@ -317,7 +317,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 			if (fromImpl.Family() == chainsel.FamilyTon && toImpl.Family() == chainsel.FamilyEVM) ||
 				(fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyTon) {
-				t.Skip("TODO: FeeQuoter v2.0 removes OOO enforcement on EVM source chains")
+				t.Skip("Skipping OOO test: FeeQuoter v2.0 defaults OOO=true on TON<->EVM lanes")
 			}
 
 			receiver := toImpl.CCIPReceiver()
