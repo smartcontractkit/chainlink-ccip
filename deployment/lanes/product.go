@@ -81,7 +81,7 @@ func newLaneAdapterRegistry() *LaneAdapterRegistry {
 	}
 }
 
-// RegisterLaneAdapter registers a new adapter; panics if the key already exists.
+// RegisterLaneAdapter registers a new adapter.
 // If the adapter implements ChainMetadataProvider, its chain family selector is
 // also registered in the global family-selector registry for GetSelectorHex.
 func (r *LaneAdapterRegistry) RegisterLaneAdapter(chainFamily string, version *semver.Version, adapter LaneAdapter) {

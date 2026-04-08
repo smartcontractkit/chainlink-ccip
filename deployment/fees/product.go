@@ -51,7 +51,7 @@ func newFeeAdapterRegistry() *FeeAdapterRegistry {
 	}
 }
 
-// RegisterFeeAdapter registers a new adapter; panics if the key already exists.
+// RegisterFeeAdapter registers a new adapter.
 func (r *FeeAdapterRegistry) RegisterFeeAdapter(chainFamily string, version *semver.Version, adapter FeeAdapter) {
 	id := newFeeAdapterID(chainFamily, version)
 

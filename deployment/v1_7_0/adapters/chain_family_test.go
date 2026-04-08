@@ -67,3 +67,19 @@ func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {
 	require.True(t, ok)
 	assert.Same(t, adapter, got)
 }
+
+func TestChainFamilyRegistry_DuplicateRegisterKeepsOriginalAdapter(t *testing.T) {
+	registry := adapters.NewChainFamilyRegistry()
+	adapter1 := &mockChainFamily{}
+	adapter2 := &mockChainFamily{}
+
+	registry.RegisterChainFamily(chainsel.FamilyEVM, adapter1)
+	require.NotPanics(t, func() {
+		registry.RegisterChainFamily(chainsel.FamilyEVM, adapter2)
+	})
+
+	got, ok := registry.GetChainFamily(chainsel.FamilyEVM)
+	require.True(t, ok)
+	assert.Same(t, adapter1, got)
+	assert.NotSame(t, adapter2, got)
+}

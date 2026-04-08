@@ -177,7 +177,7 @@ func newTestAdapterRegistry() *TestAdapterRegistry {
 	}
 }
 
-// RegisterTestAdapter registers a new adapter; panics if the key already exists.
+// RegisterTestAdapter registers a new adapter.
 func (r *TestAdapterRegistry) RegisterTestAdapter(chainFamily string, version *semver.Version, adapter TestAdapterFactory) {
 	id := newTestAdapterID(chainFamily, version)
 

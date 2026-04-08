@@ -45,7 +45,7 @@ func newFeeAggregatorAdapterRegistry() *FeeAggregatorAdapterRegistry {
 	}
 }
 
-// RegisterFeeAggregatorAdapter registers a new adapter; panics if the key already exists.
+// RegisterFeeAggregatorAdapter registers a new adapter.
 func (r *FeeAggregatorAdapterRegistry) RegisterFeeAggregatorAdapter(chainFamily string, version *semver.Version, adapter FeeAggregatorAdapter) {
 	id := newFeeAggregatorAdapterID(chainFamily, version)
 

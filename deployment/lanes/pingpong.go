@@ -49,7 +49,7 @@ func newPingPongAdapterRegistry() *PingPongAdapterRegistry {
 	}
 }
 
-// RegisterPingPongAdapter registers a new adapter; panics if the key already exists.
+// RegisterPingPongAdapter registers a new adapter.
 func (r *PingPongAdapterRegistry) RegisterPingPongAdapter(chainFamily string, version *semver.Version, adapter PingPongAdapter) {
 	id := newPingPongAdapterID(chainFamily, version)
 
