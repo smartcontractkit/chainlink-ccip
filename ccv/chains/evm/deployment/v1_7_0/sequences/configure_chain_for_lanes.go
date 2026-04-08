@@ -8,11 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -605,7 +606,7 @@ func configureCommitteeVerifierAsSource(
 		}
 		cur := currentRemoteReport.Output
 
-		if cur.Router != desired.Router || cur.AllowlistEnabled != desired.AllowlistEnabled {
+		if cur.RemoteChainConfig.Router != desired.Router || cur.RemoteChainConfig.AllowlistEnabled != desired.AllowlistEnabled {
 			remoteChainConfigArgs = append(remoteChainConfigArgs, desired)
 		} else {
 			getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
@@ -621,7 +622,7 @@ func configureCommitteeVerifierAsSource(
 			curFee := getFeeReport.Output
 			if curFee.FeeUSDCents != desired.FeeUSDCents ||
 				curFee.GasForVerification != desired.GasForVerification ||
-				curFee.PayloadSizeBytes != desired.PayloadSizeBytes {
+				curFee.PayloadSizeBytes != uint32(desired.PayloadSizeBytes) {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desired)
 			}
 		}

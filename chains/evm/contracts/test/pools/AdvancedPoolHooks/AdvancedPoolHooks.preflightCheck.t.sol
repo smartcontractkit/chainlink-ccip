@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngine.sol";
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
@@ -36,16 +37,16 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
-    uint16 blockConfirmationsRequested = 5;
+    bytes4 requestedFinalityConfig = FinalityCodec._encodeBlockDepth(5);
     bytes memory tokenArgs = abi.encode("custom token args");
 
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, requestedFinalityConfig, tokenArgs, lockOrBurnIn.amount);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
     assertEq(tokenArgs, lastPayload.context);
-    assertEq(abi.encode(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, lockOrBurnIn.amount), lastPayload.data);
+    assertEq(abi.encode(lockOrBurnIn, requestedFinalityConfig, tokenArgs, lockOrBurnIn.amount), lastPayload.data);
   }
 
   function test_preflightCheck_WithoutPolicyEngine() public {
@@ -53,7 +54,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "", lockOrBurnIn.amount);
   }
 
   function test_preflightCheck_AllowListAndPolicyEngine() public {
@@ -65,11 +66,13 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
-    hooksWithBoth.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    hooksWithBoth.preflightCheck(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "", lockOrBurnIn.amount);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
-    assertEq(abi.encode(lockOrBurnIn, uint16(5), bytes(""), lockOrBurnIn.amount), lastPayload.data);
+    assertEq(
+      abi.encode(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), bytes(""), lockOrBurnIn.amount), lastPayload.data
+    );
     assertEq(bytes(""), lastPayload.context);
   }
 
@@ -81,7 +84,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
     vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, expectedRevertReason));
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "", lockOrBurnIn.amount);
   }
 
   function test_preflightCheck_RevertWhen_SenderNotAllowed() public {
@@ -94,13 +97,13 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(STRANGER);
 
     vm.expectRevert(abi.encodeWithSelector(AdvancedPoolHooks.SenderNotAllowed.selector, STRANGER));
-    hooksWithAllowList.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    hooksWithAllowList.preflightCheck(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "", lockOrBurnIn.amount);
   }
 
   function test_preflightCheck_OnlyAuthorizedCallersCanInvoke() public {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "", lockOrBurnIn.amount);
   }
 
   function test_preflightCheck_RevertWhen_UnauthorizedCaller() public {
@@ -110,6 +113,6 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     vm.prank(s_unauthorizedCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "", lockOrBurnIn.amount);
   }
 }

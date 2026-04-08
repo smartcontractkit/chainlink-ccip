@@ -34,7 +34,7 @@ contract FeeQuoterSetup is TokenSetup {
   // Verifier
   uint16 internal constant DEFAULT_CCV_FEE_USD_CENTS = 45;
   uint32 internal constant DEFAULT_CCV_GAS_LIMIT = 7_500 * 6 + 5_000; // 6 sigs + buffer
-  uint32 internal constant DEFAULT_CCV_PAYLOAD_SIZE = 6 * 64 + 2 * 32; // 6 sigs + two slots for length
+  uint16 internal constant DEFAULT_CCV_PAYLOAD_SIZE = 6 * 64 + 2 * 32; // 6 sigs + two slots for length
 
   // Executor
   uint16 internal constant DEFAULT_EXEC_FEE_USD_CENTS = 60;

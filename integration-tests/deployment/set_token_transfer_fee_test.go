@@ -28,6 +28,7 @@ import (
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -679,29 +680,29 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	// Reset the operation cache
 	env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
 
-	// Check minBlockConfirmations for pool A
+	// Check allowed finality config for pool A (BlockDepth=12 was set)
 	reportA, err := operations.ExecuteOperation(
-		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainA,
+		env.OperationsBundle, tpopsV2_0_0.GetAllowedFinalityConfig, evmChainA,
 		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelA, Address: poolA, Args: struct{}{}},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint16(12), reportA.Output)
+	require.Equal(t, finality.Config{BlockDepth: 12}.Raw(), reportA.Output)
 
-	// Check minBlockConfirmations for pool B
+	// Check allowed finality config for pool B (not set, defaults to WaitForFinality)
 	reportB, err := operations.ExecuteOperation(
-		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainB,
+		env.OperationsBundle, tpopsV2_0_0.GetAllowedFinalityConfig, evmChainB,
 		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelB, Address: poolB, Args: struct{}{}},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint16(0), reportB.Output)
+	require.Equal(t, finality.RawWaitForFinality, reportB.Output)
 
-	// Check minBlockConfirmations for pool C
+	// Check allowed finality config for pool C (explicitly set to 0, i.e. WaitForFinality)
 	reportC, err := operations.ExecuteOperation(
-		env.OperationsBundle, tpopsV2_0_0.GetMinBlockConfirmations, evmChainC,
+		env.OperationsBundle, tpopsV2_0_0.GetAllowedFinalityConfig, evmChainC,
 		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelC, Address: poolC, Args: struct{}{}},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint16(0), reportC.Output)
+	require.Equal(t, finality.RawWaitForFinality, reportC.Output)
 
 	// Query the on-chain config for both pools
 	cfgAB, err := tokensV2.GetOnchainTokenTransferFeeConfig(*env, poolA.Hex(), evmChainSelA, evmChainSelB)

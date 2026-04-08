@@ -2,13 +2,16 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract Executor_setDynamicConfig is ExecutorSetup {
   function test_setDynamicConfig() public {
     Executor.DynamicConfig memory newConfig = Executor.DynamicConfig({
-      feeAggregator: makeAddr("newFeeAggregator"), minBlockConfirmations: 123, ccvAllowlistEnabled: false
+      feeAggregator: makeAddr("newFeeAggregator"),
+      allowedFinalityConfig: FinalityCodec._encodeBlockDepth(123),
+      ccvAllowlistEnabled: false
     });
 
     vm.expectEmit();
@@ -17,11 +20,11 @@ contract Executor_setDynamicConfig is ExecutorSetup {
 
     Executor.DynamicConfig memory config = s_executor.getDynamicConfig();
     assertEq(newConfig.feeAggregator, config.feeAggregator);
-    assertEq(newConfig.minBlockConfirmations, config.minBlockConfirmations);
+    assertEq(newConfig.allowedFinalityConfig, config.allowedFinalityConfig);
     assertEq(newConfig.ccvAllowlistEnabled, config.ccvAllowlistEnabled);
 
-    // Verify getter for minBlockConfirmations still works
-    assertEq(s_executor.getMinBlockConfirmations(), newConfig.minBlockConfirmations);
+    // Verify getAllowedFinalityConfig getter works
+    assertEq(s_executor.getAllowedFinalityConfig(), newConfig.allowedFinalityConfig);
   }
 
   function test_setDynamicConfig_RevertWhen_OnlyCallableByOwner() public {

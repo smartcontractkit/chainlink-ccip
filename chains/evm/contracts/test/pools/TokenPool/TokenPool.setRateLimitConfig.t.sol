@@ -30,7 +30,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     uint128 capacity,
     uint128 rate,
     uint32 newTime,
-    bool customBlockConfirmations
+    bool fastFinality
   ) public {
     rate = uint128(bound(rate, 0, capacity));
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
@@ -43,20 +43,18 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: customBlockConfirmations,
+      fastFinality: fastFinality,
       outboundRateLimiterConfig: newOutboundConfig,
       inboundRateLimiterConfig: newInboundConfig
     });
 
     vm.expectEmit();
-    emit TokenPool.RateLimitConfigured(
-      DEST_CHAIN_SELECTOR, customBlockConfirmations, newOutboundConfig, newInboundConfig
-    );
+    emit TokenPool.RateLimitConfigured(DEST_CHAIN_SELECTOR, fastFinality, newOutboundConfig, newInboundConfig);
 
     s_tokenPool.setRateLimitConfig(rateLimitConfigArgs);
 
     (RateLimiter.TokenBucket memory outboundAfter, RateLimiter.TokenBucket memory inboundAfter) =
-      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, customBlockConfirmations);
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, fastFinality);
 
     _assertRateLimiterState(outboundAfter, newOutboundConfig);
     assertEq(outboundAfter.lastUpdated, newTime);
@@ -65,13 +63,13 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     assertEq(inboundAfter.lastUpdated, newTime);
   }
 
-  function test_setRateLimitConfig_customBlockConfs() public {
+  function test_setRateLimitConfig_customFinality() public {
     RateLimiter.Config memory outboundConfig = RateLimiter.Config({isEnabled: true, capacity: 1e21, rate: 5e20});
     RateLimiter.Config memory inboundConfig = RateLimiter.Config({isEnabled: true, capacity: 2e21, rate: 1e21});
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: true,
+      fastFinality: true,
       outboundRateLimiterConfig: outboundConfig,
       inboundRateLimiterConfig: inboundConfig
     });
@@ -94,7 +92,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: true,
+      fastFinality: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 2}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 1})
     });
@@ -120,7 +118,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmations: false,
+      fastFinality: false,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
@@ -137,7 +135,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: wrongChainSelector,
-      customBlockConfirmations: false,
+      fastFinality: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
     });

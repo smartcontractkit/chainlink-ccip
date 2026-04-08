@@ -138,7 +138,7 @@ func buildConfigureChainForLanesInput(
 					DefaultTxGasLimit:           200_000,
 					NetworkFeeUSDCents:          10,
 					ChainFamilySelector:         evmFamilySelector,
-					LinkFeeMultiplierPercent:     90,
+					LinkFeeMultiplierPercent:    90,
 				},
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
@@ -218,8 +218,8 @@ func assertOnChainState(
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteChainSelector,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, local.router, verifierRemoteCfg.Output.Router.Hex())
-	assert.False(t, verifierRemoteCfg.Output.AllowlistEnabled)
+	assert.Equal(t, local.router, verifierRemoteCfg.Output.RemoteChainConfig.Router.Hex())
+	assert.False(t, verifierRemoteCfg.Output.RemoteChainConfig.AllowlistEnabled)
 }
 
 func TestConfigureChainForLanes_ConfiguresSingleRemoteChainEndToEnd(t *testing.T) {
@@ -439,8 +439,8 @@ func captureLaneState(
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
 	})
 	require.NoError(t, err)
-	s.verifierRouter = verifierCfg.Output.Router.Hex()
-	s.verifierAllowlistEnabled = verifierCfg.Output.AllowlistEnabled
+	s.verifierRouter = verifierCfg.Output.RemoteChainConfig.Router.Hex()
+	s.verifierAllowlistEnabled = verifierCfg.Output.RemoteChainConfig.AllowlistEnabled
 	s.verifierAllowedSenders = verifierCfg.Output.AllowedSendersList
 
 	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.GetFee, evmChain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
@@ -558,8 +558,8 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 			DefaultTokenDestGasOverhead: 100_000,
 			DefaultTxGasLimit:           250_000,
 			NetworkFeeUSDCents:          20,
-			ChainFamilySelector:      evmFamilySelector,
-			LinkFeeMultiplierPercent: 90,
+			ChainFamilySelector:         evmFamilySelector,
+			LinkFeeMultiplierPercent:    90,
 		},
 		ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 			USDCentsFee: 100,
@@ -755,11 +755,11 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 		OffRamp:       local.offRamp,
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:    boolPtr(true),
-				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
-				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
-				DefaultInboundCCVs:  []string{local.committeeVerifier},
-				DefaultOutboundCCVs: []string{local.committeeVerifier},
+				AllowTrafficFrom:     boolPtr(true),
+				OnRamps:              [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OffRamp:              common.HexToAddress(remote.offRamp).Bytes(),
+				DefaultInboundCCVs:   []string{local.committeeVerifier},
+				DefaultOutboundCCVs:  []string{local.committeeVerifier},
 				BaseExecutionGasCost: 120_000,
 				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
 					OverrideExistingConfig: true,
@@ -945,7 +945,7 @@ func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.committeeVerifier), Args: remoteSelector,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.Router.Hex(),
+	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.RemoteChainConfig.Router.Hex(),
 		"CommitteeVerifier remote config should reference the TestRouter")
 }
 
@@ -1210,6 +1210,5 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 	assert.Less(t, len(report2.ExecutionReports), len(report1.ExecutionReports),
 		"second run should skip gas price update since value is already set")
 }
-
 
 
