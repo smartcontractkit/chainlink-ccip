@@ -25,10 +25,10 @@ var _ fees.FeeAggregatorAdapter = (*FeeAggregatorAdapter)(nil)
 
 // supportedContractTypes lists the contract types this adapter knows how to update.
 var supportedContractTypes = map[datastore.ContractType]bool{
-	onrampops.ContractType:    true,
-	proxyops.ContractType:     true,
-	executorops.ContractType:  true,
-	usdcproxyops.ContractType: true,
+	datastore.ContractType(onrampops.ContractType):    true,
+	datastore.ContractType(proxyops.ContractType):     true,
+	datastore.ContractType(executorops.ContractType):  true,
+	datastore.ContractType(usdcproxyops.ContractType): true,
 }
 
 type FeeAggregatorAdapter struct{}
@@ -47,7 +47,7 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 		e.DataStore,
 		datastore.AddressRef{
 			ChainSelector: chainSelector,
-			Type:          proxyops.ContractType,
+			Type:          datastore.ContractType(proxyops.ContractType),
 		},
 		chainSelector,
 		datastore_utils.FullRef,
@@ -121,7 +121,7 @@ func (a *FeeAggregatorAdapter) resolveRefs(e cldf.Environment, input fees.SetFee
 	if len(input.Contracts) == 0 {
 		ref, err := datastore_utils.FindAndFormatRef(
 			e.DataStore,
-			datastore.AddressRef{Type: proxyops.ContractType},
+			datastore.AddressRef{Type: datastore.ContractType(proxyops.ContractType)},
 			input.ChainSelector,
 			datastore_utils.FullRef,
 		)
@@ -161,16 +161,16 @@ func setFeeAggregatorOnContract(
 	addr := common.HexToAddress(ref.Address)
 
 	switch ref.Type {
-	case proxyops.ContractType:
+	case datastore.ContractType(proxyops.ContractType):
 		return setFeeAggregatorDirect(b, chain, addr, proxyops.SetFeeAggregator, newFeeAggregator)
 
-	case usdcproxyops.ContractType:
+	case datastore.ContractType(usdcproxyops.ContractType):
 		return setFeeAggregatorDirect(b, chain, addr, usdcproxyops.SetFeeAggregator, newFeeAggregator)
 
-	case onrampops.ContractType:
+	case datastore.ContractType(onrampops.ContractType):
 		return setFeeAggregatorViaOnRampDynamicConfig(b, chain, addr, newFeeAggregator)
 
-	case executorops.ContractType:
+	case datastore.ContractType(executorops.ContractType):
 		return setFeeAggregatorViaExecutorDynamicConfig(b, chain, addr, newFeeAggregator)
 
 	default:
