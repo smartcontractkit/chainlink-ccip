@@ -20,6 +20,7 @@ import (
 
 type CommitteeVerifierDeployParams struct {
 	Version          *semver.Version
+	FeeAggregator    string
 	AllowlistAdmin   string
 	StorageLocations []string
 	Qualifier        string
@@ -38,6 +39,7 @@ type OffRampDeployParams struct {
 
 type OnRampDeployParams struct {
 	Version               *semver.Version
+	FeeAggregator         string
 	MaxUSDCentsPerMessage uint32
 }
 
@@ -51,6 +53,7 @@ type FeeQuoterDeployParams struct {
 }
 
 type ExecutorDynamicDeployConfig struct {
+	FeeAggregator         string
 	MinBlockConfirmations uint16
 	CcvAllowlistEnabled   bool
 }
@@ -79,9 +82,6 @@ type DeployContractParams struct {
 	FeeQuoter          FeeQuoterDeployParams
 	Executors          []ExecutorDeployParams
 	MockReceivers      []MockReceiverDeployParams
-	// FeeAggregator is set by chain-family config import (e.g. v1.6.0 onramp metadata).
-	// It is not part of DeployChainContractsPerChainCfg; deploy resolves topology first, then this.
-	FeeAggregator string
 }
 
 // MergeWithOverrideIfNotEmpty merges source into a copy of d. Only non-empty source fields overwrite
@@ -95,7 +95,6 @@ func (d DeployContractParams) MergeWithOverrideIfNotEmpty(source DeployContractP
 
 type DeployChainContractsInput struct {
 	ChainSelector     uint64
-	FeeAggregator     string
 	DeployerContract  string
 	DeployTestRouter  bool
 	ExistingAddresses []datastore.AddressRef
