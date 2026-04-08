@@ -19,19 +19,20 @@ import (
 	old_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	old_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
-	new_lrtp "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
-	latest_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_lock_release_token_pool"
-	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	new_lrtp "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
+	latest_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_lock_release_token_pool"
+	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
 func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
@@ -716,7 +717,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	_, err = operations.ExecuteOperation(e.OperationsBundle, erc20.Approve, chain,
 		evm_contract.FunctionInput[erc20.ApproveArgs]{
 			ChainSelector: chainSel, Address: tokenAddr,
-			Args: erc20.ApproveArgs{Spender: oldPoolAddr, Amount: totalMint},
+			Args: erc20.ApproveArgs{Spender: oldPoolAddr, Value: totalMint},
 		})
 	require.NoError(t, err)
 
