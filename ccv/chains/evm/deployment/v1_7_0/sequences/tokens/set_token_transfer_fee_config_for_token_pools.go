@@ -4,14 +4,15 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
@@ -50,13 +51,13 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 						token_pool.TokenTransferFeeConfigArgs{
 							DestChainSelector: dst,
 							TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
-								DefaultBlockConfirmationsTransferFeeBps: fee.DefaultFinalityTransferFeeBps,
-								CustomBlockConfirmationsTransferFeeBps:  fee.CustomFinalityTransferFeeBps,
-								DefaultBlockConfirmationsFeeUSDCents:    fee.DefaultFinalityFeeUSDCents,
-								CustomBlockConfirmationsFeeUSDCents:     fee.CustomFinalityFeeUSDCents,
-								DestBytesOverhead:                       fee.DestBytesOverhead,
-								DestGasOverhead:                         fee.DestGasOverhead,
-								IsEnabled:                               fee.IsEnabled,
+								FinalityTransferFeeBps:     fee.DefaultFinalityTransferFeeBps,
+								FastFinalityTransferFeeBps: fee.CustomFinalityTransferFeeBps,
+								FinalityFeeUSDCents:        fee.DefaultFinalityFeeUSDCents,
+								FastFinalityFeeUSDCents:    fee.CustomFinalityFeeUSDCents,
+								DestBytesOverhead:          fee.DestBytesOverhead,
+								DestGasOverhead:            fee.DestGasOverhead,
+								IsEnabled:                  fee.IsEnabled,
 							},
 						},
 					)
