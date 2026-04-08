@@ -83,7 +83,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				FeeUSDCents:         remoteConfig.FeeUSDCents,
 				GasForVerification:  remoteConfig.GasForVerification,
 				// TODO : standardise payload size
-				PayloadSizeBytes: uint16(remoteConfig.PayloadSizeBytes),
+				PayloadSizeBytes: remoteConfig.PayloadSizeBytes,
 			}
 			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,

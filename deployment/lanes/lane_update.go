@@ -167,7 +167,7 @@ type CommitteeVerifierRemoteChainConfig struct {
 	// The gas required to execute the verification call on the destination chain (used for billing).
 	GasForVerification uint32
 	// The size of the CCV specific payload in bytes (used for billing).
-	PayloadSizeBytes uint32
+	PayloadSizeBytes uint16
 	// SignatureConfig specifies the signature configuration for the remote chain.
 	SignatureConfig CommitteeVerifierSignatureQuorumConfig
 }
@@ -249,5 +249,5 @@ type CommitteeVerifierRemoteChainInput struct {
 	RemovedAllowlistedSenders []string
 	FeeUSDCents               uint16
 	GasForVerification        uint32
-	PayloadSizeBytes          uint32
+	PayloadSizeBytes          uint16
 }

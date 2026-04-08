@@ -26,15 +26,15 @@ type CommitteeVerifierRemoteChainConfig struct {
 	RemovedAllowlistedSenders []string
 	FeeUSDCents               uint16
 	GasForVerification        uint32
-	PayloadSizeBytes          uint32
+	PayloadSizeBytes          uint16
 	SignatureConfig           CommitteeVerifierSignatureQuorumConfig
 }
 
 // CommitteeVerifierConfig configures a CommitteeVerifier contract.
 type CommitteeVerifierConfig[C any] struct {
-	CommitteeVerifier      []C
-	RemoteChains           map[uint64]CommitteeVerifierRemoteChainConfig
-	AllowedFinalityConfig  finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
+	CommitteeVerifier     []C
+	RemoteChains          map[uint64]CommitteeVerifierRemoteChainConfig
+	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
 // ExecutorDestChainConfig configures the Executor for a remote chain.
