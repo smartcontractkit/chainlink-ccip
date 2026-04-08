@@ -71,7 +71,7 @@ flowchart LR
 
 	ccip-contract-examples/chains/evm --> chainlink-ccip
 	click ccip-contract-examples/chains/evm href "https://github.com/smartcontractkit/ccip-contract-examples"
-	ccip-owner-contracts
+	ccip-owner-contracts --> chain-selectors
 	click ccip-owner-contracts href "https://github.com/smartcontractkit/ccip-owner-contracts"
 	chain-selectors
 	click chain-selectors href "https://github.com/smartcontractkit/chain-selectors"
@@ -105,7 +105,7 @@ flowchart LR
 	chainlink-ccip/devenv --> chainlink-ccip/chains/evm/deployment
 	chainlink-ccip/devenv --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/devenv href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-ccip/integration-tests --> chainlink-ccip/chains/evm/deployment
+	chainlink-ccip/integration-tests --> chainlink-ccip/ccv/chains/evm/deployment
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/integration-tests href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-common --> chainlink-common/pkg/chipingress

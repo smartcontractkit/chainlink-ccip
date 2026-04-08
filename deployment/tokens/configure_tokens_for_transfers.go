@@ -276,13 +276,9 @@ func ResolveAdapter(registry *TokenAdapterRegistry, selector uint64, tokenPoolVe
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", selector, err)
 	}
-	version := deploy_utils.StripPatchVersion(tokenPoolVersion)
-	if family == chain_selectors.FamilyEVM && version.String() == deploy_utils.Version_1_5_0.String() {
-		version = deploy_utils.Version_1_6_0 // NOTE: for EVM, the v1.6.0 adapter currently handles v1.5.x pools
-	}
-	adapter, ok := registry.GetTokenAdapter(family, version)
+	adapter, ok := registry.GetTokenAdapter(family, tokenPoolVersion)
 	if !ok {
-		return nil, "", fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, version.String())
+		return nil, "", fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPoolVersion.String())
 	}
 
 	return adapter, family, nil

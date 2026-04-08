@@ -12,6 +12,7 @@ import (
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -303,6 +304,28 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			}
 
 			return result, nil
+		},
+	)
+}
+
+// GetDefaultDestChainConfig is not supported for v1.5 (no FeeQuoter contract).
+func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{}
+}
+
+// GetOnchainDestChainConfig is not supported for v1.5 (no FeeQuoter contract).
+func (a *FeesAdapter) GetOnchainDestChainConfig(_ cldf.Environment, _, _ uint64) (lanes.FeeQuoterDestChainConfig, error) {
+	return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("FeeQuoter dest chain config reads are not supported for v1.5 (no FeeQuoter contract)")
+}
+
+// ApplyDestChainConfigUpdates is not supported for v1.5 (no FeeQuoter contract).
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"ApplyDestChainConfigUpdatesV1_5",
+		semver.MustParse("1.5.0"),
+		"Not supported for v1.5 — no FeeQuoter contract exists",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.ApplyDestChainConfigSequenceInput) (sequences.OnChainOutput, error) {
+			return sequences.OnChainOutput{}, fmt.Errorf("FeeQuoter dest chain config updates are not supported for v1.5 (no FeeQuoter contract)")
 		},
 	)
 }

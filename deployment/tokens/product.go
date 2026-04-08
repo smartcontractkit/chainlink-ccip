@@ -17,6 +17,14 @@ import (
 
 type tokenAdapterID string
 
+// TokenFeeAdapter is an optional interface that can be implemented by TokenAdapters to support setting token transfer fee configurations.
+type TokenFeeAdapter interface {
+	SetMinBlockConfirmations(e *deployment.Environment) *cldf_ops.Sequence[SetMinBlockConfirmationsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (TokenTransferFeeConfig, error)
+	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
+}
+
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.
 type TokenAdapter interface {
 	// ConfigureTokenForTransfersSequence returns a sequence that configures a token pool for cross-chain transfers.
@@ -179,6 +187,22 @@ type ConfigureTokenForTransfersInput struct {
 	PoolType string
 	// TokenAddress is the address of the token being configured.
 	TokenRef datastore.AddressRef
+}
+
+// SetMinBlockConfirmationsSequenceInput defines the input for setting the minimum block confirmations on a V2 token pool.
+type SetMinBlockConfirmationsSequenceInput struct {
+	// Settings are provided as a map of pool address to minimum block confirmations.
+	Settings map[string]uint16 `json:"settings" yaml:"settings"`
+	// Selector is the chain selector for the chain on which to set the minimum block confirmations.
+	Selector uint64 `json:"selector" yaml:"selector"`
+}
+
+// SetTokenTransferFeeSequenceInput defines the input for setting token transfer fee configurations in a sequence.
+type SetTokenTransferFeeSequenceInput struct {
+	// Settings are provided as a map of pool address to a map of dest chain selector to fee config (use nil to disable the fee config for a dest).
+	Settings map[string]map[uint64]*TokenTransferFeeConfig `json:"settings" yaml:"settings"`
+	// Selector is the chain selector for the chain on which to set the token transfer fee configs.
+	Selector uint64 `json:"selector" yaml:"selector"`
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
