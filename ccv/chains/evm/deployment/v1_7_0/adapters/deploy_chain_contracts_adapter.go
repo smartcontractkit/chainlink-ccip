@@ -149,6 +149,7 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 	if len(metadataForoffRamp16) > 1 {
 		return output, fmt.Errorf("multiple metadata entries found for offRamp v1.6.0 on chain selector %d", input.ChainSelector)
 	}
+	// Convert metadata to typed struct if needed
 	onRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OnRampImportConfigSequenceOutput](metadataForonRamp16[0].Metadata)
 	if err != nil {
 		return output, fmt.Errorf("failed to convert metadata to "+
@@ -160,7 +161,15 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 			"OffRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 	}
 
-	output.FeeAggregator = onRampCfg16.DynamicConfig.FeeAggregator.String()
+	feeAggr := onRampCfg16.DynamicConfig.FeeAggregator.String()
+	output.OnRamp.FeeAggregator = feeAggr
+
+	for i := range output.Executors {
+		output.Executors[i].DynamicConfig.FeeAggregator = feeAggr
+	}
+	for i := range output.CommitteeVerifiers {
+		output.CommitteeVerifiers[i].FeeAggregator = feeAggr
+	}
 	output.OffRamp.GasForCallExactCheck = offRampCfg16.StaticConfig.GasForCallExactCheck
 	return output, nil
 }
@@ -171,17 +180,12 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		return sequences.DeployChainContractsInput{}, err
 	}
 
-	feeAgg, err := parseRequiredNonZeroHexAddress(input.FeeAggregator, "FeeAggregator")
+	committeeVerifiers, err := convertCommitteeVerifiers(input.ContractParams.CommitteeVerifiers)
 	if err != nil {
 		return sequences.DeployChainContractsInput{}, err
 	}
 
-	committeeVerifiers, err := convertCommitteeVerifiers(input.ContractParams.CommitteeVerifiers, feeAgg)
-	if err != nil {
-		return sequences.DeployChainContractsInput{}, err
-	}
-
-	executors, err := convertExecutors(input.ContractParams.Executors, feeAgg)
+	executors, err := convertExecutors(input.ContractParams.Executors)
 	if err != nil {
 		return sequences.DeployChainContractsInput{}, err
 	}
@@ -189,6 +193,14 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 	var legacyRMN common.Address
 	if input.ContractParams.RMNRemote.LegacyRMN != "" {
 		legacyRMN, err = parseHexAddress(input.ContractParams.RMNRemote.LegacyRMN, "RMNRemote.LegacyRMN")
+		if err != nil {
+			return sequences.DeployChainContractsInput{}, err
+		}
+	}
+
+	var onRampFeeAgg common.Address
+	if input.ContractParams.OnRamp.FeeAggregator != "" {
+		onRampFeeAgg, err = parseHexAddress(input.ContractParams.OnRamp.FeeAggregator, "OnRamp.FeeAggregator")
 		if err != nil {
 			return sequences.DeployChainContractsInput{}, err
 		}
@@ -215,7 +227,7 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 			CommitteeVerifiers: committeeVerifiers,
 			OnRamp: sequences.OnRampParams{
 				Version:               input.ContractParams.OnRamp.Version,
-				FeeAggregator:         feeAgg,
+				FeeAggregator:         onRampFeeAgg,
 				MaxUSDCentsPerMessage: input.ContractParams.OnRamp.MaxUSDCentsPerMessage,
 			},
 			FeeQuoter: sequences.FeeQuoterParams{
@@ -232,10 +244,14 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 	}, nil
 }
 
-func convertCommitteeVerifiers(params []ccvadapters.CommitteeVerifierDeployParams, feeAgg common.Address) ([]sequences.CommitteeVerifierParams, error) {
+func convertCommitteeVerifiers(params []ccvadapters.CommitteeVerifierDeployParams) ([]sequences.CommitteeVerifierParams, error) {
 	result := make([]sequences.CommitteeVerifierParams, 0, len(params))
 	for _, cv := range params {
-		var err error
+		feeAgg, err := parseRequiredNonZeroHexAddress(cv.FeeAggregator, fmt.Sprintf("committee %q FeeAggregator", cv.Qualifier))
+		if err != nil {
+			return nil, err
+		}
+
 		var allowlistAdmin common.Address
 		if cv.AllowlistAdmin != "" {
 			allowlistAdmin, err = parseHexAddress(cv.AllowlistAdmin, fmt.Sprintf("committee %q AllowlistAdmin", cv.Qualifier))
@@ -255,9 +271,18 @@ func convertCommitteeVerifiers(params []ccvadapters.CommitteeVerifierDeployParam
 	return result, nil
 }
 
-func convertExecutors(params []ccvadapters.ExecutorDeployParams, feeAgg common.Address) ([]sequences.ExecutorParams, error) {
+func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.ExecutorParams, error) {
 	result := make([]sequences.ExecutorParams, 0, len(params))
 	for _, ep := range params {
+		var feeAgg common.Address
+		var err error
+		if ep.DynamicConfig.FeeAggregator != "" {
+			feeAgg, err = parseHexAddress(ep.DynamicConfig.FeeAggregator, fmt.Sprintf("executor %q DynamicConfig.FeeAggregator", ep.Qualifier))
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		result = append(result, sequences.ExecutorParams{
 			Version:       ep.Version,
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
