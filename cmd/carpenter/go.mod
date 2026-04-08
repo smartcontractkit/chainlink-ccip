@@ -7,7 +7,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250422094245-d734371d67f2
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v3 v3.0.0-beta1
+	github.com/urfave/cli/v3 v3.8.0
 	golang.org/x/term v0.37.0
 )
 
