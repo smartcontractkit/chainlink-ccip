@@ -6,8 +6,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -75,26 +77,26 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	expectedOutboundCapacity := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity, decimals, 0)
 	requireScaledRateLimiterMatch(t, expectedOutboundRate, expectedOutboundCapacity, outboundRateLimiterReport.Rate, outboundRateLimiterReport.Capacity, "Outbound")
 
-	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
+	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs from token pool")
 	for _, ccv := range input.RemoteChainConfig.InboundCCVs {
 		require.Contains(t, inboundCCVs, common.HexToAddress(ccv), "Inbound CCV should be in the list of required inbound CCVs")
 	}
 
-	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
+	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 	for _, ccv := range input.RemoteChainConfig.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")
 	}
 
-	inboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, thresholdAmountForAdditionalCCVs, 0, []byte{}, inbound)
+	inboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, thresholdAmountForAdditionalCCVs, finality.RawWaitForFinality, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs to add above threshold from token pool")
 	for _, ccv := range input.RemoteChainConfig.InboundCCVsToAddAboveThreshold {
 		require.Contains(t, inboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Inbound CCV to add above threshold should be in the list of required inbound CCVs to add above threshold")
 	}
 
 	outboundAmountForThresholdQuery := new(big.Int).Mul(thresholdAmountForAdditionalCCVs, big.NewInt(2)) // 2x so after fees we're still above threshold
-	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, outboundAmountForThresholdQuery, 0, []byte{}, outbound)
+	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, outboundAmountForThresholdQuery, finality.RawWaitForFinality, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs to add above threshold from token pool")
 	for _, ccv := range input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold {
 		require.Contains(t, outboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Outbound CCV to add above threshold should be in the list of required outbound CCVs to add above threshold")

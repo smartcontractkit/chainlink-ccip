@@ -7,6 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -160,10 +161,7 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
-	// MinFinalityValue is the minimum finality value required by the token pool.
-	// This can be interpreted as # of block confirmations, an ID, or otherwise.
-	// Interpretation is left to each chain family.
-	MinFinalityValue uint16
+	AllowedFinalityConfig finality.Config
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool
 	// to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
 	// The old pool is derived from the TokenAdminRegistry. Only used by EVM adapters.

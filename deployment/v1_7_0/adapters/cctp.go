@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 // USDCType specifies the type of the USDC on the chain.
@@ -34,7 +35,7 @@ type RemoteCCTPChainConfig struct {
 	// GasForVerification is the gas required to verify the CCTP message on the remote chain.
 	GasForVerification uint32
 	// PayloadSizeBytes is the size of the CCTP verification payload to be checked on the remote chain.
-	PayloadSizeBytes uint32
+	PayloadSizeBytes uint16
 	// LockOrBurnMechanism specifies the mechanism by which the CCTP message will be handled.
 	// Each chain family may interpret this string differently.
 	LockOrBurnMechanism string

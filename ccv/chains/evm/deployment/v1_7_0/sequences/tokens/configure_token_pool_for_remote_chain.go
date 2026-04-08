@@ -19,8 +19,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 
@@ -581,8 +583,8 @@ func maybeUpdateRateLimiters(
 		ChainSelector: chainSelector,
 		Address:       tokenPoolAddress,
 		Args: token_pool.GetCurrentRateLimiterStateArgs{
-			RemoteChainSelector:      remoteChainSelector,
-			CustomBlockConfirmations: customBlockConfirmation,
+			RemoteChainSelector: remoteChainSelector,
+			FastFinality:        customBlockConfirmation,
 		},
 	})
 	if err != nil {
@@ -602,7 +604,7 @@ func maybeUpdateRateLimiters(
 			Args: []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector:       remoteChainSelector,
-					CustomBlockConfirmations:  customBlockConfirmation,
+					FastFinality:              customBlockConfirmation,
 					InboundRateLimiterConfig:  tokensRateLimiterToConfig(desiredInboundRateLimiterConfig),
 					OutboundRateLimiterConfig: tokensRateLimiterToConfig(desiredOutboundRateLimiterConfig),
 				},
@@ -854,7 +856,7 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		Args: token_pool.GetTokenTransferFeeConfigArgs{
 			Arg0:              common.Address{},
 			DestChainSelector: remoteChainSelector,
-			Arg2:              0,
+			Arg2:              finality.RawWaitForFinality,
 			Arg3:              []byte{},
 		},
 	})
@@ -872,36 +874,36 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		desiredTokenTransferFeeConfig.DestBytesOverhead = currentTokenTransferFeeConfig.DestBytesOverhead
 	}
 	if desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents == 0 {
-		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents = currentTokenTransferFeeConfig.DefaultBlockConfirmationsFeeUSDCents
+		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents = currentTokenTransferFeeConfig.FinalityFeeUSDCents
 	}
 	if desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents == 0 {
-		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents = currentTokenTransferFeeConfig.CustomBlockConfirmationsFeeUSDCents
+		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents = currentTokenTransferFeeConfig.FastFinalityFeeUSDCents
 	}
 	if desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps == 0 {
-		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps = currentTokenTransferFeeConfig.DefaultBlockConfirmationsTransferFeeBps
+		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps = currentTokenTransferFeeConfig.FinalityTransferFeeBps
 	}
 	if desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps == 0 {
-		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps = currentTokenTransferFeeConfig.CustomBlockConfirmationsTransferFeeBps
+		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps = currentTokenTransferFeeConfig.FastFinalityTransferFeeBps
 	}
 
 	updates := make([]token_pool.TokenTransferFeeConfigArgs, 0)
 
 	if desiredTokenTransferFeeConfig.DestGasOverhead != currentTokenTransferFeeConfig.DestGasOverhead ||
 		desiredTokenTransferFeeConfig.DestBytesOverhead != currentTokenTransferFeeConfig.DestBytesOverhead ||
-		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents != currentTokenTransferFeeConfig.DefaultBlockConfirmationsFeeUSDCents ||
-		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents != currentTokenTransferFeeConfig.CustomBlockConfirmationsFeeUSDCents ||
-		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps != currentTokenTransferFeeConfig.DefaultBlockConfirmationsTransferFeeBps ||
-		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps != currentTokenTransferFeeConfig.CustomBlockConfirmationsTransferFeeBps {
+		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents != currentTokenTransferFeeConfig.FinalityFeeUSDCents ||
+		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents != currentTokenTransferFeeConfig.FastFinalityFeeUSDCents ||
+		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps != currentTokenTransferFeeConfig.FinalityTransferFeeBps ||
+		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps != currentTokenTransferFeeConfig.FastFinalityTransferFeeBps {
 		updates = append(updates, token_pool.TokenTransferFeeConfigArgs{
 			DestChainSelector: remoteChainSelector,
 			TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
-				DestGasOverhead:                         desiredTokenTransferFeeConfig.DestGasOverhead,
-				DestBytesOverhead:                       desiredTokenTransferFeeConfig.DestBytesOverhead,
-				DefaultBlockConfirmationsFeeUSDCents:    desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
-				CustomBlockConfirmationsFeeUSDCents:     desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents,
-				DefaultBlockConfirmationsTransferFeeBps: desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
-				CustomBlockConfirmationsTransferFeeBps:  desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps,
-				IsEnabled:                               true,
+				DestGasOverhead:            desiredTokenTransferFeeConfig.DestGasOverhead,
+				DestBytesOverhead:          desiredTokenTransferFeeConfig.DestBytesOverhead,
+				FinalityFeeUSDCents:        desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
+				FastFinalityFeeUSDCents:    desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents,
+				FinalityTransferFeeBps:     desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
+				FastFinalityTransferFeeBps: desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps,
+				IsEnabled:                  true,
 			},
 		})
 	}

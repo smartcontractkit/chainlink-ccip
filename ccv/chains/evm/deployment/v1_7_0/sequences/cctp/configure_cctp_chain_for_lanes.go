@@ -18,6 +18,7 @@ import (
 	v1_6_1_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -244,7 +245,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			TokenPoolAddress:         refs.CCTPV2WithCCVsPool.Address,
 			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
-			MinFinalityValue:         1,
+			AllowedFinalityConfig:    finality.Config{BlockDepth: 1},
 			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
 		})
 		if err != nil {
@@ -573,6 +574,27 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 		return nil, fmt.Errorf("failed to set domains on CCTPVerifier: %w", err)
 	}
 	writes = append(writes, domainsReport.Output)
+
+	desiredFinality := finality.Config{BlockDepth: 1}.Raw()
+	currentFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetAllowedFinalityConfig, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       verifierAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get allowed finality config from CCTPVerifier: %w", err)
+	}
+	if currentFinalityReport.Output != desiredFinality {
+		setFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
+			ChainSelector: chain.Selector,
+			Address:       verifierAddress,
+			Args:          desiredFinality,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set allowed finality config on CCTPVerifier: %w", err)
+		}
+		writes = append(writes, setFinalityReport.Output)
+	}
+
 	return writes, nil
 }
 
