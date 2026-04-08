@@ -23,7 +23,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.0
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260401133118-aad694b37bb3
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260408074447-0acfdcb19338
 	github.com/smartcontractkit/mcms v0.37.0
 	github.com/stretchr/testify v1.11.1
 	github.com/xssnick/tonutils-go v1.14.1

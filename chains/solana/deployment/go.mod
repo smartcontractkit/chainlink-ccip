@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.0
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260401133118-aad694b37bb3
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260408074447-0acfdcb19338
 	github.com/smartcontractkit/mcms v0.37.0
 	github.com/stretchr/testify v1.11.1
 )
