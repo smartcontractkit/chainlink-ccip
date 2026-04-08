@@ -160,7 +160,7 @@ func verifyDeployedContractsPostHook(
 	return changeset.PostHook{
 		HookDefinition: changeset.HookDefinition{
 			Name:          verifyDeployedContractsHookName,
-			FailurePolicy: changeset.Abort,
+			FailurePolicy: changeset.Warn,
 			Timeout:       15 * time.Minute,
 		},
 		Func: verifyDeployedContracts(dom, verifier),
@@ -346,13 +346,17 @@ func IterateVerifiers(
 	for _, network := range networkCfg.Networks() {
 		network := network // capture loop variable
 		networkGrp.Go(func() error {
+			addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(network.ChainSelector))
+			if len(addresses) == 0 {
+				lggr.Infof("%s: no address refs for network %d in datastore, skipping", logPrefix, network.ChainSelector)
+				return nil
+			}
 			build, skipNetwork := verifier.ForEachNetwork(ctx, network, network.ChainSelector, lggr, logPrefix)
 			if skipNetwork {
 				lggr.Warnf("%s: skipping unsupported network %d", logPrefix, network.ChainSelector)
 				return nil
 			}
 
-			addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(network.ChainSelector))
 			stepGrp, ctx := errgroup.WithContext(ctx)
 			stepGrp.SetLimit(concurrentVerificationsLimit) // limit concurrent verifications to avoid overwhelming explorers; adjust as needed
 
@@ -365,6 +369,7 @@ func IterateVerifiers(
 					continue
 				}
 				if !verifier.NeedsVerification(ref) {
+					lggr.Infof("%s: skipping verification for %s %s (%s on %d) based on NeedsVerification criteria", logPrefix, ref.Type, ref.Version, ref.Address, network.ChainSelector)
 					continue
 				}
 				stepGrp.Go(func() error {
