@@ -33,6 +33,8 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is OnRampSetup {
+  bytes4 private constant CCTP_VERSION_TAG_V2_0_0 = bytes4(keccak256("CCTPVerifier 2.0.0"));
+
   uint32 private constant CCTP_VERSION = 1;
   uint16 private constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
@@ -308,11 +310,10 @@ contract cctp_e2e is OnRampSetup {
       setup.tokenMessenger,
       setup.messageTransmitterProxy,
       IERC20(address(setup.token)),
-      new string[](0),
       CCTPVerifier.DynamicConfig({
         feeAggregator: s_feeAggregator, allowlistAdmin: s_allowlistAdmin, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      rmn
+      CCTPVerifier.BaseVerifierArgs({storageLocations: new string[](0), rmn: rmn, versionTag: CCTP_VERSION_TAG_V2_0_0})
     );
     setup.tokenPoolProxy = new USDCTokenPoolProxy(
       IERC20(address(setup.token)),

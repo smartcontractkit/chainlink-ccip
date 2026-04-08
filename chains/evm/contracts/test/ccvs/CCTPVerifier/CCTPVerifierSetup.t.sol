@@ -70,12 +70,10 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote),
-      VERSION_TAG_V2_0_0
+      _baseVerifierArgs()
     );
 
     // Apply remote chain config updates.
@@ -163,5 +161,11 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
 
     return (message, messageId);
+  }
+
+  function _baseVerifierArgs() internal view returns (CCTPVerifier.BaseVerifierArgs memory) {
+    return CCTPVerifier.BaseVerifierArgs({
+      storageLocations: s_storageLocations, rmn: address(s_mockRMNRemote), versionTag: VERSION_TAG_V2_0_0
+    });
   }
 }

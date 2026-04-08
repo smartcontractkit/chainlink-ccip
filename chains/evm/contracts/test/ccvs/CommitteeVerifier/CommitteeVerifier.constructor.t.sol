@@ -30,5 +30,4 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
 
     assertEq(committeeVerifier.versionTag(), VERSION_TAG_V2_0_0);
   }
-  }
 }

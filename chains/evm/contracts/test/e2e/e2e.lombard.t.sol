@@ -28,8 +28,9 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract e2e_lombard is OnRampSetup {
-  // Lombard version tag used by VersionedVerifierResolver inbound routing and LombardVerifier.verifyMessage parsing.
+  // Version tags used by VersionedVerifierResolver inbound routing and each verifier's verifyMessage parsing.
   bytes4 internal constant LOMBARD_VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
+  bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10_000));
 
   OffRampHelper internal s_offRamp;
@@ -66,7 +67,7 @@ contract e2e_lombard is OnRampSetup {
       CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}),
       new string[](0),
       address(s_mockRMNRemote),
-      bytes4(keccak256("CommitteeVerifier 2.0.0"))
+      COMMITTEE_VERSION_TAG_V2_0_0
     );
 
     BaseVerifier.RemoteChainConfigArgs[] memory destChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
@@ -110,13 +111,15 @@ contract e2e_lombard is OnRampSetup {
       LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
       IBridgeV3(address(s_lombardBridge)),
       new string[](0),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      LOMBARD_VERSION_TAG_V2_0_0
     );
     s_destLombardVerifier = new LombardVerifier(
       LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
       IBridgeV3(address(s_lombardBridge)),
       new string[](0),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      LOMBARD_VERSION_TAG_V2_0_0
     );
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);

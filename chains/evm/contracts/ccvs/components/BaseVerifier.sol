@@ -76,15 +76,15 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   constructor(
     string[] memory storageLocations,
     address rmnAddress,
-    bytes4 versionTag
+    bytes4 _versionTag
   ) {
     _setStorageLocations(storageLocations);
 
     if (rmnAddress == address(0)) {
       revert ZeroAddressNotAllowed();
     }
-    if (versionTag == bytes4(0)) revert VersionTagCannotBeZero();
-    i_versionTag = versionTag;
+    if (_versionTag == bytes4(0)) revert VersionTagCannotBeZero();
+    i_versionTag = _versionTag;
 
     i_rmn = IRMNRemote(rmnAddress);
   }

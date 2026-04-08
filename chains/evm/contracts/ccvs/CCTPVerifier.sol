@@ -78,6 +78,13 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint16 fastFinalityBps; // ─╯ Basis points charged for fast finality on destination.
   }
 
+  /// @notice The arguments required for the BaseVerifier constructor. Needed to avoid "Stack too deep" errors.
+  struct BaseVerifierArgs {
+    string[] storageLocations;
+    address rmn;
+    bytes4 versionTag;
+  }
+
   string public constant override typeAndVersion = "CCTPVerifier 2.0.0";
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
   uint32 private constant SUPPORTED_CCTP_VERSION = 1;
@@ -156,11 +163,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IERC20 usdcToken,
-    string[] memory storageLocations,
     DynamicConfig memory dynamicConfig,
-    address rmn,
-    bytes4 versionTag
-  ) BaseVerifier(storageLocations, rmn, versionTag) {
+    BaseVerifierArgs memory baseVerifierArgs
+  ) BaseVerifier(baseVerifierArgs.storageLocations, baseVerifierArgs.rmn, baseVerifierArgs.versionTag) {
     if (
       address(tokenMessenger) == address(0) || address(messageTransmitterProxy) == address(0)
         || address(usdcToken) == address(0)
