@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/lombard_verifier"
-	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
+	v2_0_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 )
@@ -128,7 +128,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("deployer contract is required")
 			}
 
-			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
+			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v2_0_0_sequences.DeployVerifierResolverViaCREATE2, chain, v2_0_0_sequences.DeployVerifierResolverViaCREATE2Input{
 				ChainSelector:  input.ChainSelector,
 				Qualifier:      ContractQualifier,
 				Type:           datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),

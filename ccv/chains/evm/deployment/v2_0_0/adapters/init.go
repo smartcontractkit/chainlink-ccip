@@ -12,7 +12,7 @@ import (
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
+	seq2_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
 	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/verification"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
@@ -81,6 +81,6 @@ func registerContractVerificationMetadata(v *semver.Version) {
 	verification.RegisterContractMetadata(usdctokenpoolproxyops.ContractType, v, usdc_token_pool_proxy.SolidityStandardInput, usdc_token_pool_proxy.USDCTokenPoolProxyBin, "contracts/pools/USDC/USDCTokenPoolProxy.sol:USDCTokenPoolProxy")
 	verification.RegisterContractMetadata(mock_receiver.ContractType, v, mock_receiver_v2.SolidityStandardInput, mock_receiver_v2.MockReceiverV2Bin, "contracts/test/mocks/MockReceiverV2.sol:MockReceiverV2")
 	verification.RegisterContractMetadata(executorops.ContractType, v, executor.SolidityStandardInput, executor.ExecutorBin, "contracts/executor/Executor.sol:Executor")
-	verification.RegisterContractMetadata(seq1_7.ExecutorProxyType, v, proxy.SolidityStandardInput, proxy.ProxyBin, "contracts/Proxy.sol:Proxy")
+	verification.RegisterContractMetadata(seq2_0.ExecutorProxyType, v, proxy.SolidityStandardInput, proxy.ProxyBin, "contracts/Proxy.sol:Proxy")
 	verification.RegisterContractMetadata(committeeverifierops.ContractType, v, committee_verifier.SolidityStandardInput, committee_verifier.CommitteeVerifierBin, "contracts/ccvs/CommitteeVerifier.sol:CommitteeVerifier")
 }

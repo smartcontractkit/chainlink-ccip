@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
-	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/changesets"
+	v2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
@@ -104,8 +104,8 @@ func TestChainFamilyAdapter(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
-				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
-					Cfg: v1_7_0.DeployChainContractsCfg{
+				deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+					Cfg: v2_0_0.DeployChainContractsCfg{
 						ChainSel:         chainSel,
 						CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 						Params:           testsetup.CreateBasicContractParams(),

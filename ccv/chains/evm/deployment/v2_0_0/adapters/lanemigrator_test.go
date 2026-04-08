@@ -21,8 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 
-	adapters1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/adapters"
-	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/changesets"
+	adapters2_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/adapters"
+	v2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/testsetup"
 )
@@ -60,8 +60,8 @@ func TestLaneMigrator(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
-				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
-					Cfg: v1_7_0.DeployChainContractsCfg{
+				deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+					Cfg: v2_0_0.DeployChainContractsCfg{
 						ChainSel:         chainSel,
 						CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 						Params:           testsetup.CreateBasicContractParams(),
@@ -150,8 +150,8 @@ func TestLaneMigrator(t *testing.T) {
 			})
 			require.NoError(t, err)
 			destConfig := opOut.Output
-			require.Equal(t, adapters1_7.DefaultMaxPerMsgGasLimit, destConfig.MaxPerMsgGasLimit)
-			require.Equal(t, adapters1_7.DefaultMaxDataBytes, destConfig.MaxDataBytes)
+			require.Equal(t, adapters2_0.DefaultMaxPerMsgGasLimit, destConfig.MaxPerMsgGasLimit)
+			require.Equal(t, adapters2_0.DefaultMaxDataBytes, destConfig.MaxDataBytes)
 		})
 	}
 }

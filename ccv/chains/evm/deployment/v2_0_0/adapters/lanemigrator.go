@@ -17,7 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
+	seq2_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
@@ -57,7 +57,7 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 			Version: executor.Version,
 		},
 		{
-			Type:    datastore.ContractType(seq1_7.ExecutorProxyType),
+			Type:    datastore.ContractType(seq2_0.ExecutorProxyType),
 			Version: executor.Version,
 		},
 	}
@@ -214,7 +214,7 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 }
 
 func verifyOwnershipOfContracts(e deployment.Environment, chainSelector uint64, contractRefs []datastore.AddressRef) error {
-	cllCCIPTimelock, rmnTimelock, _, err := seq1_7.ResolveOwnershipDeps(e.DataStore.Addresses().Filter(
+	cllCCIPTimelock, rmnTimelock, _, err := seq2_0.ResolveOwnershipDeps(e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
 	), chainSelector)
 

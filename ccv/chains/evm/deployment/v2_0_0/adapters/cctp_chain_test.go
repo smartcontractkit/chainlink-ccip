@@ -33,7 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
+	v2_0_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -396,8 +396,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.NoError(t, err, "Failed to deploy CREATE2Factory on non-home chain")
 
 	// Build DeployCCTPChainsConfig
-	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
-		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+	cfg := v2_0_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
 			homeChainSelector: {
 				USDCType:         adapters.Canonical,
 				TokenDecimals:    6,
@@ -468,7 +468,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	}
 
 	// Apply the changeset
-	changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	changeset := v2_0_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
 	output, err := changeset.Apply(*e, cfg)
 	require.NoError(t, err, "Failed to apply DeployCCTPChains changeset")
 
@@ -889,8 +889,8 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 
 	mcmsRegistry := changesets.GetRegistry()
 
-	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
-		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+	cfg := v2_0_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
 			canonicalChainSelector: {
 				USDCType:         adapters.Canonical,
 				TokenDecimals:    6,
@@ -945,7 +945,7 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 		},
 	}
 
-	changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	changeset := v2_0_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
 	output, err := changeset.Apply(*e, cfg)
 	require.NoError(t, err, "Failed to apply DeployCCTPChains changeset")
 
