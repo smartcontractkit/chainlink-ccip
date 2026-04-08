@@ -73,8 +73,7 @@ func (m *mockDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequ
 		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainConfigCreatorInput) (adapters.DeployContractParams, error) {
 			return adapters.DeployContractParams{
 				OnRamp: adapters.OnRampDeployParams{
-					Version:       semver.MustParse("2.0.0"),
-					FeeAggregator: "0xDummyOnRampFeeAgg",
+					Version: semver.MustParse("2.0.0"),
 				},
 			}, nil
 		})
@@ -133,15 +132,18 @@ func newDeployTestTopology(chainSelectors ...uint64) *offchain.EnvironmentTopolo
 			},
 		},
 	}
+	feeAggregators := make(map[string]string, len(chainSelectors))
 	for _, sel := range chainSelectors {
-		committees["default"].ChainConfigs[strconv.FormatUint(sel, 10)] = offchain.ChainCommitteeConfig{
-			NOPAliases:    []string{"nop-1"},
-			Threshold:     1,
-			FeeAggregator: "0x0000000000000000000000000000000000000001",
+		selStr := strconv.FormatUint(sel, 10)
+		committees["default"].ChainConfigs[selStr] = offchain.ChainCommitteeConfig{
+			NOPAliases: []string{"nop-1"},
+			Threshold:  1,
 		}
+		feeAggregators[selStr] = "0x0000000000000000000000000000000000000001"
 	}
 	return &offchain.EnvironmentTopology{
 		IndexerAddress: []string{"localhost:9090"},
+		FeeAggregators: feeAggregators,
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{
 				{Alias: "nop-1", Name: "NOP One"},
@@ -240,6 +242,20 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 			expectedErr: "DeployerContract is required",
 		},
 		{
+			name: "rejects missing topology fee_aggregators entry for chain",
+			cfg: func() changesets.DeployChainContractsCfg {
+				topo := newDeployTestTopology(sel1)
+				topo.FeeAggregators = nil
+				return changesets.DeployChainContractsCfg{
+					Topology:                                topo,
+					ChainSelectors:                          []uint64{sel1},
+					DefaultCfg:                              newDefaultPerChainCfg(),
+					IgnoreImportedConfigFromPreviousVersion: true,
+				}
+			}(),
+			expectedErr: "when IgnoreImportedConfigFromPreviousVersion is true",
+		},
+		{
 			name: "rejects duplicate chain selectors",
 			cfg: changesets.DeployChainContractsCfg{
 				Topology:                                validTopology,
@@ -291,6 +307,30 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeployChainContracts_Validate_RejectsMissingTopologyFeeWhenImportNotApplicable(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	topo := newDeployTestTopology(sel1)
+	topo.FeeAggregators = nil
+	env := newDeployTestEnv(t, []uint64{sel1})
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, &versionAwareLVR{
+		supported: true,
+		versions:  []*semver.Version{semver.MustParse("1.7.0")},
+	})
+	cs := changesets.DeployChainContracts(registry)
+	err := cs.VerifyPreconditions(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:                                topo,
+			ChainSelectors:                          []uint64{sel1},
+			DefaultCfg:                              newDefaultPerChainCfg(),
+			IgnoreImportedConfigFromPreviousVersion: false,
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no v1.6.0 config import applies")
 }
 
 func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
@@ -646,7 +686,6 @@ func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {
 						selStr: {
 							NOPAliases:     []string{"nop-1"},
 							Threshold:      1,
-							FeeAggregator:  "0x0000000000000000000000000000000000000001",
 							AllowlistAdmin: "0x0000000000000000000000000000000000000002",
 						},
 					},
@@ -658,9 +697,8 @@ func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {
 					StorageLocations: []string{"https://store2.test"},
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
-							NOPAliases:    []string{"nop-1"},
-							Threshold:     1,
-							FeeAggregator: "0x0000000000000000000000000000000000000003",
+							NOPAliases: []string{"nop-1"},
+							Threshold:  1,
 						},
 					},
 					Aggregators: []offchain.AggregatorConfig{{Name: "b", Address: "localhost:2"}},
@@ -681,13 +719,11 @@ func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {
 
 	alpha, ok := qualifiers["alpha"]
 	require.True(t, ok)
-	assert.Equal(t, "0x0000000000000000000000000000000000000001", alpha.FeeAggregator)
 	assert.Equal(t, "0x0000000000000000000000000000000000000002", alpha.AllowlistAdmin)
 	assert.Equal(t, []string{"https://store1.test"}, alpha.StorageLocations)
 
 	beta, ok := qualifiers["beta"]
 	require.True(t, ok)
-	assert.Equal(t, "0x0000000000000000000000000000000000000003", beta.FeeAggregator)
 	assert.Empty(t, beta.AllowlistAdmin)
 	assert.Equal(t, []string{"https://store2.test"}, beta.StorageLocations)
 }
@@ -706,9 +742,8 @@ func TestBuildCommitteeVerifierParams_SkipsCommitteesWithoutChainConfig(t *testi
 					VerifierVersion: semver.MustParse("2.0.0"),
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
-							NOPAliases:    []string{"nop-1"},
-							Threshold:     1,
-							FeeAggregator: "0x0000000000000000000000000000000000000001",
+							NOPAliases: []string{"nop-1"},
+							Threshold:  1,
 						},
 					},
 					Aggregators: []offchain.AggregatorConfig{{Name: "a", Address: "localhost:1"}},
@@ -718,9 +753,8 @@ func TestBuildCommitteeVerifierParams_SkipsCommitteesWithoutChainConfig(t *testi
 					VerifierVersion: semver.MustParse("2.0.0"),
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						strconv.FormatUint(otherSel, 10): {
-							NOPAliases:    []string{"nop-1"},
-							Threshold:     1,
-							FeeAggregator: "0x0000000000000000000000000000000000000002",
+							NOPAliases: []string{"nop-1"},
+							Threshold:  1,
 						},
 					},
 					Aggregators: []offchain.AggregatorConfig{{Name: "b", Address: "localhost:2"}},
@@ -759,9 +793,8 @@ func TestBuildCommitteeVerifierParams_RejectsNilVerifierVersion(t *testing.T) {
 					VerifierVersion: nil,
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 						selStr: {
-							NOPAliases:    []string{"nop-1"},
-							Threshold:     1,
-							FeeAggregator: "0x0000000000000000000000000000000000000001",
+							NOPAliases: []string{"nop-1"},
+							Threshold:  1,
 						},
 					},
 					Aggregators: []offchain.AggregatorConfig{{Name: "a", Address: "localhost:1"}},
@@ -789,31 +822,75 @@ func TestBuildCommitteeVerifierParams_ReturnsEmptyForEmptyCommittees(t *testing.
 	assert.Empty(t, params)
 }
 
-func TestBuildCommitteeVerifierParams_RejectsEmptyFeeAggregator(t *testing.T) {
-	sel := chainsel.TEST_90000001.Selector
-	selStr := strconv.FormatUint(sel, 10)
+func TestDeployChainContracts_Apply_SetsFeeAggregatorOnInputFromTopology(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel1Str := strconv.FormatUint(sel1, 10)
+	env := newDeployTestEnv(t, []uint64{sel1})
+
+	var capturedInputs []adapters.DeployChainContractsInput
+	captureAdapter := &capturingDeployAdapter{captured: &capturedInputs}
+
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, captureAdapter)
+
+	topologyFeeAgg := "0xTOPOLOGY_FEE_AGGREGATOR"
+
 	topology := &offchain.EnvironmentTopology{
 		IndexerAddress: []string{"localhost:9090"},
+		FeeAggregators: map[string]string{
+			sel1Str: topologyFeeAgg,
+		},
 		NOPTopology: &offchain.NOPTopology{
 			NOPs: []offchain.NOPConfig{{Alias: "nop-1", Name: "NOP One"}},
 			Committees: map[string]offchain.CommitteeConfig{
-				"test": {
-					Qualifier:       "test",
-					VerifierVersion: semver.MustParse("2.0.0"),
+				"alpha": {
+					Qualifier:        "alpha",
+					VerifierVersion:  semver.MustParse("2.0.0"),
+					StorageLocations: []string{"https://store.test"},
 					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-						selStr: {
-							NOPAliases:    []string{"nop-1"},
-							Threshold:     1,
-							FeeAggregator: "",
+						sel1Str: {
+							NOPAliases: []string{"nop-1"},
+							Threshold:  1,
 						},
 					},
-					Aggregators: []offchain.AggregatorConfig{{Name: "a", Address: "localhost:1"}},
+					Aggregators: []offchain.AggregatorConfig{{Name: "agg-1", Address: "localhost:8080"}},
+				},
+				"beta": {
+					Qualifier:        "beta",
+					VerifierVersion:  semver.MustParse("2.0.0"),
+					StorageLocations: []string{"https://store2.test"},
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						sel1Str: {
+							NOPAliases: []string{"nop-1"},
+							Threshold:  1,
+						},
+					},
+					Aggregators: []offchain.AggregatorConfig{{Name: "agg-2", Address: "localhost:8081"}},
 				},
 			},
 		},
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{},
 	}
-	_, err := changesets.BuildCommitteeVerifierParams(topology, sel)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "FeeAggregator is required")
+
+	perChain := newDefaultPerChainCfg()
+	perChain.Executors = []adapters.ExecutorDeployParams{
+		{Version: semver.MustParse("2.0.0"), Qualifier: "exec-1"},
+	}
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:                                topology,
+			ChainSelectors:                          []uint64{sel1},
+			DefaultCfg:                              perChain,
+			IgnoreImportedConfigFromPreviousVersion: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, capturedInputs, 1)
+
+	captured := capturedInputs[0]
+	assert.Equal(t, topologyFeeAgg, captured.FeeAggregator)
+	require.Len(t, captured.ContractParams.CommitteeVerifiers, 2)
 }

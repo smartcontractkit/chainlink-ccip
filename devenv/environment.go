@@ -360,10 +360,36 @@ func NewEnvironment() (*Cfg, error) {
 
 	// deploy all the contracts
 	for i, impl := range impls {
-		// Create node key bundles for this chain type
-		nkb, err := devenvcommon.CreateNodeKeysBundle(allNodeClients, in.Blockchains[i].Type, in.Blockchains[i].ChainID)
-		if err != nil {
-			return nil, fmt.Errorf("creating node keys bundle: %w", err)
+		// Map the blockchain type (e.g. "anvil", "geth") to the chain family
+		// name the Chainlink node API expects (e.g. "evm", "solana").
+		// The node registers key endpoints under these family names, so using
+		// the raw blockchain type would hit a 404 and trigger the HTTP client's
+		// retry loop.
+		var family string
+		switch in.Blockchains[i].Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
+		}
+
+		// For EVM chains the Chainlink node auto-creates tx keys at startup,
+		// and FundNodes reads them independently via ReadPrimaryETHKey. Calling
+		// CreateNodeKeysBundle would fail because the node returns all EVM keys
+		// (one per configured chain) and the helper rejects >1. Non-EVM chains
+		// still need explicit key creation and the bundles are stored for OCR
+		// configuration.
+		var nkb map[string]clclient.NodeKeysBundle
+		if family != chainsel.FamilyEVM {
+			nkb, err = devenvcommon.CreateNodeKeysBundle(allNodeClients, family, in.Blockchains[i].ChainID)
+			if err != nil {
+				return nil, fmt.Errorf("creating node keys bundle: %w", err)
+			}
+			nodeKeyBundles[family] = nkb
 		}
 
 		// Fund nodes with native token
@@ -372,21 +398,6 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
 		selector := impl.ChainSelector()
-
-		var family string
-		switch in.Blockchains[i].Type {
-		case "anvil", "geth":
-			// NOTE: this seems like a massive hack, why not for EVM?
-			family = chainsel.FamilyEVM
-		case "solana":
-			family = chainsel.FamilySolana
-			nodeKeyBundles[family] = nkb
-		case "ton":
-			family = chainsel.FamilyTon
-			nodeKeyBundles[family] = nkb
-		default:
-			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
-		}
 		if in.ForkedEnvConfig != nil {
 			// Skip deployment on forked environments
 			L.Info().Str("ChainID", in.Blockchains[i].ChainID).Msg("Skipping contract deployment on forked environment")
