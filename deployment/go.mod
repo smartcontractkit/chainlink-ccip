@@ -26,6 +26,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.19.0
 	google.golang.org/grpc v1.79.3
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -247,7 +248,6 @@ require (
 	gopkg.in/guregu/null.v4 v4.0.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 // gotron-sdk is not longer maintained

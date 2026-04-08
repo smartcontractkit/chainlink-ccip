@@ -7,6 +7,7 @@ import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
@@ -81,7 +82,7 @@ contract OffRamp_execute is OffRampSetup {
       messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: s_onRamp,
       offRampAddress: abi.encodePacked(s_offRamp),

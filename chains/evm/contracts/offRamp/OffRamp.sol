@@ -15,6 +15,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
+import {FinalityCodec} from "../libraries/FinalityCodec.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -44,7 +45,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
-  error InvalidFinalityForReceiver(address receiver, uint16 msgBlockDepth, uint16 requiredBlockDepth);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
@@ -475,7 +475,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver,
     bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality,
+    bytes4 finality,
     bool isTokenOnlyTransfer
   ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     address[] memory requiredPoolCCVs = new address[](0);
@@ -499,8 +499,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address[] memory requiredReceiverCCVs;
     if (isTokenOnlyTransfer) {
       if (tokenTransfer.length > 0) {
-        // For token-only transfers, we skip querying the receiver for CCVs, and don't add the defaults. This enables
-        // pure token transfers to only require the pool CCVs, as the token issuer is the only party that takes any risk.
+        // For token-only transfers with tokens, we skip querying the receiver for CCVs, and don't add the defaults.
+        // This enables pure token transfers to only require the pool CCVs, as the token issuer is the only party that
+        // takes any risk. As a consequence, the receiver's finality policy (getCCVsAndFinalityConfig) is intentionally
+        // NOT checked against message.finality for this path — finality enforcement is delegated entirely to the pool
+        // (which validates finality in _validateReleaseOrMint). If a receiver wants to enforce its own finality policy
+        // for token transfers it must NOT qualify as a token-only transfer (i.e. it must have a non-zero data payload
+        // or a non-zero ccipReceiveGasLimit).
         requiredReceiverCCVs = new address[](0);
         optionalCCVs = new address[](0);
         optionalThreshold = 0;
@@ -683,7 +688,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The source chain selector.
   /// @param receiver The receiver address.
   /// @param sender The sender of the message on the source chain.
-  /// @param messageRequestedBlockDepth The finality requirement of the message.
+  /// @param messageRequestedFinality The finality requirement of the message (see `FinalityCodec`).
   /// @return requiredCCV The required CCVs.
   /// @return optionalCCVs The optional CCVs.
   /// @return optionalThreshold The threshold of optional CCVs.
@@ -691,18 +696,18 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     bytes memory sender,
-    uint16 messageRequestedBlockDepth
+    bytes4 messageRequestedFinality
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // Default block confirmations requirement is 0, which means "wait for finality". A receiver implementing
-    // IAny2EVMMessageReceiverV2 can return a different value.
+    // Default finality config is 0, which means "wait for finality". A receiver implementing IAny2EVMMessageReceiverV2
+    // can return a different value.
     // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
     // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
-    uint16 minBlockConfirmations;
+    bytes4 receiverFinalityConfig = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
 
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-      (requiredCCV, optionalCCVs, optionalThreshold, minBlockConfirmations) =
-        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockConfirmations(sourceChainSelector, sender);
+      (requiredCCV, optionalCCVs, optionalThreshold, receiverFinalityConfig) =
+        IAny2EVMMessageReceiverV2(receiver).getCCVsAndFinalityConfig(sourceChainSelector, sender);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
@@ -713,17 +718,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       }
     }
 
-    // If non-zero it means FTF is enabled. Ensure it follows the min requirements from the receiver.
-    if (messageRequestedBlockDepth != 0) {
-      // If the receiver requires finality, but the msg is FTF, revert.
-      if (minBlockConfirmations == 0) {
-        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockConfirmations);
-      }
-      // If the receiver specified a minBlockConfirmations that is higher than the message requested block confirmations, revert.
-      if (minBlockConfirmations > messageRequestedBlockDepth) {
-        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockConfirmations);
-      }
-    }
+    // Check the finality requirement of the message against the allowed finality for the receiver.
+    FinalityCodec._ensureRequestedFinalityAllowed(messageRequestedFinality, receiverFinalityConfig);
 
     // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
     // If they did specify something, we use what they specified.
@@ -741,13 +737,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param localToken The local token address.
   /// @param sourceChainSelector The source chain selector.
   /// @param amount The amount of the token to be released/minted.
+  /// @param finality The finality requirement of the message (see `FinalityCodec`).
   /// @param extraData The extra data for the pool.
   /// @return requiredCCV The required CCVs.
   function _getCCVsFromPool(
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
-    uint16 finality,
+    bytes4 finality,
     bytes memory extraData
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
@@ -780,12 +777,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param tokenTransfer Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    uint16 blockConfirmationsRequested
+    bytes4 requestedFinalityConfig
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
     address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 
@@ -820,7 +817,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
     // account for 90k gas overhead due to the interface check.
     if (localPoolAddress._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationsRequested) returns (
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, requestedFinalityConfig) returns (
         Pool.ReleaseOrMintOutV1 memory result
       ) {
         returnData = result;

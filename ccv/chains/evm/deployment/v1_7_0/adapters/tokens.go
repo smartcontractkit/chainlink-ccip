@@ -302,7 +302,7 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 			args := []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector:      input.RemoteChainSelector,
-					CustomBlockConfirmations: false,
+					FastFinality: false,
 					OutboundRateLimiterConfig: token_pool.Config{
 						IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
 						Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
@@ -316,7 +316,7 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				},
 				{
 					RemoteChainSelector:      input.RemoteChainSelector,
-					CustomBlockConfirmations: true,
+					FastFinality: true,
 					OutboundRateLimiterConfig: token_pool.Config{
 						IsEnabled: input.CustomFinalityOutboundRateLimiterConfig.IsEnabled,
 						Capacity:  input.CustomFinalityOutboundRateLimiterConfig.Capacity,
@@ -351,8 +351,8 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 	return evm_tokens.MigrateLockReleasePoolLiquidity
 }
 
-func (t *TokenAdapter) SetMinBlockConfirmations(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetMinBlockConfirmationsSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
-	return evm_tokens.SetMinBlockConfirmationsForTokenPools
+func (t *TokenAdapter) SetAllowedFinalityConfig(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetAllowedFinalityConfigSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.SetAllowedFinalityConfigForTokenPools
 }
 
 func (t *TokenAdapter) SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -394,10 +394,10 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 	}
 
 	return tokens.TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: report.Output.DefaultBlockConfirmationsTransferFeeBps,
-		CustomFinalityTransferFeeBps:  report.Output.CustomBlockConfirmationsTransferFeeBps,
-		DefaultFinalityFeeUSDCents:    report.Output.DefaultBlockConfirmationsFeeUSDCents,
-		CustomFinalityFeeUSDCents:     report.Output.CustomBlockConfirmationsFeeUSDCents,
+		DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
+		CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
+		DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
+		CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
 		DestBytesOverhead:             report.Output.DestBytesOverhead,
 		DestGasOverhead:               report.Output.DestGasOverhead,
 		IsEnabled:                     report.Output.IsEnabled,

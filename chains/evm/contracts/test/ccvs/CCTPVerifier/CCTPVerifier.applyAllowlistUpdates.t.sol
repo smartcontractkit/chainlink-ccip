@@ -32,9 +32,9 @@ contract CCTPVerifier_applyAllowlistUpdates is CCTPVerifierSetup {
 
     s_cctpVerifier.applyAllowlistUpdates(allowlistConfigs);
 
-    (bool allowlistEnabled,, address[] memory allowlistSender) =
+    (BaseVerifier.RemoteChainConfigArgs memory config, address[] memory allowlistSender) =
       s_cctpVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(allowlistEnabled, allowlistConfigs[0].allowlistEnabled);
+    assertEq(config.allowlistEnabled, allowlistConfigs[0].allowlistEnabled);
     assertEq(allowlistSender.length, allowlistConfigs[0].addedAllowlistedSenders.length);
     assertEq(allowlistSender[0], allowlistConfigs[0].addedAllowlistedSenders[0]);
   }

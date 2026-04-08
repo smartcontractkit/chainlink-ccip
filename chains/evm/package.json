@@ -7,6 +7,7 @@
   "license": "BUSL-1.1",
   "private": false,
   "scripts": {
+    "test": "FOUNDRY_PROFILE=ccip forge test",
     "publish-beta": "pnpm publish --tag beta",
     "publish-prod": "pnpm publish --tag latest",
     "compile": "./scripts/compile_all",

@@ -27,7 +27,7 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
     s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
 
     // Verify sender was added.
-    (,, address[] memory allowedSenders) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
+    (, address[] memory allowedSenders) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(allowedSenders.length, 1);
     assertEq(allowedSenders[0], senders[0]);
   }
@@ -59,7 +59,7 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
 
     s_baseVerifier.applyAllowlistUpdates(updateConfigs);
 
-    (,, address[] memory allowedSenders) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
+    (, address[] memory allowedSenders) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(allowedSenders[0], newSendersToAdd[0]);
   }
 
@@ -82,8 +82,8 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
 
     s_baseVerifier.applyAllowlistUpdates(disableConfigs);
 
-    (bool allowlistEnabled,,) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
-    assertFalse(allowlistEnabled);
+    (BaseVerifier.RemoteChainConfigArgs memory config,) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
+    assertFalse(config.allowlistEnabled);
 
     // Enabling it again will emit AllowListStateChanged.
     vm.expectEmit();

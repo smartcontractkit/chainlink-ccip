@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -25,14 +26,15 @@ type CommitteeVerifierRemoteChainConfig struct {
 	RemovedAllowlistedSenders []string
 	FeeUSDCents               uint16
 	GasForVerification        uint32
-	PayloadSizeBytes          uint32
+	PayloadSizeBytes          uint16
 	SignatureConfig           CommitteeVerifierSignatureQuorumConfig
 }
 
 // CommitteeVerifierConfig configures a CommitteeVerifier contract.
 type CommitteeVerifierConfig[C any] struct {
-	CommitteeVerifier []C
-	RemoteChains      map[uint64]CommitteeVerifierRemoteChainConfig
+	CommitteeVerifier     []C
+	RemoteChains          map[uint64]CommitteeVerifierRemoteChainConfig
+	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
 // ExecutorDestChainConfig configures the Executor for a remote chain.

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IRouter} from "../../../../interfaces/IRouter.sol";
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../../libraries/MessageV1Codec.sol";
 import {BaseERC20} from "../../../../tokens/BaseERC20.sol";
 import {CrossChainToken} from "../../../../tokens/CrossChainToken.sol";
@@ -106,7 +107,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
@@ -122,7 +123,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   function _createMessageV1WithTokenTransfer(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint16 finality,
+    bytes4 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver

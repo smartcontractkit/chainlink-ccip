@@ -7,18 +7,20 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type tokenAdapterID string
 
 // TokenFeeAdapter is an optional interface that can be implemented by TokenAdapters to support setting token transfer fee configurations.
 type TokenFeeAdapter interface {
-	SetMinBlockConfirmations(e *deployment.Environment) *cldf_ops.Sequence[SetMinBlockConfirmationsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetAllowedFinalityConfig(e *deployment.Environment) *cldf_ops.Sequence[SetAllowedFinalityConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (TokenTransferFeeConfig, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
@@ -167,11 +169,8 @@ type ConfigureTokenForTransfersInput struct {
 	// ExternalAdmin is specified when we want to propose an admin that we don't control.
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
-	RegistryAddress string
-	// MinFinalityValue is the minimum finality value required by the token pool.
-	// This can be interpreted as # of block confirmations, an ID, or otherwise.
-	// Interpretation is left to each chain family.
-	MinFinalityValue uint16
+	RegistryAddress       string
+	AllowedFinalityConfig finality.Config
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool
 	// to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
 	// The old pool is derived from the TokenAdminRegistry. Only used by EVM adapters.
@@ -191,10 +190,10 @@ type ConfigureTokenForTransfersInput struct {
 	TokenRef datastore.AddressRef
 }
 
-// SetMinBlockConfirmationsSequenceInput defines the input for setting the minimum block confirmations on a V2 token pool.
-type SetMinBlockConfirmationsSequenceInput struct {
-	// Settings are provided as a map of pool address to minimum block confirmations.
-	Settings map[string]uint16 `json:"settings" yaml:"settings"`
+// SetAllowedFinalityConfigSequenceInput defines the input for setting the allowed finality config on a V2 token pool.
+type SetAllowedFinalityConfigSequenceInput struct {
+	// Settings are provided as a map of pool address to finality config.
+	Settings map[string][4]byte `json:"settings" yaml:"settings"`
 	// Selector is the chain selector for the chain on which to set the minimum block confirmations.
 	Selector uint64 `json:"selector" yaml:"selector"`
 }
