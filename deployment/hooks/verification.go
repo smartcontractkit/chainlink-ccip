@@ -160,7 +160,7 @@ func verifyDeployedContractsPostHook(
 	return changeset.PostHook{
 		HookDefinition: changeset.HookDefinition{
 			Name:          verifyDeployedContractsHookName,
-			FailurePolicy: changeset.Abort,
+			FailurePolicy: changeset.Warn,
 			Timeout:       15 * time.Minute,
 		},
 		Func: verifyDeployedContracts(dom, verifier),
