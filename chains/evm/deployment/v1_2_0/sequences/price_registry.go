@@ -68,13 +68,13 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 				"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
 		}
 		// check if fee tokens are already present in allTokens
-		allTokenMap := make(map[string]struct{})
+		allTokenMap := make(map[common.Address]struct{})
 		for _, token := range allTokens {
-			allTokenMap[token.String()] = struct{}{}
+			allTokenMap[token] = struct{}{}
 		}
 		for _, token := range feetokensRep.Output {
-			if _, exists := allTokenMap[token.String()]; !exists {
-				allTokenMap[token.String()] = struct{}{}
+			if _, exists := allTokenMap[token]; !exists {
+				allTokenMap[token] = struct{}{}
 				allTokens = append(allTokens, token)
 			}
 		}
