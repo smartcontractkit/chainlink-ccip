@@ -300,6 +300,9 @@ func buildVerifierJobSpecs(
 				return nil, scope, fmt.Errorf("NOP %q missing signer address for family %s", nop.Alias, chainsel.FamilyEVM)
 			}
 
+			sortedFinalityCheckers := slices.Clone(disableFinalityCheckers)
+			slices.Sort(sortedFinalityCheckers)
+
 			verifierCfg := offchain.VerifierJobConfig{
 				VerifierID:                     verifierJobID.GetVerifierID(),
 				AggregatorAddress:              agg.Address,
@@ -310,7 +313,7 @@ func buildVerifierJobSpecs(
 				OnRampAddresses:                filterAddressesByChains(onRampAddrs, nopChains),
 				DefaultExecutorOnRampAddresses: filterAddressesByChains(executorOnRampAddrs, nopChains),
 				RMNRemoteAddresses:             filterAddressesByChains(rmnRemoteAddrs, nopChains),
-				DisableFinalityCheckers:        disableFinalityCheckers,
+				DisableFinalityCheckers:        sortedFinalityCheckers,
 				Monitoring: offchain.VerifierMonitoringConfig{
 					Enabled: monitoring.Enabled,
 					Type:    monitoring.Type,

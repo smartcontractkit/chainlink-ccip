@@ -61,6 +61,7 @@ var ManageJobProposals = operations.NewSequence(
 		}
 
 		jobs := buildJobsFromJobSpecs(input.JobSpecs, input.NOPs.Modes)
+		carryForwardExistingJobMetadata(jobs, existingJobs)
 
 		changedJobs := filterChangedJobs(jobs, existingJobs)
 		clModeSpecs := extractCLModeSpecs(changedJobs)
@@ -246,6 +247,26 @@ func filterCLModeJobs(jobs []shared.JobInfo) []shared.JobInfo {
 	return result
 }
 
+func carryForwardExistingJobMetadata(jobs []shared.JobInfo, existingJobs shared.NOPJobs) {
+	if existingJobs == nil {
+		return
+	}
+	for i := range jobs {
+		nopJobs, ok := existingJobs[jobs[i].NOPAlias]
+		if !ok {
+			continue
+		}
+		existing, ok := nopJobs[jobs[i].JobID]
+		if !ok {
+			continue
+		}
+		jobs[i].JDJobID = existing.JDJobID
+		jobs[i].NodeID = existing.NodeID
+		jobs[i].ActiveProposalID = existing.ActiveProposalID
+		jobs[i].Proposals = existing.Proposals
+	}
+}
+
 func filterChangedJobs(newJobs []shared.JobInfo, existingJobs shared.NOPJobs) []shared.JobInfo {
 	if existingJobs == nil {
 		return newJobs
@@ -261,6 +282,11 @@ func filterChangedJobs(newJobs []shared.JobInfo, existingJobs shared.NOPJobs) []
 
 		existing, jobExists := nopJobs[job.JobID]
 		if !jobExists {
+			changed = append(changed, job)
+			continue
+		}
+
+		if existing.Mode != job.Mode {
 			changed = append(changed, job)
 			continue
 		}
