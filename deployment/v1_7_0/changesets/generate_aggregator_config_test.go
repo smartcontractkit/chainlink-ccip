@@ -442,6 +442,123 @@ func TestGenerateAggregatorConfig_DuplicateQualifierOnSameChainFails(t *testing.
 	assert.Contains(t, err.Error(), "multiple committee verifiers with qualifier")
 }
 
+func TestGenerateAggregatorConfig_DuplicateSourceChain_DifferentSigners_ReturnsError(t *testing.T) {
+	destChainA := chainsel.TEST_90000001.Selector
+	destChainB := chainsel.TEST_90000002.Selector
+	sourceChain := chainsel.TEST_90000003.Selector
+
+	qualifier := "default"
+	verifierAddrA := "0x1111111111111111111111111111111111111111"
+	verifierAddrB := "0x2222222222222222222222222222222222222222"
+	verifierAddrSrc := "0x3333333333333333333333333333333333333333"
+
+	mock := &mockOffchainConfigAdapter{
+		committeeStatesByChain: map[uint64][]*adapters.CommitteeState{
+			destChainA: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: destChainA,
+					Address:       verifierAddrA,
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sourceChain, Signers: []string{"0xaaa", "0xbbb"}, Threshold: 2},
+					},
+				},
+			},
+			destChainB: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: destChainB,
+					Address:       verifierAddrB,
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sourceChain, Signers: []string{"0xccc", "0xddd"}, Threshold: 2},
+					},
+				},
+			},
+		},
+		verifierAddresses: map[uint64]string{
+			destChainA:  verifierAddrA,
+			destChainB:  verifierAddrB,
+			sourceChain: verifierAddrSrc,
+		},
+	}
+
+	registry := newAggregatorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	ds := datastore.NewMemoryDataStore()
+	env := deployment.Environment{
+		DataStore:   ds.Seal(),
+		BlockChains: newTestBlockChains([]uint64{destChainA, destChainB, sourceChain}),
+	}
+
+	cs := changesets.GenerateAggregatorConfig(registry)
+	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
+		ServiceIdentifier:  "test-aggregator",
+		CommitteeQualifier: qualifier,
+		Topology:           newTopologyForCommittee(qualifier, []uint64{destChainA, destChainB, sourceChain}),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflicting")
+	assert.Contains(t, err.Error(), strconv.FormatUint(sourceChain, 10))
+}
+
+func TestGenerateAggregatorConfig_DuplicateSourceChain_DifferentThreshold_ReturnsError(t *testing.T) {
+	destChainA := chainsel.TEST_90000001.Selector
+	destChainB := chainsel.TEST_90000002.Selector
+	sourceChain := chainsel.TEST_90000003.Selector
+
+	qualifier := "default"
+	signer := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	mock := &mockOffchainConfigAdapter{
+		committeeStatesByChain: map[uint64][]*adapters.CommitteeState{
+			destChainA: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: destChainA,
+					Address:       "0x1111111111111111111111111111111111111111",
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sourceChain, Signers: []string{signer}, Threshold: 1},
+					},
+				},
+			},
+			destChainB: {
+				{
+					Qualifier:     qualifier,
+					ChainSelector: destChainB,
+					Address:       "0x2222222222222222222222222222222222222222",
+					SignatureConfigs: []adapters.SignatureConfig{
+						{SourceChainSelector: sourceChain, Signers: []string{signer}, Threshold: 2},
+					},
+				},
+			},
+		},
+		verifierAddresses: map[uint64]string{
+			destChainA:  "0x1111111111111111111111111111111111111111",
+			destChainB:  "0x2222222222222222222222222222222222222222",
+			sourceChain: "0x3333333333333333333333333333333333333333",
+		},
+	}
+
+	registry := newAggregatorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	ds := datastore.NewMemoryDataStore()
+	env := deployment.Environment{
+		DataStore:   ds.Seal(),
+		BlockChains: newTestBlockChains([]uint64{destChainA, destChainB, sourceChain}),
+	}
+
+	cs := changesets.GenerateAggregatorConfig(registry)
+	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
+		ServiceIdentifier:  "test-aggregator",
+		CommitteeQualifier: qualifier,
+		Topology:           newTopologyForCommittee(qualifier, []uint64{destChainA, destChainB, sourceChain}),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflicting signature config threshold")
+}
+
 func TestGenerateAggregatorConfig_MissingAdapterForFamily(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 

@@ -168,7 +168,10 @@ func buildQuorumConfigs(
 			}
 
 			chainSelectorStr := strconv.FormatUint(sigConfig.SourceChainSelector, 10)
-			if _, exists := quorumConfigs[chainSelectorStr]; exists {
+			if existing, exists := quorumConfigs[chainSelectorStr]; exists {
+				if err := validateSignatureConfigConsistency(existing, sigConfig, chainSelectorStr, committeeQualifier); err != nil {
+					return nil, err
+				}
 				continue
 			}
 
@@ -196,6 +199,38 @@ func buildQuorumConfigs(
 	}
 
 	return quorumConfigs, nil
+}
+
+func validateSignatureConfigConsistency(
+	existing *offchain.QuorumConfig,
+	newSig adapters.SignatureConfig,
+	chainSelectorStr string,
+	committeeQualifier string,
+) error {
+	if existing.Threshold != newSig.Threshold {
+		return fmt.Errorf(
+			"committee %q chain %s: conflicting signature config threshold %d vs %d",
+			committeeQualifier, chainSelectorStr, existing.Threshold, newSig.Threshold,
+		)
+	}
+
+	existingAddrs := make([]string, len(existing.Signers))
+	for i, s := range existing.Signers {
+		existingAddrs[i] = s.Address
+	}
+	slices.Sort(existingAddrs)
+
+	newAddrs := slices.Clone(newSig.Signers)
+	slices.Sort(newAddrs)
+
+	if !slices.Equal(existingAddrs, newAddrs) {
+		return fmt.Errorf(
+			"committee %q chain %s: conflicting signers (count %d vs %d)",
+			committeeQualifier, chainSelectorStr, len(existingAddrs), len(newAddrs),
+		)
+	}
+
+	return nil
 }
 
 func buildDestinationVerifiers(

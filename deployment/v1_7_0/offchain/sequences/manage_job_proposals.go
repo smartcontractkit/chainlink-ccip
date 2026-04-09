@@ -64,6 +64,37 @@ var ManageJobProposals = operations.NewSequence(
 		carryForwardExistingJobMetadata(jobs, existingJobs)
 
 		changedJobs := filterChangedJobs(jobs, existingJobs)
+
+		transitioned := detectCLToStandaloneTransitions(jobs, existingJobs)
+		if len(transitioned) > 0 {
+			if input.RevokeOrphanedJobs {
+				if e.Offchain == nil {
+					return ManageJobProposalsOutput{}, fmt.Errorf("CL-to-standalone transition requires JD for revocation but e.Offchain is nil")
+				}
+				revokeReport, revokeErr := operations.ExecuteOperation(
+					b,
+					revoke_jobs.RevokeJobs,
+					revoke_jobs.RevokeJobsDeps{
+						JDClient: e.Offchain,
+						Logger:   e.Logger,
+						NodeIDs:  e.NodeIDs,
+					},
+					revoke_jobs.RevokeJobsInput{
+						Jobs: transitioned,
+					},
+				)
+				if revokeErr != nil {
+					return ManageJobProposalsOutput{DataStore: ds},
+						fmt.Errorf("failed to revoke CL-to-standalone transitioned jobs: %w", revokeErr)
+				}
+				e.Logger.Infow("Revoked CL-to-standalone transitioned jobs", "count", len(revokeReport.Output.RevokedJobs))
+			} else {
+				e.Logger.Warnw("CL-to-standalone transitions detected but RevokeOrphanedJobs is false; skipping JD revocation. Re-run with RevokeOrphanedJobs=true or revoke manually.",
+					"count", len(transitioned))
+			}
+			clearJDMetadata(jobs, transitioned)
+		}
+
 		clModeSpecs := extractCLModeSpecs(changedJobs)
 
 		if len(changedJobs) < len(jobs) {
@@ -120,7 +151,8 @@ var ManageJobProposals = operations.NewSequence(
 
 			if len(orphanedJobs) > 0 {
 				clOrphanedJobs := filterCLModeJobs(orphanedJobs)
-				if len(clOrphanedJobs) > 0 && e.Offchain != nil {
+				clJobsNeedingRevoke := filterNonRevokedJobs(clOrphanedJobs)
+				if len(clJobsNeedingRevoke) > 0 && e.Offchain != nil {
 					revokeReport, revokeErr := operations.ExecuteOperation(
 						b,
 						revoke_jobs.RevokeJobs,
@@ -130,7 +162,7 @@ var ManageJobProposals = operations.NewSequence(
 							NodeIDs:  e.NodeIDs,
 						},
 						revoke_jobs.RevokeJobsInput{
-							Jobs: clOrphanedJobs,
+							Jobs: clJobsNeedingRevoke,
 						},
 					)
 					if revokeErr != nil {
@@ -264,6 +296,55 @@ func carryForwardExistingJobMetadata(jobs []shared.JobInfo, existingJobs shared.
 		jobs[i].NodeID = existing.NodeID
 		jobs[i].ActiveProposalID = existing.ActiveProposalID
 		jobs[i].Proposals = existing.Proposals
+	}
+}
+
+func filterNonRevokedJobs(jobs []shared.JobInfo) []shared.JobInfo {
+	result := make([]shared.JobInfo, 0, len(jobs))
+	for _, j := range jobs {
+		if j.LatestStatus() != shared.JobProposalStatusRevoked {
+			result = append(result, j)
+		}
+	}
+	return result
+}
+
+func detectCLToStandaloneTransitions(newJobs []shared.JobInfo, existingJobs shared.NOPJobs) []shared.JobInfo {
+	if existingJobs == nil {
+		return nil
+	}
+	var transitioned []shared.JobInfo
+	for _, newJob := range newJobs {
+		if newJob.Mode != shared.NOPModeStandalone {
+			continue
+		}
+		nopJobs, ok := existingJobs[newJob.NOPAlias]
+		if !ok {
+			continue
+		}
+		existing, ok := nopJobs[newJob.JobID]
+		if !ok {
+			continue
+		}
+		if existing.Mode == shared.NOPModeCL && existing.JDJobID != "" {
+			transitioned = append(transitioned, existing)
+		}
+	}
+	return transitioned
+}
+
+func clearJDMetadata(jobs []shared.JobInfo, transitioned []shared.JobInfo) {
+	transitionedSet := make(map[shared.JobID]bool, len(transitioned))
+	for _, t := range transitioned {
+		transitionedSet[t.JobID] = true
+	}
+	for i := range jobs {
+		if transitionedSet[jobs[i].JobID] {
+			jobs[i].JDJobID = ""
+			jobs[i].NodeID = ""
+			jobs[i].ActiveProposalID = ""
+			jobs[i].Proposals = nil
+		}
 	}
 }
 

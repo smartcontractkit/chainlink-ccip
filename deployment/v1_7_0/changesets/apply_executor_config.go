@@ -372,8 +372,8 @@ func buildExecutorJobSpecs(
 type = "ccvexecutor"
 name = "%s"
 externalJobID = "%s"
-executorConfig = """
-%s"""
+executorConfig = '''
+%s'''
 `, string(jobID), jobID.ToExternalJobID(), string(configBytes))
 
 		if jobSpecs[nopAlias] == nil {

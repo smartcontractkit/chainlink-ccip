@@ -340,8 +340,8 @@ func buildVerifierJobSpecs(
 type = "ccvcommitteeverifier"
 name = "%s"
 externalJobID = "%s"
-committeeVerifierConfig = """
-%s"""
+committeeVerifierConfig = '''
+%s'''
 `, string(jobID), jobID.ToExternalJobID(), string(configBytes))
 
 			if jobSpecs[nopAlias] == nil {
