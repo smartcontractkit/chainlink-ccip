@@ -83,7 +83,7 @@ func TestApplyExecutorConfig_GeneratesValidJobSpec(t *testing.T) {
 
 	assert.Contains(t, spec, `schemaVersion = 1`)
 	assert.Contains(t, spec, `type = "ccvexecutor"`)
-	assert.Contains(t, spec, `executorConfig = """`)
+	assert.Contains(t, spec, `executorConfig = '''`)
 	assert.Contains(t, spec, `executor_id = "nop1"`)
 	assert.Contains(t, spec, `indexer_address = ["http://indexer:8100", "http://indexer:8101"]`)
 	assert.Contains(t, spec, `[chain_configuration]`)

@@ -12,7 +12,6 @@ require (
 	github.com/aptos-labs/aptos-go-sdk v1.12.0
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/ethereum/go-ethereum v1.17.2
-	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chain-selectors v1.0.98

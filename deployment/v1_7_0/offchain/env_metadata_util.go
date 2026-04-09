@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-
-	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
@@ -39,7 +36,7 @@ func SaveAggregatorConfig(ds datastore.MutableDataStore, serviceIdentifier strin
 
 	ccvMeta.OffchainConfigs.Aggregators[serviceIdentifier] = cfg
 
-	return saveCCVEnvMetadata(ds, ccvMeta)
+	return persistCCVEnvMetadata(ds, ccvMeta)
 }
 
 func GetAggregatorConfig(ds datastore.DataStore, serviceIdentifier string) (*Committee, error) {
@@ -75,7 +72,7 @@ func SaveIndexerConfig(ds datastore.MutableDataStore, serviceIdentifier string, 
 
 	ccvMeta.OffchainConfigs.Indexers[serviceIdentifier] = cfg
 
-	return saveCCVEnvMetadata(ds, ccvMeta)
+	return persistCCVEnvMetadata(ds, ccvMeta)
 }
 
 func GetIndexerConfig(ds datastore.DataStore, serviceIdentifier string) (*IndexerGeneratedConfig, error) {
@@ -111,7 +108,7 @@ func SaveTokenVerifierConfig(ds datastore.MutableDataStore, serviceIdentifier st
 
 	ccvMeta.OffchainConfigs.TokenVerifiers[serviceIdentifier] = cfg
 
-	return saveCCVEnvMetadata(ds, ccvMeta)
+	return persistCCVEnvMetadata(ds, ccvMeta)
 }
 
 func GetTokenVerifierConfig(ds datastore.DataStore, serviceIdentifier string) (*TokenVerifierGeneratedConfig, error) {
@@ -169,75 +166,83 @@ func parseCCVEnvMetadata(metadata any) (*CCVEnvMetadata, error) {
 	return &ccvMeta, nil
 }
 
-func saveCCVEnvMetadata(ds datastore.MutableDataStore, ccvMeta *CCVEnvMetadata) error {
-	var base json.RawMessage = []byte(`{}`)
-
-	envMeta, err := ds.EnvMetadata().Get()
-	if err != nil {
-		if !errors.Is(err, datastore.ErrEnvMetadataNotSet) {
-			return fmt.Errorf("failed to get env metadata for merge: %w", err)
-		}
-	} else if envMeta.Metadata != nil {
-		b, err := json.Marshal(envMeta.Metadata)
-		if err != nil {
-			return err
-		}
-		base = b
-	}
-
-	patch, err := json.Marshal(ccvMeta)
-	if err != nil {
-		return err
-	}
-
-	merged, err := jsonpatch.MergePatch(base, patch)
-	if err != nil {
-		return err
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(merged, &result); err != nil {
-		return err
-	}
-
-	return ds.EnvMetadata().Set(datastore.EnvMetadata{Metadata: result})
-}
-
-// replaceCCVEnvMetadata replaces the CCV metadata completely (not merge).
-// Needed for delete operations since JSON Merge Patch doesn't remove missing keys.
-func replaceCCVEnvMetadata(ds datastore.MutableDataStore, ccvMeta *CCVEnvMetadata) error {
+// persistCCVEnvMetadata persists CCV metadata using shallow merge at the
+// offchainConfigs level. Known offchainConfigs keys (aggregators, indexers,
+// tokenVerifiers, nopJobs) are replaced fully — removing stale nested entries
+// when chains or jobs are removed. Unknown sibling keys under offchainConfigs
+// and non-CCV top-level keys are preserved.
+func persistCCVEnvMetadata(ds datastore.MutableDataStore, ccvMeta *CCVEnvMetadata) error {
 	var existingMeta map[string]any
 	envMeta, err := ds.EnvMetadata().Get()
 	if err != nil {
 		if !errors.Is(err, datastore.ErrEnvMetadataNotSet) {
-			return fmt.Errorf("failed to get env metadata for replace: %w", err)
+			return fmt.Errorf("failed to get env metadata: %w", err)
 		}
 		existingMeta = make(map[string]any)
 	} else if envMeta.Metadata != nil {
 		data, err := json.Marshal(envMeta.Metadata)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal existing env metadata: %w", err)
 		}
 		if err := json.Unmarshal(data, &existingMeta); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal existing env metadata: %w", err)
 		}
 	} else {
 		existingMeta = make(map[string]any)
 	}
 
-	ccvData, err := json.Marshal(ccvMeta)
-	if err != nil {
-		return err
-	}
+	if ccvMeta.OffchainConfigs != nil {
+		existingOC, ok := existingMeta["offchainConfigs"].(map[string]any)
+		if !ok {
+			existingOC = make(map[string]any)
+		}
 
-	var ccvMap map[string]any
-	if err := json.Unmarshal(ccvData, &ccvMap); err != nil {
-		return err
-	}
+		oc := ccvMeta.OffchainConfigs
+		if oc.Aggregators != nil {
+			v, err := marshalToAny(oc.Aggregators)
+			if err != nil {
+				return fmt.Errorf("failed to convert aggregators: %w", err)
+			}
+			existingOC["aggregators"] = v
+		}
+		if oc.Indexers != nil {
+			v, err := marshalToAny(oc.Indexers)
+			if err != nil {
+				return fmt.Errorf("failed to convert indexers: %w", err)
+			}
+			existingOC["indexers"] = v
+		}
+		if oc.TokenVerifiers != nil {
+			v, err := marshalToAny(oc.TokenVerifiers)
+			if err != nil {
+				return fmt.Errorf("failed to convert token verifiers: %w", err)
+			}
+			existingOC["tokenVerifiers"] = v
+		}
+		if oc.NOPJobs != nil {
+			v, err := marshalToAny(oc.NOPJobs)
+			if err != nil {
+				return fmt.Errorf("failed to convert NOP jobs: %w", err)
+			}
+			existingOC["nopJobs"] = v
+		}
 
-	maps.Copy(existingMeta, ccvMap)
+		existingMeta["offchainConfigs"] = existingOC
+	}
 
 	return ds.EnvMetadata().Set(datastore.EnvMetadata{Metadata: existingMeta})
+}
+
+func marshalToAny(v any) (any, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal value: %w", err)
+	}
+	var result any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal value: %w", err)
+	}
+	return result, nil
 }
 
 func SaveJob(ds datastore.MutableDataStore, job shared.JobInfo) error {
@@ -258,7 +263,7 @@ func SaveJob(ds datastore.MutableDataStore, job shared.JobInfo) error {
 
 	ccvMeta.OffchainConfigs.NOPJobs[job.NOPAlias][job.JobID] = job
 
-	return saveCCVEnvMetadata(ds, ccvMeta)
+	return persistCCVEnvMetadata(ds, ccvMeta)
 }
 
 func SaveJobs(ds datastore.MutableDataStore, jobs []shared.JobInfo) error {
@@ -285,7 +290,7 @@ func SaveJobs(ds datastore.MutableDataStore, jobs []shared.JobInfo) error {
 		ccvMeta.OffchainConfigs.NOPJobs[job.NOPAlias][job.JobID] = job
 	}
 
-	return saveCCVEnvMetadata(ds, ccvMeta)
+	return persistCCVEnvMetadata(ds, ccvMeta)
 }
 
 func GetAllJobs(ds datastore.DataStore) (shared.NOPJobs, error) {
@@ -349,7 +354,7 @@ func DeleteJob(ds datastore.MutableDataStore, nopAlias shared.NOPAlias, jobID sh
 		delete(ccvMeta.OffchainConfigs.NOPJobs, nopAlias)
 	}
 
-	return replaceCCVEnvMetadata(ds, ccvMeta)
+	return persistCCVEnvMetadata(ds, ccvMeta)
 }
 
 func CollectOrphanedJobs(
@@ -381,7 +386,7 @@ func CollectOrphanedJobs(
 				shouldRevoke = true
 			}
 
-			if shouldRevoke && job.LatestStatus() != shared.JobProposalStatusRevoked {
+			if shouldRevoke {
 				orphaned = append(orphaned, job)
 			}
 		}
