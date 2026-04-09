@@ -163,6 +163,16 @@ var (
 			destGrp.SetLimit(10)
 			gasPricePerChain := make(map[uint64]*big.Int)
 			gasPriceMu := sync.Mutex{}
+			// fetch fee tokens
+			feeTokensRep, err := operations.ExecuteOperation(b, fqops.GetFeeTokens, evmChain, contract.FunctionInput[struct{}]{
+				Address:       fqAddress,
+				ChainSelector: chainSelector,
+				Args:          struct{}{},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee tokens from feequoter %s on chain %s: %w",
+					fqAddress.Hex(), evmChain.String(), err)
+			}
 			for _, remoteChain := range in.RemoteChains {
 				remoteChain := remoteChain
 				destGrp.Go(func() error {
@@ -297,7 +307,16 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get all authorized callers from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
+
+			// add fee tokens to all tokens if not present
+			for _, token := range feeTokensRep.Output {
+				if _, exists := allTokens[token]; !exists {
+					allTokens[token] = struct{}{}
+				}
+			}
+
 			tokenSlice := maps.Keys(allTokens)
+			// add fee tokens
 			tokenPrices, err := operations.ExecuteOperation(b, fqops.GetTokenPrices, evmChain, contract.FunctionInput[[]common.Address]{
 				Address:       fqAddress,
 				ChainSelector: chainSelector,

@@ -48,6 +48,8 @@ contracts:
         access: public
       - name: getDestinationChainGasPrice
         access: public
+      - name: getFeeTokens
+        access: public
 
   # 1.6.2
   - contract_name: CCTPMessageTransmitterProxy

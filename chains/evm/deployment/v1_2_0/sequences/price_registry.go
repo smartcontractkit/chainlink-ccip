@@ -57,7 +57,27 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 			}
 			gasPrices[remoteChainSelector] = gasPricesOutput.Output.Value
 		}
-
+		// get fee tokens
+		feetokensRep, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
+			ChainSelector: chain.Selector,
+			Address:       input.PriceRegistry,
+			Args:          nil,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
+				"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
+		}
+		// check if fee tokens are already present in allTokens
+		allTokenMap := make(map[string]struct{})
+		for _, token := range allTokens {
+			allTokenMap[token.String()] = struct{}{}
+		}
+		for _, token := range feetokensRep.Output {
+			if _, exists := allTokenMap[token.String()]; !exists {
+				allTokenMap[token.String()] = struct{}{}
+				allTokens = append(allTokens, token)
+			}
+		}
 		tokenPrices := make(map[common.Address]*big.Int)
 		tokenPriceOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetTokenPrices, chain, contract.FunctionInput[[]common.Address]{
 			ChainSelector: chain.Selector,
