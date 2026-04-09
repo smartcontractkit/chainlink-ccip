@@ -26,4 +26,7 @@ func init() {
 	feeReg := fees.GetRegistry()
 	evmAdapter := evmseq.EVMAdapter{}
 	feeReg.RegisterFeeAdapter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), NewFeesAdapter(&evmAdapter))
+
+	feeAggReg := fees.GetFeeAggregatorRegistry()
+	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), NewFeeAggregatorAdapter(&evmAdapter))
 }

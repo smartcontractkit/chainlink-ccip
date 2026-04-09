@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -17,10 +18,16 @@ func main() {
 	if len(os.Args) >= 5 {
 		outDirSuffix = os.Args[4] + "/latest"
 	} else {
-		outDirSuffix = "../../../../ccv/chains/evm/gobindings/generated/latest"
+		outDirSuffix = "../generated/latest"
 	}
 
 	if os.Getenv("ZKSYNC") == "true" {
+		switch contract {
+		case "CREATE2Factory", "TokenPoolFactory":
+			fmt.Printf("Skipping zk bytecode binding for %s\n", pkgName)
+			return
+		}
+
 		zksyncBytecodePath := filepath.Join("..", "zkout", contract+".sol", contract+".json")
 		zksyncBytecode := zksyncwrapper.ReadBytecodeFromForgeJSON(zksyncBytecodePath)
 		outPath := filepath.Join(wrap.GetOutDir(outDirSuffix, pkgName), pkgName+"_zksync.go")

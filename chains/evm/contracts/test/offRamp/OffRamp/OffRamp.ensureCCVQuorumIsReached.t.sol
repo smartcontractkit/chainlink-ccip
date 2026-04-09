@@ -6,6 +6,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
@@ -26,7 +27,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
   address internal s_destTokenPool;
   bytes internal s_sender;
 
-  uint16 internal constant FINALITY = 0;
+  bytes4 internal constant FINALITY = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
 
   function setUp() public override {
     super.setUp();
@@ -121,11 +122,12 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     // Mock receiver to return no required CCVs (so it falls back to defaults via address(0)).
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
       abi.encode(
         new address[](0), // no required CCVs - will fall back to defaults.
         new address[](0), // no optional CCVs.
-        uint8(0) // no optional threshold.
+        uint8(0), // no optional threshold.
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG // allowedFinalityConfig - require finality.
       )
     );
 
@@ -186,8 +188,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(new address[](0), receiverOptional, uint8(2))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(2), FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
@@ -216,8 +218,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     receiverRequired[0] = s_requiredCCV;
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(receiverRequired, new address[](0), uint8(0))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(receiverRequired, new address[](0), uint8(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
@@ -250,8 +252,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     receiverRequired[0] = s_requiredCCV;
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(receiverRequired, new address[](0), uint8(0))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(receiverRequired, new address[](0), uint8(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);
@@ -286,8 +288,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(new address[](0), receiverOptional, uint8(2))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(2), FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(new MessageV1Codec.TokenTransferV1[](0), false);
@@ -310,8 +312,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.mockCall(
       s_receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockConfirmations.selector, SOURCE_CHAIN_SELECTOR),
-      abi.encode(new address[](0), receiverOptional, uint8(1))
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndFinalityConfig.selector, SOURCE_CHAIN_SELECTOR),
+      abi.encode(new address[](0), receiverOptional, uint8(1), FinalityCodec.WAIT_FOR_FINALITY_FLAG)
     );
 
     MessageV1Codec.MessageV1 memory message = _buildMessage(tokenTransfers, false);

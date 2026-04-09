@@ -17,6 +17,7 @@ import (
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
@@ -83,17 +84,20 @@ func dummyDeployContractParams() ccvadapters.DeployContractParams {
 	v170 := semver.MustParse("2.0.0")
 	return ccvadapters.DeployContractParams{
 		OnRamp: ccvadapters.OnRampDeployParams{
-			Version: v170,
+			Version:       v170,
+			FeeAggregator: "0xDummyOnRampFeeAgg",
 		},
 		OffRamp: ccvadapters.OffRampDeployParams{
 			Version: v170,
+			// GasForCallExactCheck etc. left zero so merge keeps generated (imported) values.
 		},
 		Executors: []ccvadapters.ExecutorDeployParams{
 			{
 				Version:       v170,
 				MaxCCVsPerMsg: 3,
 				DynamicConfig: ccvadapters.ExecutorDynamicDeployConfig{
-					MinBlockConfirmations: 5,
+					FeeAggregator:         "0xDummyExecutorFeeAgg",
+					AllowedFinalityConfig: finality.Config{BlockDepth: 5},
 					CcvAllowlistEnabled:   true,
 				},
 				Qualifier: "dummy-exec",
@@ -102,6 +106,7 @@ func dummyDeployContractParams() ccvadapters.DeployContractParams {
 		CommitteeVerifiers: []ccvadapters.CommitteeVerifierDeployParams{
 			{
 				Version:          v170,
+				FeeAggregator:    "0xDummyCVFeeAgg",
 				StorageLocations: []string{"https://dummy.store"},
 				Qualifier:        "dummy-cv",
 			},
@@ -166,8 +171,10 @@ func TestSetContractParamsFromImportedConfig(t *testing.T) {
 		require.NoError(t, err, "MergeWithOverrideIfNotEmpty should not error")
 		switch chainSelector {
 		case 5009297550715157269:
-			require.Equal(t, feeAggregatorAddress.String(), generated.FeeAggregator,
-				"FeeAggregator should come from v1.6 OnRamp DynamicConfig")
+			// This chain has OnRamp 1.6.0 + OffRamp 1.6.0 + RMN 1.5.0: v1.6 and v1.5 merge.
+			// v1.5's GasForCallExactCheck (5000) is overwritten by v1.6's value.
+			require.Equal(t, feeAggregatorAddress, common.HexToAddress(generated.OnRamp.FeeAggregator),
+				"OnRamp.FeeAggregator should come from v1.6 OnRamp DynamicConfig")
 			require.Equal(t, uint16(6000), generated.OffRamp.GasForCallExactCheck,
 				"OffRamp.GasForCallExactCheck comes from v1.6 path after merge (v1.6 overwrites v1.5)")
 			require.Equal(t, legacyRMNAddress1, common.HexToAddress(generated.RMNRemote.LegacyRMN),
@@ -176,14 +183,18 @@ func TestSetContractParamsFromImportedConfig(t *testing.T) {
 				"merged OffRamp.GasForCallExactCheck should come from generated")
 			require.Equal(t, legacyRMNAddress1, common.HexToAddress(merged.RMNRemote.LegacyRMN),
 				"merged RMNRemote.LegacyRMN should come from generated")
-			require.Equal(t, feeAggregatorAddress.String(), merged.FeeAggregator,
-				"merged FeeAggregator should come from generated (imported config)")
-			require.Equal(t, dummyBase.OnRamp, merged.OnRamp,
-				"merged OnRamp should match dummy")
-			require.Equal(t, dummyBase.Executors, merged.Executors,
-				"merged Executors should match dummy")
-			require.Equal(t, dummyBase.CommitteeVerifiers, merged.CommitteeVerifiers,
-				"merged CommitteeVerifiers should match dummy")
+			// OnRamp, OffRamp, RMNRemote unchanged from generated (imported config).
+			require.Equal(t, feeAggregatorAddress, common.HexToAddress(merged.OnRamp.FeeAggregator),
+				"merged OnRamp.FeeAggregator should come from generated (imported config)")
+
+			for i, exec := range dummyBase.Executors {
+				exec.DynamicConfig.FeeAggregator = feeAggregatorAddress.String()
+				require.Equal(t, exec, merged.Executors[i], "merged Executors should keep dummy values for empty fields in generated (imported) config")
+			}
+			for i, cv := range dummyBase.CommitteeVerifiers {
+				cv.FeeAggregator = feeAggregatorAddress.String()
+				require.Equal(t, cv, merged.CommitteeVerifiers[i], "merged CommitteeVerifiers should keep dummy values for empty fields in generated (imported) config")
+			}
 
 		case 4949039107694359620:
 			// This chain has only RMN 1.5.0: v1.6 path returns empty (no OnRamp 1.6.0), v1.5 fills LegacyRMN and default GasForCallExactCheck.

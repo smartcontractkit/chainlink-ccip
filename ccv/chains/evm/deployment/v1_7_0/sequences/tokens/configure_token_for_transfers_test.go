@@ -13,11 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
-	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -108,9 +109,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 				},
 			},
-			ExternalAdmin:    "", // Use internal admin
-			RegistryAddress:  tokenAdminRegistryAddress,
-			MinFinalityValue: 12,
+			ExternalAdmin:         "", // Use internal admin
+			RegistryAddress:       tokenAdminRegistryAddress,
+			AllowedFinalityConfig: finality.Config{BlockDepth: 12},
 		}
 
 		// Execute the configure token for transfers sequence
@@ -140,9 +141,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		// Verify configuration for second remote chain
 		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2])
 
-		minBlockConfirmation, err := tp.GetMinBlockConfirmations(nil)
-		require.NoError(t, err, "Failed to get configured min block confirmation")
-		require.Equal(t, input.MinFinalityValue, minBlockConfirmation, "Min block confirmation should match input")
+		allowedFinalityConfig, err := tp.GetAllowedFinalityConfig(nil)
+		require.NoError(t, err, "Failed to get allowed finality config")
+		require.Equal(t, input.AllowedFinalityConfig.Raw(), allowedFinalityConfig, "Allowed finality config should match input")
 
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityInboundRateLimiterConfig
 		customFinalityOutboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityOutboundRateLimiterConfig
@@ -258,9 +259,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		tp, err := tp_bindings.NewTokenPool(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
 		require.NoError(t, err, "Failed to instantiate token pool contract")
 
-		minBlockConfirmation, err := tp.GetMinBlockConfirmations(nil)
-		require.NoError(t, err, "Failed to get configured min block confirmation")
-		require.Equal(t, uint16(0), minBlockConfirmation, "Min block confirmation should remain default")
+		allowedFinalityConfig, err := tp.GetAllowedFinalityConfig(nil)
+		require.NoError(t, err, "Failed to get allowed finality config")
+		require.Equal(t, finality.RawWaitForFinality, allowedFinalityConfig, "Allowed finality config should remain default")
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel].CustomFinalityInboundRateLimiterConfig
 		customFinalityOutboundRateLimiterConfig := input.RemoteChains[remoteChainSel].CustomFinalityOutboundRateLimiterConfig
 		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel, &customFinalityInboundRateLimiterConfig, &customFinalityOutboundRateLimiterConfig)
@@ -300,14 +301,14 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 	require.Contains(t, remotePools, config.RemotePool, "Remote pool should be in the list of remote pools")
 
 	// Check inbound CCVs
-	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
+	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs")
 	for _, ccv := range config.InboundCCVs {
 		require.Contains(t, inboundCCVs, common.HexToAddress(ccv), "Inbound CCV should be in the list of required inbound CCVs")
 	}
 
 	// Check outbound CCVs
-	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
+	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs")
 	for _, ccv := range config.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BaseERC20} from "../../../tokens/BaseERC20.sol";
@@ -28,12 +29,13 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
   uint16 internal constant BPS_DIVIDER = 10_000;
   uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
+  bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("CCTPVerifier 2.0.0"));
 
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
   uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
 
-  uint16 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = 0;
-  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
+  bytes4 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = FinalityCodec.WAIT_FOR_FINALITY_FLAG;
+  bytes4 internal constant CCIP_FAST_FINALITY_THRESHOLD = bytes4(uint32(1));
 
   uint32 internal constant REMOTE_DOMAIN_IDENTIFIER = 9999;
   uint32 internal constant LOCAL_DOMAIN_IDENTIFIER = 8888;
@@ -69,11 +71,10 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
 
     // Apply remote chain config updates.
@@ -126,7 +127,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   function _createCCIPMessage(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint16 finality,
+    bytes4 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver
@@ -161,5 +162,11 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
 
     return (message, messageId);
+  }
+
+  function _baseVerifierArgs() internal view returns (CCTPVerifier.BaseVerifierArgs memory) {
+    return CCTPVerifier.BaseVerifierArgs({
+      storageLocations: s_storageLocations, rmn: address(s_mockRMNRemote), versionTag: VERSION_TAG_V2_0_0
+    });
   }
 }

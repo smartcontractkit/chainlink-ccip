@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
-	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_receiver_v2"
+	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
@@ -355,7 +355,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q1Receiver, err := mock_recv_bindings.NewMockReceiverV2(q1ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	q1Result, err := q1Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
+	q1Result, err := q1Receiver.GetCCVsAndFinalityConfig(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
 	require.Len(t, q1Result.RequiredVerifier, 2)
 	require.Len(t, q1Result.OptionalVerifiers, 0)
@@ -364,7 +364,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q2Receiver, err := mock_recv_bindings.NewMockReceiverV2(q2ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	q2Result, err := q2Receiver.GetCCVsAndMinBlockConfirmations(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
+	q2Result, err := q2Receiver.GetCCVsAndFinalityConfig(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
 	require.Len(t, q2Result.RequiredVerifier, 1)
 	require.Len(t, q2Result.OptionalVerifiers, 1)

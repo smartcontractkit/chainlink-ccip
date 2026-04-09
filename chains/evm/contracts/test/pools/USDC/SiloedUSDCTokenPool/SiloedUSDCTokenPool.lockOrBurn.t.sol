@@ -117,10 +117,10 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultBlockConfirmationsFeeUSDCents: 0,
-      customBlockConfirmationsFeeUSDCents: 0,
-      defaultBlockConfirmationsTransferFeeBps: defaultFeeBps,
-      customBlockConfirmationsTransferFeeBps: 0,
+      finalityFeeUSDCents: 0,
+      fastFinalityFeeUSDCents: 0,
+      finalityTransferFeeBps: defaultFeeBps,
+      fastFinalityTransferFeeBps: 0,
       isEnabled: true
     });
 

@@ -7,12 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -22,8 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
-	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/message_hasher"
+	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -303,8 +305,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
-			require.False(t, committeeVerifierRemoteChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
+			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.RemoteChainConfig.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
+			require.False(t, committeeVerifierRemoteChainConfig.Output.RemoteChainConfig.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
 
 			// Check signature quorum on CommitteeVerifier
 			signatureQuorumReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
@@ -358,14 +360,14 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
 				&bind.CallOpts{Context: t.Context()},
 				message_hasher.ExtraArgsCodecGenericExtraArgsV3{
-					GasLimit:           80_000,
-					BlockConfirmations: 0,
-					Ccvs:               []common.Address{common.HexToAddress(committeeVerifierResolverAddr)},
-					CcvArgs:            [][]byte{{}},
-					Executor:           common.HexToAddress(executorAddr),
-					ExecutorArgs:       []byte{},
-					TokenReceiver:      []byte{},
-					TokenArgs:          []byte{},
+					GasLimit:                80_000,
+					RequestedFinalityConfig: finality.RawWaitForFinality,
+					Ccvs:                    []common.Address{common.HexToAddress(committeeVerifierResolverAddr)},
+					CcvArgs:                 [][]byte{{}},
+					Executor:                common.HexToAddress(executorAddr),
+					ExecutorArgs:            []byte{},
+					TokenReceiver:           []byte{},
+					TokenArgs:               []byte{},
 				},
 			)
 			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")

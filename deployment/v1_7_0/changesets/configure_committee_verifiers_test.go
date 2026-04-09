@@ -294,7 +294,7 @@ func TestTopologyCommitteePopulator_PopulatesSuccessfully(t *testing.T) {
 	assert.True(t, rc.AllowlistEnabled)
 	assert.Equal(t, uint32(100000), rc.GasForVerification)
 	assert.Equal(t, uint16(50), rc.FeeUSDCents)
-	assert.Equal(t, uint32(1024), rc.PayloadSizeBytes)
+	assert.Equal(t, uint16(1024), rc.PayloadSizeBytes)
 	assert.Equal(t, uint8(2), rc.SignatureConfig.Threshold)
 	assert.ElementsMatch(t, []string{"0xSigner1", "0xSigner2"}, rc.SignatureConfig.Signers)
 }

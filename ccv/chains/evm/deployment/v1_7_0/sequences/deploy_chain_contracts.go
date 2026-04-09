@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
+	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -72,8 +73,8 @@ type MockReceiverParams struct {
 	// or will be deployed by the DeployChainContracts sequence.
 	OptionalVerifiers []datastore.AddressRef
 	OptionalThreshold uint8
-	// MinimumBlockConfirmations is the minimum block depth that the mock receiver will accept.
-	MinimumBlockConfirmations uint16
+	// AllowedFinalityConfig is the finality config that the mock receiver will accept.
+	AllowedFinalityConfig [4]byte
 	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
 	// If only one mock receiver is deployed this can be left blank.
 	Qualifier string
@@ -521,14 +522,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				desiredFeeAggregator = executorParam.DynamicConfig.FeeAggregator
 			}
 			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
-				dynamicConfigReport.Output.MinBlockConfirmations != executorParam.DynamicConfig.MinBlockConfirmations ||
+				dynamicConfigReport.Output.AllowedFinalityConfig != executorParam.DynamicConfig.AllowedFinalityConfig ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.DynamicConfig]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(executorRef.Address),
 					Args: executor.DynamicConfig{
 						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
-						MinBlockConfirmations: executorParam.DynamicConfig.MinBlockConfirmations,
+						AllowedFinalityConfig: executorParam.DynamicConfig.AllowedFinalityConfig,
 						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
 					},
 				})
@@ -663,31 +664,31 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 			addresses = append(addresses, deployReceiverReport.Output)
 
-			// Set minimum block depth on the MockReceiver if diff exists
-			if mockReceiverParams.MinimumBlockConfirmations != 0 {
-				// Get the minimum block depth on the MockReceiver
-				minimumBlockConfirmations, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockConfirmations, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs]{
+			// Set finality config on the MockReceiver if diff exists
+			if mockReceiverParams.AllowedFinalityConfig != finality.RawWaitForFinality {
+				// Get the current finality config on the MockReceiver
+				finalityConfigResult, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndFinalityConfig, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndFinalityConfigArgs]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-					Args: mock_receiver_v2.GetCCVsAndMinBlockConfirmationsArgs{
+					Args: mock_receiver_v2.GetCCVsAndFinalityConfigArgs{
 						Arg0: chain.Selector,
 						Arg1: []byte{},
 					},
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get finality config on MockReceiver: %w", err)
 				}
-				if minimumBlockConfirmations.Output.MinBlockDepth != mockReceiverParams.MinimumBlockConfirmations {
-					// Set the minimum block depth on the MockReceiver
-					setMinimumBlockConfirmationsReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockConfirmations, chain, contract_utils.FunctionInput[uint16]{
+				if finalityConfigResult.Output.AllowedFinalityConfig != mockReceiverParams.AllowedFinalityConfig {
+					// Set the finality config on the MockReceiver
+					setFinalityConfigReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
 						ChainSelector: chain.Selector,
 						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-						Args:          mockReceiverParams.MinimumBlockConfirmations,
+						Args:          mockReceiverParams.AllowedFinalityConfig,
 					})
 					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set minimum block depth on MockReceiver: %w", err)
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set finality config on MockReceiver: %w", err)
 					}
-					writes = append(writes, setMinimumBlockConfirmationsReport.Output)
+					writes = append(writes, setFinalityConfigReport.Output)
 				}
 			}
 		}
