@@ -123,16 +123,16 @@ func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry) deployment.C
 			return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports, DataStore: manageReport.Output.DataStore}, nil
 		}
 
-		committeeNOPs := filterNOPsByAliases(cfg.Topology.NOPTopology.NOPs, getCommitteeNOPAliases(committee))
-		families := deriveFamiliesFromSelectors(selectors)
-		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, families)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
-		}
-
 		nopsToValidate := cfg.TargetNOPs
 		if len(nopsToValidate) == 0 {
 			nopsToValidate = shared.ConvertStringToNopAliases(getCommitteeNOPAliases(committee))
+		}
+
+		targetedNOPs := filterNOPsByAliases(cfg.Topology.NOPTopology.NOPs, shared.ConvertNopAliasToString(nopsToValidate))
+		families := deriveFamiliesFromSelectors(selectors)
+		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, targetedNOPs, families)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
 		}
 
 		clNOPs := filterCLModeNOPs(nopsToValidate, cfg.Topology.NOPTopology.NOPs)
