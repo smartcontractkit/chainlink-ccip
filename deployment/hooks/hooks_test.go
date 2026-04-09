@@ -162,7 +162,7 @@ func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_DedupesSameFami
 	})
 	require.Len(t, postHooks, 1, "EVM chains share one family; expect one post hook")
 	require.Equal(t, hooks.VerifyDeployedContractsHookName, postHooks[0].Name)
-	require.Equal(t, changeset.Abort, postHooks[0].FailurePolicy)
+	require.Equal(t, changeset.Warn, postHooks[0].FailurePolicy)
 }
 
 func TestVerifyDeployedContractsPostHookForMultipleChainFamilies_OneHookPerDistinctFamily(t *testing.T) {

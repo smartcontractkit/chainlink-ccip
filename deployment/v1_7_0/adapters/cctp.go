@@ -193,10 +193,9 @@ func (r *CCTPChainRegistry) RegisterCCTPChain(chainFamily string, adapter CCTPCh
 	if _, exists := r.m[chainFamily]; !exists {
 		r.m[chainFamily] = make(map[USDCType]CCTPChain)
 	}
-	if _, exists := r.m[chainFamily][adapter.USDCType()]; exists {
-		panic(fmt.Errorf("CCTPChain '%s %s' already registered", chainFamily, adapter.USDCType()))
+	if _, exists := r.m[chainFamily][adapter.USDCType()]; !exists {
+		r.m[chainFamily][adapter.USDCType()] = adapter
 	}
-	r.m[chainFamily][adapter.USDCType()] = adapter
 }
 
 // GetCCTPChain retrieves a registered CCTP chain for the given chain family.

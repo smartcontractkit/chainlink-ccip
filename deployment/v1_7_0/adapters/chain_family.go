@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -135,10 +134,9 @@ func GetChainFamilyRegistry() *ChainFamilyRegistry {
 func (r *ChainFamilyRegistry) RegisterChainFamily(chainFamily string, adapter ChainFamily) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Errorf("ChainFamily '%s' already registered", chainFamily))
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = adapter
 	}
-	r.m[chainFamily] = adapter
 }
 
 func (r *ChainFamilyRegistry) GetChainFamily(chainFamily string) (ChainFamily, bool) {

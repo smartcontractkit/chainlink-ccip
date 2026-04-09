@@ -18,7 +18,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog"
+	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
+	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/stretchr/testify/require"
+	"github.com/xssnick/tonutils-go/tlb"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -420,6 +423,44 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		return ccipcommon.SerializeClientSVMExtraArgsV1(extraArgs)
 	case chain_selectors.FamilySolana:
 		panic("unimplemented GetExtraArgs(solana->solana)")
+	case chain_selectors.FamilyTon:
+		// TON->Solana: TON fee quoter expects TLB-encoded SVMExtraArgsV1 for SVM destinations
+		computeUnits := uint32(100_000)
+		ooo := true
+		for _, opt := range opts {
+			switch opt.Name {
+			case testadapters.ExtraArgGasLimit:
+				unitsBig := opt.Value.(*big.Int)
+				if !unitsBig.IsUint64() {
+					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
+				}
+				units := unitsBig.Uint64()
+				if units > math.MaxUint32 {
+					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
+				}
+				computeUnits = uint32(units)
+			case testadapters.ExtraArgOOO:
+				ooo = opt.Value.(bool)
+			default:
+				// unsupported arg
+			}
+		}
+		tonAccounts := make(ton_onramp_common.SnakedCell[ton_onramp.Account256], len(accounts))
+		for i, acc := range accounts {
+			tonAccounts[i] = ton_onramp.Account256{Value: acc[:]}
+		}
+		extraArgs := ton_onramp.SVMExtraArgsV1{
+			ComputeUnits:             computeUnits,
+			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
+			AllowOutOfOrderExecution: ooo,
+			TokenReceiver:            receiverProgram[:],
+			Accounts:                 tonAccounts,
+		}
+		extraArgsCell, err := tlb.ToCell(extraArgs)
+		if err != nil {
+			return nil, err
+		}
+		return extraArgsCell.ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)

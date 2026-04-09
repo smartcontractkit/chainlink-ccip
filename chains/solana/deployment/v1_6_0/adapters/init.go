@@ -21,4 +21,7 @@ func init() {
 	feeReg := fees.GetRegistry()
 	solAdapter := solseq.SolanaAdapter{}
 	feeReg.RegisterFeeAdapter(chainsel.FamilySolana, semver.MustParse("1.6.0"), NewFeesAdapter(&solAdapter))
+
+	feeAggReg := fees.GetFeeAggregatorRegistry()
+	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilySolana, semver.MustParse("1.6.0"), NewFeeAggregatorAdapter(&solAdapter))
 }
