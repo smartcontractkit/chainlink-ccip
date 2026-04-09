@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"fmt"
 	"sync"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -67,7 +66,7 @@ type RemoteLombardChainConfig struct {
 	RemoteAdapter      string
 	FeeUSDCents        uint16
 	GasForVerification uint32
-	PayloadSizeBytes   uint32
+	PayloadSizeBytes   uint16
 }
 
 // ConfigureLombardChainForLanesDeps are the dependencies for the ConfigureLombardChainForLanes sequence.
@@ -117,10 +116,9 @@ func NewLombardChainRegistry() *LombardChainRegistry {
 func (r *LombardChainRegistry) RegisterLombardChain(chainFamily string, adapter LombardChain) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Errorf("LombardChain '%s' already registered", chainFamily))
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = adapter
 	}
-	r.m[chainFamily] = adapter
 }
 
 // GetLombardChain retrieves a registered Lombard chain for the given chain family.

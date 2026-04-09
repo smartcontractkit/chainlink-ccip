@@ -16,7 +16,7 @@ func TestMergeIfNotEmpty(t *testing.T) {
 	t.Run("empty source returns base unchanged", func(t *testing.T) {
 		base := DeployContractParams{
 			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xBase"},
-			OnRamp:    OnRampDeployParams{Version: v170, MaxUSDCentsPerMessage: 10},
+			OnRamp:    OnRampDeployParams{Version: v170, FeeAggregator: "0xAgg"},
 		}
 		source := DeployContractParams{}
 
@@ -28,7 +28,7 @@ func TestMergeIfNotEmpty(t *testing.T) {
 	t.Run("source overwrites base for set struct fields", func(t *testing.T) {
 		base := DeployContractParams{
 			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xBaseRMN"},
-			OnRamp:    OnRampDeployParams{Version: v170, MaxUSDCentsPerMessage: 10},
+			OnRamp:    OnRampDeployParams{Version: v170, FeeAggregator: "0xBaseAgg"},
 		}
 		source := DeployContractParams{
 			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xSourceRMN"},
@@ -37,13 +37,14 @@ func TestMergeIfNotEmpty(t *testing.T) {
 		merged, err := base.MergeWithOverrideIfNotEmpty(source)
 		require.NoError(t, err)
 		assert.Equal(t, "0xSourceRMN", merged.RMNRemote.LegacyRMN, "RMNRemote should come from source")
-		assert.Equal(t, uint32(10), merged.OnRamp.MaxUSDCentsPerMessage, "OnRamp should be unchanged from base")
+		assert.Equal(t, "0xBaseAgg", merged.OnRamp.FeeAggregator, "OnRamp should be unchanged from base")
 	})
 
 	t.Run("empty source fields do not overwrite base", func(t *testing.T) {
 		base := DeployContractParams{
 			OnRamp: OnRampDeployParams{
 				Version:               v170,
+				FeeAggregator:         "0xBaseAgg",
 				MaxUSDCentsPerMessage: 100,
 			},
 			OffRamp: OffRampDeployParams{
@@ -52,18 +53,23 @@ func TestMergeIfNotEmpty(t *testing.T) {
 				MaxGasBufferToUpdateState: 50,
 			},
 		}
+		// Source has one non-empty field (FeeAggregator) and rest empty/zero
 		source := DeployContractParams{
 			OnRamp: OnRampDeployParams{
-				MaxUSDCentsPerMessage: 0,
+				FeeAggregator:         "0xSourceAgg",
+				MaxUSDCentsPerMessage: 0, // zero = empty, should not overwrite base
 			},
 			OffRamp: OffRampDeployParams{
-				GasForCallExactCheck:      0,
+				GasForCallExactCheck:      0, // zero = empty, should not overwrite base
 				MaxGasBufferToUpdateState: 0,
 			},
 		}
 
 		merged, err := base.MergeWithOverrideIfNotEmpty(source)
 		require.NoError(t, err)
+		// Non-empty from source overwrites
+		assert.Equal(t, "0xSourceAgg", merged.OnRamp.FeeAggregator)
+		// Empty/zero from source does not overwrite base
 		assert.Equal(t, uint32(100), merged.OnRamp.MaxUSDCentsPerMessage, "base value preserved when source is zero")
 		assert.Equal(t, uint16(2000), merged.OffRamp.GasForCallExactCheck, "base value preserved when source is zero")
 		assert.Equal(t, uint32(50), merged.OffRamp.MaxGasBufferToUpdateState, "base value preserved when source is zero")
@@ -169,7 +175,11 @@ func TestMergeIfNotEmpty(t *testing.T) {
 		assert.Equal(t, "0xVerifier", merged.MockReceivers[0].RequiredVerifiers[0].Address)
 	})
 
-	t.Run("merge with import-style source populates RMNRemote OffRamp CommitteeVerifiers OnRamp FeeQuoter Executors", func(t *testing.T) {
+	// Test merge when source has the shape of output from importConfig (v1.5 RMN) + importConfigFromv1_6_0:
+	// RMNRemote.LegacyRMN, OffRamp.GasForCallExactCheck, OnRamp.FeeAggregator, and optionally
+	// CommitteeVerifiers/Executors with FeeAggregator set.
+	t.Run("merge with importConfigFromv1_6_0-style source populates RMNRemote OffRamp CommitteeVerifiers OnRamp FeeQuoter Executors", func(t *testing.T) {
+		// Base: full params as from topology/defaults
 		base := DeployContractParams{
 			RMNRemote: RMNRemoteDeployParams{
 				Version:   v170,
@@ -181,11 +191,12 @@ func TestMergeIfNotEmpty(t *testing.T) {
 				MaxGasBufferToUpdateState: 100,
 			},
 			CommitteeVerifiers: []CommitteeVerifierDeployParams{
-				{Version: v170, Qualifier: "committee1"},
-				{Version: v170, Qualifier: "committee2"},
+				{Version: v170, Qualifier: "committee1", FeeAggregator: "0xBaseFeeAgg"},
+				{Version: v170, Qualifier: "committee2", FeeAggregator: "0xBaseFeeAgg"},
 			},
 			OnRamp: OnRampDeployParams{
 				Version:               v170,
+				FeeAggregator:         "0xBaseOnRampFeeAgg",
 				MaxUSDCentsPerMessage: 50,
 			},
 			FeeQuoter: FeeQuoterDeployParams{
@@ -195,25 +206,31 @@ func TestMergeIfNotEmpty(t *testing.T) {
 				WETHPremiumMultiplierWeiPerEth: 1e18,
 			},
 			Executors: []ExecutorDeployParams{
-				{Version: v170, Qualifier: "exec1", DynamicConfig: ExecutorDynamicDeployConfig{MinBlockConfirmations: 1}},
-				{Version: v170, Qualifier: "exec2", DynamicConfig: ExecutorDynamicDeployConfig{MinBlockConfirmations: 2}},
+				{Version: v170, Qualifier: "exec1", DynamicConfig: ExecutorDynamicDeployConfig{FeeAggregator: "0xBaseExecFeeAgg"}},
+				{Version: v170, Qualifier: "exec2", DynamicConfig: ExecutorDynamicDeployConfig{FeeAggregator: "0xBaseExecFeeAgg"}},
 			},
 		}
 
+		// Source: values as populated by importConfig (RMNRemote.LegacyRMN from v1.5) and importConfigFromv1_6_0
+		// (OnRamp.FeeAggregator, OffRamp.GasForCallExactCheck; and FeeAggregator on CommitteeVerifiers/Executors when those slices exist)
 		importedLegacyRMN := "0xImportedLegacyRMN"
 		importedGasForCallExactCheck := uint16(5000)
+		importedFeeAggregator := "0xImportedFeeAggregator"
 		source := DeployContractParams{
 			RMNRemote: RMNRemoteDeployParams{
 				LegacyRMN: importedLegacyRMN,
+				// Version not set by import
 			},
 			OffRamp: OffRampDeployParams{
 				GasForCallExactCheck: importedGasForCallExactCheck,
+				// Version, MaxGasBufferToUpdateState not set by import
 			},
 			CommitteeVerifiers: []CommitteeVerifierDeployParams{
-				{Version: v170, Qualifier: "importedCommittee"},
+				{Version: v170, Qualifier: "importedCommittee", FeeAggregator: importedFeeAggregator},
 			},
 			OnRamp: OnRampDeployParams{
-				MaxUSDCentsPerMessage: 0,
+				FeeAggregator: importedFeeAggregator,
+				// Version, MaxUSDCentsPerMessage not set by import
 			},
 			FeeQuoter: FeeQuoterDeployParams{
 				Version:           v170,
@@ -222,20 +239,26 @@ func TestMergeIfNotEmpty(t *testing.T) {
 				USDPerWETH:        big.NewInt(6e6),
 			},
 			Executors: []ExecutorDeployParams{
-				{Version: v170, Qualifier: "importedExec", DynamicConfig: ExecutorDynamicDeployConfig{}},
+				{Version: v170, Qualifier: "importedExec", DynamicConfig: ExecutorDynamicDeployConfig{FeeAggregator: importedFeeAggregator}},
 			},
 		}
 
 		merged, err := base.MergeWithOverrideIfNotEmpty(source)
 		require.NoError(t, err)
 
+		// RMNRemote: merged should have source's LegacyRMN (as set by importConfig from v1.5)
 		assert.Equal(t, importedLegacyRMN, merged.RMNRemote.LegacyRMN, "RMNRemote.LegacyRMN should come from import")
+
+		// OffRamp: merged should have source's GasForCallExactCheck (as set by importConfigFromv1_6_0)
 		assert.Equal(t, importedGasForCallExactCheck, merged.OffRamp.GasForCallExactCheck, "OffRamp.GasForCallExactCheck should come from import")
 
+		// CommitteeVerifiers: merged should have source's slice (import-style: FeeAggregator set)
 		require.Len(t, merged.CommitteeVerifiers, 1)
 		assert.Equal(t, "importedCommittee", merged.CommitteeVerifiers[0].Qualifier)
+		assert.Equal(t, importedFeeAggregator, merged.CommitteeVerifiers[0].FeeAggregator)
 
-		assert.Equal(t, uint32(50), merged.OnRamp.MaxUSDCentsPerMessage, "OnRamp.MaxUSDCentsPerMessage should stay from base when source is zero")
+		// OnRamp: merged should have source's FeeAggregator (as set by importConfigFromv1_6_0)
+		assert.Equal(t, importedFeeAggregator, merged.OnRamp.FeeAggregator, "OnRamp.FeeAggregator should come from import")
 
 		// FeeQuoter: merged should have source's values
 		require.NotNil(t, merged.FeeQuoter.MaxFeeJuelsPerMsg)
@@ -248,17 +271,6 @@ func TestMergeIfNotEmpty(t *testing.T) {
 		// Executors: merged should have source's slice (import-style: DynamicConfig.FeeAggregator set)
 		require.Len(t, merged.Executors, 1)
 		assert.Equal(t, "importedExec", merged.Executors[0].Qualifier)
-	})
-
-	t.Run("source overwrites base FeeAggregator on DeployContractParams", func(t *testing.T) {
-		base := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{Version: v170},
-		}
-		source := DeployContractParams{
-			FeeAggregator: "0x1111111111111111111111111111111111111111",
-		}
-		merged, err := base.MergeWithOverrideIfNotEmpty(source)
-		require.NoError(t, err)
-		assert.Equal(t, "0x1111111111111111111111111111111111111111", merged.FeeAggregator)
+		assert.Equal(t, importedFeeAggregator, merged.Executors[0].DynamicConfig.FeeAggregator)
 	})
 }

@@ -68,11 +68,16 @@ func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {
 	assert.Same(t, adapter, got)
 }
 
-func TestChainFamilyRegistry_DuplicatePanics(t *testing.T) {
+func TestChainFamilyRegistry_DuplicateRegisterDoesNotPanic(t *testing.T) {
 	registry := adapters.NewChainFamilyRegistry()
-	registry.RegisterChainFamily(chainsel.FamilyEVM, &mockChainFamily{})
+	adapter1 := &mockChainFamily{}
 
-	require.Panics(t, func() {
-		registry.RegisterChainFamily(chainsel.FamilyEVM, &mockChainFamily{})
+	registry.RegisterChainFamily(chainsel.FamilyEVM, adapter1)
+	require.NotPanics(t, func() {
+		registry.RegisterChainFamily(chainsel.FamilyEVM, adapter1)
 	})
+
+	got, ok := registry.GetChainFamily(chainsel.FamilyEVM)
+	require.True(t, ok)
+	assert.Same(t, adapter1, got)
 }

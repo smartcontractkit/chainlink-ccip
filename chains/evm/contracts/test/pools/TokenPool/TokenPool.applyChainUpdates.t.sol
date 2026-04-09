@@ -131,12 +131,12 @@ contract TokenPool_applyChainUpdates is BaseTest {
     // State remains
     assertState(chainUpdates);
 
-    // Configure custom block confirmation rate limiters on the chain we're about to remove.
+    // Configure fast finality rate limiters on the chain we're about to remove.
     {
       TokenPool.RateLimitConfigArgs[] memory customRLArgs = new TokenPool.RateLimitConfigArgs[](1);
       customRLArgs[0] = TokenPool.RateLimitConfigArgs({
         remoteChainSelector: evmChainSelector,
-        customBlockConfirmations: true,
+        fastFinality: true,
         outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18}),
         inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18})
       });
@@ -156,7 +156,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
 
     s_tokenPool.applyChainUpdates(chainRemoves, new TokenPool.ChainUpdate[](0));
 
-    // Custom block confirmation buckets should be deleted along with the chain.
+    // Fast finality buckets should be deleted along with the chain.
     {
       (RateLimiter.TokenBucket memory outPost, RateLimiter.TokenBucket memory inPost) =
         s_tokenPool.getCurrentRateLimiterState(evmChainSelector, true);

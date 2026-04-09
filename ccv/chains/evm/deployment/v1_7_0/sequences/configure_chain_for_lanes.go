@@ -8,11 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -605,7 +606,7 @@ func configureCommitteeVerifierAsSource(
 		}
 		cur := currentRemoteReport.Output
 
-		if cur.Router != desired.Router || cur.AllowlistEnabled != desired.AllowlistEnabled {
+		if cur.RemoteChainConfig.Router != desired.Router || cur.RemoteChainConfig.AllowlistEnabled != desired.AllowlistEnabled {
 			remoteChainConfigArgs = append(remoteChainConfigArgs, desired)
 		} else {
 			getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
@@ -621,7 +622,7 @@ func configureCommitteeVerifierAsSource(
 			curFee := getFeeReport.Output
 			if curFee.FeeUSDCents != desired.FeeUSDCents ||
 				curFee.GasForVerification != desired.GasForVerification ||
-				curFee.PayloadSizeBytes != desired.PayloadSizeBytes {
+				curFee.PayloadSizeBytes != uint32(desired.PayloadSizeBytes) {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desired)
 			}
 		}
@@ -698,6 +699,28 @@ func configureCommitteeVerifierAsSource(
 			return nil, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
 		}
 		writes = append(writes, report.Output)
+	}
+
+	if !cv.AllowedFinalityConfig.IsZero() {
+		desiredFinality := cv.AllowedFinalityConfig.Raw()
+		currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(cvAddr),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
+		}
+		if currentFinalityReport.Output != desiredFinality {
+			setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(cvAddr),
+				Args:          desiredFinality,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to set allowed finality config on CommitteeVerifier on chain %s: %w", chain, err)
+			}
+			writes = append(writes, setFinalityReport.Output)
+		}
 	}
 
 	return writes, nil

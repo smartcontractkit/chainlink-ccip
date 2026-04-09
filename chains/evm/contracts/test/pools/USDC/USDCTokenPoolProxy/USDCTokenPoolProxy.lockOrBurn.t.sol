@@ -6,6 +6,7 @@ import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Router} from "../../../../Router.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
@@ -200,7 +201,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_LockReleaseV2() public {
     uint256 amount = 500;
     bytes memory tokenArgs = abi.encode(1, 2, 3);
-    uint16 blockConfirmationsRequested = 2;
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(2);
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
 
     // Enable IPoolV2 interface for lock release pool.
@@ -230,20 +231,19 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     // Mock the lock release pool's IPoolV2.lockOrBurn.
     vm.mockCall(
       address(s_lockReleasePool),
-      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationsRequested, tokenArgs)),
+      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, requestedFinality, tokenArgs)),
       abi.encode(expectedOutput, amount)
     );
 
     vm.startPrank(s_routerAllowedOnRamp);
 
     vm.expectCall(
-      address(s_lockReleasePool),
-      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationsRequested, tokenArgs))
+      address(s_lockReleasePool), abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, requestedFinality, tokenArgs))
     );
     vm.expectCall(address(s_USDCToken), abi.encodeCall(IERC20.transfer, (address(s_lockReleasePool), amount)));
 
     (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
-      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, requestedFinality, tokenArgs);
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
@@ -252,7 +252,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_CCTPV2WithCCV() public {
     uint256 amount = 400;
     bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
-    uint16 blockConfirmationsRequested = 1;
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(1);
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
     address verifierImpl = makeAddr("verifierImpl");
 
@@ -269,7 +269,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, 1, tokenArgs),
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, FinalityCodec._encodeBlockDepth(1), tokenArgs),
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}), amount)
     );
 
@@ -285,12 +285,12 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.expectCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, blockConfirmationsRequested, tokenArgs)
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, requestedFinality, tokenArgs)
     );
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, verifierImpl, amount));
 
     (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
-      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, requestedFinality, tokenArgs);
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
@@ -335,7 +335,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         amount: amount,
         localToken: address(s_USDCToken)
       }),
-      0,
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ""
     );
   }
@@ -343,7 +343,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_CCTPV2WithCCV_RevertWhen_ChainNotSupportedByVerifier() public {
     uint256 amount = 100;
     bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
-    uint16 blockConfirmationsRequested = 1;
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(1);
     address verifierImpl = address(0);
 
     vm.mockCall(
@@ -365,7 +365,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         amount: amount,
         localToken: address(s_USDCToken)
       }),
-      blockConfirmationsRequested,
+      requestedFinality,
       tokenArgs
     );
   }
@@ -489,7 +489,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_InvalidMechanism() public {
@@ -515,7 +515,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.INVALID_MECHANISM
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_LockReleasePoolNotSet() public {
@@ -557,7 +557,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     vm.expectRevert(
       abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, lockReleaseChainSelector)
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_UnsupportedMechanism_CCTPV1() public {
@@ -577,7 +577,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function test_lockOrBurn_V2_RevertWhen_UnsupportedMechanism_CCTPV2() public {
@@ -597,6 +597,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2
       )
     );
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, 0, "");
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 }

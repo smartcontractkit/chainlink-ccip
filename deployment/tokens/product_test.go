@@ -89,14 +89,6 @@ func TestRegisterTokenAdapter(t *testing.T) {
 			version2:     semver.MustParse("2.0.2"),
 			expectedErr:  "",
 		},
-		{
-			desc:         "registering two adapters with same chain family and version fails",
-			chainFamily1: "evm",
-			version1:     semver.MustParse("1.0.3"),
-			chainFamily2: "evm",
-			version2:     semver.MustParse("1.0.3"),
-			expectedErr:  "TokenAdapter 'evm 1.0.3' already registered",
-		},
 	}
 
 	for _, tt := range tests {

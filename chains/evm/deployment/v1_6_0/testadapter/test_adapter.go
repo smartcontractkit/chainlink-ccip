@@ -16,8 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-
-	// "github.com/xssnick/tonutils-go/tlb" Temporarily disabled TON
+	"github.com/xssnick/tonutils-go/tlb"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -27,7 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	// ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp" Temporarily disabled TON
+	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
@@ -315,26 +314,25 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		return nil, nil
 	case chain_selectors.FamilyTon:
 		// TODO: maybe for 1.6 we should look up the source adapter and use a 1.6 method to encode? would be good to avoid other chain SDKs
-		panic("Temporarily disabled TON")
-		// extraArgs := ton_onramp.GenericExtraArgsV2{
-		// 	GasLimit:                 big.NewInt(1000000),
-		// 	AllowOutOfOrderExecution: true,
-		// }
-		// for _, opt := range opts {
-		// 	switch opt.Name {
-		// 	case testadapters.ExtraArgGasLimit:
-		// 		extraArgs.GasLimit = opt.Value.(*big.Int)
-		// 	case testadapters.ExtraArgOOO:
-		// 		extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
-		// 	default:
-		// 		// unsupported arg
-		// 	}
-		// }
-		// extraArgsCell, err := tlb.ToCell(extraArgs)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// return extraArgsCell.ToBOC(), nil
+		extraArgs := ton_onramp.GenericExtraArgsV2{
+			GasLimit:                 big.NewInt(1000000),
+			AllowOutOfOrderExecution: true,
+		}
+		for _, opt := range opts {
+			switch opt.Name {
+			case testadapters.ExtraArgGasLimit:
+				extraArgs.GasLimit = opt.Value.(*big.Int)
+			case testadapters.ExtraArgOOO:
+				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
+			default:
+				// unsupported arg
+			}
+		}
+		extraArgsCell, err := tlb.ToCell(extraArgs)
+		if err != nil {
+			return nil, err
+		}
+		return extraArgsCell.ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)

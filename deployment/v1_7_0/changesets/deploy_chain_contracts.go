@@ -84,18 +84,6 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 			if perChain.DeployerContract == "" {
 				return fmt.Errorf("DeployerContract is required for chain %d", sel)
 			}
-			if _, topOk := cfg.Cfg.Topology.GetFeeAggregator(sel); !topOk {
-				if cfg.Cfg.IgnoreImportedConfigFromPreviousVersion {
-					return fmt.Errorf("topology fee_aggregators entry is required for chain %d when IgnoreImportedConfigFromPreviousVersion is true", sel)
-				}
-				shouldImport, impErr := shouldImportConfigFromPreviousVersion(e, registry, sel)
-				if impErr != nil {
-					return fmt.Errorf("chain %d: %w", sel, impErr)
-				}
-				if !shouldImport {
-					return fmt.Errorf("topology fee_aggregators entry is required for chain %d when no v1.6.0 config import applies", sel)
-				}
-			}
 		}
 
 		for sel := range cfg.Cfg.ChainCfgs {
@@ -191,20 +179,6 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				}
 			}
 
-			// Net effect will be that the fee aggregator is set to the value in the topology it takes precedence
-			// If the topology does not have a fee aggregator, then the value in the input config is used (populated by v1.6.0 config import)
-			var feeAgg string
-			if fa, ok := cfg.Cfg.Topology.GetFeeAggregator(sel); ok {
-				feeAgg = fa
-			} else if input.ContractParams.FeeAggregator != "" {
-				feeAgg = input.ContractParams.FeeAggregator
-			}
-			if feeAgg == "" {
-				return deployment.ChangesetOutput{Reports: allReports},
-					fmt.Errorf("chain %d: FeeAggregator is required (set topology fee_aggregators or ensure v1.6.0 config import provides it)", sel)
-			}
-			input.FeeAggregator = feeAgg
-
 			e.Logger.Infow(
 				"Deploying chain contracts with topology-derived committee verifiers",
 				"chain", sel,
@@ -280,8 +254,13 @@ func BuildCommitteeVerifierParams(
 			return nil, fmt.Errorf("committee %q has nil VerifierVersion", qualifier)
 		}
 
+		if chainCfg.FeeAggregator == "" {
+			return nil, fmt.Errorf("committee %q: FeeAggregator is required", qualifier)
+		}
+
 		params = append(params, adapters.CommitteeVerifierDeployParams{
 			Version:          committee.VerifierVersion,
+			FeeAggregator:    chainCfg.FeeAggregator,
 			AllowlistAdmin:   chainCfg.AllowlistAdmin,
 			StorageLocations: committee.StorageLocations,
 			Qualifier:        qualifier,

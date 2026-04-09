@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -28,12 +29,13 @@ type CommitteeVerifierRemoteChainConfig struct {
 	RemovedAllowlistedSenders []string
 	FeeUSDCents               uint16
 	GasForVerification        uint32
-	PayloadSizeBytes          uint32
+	PayloadSizeBytes          uint16
 }
 
 type CommitteeVerifierInputConfig struct {
-	CommitteeQualifier string
-	RemoteChains       map[uint64]CommitteeVerifierRemoteChainConfig
+	CommitteeQualifier    string
+	RemoteChains          map[uint64]CommitteeVerifierRemoteChainConfig
+	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
 // PartialRemoteChainConfig is the user-facing input for a single remote chain. Contract
@@ -134,6 +136,13 @@ func ConfigureChainsForLanesFromTopology(
 			if !slices.Contains(e.BlockChains.ListChainSelectors(), chainCfg.ChainSelector) {
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
 			}
+			for _, cv := range chainCfg.CommitteeVerifiers {
+				if !cv.AllowedFinalityConfig.IsZero() {
+					if err := cv.AllowedFinalityConfig.Validate(); err != nil {
+						return fmt.Errorf("invalid AllowedFinalityConfig for committee verifier on chain %d: %w", chainCfg.ChainSelector, err)
+					}
+				}
+			}
 			for remoteSelector, remoteCfg := range chainCfg.RemoteChains {
 				if remoteCfg.DefaultExecutorQualifier == "" {
 					return fmt.Errorf("DefaultExecutorQualifier is required for remote chain %d on local chain %d", remoteSelector, chainCfg.ChainSelector)
@@ -197,8 +206,9 @@ func ConfigureChainsForLanesFromTopology(
 				}
 
 				committeeVerifiers = append(committeeVerifiers, adapters.CommitteeVerifierConfig[datastore.AddressRef]{
-					CommitteeVerifier: contracts,
-					RemoteChains:      remoteChains,
+					CommitteeVerifier:     contracts,
+					RemoteChains:          remoteChains,
+					AllowedFinalityConfig: verifierInput.AllowedFinalityConfig,
 				})
 			}
 
@@ -289,8 +299,9 @@ func applyConfigureChains(
 				contracts = append(contracts, resolvedContract)
 			}
 			committeeVerifiers[i] = adapters.CommitteeVerifierConfig[datastore.AddressRef]{
-				CommitteeVerifier: contracts,
-				RemoteChains:      verifier.RemoteChains,
+				CommitteeVerifier:     contracts,
+				RemoteChains:          verifier.RemoteChains,
+				AllowedFinalityConfig: verifier.AllowedFinalityConfig,
 			}
 		}
 

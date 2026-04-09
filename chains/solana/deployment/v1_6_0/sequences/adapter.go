@@ -96,23 +96,19 @@ var svmFamilySelector = [4]byte{0x1e, 0x10, 0xbd, 0xc4}
 func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChainConfig {
 	return laneapi.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
+		MaxDataBytes:                1_280,
+		MaxPerMsgGasLimit:           400_000,
 		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
 		ChainFamilySelector:         binary.BigEndian.Uint32(svmFamilySelector[:]),
-		DefaultTokenFeeUSDCents:     25,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
+		DefaultTokenFeeUSDCents:     35,
+		DefaultTokenDestGasOverhead: 150_000,
+		DefaultTxGasLimit:           1, // irrelevant for Solana
 		NetworkFeeUSDCents:          10,
 		V1Params: &laneapi.FeeQuoterV1Params{
-			MaxNumberOfTokensPerMsg:           10,
-			DestGasPerPayloadByteHigh:         40,
-			DestGasPerPayloadByteThreshold:    3000,
-			DestDataAvailabilityOverheadGas:   100,
-			DestGasPerDataAvailabilityByte:    16,
-			DestDataAvailabilityMultiplierBps: 1,
-			GasMultiplierWeiPerEth:            11e17,
+			MaxNumberOfTokensPerMsg:    1,
+			GasMultiplierWeiPerEth:     11e17,
+			GasPriceStalenessThreshold: 90_000,
+			EnforceOutOfOrder:          true,
 		},
 		V2Params: &laneapi.FeeQuoterV2Params{
 			LinkFeeMultiplierPercent: 90,
