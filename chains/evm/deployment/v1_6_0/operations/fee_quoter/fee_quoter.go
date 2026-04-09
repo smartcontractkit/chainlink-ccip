@@ -169,14 +169,14 @@ type DestChainConfigArgs struct {
 	DestChainConfig   DestChainConfig
 }
 
+type FeeTokenArgs struct {
+	Token                      common.Address
+	PremiumMultiplierWeiPerEth uint64
+}
+
 type GasPriceUpdate struct {
 	DestChainSelector uint64
 	UsdPerUnitGas     *big.Int
-}
-
-type PremiumMultiplierWeiPerEthArgs struct {
-	Token                      common.Address
-	PremiumMultiplierWeiPerEth uint64
 }
 
 type PriceUpdates struct {
@@ -251,7 +251,7 @@ type ConstructorArgs struct {
 	FeeTokens                      []common.Address
 	TokenPriceFeeds                []TokenPriceFeedUpdate
 	TokenTransferFeeConfigArgs     []TokenTransferFeeConfigArgs
-	PremiumMultiplierWeiPerEthArgs []PremiumMultiplierWeiPerEthArgs
+	PremiumMultiplierWeiPerEthArgs []FeeTokenArgs
 	DestChainConfigArgs            []DestChainConfigArgs
 }
 
