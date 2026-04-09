@@ -9,8 +9,9 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 contract BaseVerifierTestHelper is BaseVerifier {
   constructor(
     string[] memory storageLocations,
-    address rmn
-  ) BaseVerifier(storageLocations, rmn) {}
+    address rmn,
+    bytes4 versionTag
+  ) BaseVerifier(storageLocations, rmn, versionTag) {}
 
   function applyRemoteChainConfigUpdates(
     RemoteChainConfigArgs[] calldata destChainConfigArgs
@@ -51,15 +52,18 @@ contract BaseVerifierTestHelper is BaseVerifier {
     return "BaseVerifierTestHelper 1.0.0";
   }
 
-  function versionTag() public pure override returns (bytes4) {
-    return bytes4(keccak256("BaseVerifierTestHelper"));
-  }
-
   /// @notice Exposes the internal storage location setter for testing.
   function setStorageLocations(
     string[] memory storageLocations
   ) external {
     _setStorageLocations(storageLocations);
+  }
+
+  /// @notice Exposes the internal finality config setter for testing.
+  function setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) external {
+    _setAllowedFinalityConfig(allowedFinality);
   }
 
   /// @notice Exposes FeeTokenHandler withdraw helper for tests.

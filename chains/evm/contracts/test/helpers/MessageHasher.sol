@@ -3,6 +3,7 @@ pragma solidity ^0.8.4;
 
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 
 contract MessageHasher {
   function encodeEVMExtraArgsV1(
@@ -96,5 +97,47 @@ contract MessageHasher {
   {
     return
       (extraArgs.gasLimit, extraArgs.allowOutOfOrderExecution, extraArgs.tokenReceiver, extraArgs.receiverObjectIds);
+  }
+
+  // ================================================================
+  // │                       FinalityCodec                         │
+  // ================================================================
+
+  /// @notice Encodes a block depth into the finality params.
+  /// @param blockDepth The number of blocks to wait.
+  /// @return The encoded finality value.
+  function encodeBlockDepth(
+    uint16 blockDepth
+  ) public pure returns (bytes4) {
+    return FinalityCodec._encodeBlockDepth(blockDepth);
+  }
+
+  /// @notice Encodes the safe flag combined with an optional block depth into the finality params.
+  /// @param blockDepth The number of blocks to wait on top of the safe tag (0 for flag-only).
+  /// @return The encoded finality value.
+  function encodeBlockDepthAndSafeFlag(
+    uint16 blockDepth
+  ) public pure returns (bytes4) {
+    return FinalityCodec._encodeBlockDepthAndSafeFlag(blockDepth);
+  }
+
+  /// @notice Validates that a requested finality value is structurally well-formed.
+  /// Reverts with RequestedFinalityCanOnlyHaveOneMode if more than one mode is active.
+  /// @param encodedFinality The encoded finality params to validate.
+  function validateRequestedFinality(
+    bytes4 encodedFinality
+  ) public pure {
+    FinalityCodec._validateRequestedFinality(encodedFinality);
+  }
+
+  /// @notice Validates that requestedFinality is well-formed and permitted by allowedFinality.
+  /// Reverts with InvalidRequestedFinality if the request is not allowed.
+  /// @param requestedFinality The finality mode requested by the sender.
+  /// @param allowedFinality The finality configuration permitted by the pool or CCVs.
+  function ensureRequestedFinalityAllowed(
+    bytes4 requestedFinality,
+    bytes4 allowedFinality
+  ) public pure {
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, allowedFinality);
   }
 }

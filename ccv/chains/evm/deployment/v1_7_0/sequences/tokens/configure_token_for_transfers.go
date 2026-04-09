@@ -115,19 +115,19 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("token %s is not supported by token pool %s", tokenAddress, tokenPoolAddress)
 		}
 
-		// Configure minimum block confirmation (skip if already set to desired value).
-		currentMinBlockReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetMinBlockConfirmations, evmChain, evm_contract.FunctionInput[struct{}]{
+		desiredFinalityConfig := input.AllowedFinalityConfig.Raw()
+		currentAllowedFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get min block confirmation from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
 		}
-		if currentMinBlockReport.Output != input.MinFinalityValue {
-			configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmations, evmChain, evm_contract.FunctionInput[uint16]{
+		if currentAllowedFinalityReport.Output != desiredFinalityConfig {
+			configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[[4]byte]{
 				ChainSelector: input.ChainSelector,
 				Address:       tokenPoolAddress,
-				Args:          input.MinFinalityValue,
+				Args:          desiredFinalityConfig,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)

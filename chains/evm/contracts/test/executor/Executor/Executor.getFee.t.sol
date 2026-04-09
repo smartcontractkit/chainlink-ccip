@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 contract Executor_getFee is ExecutorSetup {
@@ -9,20 +10,19 @@ contract Executor_getFee is ExecutorSetup {
     address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = INITIAL_CCV;
 
-    uint16 fee = s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "", s_sourceFeeToken);
+    uint16 fee =
+      s_executor.getFee(DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, ccvAddresses, "", s_sourceFeeToken);
 
     assertEq(DEFAULT_EXEC_FEE_USD_CENTS, fee);
   }
 
-  function test_getFee_RevertWhen_Executor__RequestedBlockDepthTooLow() public {
-    uint16 blockConfirmationsRequested = MIN_BLOCK_CONFIRMATIONS - 1;
+  function test_getFee_RevertWhen_InvalidRequestedFinality() public {
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(49);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        Executor.Executor__RequestedBlockDepthTooLow.selector, blockConfirmationsRequested, MIN_BLOCK_CONFIRMATIONS
-      )
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, s_minFinalityConfig)
     );
-    s_executor.getFee(DEST_CHAIN_SELECTOR, blockConfirmationsRequested, new address[](1), "", s_sourceFeeToken);
+    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedFinality, new address[](1), "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_InvalidDestChain() public {
@@ -30,7 +30,7 @@ contract Executor_getFee is ExecutorSetup {
     ccvAddresses[0] = INITIAL_CCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, DEST_CHAIN_SELECTOR + 1));
-    s_executor.getFee(DEST_CHAIN_SELECTOR + 1, 0, ccvAddresses, "", s_sourceFeeToken);
+    s_executor.getFee(DEST_CHAIN_SELECTOR + 1, FinalityCodec.WAIT_FOR_FINALITY_FLAG, ccvAddresses, "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_UnsupportedRequiredCCV() public {
@@ -39,7 +39,7 @@ contract Executor_getFee is ExecutorSetup {
     ccvAddresses[0] = unsupportedCCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidCCV.selector, unsupportedCCV));
-    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "", s_sourceFeeToken);
+    s_executor.getFee(DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, ccvAddresses, "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_ExceedsMaxCCVs() public {
@@ -48,6 +48,6 @@ contract Executor_getFee is ExecutorSetup {
     ccvAddresses[1] = INITIAL_CCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.ExceedsMaxCCVs.selector, ccvAddresses.length, INITIAL_MAX_CCVS));
-    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "", s_sourceFeeToken);
+    s_executor.getFee(DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, ccvAddresses, "", s_sourceFeeToken);
   }
 }

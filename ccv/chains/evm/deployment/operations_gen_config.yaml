@@ -109,9 +109,9 @@ contracts:
   - contract_name: MockReceiverV2
     version: "2.0.0"
     functions:
-      - name: getCCVsAndMinBlockConfirmations
+      - name: getCCVsAndFinalityConfig
         access: public
-      - name: setMinBlockConfirmations
+      - name: setAllowedFinalityConfig
         access: public # Only used in testing, not critical
 
   # Token Pool contracts (latest / v2.0.0)
@@ -121,7 +121,7 @@ contracts:
     abi_file: burn_mint_token_pool.json
     no_deployment: true
     functions:
-      - name: setMinBlockConfirmations
+      - name: setAllowedFinalityConfig
         access: owner
       - name: addRemotePool
         access: owner
@@ -145,7 +145,7 @@ contracts:
         access: public
       - name: getCurrentRateLimiterState
         access: public
-      - name: getMinBlockConfirmations
+      - name: getAllowedFinalityConfig
         access: public
       - name: getSupportedChains
         access: public
@@ -279,7 +279,7 @@ contracts:
         access: public
       - name: getMaxCCVsPerMessage
         access: public
-      - name: getMinBlockConfirmations
+      - name: getAllowedFinalityConfig
         access: public
 
   - contract_name: Proxy
@@ -306,6 +306,8 @@ contracts:
       - name: updateSupportedTokens
         access: owner
       - name: setRemoteAdapters
+        access: owner
+      - name: setAllowedFinalityConfig
         access: owner
       - name: setDynamicConfig
         access: owner
@@ -349,6 +351,8 @@ contracts:
         access: owner
       - name: updateStorageLocations
         access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
       - name: withdrawFeeTokens
         access: owner
       - name: versionTag
@@ -363,6 +367,8 @@ contracts:
         access: public
       - name: getStorageLocations
         access: public
+      - name: getAllowedFinalityConfig
+        access: public
       - name: getFee
         access: public
 
@@ -372,6 +378,8 @@ contracts:
       - name: setDynamicConfig
         access: owner
       - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setAllowedFinalityConfig
         access: owner
       - name: applyAllowlistUpdates
         access: owner
@@ -384,6 +392,8 @@ contracts:
       - name: getDynamicConfig
         access: public
       - name: getSignatureConfig
+        access: public
+      - name: getAllowedFinalityConfig
         access: public
       - name: getFee
         access: public

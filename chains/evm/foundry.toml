@@ -1,3 +1,4 @@
+# Run Forge tests, coverage, and snapshots with `FOUNDRY_PROFILE=ccip` (see `GNUmakefile` and `package.json`).
 [profile.default]
 solc_version = '0.8.26'
 evm_version = 'paris'

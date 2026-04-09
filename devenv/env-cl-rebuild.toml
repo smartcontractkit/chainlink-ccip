@@ -11,33 +11,45 @@
     [nodesets.node_specs.node]
       docker_ctx = "../../chainlink"
       docker_file = "core/chainlink.Dockerfile"
+      [nodesets.node_specs.node.docker_build_args]
+        CL_INSTALL_PRIVATE_PLUGINS = "false"
 
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
       docker_ctx = "../../chainlink"
       docker_file = "core/chainlink.Dockerfile"
+      [nodesets.node_specs.node.docker_build_args]
+        CL_INSTALL_PRIVATE_PLUGINS = "false"
 
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
       docker_ctx = "../../chainlink"
       docker_file = "core/chainlink.Dockerfile"
+      [nodesets.node_specs.node.docker_build_args]
+        CL_INSTALL_PRIVATE_PLUGINS = "false"
 
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
       docker_ctx = "../../chainlink"
       docker_file = "core/chainlink.Dockerfile"
-  
+      [nodesets.node_specs.node.docker_build_args]
+        CL_INSTALL_PRIVATE_PLUGINS = "false"
+
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
       docker_ctx = "../../chainlink"
       docker_file = "core/chainlink.Dockerfile"
-  
+      [nodesets.node_specs.node.docker_build_args]
+        CL_INSTALL_PRIVATE_PLUGINS = "false"
+
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
       docker_ctx = "../../chainlink"
       docker_file = "core/chainlink.Dockerfile"
+      [nodesets.node_specs.node.docker_build_args]
+        CL_INSTALL_PRIVATE_PLUGINS = "false"

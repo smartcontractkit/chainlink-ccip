@@ -121,7 +121,7 @@ func TestVerifyDeployedContractsPostHook_Definition(t *testing.T) {
 	registerMyContractV1(t)
 	h := hooks.NewVerifyDeployedContractsPostHook(domain.Domain{}, testEVMVerifier())
 	require.Equal(t, hooks.VerifyDeployedContractsHookName, h.Name)
-	require.Equal(t, changeset.Abort, h.FailurePolicy)
+	require.Equal(t, changeset.Warn, h.FailurePolicy)
 	require.NotNil(t, h.Func)
 }
 

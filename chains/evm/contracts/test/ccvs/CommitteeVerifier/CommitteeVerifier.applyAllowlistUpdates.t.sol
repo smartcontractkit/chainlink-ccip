@@ -32,9 +32,9 @@ contract CommitteeVerifier_applyAllowlistUpdates is CommitteeVerifierSetup {
 
     s_committeeVerifier.applyAllowlistUpdates(allowlistConfigs);
 
-    (bool allowlistEnabled,, address[] memory allowlistSender) =
+    (BaseVerifier.RemoteChainConfigArgs memory config, address[] memory allowlistSender) =
       s_committeeVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(allowlistEnabled, allowlistConfigs[0].allowlistEnabled);
+    assertEq(config.allowlistEnabled, allowlistConfigs[0].allowlistEnabled);
     assertEq(allowlistSender.length, allowlistConfigs[0].addedAllowlistedSenders.length);
     assertEq(allowlistSender[0], allowlistConfigs[0].addedAllowlistedSenders[0]);
   }

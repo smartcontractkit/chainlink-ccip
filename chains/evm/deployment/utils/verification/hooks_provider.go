@@ -69,7 +69,7 @@ func (p *EVMContractInputsProvider) ForEachNetwork(
 		lggr.Warnf("%s: no verification strategy for %d, skipping network", logPrefix, selector)
 		return nil, true
 	}
-
+	lggr.Infof("%s: using verification strategy %d for %d", logPrefix, strategy, selector)
 	return func(_ context.Context, ref datastore.AddressRef) (cldverification.Verifiable, error) {
 		metadata, err := p.GetInputs(ref.Type, ref.Version)
 		if err != nil {

@@ -6,6 +6,7 @@ import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
@@ -40,7 +41,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       IBridgeV3(address(s_mockBridge)),
       s_storageLocations,
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      VERSION_TAG_V2_0_0
     );
 
     // Deploy test token and add it as a supported token.
@@ -104,7 +106,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(s_onRamp),
       offRampAddress: abi.encodePacked(s_offRamp),

@@ -213,8 +213,8 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 					},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
-				require.Equal(t, common.HexToAddress(input.Router), remoteChainConfigReport.Output.Router, "Router in remote chain config should match")
-				require.Equal(t, remoteConfig.AllowlistEnabled, remoteChainConfigReport.Output.AllowlistEnabled, "AllowlistEnabled should match")
+				require.Equal(t, common.HexToAddress(input.Router), remoteChainConfigReport.Output.RemoteChainConfig.Router, "Router in remote chain config should match")
+				require.Equal(t, remoteConfig.AllowlistEnabled, remoteChainConfigReport.Output.RemoteChainConfig.AllowlistEnabled, "AllowlistEnabled should match")
 
 				// Check outbound implementation on CommitteeVerifierResolver
 				boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(

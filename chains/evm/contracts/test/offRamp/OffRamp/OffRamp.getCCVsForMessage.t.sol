@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
@@ -21,7 +22,7 @@ contract OffRamp_getCCVsForMessage is OffRampSetup {
       messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: s_onRamp,
       offRampAddress: abi.encodePacked(s_offRamp),
@@ -53,7 +54,7 @@ contract OffRamp_getCCVsForMessage is OffRampSetup {
       messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: s_onRamp,
       offRampAddress: abi.encodePacked(s_offRamp),

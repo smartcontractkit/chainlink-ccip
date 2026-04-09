@@ -8,6 +8,7 @@ import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.so
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
@@ -18,6 +19,8 @@ import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract e2e is OnRampSetup {
+  bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
+
   OffRampHelper internal s_offRamp;
 
   address internal s_destVerifier;
@@ -35,7 +38,8 @@ contract e2e is OnRampSetup {
     s_sourceCommitteeVerifier = new CommitteeVerifier(
       CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}),
       new string[](0),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      COMMITTEE_VERSION_TAG_V2_0_0
     );
 
     BaseVerifier.RemoteChainConfigArgs[] memory destChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
@@ -142,7 +146,7 @@ contract e2e is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: userCCVAddresses,
           ccvArgs: userCCVArgs,
-          blockConfirmations: 0,
+          requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
           gasLimit: GAS_LIMIT,
           executor: address(0),
           executorArgs: "",
