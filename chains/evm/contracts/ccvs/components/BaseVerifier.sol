@@ -23,6 +23,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error CallerIsNotARampOnRouter(address caller);
   error RemoteChainNotSupported(uint64 remoteChainSelector);
   error ZeroAddressNotAllowed();
+  error VersionTagCannotBeZero();
 
   event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address senders);
@@ -60,6 +61,13 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @dev The rmn contract.
   IRMNRemote internal immutable i_rmn;
+  /// @dev The version tag that this instance of the verifier supports. This could be used as a domain separator, but
+  /// should never be the primary defense against signature replay attacks across different verifiers. The primary
+  /// defense should be using non-overlapping signer sets for different verifiers, and the version tag should only be
+  /// used to prevent accidental misuse of signatures in the wrong verifier.
+  /// A schema for domain separation could be to use the first two bytes as unique verifier ID, and the second two bytes
+  /// for versioning within the same verifier. For example, 0xAABBCCDD could represent verifier ID AABB, version CCDD.
+  bytes4 internal immutable i_versionTag;
 
   /// @dev The remote chain specific configs.
   mapping(uint64 remoteChainSelector => RemoteChainConfig remoteChainConfig) private s_remoteChainConfigs;
@@ -74,13 +82,16 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   constructor(
     string[] memory storageLocations,
-    address rmnAddress
+    address rmnAddress,
+    bytes4 _versionTag
   ) {
     _setStorageLocations(storageLocations);
 
     if (rmnAddress == address(0)) {
       revert ZeroAddressNotAllowed();
     }
+    if (_versionTag == bytes4(0)) revert VersionTagCannotBeZero();
+    i_versionTag = _versionTag;
 
     i_rmn = IRMNRemote(rmnAddress);
   }
@@ -300,7 +311,9 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @notice Exposes the version tag for outbound requests.
   /// @dev Used by operational tooling. Verifiers implemented by CLL override this function.
-  function versionTag() public pure virtual returns (bytes4);
+  function versionTag() public view virtual returns (bytes4 tag) {
+    return i_versionTag;
+  }
 
   /// @inheritdoc IERC165
   function supportsInterface(

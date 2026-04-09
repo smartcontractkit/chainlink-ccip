@@ -7,8 +7,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/erc20"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
 // ApproveProposalOnly is identical to Approve but forces the operation into a proposal
@@ -24,7 +25,7 @@ var ApproveProposalOnly = contract.NewWrite(contract.WriteParams[ApproveArgs, *e
 	IsAllowedCaller: contract.NoCallersAllowed[*erc20_bindings.ERC20, ApproveArgs],
 	Validate:        validateApproveArgs,
 	CallContract: func(token *erc20_bindings.ERC20, opts *bind.TransactOpts, args ApproveArgs) (*types.Transaction, error) {
-		return token.Approve(opts, args.Spender, args.Amount)
+		return token.Approve(opts, args.Spender, args.Value)
 	},
 })
 
@@ -32,7 +33,7 @@ func validateApproveArgs(args ApproveArgs) error {
 	if args.Spender == (common.Address{}) {
 		return fmt.Errorf("spender address must be set")
 	}
-	if args.Amount == nil || args.Amount.Sign() <= 0 {
+	if args.Value == nil || args.Value.Sign() <= 0 {
 		return fmt.Errorf("amount must be greater than zero")
 	}
 	return nil

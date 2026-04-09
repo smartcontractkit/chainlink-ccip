@@ -21,11 +21,10 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
 
     // Check allowance of the token messenger on the USDC token.
@@ -46,11 +45,10 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       ITokenMessenger(address(0)),
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
   }
 
@@ -60,11 +58,10 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       CCTPMessageTransmitterProxy(address(0)),
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
   }
 
@@ -74,11 +71,25 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       IERC20(address(0)),
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
+    );
+  }
+
+  function test_constructor_RevertWhen_VersionTagCannotBeZero() public {
+    vm.expectRevert(BaseVerifier.VersionTagCannotBeZero.selector);
+    new CCTPVerifier(
+      s_mockTokenMessenger,
+      s_messageTransmitterProxy,
+      s_USDCToken,
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      }),
+      CCTPVerifier.BaseVerifierArgs({
+        storageLocations: s_storageLocations, rmn: address(s_mockRMNRemote), versionTag: bytes4(0)
+      })
     );
   }
 
@@ -91,11 +102,10 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
   }
 
@@ -106,11 +116,10 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
   }
 
@@ -129,11 +138,10 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      address(s_mockRMNRemote)
+      _baseVerifierArgs()
     );
   }
 }
