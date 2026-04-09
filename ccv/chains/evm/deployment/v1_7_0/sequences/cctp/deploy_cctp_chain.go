@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/verifier_tags"
 )
 
 const (
@@ -108,12 +109,15 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				TokenMessenger:          tokenMessengerV2Address,
 				MessageTransmitterProxy: cctpV2MessageTransmitterProxyAddress,
 				UsdcToken:               usdcTokenAddress,
-				StorageLocations:        input.StorageLocations,
 				DynamicConfig: cctp_verifier.DynamicConfig{
 					FeeAggregator:   feeAggregatorAddress,
 					FastFinalityBps: input.FastFinalityBps,
 				},
-				Rmn: rmnAddress,
+				BaseVerifierArgs: cctp_verifier.BaseVerifierArgs{
+					StorageLocations: input.StorageLocations,
+					Rmn:              rmnAddress,
+					VersionTag:       verifier_tags.CCTPVerifierV2(),
+				},
 			},
 		}, existingAddresses)
 		if err != nil {
