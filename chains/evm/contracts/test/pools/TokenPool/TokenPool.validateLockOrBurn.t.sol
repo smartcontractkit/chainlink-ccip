@@ -157,19 +157,32 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, requestedFinality, "", fee);
   }
 
-  // The dest pool always trusts the source pool, so all finality is allowed as it can only have come from
-  // a trusted source pool.
-  function test_validateLockOrBurn_WithFtfRequestedAndNoAllowedConfig() public {
-    s_tokenPool.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+  function test_validateLockOrBurn_RevertWhen_RequestedDepthBelowMinimum() public {
+    bytes4 minFinality = FinalityCodec._encodeBlockDepth(5);
+    s_tokenPool.setAllowedFinalityConfig(minFinality);
+    vm.startPrank(s_allowedOnRamp);
 
-    Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
+    bytes4 requestedFinality = FinalityCodec._encodeBlockDepth(uint16(uint32(minFinality) - 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, requestedFinality, minFinality)
+    );
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), requestedFinality, "", 0);
+  }
+
+  function test_validateLockOrBurn_RevertWhen_FtfNotAllowedByPool() public {
+    vm.startPrank(OWNER);
+    s_tokenPool.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     vm.startPrank(s_allowedOnRamp);
 
-    vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
-
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, FinalityCodec._encodeBlockDepth(1), "", 0);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector,
+        FinalityCodec._encodeBlockDepth(1),
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      )
+    );
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1e18), FinalityCodec._encodeBlockDepth(1), "", 0);
   }
 
   function _buildLockOrBurnIn(
