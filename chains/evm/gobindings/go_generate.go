@@ -57,5 +57,4 @@ package ccip
 //go:generate go run ./wrap ccip MockLombardBridge mock_lombard_bridge
 
 // Extract bytecode and ABI from generated wrappers
-//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi
-//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=../../../ccv/chains/evm/gobindings/generated -bytecode=../bytecode -abi=../abi -include-latest
+//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi -include-latest

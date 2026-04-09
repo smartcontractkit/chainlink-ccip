@@ -5,8 +5,6 @@ go 1.25.5
 // Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
 
-replace github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm => ../.
-
 replace github.com/smartcontractkit/chainlink-ccip => ../../../../.
 
 replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../../deployment
@@ -18,7 +16,6 @@ require (
 	github.com/ethereum/go-ethereum v1.17.2
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260407160429-e6e3a1570ff1
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260407160429-e6e3a1570ff1
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260407160429-e6e3a1570ff1
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260407160429-e6e3a1570ff1
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
