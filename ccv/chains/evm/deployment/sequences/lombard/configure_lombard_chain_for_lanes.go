@@ -23,11 +23,11 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 var ConfigureLombardChainForLanes = cldf_ops.NewSequence(

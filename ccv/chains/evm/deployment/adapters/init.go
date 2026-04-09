@@ -39,9 +39,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
-	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 func init() {

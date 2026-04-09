@@ -19,7 +19,7 @@ import (
 	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"

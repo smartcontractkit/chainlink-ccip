@@ -14,19 +14,19 @@ import (
 
 func TestGetMockReceiverVerifiers(t *testing.T) {
 	chainSelector := uint64(12345)
-	v1_7_0 := semver.MustParse("2.0.0")
+	v2_0_0 := semver.MustParse("2.0.0")
 
 	// Note that address is not specified in the refs below - this is intentional.
 	requiredVerifierRef := datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(committee_verifier.ContractType),
-		Version:       v1_7_0,
+		Version:       v2_0_0,
 		Qualifier:     "alpha",
 	}
 	optionalVerifierRef := datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(committee_verifier.ContractType),
-		Version:       v1_7_0,
+		Version:       v2_0_0,
 		Qualifier:     "beta",
 	}
 
@@ -38,7 +38,7 @@ func TestGetMockReceiverVerifiers(t *testing.T) {
 		{
 			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(committee_verifier.ContractType),
-			Version:       v1_7_0,
+			Version:       v2_0_0,
 			Qualifier:     "alpha",
 			Address:       requiredAddr.Hex(),
 		},
@@ -51,7 +51,7 @@ func TestGetMockReceiverVerifiers(t *testing.T) {
 		{
 			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(committee_verifier.ContractType),
-			Version:       v1_7_0,
+			Version:       v2_0_0,
 			Qualifier:     "gamma",
 			Address:       common.HexToAddress("0xCC").Hex(),
 		},
@@ -60,7 +60,7 @@ func TestGetMockReceiverVerifiers(t *testing.T) {
 		{
 			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(committee_verifier.ContractType),
-			Version:       v1_7_0,
+			Version:       v2_0_0,
 			Qualifier:     "beta",
 			Address:       optionalAddr.Hex(),
 		},
@@ -73,7 +73,7 @@ func TestGetMockReceiverVerifiers(t *testing.T) {
 		{
 			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(committee_verifier.ContractType),
-			Version:       v1_7_0,
+			Version:       v2_0_0,
 			Qualifier:     "delta",
 			Address:       common.HexToAddress("0xDD").Hex(),
 		},

@@ -26,7 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}

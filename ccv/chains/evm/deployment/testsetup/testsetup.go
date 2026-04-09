@@ -9,9 +9,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/executor"

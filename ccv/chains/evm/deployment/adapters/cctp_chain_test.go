@@ -22,20 +22,20 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
+	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
+	burn_mint_with_lock_release_flag_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_usdc_token_transmitter"
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
-	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
-	burn_mint_with_lock_release_flag_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	v2_0_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -398,8 +398,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.NoError(t, err, "Failed to deploy CREATE2Factory on non-home chain")
 
 	// Build DeployCCTPChainsConfig
-	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
-		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+	cfg := v2_0_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
 			homeChainSelector: {
 				USDCType:         adapters.Canonical,
 				TokenDecimals:    6,
@@ -470,7 +470,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	}
 
 	// Apply the changeset
-	changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	changeset := v2_0_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
 	output, err := changeset.Apply(*e, cfg)
 	require.NoError(t, err, "Failed to apply DeployCCTPChains changeset")
 
@@ -891,8 +891,8 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 
 	mcmsRegistry := changesets.GetRegistry()
 
-	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
-		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+	cfg := v2_0_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
 			canonicalChainSelector: {
 				USDCType:         adapters.Canonical,
 				TokenDecimals:    6,
@@ -947,7 +947,7 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 		},
 	}
 
-	changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	changeset := v2_0_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
 	output, err := changeset.Apply(*e, cfg)
 	require.NoError(t, err, "Failed to apply DeployCCTPChains changeset")
 

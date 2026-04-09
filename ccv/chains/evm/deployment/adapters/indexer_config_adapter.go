@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/versioned_verifier_resolver"
-	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 type EVMIndexerConfigAdapter struct{}

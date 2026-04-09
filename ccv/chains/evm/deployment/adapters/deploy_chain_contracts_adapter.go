@@ -17,9 +17,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/sequences"
-	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 type EVMDeployChainContractsAdapter struct{}

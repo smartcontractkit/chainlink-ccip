@@ -19,16 +19,16 @@ import (
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/usdc_token_pool_proxy"
-	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/sequences"
+	v2_0_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/verifier_tags"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/versioned_verifier_resolver"
 )
@@ -400,7 +400,7 @@ func deployOrResolveCCTPVerifierResolver(
 		if create2FactoryAddress == (common.Address{}) {
 			return datastore.AddressRef{}, fmt.Errorf("deployer contract is required")
 		}
-		report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
+		report, err := cldf_ops.ExecuteSequence(b, v2_0_0_sequences.DeployVerifierResolverViaCREATE2, chain, v2_0_0_sequences.DeployVerifierResolverViaCREATE2Input{
 			ChainSelector:  chainSelector,
 			Type:           datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
 			Version:        cctp_verifier.Version,

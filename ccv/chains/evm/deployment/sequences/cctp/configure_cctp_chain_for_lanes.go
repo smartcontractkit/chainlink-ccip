@@ -18,11 +18,11 @@ import (
 	v1_6_1_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/cctp_verifier"

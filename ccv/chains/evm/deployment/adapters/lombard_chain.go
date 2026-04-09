@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"

@@ -9,8 +9,8 @@ import (
 	offrampoperations "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	dsutil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 

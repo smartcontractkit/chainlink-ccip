@@ -19,8 +19,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/siloed_usdc_token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(

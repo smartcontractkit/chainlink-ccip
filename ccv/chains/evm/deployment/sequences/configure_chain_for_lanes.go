@@ -17,8 +17,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	seqtypes "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/fee_quoter"

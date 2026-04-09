@@ -22,7 +22,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 
 	adapters1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/adapters"
-	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/changesets"
+	v2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/testsetup"
 )
@@ -60,8 +60,8 @@ func TestLaneMigrator(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
-				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
-					Cfg: v1_7_0.DeployChainContractsCfg{
+				deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+					Cfg: v2_0_0.DeployChainContractsCfg{
 						ChainSel:         chainSel,
 						CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 						Params:           testsetup.CreateBasicContractParams(),

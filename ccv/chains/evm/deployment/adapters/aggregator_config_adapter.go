@@ -10,8 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/versioned_verifier_resolver"
 	cv "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )

@@ -11,9 +11,9 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/sequences/cctp"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 // MigrateHybridLockReleaseLiquidityConfig is the configuration for the MigrateHybridLockReleaseLiquidity changeset.

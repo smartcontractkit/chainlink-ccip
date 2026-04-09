@@ -34,7 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/adapters"
-	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/changesets"
+	v2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/testsetup"
@@ -66,7 +66,7 @@ func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, 
 }
 
 func TestTokenAdapter(t *testing.T) {
-	// v1.6.1 adapter is registered by its init() via the blank import of v1_7_0/adapters
+	// v1.6.1 adapter is registered by its init() via the blank import of v2_0_0/adapters
 	// (which transitively triggers v1_6_1/adapters init). No manual registration needed.
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
 	_, ok := tokenAdapterRegistry.GetTokenAdapter("evm", semver.MustParse("1.6.1"))
@@ -109,8 +109,8 @@ func TestTokenAdapter(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
-				deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
-					Cfg: v1_7_0.DeployChainContractsCfg{
+				deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+					Cfg: v2_0_0.DeployChainContractsCfg{
 						ChainSel:         chainSel,
 						CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 						Params:           testsetup.CreateBasicContractParams(),
@@ -405,8 +405,8 @@ func TestTokenExpansion(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
-			Cfg: v1_7_0.DeployChainContractsCfg{
+		deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+			Cfg: v2_0_0.DeployChainContractsCfg{
 				ChainSel:         chainSel,
 				CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 				Params:           testsetup.CreateBasicContractParams(),
