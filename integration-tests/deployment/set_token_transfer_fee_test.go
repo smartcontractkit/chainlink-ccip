@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmadaptersv2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/adapters"
-	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/token_pool"
+	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/token_pool"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
