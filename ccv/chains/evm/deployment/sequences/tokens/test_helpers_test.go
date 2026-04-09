@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"

@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 )
 
 // FilterOffRampAdds reads all currently registered OffRamps from the Router in a single call,
