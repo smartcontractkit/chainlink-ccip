@@ -227,10 +227,9 @@ func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version 
 	id := newTokenAdapterID(chainFamily, version)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("TokenAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetTokenAdapter retrieves a registered TokenAdapter for the given chain family and version.

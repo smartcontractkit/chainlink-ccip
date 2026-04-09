@@ -51,17 +51,16 @@ func newFeeAdapterRegistry() *FeeAdapterRegistry {
 	}
 }
 
-// RegisterFeeAdapter registers a new adapter; panics if the key already exists.
+// RegisterFeeAdapter registers a new adapter.
 func (r *FeeAdapterRegistry) RegisterFeeAdapter(chainFamily string, version *semver.Version, adapter FeeAdapter) {
 	id := newFeeAdapterID(chainFamily, version)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("FeeAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetFeeAdapter looks up an adapter; the second return value tells you if it was found.

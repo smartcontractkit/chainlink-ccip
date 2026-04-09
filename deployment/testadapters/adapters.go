@@ -48,8 +48,10 @@ type MessageComponents struct {
 	TokenAmounts []TokenAmount
 }
 
-const ExtraArgGasLimit = "gasLimit|computeUnits"
-const ExtraArgOOO = "outOfOrderExecutionEnabled"
+const (
+	ExtraArgGasLimit = "gasLimit|computeUnits"
+	ExtraArgOOO      = "outOfOrderExecutionEnabled"
+)
 
 // ExtraArgOpt is a generic representation of an extra arg that can be applied
 // to any kind of ccip message.
@@ -175,17 +177,16 @@ func newTestAdapterRegistry() *TestAdapterRegistry {
 	}
 }
 
-// RegisterTestAdapter registers a new adapter; panics if the key already exists.
+// RegisterTestAdapter registers a new adapter.
 func (r *TestAdapterRegistry) RegisterTestAdapter(chainFamily string, version *semver.Version, adapter TestAdapterFactory) {
 	id := newTestAdapterID(chainFamily, version)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("TestAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetTestAdapter looks up an adapter; the second return value tells you if it was found.
