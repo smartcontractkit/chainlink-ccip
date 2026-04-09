@@ -17,8 +17,8 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
-	ccvmocks "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
+	ccvmocks "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain/shared"
 )
@@ -298,6 +298,351 @@ func TestManageJobProposals_RevokeOrphanedJobsFalseSkipsRevoke(t *testing.T) {
 
 	_, err = cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
 	require.NoError(t, err)
+}
+
+// TestManageJobProposals_ModeChangeStandaloneToCLExpectJDProposal verifies that
+// when a NOP transitions from standalone to CL mode with the same spec,
+// the job IS detected as changed and proposed to JD.
+func TestManageJobProposals_ModeChangeStandaloneToCLExpectJDProposal(t *testing.T) {
+	nop := shared.NOPAlias("nop-1")
+	jid := jobID(nop, "executor-pool1")
+	spec := "type = 'ccvexecutor'\n"
+
+	mutableDS := datastore.NewMemoryDataStore()
+	err := offchain.SaveJobs(mutableDS, []shared.JobInfo{
+		{
+			JobID:         jid,
+			ExternalJobID: jid.ToExternalJobID(),
+			NOPAlias:      nop,
+			Mode:          shared.NOPModeStandalone,
+			Spec:          spec,
+			Proposals: map[string]shared.ProposalRevision{
+				"prop-1": {
+					ProposalID: "prop-1",
+					Revision:   1,
+					Status:     shared.JobProposalStatusApproved,
+					Spec:       spec,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	mockClient := ccvmocks.NewMockJDClient(t)
+	mockClient.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{{Id: "node-1", Name: string(nop)}}}, nil,
+	)
+	mockClient.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobv1.ProposeJobResponse{
+			Proposal: &jobv1.Proposal{Id: "prop-2", JobId: "jd-job-1", Spec: spec,
+				Status: jobv1.ProposalStatus_PROPOSAL_STATUS_PENDING, Revision: 2},
+		}, nil,
+	)
+
+	input := sequences.ManageJobProposalsInput{
+		JobSpecs: shared.NOPJobSpecs{
+			nop: {jid: spec},
+		},
+		NOPs: sequences.NOPContext{
+			Modes:      map[shared.NOPAlias]shared.NOPMode{nop: shared.NOPModeCL},
+			TargetNOPs: []shared.NOPAlias{nop},
+			AllNOPs:    []shared.NOPAlias{nop},
+		},
+	}
+	deps := sequences.ManageJobProposalsDeps{
+		Env: newMJPEnv(t, mockClient, mutableDS.Seal()),
+	}
+
+	report, err := cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
+	require.NoError(t, err)
+	require.Len(t, report.Output.Jobs, 1)
+	assert.Equal(t, shared.NOPModeCL, report.Output.Jobs[0].Mode)
+	assert.Equal(t, "jd-job-1", report.Output.Jobs[0].JDJobID)
+}
+
+// TestManageJobProposals_ModeChangeCLToStandaloneExpectModeUpdatedInDataStore verifies that
+// when a NOP transitions from CL to standalone mode with the same spec,
+// the job is detected as changed and saved with the new mode.
+func TestManageJobProposals_ModeChangeCLToStandaloneExpectModeUpdatedInDataStore(t *testing.T) {
+	nop := shared.NOPAlias("nop-1")
+	jid := jobID(nop, "executor-pool1")
+	spec := "type = 'ccvexecutor'\n"
+
+	mutableDS := datastore.NewMemoryDataStore()
+	err := offchain.SaveJobs(mutableDS, []shared.JobInfo{
+		{
+			JobID:         jid,
+			ExternalJobID: jid.ToExternalJobID(),
+			NOPAlias:      nop,
+			Mode:          shared.NOPModeCL,
+			JDJobID:       "jd-job-1",
+			NodeID:        "node-1",
+			Spec:          spec,
+			Proposals: map[string]shared.ProposalRevision{
+				"prop-1": {
+					ProposalID: "prop-1",
+					Revision:   1,
+					Status:     shared.JobProposalStatusApproved,
+					Spec:       spec,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	input := sequences.ManageJobProposalsInput{
+		JobSpecs: shared.NOPJobSpecs{
+			nop: {jid: spec},
+		},
+		NOPs: sequences.NOPContext{
+			Modes:      map[shared.NOPAlias]shared.NOPMode{nop: shared.NOPModeStandalone},
+			TargetNOPs: []shared.NOPAlias{nop},
+			AllNOPs:    []shared.NOPAlias{nop},
+		},
+	}
+	deps := sequences.ManageJobProposalsDeps{
+		Env: newMJPEnv(t, nil, mutableDS.Seal()),
+	}
+
+	report, err := cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
+	require.NoError(t, err)
+	require.Len(t, report.Output.Jobs, 1)
+	assert.Equal(t, shared.NOPModeStandalone, report.Output.Jobs[0].Mode)
+
+	savedJobs, err := offchain.GetAllJobs(report.Output.DataStore.Seal())
+	require.NoError(t, err)
+	savedJob := savedJobs[nop][jid]
+	assert.Equal(t, shared.NOPModeStandalone, savedJob.Mode)
+}
+
+func TestManageJobProposals_CLToStandaloneTransition_WithRevokeFlag_RevokesOldCLJobAndClearsMetadata(t *testing.T) {
+	nop := shared.NOPAlias("nop-1")
+	jid := jobID(nop, "executor-pool1")
+	spec := "type = 'ccvexecutor'\n"
+
+	mutableDS := datastore.NewMemoryDataStore()
+	err := offchain.SaveJobs(mutableDS, []shared.JobInfo{
+		{
+			JobID:            jid,
+			ExternalJobID:    jid.ToExternalJobID(),
+			NOPAlias:         nop,
+			Mode:             shared.NOPModeCL,
+			JDJobID:          "jd-job-1",
+			NodeID:           "node-1",
+			ActiveProposalID: "prop-1",
+			Spec:             spec,
+			Proposals: map[string]shared.ProposalRevision{
+				"prop-1": {
+					ProposalID: "prop-1",
+					Revision:   1,
+					Status:     shared.JobProposalStatusApproved,
+					Spec:       spec,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	mockClient := ccvmocks.NewMockJDClient(t)
+	mockClient.EXPECT().RevokeJob(mock.Anything, mock.Anything).Return(
+		&jobv1.RevokeJobResponse{}, nil,
+	)
+
+	input := sequences.ManageJobProposalsInput{
+		JobSpecs: shared.NOPJobSpecs{
+			nop: {jid: spec},
+		},
+		RevokeOrphanedJobs: true,
+		AffectedScope:      shared.ExecutorJobScope{ExecutorQualifier: "pool1"},
+		NOPs: sequences.NOPContext{
+			Modes:      map[shared.NOPAlias]shared.NOPMode{nop: shared.NOPModeStandalone},
+			TargetNOPs: []shared.NOPAlias{nop},
+			AllNOPs:    []shared.NOPAlias{nop},
+		},
+	}
+	deps := sequences.ManageJobProposalsDeps{
+		Env: newMJPEnv(t, mockClient, mutableDS.Seal()),
+	}
+
+	report, err := cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
+	require.NoError(t, err)
+	require.Len(t, report.Output.Jobs, 1)
+
+	savedJobs, err := offchain.GetAllJobs(report.Output.DataStore.Seal())
+	require.NoError(t, err)
+	savedJob := savedJobs[nop][jid]
+	assert.Equal(t, shared.NOPModeStandalone, savedJob.Mode)
+	assert.Empty(t, savedJob.JDJobID, "JD metadata must be cleared after CL-to-standalone transition")
+	assert.Empty(t, savedJob.NodeID, "JD metadata must be cleared after CL-to-standalone transition")
+	assert.Empty(t, savedJob.ActiveProposalID, "JD metadata must be cleared after CL-to-standalone transition")
+	assert.Nil(t, savedJob.Proposals, "JD metadata must be cleared after CL-to-standalone transition")
+}
+
+func TestManageJobProposals_CLToStandaloneTransition_WithoutRevokeFlag_ClearsMetadataButSkipsJDRevoke(t *testing.T) {
+	nop := shared.NOPAlias("nop-1")
+	jid := jobID(nop, "executor-pool1")
+	spec := "type = 'ccvexecutor'\n"
+
+	mutableDS := datastore.NewMemoryDataStore()
+	err := offchain.SaveJobs(mutableDS, []shared.JobInfo{
+		{
+			JobID:            jid,
+			ExternalJobID:    jid.ToExternalJobID(),
+			NOPAlias:         nop,
+			Mode:             shared.NOPModeCL,
+			JDJobID:          "jd-job-1",
+			NodeID:           "node-1",
+			ActiveProposalID: "prop-1",
+			Spec:             spec,
+			Proposals: map[string]shared.ProposalRevision{
+				"prop-1": {
+					ProposalID: "prop-1",
+					Revision:   1,
+					Status:     shared.JobProposalStatusApproved,
+					Spec:       spec,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	mockClient := ccvmocks.NewMockJDClient(t)
+	// RevokeJob must NOT be called — mockClient will fail if any unexpected call is made.
+
+	input := sequences.ManageJobProposalsInput{
+		JobSpecs: shared.NOPJobSpecs{
+			nop: {jid: spec},
+		},
+		RevokeOrphanedJobs: false,
+		AffectedScope:      shared.ExecutorJobScope{ExecutorQualifier: "pool1"},
+		NOPs: sequences.NOPContext{
+			Modes:      map[shared.NOPAlias]shared.NOPMode{nop: shared.NOPModeStandalone},
+			TargetNOPs: []shared.NOPAlias{nop},
+			AllNOPs:    []shared.NOPAlias{nop},
+		},
+	}
+	deps := sequences.ManageJobProposalsDeps{
+		Env: newMJPEnv(t, mockClient, mutableDS.Seal()),
+	}
+
+	report, err := cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
+	require.NoError(t, err)
+	require.Len(t, report.Output.Jobs, 1)
+
+	savedJobs, err := offchain.GetAllJobs(report.Output.DataStore.Seal())
+	require.NoError(t, err)
+	savedJob := savedJobs[nop][jid]
+	assert.Equal(t, shared.NOPModeStandalone, savedJob.Mode)
+	assert.Empty(t, savedJob.JDJobID, "JD metadata must be cleared even without revoke flag")
+	assert.Empty(t, savedJob.NodeID, "JD metadata must be cleared even without revoke flag")
+	assert.Empty(t, savedJob.ActiveProposalID, "JD metadata must be cleared even without revoke flag")
+	assert.Nil(t, savedJob.Proposals, "JD metadata must be cleared even without revoke flag")
+}
+
+func TestManageJobProposals_RevokedOrphanCleanedFromDatastoreWithoutJDCall(t *testing.T) {
+	nop := shared.NOPAlias("nop-1")
+	orphanJID := shared.NewExecutorJobID(nop, shared.ExecutorJobScope{ExecutorQualifier: "old-pool"}).ToJobID()
+
+	mutableDS := datastore.NewMemoryDataStore()
+	err := offchain.SaveJobs(mutableDS, []shared.JobInfo{
+		{
+			JobID:    orphanJID,
+			JDJobID:  "jd-job-orphan",
+			NodeID:   "node-1",
+			NOPAlias: nop,
+			Mode:     shared.NOPModeCL,
+			Spec:     "type = 'ccvexecutor'\n",
+			Proposals: map[string]shared.ProposalRevision{
+				"p1": {ProposalID: "p1", Status: shared.JobProposalStatusRevoked},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	mockClient := ccvmocks.NewMockJDClient(t)
+	// RevokeJob must NOT be called for an already-revoked job
+
+	input := sequences.ManageJobProposalsInput{
+		JobSpecs:           shared.NOPJobSpecs{},
+		RevokeOrphanedJobs: true,
+		AffectedScope:      shared.ExecutorJobScope{ExecutorQualifier: "old-pool"},
+		NOPs: sequences.NOPContext{
+			Modes:      map[shared.NOPAlias]shared.NOPMode{nop: shared.NOPModeCL},
+			TargetNOPs: []shared.NOPAlias{nop},
+			AllNOPs:    []shared.NOPAlias{nop},
+		},
+	}
+	deps := sequences.ManageJobProposalsDeps{
+		Env: newMJPEnv(t, mockClient, mutableDS.Seal()),
+	}
+
+	report, err := cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
+	require.NoError(t, err)
+	assert.Len(t, report.Output.RevokedJobs, 1, "revoked orphan should be in cleanup list")
+
+	allJobs, err := offchain.GetAllJobs(report.Output.DataStore.Seal())
+	require.NoError(t, err)
+	assert.Empty(t, allJobs[nop], "orphaned job should be deleted from datastore")
+}
+
+// TestManageJobProposals_UnchangedCLJobExpectJDMetadataPreserved verifies that
+// when a CL-mode job is re-submitted with the same spec (no change),
+// the existing JD metadata (jdJobId, nodeId, proposals) is preserved
+// in the output DataStore rather than being wiped.
+func TestManageJobProposals_UnchangedCLJobExpectJDMetadataPreserved(t *testing.T) {
+	nop := shared.NOPAlias("nop-1")
+	jid := jobID(nop, "executor-pool1")
+	spec := "type = 'ccvexecutor'\n"
+
+	mutableDS := datastore.NewMemoryDataStore()
+	err := offchain.SaveJobs(mutableDS, []shared.JobInfo{
+		{
+			JobID:         jid,
+			ExternalJobID: jid.ToExternalJobID(),
+			NOPAlias:      nop,
+			Mode:          shared.NOPModeCL,
+			JDJobID:       "jd-job-1",
+			NodeID:        "node-1",
+			Spec:          spec,
+			Proposals: map[string]shared.ProposalRevision{
+				"prop-1": {
+					ProposalID: "prop-1",
+					Revision:   1,
+					Status:     shared.JobProposalStatusApproved,
+					Spec:       spec,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	mockClient := ccvmocks.NewMockJDClient(t)
+
+	input := sequences.ManageJobProposalsInput{
+		JobSpecs: shared.NOPJobSpecs{
+			nop: {jid: spec},
+		},
+		NOPs: sequences.NOPContext{
+			Modes:      map[shared.NOPAlias]shared.NOPMode{nop: shared.NOPModeCL},
+			TargetNOPs: []shared.NOPAlias{nop},
+			AllNOPs:    []shared.NOPAlias{nop},
+		},
+	}
+	deps := sequences.ManageJobProposalsDeps{
+		Env: newMJPEnv(t, mockClient, mutableDS.Seal()),
+	}
+
+	report, err := cldf_ops.ExecuteSequence(newMJPBundle(t), sequences.ManageJobProposals, deps, input)
+	require.NoError(t, err)
+
+	savedJobs, err := offchain.GetAllJobs(report.Output.DataStore.Seal())
+	require.NoError(t, err)
+
+	savedJob := savedJobs[nop][jid]
+	assert.Equal(t, "jd-job-1", savedJob.JDJobID, "jdJobId must be preserved for unchanged jobs")
+	assert.Equal(t, "node-1", savedJob.NodeID, "nodeId must be preserved for unchanged jobs")
+	require.Len(t, savedJob.Proposals, 1, "proposals must be preserved for unchanged jobs")
+	assert.Equal(t, "prop-1", savedJob.Proposals["prop-1"].ProposalID)
 }
 
 // TestManageJobProposals_RevokeOrphanedJobsTrueRevokesViaCL verifies that

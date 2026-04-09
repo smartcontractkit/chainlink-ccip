@@ -55,7 +55,7 @@ type ProposalRevision struct {
 // JobInfo contains all metadata about a job and its proposal history.
 type JobInfo struct {
 	JobID         JobID    `json:"jobId"`
-	JDJobID       string   `json:"jdJobId"`
+	JDJobID       string   `json:"jdJobId,omitempty"`
 	ExternalJobID string   `json:"externalJobId"`
 	NOPAlias      NOPAlias `json:"nopAlias"`
 	NodeID        string   `json:"nodeId,omitempty"`

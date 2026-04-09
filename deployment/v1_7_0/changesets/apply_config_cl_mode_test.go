@@ -1017,6 +1017,151 @@ func TestApplyExecutorConfig_RevokeOrphanedJobsDoesNotAffectVerifierJobs(t *test
 	assert.True(t, hasVerifier, "verifier job must remain after executor revoke orphaned")
 }
 
+func TestApplyVerifierConfig_TargetNOPsSucceedsWhenNonTargetedNOPMissingFromJD(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+
+	verifierAdapter := &mockVerifierJobConfigAdapter{
+		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
+			sel1: {
+				CommitteeVerifierAddress: "0xCommitteeVerifier",
+				OnRampAddress:            "0xOnRamp",
+				ExecutorProxyAddress:     "0xExecutorProxy",
+				RMNRemoteAddress:         "0xRMNRemote",
+			},
+		},
+	}
+	registry := adapters.NewVerifierConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
+
+	topo := &offchain.EnvironmentTopology{
+		IndexerAddress: []string{"http://indexer:8080"},
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{
+					Alias:                 "nop1",
+					Name:                  "nop1-name",
+					Mode:                  shared.NOPModeCL,
+					SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xabc123"},
+				},
+				{
+					Alias: "nop2",
+					Name:  "nop2-name",
+					Mode:  shared.NOPModeCL,
+				},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"c1": {
+					Qualifier: "c1",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						fmt.Sprintf("%d", sel1): {NOPAliases: []string{"nop1", "nop2"}, Threshold: 1},
+					},
+					Aggregators: []offchain.AggregatorConfig{{Name: "agg-1", Address: "ws://agg:9090"}},
+				},
+			},
+		},
+		ExecutorPools: map[string]offchain.ExecutorPoolConfig{},
+	}
+
+	env := newVerifierTestEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{
+			Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop1"}},
+		}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{
+			ChainConfigs: []*nodev1.ChainConfig{chainConfig("node-1", "90000001")},
+		}, nil,
+	).Maybe()
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "prop-1"}}, nil,
+	).Maybe()
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1"}
+
+	cs := changesets.ApplyVerifierConfig(registry)
+	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
+		Topology:                 topo,
+		CommitteeQualifier:       "c1",
+		DefaultExecutorQualifier: "pool1",
+		TargetNOPs:               []shared.NOPAlias{"nop1"},
+	})
+	require.NoError(t, err, "targeted NOP (nop1) has a signer and is in NodeIDs; untargeted nop2 must not prevent the config")
+}
+
+func TestApplyVerifierConfig_UntargetedNOPMissingSignerDoesNotBlockTargetedNOPs(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+
+	verifierAdapter := &mockVerifierJobConfigAdapter{
+		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
+			sel1: {
+				CommitteeVerifierAddress: "0xCommitteeVerifier",
+				OnRampAddress:            "0xOnRamp",
+				ExecutorProxyAddress:     "0xExecutorProxy",
+				RMNRemoteAddress:         "0xRMNRemote",
+			},
+		},
+	}
+	registry := adapters.NewVerifierConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
+
+	topo := &offchain.EnvironmentTopology{
+		IndexerAddress: []string{"http://indexer:8080"},
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{
+					Alias: "nop1",
+					Name:  "nop1-name",
+					Mode:  shared.NOPModeCL,
+				},
+				{
+					Alias: "nop2",
+					Name:  "nop2-name",
+					Mode:  shared.NOPModeCL,
+				},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				"c1": {
+					Qualifier: "c1",
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						fmt.Sprintf("%d", sel1): {NOPAliases: []string{"nop1", "nop2"}, Threshold: 1},
+					},
+					Aggregators: []offchain.AggregatorConfig{{Name: "agg-1", Address: "ws://agg:9090"}},
+				},
+			},
+		},
+		ExecutorPools: map[string]offchain.ExecutorPoolConfig{},
+	}
+
+	env := newVerifierTestEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{
+			Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop1"}},
+		}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{
+			ChainConfigs: []*nodev1.ChainConfig{chainConfig("node-1", "90000001")},
+		}, nil,
+	).Maybe()
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "prop-1"}}, nil,
+	).Maybe()
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1"}
+
+	cs := changesets.ApplyVerifierConfig(registry)
+	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
+		Topology:                 topo,
+		CommitteeQualifier:       "c1",
+		DefaultExecutorQualifier: "pool1",
+		TargetNOPs:               []shared.NOPAlias{"nop1"},
+	})
+	require.NoError(t, err, "nop1 is targeted and in NodeIDs; nop2 missing signer+NodeID must not block nop1")
+}
+
 func TestApplyVerifierConfig_WrapperPassesTargetNOPsAndRevokeOrphanedJobsToSequence(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	verifierAdapter := &mockVerifierJobConfigAdapter{
