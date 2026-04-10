@@ -98,7 +98,7 @@ tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("2.0.0"), evm1_7_0.
 tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), evm1_5_1.TokenAdapter{})
 tokenAdapterReg.RegisterTokenAdapter("solana", semver.MustParse("1.6.2"), solana1_6_2.TokenAdapter{})
 
-// We would have a separate chain adapter registry for v1_7_0.
+// We would have a separate chain adapter registry for v2_0_0.
 // We only have a single adapter registry for tokens because tokens must be backwards compatible.
 // You must be able to connect any token pool version to any other token pool version.
 chainAdapterReg1_6_0 := chains1_6_0.NewChainAdapterRegistry()
