@@ -46,7 +46,7 @@ pub struct CcipSend<'info> {
         associated_token::mint = ccip_fee_token_mint.key(),
         associated_token::token_program = ccip_fee_token_program.key(),
     )]
-    pub authority_fee_token_ata: InterfaceAccount<'info, TokenAccount>,
+    pub authority_fee_token_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
@@ -70,21 +70,21 @@ pub struct CcipSend<'info> {
     #[account(
         owner = ccip_fee_token_program.key(),
     )]
-    pub ccip_fee_token_mint: InterfaceAccount<'info, Mint>,
+    pub ccip_fee_token_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         associated_token::authority = ccip_sender.key(),
         associated_token::mint = ccip_fee_token_mint.key(),
         associated_token::token_program = ccip_fee_token_program.key(),
     )]
-    pub ccip_fee_token_user_ata: InterfaceAccount<'info, TokenAccount>,
+    pub ccip_fee_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::authority = ccip_fee_billing_signer.key(),
         associated_token::mint = ccip_fee_token_mint.key(),
         associated_token::token_program = ccip_fee_token_program.key(),
     )]
-    pub ccip_fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
+    pub ccip_fee_token_receiver: Box<InterfaceAccount<'info, TokenAccount>>,
     /// CHECK: validated during CPI
     pub ccip_fee_billing_signer: UncheckedAccount<'info>,
     /// CHECK: validated during CPI
