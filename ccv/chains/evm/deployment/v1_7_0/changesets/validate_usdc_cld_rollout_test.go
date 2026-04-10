@@ -86,6 +86,34 @@ func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidMechanism(t *testing.
 	assert.Contains(t, err.Error(), "unsupported mechanism")
 }
 
+func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidTokenPoolKind(t *testing.T) {
+	env := newValidateUSDCCLDTestEnv(t)
+	cfg := validValidateUSDCCLDRolloutConfig()
+	chainCfg := cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector]
+	chainCfg.ExpectedTokenPoolKind = &changesets.ValidateUSDCCLDRolloutPoolKindConfig{Kind: "BAD_POOL_KIND"}
+	cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector] = chainCfg
+
+	err := validateUSDCCLDCS().VerifyPreconditions(env, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported pool kind")
+}
+
+func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidRemotePoolKind(t *testing.T) {
+	env := newValidateUSDCCLDTestEnv(t)
+	cfg := validValidateUSDCCLDRolloutConfig()
+	chainCfg := cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector]
+	remoteCfg := chainCfg.RemoteChains[chainsel.POLYGON_MAINNET.Selector]
+	remoteCfg.ExpectedRemotePoolKinds = []changesets.ValidateUSDCCLDRolloutPoolKindConfig{
+		{Kind: "BAD_POOL_KIND"},
+	}
+	chainCfg.RemoteChains[chainsel.POLYGON_MAINNET.Selector] = remoteCfg
+	cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector] = chainCfg
+
+	err := validateUSDCCLDCS().VerifyPreconditions(env, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported pool kind")
+}
+
 func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidLiquidityAmount(t *testing.T) {
 	env := newValidateUSDCCLDTestEnv(t)
 	cfg := changesets.ValidateUSDCCLDRolloutConfig{
