@@ -81,8 +81,6 @@ flowchart LR
 	chainlink-ccip --> chainlink-evm/gethwrappers/helpers
 	chainlink-ccip --> chainlink-protos/rmn/v1.6/go
 	click chainlink-ccip href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-ccip/ccv/chains/evm/deployment --> chainlink-ccip/chains/evm/deployment
-	click chainlink-ccip/ccv/chains/evm/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/evm/deployment --> ccip-contract-examples/chains/evm
 	chainlink-ccip/chains/evm/deployment --> chainlink-ccip/deployment
 	click chainlink-ccip/chains/evm/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
@@ -102,7 +100,7 @@ flowchart LR
 	chainlink-ccip/devenv --> chainlink-ccip/chains/solana/deployment
 	chainlink-ccip/devenv --> chainlink-ton/devenv
 	click chainlink-ccip/devenv href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-ccip/integration-tests --> chainlink-ccip/ccv/chains/evm/deployment
+	chainlink-ccip/integration-tests --> chainlink-ccip/chains/evm/deployment
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/integration-tests href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-common --> chainlink-common/pkg/chipingress
@@ -209,7 +207,6 @@ flowchart LR
 
 	subgraph chainlink-ccip-repo[chainlink-ccip]
 		 chainlink-ccip
-		 chainlink-ccip/ccv/chains/evm/deployment
 		 chainlink-ccip/chains/evm/deployment
 		 chainlink-ccip/chains/solana
 		 chainlink-ccip/chains/solana/deployment
