@@ -10,14 +10,15 @@ import (
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -123,6 +124,23 @@ var DeployToken = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC20WithDrip token: %w", err)
 			}
+
+		case tip20.ContractType:
+			report, err := cldf_ops.ExecuteSequence(b, tip20.Deploy, chain, tip20.FactoryDeployArgs{
+				QuoteToken: common.Address{}, // defaults to sensible value
+				Currency:   "",               // defaults to sensible value
+				Salt:       [32]byte{},       // defaults to random salt
+				Symbol:     input.Symbol,
+				Admin:      common.HexToAddress(input.ExternalAdmin),
+				Name:       input.Name,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TIP20 token via factory: %w", err)
+			}
+			if len(report.Output.Addresses) == 0 {
+				return sequences.OnChainOutput{}, errors.New("no address returned from TIP20 factory deployment")
+			}
+			tokenRef = report.Output.Addresses[0]
 
 		default:
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type: %s", input.Type)
