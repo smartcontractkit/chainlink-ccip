@@ -124,7 +124,7 @@ func TestApplyVerifierConfig_GeneratesValidJobSpec(t *testing.T) {
 
 	assert.Contains(t, spec, `schemaVersion = 1`)
 	assert.Contains(t, spec, `type = "ccvcommitteeverifier"`)
-	assert.Contains(t, spec, `committeeVerifierConfig = """`)
+	assert.Contains(t, spec, `committeeVerifierConfig = '''`)
 	assert.Contains(t, spec, fmt.Sprintf("%d", sel1))
 	assert.Contains(t, spec, "0xCommitteeVerifier")
 	assert.Contains(t, spec, "0xOnRamp")
