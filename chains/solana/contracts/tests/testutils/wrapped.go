@@ -138,9 +138,10 @@ func MustDeserializeExtraArgs[A any](t *testing.T, obj A, data []byte, tag strin
 	return obj
 }
 
-// RetryOnStaleSlot retries the given function on "not a recent slot" errors,
-// which can occur when the finalized slot lags behind the current slot under validator load.
-func RetryOnStaleSlot(t *testing.T, maxRetries int, fn func() error) {
+// RetryIfErrContains runs fn, retrying up to maxRetries times when the returned
+// error contains errSubstring. Useful for transient validator issues like
+// "not a recent slot" during lookup table initialization under load.
+func RetryIfErrContains(t *testing.T, maxRetries int, errSubstring string, fn func() error) {
 	t.Helper()
 	var err error
 	for attempt := range maxRetries {
@@ -148,11 +149,11 @@ func RetryOnStaleSlot(t *testing.T, maxRetries int, fn func() error) {
 		if err == nil {
 			return
 		}
-		if !strings.Contains(err.Error(), "not a recent slot") {
+		if !strings.Contains(err.Error(), errSubstring) {
 			break
 		}
 		if attempt < maxRetries-1 {
-			t.Logf("stale slot (attempt %d/%d), retrying...", attempt+1, maxRetries)
+			t.Logf("transient error %q (attempt %d/%d), retrying...", errSubstring, attempt+1, maxRetries)
 			time.Sleep(100 * time.Millisecond)
 		}
 	}

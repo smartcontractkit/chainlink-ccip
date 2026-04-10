@@ -601,13 +601,13 @@ func TestCCIPRouter(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAta0, ixAta1, ixAuth, ixAta2, ixAtaLink}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin, legacyAdmin))
 
 			// Lookup Table for Tokens
-			testutils.RetryOnStaleSlot(t, 5, func() error { return token0.SetupLookupTable(ctx, solanaGoClient, token0PoolAdmin) })
+			testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error { return token0.SetupLookupTable(ctx, solanaGoClient, token0PoolAdmin) })
 			token0Entries := token0.ToTokenPoolEntries()
-			testutils.RetryOnStaleSlot(t, 5, func() error { return token1.SetupLookupTable(ctx, solanaGoClient, token1PoolAdmin) })
+			testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error { return token1.SetupLookupTable(ctx, solanaGoClient, token1PoolAdmin) })
 			token1Entries := token1.ToTokenPoolEntries()
-			testutils.RetryOnStaleSlot(t, 5, func() error { return token2.SetupLookupTable(ctx, solanaGoClient, token2PoolAdmin) })
+			testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error { return token2.SetupLookupTable(ctx, solanaGoClient, token2PoolAdmin) })
 			token2Entries := token2.ToTokenPoolEntries()
-			testutils.RetryOnStaleSlot(t, 5, func() error { return linkPool.SetupLookupTable(ctx, solanaGoClient, legacyAdmin) })
+			testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error { return linkPool.SetupLookupTable(ctx, solanaGoClient, legacyAdmin) })
 			link22Entries := linkPool.ToTokenPoolEntries()
 
 			// Verify Lookup tables where correctly initialized
@@ -700,7 +700,7 @@ func TestCCIPRouter(t *testing.T) {
 				usdcPool.WritableIndexes = append(usdcPool.WritableIndexes, 10, 16)
 
 				// Lookup Table for Tokens
-				testutils.RetryOnStaleSlot(t, 5, func() error { return usdcPool.SetupLookupTable(ctx, solanaGoClient, usdcPoolAdmin) })
+				testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error { return usdcPool.SetupLookupTable(ctx, solanaGoClient, usdcPoolAdmin) })
 				usdcEntries := usdcPool.ToTokenPoolEntries()
 
 				// Verify Lookup tables where correctly initialized
@@ -740,7 +740,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.billingATA,
 			}
 			var lookupTableAddr solana.PublicKey
-			testutils.RetryOnStaleSlot(t, 5, func() error {
+			testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error {
 				var err error
 				lookupTableAddr, err = common.SetupLookupTable(ctx, solanaGoClient, legacyAdmin, lookupEntries)
 				return err
@@ -778,7 +778,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.fqBillingConfigPDA,
 				link22.fqEvmConfigPDA,
 			}
-			testutils.RetryOnStaleSlot(t, 5, func() error {
+			testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error {
 				var err error
 				offrampLookupTableAddr, err = common.SetupLookupTable(ctx, solanaGoClient, legacyAdmin, lookupEntries)
 				return err
