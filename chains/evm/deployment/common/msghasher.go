@@ -14,6 +14,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -30,18 +31,6 @@ var (
 	ANY_2_EVM_MESSAGE_HASH = utils.Keccak256Fixed([]byte("Any2EVMMessageHashV1"))
 
 	messageHasherABI = types.MustGetABI(message_hasher.MessageHasherABI)
-
-	// bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
-	evmExtraArgsV1Tag = hexutil.MustDecode("0x97a657c9")
-
-	// bytes4 public constant EVM_EXTRA_ARGS_V2_TAG = 0x181dcf10;
-	evmExtraArgsV2Tag = hexutil.MustDecode("0x181dcf10")
-
-	// bytes4 public constant SVM_EXTRA_EXTRA_ARGS_V1_TAG = 0x1f3b3aba
-	svmExtraArgsV1Tag = hexutil.MustDecode("0x1f3b3aba")
-
-	// bytes4 public constant SUI_EXTRA_ARGS_V1_TAG = 0x21ea4ca9
-	suiVMExtraArgsV1Tag = hexutil.MustDecode("0x21ea4ca9")
 )
 
 // MessageHasherV1 implements the MessageHasher interface.
@@ -315,25 +304,43 @@ func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 	return 0, errors.New("invalid token message, dest gas amount not found in the DestExecDataDecoded map")
 }
 
-func SerializeExtraArgs(tag []byte, method string, inputs ...any) ([]byte, error) {
+func serializeExtraArgs(tag []byte, method string, inputs ...any) ([]byte, error) {
 	v, err := messageHasherABI.Methods[method].Inputs.Pack(inputs...)
 	return append(tag, v...), err
 }
 
-func SerializeEVMExtraArgsV1(data message_hasher.ClientEVMExtraArgsV1) ([]byte, error) {
-	return SerializeExtraArgs(evmExtraArgsV1Tag, "encodeEVMExtraArgsV1", data)
+func SerializeEVMExtraArgsV1(data extraargs.ClientEVMExtraArgsV1) ([]byte, error) {
+	return serializeExtraArgs(extraargs.EVMExtraArgsV1Tag, "encodeEVMExtraArgsV1",
+		message_hasher.ClientEVMExtraArgsV1{GasLimit: data.GasLimit})
 }
 
-func SerializeClientGenericExtraArgsV2(data message_hasher.ClientGenericExtraArgsV2) ([]byte, error) {
-	return SerializeExtraArgs(evmExtraArgsV2Tag, "encodeGenericExtraArgsV2", data)
+func SerializeClientGenericExtraArgsV2(data extraargs.ClientGenericExtraArgsV2) ([]byte, error) {
+	return serializeExtraArgs(extraargs.GenericExtraArgsV2Tag, "encodeGenericExtraArgsV2",
+		message_hasher.ClientGenericExtraArgsV2{
+			GasLimit:                 data.GasLimit,
+			AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+		})
 }
 
-func SerializeClientSVMExtraArgsV1(data message_hasher.ClientSVMExtraArgsV1) ([]byte, error) {
-	return SerializeExtraArgs(svmExtraArgsV1Tag, "encodeSVMExtraArgsV1", data)
+func SerializeClientSVMExtraArgsV1(data extraargs.ClientSVMExtraArgsV1) ([]byte, error) {
+	return serializeExtraArgs(extraargs.SVMExtraArgsV1Tag, "encodeSVMExtraArgsV1",
+		message_hasher.ClientSVMExtraArgsV1{
+			ComputeUnits:             data.ComputeUnits,
+			AccountIsWritableBitmap:  data.AccountIsWritableBitmap,
+			AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+			TokenReceiver:            data.TokenReceiver,
+			Accounts:                 data.Accounts,
+		})
 }
 
-func SerializeClientSUIExtraArgsV1(data message_hasher.ClientSuiExtraArgsV1) ([]byte, error) {
-	return SerializeExtraArgs(suiVMExtraArgsV1Tag, "encodeSUIExtraArgsV1", data)
+func SerializeClientSUIExtraArgsV1(data extraargs.ClientSuiExtraArgsV1) ([]byte, error) {
+	return serializeExtraArgs(extraargs.SUIExtraArgsV1Tag, "encodeSUIExtraArgsV1",
+		message_hasher.ClientSuiExtraArgsV1{
+			GasLimit:                 data.GasLimit,
+			AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+			TokenReceiver:            data.TokenReceiver,
+			ReceiverObjectIds:        data.ReceiverObjectIds,
+		})
 }
 
 // Interface compliance check

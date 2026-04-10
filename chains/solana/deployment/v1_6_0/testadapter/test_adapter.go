@@ -48,8 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
-	ccipcommon "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/common"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 )
 
 var (
@@ -402,7 +401,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		extraArgs := msg_hasher163.ClientSVMExtraArgsV1{
+		extraArgs := extraargs.ClientSVMExtraArgsV1{
 			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts:                 accounts,
 			TokenReceiver:            receiverProgram,
@@ -427,7 +426,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 				// unsupported arg
 			}
 		}
-		return ccipcommon.SerializeClientSVMExtraArgsV1(extraArgs)
+		return extraargs.SerializeClientSVMExtraArgsV1(extraArgs)
 	case chain_selectors.FamilySolana:
 		panic("unimplemented GetExtraArgs(solana->solana)")
 	case chain_selectors.FamilyTon:

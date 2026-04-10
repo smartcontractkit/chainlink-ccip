@@ -36,8 +36,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	ccipcommon "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/common"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -307,7 +307,7 @@ func (a *EVMAdapter) NativeFeeToken() string {
 func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		extraArgs := msg_hasher163.ClientGenericExtraArgsV2{
+		extraArgs := extraargs.ClientGenericExtraArgsV2{
 			GasLimit:                 new(big.Int).SetUint64(100_000),
 			AllowOutOfOrderExecution: true,
 		}
