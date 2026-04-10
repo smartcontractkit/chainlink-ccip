@@ -59,7 +59,7 @@ var Deploy = operations.NewSequence(
 	Version,
 	"Deploys a TIP20 token via the TIP20 factory. Only applicable for Tempo testnet / mainnet.",
 	func(b operations.Bundle, chain evm.Chain, input FactoryDeployArgs) (sequences.OnChainOutput, error) {
-		isTempoTestnet := chainsel.TEMPO_TESTNET.Selector == chain.Selector
+		isTempoTestnet := chainsel.TEMPO_TESTNET_MODERATO.Selector == chain.Selector || chainsel.TEMPO_TESTNET.Selector == chain.Selector
 		isTempoMainnet := chainsel.TEMPO_MAINNET.Selector == chain.Selector
 		if !isTempoTestnet && !isTempoMainnet {
 			return sequences.OnChainOutput{}, errors.New("TIP20 token deployment is only supported on Tempo testnet and mainnet")
