@@ -76,6 +76,20 @@ var DeployToken = cldf_ops.NewSequence(
 			preMint = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
 		}
 
+		externalAdmin := common.Address{}
+		if input.ExternalAdmin != "" && !common.IsHexAddress(input.ExternalAdmin) {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid external admin address: %s", input.ExternalAdmin)
+		} else {
+			externalAdmin = common.HexToAddress(input.ExternalAdmin)
+		}
+
+		ccipAdmin := common.Address{}
+		if input.CCIPAdmin != "" && !common.IsHexAddress(input.CCIPAdmin) {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid CCIP admin address: %s", input.CCIPAdmin)
+		} else {
+			ccipAdmin = common.HexToAddress(input.CCIPAdmin)
+		}
+
 		switch input.Type {
 		case erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, erc20.Deploy, chain, contract.DeployInput[erc20.ConstructorArgs]{
@@ -131,7 +145,7 @@ var DeployToken = cldf_ops.NewSequence(
 				Currency:   "",               // defaults to sensible value
 				Salt:       [32]byte{},       // defaults to random salt
 				Symbol:     input.Symbol,
-				Admin:      common.HexToAddress(input.ExternalAdmin),
+				Admin:      externalAdmin,
 				Name:       input.Name,
 			})
 			if err != nil {
@@ -179,7 +193,7 @@ var DeployToken = cldf_ops.NewSequence(
 			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
 				ChainSelector: chain.Selector,
 				Address:       tokenAddr,
-				Args:          input.CCIPAdmin,
+				Args:          ccipAdmin.Hex(),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCIP admin: %w", err)
@@ -202,7 +216,7 @@ var DeployToken = cldf_ops.NewSequence(
 				Address:       tokenAddr,
 				Args: burn_mint_erc20.RoleAssignment{
 					Role: role,
-					To:   common.HexToAddress(input.ExternalAdmin),
+					To:   externalAdmin,
 				},
 			})
 			if err != nil {
