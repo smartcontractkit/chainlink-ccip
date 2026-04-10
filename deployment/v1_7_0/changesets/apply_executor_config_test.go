@@ -390,7 +390,7 @@ func extractExecutorChainSelectors(t *testing.T, ds datastore.DataStore, nopAlia
 
 func extractExecutorConfig(t *testing.T, jobSpec string) string {
 	t.Helper()
-	const marker = "executorConfig = \"\"\"\n"
+	const marker = "executorConfig = '''\n"
 	start := len(jobSpec)
 	for i := 0; i < len(jobSpec)-len(marker); i++ {
 		if jobSpec[i:i+len(marker)] == marker {
@@ -400,7 +400,7 @@ func extractExecutorConfig(t *testing.T, jobSpec string) string {
 	}
 	end := len(jobSpec)
 	for i := start; i < len(jobSpec)-3; i++ {
-		if jobSpec[i:i+3] == "\"\"\"" {
+		if jobSpec[i:i+3] == "'''" {
 			end = i
 			break
 		}

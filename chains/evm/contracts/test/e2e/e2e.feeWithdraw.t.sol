@@ -30,6 +30,8 @@ import {VmSafe} from "forge-std/Vm.sol";
 ///      3. Verifier fees go to resolver (proxy), not implementation
 ///      4. All withdrawFeeTokens functions are permissionless (PAL compatible)
 contract e2e_feeWithdrawal is OnRampSetup {
+  bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
+
   struct Balances {
     uint256 onRampBalance;
     uint256 executorBalance;
@@ -117,7 +119,8 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_verifierImpl = new CommitteeVerifier(
       CommitteeVerifier.DynamicConfig({feeAggregator: s_feeAggregator, allowlistAdmin: address(0)}),
       new string[](0),
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      COMMITTEE_VERSION_TAG_V2_0_0
     );
 
     // Configure verifier for destination chain

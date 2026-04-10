@@ -321,11 +321,13 @@ func buildExecutorJobSpecs(
 			if !ok {
 				continue
 			}
+			sortedPool := slices.Clone(chainCfg.NOPAliases)
+			slices.Sort(sortedPool)
 			chainCfgs[chainSelectorStr] = offchain.ExecutorChainCfg{
 				OffRampAddress:         genCfg.OffRampAddress,
 				RmnAddress:             genCfg.RmnAddress,
 				DefaultExecutorAddress: genCfg.ExecutorProxyAddress,
-				ExecutorPool:           chainCfg.NOPAliases,
+				ExecutorPool:           sortedPool,
 				ExecutionInterval:      chainCfg.ExecutionInterval,
 			}
 		}
@@ -370,8 +372,8 @@ func buildExecutorJobSpecs(
 type = "ccvexecutor"
 name = "%s"
 externalJobID = "%s"
-executorConfig = """
-%s"""
+executorConfig = '''
+%s'''
 `, string(jobID), jobID.ToExternalJobID(), string(configBytes))
 
 		if jobSpecs[nopAlias] == nil {
