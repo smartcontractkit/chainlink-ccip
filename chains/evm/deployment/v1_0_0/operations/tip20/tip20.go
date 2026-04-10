@@ -94,6 +94,7 @@ var Deploy = operations.NewSequence(
 			}
 		}
 
+		b.Logger.Infof("Validating quote token address: %s", input.QuoteToken.Hex())
 		isQuoteTokenValid, err := operations.ExecuteOperation(b, IsTIP20, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: chain.Selector,
 			Address:       factoryAddr,
@@ -106,6 +107,7 @@ var Deploy = operations.NewSequence(
 			return sequences.OnChainOutput{}, errors.New("quoteToken must be a valid TIP-20 token address")
 		}
 
+		b.Logger.Infof("Deploying TIP20 token: %+v", input)
 		createTokenReport, err := operations.ExecuteOperation(b, CreateToken, chain, contract.FunctionInput[CreateTokenArgs]{
 			ChainSelector: chain.Selector,
 			Address:       factoryAddr,
@@ -122,6 +124,7 @@ var Deploy = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("createToken: %w", err)
 		}
 
+		b.Logger.Info("Retrieving address of deployed token via factory's getTokenAddress function")
 		tokenAddrReport, err := operations.ExecuteOperation(b, GetTokenAddress, chain, contract.FunctionInput[GetTokenAddressArgs]{
 			ChainSelector: chain.Selector,
 			Address:       factoryAddr,
@@ -134,6 +137,7 @@ var Deploy = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("getTokenAddress after deploy: %w", err)
 		}
 
+		b.Logger.Infof("Deployed TIP20 token at address: %s", tokenAddrReport.Output.Hex())
 		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{createTokenReport.Output})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("batch operation: %w", err)
