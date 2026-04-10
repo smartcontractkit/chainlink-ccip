@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(

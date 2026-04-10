@@ -23,7 +23,7 @@ deployment/
 │   └── operations/      # Utilities for building operations
 │       ├── call/
 │       └── deployment/
-├── v1_7_0/              # CCIP 2.0.0 operations, sequences, & changesets
+├── v2_0_0/              # CCIP 2.0.0 operations, sequences, & changesets
 │   ├── changesets/
 │   ├── sequences/
 │   └── operations/
@@ -96,13 +96,13 @@ var Deploy = contract.NewDeploy(
 
 A sequence is a composition of operations. Sequences accept a serializable input and a minimal set of dependencies. In the case of EVM, most sequences should only depend on `cldf_evm.Chain`. Coupling sequences too closely with the deployment environment makes them less portable.
 
-For a reference implementation, see the [DeployChainContracts Sequence](/chains/evm/deployment/v1_7_0/sequences/deploy_chain_contracts.go). Notice how this sequence only targets one chain. It is simplest to keep sequence logic focused on synchronous steps. Leave it to another routine to handle the execution of multiple sequences concurrently.
+For a reference implementation, see the [DeployChainContracts Sequence](/chains/evm/deployment/v2_0_0/sequences/deploy_chain_contracts.go). Notice how this sequence only targets one chain. It is simplest to keep sequence logic focused on synchronous steps. Leave it to another routine to handle the execution of multiple sequences concurrently.
 
 ### Changesets
 
 Changesets essentially wrap sequences with the context of a deployment environment. For example, they can read addresses from a datastore, pass said addresses into sequences as input, and produce MCMS proposals based on the combination of sequence output and known MCMS addresses.
 
-To create a changeset from a sequence that just makes calls and/or deploys contracts, use `changesets.NewFromOnChainSequence` combined with `datastore_utils.FindAndFormatEachRef` to avoid having to rewrite boilerplate for MCMS and datastore. For reference implementations, see [DeployChainContracts Changeset](/chains/evm/deployment/v1_7_0/changesets/deploy_chain_contracts.go) and [ConfigureChainForLanes Changeset](/chains/evm/deployment/v1_7_0/changesets/configure_chain_for_lanes.go).
+To create a changeset from a sequence that just makes calls and/or deploys contracts, use `changesets.NewFromOnChainSequence` combined with `datastore_utils.FindAndFormatEachRef` to avoid having to rewrite boilerplate for MCMS and datastore. For reference implementations, see [DeployChainContracts Changeset](/chains/evm/deployment/v2_0_0/changesets/deploy_chain_contracts.go) and [ConfigureChainForLanes Changeset](/chains/evm/deployment/v2_0_0/changesets/configure_chain_for_lanes.go).
 
 ## North Star
 
