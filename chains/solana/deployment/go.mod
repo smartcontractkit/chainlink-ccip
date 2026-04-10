@@ -9,6 +9,9 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ../../../
 
+	// Make sure we're working with the latest chainlink-ccip/chains/evm
+	github.com/smartcontractkit/chainlink-ccip/chains/evm => ../../../chains/evm
+
 	// Make sure we're working with the latest chainlink-ccip/chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../
 
@@ -23,7 +26,7 @@ require (
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260331203127-b8dc0a6b85c5
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-00010101000000-000000000000
@@ -41,6 +44,7 @@ require (
 	github.com/creachadair/jrpc2 v1.2.0 // indirect
 	github.com/creachadair/mds v0.13.4 // indirect
 	github.com/digital-asset/dazl-client/v8 v8.9.0 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260331203127-b8dc0a6b85c5 // indirect
 	github.com/stellar/go-stellar-sdk v0.1.0 // indirect
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect

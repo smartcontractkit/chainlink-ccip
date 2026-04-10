@@ -7,6 +7,8 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 
 replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 
+replace github.com/smartcontractkit/chainlink-ccip/chains/evm => ../../../chains/evm
+
 replace github.com/smartcontractkit/chainlink-ccip => ../../../.
 
 require (
@@ -17,7 +19,7 @@ require (
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260407160429-e6e3a1570ff1
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260407160429-e6e3a1570ff1
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
@@ -239,6 +241,7 @@ require (
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260306142855-8d629e752265 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260407160429-e6e3a1570ff1 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect

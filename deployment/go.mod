@@ -5,6 +5,8 @@ go 1.25.5
 // Make sure we're working with the latest chainlink-ccip/deployment
 replace github.com/smartcontractkit/chainlink-ccip => ../.
 
+replace github.com/smartcontractkit/chainlink-ccip/chains/evm => ../chains/evm
+
 require (
 	dario.cat/mergo v1.0.2
 	github.com/BurntSushi/toml v1.5.0
@@ -16,6 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260331203127-b8dc0a6b85c5
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260310151336-c98a9c147ac0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
 	github.com/smartcontractkit/chainlink-evm v0.3.3
