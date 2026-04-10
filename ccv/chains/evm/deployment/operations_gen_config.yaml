@@ -33,11 +33,10 @@ contracts:
       - name: getAllAuthorizedCallers
         access: public
 
-  - contract_name: FactoryBurnMintERC20
+  - contract_name: CrossChainToken
     version: "2.0.0"
-    version_path: "latest"
     package_name: erc20
-    abi_file: factory_burn_mint_erc20.json
+    abi_file: cross_chain_token.json
     no_deployment: true
     functions:
       - name: approve
