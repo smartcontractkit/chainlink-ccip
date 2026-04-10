@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 func TestTIP20FactoryABI_Parses(t *testing.T) {
@@ -55,7 +55,7 @@ func TestDeploy_RejectsNonTempoChain(t *testing.T) {
 	chain, ok := e.BlockChains.EVMChains()[evmSel]
 	require.True(t, ok)
 
-	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, tip20.Deploy, chain, tip20.FactoryDeployArgs{
+	_, err = operations.ExecuteSequence(e.OperationsBundle, tip20.Deploy, chain, tip20.FactoryDeployArgs{
 		QuoteToken: common.Address{}, // defaults to sensible value
 		Currency:   "",               // defaults to sensible value
 		Salt:       [32]byte{},       // generate random salt

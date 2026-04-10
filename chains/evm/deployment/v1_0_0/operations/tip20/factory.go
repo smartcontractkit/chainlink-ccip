@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var FactoryContractType cldf_deployment.ContractType = "TIP20Factory"
+var FactoryContractType deployment.ContractType = "TIP20Factory"
 
 // TIP20FactoryABI is a minimal ABI for the Tempo TIP-20 factory precompile (ITIP20Factory).
 const TIP20FactoryABI = `[{"type":"function","name":"createToken","inputs":[{"name":"name","type":"string"},{"name":"symbol","type":"string"},{"name":"currency","type":"string"},{"name":"quoteToken","type":"address"},{"name":"admin","type":"address"},{"name":"salt","type":"bytes32"}],"outputs":[{"name":"","type":"address"}],"stateMutability":"nonpayable"},{"type":"function","name":"getTokenAddress","inputs":[{"name":"sender","type":"address"},{"name":"salt","type":"bytes32"}],"outputs":[{"name":"","type":"address"}],"stateMutability":"pure"},{"type":"function","name":"isTIP20","inputs":[{"name":"token","type":"address"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"}]`
