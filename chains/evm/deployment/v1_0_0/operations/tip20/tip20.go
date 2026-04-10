@@ -23,6 +23,7 @@ var (
 	TypeAndVersion                         = deployment.NewTypeAndVersion(ContractType, *Version)
 )
 
+// NOTE: these addresses are the same on both Tempo testnet and mainnet, so we don't need separate constants per environment.
 const (
 	TokenFactoryAddress = "0x20Fc000000000000000000000000000000000000"
 	TokenThetaUSD       = "0x20c0000000000000000000000000000000000003"
@@ -32,24 +33,27 @@ const (
 )
 
 // NOTE: the gas station app in slack uses PathUSD, so we use it as the default for ease of use.
+// If we want to deploy a token with currency USD, then its quote token must also be USD.
 const DefaultQuoteToken = TokenPathUSD
 
-// NOTE: most pre-deployed TIP20 tokens on Tempo use USD as their currency, so we set it as the default for ease of use.
+// NOTE: we chose USD as the default currency since most of the well-known TIP20 tokens on Tempo
+// use USD as their currency (e.g. ThetaUSD, BetaUSD, AlphaUSD, PathUSD).
 const DefaultCurrency = "USD"
 
 type FactoryDeployArgs struct {
-	Currency   string         // The currency of the token. Defaults to "USD" if not provided.
-	Symbol     string         // The Token symbol. This is a required input.
+	Currency   string         // The token currency. Defaults to USD if not provided.
+	Symbol     string         // The token symbol. This is a required input.
 	Name       string         // The token name. This is a required input.
 	QuoteToken common.Address // Address of a pre-existing TIP20 token to use as the quote token. Defaults to PathUSD if not provided.
-	Admin      common.Address // The admin of the token. Defaults to the deployer address if not provided.
+	Admin      common.Address // The token admin. Defaults to the deployer address if not provided.
 	Salt       [32]byte       // Optional salt for deterministic deployment. Defaults to a random salt if not provided.
 }
 
 // Deploy deploys the TIP20 token contract with the provided deploy arguments. The TIP20 token is ERC20 compliant and includes additional
 // features as defined in the TIP20 standard: https://www.mintlify.com/tempoxyz/tempo/protocol/tip20/overview#erc-20-compatibility. This
 // sequence is only applicable for Tempo testnet / mainnet. The token is deployed via the factory contract as recommended in the docs. We
-// use sensible defaults for Currency and QuoteToken, so they are not required to be provided by the user when deploying a TIP20 token.
+// use sensible defaults for QuoteToken, Currency, Admin, and Salt to reduce the configuration burden on the user when deploying a TIP20
+// token.
 //
 //	Factory Contract: https://github.com/tempoxyz/tempo/blob/a20e2e46c7cba6164ef95c91bf83d5fc614750f3/tips/ref-impls/src/TIP20Factory.sol#L1
 //	Token Contract: https://github.com/tempoxyz/tempo/blob/a20e2e46c7cba6164ef95c91bf83d5fc614750f3/tips/ref-impls/src/TIP20.sol#L1
@@ -82,6 +86,13 @@ var Deploy = operations.NewSequence(
 		if input.Admin == (common.Address{}) {
 			input.Admin = deployerKey
 		}
+		if input.Salt == [32]byte{} {
+			if salt, err := generateValidSalt(b, chain, factoryAddr, deployerKey); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to produce a valid salt for token deployment: %w", err)
+			} else {
+				input.Salt = salt
+			}
+		}
 
 		isQuoteTokenValid, err := operations.ExecuteOperation(b, IsTIP20, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: chain.Selector,
@@ -93,14 +104,6 @@ var Deploy = operations.NewSequence(
 		}
 		if !isQuoteTokenValid.Output {
 			return sequences.OnChainOutput{}, errors.New("quoteToken must be a valid TIP-20 token address")
-		}
-
-		if input.Salt == [32]byte{} {
-			if salt, err := generateValidSalt(b, chain, factoryAddr, deployerKey); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to produce a valid salt for token deployment: %w", err)
-			} else {
-				input.Salt = salt
-			}
 		}
 
 		createTokenReport, err := operations.ExecuteOperation(b, CreateToken, chain, contract.FunctionInput[CreateTokenArgs]{
