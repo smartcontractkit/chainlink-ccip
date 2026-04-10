@@ -49,7 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
-	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
+	ccipcommon "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/common"
 )
 
 var (

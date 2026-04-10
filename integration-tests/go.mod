@@ -9,9 +9,6 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip/chains/evm
 	github.com/smartcontractkit/chainlink-ccip/chains/evm => ../chains/evm
 
-	// Make sure we're working with the latest chainlink-ccip/chains/evm/deployment
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../chains/evm/deployment
-
 	// Make sure we're working with the latest chainlink-ccip/chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 
@@ -29,7 +26,6 @@ require (
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-00010101000000-000000000000
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.1.1-solana.0.20251125153543-0b618525aa03
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
