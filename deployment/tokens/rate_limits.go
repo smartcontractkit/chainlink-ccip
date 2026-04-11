@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -21,28 +22,39 @@ type TPRLInput struct {
 }
 
 type RemoteOutbounds struct {
-	DefaultFinality RateLimiterConfigFloatInput `yaml:"defaultFinality" json:"defaultFinality"`
-	CustomFinality  RateLimiterConfigFloatInput `yaml:"customFinality" json:"customFinality"`
+	// RateLimit the rate limiter config. For CCIP v2.0, there are two types of rate limits: custom and default.
+	// Originally, this struct had two separate fields (one for each rate limit type) which isn't ideal because:
+	// ---
+	//   1. Only one of these rate limits is ever active at a time depending on the value of `allowedFinality`
+	//   2. It forces the user to configure more than what they actually need onchain leading to higher risk of misconfiguration
+	//   3. The user if forced to provide both rate limits up front - failure to provide one of them will lead to the unspecified one being reset by mistake
+	// ---
+	// For v2.0.0 it's possible to avoid these hazards entirely by collapsing both fields into one. With one
+	// rate limit config, we simply need to read the allowedFinalityConfig from the chain and if it is zero,
+	// then we update the default rate limit, otherwise we update the custom rate limit. This not only makes
+	// things this safer and easier to run but allows us to maintain full backwards compatibility with 1.6.0
+	// tooling as well.
+	RateLimit RateLimiterConfigFloatInput `yaml:"rateLimit" json:"rateLimit"`
 }
 
 type TPRLConfig struct {
 	ChainAdapterVersion      *semver.Version            `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
 	TokenRef                 datastore.AddressRef       `yaml:"tokenRef" json:"tokenRef"`
 	TokenPoolRef             datastore.AddressRef       `yaml:"tokenPoolRef" json:"tokenPoolRef"`
+	AllowedFinalityConfig    finality.Config            `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	RemoteOutbounds          map[uint64]RemoteOutbounds `yaml:"remoteOutbounds" json:"remoteOutbounds"`
 	SkipIfMissingPermissions bool                       `yaml:"skipIfMissingPermissions" json:"skipIfMissingPermissions"`
 }
 
 type TPRLRemotes struct {
-	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
-	DefaultFinalityInboundRateLimiterConfig  RateLimiterConfig
-	CustomFinalityOutboundRateLimiterConfig  RateLimiterConfig
-	CustomFinalityInboundRateLimiterConfig   RateLimiterConfig
-	ChainSelector                            uint64
-	RemoteChainSelector                      uint64
-	TokenRef                                 datastore.AddressRef
-	TokenPoolRef                             datastore.AddressRef
-	ExistingDataStore                        datastore.DataStore
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	AllowedFinalityConfig     finality.Config
+	ChainSelector             uint64
+	RemoteChainSelector       uint64
+	TokenRef                  datastore.AddressRef
+	TokenPoolRef              datastore.AddressRef
+	ExistingDataStore         datastore.DataStore
 
 	// If true, the changeset will check if timelock or the deployer key has sufficient permissions to set rate limits
 	// on the token pool. If both accounts are missing permissions (i.e. not the pool owner or rate limit admin), then
@@ -62,19 +74,11 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
 		for _, config := range cfg.Configs {
 			for remoteSelector, input := range config.RemoteOutbounds {
-				if input.DefaultFinality.IsEnabled {
-					if input.DefaultFinality.Capacity <= 0 || input.DefaultFinality.Rate <= 0 {
+				if input.RateLimit.IsEnabled {
+					if input.RateLimit.Capacity <= 0 || input.RateLimit.Rate <= 0 {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
-					if input.DefaultFinality.Rate > input.DefaultFinality.Capacity {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d has rate greater than capacity", remoteSelector)
-					}
-				}
-				if input.CustomFinality.IsEnabled {
-					if input.CustomFinality.Capacity <= 0 || input.CustomFinality.Rate <= 0 {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
-					}
-					if input.CustomFinality.Rate > input.CustomFinality.Capacity {
+					if input.RateLimit.Rate > input.RateLimit.Capacity {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d has rate greater than capacity", remoteSelector)
 					}
 				}
@@ -119,6 +123,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			for remoteSelector, inputs := range config.RemoteOutbounds {
 				tprlRemote := TPRLRemotes{
 					SkipIfMissingPermissions: config.SkipIfMissingPermissions,
+					AllowedFinalityConfig:    config.AllowedFinalityConfig,
 					ChainSelector:            selector,
 					RemoteChainSelector:      remoteSelector,
 					TokenRef:                 tokenFull,
@@ -158,8 +163,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
 				}
-				tprlRemote.DefaultFinalityOutboundRateLimiterConfig, tprlRemote.DefaultFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.DefaultFinality, remoteInputs.DefaultFinality, decimals, remoteDecimals, family, tokenPool.Version)
-				tprlRemote.CustomFinalityOutboundRateLimiterConfig, tprlRemote.CustomFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.CustomFinality, remoteInputs.CustomFinality, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs.RateLimit, remoteInputs.RateLimit, decimals, remoteDecimals, family, tokenPool.Version)
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {

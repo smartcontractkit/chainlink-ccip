@@ -86,7 +86,6 @@ func TestTokenAdapter(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-
 			chainA := uint64(5009297550715157269)
 			chainB := uint64(4949039107694359620)
 			e, err := environment.New(t.Context(),
@@ -206,22 +205,12 @@ func TestTokenAdapter(t *testing.T) {
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
-					DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+					InboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
 						Rate:      10,
 						Capacity:  100,
 					},
-					DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
-						IsEnabled: true,
-						Rate:      10,
-						Capacity:  100,
-					},
-					CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
-						IsEnabled: true,
-						Rate:      10,
-						Capacity:  100,
-					},
-					CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+					OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
 						Rate:      10,
 						Capacity:  100,
@@ -356,10 +345,10 @@ func TestTokenAdapter(t *testing.T) {
 					currentStates := rateLimiterStateReport.Output
 					cfg := getRemoteChainConfig(nil, nil, nil)
 					const decimals = 18
-					require.Equal(t, cfg.DefaultFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
-					requireRateLimiterScaled(t, cfg.DefaultFinalityInboundRateLimiterConfig.Rate, cfg.DefaultFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Rate, currentStates.InboundRateLimiterState.Capacity, decimals, true)
-					require.Equal(t, cfg.DefaultFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
-					requireRateLimiterScaled(t, cfg.DefaultFinalityOutboundRateLimiterConfig.Rate, cfg.DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
+					require.Equal(t, cfg.InboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+					requireRateLimiterScaled(t, cfg.InboundRateLimiterConfig.Rate, cfg.InboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Rate, currentStates.InboundRateLimiterState.Capacity, decimals, true)
+					require.Equal(t, cfg.OutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+					requireRateLimiterScaled(t, cfg.OutboundRateLimiterConfig.Rate, cfg.OutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
 				}
 
 				// Chain A has a 2.0.0 token pool so should have set CCVs
@@ -382,7 +371,6 @@ func TestTokenAdapter(t *testing.T) {
 }
 
 func TestTokenExpansion(t *testing.T) {
-
 	chainA := uint64(5009297550715157269)
 	chainB := uint64(4949039107694359620)
 
