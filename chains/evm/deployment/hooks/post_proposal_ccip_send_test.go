@@ -1,7 +1,6 @@
 package hooks
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -153,7 +152,7 @@ func TestGlobalPostProposalCCIPSendHook_EndToEnd_WithEVMProviderInRegistry(t *te
 	require.IsType(t, &EVMPostProposalCCIPSend{}, registered)
 
 	hook := cciphooks.GlobalPostProposalCCIPSendHook(dom)
-	err := hook.Func(context.Background(), cldf_changeset.PostProposalHookParams{
+	err := hook.Func(t.Context(), cldf_changeset.PostProposalHookParams{
 		Env: cldf_changeset.ProposalHookEnv{
 			Name:   envName,
 			Logger: logger.Test(t),

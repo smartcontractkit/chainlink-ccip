@@ -48,7 +48,7 @@ func AnvilImpersonateAccount(rpcURL, addr string) error {
 	return AnvilRPCCall(rpcURL, "anvil_impersonateAccount", []any{addr})
 }
 
-func SendImpersonatedTx(ec *ethclient.Client, rpcURL string, from, to string, data []byte) error {
+func SendImpersonatedTx(ctx context.Context, ec *ethclient.Client, rpcURL string, from, to string, data []byte) error {
 	if err := AnvilImpersonateAccount(rpcURL, from); err != nil {
 		return fmt.Errorf("anvil impersonate %s: %w", from, err)
 	}
@@ -59,12 +59,12 @@ func SendImpersonatedTx(ec *ethclient.Client, rpcURL string, from, to string, da
 		To:   &toAddr,
 		Data: data,
 	}
-	estGas, err := ec.EstimateGas(context.Background(), msg)
+	estGas, err := ec.EstimateGas(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("estimate gas: %w", err)
 	}
 
-	gasPrice, err := ec.SuggestGasPrice(context.Background())
+	gasPrice, err := ec.SuggestGasPrice(ctx)
 	if err != nil {
 		return fmt.Errorf("suggest gas: %w", err)
 	}

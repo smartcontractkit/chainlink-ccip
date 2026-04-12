@@ -42,7 +42,7 @@ func ProcessMCMSProposalsWithTimelockForAnvil(ctx context.Context, bcsInput []*b
 			}
 			defer ec.Close()
 			for _, tx := range op.Transactions {
-				err = testhelpers.SendImpersonatedTx(ec, rpcURL, tlAddr, tx.To, tx.Data)
+				err = testhelpers.SendImpersonatedTx(ctx, ec, rpcURL, tlAddr, tx.To, tx.Data)
 				if err != nil {
 					return fmt.Errorf("could not send impersonated tx to %s on chain with id %d from %s: %w", tx.To, chainId.Uint64(), tlAddr, err)
 				}

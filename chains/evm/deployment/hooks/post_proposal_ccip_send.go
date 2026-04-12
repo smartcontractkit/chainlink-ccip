@@ -160,7 +160,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		if err != nil {
 			return nil, fmt.Errorf("failed to build transfer tx for fee token %s on chain %d: %w", addr.Hex(), srcSel, err)
 		}
-		if err := testhelpers.SendImpersonatedTx(ec, rpcUrl, tokenOwner.Hex(), addr.Hex(), tx.Data()); err != nil {
+		if err := testhelpers.SendImpersonatedTx(env.GetContext(), ec, rpcUrl, tokenOwner.Hex(), addr.Hex(), tx.Data()); err != nil {
 			return nil, fmt.Errorf(
 				"failed to send impersonated transfer for fee token %s from token owner %s to deployer %s on chain %d: %w",
 				addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err,
