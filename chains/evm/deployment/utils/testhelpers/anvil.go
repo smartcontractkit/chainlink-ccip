@@ -82,7 +82,7 @@ func SendImpersonatedTx(ctx context.Context, ec *ethclient.Client, rpcURL string
 		"data": fmt.Sprintf("0x%x", data),
 	}
 
-	bal, err := ec.BalanceAt(context.Background(), fromAddr, nil)
+	bal, err := ec.BalanceAt(ctx, fromAddr, nil)
 	if err != nil {
 		return fmt.Errorf("fetch balance: %w", err)
 	}
