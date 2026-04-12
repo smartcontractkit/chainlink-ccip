@@ -22,18 +22,18 @@ type TPRLInput struct {
 }
 
 type RemoteOutbounds struct {
-	// RateLimit the rate limiter config. For CCIP v2.0, there are two types of rate limits: custom and default.
-	// Originally, this struct had two separate fields (one for each rate limit type) which isn't ideal because:
+	// RateLimit is the rate limiter config. For CCIP v2.0, there are two types of rate limits: custom and default.
+	// Originally, this struct had two separate fields (one for each rate limit type), which isn't ideal because:
 	// ---
 	//   1. Only one of these rate limits is ever active at a time depending on the value of `allowedFinality`
-	//   2. It forces the user to configure more than what they actually need onchain leading to higher risk of misconfiguration
-	//   3. The user if forced to provide both rate limits up front - failure to provide one of them will lead to the unspecified one being reset by mistake
+	//   2. It forces the user to configure more than they actually need on-chain leading to higher risk of misconfiguration
+	//   3. The user is forced to provide both rate limits up front; failure to provide one of them will lead to the unspecified one being reset by mistake
 	// ---
-	// For v2.0.0 it's possible to avoid these hazards entirely by collapsing both fields into one. With one
+	// For v2.0, it is possible to avoid these hazards entirely by collapsing both fields into one. With one
 	// rate limit config, we simply need to read the allowedFinalityConfig from the chain and if it is zero,
-	// then we update the default rate limit, otherwise we update the custom rate limit. This not only makes
-	// things this safer and easier to run but allows us to maintain full backwards compatibility with 1.6.0
-	// tooling as well.
+	// then we update the default rate limit; otherwise we update the custom rate limit. This not only makes
+	// the operation safer and easier to run, but also reduces the mental overhead involved in keeping track
+	// of different rate limit semantics between versions v1.5, v1.6, and v2.0.
 	RateLimit RateLimiterConfigFloatInput `yaml:"rateLimit" json:"rateLimit"`
 }
 
