@@ -10,6 +10,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/domain"
@@ -27,9 +28,9 @@ const PostProposalCCIPSendHookName = postProposalCCIPSendHookName
 // PostProposalCCIPSend supplies chain-family metadata used by [verifyCCIPSend] to run CCIP send smoke checks
 // after MCMS timelock execution.
 type PostProposalCCIPSend interface {
-	SkipSend(env cldf.Environment) bool
+	SkipSend(env cldf_changeset.ProposalHookEnv) bool
 	PreSendValidation(env cldf.Environment, srcSel uint64) error
-	SupportedFeeTokens(env cldf.Environment, srcSel uint64) ([]string, error)
+	SupportedFeeTokens(env cldf.Environment, srcSel uint64, forkContext cldf_changeset.ForkContext) ([]string, error)
 	SupportedDestinations(env cldf.Environment, srcSel uint64) ([]uint64, error)
 	AdapterVersionForLane(env cldf.Environment, srcSel, destSel uint64) (*semver.Version, error)
 }
@@ -109,15 +110,7 @@ func verifyCCIPSend(dom domain.Domain) cldf_changeset.PostProposalHookFunc {
 		if err != nil {
 			return fmt.Errorf("verify-ccip-send: datastore for env %q: %w", params.Env.Name, err)
 		}
-		deployEnv := cldf.Environment{
-			Name:        params.Env.Name,
-			Logger:      params.Env.Logger,
-			BlockChains: params.Env.BlockChains,
-			DataStore:   ds,
-			GetContext: func() context.Context {
-				return ctx
-			},
-		}
+
 		byFamily := groupSelectorsByFamily(params.Env.Logger, selectors)
 		var errs []error
 		for family, sels := range byFamily {
@@ -127,7 +120,7 @@ func verifyCCIPSend(dom domain.Domain) cldf_changeset.PostProposalHookFunc {
 					family, sels)
 				continue
 			}
-			if err := runPostProposalCCIPSends(ctx, params.Env.Logger, &deployEnv, family, provider, sels); err != nil {
+			if err := runPostProposalCCIPSends(ctx, params.Env.Logger, params.Env, ds, family, provider, sels); err != nil {
 				errs = append(errs, fmt.Errorf("verify-ccip-send: family %s: %w", family, err))
 			}
 		}
@@ -138,26 +131,36 @@ func verifyCCIPSend(dom domain.Domain) cldf_changeset.PostProposalHookFunc {
 func runPostProposalCCIPSends(
 	ctx context.Context,
 	lggr logger.Logger,
-	env *cldf.Environment,
+	hookEnv cldf_changeset.ProposalHookEnv,
+	ds datastore.DataStore,
 	family string,
 	provider PostProposalCCIPSend,
 	srcSelectors []uint64,
 ) error {
-	if provider.SkipSend(*env) {
+	if provider.SkipSend(hookEnv) {
 		lggr.Infof("verify-ccip-send: provider for family %s skips CCIP send, skipping send verify for selectors %v",
 			family, srcSelectors)
 		return nil
 	}
 	var errs []error
+	env := cldf.Environment{
+		Name:        hookEnv.Name,
+		Logger:      hookEnv.Logger,
+		BlockChains: hookEnv.BlockChains,
+		DataStore:   ds,
+		GetContext: func() context.Context {
+			return ctx
+		},
+	}
 	for _, srcSel := range srcSelectors {
-		err := provider.PreSendValidation(*env, srcSel)
+		err := provider.PreSendValidation(env, srcSel)
 		if err != nil {
 			lggr.Warnf("verify-ccip-send: skip CCIP send verify from chain %d: pre-send validation: %v", srcSel, err)
 			errs = append(errs, err)
 			continue
 		}
 
-		dests, err := provider.SupportedDestinations(*env, srcSel)
+		dests, err := provider.SupportedDestinations(env, srcSel)
 		if err != nil {
 			lggr.Warnf("verify-ccip-send: skip CCIP send verify from chain %d: supported destinations: %v", srcSel, err)
 			errs = append(errs, err)
@@ -168,7 +171,7 @@ func runPostProposalCCIPSends(
 			continue
 		}
 
-		feeTokens, err := provider.SupportedFeeTokens(*env, srcSel)
+		feeTokens, err := provider.SupportedFeeTokens(env, srcSel, hookEnv.ForkContext)
 		if err != nil {
 			lggr.Warnf("verify-ccip-send: fee tokens for chain %d: %v; using native only", srcSel, err)
 			errs = append(errs, err)
@@ -179,7 +182,7 @@ func runPostProposalCCIPSends(
 		}
 
 		for _, destSel := range dests {
-			adapterVer, err := provider.AdapterVersionForLane(*env, srcSel, destSel)
+			adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("verify-ccip-send: adapter version src %d dest %d: %w", srcSel, destSel, err))
 				continue
@@ -198,7 +201,7 @@ func runPostProposalCCIPSends(
 			}
 			var destAdapter testadapters.TestAdapter
 			if destFamily == family {
-				destAdapter = factory(env, destSel)
+				destAdapter = factory(&env, destSel)
 			} else {
 				// source and dest selectors should have same version
 				// there is no cross version lane supported yet
@@ -208,12 +211,12 @@ func runPostProposalCCIPSends(
 						destFamily, adapterVer.String()))
 					continue
 				}
-				destAdapter = destAdapterFactory(env, destSel)
+				destAdapter = destAdapterFactory(&env, destSel)
 			}
 
 			receiver := destAdapter.CCIPReceiver()
 
-			srcAdapter := factory(env, srcSel)
+			srcAdapter := factory(&env, srcSel)
 			extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("verify-ccip-send: extra args for src %d -> dest %d: %w", srcSel, destSel, err))

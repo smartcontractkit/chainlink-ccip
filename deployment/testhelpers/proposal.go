@@ -393,10 +393,9 @@ func ProcessTimelockProposals(t *testing.T, env cldf.Environment, proposals []mc
 		// This has been a cause of flakiness in the past (caused an AlreadyScheduled error).
 		saltOverride := utils.RandomHash()
 		prop.SaltOverride = &saltOverride
-		_, err := prop.SetOperationIDs(t.Context(), true)
-		require.NoError(t, err, "failed to set operation IDs for timelock proposal")
+
 		p := SignMCMSTimelockProposal(t, env, &prop, realBackend)
-		err = ExecuteMCMSProposal(t, env, p)
+		err := ExecuteMCMSProposal(t, env, p)
 		require.NoError(t, err, "failed to execute MCMS proposal")
 		if prop.Action != mcmstypes.TimelockActionSchedule {
 			// We don't need to execute the proposal if it's not a schedule action

@@ -25,16 +25,16 @@ import (
 )
 
 type stubPostProposalProvider struct {
-	skinSendFn              func(env cldf.Environment) bool
+	skipSendFn              func(env cldf_changeset.ProposalHookEnv) bool
 	preSendValidationFn     func(env cldf.Environment, srcSel uint64) error
-	supportedFeeTokensFn    func(env cldf.Environment, srcSel uint64) ([]string, error)
+	supportedFeeTokensFn    func(env cldf.Environment, srcSel uint64, forkContext cldf_changeset.ForkContext) ([]string, error)
 	supportedDestinationsFn func(env cldf.Environment, srcSel uint64) ([]uint64, error)
 	adapterVersionForLaneFn func(env cldf.Environment, srcSel, destSel uint64) (*semver.Version, error)
 }
 
-func (s *stubPostProposalProvider) SkipSend(env cldf.Environment) bool {
-	if s.skinSendFn != nil {
-		return s.skinSendFn(env)
+func (s *stubPostProposalProvider) SkipSend(env cldf_changeset.ProposalHookEnv) bool {
+	if s.skipSendFn != nil {
+		return s.skipSendFn(env)
 	}
 	return false
 }
@@ -46,9 +46,13 @@ func (s *stubPostProposalProvider) PreSendValidation(env cldf.Environment, srcSe
 	return nil
 }
 
-func (s *stubPostProposalProvider) SupportedFeeTokens(env cldf.Environment, srcSel uint64) ([]string, error) {
+func (s *stubPostProposalProvider) SupportedFeeTokens(
+	env cldf.Environment,
+	srcSel uint64,
+	forkContext cldf_changeset.ForkContext,
+) ([]string, error) {
 	if s.supportedFeeTokensFn != nil {
-		return s.supportedFeeTokensFn(env, srcSel)
+		return s.supportedFeeTokensFn(env, srcSel, forkContext)
 	}
 	return []string{""}, nil
 }
@@ -215,16 +219,23 @@ func successfulTimelockReport(selector uint64) cldf_changeset.MCMSTimelockExecut
 	}
 }
 
-func newTestEnv(t *testing.T) *cldf.Environment {
+func newTestHookEnvAndDataStore(t *testing.T) (cldf_changeset.ProposalHookEnv, datastore.DataStore) {
 	ds := datastore.NewMemoryDataStore()
-	return &cldf.Environment{
+	return cldf_changeset.ProposalHookEnv{
 		Name:      "test-env",
 		Logger:    logger.Test(t),
-		DataStore: ds.Seal(),
-		GetContext: func() context.Context {
-			return t.Context()
-		},
-	}
+	}, ds.Seal()
+}
+
+func runWithTestHookEnv(
+	t *testing.T,
+	family string,
+	provider PostProposalCCIPSend,
+	srcSelectors []uint64,
+) error {
+	t.Helper()
+	hookEnv, ds := newTestHookEnvAndDataStore(t)
+	return runPostProposalCCIPSends(t.Context(), logger.Test(t), hookEnv, ds, family, provider, srcSelectors)
 }
 
 func TestPostProposalCCIPSendRegistry_RegisterFirstWinsAndReset(t *testing.T) {
@@ -366,13 +377,13 @@ func TestVerifyCCIPSend_AggregatesErrorsByFamily(t *testing.T) {
 	require.ErrorContains(t, err, "solana pre-send")
 }
 
-func TestRunPostProposalCCIPSends_SkinSendSkips(t *testing.T) {
+func TestRunPostProposalCCIPSends_SkipSendSkips(t *testing.T) {
 	provider := &stubPostProposalProvider{
-		skinSendFn: func(env cldf.Environment) bool {
+		skipSendFn: func(env cldf_changeset.ProposalHookEnv) bool {
 			return true
 		},
 	}
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{1})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{1})
 	require.NoError(t, err)
 }
 
@@ -400,7 +411,7 @@ func TestRunPostProposalCCIPSends_PreSendAndDiscoveryErrors(t *testing.T) {
 				return nil, nil
 			}
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSel uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSel uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			if srcSel == 4 {
 				return nil, feeErr
 			}
@@ -408,7 +419,7 @@ func TestRunPostProposalCCIPSends_PreSendAndDiscoveryErrors(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{1, 2, 3, 4})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{1, 2, 3, 4})
 	require.Error(t, err)
 	require.ErrorContains(t, err, preErr.Error())
 	require.ErrorContains(t, err, destsErr.Error())
@@ -424,7 +435,7 @@ func TestRunPostProposalCCIPSends_AdapterVersionError(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -432,7 +443,7 @@ func TestRunPostProposalCCIPSends_AdapterVersionError(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "adapter version src")
 	require.ErrorContains(t, err, adapterVersionErr.Error())
@@ -447,7 +458,7 @@ func TestRunPostProposalCCIPSends_MissingSourceAdapter(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -455,7 +466,7 @@ func TestRunPostProposalCCIPSends_MissingSourceAdapter(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no test adapter for family evm version")
 	require.ErrorContains(t, err, version.String())
@@ -473,7 +484,7 @@ func TestRunPostProposalCCIPSends_InvalidDestinationSelector(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{0}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -481,7 +492,7 @@ func TestRunPostProposalCCIPSends_InvalidDestinationSelector(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "dest selector 0")
 }
@@ -499,7 +510,7 @@ func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -507,7 +518,7 @@ func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no test adapter for dest family solana version")
 	require.ErrorContains(t, err, version.String())
@@ -536,7 +547,7 @@ func TestRunPostProposalCCIPSends_ExtraArgsError(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -544,7 +555,7 @@ func TestRunPostProposalCCIPSends_ExtraArgsError(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "extra args for src")
 	require.ErrorContains(t, err, extraArgsErr.Error())
@@ -573,7 +584,7 @@ func TestRunPostProposalCCIPSends_BuildMessageError(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -581,7 +592,7 @@ func TestRunPostProposalCCIPSends_BuildMessageError(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "build message src")
 	require.ErrorContains(t, err, buildErr.Error())
@@ -610,7 +621,7 @@ func TestRunPostProposalCCIPSends_SendMessageError(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{""}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -618,7 +629,7 @@ func TestRunPostProposalCCIPSends_SendMessageError(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "CCIP send from")
 	require.ErrorContains(t, err, sendErr.Error())
@@ -640,7 +651,7 @@ func TestRunPostProposalCCIPSends_UsesNativeFeeWhenProviderReturnsNone(t *testin
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return nil, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -648,7 +659,7 @@ func TestRunPostProposalCCIPSends_UsesNativeFeeWhenProviderReturnsNone(t *testin
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.NoError(t, err)
 	require.Len(t, srcAdapter.builtMessages, 1)
 	require.Equal(t, "", srcAdapter.builtMessages[0].FeeToken)
@@ -679,7 +690,7 @@ func TestRunPostProposalCCIPSends_CrossFamilyHappyPath(t *testing.T) {
 		supportedDestinationsFn: func(env cldf.Environment, srcSelArg uint64) ([]uint64, error) {
 			return []uint64{destSel}, nil
 		},
-		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64) ([]string, error) {
+		supportedFeeTokensFn: func(env cldf.Environment, srcSelArg uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 			return []string{"fee-token"}, nil
 		},
 		adapterVersionForLaneFn: func(env cldf.Environment, srcSelArg, destSelArg uint64) (*semver.Version, error) {
@@ -687,7 +698,7 @@ func TestRunPostProposalCCIPSends_CrossFamilyHappyPath(t *testing.T) {
 		},
 	}
 
-	err := runPostProposalCCIPSends(t.Context(), logger.Test(t), newTestEnv(t), chain_selectors.FamilyEVM, provider, []uint64{srcSel})
+	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.NoError(t, err)
 	require.Len(t, srcAdapter.builtMessages, 1)
 	require.Equal(t, destSel, srcAdapter.builtMessages[0].DestChainSelector)

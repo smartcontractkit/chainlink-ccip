@@ -51,31 +51,26 @@ func useOnlyEVMPostProposalProvider(t *testing.T) {
 	})
 }
 
-func TestEVMPostProposalCCIPSend_SkinSend(t *testing.T) {
+func TestEVMPostProposalCCIPSend_SkipSend(t *testing.T) {
 	p := &EVMPostProposalCCIPSend{}
 
 	tests := []struct {
 		name string
-		env  cldf.Environment
+		env  cldf_changeset.ProposalHookEnv
 		want bool
 	}{
 		{
 			name: "non forked env skips send",
-			env:  cldf.Environment{Name: "staging"},
+			env:  cldf_changeset.ProposalHookEnv{Name: "staging"},
 			want: true,
 		},
 		{
-			name: "forked env without node ids runs send",
-			env:  cldf.Environment{Name: "proposal-fork"},
-			want: false,
-		},
-		{
-			name: "forked env with node ids skips send",
-			env: cldf.Environment{
-				Name:    "proposal-fork",
-				NodeIDs: []string{"node-1"},
+			name: "evm fork context runs send",
+			env: cldf_changeset.ProposalHookEnv{
+				Name:        "proposal-fork",
+				ForkContext: (*cldf_changeset.EVMForkContext)(nil),
 			},
-			want: true,
+			want: false,
 		},
 	}
 
@@ -133,7 +128,7 @@ func TestEVMPostProposalCCIPSend_AdapterVersionForLane_Error(t *testing.T) {
 	require.ErrorContains(t, err, "derive all lane versions from source")
 }
 
-func TestEVMPostProposalCCIPSend_SupportedFeeTokens_ErrorWhenOnRampMissing(t *testing.T) {
+func TestEVMPostProposalCCIPSend_SupportedFeeTokens_ErrorWhenForkContextInvalid(t *testing.T) {
 	p := &EVMPostProposalCCIPSend{}
 	ethSel := chain_selectors.ETHEREUM_MAINNET.Selector
 	env := cldf.Environment{
@@ -141,9 +136,9 @@ func TestEVMPostProposalCCIPSend_SupportedFeeTokens_ErrorWhenOnRampMissing(t *te
 		BlockChains: blockChainsWithSelectors(ethSel),
 	}
 
-	_, err := p.SupportedFeeTokens(env, ethSel)
+	_, err := p.SupportedFeeTokens(env, ethSel, nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "failed to find onramp address")
+	require.ErrorContains(t, err, "invalid fork context type")
 }
 
 func TestGlobalPostProposalCCIPSendHook_EndToEnd_WithEVMProviderInRegistry(t *testing.T) {

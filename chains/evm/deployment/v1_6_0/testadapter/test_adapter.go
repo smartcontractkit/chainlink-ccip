@@ -228,7 +228,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		}
 		messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 
-		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
+		fmt.Printf("Sent CCIP message %+v id %s seq %d from chain %d to chain %d\n", msg, messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
 		return it.Event.SequenceNumber, messageID, nil
 	}
 }
