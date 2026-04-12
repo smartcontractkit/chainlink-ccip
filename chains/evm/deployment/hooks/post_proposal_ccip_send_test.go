@@ -64,10 +64,18 @@ func TestEVMPostProposalCCIPSend_SkipSend(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "evm fork context runs send",
+			name: "evm empty fork context skips send",
 			env: cldf_changeset.ProposalHookEnv{
 				Name:        "proposal-fork",
 				ForkContext: (*cldf_changeset.EVMForkContext)(nil),
+			},
+			want: true,
+		},
+		{
+			name: "evm non-empty fork context runs send",
+			env: cldf_changeset.ProposalHookEnv{
+				Name:        "proposal-fork",
+				ForkContext: &cldf_changeset.EVMForkContext{},
 			},
 			want: false,
 		},
