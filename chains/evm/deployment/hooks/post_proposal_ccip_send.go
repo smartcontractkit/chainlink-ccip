@@ -48,8 +48,8 @@ func (e *EVMPostProposalCCIPSend) SkipSend(env cldf_changeset.ProposalHookEnv) b
 	if envContext == nil {
 		return true
 	}
-	_, ok := envContext.(*cldf_changeset.EVMForkContext)
-	return !ok
+	evmForkContext, ok := envContext.(*cldf_changeset.EVMForkContext)
+	return !ok || evmForkContext == nil
 }
 
 func (e *EVMPostProposalCCIPSend) PreSendValidation(env cldf.Environment, srcSel uint64) error {
@@ -110,6 +110,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to eth client for chain %d at rpc %s: %w", srcSel, evmForkContext.ChainConfig.HTTPRPCs[0].External, err)
 	}
+	defer ec.Close()
 	fqAddr, fqVer, err := sequences.GetFeeQuoterAddressAndVersionFromOnRamp(env.DataStore, srcSel, env.BlockChains)
 	if err != nil {
 		return nil, err
