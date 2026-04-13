@@ -286,10 +286,17 @@ The runtime messaging interface for e2e tests: `SendMessage`, `WaitOneSentEventB
 
 ## Directory Layout
 
-Follow this canonical layout for a 2.0 chain family:
+Chain family adapters live alongside their contracts. EVM and Solana are in `chainlink-ccip/chains/`, but most other families have their own repository:
+
+- `chainlink-ccip/chains/evm/deployment/` -- EVM
+- `chainlink-ccip/chains/solana/deployment/` -- Solana
+- `chainlink-canton/ccip/deployment/` -- Canton
+- `chainlink-stellar/deployment/` -- Stellar
+
+Follow this canonical layout within your module:
 
 ```
-chains/<family>/deployment/
+<family>/deployment/
 ├── go.mod
 ├── go.sum
 ├── utils/                          # Shared utilities
@@ -324,7 +331,7 @@ chains/<family>/deployment/
 Create `init()` functions that run automatically when your package is imported. Here is the complete registration checklist for a 2.0 chain family, modeled after the EVM implementation:
 
 ```go
-// chains/<family>/deployment/v2_0_0/adapters/init.go
+// <your-repo>/deployment/v2_0_0/adapters/init.go
 package adapters
 
 func init() {
@@ -380,11 +387,17 @@ func init() {
 
 ### Wiring into chainlink-deployments
 
-In `chainlink-deployments/domains/ccv/pkg/pipelines/shared.go`, add a blank import to trigger your `init()`:
+In `chainlink-deployments/domains/ccv/pkg/pipelines/shared.go`, add a blank import to trigger your `init()`. Most chain families live in their own repositories (e.g. `chainlink-canton`, `chainlink-stellar`), not in `chainlink-ccip/chains/`:
 
 ```go
 import (
-    _ "github.com/smartcontractkit/chainlink-ccip/chains/mychain/deployment/v2_0_0/adapters"
+    // EVM and Solana live in chainlink-ccip/chains/
+    _ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+    _ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
+
+    // Other families have their own repos
+    _ "github.com/smartcontractkit/chainlink-canton/ccip/deployment/v2_0_0/adapters"
+    _ "github.com/smartcontractkit/chainlink-stellar/deployment/v2_0_0/adapters"
 )
 ```
 
@@ -571,7 +584,7 @@ The EVM 2.0 `init.go` at `chains/evm/deployment/v2_0_0/adapters/init.go` registe
 Use this checklist to track your progress:
 
 - [ ] Chain family constant defined in `chain-selectors`
-- [ ] Go module created at `chains/<family>/deployment/`
+- [ ] Go module created (in `chainlink-ccip/chains/<family>/deployment/` or your own repo)
 - [ ] **Tier 1 (2.0-specific)**
   - [ ] `DeployChainContractsAdapter` -- deploy 2.0 contracts
   - [ ] `ChainFamily` -- lane configuration + address resolution
