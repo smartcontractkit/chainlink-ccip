@@ -334,13 +334,6 @@ func validateChainState(
 		return
 	}
 
-	proxyToken, err := proxy.GetToken(callOpts)
-	if err != nil {
-		v.addf("chains[%d]: failed to read proxy token from %s: %v", chain.Selector, proxyAddr.Hex(), err)
-	} else if proxyToken != usdcToken {
-		v.addf("chains[%d]: proxy token mismatch, expected %s got %s", chain.Selector, usdcToken.Hex(), proxyToken.Hex())
-	}
-
 	if supported, err := proxy.IsSupportedToken(callOpts, usdcToken); err != nil {
 		v.addf("chains[%d]: failed to check proxy supported token on %s: %v", chain.Selector, proxyAddr.Hex(), err)
 	} else if !supported {
@@ -425,41 +418,6 @@ func validateRemoteChainState(
 				v.addf("chains[%d].remoteChains[%d]: failed to decode remote token bytes: %v", chainSelector, remoteSelector, decodeErr)
 			} else if remoteToken != common.HexToAddress(cfg.ExpectedRemoteToken) {
 				v.addf("chains[%d].remoteChains[%d]: remote token mismatch, expected %s got %s", chainSelector, remoteSelector, cfg.ExpectedRemoteToken, remoteToken.Hex())
-			}
-		}
-	}
-
-	if len(cfg.ExpectedRemotePools) > 0 || len(cfg.ExpectedRemotePoolKinds) > 0 || cfg.RequireLegacyRemotePool || cfg.RequireCurrentRemotePool || !datastore_utils.IsAddressRefEmpty(cfg.LegacyRemotePoolRef) || !datastore_utils.IsAddressRefEmpty(cfg.CurrentRemotePoolRef) {
-		// Step 2d: ensure the proxy’s remote pool list contains the expected pool addresses.
-		// This supports three ways to express expectations:
-		// - explicit addresses (ExpectedRemotePools)
-		// - explicit datastore refs (LegacyRemotePoolRef / CurrentRemotePoolRef)
-		// - higher-level pool kinds resolved against the REMOTE chain selector (ExpectedRemotePoolKinds)
-		remotePoolsBytes, err := proxy.GetRemotePools(callOpts, remoteSelector)
-		if err != nil {
-			v.addf("chains[%d].remoteChains[%d]: failed to read remote pools from proxy: %v", chainSelector, remoteSelector, err)
-		} else {
-			actualPools, decodeErr := decodeEVMAddressList(remotePoolsBytes)
-			if decodeErr != nil {
-				v.addf("chains[%d].remoteChains[%d]: failed to decode remote pool bytes: %v", chainSelector, remoteSelector, decodeErr)
-			} else {
-				for _, expectedPool := range cfg.ExpectedRemotePools {
-					if !containsAddress(actualPools, common.HexToAddress(expectedPool)) {
-						v.addf("chains[%d].remoteChains[%d]: expected remote pool %s missing from proxy config", chainSelector, remoteSelector, expectedPool)
-					}
-				}
-				for _, expectedPoolKind := range cfg.ExpectedRemotePoolKinds {
-					expectedPoolAddr, resolveErr := resolvePoolKindAddress(e, remoteSelector, expectedPoolKind)
-					if resolveErr != nil {
-						v.addf("chains[%d].remoteChains[%d]: failed to resolve remote pool kind %s: %v", chainSelector, remoteSelector, expectedPoolKind.Kind, resolveErr)
-						continue
-					}
-					if !containsAddress(actualPools, *expectedPoolAddr) {
-						v.addf("chains[%d].remoteChains[%d]: expected remote pool kind %s (%s) missing from proxy config", chainSelector, remoteSelector, expectedPoolKind.Kind, expectedPoolAddr.Hex())
-					}
-				}
-				validateExpectedRemotePoolRef(e, chainSelector, remoteSelector, "legacy", cfg.RequireLegacyRemotePool, cfg.LegacyRemotePoolRef, actualPools, v)
-				validateExpectedRemotePoolRef(e, chainSelector, remoteSelector, "current", cfg.RequireCurrentRemotePool, cfg.CurrentRemotePoolRef, actualPools, v)
 			}
 		}
 	}
@@ -759,35 +717,6 @@ func validateResolvedProxyPoolKind(
 	}
 }
 
-func validateExpectedRemotePoolRef(
-	e deployment.Environment,
-	chainSelector uint64,
-	remoteSelector uint64,
-	label string,
-	required bool,
-	ref cldf_datastore.AddressRef,
-	actualPools []common.Address,
-	v *validationCollector,
-) {
-	if datastore_utils.IsAddressRefEmpty(ref) {
-		if required {
-			v.addf("chains[%d].remoteChains[%d]: %s remote pool ref is required", chainSelector, remoteSelector, label)
-		}
-		return
-	}
-	// Important: resolve against remoteSelector so we only search the remote chain's datastore scope.
-	// This prevents accidentally selecting a same-type/version ref from the local chain.
-	resolvedRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, remoteSelector, datastore_utils.FullRef)
-	if err != nil {
-		v.addf("chains[%d].remoteChains[%d]: failed to resolve %s remote pool ref %s: %v", chainSelector, remoteSelector, label, datastore_utils.SprintRef(ref), err)
-		return
-	}
-	expected := common.HexToAddress(resolvedRef.Address)
-	if !containsAddress(actualPools, expected) {
-		v.addf("chains[%d].remoteChains[%d]: %s remote pool %s missing from proxy config", chainSelector, remoteSelector, label, expected.Hex())
-	}
-}
-
 func validateDerivedLiquidityValue(v *validationCollector, field string, actual *big.Int, expected *big.Int, err error) {
 	if err != nil {
 		v.addf("%s: %v", field, err)
@@ -1003,18 +932,6 @@ func decodeEVMAddressBytes(data []byte) (common.Address, error) {
 		}
 		return common.Address{}, fmt.Errorf("expected 20-byte or 32-byte address encoding, got %d bytes", len(data))
 	}
-}
-
-func decodeEVMAddressList(values [][]byte) ([]common.Address, error) {
-	out := make([]common.Address, 0, len(values))
-	for _, value := range values {
-		addr, err := decodeEVMAddressBytes(value)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, addr)
-	}
-	return out, nil
 }
 
 func containsAddress(values []common.Address, target common.Address) bool {
