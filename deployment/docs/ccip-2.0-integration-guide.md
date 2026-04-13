@@ -22,8 +22,8 @@ CCIP 2.0 introduces several architectural changes that affect how chain families
 
 | Concept | 1.6 | 2.0 |
 |---------|-----|-----|
-| **Verification** | RMN (Risk Management Network) | Committee Verifiers per committee qualifier |
 | **Execution** | Implicit (part of OffRamp) | Explicit Executor contracts with qualifiers |
+| **OCR** | OCR3 configured on OffRamp | No OCR -- off-chain consensus handled differently |
 | **Lane Configuration** | Per-leg: `ConfigureLaneLegAsSource` / `ConfigureLaneLegAsDest` | Per-chain: `ConfigureChainForLanes` (holistic) |
 | **Contract Deployment** | `Deployer.DeployChainContracts()` via `DeployerRegistry` | `DeployChainContractsAdapter.DeployChainContracts()` via `DeployChainContractsRegistry` |
 | **Lane Adapter** | `LaneAdapter` (required) | `ChainFamily` (replaces LaneAdapter) |
@@ -38,7 +38,7 @@ flowchart TB
         DCC["DeployChainContracts"]
         CCLFT["ConfigureChainsForLanesFromTopology"]
         TE["TokenExpansion"]
-        DMCMS["DeployMCMS / SetOCR3Config"]
+        DMCMS["DeployMCMS"]
     end
 
     subgraph registries [Singleton Registries]
@@ -85,7 +85,7 @@ These are the primary interfaces for 2.0. They live in `deployment/v2_0_0/adapte
 **Registry:** `DeployChainContractsRegistry` via `adapters.GetDeployChainContractsRegistry()`
 **Key:** `chainFamily` (version-agnostic within 2.0)
 
-Deploys all 2.0 CCIP contracts for a chain: Router, OnRamp, OffRamp, FeeQuoter, CommitteeVerifier(s), Executor(s), Proxy, RMNRemote.
+Deploys all 2.0 CCIP contracts for a chain: Router, OnRamp, OffRamp, FeeQuoter, CommitteeVerifier(s), Executor(s), Proxy, and RMNRemote (RMN is retained in 2.0 for curse/uncurse).
 
 This **replaces** `Deployer.DeployChainContracts()` which is the 1.6 deployment path. The 2.0 changeset dispatches through `DeployChainContractsRegistry`, not `DeployerRegistry`.
 
@@ -148,13 +148,13 @@ All are keyed by `chainFamily` (no version) and registered via `Register(family,
 
 These are version-agnostic and documented in [Interfaces Reference](interfaces.md). They are still required for 2.0.
 
-#### Deployer (MCMS/OCR3 only)
+#### Deployer (MCMS only)
 
 **Source:** [deploy/product.go](../deploy/product.go)
 
-For 2.0, the `Deployer` interface is needed for MCMS and OCR3 operations only. Its `DeployChainContracts()` method is the 1.6 path -- use `DeployChainContractsAdapter` instead.
+For 2.0, the `Deployer` interface is needed for MCMS governance operations only. Its `DeployChainContracts()` method is the 1.6 path -- use `DeployChainContractsAdapter` instead. Note that `SetOCR3Config()` is a 1.6 concept and is not used in 2.0.
 
-EVM 2.0 reuses the 1.6 `EVMAdapter` struct for these shared methods since MCMS and OCR3 are not version-specific:
+EVM 2.0 reuses the 1.6 `EVMAdapter` struct for these shared methods since MCMS is not version-specific:
 
 ```go
 deploy.GetRegistry().RegisterDeployer(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &evmseqV1_6.EVMAdapter{})
@@ -163,9 +163,11 @@ deploy.GetRegistry().RegisterDeployer(chainsel.FamilyEVM, semver.MustParse("2.0.
 Methods you must implement:
 - `DeployMCMS()` -- deploy Multi-Chain Multi-Sig governance contracts
 - `FinalizeDeployMCMS()` -- post-deploy MCMS initialization (can no-op)
-- `SetOCR3Config()` -- set OCR3 configuration on OffRamp
 - `GrantAdminRoleToTimelock()` -- grant admin between timelocks
 - `UpdateMCMSConfig()` -- update MCMS signer/config on-chain
+
+Methods you can skip for 2.0:
+- `SetOCR3Config()` -- 1.6 only, not used in 2.0
 
 #### TokenAdapter
 
@@ -350,7 +352,7 @@ func init() {
 
     // --- Tier 2: Shared infrastructure registrations ---
 
-    // Deployer (for MCMS/OCR3 only -- can reuse a shared adapter struct)
+    // Deployer (for MCMS only -- can reuse a shared adapter struct)
     deploy.GetRegistry().RegisterDeployer(chainsel.FamilyMyChain, v, &MyMCMSAdapter{})
 
     // MCMS Reader
@@ -556,7 +558,7 @@ Each pipeline uses the adapter registries, so once your chain family's `init()` 
 
 | Chain | Location | Key Patterns |
 |-------|----------|--------------|
-| **EVM 2.0** | `chains/evm/deployment/v2_0_0/` | Canonical 2.0 reference: full adapter set, multi-version token adapters (1.5.1, 1.6.1, 2.0.0), reuses 1.6 `EVMAdapter` for MCMS/OCR3 |
+| **EVM 2.0** | `chains/evm/deployment/v2_0_0/` | Canonical 2.0 reference: full adapter set, multi-version token adapters (1.5.1, 1.6.1, 2.0.0), reuses 1.6 `EVMAdapter` for MCMS |
 | **EVM CCV Devenv** | `chainlink-ccv/build/devenv/evm/` | `OnChainConfigurable` + `TokenConfigProvider` implementation, `ImplFactory` registration |
 | **Solana 1.6** | `chains/solana/deployment/v1_6_0/` | Stateful adapter (caches timelock addresses), two-phase MCMS, PDA-based address derivation. Useful as a non-EVM reference even though it's 1.6 |
 
@@ -580,7 +582,7 @@ Use this checklist to track your progress:
   - [ ] `CommitteeVerifierContractAdapter` -- committee verifier refs
   - [ ] `TokenVerifierConfigAdapter` -- token verifier addresses
 - [ ] **Tier 2 (shared infrastructure)**
-  - [ ] `Deployer` (MCMS/OCR3 methods)
+  - [ ] `Deployer` (MCMS methods)
   - [ ] `MCMSReader`
   - [ ] `TransferOwnershipAdapter`
   - [ ] `TokenAdapter` (per pool version)
