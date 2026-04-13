@@ -102,7 +102,7 @@ func GlobalPostProposalCCIPSendHook(dom domain.Domain) cldf_changeset.PostPropos
 
 func verifyCCIPSend(dom domain.Domain) cldf_changeset.PostProposalHookFunc {
 	return func(ctx context.Context, params cldf_changeset.PostProposalHookParams) error {
-		selectors := chainSelectorsFromSuccessfulTimelockReports(params.Reports)
+		selectors := params.Env.BlockChains.ListChainSelectors()
 		if len(selectors) == 0 {
 			return nil
 		}
@@ -173,7 +173,7 @@ func runPostProposalCCIPSends(
 
 		feeTokens, err := provider.SupportedFeeTokens(env, srcSel, hookEnv.ForkContext)
 		if err != nil {
-			lggr.Warnf("verify-ccip-send: fee tokens for chain %d: %v; using native only", srcSel, err)
+			lggr.Warnf("verify-ccip-send: fee tokens for chain %d: %v", srcSel, err)
 			errs = append(errs, err)
 			continue
 		}
@@ -260,32 +260,6 @@ func groupSelectorsByFamily(lggr logger.Logger, selectors []uint64) map[string][
 			continue
 		}
 		out[family] = append(out[family], sel)
-	}
-	return out
-}
-
-func chainSelectorsFromSuccessfulTimelockReports(reports []cldf_changeset.MCMSTimelockExecuteReport) []uint64 {
-	seen := make(map[uint64]struct{})
-	var out []uint64
-	for _, r := range reports {
-		if r.Type != cldf_changeset.MCMSTimelockExecuteReportType {
-			continue
-		}
-		if r.Status != "" && r.Status != "SUCCESS" {
-			continue
-		}
-		if r.Error != "" {
-			continue
-		}
-		sel := r.Input.ChainSelector
-		if sel == 0 {
-			continue
-		}
-		if _, dup := seen[sel]; dup {
-			continue
-		}
-		seen[sel] = struct{}{}
-		out = append(out, sel)
 	}
 	return out
 }

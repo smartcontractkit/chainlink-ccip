@@ -14,6 +14,9 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	evmchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
@@ -222,8 +225,8 @@ func successfulTimelockReport(selector uint64) cldf_changeset.MCMSTimelockExecut
 func newTestHookEnvAndDataStore(t *testing.T) (cldf_changeset.ProposalHookEnv, datastore.DataStore) {
 	ds := datastore.NewMemoryDataStore()
 	return cldf_changeset.ProposalHookEnv{
-		Name:      "test-env",
-		Logger:    logger.Test(t),
+		Name:   "test-env",
+		Logger: logger.Test(t),
 	}, ds.Seal()
 }
 
@@ -264,22 +267,6 @@ func TestGlobalPostProposalCCIPSendHook_Metadata(t *testing.T) {
 	require.NotNil(t, h.Func)
 }
 
-func TestChainSelectorsFromSuccessfulTimelockReports_FiltersAndDedupes(t *testing.T) {
-	eth := chain_selectors.ETHEREUM_MAINNET.Selector
-	sol := chain_selectors.SOLANA_MAINNET.Selector
-	reports := []cldf_changeset.MCMSTimelockExecuteReport{
-		{Type: "other", Input: cldf_changeset.MCMSTimelockExecuteReportInput{ChainSelector: eth}},
-		{Type: cldf_changeset.MCMSTimelockExecuteReportType, Status: "FAILED", Input: cldf_changeset.MCMSTimelockExecuteReportInput{ChainSelector: eth}},
-		{Type: cldf_changeset.MCMSTimelockExecuteReportType, Error: "boom", Input: cldf_changeset.MCMSTimelockExecuteReportInput{ChainSelector: eth}},
-		{Type: cldf_changeset.MCMSTimelockExecuteReportType, Input: cldf_changeset.MCMSTimelockExecuteReportInput{ChainSelector: 0}},
-		successfulTimelockReport(eth),
-		{Type: cldf_changeset.MCMSTimelockExecuteReportType, Input: cldf_changeset.MCMSTimelockExecuteReportInput{ChainSelector: eth}},
-		successfulTimelockReport(sol),
-	}
-
-	require.Equal(t, []uint64{eth, sol}, chainSelectorsFromSuccessfulTimelockReports(reports))
-}
-
 func TestGroupSelectorsByFamily_SkipsInvalidSelectors(t *testing.T) {
 	eth := chain_selectors.ETHEREUM_MAINNET.Selector
 	poly := chain_selectors.POLYGON_MAINNET.Selector
@@ -291,20 +278,6 @@ func TestGroupSelectorsByFamily_SkipsInvalidSelectors(t *testing.T) {
 	require.Equal(t, []uint64{sol}, grouped[chain_selectors.FamilySolana])
 }
 
-func TestVerifyCCIPSend_NoSuccessfulReports_NoOp(t *testing.T) {
-	ResetPostProposalCCIPSendRegistryForTest()
-	dom := domain.NewDomain(t.TempDir(), "test")
-	fn := verifyCCIPSend(dom)
-
-	err := fn(t.Context(), cldf_changeset.PostProposalHookParams{
-		Env: cldf_changeset.ProposalHookEnv{
-			Name:   "missing-env",
-			Logger: logger.Test(t),
-		},
-	})
-	require.NoError(t, err)
-}
-
 func TestVerifyCCIPSend_DataStoreError(t *testing.T) {
 	ResetPostProposalCCIPSendRegistryForTest()
 	dom := domain.NewDomain(t.TempDir(), "test")
@@ -314,6 +287,9 @@ func TestVerifyCCIPSend_DataStoreError(t *testing.T) {
 		Env: cldf_changeset.ProposalHookEnv{
 			Name:   "missing-env",
 			Logger: logger.Test(t),
+			BlockChains: chain.NewBlockChains(map[uint64]chain.BlockChain{
+				chain_selectors.ETHEREUM_MAINNET.Selector: evmchain.Chain{},
+			}),
 		},
 		Reports: []cldf_changeset.MCMSTimelockExecuteReport{
 			successfulTimelockReport(chain_selectors.ETHEREUM_MAINNET.Selector),
@@ -364,6 +340,10 @@ func TestVerifyCCIPSend_AggregatesErrorsByFamily(t *testing.T) {
 		Env: cldf_changeset.ProposalHookEnv{
 			Name:   "staging",
 			Logger: logger.Test(t),
+			BlockChains: chain.NewBlockChains(map[uint64]chain.BlockChain{
+				chain_selectors.ETHEREUM_MAINNET.Selector: evmchain.Chain{},
+				chain_selectors.SOLANA_MAINNET.Selector:   solana.Chain{},
+			}),
 		},
 		Reports: []cldf_changeset.MCMSTimelockExecuteReport{
 			successfulTimelockReport(chain_selectors.ETHEREUM_MAINNET.Selector),
