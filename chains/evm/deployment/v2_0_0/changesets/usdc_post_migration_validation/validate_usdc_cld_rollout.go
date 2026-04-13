@@ -21,6 +21,7 @@ import (
 	cctpthroughccvpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	erc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20"
 	siloedpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
+	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	usdcproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	erc20lockboxbinding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/erc20_lock_box"
 	siloedusdcpoolbinding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/siloed_usdc_token_pool"
@@ -234,6 +235,15 @@ func verifyValidateUSDCCLDRollout(e deployment.Environment, cfg ValidateUSDCCLDR
 
 func applyValidateUSDCCLDRollout(e deployment.Environment, cfg ValidateUSDCCLDRolloutConfig) (deployment.ChangesetOutput, error) {
 	v := &validationCollector{}
+	defer func() {
+		if v.err() == nil {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: completed successfully (chains=%d homeChainLiquidity=%v)",
+				len(cfg.Chains),
+				cfg.HomeChainLiquidity != nil,
+			)
+		}
+	}()
 
 	// Step 1: validate per-chain post-state (TokenAdminRegistry, proxy wiring, lane configuration).
 	for chainSelector, chainCfg := range cfg.Chains {
@@ -268,6 +278,13 @@ func validateChainState(
 	cfg ValidateUSDCCLDRolloutChainConfig,
 	v *validationCollector,
 ) {
+	errsBefore := len(v.errs)
+	defer func() {
+		if len(v.errs) == errsBefore {
+			e.Logger.Infof("ValidateUSDCCLDRollout: chain %d: all configured checks for this chain passed", chain.Selector)
+		}
+	}()
+
 	callOpts := &bind.CallOpts{Context: e.GetContext()}
 	usdcToken := common.HexToAddress(cfg.USDCToken)
 
@@ -315,6 +332,12 @@ func validateChainState(
 				expectedTokenPoolAddr.Hex(),
 				tokenConfigReport.Output.TokenPool.Hex(),
 			)
+		} else if expectedTokenPoolAddr != nil {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: chain %d: TokenAdminRegistry active pool matches expected address %s",
+				chain.Selector,
+				expectedTokenPoolAddr.Hex(),
+			)
 		}
 	}
 
@@ -338,6 +361,13 @@ func validateChainState(
 		v.addf("chains[%d]: failed to check proxy supported token on %s: %v", chain.Selector, proxyAddr.Hex(), err)
 	} else if !supported {
 		v.addf("chains[%d]: proxy %s does not report USDC %s as supported", chain.Selector, proxyAddr.Hex(), usdcToken.Hex())
+	} else {
+		e.Logger.Infof(
+			"ValidateUSDCCLDRollout: chain %d: proxy %s reports USDC %s as a supported token",
+			chain.Selector,
+			proxyAddr.Hex(),
+			usdcToken.Hex(),
+		)
 	}
 
 	// Step 1c: read proxy backing pool addresses once (GetPools), then:
@@ -349,18 +379,37 @@ func validateChainState(
 		v.addf("chains[%d]: failed to read proxy pools from %s: %v", chain.Selector, proxyAddr.Hex(), err)
 	} else {
 		pools = &actualPools
-		validateExpectedProxyPools(chain.Selector, cfg.ExpectedProxyPools, actualPools, v)
+		e.Logger.Infof(
+			"ValidateUSDCCLDRollout: chain %d: read proxy backing pools from %s (cctpV1=%s cctpV2=%s cctpV2WithCCV=%s siloedLockRelease=%s)",
+			chain.Selector,
+			proxyAddr.Hex(),
+			actualPools.CctpV1Pool.Hex(),
+			actualPools.CctpV2Pool.Hex(),
+			actualPools.CctpV2PoolWithCCV.Hex(),
+			actualPools.SiloedLockReleasePool.Hex(),
+		)
+		validateExpectedProxyPools(e, chain.Selector, cfg.ExpectedProxyPools, actualPools, v)
 		validateExpectedProxyPoolRefs(e, chain.Selector, cfg.ExpectedProxyPoolRefs, actualPools, v)
 		validateExpectedProxyPoolKinds(e, chain.Selector, cfg.ExpectedProxyPoolKinds, actualPools, v)
 	}
 
 	for remoteSelector, remoteCfg := range cfg.RemoteChains {
-		validateRemoteChainState(e, callOpts, chain.Selector, proxy, pools, remoteSelector, remoteCfg, v)
+		validateRemoteChainState(e, chain, callOpts, chain.Selector, proxy, pools, remoteSelector, remoteCfg, v)
 	}
+}
+
+func needsRemotePoolValidation(cfg ValidateUSDCCLDRolloutRemoteChainConfig) bool {
+	return len(cfg.ExpectedRemotePools) > 0 ||
+		len(cfg.ExpectedRemotePoolKinds) > 0 ||
+		cfg.RequireLegacyRemotePool ||
+		cfg.RequireCurrentRemotePool ||
+		!datastore_utils.IsAddressRefEmpty(cfg.LegacyRemotePoolRef) ||
+		!datastore_utils.IsAddressRefEmpty(cfg.CurrentRemotePoolRef)
 }
 
 func validateRemoteChainState(
 	e deployment.Environment,
+	chain cldf_evm.Chain,
 	callOpts *bind.CallOpts,
 	chainSelector uint64,
 	proxy *usdcproxybinding.USDCTokenPoolProxy,
@@ -373,6 +422,18 @@ func validateRemoteChainState(
 		// Remote lane validations are opt-in per remoteSelector.
 		return
 	}
+
+	errsBefore := len(v.errs)
+	defer func() {
+		if len(v.errs) == errsBefore {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: chain %d -> remote %d: lane validation passed (mechanism=%s)",
+				chainSelector,
+				remoteSelector,
+				cfg.ExpectedMechanism,
+			)
+		}
+	}()
 
 	// Step 2a: mechanism must match what CLD configured on the proxy for this remote chain.
 	mechanism, err := proxy.GetLockOrBurnMechanism(callOpts, remoteSelector)
@@ -418,6 +479,88 @@ func validateRemoteChainState(
 				v.addf("chains[%d].remoteChains[%d]: failed to decode remote token bytes: %v", chainSelector, remoteSelector, decodeErr)
 			} else if remoteToken != common.HexToAddress(cfg.ExpectedRemoteToken) {
 				v.addf("chains[%d].remoteChains[%d]: remote token mismatch, expected %s got %s", chainSelector, remoteSelector, cfg.ExpectedRemoteToken, remoteToken.Hex())
+			} else {
+				e.Logger.Infof(
+					"ValidateUSDCCLDRollout: chain %d -> remote %d: remote token matches expected %s",
+					chainSelector,
+					remoteSelector,
+					cfg.ExpectedRemoteToken,
+				)
+			}
+		}
+	}
+
+	if needsRemotePoolValidation(cfg) {
+		remotePoolsBytes, proxyErr := proxy.GetRemotePools(callOpts, remoteSelector)
+		if proxyErr != nil {
+			backingPool := common.Address{}
+			if pools != nil {
+				backingPool = backingPoolForMechanism(*pools, cfg.ExpectedMechanism)
+			}
+			if backingPool == (common.Address{}) {
+				v.addf(
+					"chains[%d].remoteChains[%d]: failed to read remote pools from proxy: %v (subpool fallback unavailable: backing pool for mechanism %s is unset or proxy GetPools failed)",
+					chainSelector,
+					remoteSelector,
+					proxyErr,
+					cfg.ExpectedMechanism,
+				)
+			} else {
+				subpoolReport, subpoolErr := cldf_ops.ExecuteOperation(
+					e.OperationsBundle,
+					tokenpoolops.GetRemotePools,
+					chain,
+					cldf_evm_contract.FunctionInput[uint64]{
+						ChainSelector: chain.Selector,
+						Address:       backingPool,
+						Args:          remoteSelector,
+					},
+				)
+				if subpoolErr != nil {
+					v.addf(
+						"chains[%d].remoteChains[%d]: proxy GetRemotePools failed: %v; backing subpool %s GetRemotePools failed: %v",
+						chainSelector,
+						remoteSelector,
+						proxyErr,
+						backingPool.Hex(),
+						subpoolErr,
+					)
+				} else {
+					remotePoolsBytes = subpoolReport.Output
+					e.Logger.Infof(
+						"ValidateUSDCCLDRollout: chain %d -> remote %d: read remote pools from backing subpool %s (proxy GetRemotePools failed: %v)",
+						chainSelector,
+						remoteSelector,
+						backingPool.Hex(),
+						proxyErr,
+					)
+					proxyErr = nil
+				}
+			}
+		}
+
+		if proxyErr == nil {
+			actualPools, decodeErr := decodeEVMAddressList(remotePoolsBytes)
+			if decodeErr != nil {
+				v.addf("chains[%d].remoteChains[%d]: failed to decode remote pool bytes: %v", chainSelector, remoteSelector, decodeErr)
+			} else {
+				for _, expectedPool := range cfg.ExpectedRemotePools {
+					if !containsAddress(actualPools, common.HexToAddress(expectedPool)) {
+						v.addf("chains[%d].remoteChains[%d]: expected remote pool %s missing from remote pool list", chainSelector, remoteSelector, expectedPool)
+					}
+				}
+				for _, expectedPoolKind := range cfg.ExpectedRemotePoolKinds {
+					expectedPoolAddr, resolveErr := resolvePoolKindAddress(e, remoteSelector, expectedPoolKind)
+					if resolveErr != nil {
+						v.addf("chains[%d].remoteChains[%d]: failed to resolve remote pool kind %s: %v", chainSelector, remoteSelector, expectedPoolKind.Kind, resolveErr)
+						continue
+					}
+					if !containsAddress(actualPools, *expectedPoolAddr) {
+						v.addf("chains[%d].remoteChains[%d]: expected remote pool kind %s (%s) missing from remote pool list", chainSelector, remoteSelector, expectedPoolKind.Kind, expectedPoolAddr.Hex())
+					}
+				}
+				validateExpectedRemotePoolRef(e, chainSelector, remoteSelector, "legacy", cfg.RequireLegacyRemotePool, cfg.LegacyRemotePoolRef, actualPools, v)
+				validateExpectedRemotePoolRef(e, chainSelector, remoteSelector, "current", cfg.RequireCurrentRemotePool, cfg.CurrentRemotePoolRef, actualPools, v)
 			}
 		}
 	}
@@ -429,6 +572,16 @@ func validateHomeChainLiquidityState(
 	cfg ValidateUSDCCLDRolloutHomeChainLiquidityConfig,
 	v *validationCollector,
 ) {
+	errsBefore := len(v.errs)
+	defer func() {
+		if len(v.errs) == errsBefore {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: homeChainLiquidity chain %d: all configured liquidity checks passed",
+				cfg.ChainSelector,
+			)
+		}
+	}()
+
 	callOpts := &bind.CallOpts{Context: e.GetContext()}
 	usdcToken := common.HexToAddress(cfg.USDCToken)
 	siloedPoolAddr := common.HexToAddress(cfg.SiloedUSDCTokenPool)
@@ -445,6 +598,12 @@ func validateHomeChainLiquidityState(
 		v.addf("homeChainLiquidity: failed to read siloed pool token from %s: %v", cfg.SiloedUSDCTokenPool, err)
 	} else if siloedPoolToken != usdcToken {
 		v.addf("homeChainLiquidity: siloed pool token mismatch, expected %s got %s", usdcToken.Hex(), siloedPoolToken.Hex())
+	} else {
+		e.Logger.Infof(
+			"ValidateUSDCCLDRollout: homeChainLiquidity: siloed pool %s token matches USDC %s",
+			cfg.SiloedUSDCTokenPool,
+			usdcToken.Hex(),
+		)
 	}
 
 	lockBoxConfigReport, err := cldf_ops.ExecuteOperation(
@@ -463,6 +622,11 @@ func validateHomeChainLiquidityState(
 
 	lockBoxes := make(map[uint64]common.Address)
 	if err == nil {
+		e.Logger.Infof(
+			"ValidateUSDCCLDRollout: homeChainLiquidity: loaded %d lockbox config(s) from siloed pool %s",
+			len(lockBoxConfigReport.Output),
+			cfg.SiloedUSDCTokenPool,
+		)
 		lockBoxes = make(map[uint64]common.Address, len(lockBoxConfigReport.Output))
 		seenLockBoxes := make(map[common.Address]uint64, len(lockBoxConfigReport.Output))
 		for _, lockBoxCfg := range lockBoxConfigReport.Output {
@@ -480,6 +644,7 @@ func validateHomeChainLiquidityState(
 	}
 
 	for remoteSelector, laneCheck := range cfg.Checks {
+		errsBeforeLane := len(v.errs)
 		// Step 3b: validate each migrated lane. This is designed to be run twice during the rollout:
 		// - first with a tiny (1 USDC) withdraw amount as a canary
 		// - then with a larger percentage (e.g. 60%) and later with the remaining balance
@@ -505,6 +670,11 @@ func validateHomeChainLiquidityState(
 		}
 		if !lockReleaseReport.Output {
 			v.addf("homeChainLiquidity.checks[%d]: hybrid pool %s is not configured for lock-release", remoteSelector, cfg.HybridLockReleaseTokenPool)
+		} else {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: homeChainLiquidity.checks[%d]: hybrid pool is in lock-release mode for remote chain",
+				remoteSelector,
+			)
 		}
 
 		lockBoxAddr, ok := lockBoxes[remoteSelector]
@@ -601,6 +771,7 @@ func validateHomeChainLiquidityState(
 
 		expectedHybridLocked, hybridErr := deriveExpectedHybridLocked(laneCheck)
 		validateDerivedLiquidityValue(
+			e,
 			v,
 			fmt.Sprintf("homeChainLiquidity.checks[%d].ExpectedHybridLocked", remoteSelector),
 			lockedTokensReport.Output,
@@ -610,16 +781,25 @@ func validateHomeChainLiquidityState(
 
 		expectedLockBoxBalance, lockBoxErr := deriveExpectedLockBoxBalance(laneCheck)
 		validateDerivedLiquidityValue(
+			e,
 			v,
 			fmt.Sprintf("homeChainLiquidity.checks[%d].ExpectedLockBoxBalance", remoteSelector),
 			lockBoxBalanceReport.Output,
 			expectedLockBoxBalance,
 			lockBoxErr,
 		)
+
+		if len(v.errs) == errsBeforeLane {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: homeChainLiquidity.checks[%d]: lane liquidity assertions completed for this remote",
+				remoteSelector,
+			)
+		}
 	}
 }
 
 func validateExpectedProxyPools(
+	e deployment.Environment,
 	chainSelector uint64,
 	expected *ValidateUSDCCLDRolloutProxyPoolAddresses,
 	actual usdcproxybinding.USDCTokenPoolProxyPoolAddresses,
@@ -628,17 +808,49 @@ func validateExpectedProxyPools(
 	if expected == nil {
 		return
 	}
-	if expected.CCTPV1Pool != "" && actual.CctpV1Pool != common.HexToAddress(expected.CCTPV1Pool) {
-		v.addf("chains[%d]: proxy CCTP V1 pool mismatch, expected %s got %s", chainSelector, expected.CCTPV1Pool, actual.CctpV1Pool.Hex())
+	if expected.CCTPV1Pool != "" {
+		if actual.CctpV1Pool != common.HexToAddress(expected.CCTPV1Pool) {
+			v.addf("chains[%d]: proxy CCTP V1 pool mismatch, expected %s got %s", chainSelector, expected.CCTPV1Pool, actual.CctpV1Pool.Hex())
+		} else {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: chain %d: proxy CCTP V1 backing pool matches expected %s",
+				chainSelector,
+				expected.CCTPV1Pool,
+			)
+		}
 	}
-	if expected.CCTPV2Pool != "" && actual.CctpV2Pool != common.HexToAddress(expected.CCTPV2Pool) {
-		v.addf("chains[%d]: proxy CCTP V2 pool mismatch, expected %s got %s", chainSelector, expected.CCTPV2Pool, actual.CctpV2Pool.Hex())
+	if expected.CCTPV2Pool != "" {
+		if actual.CctpV2Pool != common.HexToAddress(expected.CCTPV2Pool) {
+			v.addf("chains[%d]: proxy CCTP V2 pool mismatch, expected %s got %s", chainSelector, expected.CCTPV2Pool, actual.CctpV2Pool.Hex())
+		} else {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: chain %d: proxy CCTP V2 backing pool matches expected %s",
+				chainSelector,
+				expected.CCTPV2Pool,
+			)
+		}
 	}
-	if expected.CCTPV2PoolWithCCV != "" && actual.CctpV2PoolWithCCV != common.HexToAddress(expected.CCTPV2PoolWithCCV) {
-		v.addf("chains[%d]: proxy CCTP V2 with CCV pool mismatch, expected %s got %s", chainSelector, expected.CCTPV2PoolWithCCV, actual.CctpV2PoolWithCCV.Hex())
+	if expected.CCTPV2PoolWithCCV != "" {
+		if actual.CctpV2PoolWithCCV != common.HexToAddress(expected.CCTPV2PoolWithCCV) {
+			v.addf("chains[%d]: proxy CCTP V2 with CCV pool mismatch, expected %s got %s", chainSelector, expected.CCTPV2PoolWithCCV, actual.CctpV2PoolWithCCV.Hex())
+		} else {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: chain %d: proxy CCTP V2 with CCV backing pool matches expected %s",
+				chainSelector,
+				expected.CCTPV2PoolWithCCV,
+			)
+		}
 	}
-	if expected.SiloedLockReleasePool != "" && actual.SiloedLockReleasePool != common.HexToAddress(expected.SiloedLockReleasePool) {
-		v.addf("chains[%d]: proxy siloed lock-release pool mismatch, expected %s got %s", chainSelector, expected.SiloedLockReleasePool, actual.SiloedLockReleasePool.Hex())
+	if expected.SiloedLockReleasePool != "" {
+		if actual.SiloedLockReleasePool != common.HexToAddress(expected.SiloedLockReleasePool) {
+			v.addf("chains[%d]: proxy siloed lock-release pool mismatch, expected %s got %s", chainSelector, expected.SiloedLockReleasePool, actual.SiloedLockReleasePool.Hex())
+		} else {
+			e.Logger.Infof(
+				"ValidateUSDCCLDRollout: chain %d: proxy siloed lock-release backing pool matches expected %s",
+				chainSelector,
+				expected.SiloedLockReleasePool,
+			)
+		}
 	}
 }
 
@@ -693,6 +905,13 @@ func validateResolvedProxyPoolRef(
 	expected := common.HexToAddress(resolvedRef.Address)
 	if actual != expected {
 		v.addf("chains[%d]: proxy %s pool mismatch, expected %s got %s", chainSelector, label, expected.Hex(), actual.Hex())
+	} else {
+		e.Logger.Infof(
+			"ValidateUSDCCLDRollout: chain %d: proxy %s backing pool matches datastore ref (%s)",
+			chainSelector,
+			label,
+			expected.Hex(),
+		)
 	}
 }
 
@@ -714,10 +933,46 @@ func validateResolvedProxyPoolKind(
 	}
 	if actual != *expected {
 		v.addf("chains[%d]: proxy %s pool mismatch, expected %s got %s", chainSelector, label, expected.Hex(), actual.Hex())
+	} else {
+		e.Logger.Infof(
+			"ValidateUSDCCLDRollout: chain %d: proxy %s backing pool matches resolved pool kind %s",
+			chainSelector,
+			label,
+			spec.Kind,
+		)
 	}
 }
 
-func validateDerivedLiquidityValue(v *validationCollector, field string, actual *big.Int, expected *big.Int, err error) {
+func validateExpectedRemotePoolRef(
+	e deployment.Environment,
+	chainSelector uint64,
+	remoteSelector uint64,
+	label string,
+	required bool,
+	ref cldf_datastore.AddressRef,
+	actualPools []common.Address,
+	v *validationCollector,
+) {
+	if datastore_utils.IsAddressRefEmpty(ref) {
+		if required {
+			v.addf("chains[%d].remoteChains[%d]: %s remote pool ref is required", chainSelector, remoteSelector, label)
+		}
+		return
+	}
+	// Important: resolve against remoteSelector so we only search the remote chain's datastore scope.
+	// This prevents accidentally selecting a same-type/version ref from the local chain.
+	resolvedRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, remoteSelector, datastore_utils.FullRef)
+	if err != nil {
+		v.addf("chains[%d].remoteChains[%d]: failed to resolve %s remote pool ref %s: %v", chainSelector, remoteSelector, label, datastore_utils.SprintRef(ref), err)
+		return
+	}
+	expected := common.HexToAddress(resolvedRef.Address)
+	if !containsAddress(actualPools, expected) {
+		v.addf("chains[%d].remoteChains[%d]: %s remote pool %s missing from remote pool list", chainSelector, remoteSelector, label, expected.Hex())
+	}
+}
+
+func validateDerivedLiquidityValue(e deployment.Environment, v *validationCollector, field string, actual *big.Int, expected *big.Int, err error) {
 	if err != nil {
 		v.addf("%s: %v", field, err)
 		return
@@ -727,6 +982,8 @@ func validateDerivedLiquidityValue(v *validationCollector, field string, actual 
 	}
 	if actual.Cmp(expected) != 0 {
 		v.addf("%s mismatch, expected %s got %s", field, expected.String(), actual.String())
+	} else {
+		e.Logger.Infof("ValidateUSDCCLDRollout: %s matches expected %s", field, expected.String())
 	}
 }
 
@@ -932,6 +1189,18 @@ func decodeEVMAddressBytes(data []byte) (common.Address, error) {
 		}
 		return common.Address{}, fmt.Errorf("expected 20-byte or 32-byte address encoding, got %d bytes", len(data))
 	}
+}
+
+func decodeEVMAddressList(values [][]byte) ([]common.Address, error) {
+	out := make([]common.Address, 0, len(values))
+	for _, value := range values {
+		addr, err := decodeEVMAddressBytes(value)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, addr)
+	}
+	return out, nil
 }
 
 func containsAddress(values []common.Address, target common.Address) bool {
