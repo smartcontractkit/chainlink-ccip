@@ -51,6 +51,7 @@ var (
 	validateUSDCCLDVersionLegacyCanonicalUSDCTokenPool = semver.MustParse("1.6.2")
 	validateUSDCCLDVersionLegacyBurnMintTokenPool      = semver.MustParse("1.5.1")
 	validateUSDCCLDVersionLegacyHybridLockReleasePool  = semver.MustParse("1.6.2")
+	validateUSDCCLDVersionTokenAdminRegistry           = semver.MustParse("1.5.0")
 )
 
 type ValidateUSDCCLDRolloutConfig struct {
@@ -61,8 +62,10 @@ type ValidateUSDCCLDRolloutConfig struct {
 }
 
 type ValidateUSDCCLDRolloutChainConfig struct {
-	USDCToken          string
-	TokenAdminRegistry string
+	USDCToken string
+	// TokenAdminRegistryRef identifies the TokenAdminRegistry instance to read on this chain.
+	// For this rollout it should always be {type: "TokenAdminRegistry", version: "1.5.0"}.
+	TokenAdminRegistryRef cldf_datastore.AddressRef
 	// ExpectedTokenPool, ExpectedTokenPoolRef, and ExpectedTokenPoolKind are alternate ways to express
 	// the expected TokenAdminRegistry "active pool" on this chain for the current rollout phase.
 	ExpectedTokenPool     string
@@ -171,7 +174,7 @@ func verifyValidateUSDCCLDRollout(e deployment.Environment, cfg ValidateUSDCCLDR
 			v.addf("chains[%d]: chain selector is not available in environment", chainSelector)
 		}
 		verifyHexAddress(v, fmt.Sprintf("chains[%d].USDCToken", chainSelector), chainCfg.USDCToken, true)
-		verifyHexAddress(v, fmt.Sprintf("chains[%d].TokenAdminRegistry", chainSelector), chainCfg.TokenAdminRegistry, true)
+		verifyTokenAdminRegistryRef(v, fmt.Sprintf("chains[%d].TokenAdminRegistryRef", chainSelector), chainCfg.TokenAdminRegistryRef)
 		verifyHexAddress(v, fmt.Sprintf("chains[%d].ExpectedTokenPool", chainSelector), chainCfg.ExpectedTokenPool, false)
 		verifyHexAddress(v, fmt.Sprintf("chains[%d].USDCTokenPoolProxy", chainSelector), chainCfg.USDCTokenPoolProxy, false)
 		verifyProxyPools(v, fmt.Sprintf("chains[%d].ExpectedProxyPools", chainSelector), chainCfg.ExpectedProxyPools)
@@ -268,6 +271,16 @@ func validateChainState(
 	callOpts := &bind.CallOpts{Context: e.GetContext()}
 	usdcToken := common.HexToAddress(cfg.USDCToken)
 
+	// Step 1: resolve TokenAdminRegistry address from datastore (chain-scoped).
+	tokenAdminRegistryAddr, err := resolveExpectedAddress(e, chain.Selector, "", cfg.TokenAdminRegistryRef)
+	if err != nil {
+		v.addf("chains[%d]: failed to resolve TokenAdminRegistry: %v", chain.Selector, err)
+	}
+	if tokenAdminRegistryAddr == nil {
+		v.addf("chains[%d]: TokenAdminRegistryRef must resolve to an address", chain.Selector)
+		// Continue running proxy validations even if TAR cannot be read.
+	}
+
 	// Step 1a: resolve the expected "active pool" for TokenAdminRegistry on this chain. You can
 	// express this expectation as a direct address, as a datastore ref, or as a higher-level pool kind.
 	// All resolution paths are chain-scoped using chain.Selector.
@@ -282,25 +295,27 @@ func validateChainState(
 		}
 	}
 
-	tokenConfigReport, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle,
-		tokenadminops.GetTokenConfig,
-		chain,
-		cldf_evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cfg.TokenAdminRegistry),
-			Args:          usdcToken,
-		},
-	)
-	if err != nil {
-		v.addf("chains[%d]: failed to read token config from token admin registry %s: %v", chain.Selector, cfg.TokenAdminRegistry, err)
-	} else if expectedTokenPoolAddr != nil && tokenConfigReport.Output.TokenPool != *expectedTokenPoolAddr {
-		v.addf(
-			"chains[%d]: token admin registry active pool mismatch, expected %s got %s",
-			chain.Selector,
-			expectedTokenPoolAddr.Hex(),
-			tokenConfigReport.Output.TokenPool.Hex(),
+	if tokenAdminRegistryAddr != nil {
+		tokenConfigReport, err := cldf_ops.ExecuteOperation(
+			e.OperationsBundle,
+			tokenadminops.GetTokenConfig,
+			chain,
+			cldf_evm_contract.FunctionInput[common.Address]{
+				ChainSelector: chain.Selector,
+				Address:       *tokenAdminRegistryAddr,
+				Args:          usdcToken,
+			},
 		)
+		if err != nil {
+			v.addf("chains[%d]: failed to read token config from token admin registry %s: %v", chain.Selector, tokenAdminRegistryAddr.Hex(), err)
+		} else if expectedTokenPoolAddr != nil && tokenConfigReport.Output.TokenPool != *expectedTokenPoolAddr {
+			v.addf(
+				"chains[%d]: token admin registry active pool mismatch, expected %s got %s",
+				chain.Selector,
+				expectedTokenPoolAddr.Hex(),
+				tokenConfigReport.Output.TokenPool.Hex(),
+			)
+		}
 	}
 
 	proxyAddr, err := resolveExpectedAddress(e, chain.Selector, cfg.USDCTokenPoolProxy, cfg.USDCTokenPoolProxyRef)
@@ -870,6 +885,26 @@ func verifyAddressRef(v *validationCollector, field string, ref cldf_datastore.A
 	}
 	if ref.Address != "" && !common.IsHexAddress(ref.Address) {
 		v.addf("%s.Address: invalid address %q", field, ref.Address)
+	}
+}
+
+func verifyTokenAdminRegistryRef(v *validationCollector, field string, ref cldf_datastore.AddressRef) {
+	if datastore_utils.IsAddressRefEmpty(ref) {
+		v.addf("%s: value is required", field)
+		return
+	}
+	verifyAddressRef(v, field, ref)
+
+	// In this rollout TAR is fixed to TokenAdminRegistry v1.5.0.
+	if ref.Type != cldf_datastore.ContractType("TokenAdminRegistry") {
+		v.addf("%s.Type: expected %q, got %q", field, "TokenAdminRegistry", ref.Type)
+	}
+	if ref.Version == nil || !ref.Version.Equal(validateUSDCCLDVersionTokenAdminRegistry) {
+		if ref.Version == nil {
+			v.addf("%s.Version: expected %q, got <nil>", field, "1.5.0")
+		} else {
+			v.addf("%s.Version: expected %q, got %q", field, "1.5.0", ref.Version.String())
+		}
 	}
 }
 

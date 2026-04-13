@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,8 +25,11 @@ func validValidateUSDCCLDRolloutConfig() changesets.ValidateUSDCCLDRolloutConfig
 	return changesets.ValidateUSDCCLDRolloutConfig{
 		Chains: map[uint64]changesets.ValidateUSDCCLDRolloutChainConfig{
 			chainsel.ETHEREUM_MAINNET.Selector: {
-				USDCToken:          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-				TokenAdminRegistry: "0x1111111111111111111111111111111111111111",
+				USDCToken: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+				TokenAdminRegistryRef: datastore.AddressRef{
+					Type:    datastore.ContractType("TokenAdminRegistry"),
+					Version: semver.MustParse("1.5.0"),
+				},
 				ExpectedTokenPool:  "0x2222222222222222222222222222222222222222",
 				USDCTokenPoolProxy: "0x3333333333333333333333333333333333333333",
 				ExpectedProxyPools: &changesets.ValidateUSDCCLDRolloutProxyPoolAddresses{
@@ -83,6 +87,33 @@ func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidMechanism(t *testing.
 	err := validateUSDCCLDCS().VerifyPreconditions(env, cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported mechanism")
+}
+
+func TestValidateUSDCCLDRollout_VerifyPreconditions_TokenAdminRegistryRef_Required(t *testing.T) {
+	env := newValidateUSDCCLDTestEnv(t)
+	cfg := validValidateUSDCCLDRolloutConfig()
+	chainCfg := cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector]
+	chainCfg.TokenAdminRegistryRef = datastore.AddressRef{}
+	cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector] = chainCfg
+
+	err := validateUSDCCLDCS().VerifyPreconditions(env, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "TokenAdminRegistryRef: value is required")
+}
+
+func TestValidateUSDCCLDRollout_VerifyPreconditions_TokenAdminRegistryRef_WrongVersion(t *testing.T) {
+	env := newValidateUSDCCLDTestEnv(t)
+	cfg := validValidateUSDCCLDRolloutConfig()
+	chainCfg := cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector]
+	chainCfg.TokenAdminRegistryRef = datastore.AddressRef{
+		Type:    datastore.ContractType("TokenAdminRegistry"),
+		Version: semver.MustParse("1.5.1"),
+	}
+	cfg.Chains[chainsel.ETHEREUM_MAINNET.Selector] = chainCfg
+
+	err := validateUSDCCLDCS().VerifyPreconditions(env, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "TokenAdminRegistryRef.Version: expected")
 }
 
 func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidTokenPoolKind(t *testing.T) {
