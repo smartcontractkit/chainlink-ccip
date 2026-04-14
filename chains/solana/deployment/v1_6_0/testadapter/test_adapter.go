@@ -60,6 +60,7 @@ var (
 
 func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMTestAdapterForFamily)
 }
 
 type SVMAdapter struct {
@@ -84,6 +85,12 @@ func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	return &SVMAdapter{
 		state: s,
 		Chain: c,
+	}
+}
+
+func NewSVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
+	return &SVMAdapter{
+		state: &testadapters.DataStoreStateProvider{Selector: selector, DS: ds},
 	}
 }
 

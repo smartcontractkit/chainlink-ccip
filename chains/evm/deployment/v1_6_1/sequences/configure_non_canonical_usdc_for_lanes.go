@@ -59,13 +59,11 @@ var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
 			remotePool = common.LeftPadBytes(remotePool, 32)
 
 			remoteChains[remoteChainSelector] = tokens.RemoteChainConfig[[]byte, string]{
-				TokenTransferFeeConfig:                   remoteChainConfig.TokenTransferFeeConfig,
-				RemoteToken:                              remoteToken,
-				RemotePool:                               remotePool,
-				DefaultFinalityInboundRateLimiterConfig:  remoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
-				DefaultFinalityOutboundRateLimiterConfig: remoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
-				CustomFinalityInboundRateLimiterConfig:   remoteChainConfig.CustomFinalityInboundRateLimiterConfig,
-				CustomFinalityOutboundRateLimiterConfig:  remoteChainConfig.CustomFinalityOutboundRateLimiterConfig,
+				TokenTransferFeeConfig:    remoteChainConfig.TokenTransferFeeConfig,
+				RemoteToken:               remoteToken,
+				RemotePool:                remotePool,
+				InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
+				OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
 			}
 		}
 
