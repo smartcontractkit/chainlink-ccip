@@ -82,11 +82,11 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 type ConfigureChainForLanesInput struct {
 	ChainSelector       uint64
 	AllowOnrampOverride bool
-	Router              string
-	OnRamp              string
+	Router              []byte
+	OnRamp              []byte
 	CommitteeVerifiers  []CommitteeVerifierConfig[datastore.AddressRef]
-	FeeQuoter           string
-	OffRamp             string
+	FeeQuoter           []byte
+	OffRamp             []byte
 	RemoteChains        map[uint64]RemoteChainConfig[[]byte, string]
 	// FamilyExtras holds chain-family-specific configuration passed through
 	// from the changeset. Each family adapter's sequence is responsible for
@@ -107,6 +107,9 @@ type ChainFamily interface {
 	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error)
+	GetAddressBytesLength() uint8
+	GetChainFamilySelector() [4]byte
+	GetDefaultFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.

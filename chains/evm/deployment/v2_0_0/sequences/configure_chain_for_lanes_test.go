@@ -96,6 +96,10 @@ func deployChain(
 	return out
 }
 
+func addrBytes(hexAddr string) []byte {
+	return common.HexToAddress(hexAddr).Bytes()
+}
+
 func buildConfigureChainForLanesInput(
 	local deployedContracts,
 	localSelector uint64,
@@ -104,10 +108,10 @@ func buildConfigureChainForLanesInput(
 ) changesetadapters.ConfigureChainForLanesInput {
 	return changesetadapters.ConfigureChainForLanesInput{
 		ChainSelector: localSelector,
-		Router:        local.router,
-		OnRamp:        local.onRamp,
-		FeeQuoter:     local.feeQuoter,
-		OffRamp:       local.offRamp,
+		Router:        addrBytes(local.router),
+		OnRamp:        addrBytes(local.onRamp),
+		FeeQuoter:     addrBytes(local.feeQuoter),
+		OffRamp:       addrBytes(local.offRamp),
 		CommitteeVerifiers: []changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
 				CommitteeVerifier: []datastore.AddressRef{
@@ -749,10 +753,10 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 
 	partialInput := changesetadapters.ConfigureChainForLanesInput{
 		ChainSelector: chainSelector,
-		Router:        local.router,
-		OnRamp:        local.onRamp,
-		FeeQuoter:     local.feeQuoter,
-		OffRamp:       local.offRamp,
+		Router:        addrBytes(local.router),
+		OnRamp:        addrBytes(local.onRamp),
+		FeeQuoter:     addrBytes(local.feeQuoter),
+		OffRamp:       addrBytes(local.offRamp),
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
 				AllowTrafficFrom:     boolPtr(true),
@@ -887,7 +891,7 @@ func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
 	remote := deployChain(t, e, remoteSelector)
 
 	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
-	input.Router = localWithTest.testRouter
+	input.Router = addrBytes(localWithTest.testRouter)
 
 	_, err = operations.ExecuteSequence(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
@@ -1121,7 +1125,7 @@ func TestConfigureChainForLanes_OverwritesOnRampWhenAllowed(t *testing.T) {
 	require.NoError(t, err)
 
 	input := buildConfigureChainForLanesInput(localWithTest.deployedContracts, chainSelector, remote, remoteSelector)
-	input.Router = localWithTest.testRouter
+	input.Router = addrBytes(localWithTest.testRouter)
 	input.AllowOnrampOverride = true
 
 	_, err = operations.ExecuteSequence(
