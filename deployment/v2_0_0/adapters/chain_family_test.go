@@ -57,6 +57,18 @@ func (m *mockChainFamily) ResolveExecutor(_ datastore.DataStore, _ uint64, _ str
 	return "", nil
 }
 
+func (m *mockChainFamily) GetAddressBytesLength() uint8 {
+	return 20
+}
+
+func (m *mockChainFamily) GetChainFamilySelector() [4]byte {
+	return [4]byte{}
+}
+
+func (m *mockChainFamily) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
+	return adapters.FeeQuoterDestChainConfig{}
+}
+
 func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {
 	registry := adapters.NewChainFamilyRegistry()
 	adapter := &mockChainFamily{}

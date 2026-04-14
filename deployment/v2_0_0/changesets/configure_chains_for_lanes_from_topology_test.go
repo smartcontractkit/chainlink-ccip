@@ -87,6 +87,28 @@ func (m *mockChainFamilyAdapter) ResolveExecutor(_ datastore.DataStore, chainSel
 	return "", fmt.Errorf("executor not found for chain %d qualifier %q", chainSelector, qualifier)
 }
 
+func (m *mockChainFamilyAdapter) GetAddressBytesLength() uint8 {
+	return 20
+}
+
+func (m *mockChainFamilyAdapter) GetChainFamilySelector() [4]byte {
+	return [4]byte{0x28, 0x12, 0xd5, 0x2c}
+}
+
+func (m *mockChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
+	return adapters.FeeQuoterDestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           8_000_000,
+		DestGasPerPayloadByteBase:   16,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    90,
+	}
+}
+
 func (m *mockChainFamilyAdapter) getAddress(chainSelector uint64, contractType string) ([]byte, error) {
 	if m.addresses != nil {
 		if byType, ok := m.addresses[chainSelector]; ok {
@@ -157,6 +179,8 @@ func testRef(chainSelector uint64, address string, contractType datastore.Contra
 		Version:       semver.MustParse("1.0.0"),
 	}
 }
+
+func ptrTo[T any](v T) *T { return &v }
 
 func newMockAdapter(prefix string, chainAddresses map[uint64]map[string][]byte, executors map[uint64]map[string]string) *mockChainFamilyAdapter {
 	return &mockChainFamilyAdapter{
@@ -263,10 +287,10 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 	assert.Empty(t, remoteSolanaAdapter.inputs, "remote Solana adapter should not be called directly; it is only used for address conversion")
 
 	input := localAdapter.inputs[0]
-	assert.Equal(t, "0xaa01", input.Router)
-	assert.Equal(t, "0xbb02", input.OnRamp)
-	assert.Equal(t, "0xcc03", input.FeeQuoter)
-	assert.Equal(t, "0xdd04", input.OffRamp)
+	assert.Equal(t, []byte{0xaa, 0x01}, input.Router)
+	assert.Equal(t, []byte{0xbb, 0x02}, input.OnRamp)
+	assert.Equal(t, []byte{0xcc, 0x03}, input.FeeQuoter)
+	assert.Equal(t, []byte{0xdd, 0x04}, input.OffRamp)
 	require.Len(t, input.RemoteChains, 2)
 	assert.Equal(t, []byte{0xee, 0x22}, input.RemoteChains[remoteEVM].OffRamp)
 	assert.Equal(t, []byte{0xff, 0x22}, input.RemoteChains[remoteSolana].OffRamp)
@@ -544,7 +568,7 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
 						DefaultExecutorQualifier: "default",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{MaxDataBytes: 1000},
+						FeeQuoterDestChainConfig: changesets.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](1000)},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 100, Enabled: true},
 					},
 				},
@@ -557,7 +581,7 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
 						DefaultExecutorQualifier: "default",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{MaxDataBytes: 2000},
+						FeeQuoterDestChainConfig: changesets.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](2000)},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 200, Enabled: true},
 					},
 				},
@@ -646,7 +670,7 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 	})
 	require.NoError(t, err)
 	require.Len(t, evmAdapter.inputs, 1)
-	assert.Equal(t, "0xbb99", evmAdapter.inputs[0].Router)
+	assert.Equal(t, []byte{0xbb, 0x99}, evmAdapter.inputs[0].Router)
 	assert.True(t, evmAdapter.inputs[0].AllowOnrampOverride,
 		"UseTestRouter=true should set AllowOnrampOverride=true on sequence input")
 }
@@ -715,7 +739,7 @@ func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(
 	})
 	require.NoError(t, err)
 	require.Len(t, evmAdapter.inputs, 1)
-	assert.Equal(t, "0xaa01", evmAdapter.inputs[0].Router,
+	assert.Equal(t, []byte{0xaa, 0x01}, evmAdapter.inputs[0].Router,
 		"with UseTestRouter=false and both routers in the datastore, the standard Router should be selected")
 	assert.False(t, evmAdapter.inputs[0].AllowOnrampOverride,
 		"UseTestRouter=false should set AllowOnrampOverride=false on sequence input")

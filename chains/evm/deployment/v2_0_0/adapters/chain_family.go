@@ -174,8 +174,28 @@ func (a *ChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte
 // evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
 
+func (a *ChainFamilyAdapter) GetAddressBytesLength() uint8 {
+	return 20
+}
+
 func (a *ChainFamilyAdapter) GetChainFamilySelector() [4]byte {
 	return evmFamilySelector
+}
+
+func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccvadapters.FeeQuoterDestChainConfig {
+	return ccvadapters.FeeQuoterDestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           8_000_000,
+		DestGasPerPayloadByteBase:   20,
+		ChainFamilySelector:         evmFamilySelector,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    90,
+		USDPerUnitGas:               big.NewInt(1e6),
+	}
 }
 
 func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
