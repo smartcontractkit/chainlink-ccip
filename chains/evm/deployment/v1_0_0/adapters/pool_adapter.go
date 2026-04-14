@@ -146,8 +146,8 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 			}
 
 			output, err := a.Ops.SetRateLimiterConfig(b, chain, tokenPoolAddr, input.RemoteChainSelector,
-				input.DefaultFinalityOutboundRateLimiterConfig,
-				input.DefaultFinalityInboundRateLimiterConfig,
+				input.OutboundRateLimiterConfig,
+				input.InboundRateLimiterConfig,
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)

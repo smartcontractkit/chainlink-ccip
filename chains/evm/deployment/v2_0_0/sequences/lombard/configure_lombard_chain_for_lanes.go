@@ -15,14 +15,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lombard_verifier"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -126,19 +126,11 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
 				// Lombard does not use rate limiters
-				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+				InboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
 					Capacity: 0,
 					Rate:     0,
 				},
-				CustomFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
-					Capacity: 0,
-					Rate:     0,
-				},
-				DefaultFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
-					Capacity: 0,
-					Rate:     0,
-				},
-				CustomFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+				OutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
 					Capacity: 0,
 					Rate:     0,
 				},
@@ -161,11 +153,11 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemoteChainSelector: remoteChainSelector,
 				OutboundCCVs: []common.Address{
 					lombardVerifierResolverAddress,
-					common.Address{}, // This means "require the default CCV(s) for this lane".
+					{}, // This means "require the default CCV(s) for this lane".
 				},
 				InboundCCVs: []common.Address{
 					lombardVerifierResolverAddress,
-					common.Address{}, // This means "require the default CCV(s) for this lane".
+					{}, // This means "require the default CCV(s) for this lane".
 				},
 			})
 
