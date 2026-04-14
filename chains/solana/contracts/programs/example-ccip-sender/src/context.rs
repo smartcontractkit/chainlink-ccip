@@ -70,7 +70,7 @@ pub struct CcipSend<'info> {
     #[account(
         owner = ccip_fee_token_program.key(),
     )]
-    pub ccip_fee_token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub ccip_fee_token_mint: InterfaceAccount<'info, Mint>,
     #[account(
         mut,
         associated_token::authority = ccip_sender.key(),
