@@ -51,7 +51,7 @@ type TokenTransferFeeForDst struct {
 // chain selector. This allows the user to set multiple destination chain configurations for the same token
 // pool address without repeating the pool address for each one.
 type TokenTransferFeeForPool struct {
-	MinBlockConfirmations utils.Optional[uint16]   `json:"minBlockConfirmations" yaml:"minBlockConfirmations"`
+	AllowedFinalityConfig finality.Config          `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 	Destinations          []TokenTransferFeeForDst `json:"destinations" yaml:"destinations"`
 	PoolAddress           string                   `json:"poolAddress" yaml:"poolAddress"`
 }
@@ -133,10 +133,10 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 			}
 
 			feeConfigSettings := map[string]map[uint64]*TokenTransferFeeConfig{}
-			minBlocksSettings := map[string][4]byte{}
+			finConfigSettings := map[string]finality.Config{}
 			for _, pool := range src.TokenPools {
-				if minBlockConfirmations, ok := pool.MinBlockConfirmations.Get(); ok {
-					minBlocksSettings[pool.PoolAddress] = finality.Config{BlockDepth: minBlockConfirmations}.Raw()
+				if !pool.AllowedFinalityConfig.IsZero() {
+					finConfigSettings[pool.PoolAddress] = pool.AllowedFinalityConfig
 				}
 				if len(pool.Destinations) > 0 {
 					feeConfigSettings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
@@ -150,25 +150,25 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 				}
 			}
 
-			if len(minBlocksSettings) > 0 {
-				minBlocksReport, err := cldf_ops.ExecuteSequence(
+			if len(finConfigSettings) > 0 {
+				report, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle,
 					feesAdapter.SetAllowedFinalityConfig(&e),
 					e.BlockChains,
 					SetAllowedFinalityConfigSequenceInput{
 						Selector: src.Selector,
-						Settings: minBlocksSettings,
+						Settings: finConfigSettings,
 					},
 				)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetAllowedFinalityConfig operation for src %d: %w", src.Selector, err)
 				}
-				batchOps = append(batchOps, minBlocksReport.Output.BatchOps...)
-				reports = append(reports, minBlocksReport.ExecutionReports...)
+				batchOps = append(batchOps, report.Output.BatchOps...)
+				reports = append(reports, report.ExecutionReports...)
 			}
 
 			if len(feeConfigSettings) > 0 {
-				feeConfigsReport, err := cldf_ops.ExecuteSequence(
+				report, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle,
 					feesAdapter.SetTokenTransferFee(&e),
 					e.BlockChains,
@@ -180,8 +180,8 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute SetTokenTransferFee operation for src %d: %w", src.Selector, err)
 				}
-				batchOps = append(batchOps, feeConfigsReport.Output.BatchOps...)
-				reports = append(reports, feeConfigsReport.ExecutionReports...)
+				batchOps = append(batchOps, report.Output.BatchOps...)
+				reports = append(reports, report.ExecutionReports...)
 			}
 		}
 

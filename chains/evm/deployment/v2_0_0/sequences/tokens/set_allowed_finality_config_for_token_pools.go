@@ -8,8 +8,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -26,7 +26,7 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 		}
 
 		writes := make([]contract.WriteOutput, 0)
-		for pool, minBlockConfirmations := range input.Settings {
+		for pool, finalityConfig := range input.Settings {
 			src := chain.Selector
 			if !common.IsHexAddress(pool) {
 				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for src %d: %s", src, pool)
@@ -42,7 +42,7 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 				contract.FunctionInput[[4]byte]{
 					ChainSelector: src,
 					Address:       addr,
-					Args:          minBlockConfirmations,
+					Args:          finalityConfig.Raw(),
 				},
 			)
 			if err != nil {
