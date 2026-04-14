@@ -92,7 +92,7 @@ func setTokenTransferFeeVerify() func(deployment.Environment, SetTokenTransferFe
 					return fmt.Errorf("empty pool address at args[%d].tokenPools[%d] (src=%d)", i, j, src.Selector)
 				}
 				if exists := seenPools.Add(trimmed); exists {
-					return fmt.Errorf("duplicate pool address at args[%d].tokenPools[%d] (src=%d): %s", i, j, src.Selector, pool.PoolAddress)
+					return fmt.Errorf("duplicate pool address at args[%d].tokenPools[%d] (src=%d): %s", i, j, src.Selector, trimmed)
 				}
 				if !pool.AllowedFinalityConfig.IsZero() {
 					if err := pool.AllowedFinalityConfig.Validate(); err != nil {
@@ -140,16 +140,17 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 			feeConfigSettings := map[string]map[uint64]*TokenTransferFeeConfig{}
 			finConfigSettings := map[string]finality.Config{}
 			for _, pool := range src.TokenPools {
+				poolAddress := strings.TrimSpace(pool.PoolAddress)
 				if !pool.AllowedFinalityConfig.IsZero() {
-					finConfigSettings[pool.PoolAddress] = pool.AllowedFinalityConfig
+					finConfigSettings[poolAddress] = pool.AllowedFinalityConfig
 				}
 				if len(pool.Destinations) > 0 {
-					feeConfigSettings[pool.PoolAddress] = map[uint64]*TokenTransferFeeConfig{}
+					feeConfigSettings[poolAddress] = map[uint64]*TokenTransferFeeConfig{}
 					for _, dst := range pool.Destinations {
-						if args, err := inferTokenTransferFeeArgs(feesAdapter, e, pool.PoolAddress, src.Selector, dst.Selector, dst); err != nil {
-							return deployment.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for src %d, dst %d, and pool %s: %w", src.Selector, dst.Selector, pool.PoolAddress, err)
+						if args, err := inferTokenTransferFeeArgs(feesAdapter, e, poolAddress, src.Selector, dst.Selector, dst); err != nil {
+							return deployment.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for src %d, dst %d, and pool %s: %w", src.Selector, dst.Selector, poolAddress, err)
 						} else {
-							feeConfigSettings[pool.PoolAddress][dst.Selector] = args
+							feeConfigSettings[poolAddress][dst.Selector] = args
 						}
 					}
 				}
