@@ -94,6 +94,11 @@ func setTokenTransferFeeVerify() func(deployment.Environment, SetTokenTransferFe
 				if exists := seenPools.Add(trimmed); exists {
 					return fmt.Errorf("duplicate pool address at args[%d].tokenPools[%d] (src=%d): %s", i, j, src.Selector, pool.PoolAddress)
 				}
+				if !pool.AllowedFinalityConfig.IsZero() {
+					if err := pool.AllowedFinalityConfig.Validate(); err != nil {
+						return fmt.Errorf("invalid allowed finality config at args[%d].tokenPools[%d] (src=%d): %w", i, j, src.Selector, err)
+					}
+				}
 
 				seenDests := utils.NewSet[uint64]()
 				for k, dst := range pool.Destinations {
