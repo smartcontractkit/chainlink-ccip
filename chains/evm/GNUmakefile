@@ -69,14 +69,8 @@ extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to b
 
 .PHONY: operations
 operations: pnpmdep wrappers
-    # Pre v2
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
-    # v2
-	go run cmd/operations-gen/main.go -config ../../ccv/chains/evm/deployment/operations_gen_config.yaml
 
 .PHONY: operations-fast
 operations-fast:
-    # Pre v2
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
-    # v2
-	go run cmd/operations-gen/main.go -config ../../ccv/chains/evm/deployment/operations_gen_config.yaml

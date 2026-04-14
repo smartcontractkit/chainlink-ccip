@@ -54,6 +54,7 @@ func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffR
 
 func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMTestAdapterForFamily)
 }
 
 type EVMAdapter struct {
@@ -72,6 +73,12 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	return &EVMAdapter{
 		state: s,
 		Chain: c,
+	}
+}
+
+func NewEVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
+	return &EVMAdapter{
+		state: &testadapters.DataStoreStateProvider{Selector: selector, DS: ds},
 	}
 }
 
@@ -180,8 +187,14 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		if err != nil {
 			return 0, messageID, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
 		}
-
-		sender.Value = fee
+		if msg.FeeToken == (common.Address{}) || msg.FeeToken == common.HexToAddress(a.NativeFeeToken()) {
+			sender.Value = fee
+		} else {
+			err := a.AllowRouterToWithdrawTokens(ctx, msg.FeeToken.Hex(), new(big.Int).Add(fee, fee)) // approve 2x the fee to be safe
+			if err != nil {
+				return 0, messageID, fmt.Errorf("failed to approve tokens for fee: %w", err)
+			}
+		}
 
 		tx, err := r.CcipSend(sender, destChainSelector, msg)
 		if err != nil {
@@ -222,7 +235,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		}
 		messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 
-		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
+		fmt.Printf("Sent CCIP message %+v id %s seq %d from chain %d to chain %d\n", msg, messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
 		return it.Event.SequenceNumber, messageID, nil
 	}
 }

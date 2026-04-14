@@ -519,9 +519,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 								RegistryRef: datastore.AddressRef{}, // inferred
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmB.Chain.Selector: {
-										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-										OutboundCCVs:                             []datastore.AddressRef{},
-										InboundCCVs:                              []datastore.AddressRef{},
+										OutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:              []datastore.AddressRef{},
+										InboundCCVs:               []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
 											ChainSelector: evmB.Chain.Selector,
 											Qualifier:     evmB.Token.Symbol,
@@ -551,9 +551,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 								RegistryRef: datastore.AddressRef{}, // inferred
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmA.Chain.Selector: {
-										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-										OutboundCCVs:                             []datastore.AddressRef{},
-										InboundCCVs:                              []datastore.AddressRef{},
+										OutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:              []datastore.AddressRef{},
+										InboundCCVs:               []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
 											Address: tokA.Hex(), // Testing a different code path
 										},
@@ -876,9 +876,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								evmA.Chain.Selector: {
-									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:                             []datastore.AddressRef{},
-									InboundCCVs:                              []datastore.AddressRef{},
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: evmA.Chain.Selector,
 										Qualifier:     evmA.Token.Symbol,
@@ -892,9 +892,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 									},
 								},
 								evmB.Chain.Selector: {
-									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:                             []datastore.AddressRef{},
-									InboundCCVs:                              []datastore.AddressRef{},
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: evmB.Chain.Selector,
 										Qualifier:     evmB.Token.Symbol,
@@ -924,9 +924,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
-									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:                             []datastore.AddressRef{},
-									InboundCCVs:                              []datastore.AddressRef{},
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: solbnm.Chain.Selector,
 										Qualifier:     solbnm.Token.Symbol,
@@ -956,9 +956,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
-									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-									OutboundCCVs:                             []datastore.AddressRef{},
-									InboundCCVs:                              []datastore.AddressRef{},
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: solbnm.Chain.Selector,
 										Qualifier:     solbnm.Token.Symbol,

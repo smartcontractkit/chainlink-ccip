@@ -245,7 +245,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -265,7 +265,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -334,7 +334,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -349,7 +349,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -389,7 +389,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -406,7 +406,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -509,7 +509,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -525,7 +525,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -645,7 +645,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							selB: {
-								DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+								OutboundRateLimiterConfig: defaultRL,
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: selB,
 									Qualifier:     tokenSymbolB,
@@ -677,7 +677,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							selA: {
-								DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+								OutboundRateLimiterConfig: defaultRL,
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: selA,
 									Qualifier:     tokenSymbolA,
@@ -783,7 +783,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							solChainSel: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							solChainSel: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
@@ -791,11 +791,11 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 					TokenPoolVersion: v1_6_0_scenarios,
 					DeployTokenInput: &tokensapi.DeployTokenInput{
 						Name: "Scenario5 SOL Token", Symbol: solTokenSymbol, Decimals: 9,
-						Type:                  solanautils.SPLTokens,
-						ExternalAdmin:         solana.NewWallet().PublicKey().String(),
+						Type:                   solanautils.SPLTokens,
+						ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 						DisableFreezeAuthority: true,
-						Senders:               []string{solChain.DeployerKey.PublicKey().String()},
-						PreMint:               &defaultPreMint,
+						Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+						PreMint:                &defaultPreMint,
 					},
 					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 						TokenPoolQualifier: "",
@@ -803,7 +803,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							evmChainSel: {DefaultFinalityOutboundRateLimiterConfig: defaultRL},
+							evmChainSel: {OutboundRateLimiterConfig: defaultRL},
 						},
 					},
 				},
