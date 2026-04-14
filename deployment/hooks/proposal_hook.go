@@ -53,6 +53,8 @@ var (
 	oncePostProposalCCIPSendRegistry      sync.Once
 )
 
+// GetPostProposalCCIPSendRegistry returns the singleton registry used by
+// family-specific post-proposal CCIP send providers.
 func GetPostProposalCCIPSendRegistry() *PostProposalCCIPSendRegistry {
 	oncePostProposalCCIPSendRegistry.Do(func() {
 		singletonPostProposalCCIPSendRegistry = newPostProposalCCIPSendRegistry()
@@ -100,8 +102,11 @@ func GlobalPostProposalCCIPSendHook(dom domain.Domain) cldf_changeset.PostPropos
 	}
 }
 
+// verifyCCIPSend builds the post-proposal function that runs CCIP send
+// verification across all families represented in the hook environment.
 func verifyCCIPSend(dom domain.Domain) cldf_changeset.PostProposalHookFunc {
 	return func(ctx context.Context, params cldf_changeset.PostProposalHookParams) error {
+		// Hook runs only against chains involved in the proposal execution.
 		selectors := params.Env.BlockChains.ListChainSelectors()
 		if len(selectors) == 0 {
 			return nil
@@ -128,6 +133,8 @@ func verifyCCIPSend(dom domain.Domain) cldf_changeset.PostProposalHookFunc {
 	}
 }
 
+// runPostProposalCCIPSends executes CCIP send verification probes for each
+// source selector, destination selector, and supported fee token.
 func runPostProposalCCIPSends(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -143,6 +150,7 @@ func runPostProposalCCIPSends(
 		return nil
 	}
 	var errs []error
+	// Adapters and provider contracts consume cldf.Environment, so rebuild it from hook inputs.
 	env := cldf.Environment{
 		Name:        hookEnv.Name,
 		Logger:      hookEnv.Logger,
@@ -178,6 +186,7 @@ func runPostProposalCCIPSends(
 			continue
 		}
 		if len(feeTokens) == 0 {
+			// Keep a native-fee send path even when no ERC20 fee token is discoverable.
 			feeTokens = []string{""}
 		}
 
@@ -199,19 +208,31 @@ func runPostProposalCCIPSends(
 				errs = append(errs, fmt.Errorf("verify-ccip-send: dest selector %d: %w", destSel, err))
 				continue
 			}
-			var destAdapter testadapters.TestAdapter
-			if destFamily == family {
-				destAdapter = factory(&env, destSel)
-			} else {
-				// source and dest selectors should have same version
-				// there is no cross version lane supported yet
-				destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
+			var destAdapter testadapters.TestAdapterForFamily
+
+			// if dest sel is not present in env we just load the family specific adapter with the selector, otherwise we load the full adapter with env
+			if !env.BlockChains.Exists(destSel) {
+				destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
 				if !ok {
-					errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
+					errs = append(errs, fmt.Errorf(
+						"verify-ccip-send: no test adapter for family %s version %s",
 						destFamily, adapterVer.String()))
 					continue
 				}
-				destAdapter = destAdapterFactory(&env, destSel)
+				destAdapter = destAdapterFactory(env.DataStore, destSel)
+			} else {
+				if family == destFamily {
+					destAdapter = factory(&env, destSel)
+				} else {
+					// Backward compatibility: fall back to full adapters when available.
+					fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
+					if !hasFullAdapter {
+						errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
+							destFamily, adapterVer.String()))
+						continue
+					}
+					destAdapter = fullDestFactory(&env, destSel)
+				}
 			}
 
 			receiver := destAdapter.CCIPReceiver()
@@ -224,6 +245,7 @@ func runPostProposalCCIPSends(
 			}
 
 			for _, feeTok := range feeTokens {
+				// Send one probe per fee token to verify each available fee payment path.
 				msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
 					DestChainSelector: destSel,
 					Receiver:          receiver,
@@ -251,6 +273,7 @@ func runPostProposalCCIPSends(
 	return errors.Join(errs...)
 }
 
+// groupSelectorsByFamily groups selectors by chain family and drops invalid selectors.
 func groupSelectorsByFamily(lggr logger.Logger, selectors []uint64) map[string][]uint64 {
 	out := make(map[string][]uint64)
 	for _, sel := range selectors {

@@ -190,14 +190,24 @@ func newUniqueAdapterVersion() *semver.Version {
 
 func registerFactoryForVersion(t *testing.T, family string, version *semver.Version, adapters map[uint64]*stubTestAdapter) {
 	t.Helper()
+	lookupAdapter := func(selector uint64) *stubTestAdapter {
+		if ad, ok := adapters[selector]; ok {
+			return ad
+		}
+		return &stubTestAdapter{selector: selector, family: family}
+	}
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(
 		family,
 		version,
 		func(_ *cldf.Environment, selector uint64) testadapters.TestAdapter {
-			if ad, ok := adapters[selector]; ok {
-				return ad
-			}
-			return &stubTestAdapter{selector: selector, family: family}
+			return lookupAdapter(selector)
+		},
+	)
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(
+		family,
+		version,
+		func(_ datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
+			return lookupAdapter(selector)
 		},
 	)
 }
@@ -500,7 +510,7 @@ func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "no test adapter for dest family solana version")
+	require.ErrorContains(t, err, "no receiver/extra-args adapter for dest family solana version")
 	require.ErrorContains(t, err, version.String())
 }
 

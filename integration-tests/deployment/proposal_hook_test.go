@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/domain"
@@ -203,9 +204,11 @@ func TestProposalHookForCCIPSend(t *testing.T) {
 	hook := hooks.GlobalPostProposalCCIPSendHook(dom)
 	hookErr := hook.Func(t.Context(), cldf_changeset.PostProposalHookParams{
 		Env: cldf_changeset.ProposalHookEnv{
-			Name:        e.Name,
-			Logger:      e.Logger,
-			BlockChains: e.BlockChains,
+			Name:   e.Name,
+			Logger: e.Logger,
+			BlockChains: chain.NewBlockChains(map[uint64]chain.BlockChain{
+				chain_selectors.ETHEREUM_MAINNET.Selector: e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector],
+			}),
 			ForkContext: &cldf_changeset.EVMForkContext{
 				ChainConfig: cldfenv.ChainConfig{
 					HTTPRPCs: []cldfenv.RPCs{{External: "http://127.0.0.1:8545"}},

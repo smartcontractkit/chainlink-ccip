@@ -31,6 +31,7 @@ import (
 
 var _ cciphooks.PostProposalCCIPSend = (*EVMPostProposalCCIPSend)(nil)
 
+// fund deployer with at least one token unit so forked sends can pay fees.
 var feeTokenFundingAmount = big.NewInt(1e18)
 
 func init() {
@@ -40,9 +41,8 @@ func init() {
 // EVMPostProposalCCIPSend provides EVM-specific discovery of CCIP lanes and fee tokens for post-proposal verify.
 type EVMPostProposalCCIPSend struct{}
 
-// SkipSend returns true if the proposal hook should be skipped
-// In this case it returns true if ProposalHook env is not forked
-// if not forked the fork context should be nil
+// SkipSend reports whether post-proposal CCIP send verification should be skipped.
+// It returns true when the hook environment is not running on an EVM fork.
 func (e *EVMPostProposalCCIPSend) SkipSend(env cldf_changeset.ProposalHookEnv) bool {
 	envContext := env.ForkContext
 	if envContext == nil {
@@ -52,6 +52,8 @@ func (e *EVMPostProposalCCIPSend) SkipSend(env cldf_changeset.ProposalHookEnv) b
 	return !ok || evmForkContext == nil
 }
 
+// PreSendValidation verifies that srcSel is a valid selector and that the
+// source chain exists in the EVM chains configured on env.
 func (e *EVMPostProposalCCIPSend) PreSendValidation(env cldf.Environment, srcSel uint64) error {
 	_, err := chain_selectors.GetSelectorFamily(srcSel)
 	if err != nil {
@@ -64,6 +66,8 @@ func (e *EVMPostProposalCCIPSend) PreSendValidation(env cldf.Environment, srcSel
 	return nil
 }
 
+// SupportedDestinations returns all destination selectors that have a
+// resolvable lane version from the source selector.
 func (e *EVMPostProposalCCIPSend) SupportedDestinations(env cldf.Environment, srcSel uint64) ([]uint64, error) {
 	allDests, err := e.supportedRemoteChainsWithVersions(env, srcSel)
 	if err != nil {
@@ -72,6 +76,7 @@ func (e *EVMPostProposalCCIPSend) SupportedDestinations(env cldf.Environment, sr
 	return maps.Keys(allDests), nil
 }
 
+// AdapterVersionForLane returns the adapter version for the srcSel -> destSel lane.
 func (e *EVMPostProposalCCIPSend) AdapterVersionForLane(env cldf.Environment, srcSel, destSel uint64) (*semver.Version, error) {
 	allDests, err := e.supportedRemoteChainsWithVersions(env, srcSel)
 	if err != nil {
@@ -85,6 +90,8 @@ func (e *EVMPostProposalCCIPSend) AdapterVersionForLane(env cldf.Environment, sr
 	return nil, fmt.Errorf("no adapter version found for src %d -> dest %d", srcSel, destSel)
 }
 
+// supportedRemoteChainsWithVersions resolves destination selectors and
+// their lane versions for a given source selector.
 func (e *EVMPostProposalCCIPSend) supportedRemoteChainsWithVersions(env cldf.Environment, srcSel uint64) (map[uint64]*semver.Version, error) {
 	resolver := &adapters1_2.LaneVersionResolver{}
 	alldests, _, err := resolver.DeriveLaneVersionsForChain(env, srcSel)
@@ -94,6 +101,9 @@ func (e *EVMPostProposalCCIPSend) supportedRemoteChainsWithVersions(env cldf.Env
 	return alldests, nil
 }
 
+// SupportedFeeTokens discovers fee tokens configured on the source chain's
+// FeeQuoter and ensures the deployer is funded for each token on forked chains.
+// The first returned token is always the empty string, representing native fee payment.
 func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSel uint64, forkContext cldf_changeset.ForkContext) ([]string, error) {
 	evmForkContext, ok := forkContext.(*cldf_changeset.EVMForkContext)
 	if !ok {
@@ -121,6 +131,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	}
 
 	var addrs []common.Address
+	// FeeQuoter bindings differ by major version; select the matching wrapper at runtime.
 	switch fqVer.Major() {
 	case 1:
 		fq, err := fq16.NewFeeQuoter(fqAddr, chain.Client)
@@ -153,6 +164,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		if err == nil && deployerBal.Cmp(feeTokenFundingAmount) >= 0 {
 			continue
 		}
+		// Prefer owner() when available; otherwise infer a likely funded account from token events.
 		tokenOwner, err := discoverFeeTokenFundingAccount(chain.Client, token, addr, feeTokenFundingAmount)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover funding account for fee token %s on chain %d: %w", addr.Hex(), srcSel, err)
@@ -169,6 +181,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		}
 	}
 	out := make([]string, 0, len(addrs)+1)
+	// Keep native token first (empty string) to mirror adapter expectations.
 	out = append(out, "") // native (empty encodes to wrapped native in adapter)
 	for _, a := range addrs {
 		out = append(out, a.Hex())
@@ -176,6 +189,8 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	return out, nil
 }
 
+// discoverFeeTokenFundingAccount returns an account that can fund fundingAmount
+// of tokenAddr, preferring owner() and falling back to event-derived candidates.
 func discoverFeeTokenFundingAccount(
 	backend bind.ContractBackend,
 	token *burn_mint_erc20.BurnMintERC20,
@@ -193,15 +208,18 @@ func discoverFeeTokenFundingAccount(
 	if ownerBal.Cmp(fundingAmount) >= 0 {
 		return owner, nil
 	}
-	return common.Address{}, fmt.Errorf("owner %s has insufficient balance %s for token %s (required %s)",
-		owner.Hex(), ownerBal.String(), tokenAddr.Hex(), fundingAmount.String())
+	// if owner does not have sufficient balance, fall back to finding sender from token events
+	return findFundingSenderFromTokenEvents(backend, token, tokenAddr, fundingAmount)
 }
 
+// optionalAddressGetter calls a no-arg address getter on contractAddr and
+// returns its result.
 func optionalAddressGetter(
 	backend bind.ContractBackend,
 	contractAddr common.Address,
 	getter string,
 ) (common.Address, error) {
+	// Build a minimal ABI dynamically so this works with tokens that may or may not expose the getter.
 	parsed, err := abi.JSON(strings.NewReader(fmt.Sprintf(
 		`[{"inputs":[],"name":"%s","outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view","type":"function"}]`,
 		getter,
@@ -220,6 +238,8 @@ func optionalAddressGetter(
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+// findFundingSenderFromTokenEvents searches recent Transfer/Approval logs and
+// returns a sender with at least fundingAmount balance.
 func findFundingSenderFromTokenEvents(
 	backend bind.ContractBackend,
 	token *burn_mint_erc20.BurnMintERC20,
@@ -247,6 +267,7 @@ func findFundingSenderFromTokenEvents(
 	transferSig := crypto.Keccak256Hash([]byte("Transfer(address,address,uint256)"))
 	approvalSig := crypto.Keccak256Hash([]byte("Approval(address,address,uint256)"))
 
+	// Walk newest-to-oldest logs in bounded chunks to quickly find an address that can fund the deployer.
 	for toBlock := latestBlock; ; {
 		fromBlock := uint64(0)
 		if toBlock > chunkSize {
@@ -264,6 +285,7 @@ func findFundingSenderFromTokenEvents(
 		if err != nil {
 			return common.Address{}, fmt.Errorf("filter token logs from %d to %d: %w", fromBlock, toBlock, err)
 		}
+		// Iterate logs backwards so recent token movement is checked first.
 		for i := len(logs) - 1; i >= 0; i-- {
 			lg := logs[i]
 			if len(lg.Topics) < 2 {
