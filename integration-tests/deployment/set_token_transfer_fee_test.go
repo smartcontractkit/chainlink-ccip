@@ -596,7 +596,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolA.Hex(),
-							MinBlockConfirmations: utils.NewOptional(uint16(12)),
+							AllowedFinalityConfig: finality.Config{BlockDepth: 12},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
@@ -621,7 +621,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolB.Hex(),
-							MinBlockConfirmations: utils.Optional[uint16]{Value: 12, Valid: false},
+							AllowedFinalityConfig: finality.Config{},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
@@ -646,7 +646,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolC.Hex(),
-							MinBlockConfirmations: utils.NewOptional(uint16(0)),
+							AllowedFinalityConfig: finality.Config{WaitForFinality: true},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
