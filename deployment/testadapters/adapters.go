@@ -99,9 +99,6 @@ type TestAdapter interface {
 	// // RandomReceiver returns a random receiver for the given chain family.
 	// RandomReceiver() []byte
 
-	// // CCIPReceiver returns a CCIP receiver for the given chain family.
-	CCIPReceiver() []byte
-
 	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is
 	// expected to be an EOA and not a contract.
 	// t parameter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
@@ -117,12 +114,6 @@ type TestAdapter interface {
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
-
-	// GetExtraArgs returns the default extra args for sending messages to this
-	// chain family from the given source family.
-	// Therefore the extra args are source-family encoded, so abi.encode for EVM,
-	// borsch for Solana, etc.
-	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 
 	// LowGasLimit returns a low gas limit value that can be used in tests to trigger out-of-gas errors.
 	LowGasLimit() *big.Int
@@ -157,12 +148,19 @@ type TestAdapter interface {
 
 	// CurrentBlock returns the current block number of the chain, if applicable.
 	CurrentBlock(t *testing.T) uint64
+
+	TestAdapterForFamily
 }
 
 // TestAdapterForFamily narrows TestAdapter to destination-message wiring helpers.
 // It is intentionally chain-agnostic and does not require a live chain client.
 type TestAdapterForFamily interface {
+	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
+	// GetExtraArgs returns the default extra args for sending messages to this
+	// chain family from the given source family.
+	// Therefore the extra args are source-family encoded, so abi.encode for EVM,
+	// borsch for Solana, etc.
 	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 }
 

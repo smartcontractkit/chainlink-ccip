@@ -510,7 +510,7 @@ func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "no receiver/extra-args adapter for dest family solana version")
+	require.ErrorContains(t, err, "no test adapter for family solana version")
 	require.ErrorContains(t, err, version.String())
 }
 
