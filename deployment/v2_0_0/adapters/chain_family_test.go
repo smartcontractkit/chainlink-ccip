@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
@@ -71,6 +72,14 @@ func (m *mockChainFamily) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuote
 
 func (m *mockChainFamily) GetDefaultRemoteChainConfig() adapters.RemoteChainDefaults {
 	return adapters.RemoteChainDefaults{}
+}
+
+func (m *mockChainFamily) GetDefaultCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierRemoteChainDefaults {
+	return adapters.CommitteeVerifierRemoteChainDefaults{}
+}
+
+func (m *mockChainFamily) GetDefaultFinalityConfig() finality.Config {
+	return finality.Config{}
 }
 
 func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {

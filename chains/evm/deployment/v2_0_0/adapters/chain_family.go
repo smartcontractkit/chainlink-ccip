@@ -12,6 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -226,6 +228,23 @@ func (a *ChainFamilyAdapter) GetDefaultRemoteChainConfig() ccvadapters.RemoteCha
 		TokenReceiverAllowed:      false,
 		MessageNetworkFeeUSDCents: 10,
 		TokenNetworkFeeUSDCents:   25,
+	}
+}
+
+func (a *ChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccvadapters.CommitteeVerifierRemoteChainDefaults {
+	return ccvadapters.CommitteeVerifierRemoteChainDefaults{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        0,
+		GasForVerification: 60_000,
+		PayloadSizeBytes:   390,
+	}
+}
+
+func (a *ChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
+	return finality.Config{
+		WaitForFinality: true,
+		WaitForSafe:     true,
+		BlockDepth:      1,
 	}
 }
 

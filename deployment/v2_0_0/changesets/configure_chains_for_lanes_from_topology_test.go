@@ -22,6 +22,7 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -117,6 +118,23 @@ func (m *mockChainFamilyAdapter) GetDefaultRemoteChainConfig() adapters.RemoteCh
 		TokenReceiverAllowed:      false,
 		MessageNetworkFeeUSDCents: 10,
 		TokenNetworkFeeUSDCents:   25,
+	}
+}
+
+func (m *mockChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierRemoteChainDefaults {
+	return adapters.CommitteeVerifierRemoteChainDefaults{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        0,
+		GasForVerification: 60_000,
+		PayloadSizeBytes:   390,
+	}
+}
+
+func (m *mockChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
+	return finality.Config{
+		WaitForFinality: true,
+		WaitForSafe:     true,
+		BlockDepth:      1,
 	}
 }
 
@@ -271,10 +289,10 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
-						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-							remoteEVM:    {FeeUSDCents: 10, GasForVerification: 20, PayloadSizeBytes: 30},
-							remoteSolana: {FeeUSDCents: 40, GasForVerification: 50, PayloadSizeBytes: 60},
-						},
+					RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
+						remoteEVM:    {FeeUSDCents: ptrTo[uint16](10), GasForVerification: ptrTo[uint32](20), PayloadSizeBytes: ptrTo[uint16](30)},
+						remoteSolana: {FeeUSDCents: ptrTo[uint16](40), GasForVerification: ptrTo[uint32](50), PayloadSizeBytes: ptrTo[uint16](60)},
+					},
 					},
 				},
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
@@ -1108,4 +1126,176 @@ func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *
 	assert.Equal(t, uint16(75), remote.TokenNetworkFeeUSDCents, "override TokenNetworkFeeUSDCents")
 	assert.Equal(t, uint16(500), remote.ExecutorDestChainConfig.USDCentsFee, "override ExecutorDestChainConfig.USDCentsFee")
 	assert.False(t, remote.ExecutorDestChainConfig.Enabled, "override ExecutorDestChainConfig.Enabled=false")
+}
+
+func TestConfigureChainsForLanesFromTopology_EmptyCVConfigUsesAdapterDefaults(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {
+				testRef(localSelector, "0xverifier", "CommitteeVerifier"),
+				testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"),
+			},
+		},
+	})
+
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0x11}, "OffRamp": {0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: &offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						},
+					},
+				},
+			},
+		},
+		Chains: []changesets.PartialChainConfig{
+			{
+				ChainSelector: localSelector,
+				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+					{
+						CommitteeQualifier: "default",
+						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {},
+						},
+					},
+				},
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+					remoteSelector: {},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, evmAdapter.inputs, 1)
+
+	cv := evmAdapter.inputs[0].CommitteeVerifiers[0]
+	remoteCfg := cv.RemoteChains[remoteSelector]
+	assert.False(t, remoteCfg.AllowlistEnabled, "adapter default AllowlistEnabled")
+	assert.Equal(t, uint16(0), remoteCfg.FeeUSDCents, "adapter default FeeUSDCents")
+	assert.Equal(t, uint32(60_000), remoteCfg.GasForVerification, "adapter default GasForVerification")
+	assert.Equal(t, uint16(390), remoteCfg.PayloadSizeBytes, "adapter default PayloadSizeBytes")
+
+	assert.True(t, cv.AllowedFinalityConfig.WaitForFinality, "adapter default WaitForFinality")
+	assert.True(t, cv.AllowedFinalityConfig.WaitForSafe, "adapter default WaitForSafe")
+	assert.Equal(t, uint16(1), cv.AllowedFinalityConfig.BlockDepth, "adapter default BlockDepth")
+}
+
+func TestConfigureChainsForLanesFromTopology_CVPointerOverridesReplaceDefaults(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	addAddress(t, ds, testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {
+				testRef(localSelector, "0xverifier", "CommitteeVerifier"),
+				testRef(localSelector, "0xresolver", "CommitteeVerifierResolver"),
+			},
+		},
+	})
+
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0x11}, "OffRamp": {0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	customFinality := finality.Config{WaitForFinality: true}
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: &offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						},
+					},
+				},
+			},
+		},
+		Chains: []changesets.PartialChainConfig{
+			{
+				ChainSelector: localSelector,
+				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+					{
+						CommitteeQualifier:    "default",
+						AllowedFinalityConfig: &customFinality,
+						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								AllowlistEnabled:   ptrTo(true),
+								FeeUSDCents:        ptrTo[uint16](99),
+								GasForVerification: ptrTo[uint32](80_000),
+								PayloadSizeBytes:   ptrTo[uint16](500),
+							},
+						},
+					},
+				},
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+					remoteSelector: {},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, evmAdapter.inputs, 1)
+
+	cv := evmAdapter.inputs[0].CommitteeVerifiers[0]
+	remoteCfg := cv.RemoteChains[remoteSelector]
+	assert.True(t, remoteCfg.AllowlistEnabled, "override AllowlistEnabled=true")
+	assert.Equal(t, uint16(99), remoteCfg.FeeUSDCents, "override FeeUSDCents")
+	assert.Equal(t, uint32(80_000), remoteCfg.GasForVerification, "override GasForVerification")
+	assert.Equal(t, uint16(500), remoteCfg.PayloadSizeBytes, "override PayloadSizeBytes")
+
+	assert.Equal(t, customFinality, cv.AllowedFinalityConfig, "override AllowedFinalityConfig")
+	assert.False(t, cv.AllowedFinalityConfig.WaitForSafe, "explicit finality should not have WaitForSafe")
+	assert.Equal(t, uint16(0), cv.AllowedFinalityConfig.BlockDepth, "explicit finality should not have BlockDepth")
 }
