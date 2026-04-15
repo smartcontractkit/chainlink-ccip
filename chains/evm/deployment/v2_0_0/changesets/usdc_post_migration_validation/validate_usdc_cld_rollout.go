@@ -140,10 +140,10 @@ type ValidateUSDCCLDRolloutLiquidityLaneCheck struct {
 	//
 	// It is intentionally uint64 to align with the migration changeset input type.
 	ExpectedWithdrawAmount    *uint64
-	PreHybridLocked           string
-	ExpectedHybridLocked      string
-	PreLockBoxBalance         string
-	ExpectedLockBoxBalance    string
+	PreHybridLocked           *uint64
+	ExpectedHybridLocked      *uint64
+	PreLockBoxBalance         *uint64
+	ExpectedLockBoxBalance    *uint64
 	ExpectedLiquidityProvider string
 }
 
@@ -227,10 +227,10 @@ func verifyValidateUSDCCLDRollout(e deployment.Environment, cfg ValidateUSDCCLDR
 			verifyEVMChainSelector(v, remoteSelector, "homeChainLiquidity.Checks")
 			verifyHexAddress(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedLiquidityProvider", remoteSelector), laneCheck.ExpectedLiquidityProvider, false)
 			verifyOptionalUint64(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedWithdrawAmount", remoteSelector), laneCheck.ExpectedWithdrawAmount, true)
-			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].PreHybridLocked", remoteSelector), laneCheck.PreHybridLocked, false)
-			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedHybridLocked", remoteSelector), laneCheck.ExpectedHybridLocked, false)
-			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].PreLockBoxBalance", remoteSelector), laneCheck.PreLockBoxBalance, false)
-			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedLockBoxBalance", remoteSelector), laneCheck.ExpectedLockBoxBalance, false)
+			verifyOptionalUint64(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].PreHybridLocked", remoteSelector), laneCheck.PreHybridLocked, false)
+			verifyOptionalUint64(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedHybridLocked", remoteSelector), laneCheck.ExpectedHybridLocked, false)
+			verifyOptionalUint64(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].PreLockBoxBalance", remoteSelector), laneCheck.PreLockBoxBalance, false)
+			verifyOptionalUint64(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedLockBoxBalance", remoteSelector), laneCheck.ExpectedLockBoxBalance, false)
 		}
 	}
 
@@ -992,16 +992,13 @@ func validateDerivedLiquidityValue(e deployment.Environment, v *validationCollec
 }
 
 func deriveExpectedHybridLocked(check ValidateUSDCCLDRolloutLiquidityLaneCheck) (*big.Int, error) {
-	if check.ExpectedHybridLocked != "" {
-		return parseBigInt(check.ExpectedHybridLocked)
+	if check.ExpectedHybridLocked != nil {
+		return new(big.Int).SetUint64(*check.ExpectedHybridLocked), nil
 	}
-	if check.PreHybridLocked == "" || check.ExpectedWithdrawAmount == nil {
+	if check.PreHybridLocked == nil || check.ExpectedWithdrawAmount == nil {
 		return nil, nil
 	}
-	pre, err := parseBigInt(check.PreHybridLocked)
-	if err != nil {
-		return nil, fmt.Errorf("invalid PreHybridLocked %q: %w", check.PreHybridLocked, err)
-	}
+	pre := new(big.Int).SetUint64(*check.PreHybridLocked)
 	withdraw := new(big.Int).SetUint64(*check.ExpectedWithdrawAmount)
 	if pre.Cmp(withdraw) < 0 {
 		return nil, fmt.Errorf("pre hybrid locked amount %s is smaller than expected withdraw amount %s", pre.String(), withdraw.String())
@@ -1010,16 +1007,13 @@ func deriveExpectedHybridLocked(check ValidateUSDCCLDRolloutLiquidityLaneCheck) 
 }
 
 func deriveExpectedLockBoxBalance(check ValidateUSDCCLDRolloutLiquidityLaneCheck) (*big.Int, error) {
-	if check.ExpectedLockBoxBalance != "" {
-		return parseBigInt(check.ExpectedLockBoxBalance)
+	if check.ExpectedLockBoxBalance != nil {
+		return new(big.Int).SetUint64(*check.ExpectedLockBoxBalance), nil
 	}
-	if check.PreLockBoxBalance == "" || check.ExpectedWithdrawAmount == nil {
+	if check.PreLockBoxBalance == nil || check.ExpectedWithdrawAmount == nil {
 		return nil, nil
 	}
-	pre, err := parseBigInt(check.PreLockBoxBalance)
-	if err != nil {
-		return nil, fmt.Errorf("invalid PreLockBoxBalance %q: %w", check.PreLockBoxBalance, err)
-	}
+	pre := new(big.Int).SetUint64(*check.PreLockBoxBalance)
 	withdraw := new(big.Int).SetUint64(*check.ExpectedWithdrawAmount)
 	return new(big.Int).Add(pre, withdraw), nil
 }
@@ -1115,23 +1109,6 @@ func verifyHexAddress(v *validationCollector, field, value string, required bool
 	}
 }
 
-func verifyOptionalBigInt(v *validationCollector, field, value string, mustBePositive bool) {
-	if value == "" {
-		return
-	}
-	n, err := parseBigInt(value)
-	if err != nil {
-		v.addf("%s: %v", field, err)
-		return
-	}
-	if mustBePositive && n.Sign() <= 0 {
-		v.addf("%s: must be greater than zero", field)
-	}
-	if !mustBePositive && n.Sign() < 0 {
-		v.addf("%s: must be zero or greater", field)
-	}
-}
-
 func verifyOptionalUint64(v *validationCollector, field string, value *uint64, mustBePositive bool) {
 	if value == nil {
 		return
@@ -1139,14 +1116,6 @@ func verifyOptionalUint64(v *validationCollector, field string, value *uint64, m
 	if mustBePositive && *value == 0 {
 		v.addf("%s: must be greater than zero", field)
 	}
-}
-
-func parseBigInt(value string) (*big.Int, error) {
-	n, ok := new(big.Int).SetString(strings.TrimSpace(value), 10)
-	if !ok {
-		return nil, fmt.Errorf("invalid decimal integer %q", value)
-	}
-	return n, nil
 }
 
 func mechanismUint8(mechanism string) (uint8, error) {
