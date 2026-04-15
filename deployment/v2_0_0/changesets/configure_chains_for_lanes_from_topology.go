@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"math/big"
 	"slices"
 	"strconv"
 
@@ -38,6 +39,27 @@ type CommitteeVerifierInputConfig struct {
 	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
+// FeeQuoterDestChainConfigOverrides provides lane-pair-specific overrides on top of the
+// chain-family defaults returned by the remote adapter's GetDefaultFeeQuoterDestChainConfig.
+// Nil fields are left at the adapter default; non-nil fields replace the default.
+//
+// DestGasOverhead is intentionally omitted — it is a LEGACY v2 field whose responsibility
+// moved to OnRamp.BaseExecutionGasCost. ChainFamilySelector is also omitted because it is
+// always auto-populated from the remote adapter.
+type FeeQuoterDestChainConfigOverrides struct {
+	OverrideExistingConfig      bool
+	IsEnabled                   *bool
+	MaxDataBytes                *uint32
+	MaxPerMsgGasLimit           *uint32
+	DestGasPerPayloadByteBase   *uint8
+	DefaultTokenFeeUSDCents     *uint16
+	DefaultTokenDestGasOverhead *uint32
+	DefaultTxGasLimit           *uint32
+	NetworkFeeUSDCents          *uint16
+	LinkFeeMultiplierPercent    *uint8
+	USDPerUnitGas               *big.Int
+}
+
 // PartialRemoteChainConfig is the user-facing input for a single remote chain. Contract
 // addresses that can be derived from the datastore (remote OnRamp/OffRamp, local Executor)
 // are resolved automatically — the user only provides the executor qualifier and lane-specific
@@ -49,9 +71,8 @@ type PartialRemoteChainConfig struct {
 	LaneMandatedInboundCCVs   []datastore.AddressRef
 	DefaultOutboundCCVs       []datastore.AddressRef
 	LaneMandatedOutboundCCVs  []datastore.AddressRef
-	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfig
+	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
 	ExecutorDestChainConfig   adapters.ExecutorDestChainConfig
-	AddressBytesLength        uint8
 	BaseExecutionGasCost      uint32
 	TokenReceiverAllowed      *bool
 	MessageNetworkFeeUSDCents uint16
@@ -260,19 +281,17 @@ func applyConfigureChains(
 			return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for chain family %q", family)
 		}
 
-		var routerAddr string
+		var routerBytes []byte
 		if useTestRouter {
-			routerBytes, rErr := adapter.GetTestRouter(e.DataStore, chainCfg.ChainSelector)
-			if rErr != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve test router on chain %d: %w", chainCfg.ChainSelector, rErr)
+			routerBytes, err = adapter.GetTestRouter(e.DataStore, chainCfg.ChainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve test router on chain %d: %w", chainCfg.ChainSelector, err)
 			}
-			routerAddr = fmt.Sprintf("0x%x", routerBytes)
 		} else {
-			routerBytes, rErr := adapter.GetRouterAddress(e.DataStore, chainCfg.ChainSelector)
-			if rErr != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve router on chain %d: %w", chainCfg.ChainSelector, rErr)
+			routerBytes, err = adapter.GetRouterAddress(e.DataStore, chainCfg.ChainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve router on chain %d: %w", chainCfg.ChainSelector, err)
 			}
-			routerAddr = fmt.Sprintf("0x%x", routerBytes)
 		}
 
 		onRampBytes, err := adapter.GetOnRampAddress(e.DataStore, chainCfg.ChainSelector)
@@ -327,11 +346,11 @@ func applyConfigureChains(
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
 			ChainSelector:       chainCfg.ChainSelector,
 			AllowOnrampOverride: useTestRouter,
-			Router:              routerAddr,
-			OnRamp:              fmt.Sprintf("0x%x", onRampBytes),
+			Router:              routerBytes,
+			OnRamp:              onRampBytes,
 			CommitteeVerifiers:  committeeVerifiers,
-			FeeQuoter:           fmt.Sprintf("0x%x", feeQuoterBytes),
-			OffRamp:             fmt.Sprintf("0x%x", offRampBytes),
+			FeeQuoter:           feeQuoterBytes,
+			OffRamp:             offRampBytes,
 			RemoteChains:        remoteChains,
 			FamilyExtras:        chainCfg.FamilyExtras,
 		})
@@ -400,6 +419,12 @@ func resolveRemoteChainConfig(
 		return adapters.RemoteChainConfig[[]byte, string]{}, err
 	}
 
+	fqConfig := mergeFeeQuoterDestChainConfig(
+		remoteAdapter.GetDefaultFeeQuoterDestChainConfig(),
+		inCfg.FeeQuoterDestChainConfig,
+	)
+	fqConfig.ChainFamilySelector = remoteAdapter.GetChainFamilySelector()
+
 	return adapters.RemoteChainConfig[[]byte, string]{
 		AllowTrafficFrom:          inCfg.AllowTrafficFrom,
 		OnRamps:                   [][]byte{remoteOnRampBytes},
@@ -409,9 +434,9 @@ func resolveRemoteChainConfig(
 		LaneMandatedInboundCCVs:   laneMandatedInboundCCVs,
 		DefaultOutboundCCVs:       defaultOutboundCCVs,
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
-		FeeQuoterDestChainConfig:  inCfg.FeeQuoterDestChainConfig,
+		FeeQuoterDestChainConfig:  fqConfig,
 		ExecutorDestChainConfig:   inCfg.ExecutorDestChainConfig,
-		AddressBytesLength:        inCfg.AddressBytesLength,
+		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
 		BaseExecutionGasCost:      inCfg.BaseExecutionGasCost,
 		TokenReceiverAllowed:      inCfg.TokenReceiverAllowed,
 		MessageNetworkFeeUSDCents: inCfg.MessageNetworkFeeUSDCents,
@@ -433,6 +458,44 @@ func resolveLocalContractsForTopologyChangeset(
 		resolved = append(resolved, addr.Address)
 	}
 	return resolved, nil
+}
+
+func mergeFeeQuoterDestChainConfig(
+	defaults adapters.FeeQuoterDestChainConfig,
+	overrides FeeQuoterDestChainConfigOverrides,
+) adapters.FeeQuoterDestChainConfig {
+	defaults.OverrideExistingConfig = overrides.OverrideExistingConfig
+	if overrides.IsEnabled != nil {
+		defaults.IsEnabled = *overrides.IsEnabled
+	}
+	if overrides.MaxDataBytes != nil {
+		defaults.MaxDataBytes = *overrides.MaxDataBytes
+	}
+	if overrides.MaxPerMsgGasLimit != nil {
+		defaults.MaxPerMsgGasLimit = *overrides.MaxPerMsgGasLimit
+	}
+	if overrides.DestGasPerPayloadByteBase != nil {
+		defaults.DestGasPerPayloadByteBase = *overrides.DestGasPerPayloadByteBase
+	}
+	if overrides.DefaultTokenFeeUSDCents != nil {
+		defaults.DefaultTokenFeeUSDCents = *overrides.DefaultTokenFeeUSDCents
+	}
+	if overrides.DefaultTokenDestGasOverhead != nil {
+		defaults.DefaultTokenDestGasOverhead = *overrides.DefaultTokenDestGasOverhead
+	}
+	if overrides.DefaultTxGasLimit != nil {
+		defaults.DefaultTxGasLimit = *overrides.DefaultTxGasLimit
+	}
+	if overrides.NetworkFeeUSDCents != nil {
+		defaults.NetworkFeeUSDCents = *overrides.NetworkFeeUSDCents
+	}
+	if overrides.LinkFeeMultiplierPercent != nil {
+		defaults.LinkFeeMultiplierPercent = *overrides.LinkFeeMultiplierPercent
+	}
+	if overrides.USDPerUnitGas != nil {
+		defaults.USDPerUnitGas = new(big.Int).Set(overrides.USDPerUnitGas)
+	}
+	return defaults
 }
 
 // filterNOPsToCommitteeMembers returns only the NOPs whose aliases appear in at least one

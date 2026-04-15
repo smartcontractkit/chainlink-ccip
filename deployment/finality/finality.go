@@ -3,7 +3,6 @@ package finality
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 )
 
 // Bit layout mirrors FinalityCodec.sol:
@@ -76,14 +75,6 @@ func (c Config) IsZero() bool {
 func (c Config) Validate() error {
 	if c.IsZero() {
 		return errors.New("finality config is empty; set at least one mode")
-	}
-	if c.WaitForSafe && c.BlockDepth > 0 {
-		return nil // allowed finality can combine safe + block depth
-	}
-	if c.WaitForFinality && (c.WaitForSafe || c.BlockDepth > 0) {
-		return fmt.Errorf(
-			"WaitForFinality is the zero-value sentinel and cannot be combined with other modes "+
-				"(WaitForSafe=%v, BlockDepth=%d)", c.WaitForSafe, c.BlockDepth)
 	}
 	return nil
 }
