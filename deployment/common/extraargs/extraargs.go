@@ -1,8 +1,11 @@
 package extraargs
 
-import "math/big"
+import (
+	"math/big"
 
-// Tag constants matching Solidity Client.sol selectors.
+	"github.com/ethereum/go-ethereum/accounts/abi"
+)
+
 var (
 	EVMExtraArgsV1Tag     = []byte{0x97, 0xa6, 0x57, 0xc9}
 	GenericExtraArgsV2Tag = []byte{0x18, 0x1d, 0xcf, 0x10}
@@ -34,22 +37,100 @@ type ClientSuiExtraArgsV1 struct {
 	ReceiverObjectIds        [][32]byte
 }
 
-// TODO: implement without EVM contract/gobinding dependency using
-// go-ethereum/accounts/abi with hardcoded ABI strings. The encoding
-// is standard Solidity ABI: tag (4 bytes) + abi.encode(struct).
+var (
+	evmExtraArgsV1ABI = abi.Arguments{
+		{Type: mustABITupleType([]abi.ArgumentMarshaling{
+			{Name: "gasLimit", Type: "uint256"},
+		})},
+	}
+
+	genericExtraArgsV2ABI = abi.Arguments{
+		{Type: mustABITupleType([]abi.ArgumentMarshaling{
+			{Name: "gasLimit", Type: "uint256"},
+			{Name: "allowOutOfOrderExecution", Type: "bool"},
+		})},
+	}
+
+	svmExtraArgsV1ABI = abi.Arguments{
+		{Type: mustABITupleType([]abi.ArgumentMarshaling{
+			{Name: "computeUnits", Type: "uint32"},
+			{Name: "accountIsWritableBitmap", Type: "uint64"},
+			{Name: "allowOutOfOrderExecution", Type: "bool"},
+			{Name: "tokenReceiver", Type: "bytes32"},
+			{Name: "accounts", Type: "bytes32[]"},
+		})},
+	}
+
+	suiExtraArgsV1ABI = abi.Arguments{
+		{Type: mustABITupleType([]abi.ArgumentMarshaling{
+			{Name: "gasLimit", Type: "uint256"},
+			{Name: "allowOutOfOrderExecution", Type: "bool"},
+			{Name: "tokenReceiver", Type: "bytes32"},
+			{Name: "receiverObjectIds", Type: "bytes32[]"},
+		})},
+	}
+)
+
+func mustABITupleType(fields []abi.ArgumentMarshaling) abi.Type {
+	t, err := abi.NewType("tuple", "", fields)
+	if err != nil {
+		panic("extraargs: bad ABI type: " + err.Error())
+	}
+	return t
+}
+
+func serializeExtraArgs(tag []byte, args abi.Arguments, values ...any) ([]byte, error) {
+	encoded, err := args.Pack(values...)
+	if err != nil {
+		return nil, err
+	}
+	return append(tag, encoded...), nil
+}
 
 func SerializeEVMExtraArgsV1(data ClientEVMExtraArgsV1) ([]byte, error) {
-	panic("extraargs: SerializeEVMExtraArgsV1 not yet implemented; use chains/evm/deployment/common.SerializeEVMExtraArgsV1")
+	return serializeExtraArgs(EVMExtraArgsV1Tag, evmExtraArgsV1ABI, struct {
+		GasLimit *big.Int
+	}{
+		GasLimit: data.GasLimit,
+	})
 }
 
 func SerializeClientGenericExtraArgsV2(data ClientGenericExtraArgsV2) ([]byte, error) {
-	panic("extraargs: SerializeClientGenericExtraArgsV2 not yet implemented; use chains/evm/deployment/common.SerializeClientGenericExtraArgsV2")
+	return serializeExtraArgs(GenericExtraArgsV2Tag, genericExtraArgsV2ABI, struct {
+		GasLimit                 *big.Int
+		AllowOutOfOrderExecution bool
+	}{
+		GasLimit:                 data.GasLimit,
+		AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+	})
 }
 
 func SerializeClientSVMExtraArgsV1(data ClientSVMExtraArgsV1) ([]byte, error) {
-	panic("extraargs: SerializeClientSVMExtraArgsV1 not yet implemented; use chains/evm/deployment/common.SerializeClientSVMExtraArgsV1")
+	return serializeExtraArgs(SVMExtraArgsV1Tag, svmExtraArgsV1ABI, struct {
+		ComputeUnits             uint32
+		AccountIsWritableBitmap  uint64
+		AllowOutOfOrderExecution bool
+		TokenReceiver            [32]byte
+		Accounts                 [][32]byte
+	}{
+		ComputeUnits:             data.ComputeUnits,
+		AccountIsWritableBitmap:  data.AccountIsWritableBitmap,
+		AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+		TokenReceiver:            data.TokenReceiver,
+		Accounts:                 data.Accounts,
+	})
 }
 
 func SerializeClientSUIExtraArgsV1(data ClientSuiExtraArgsV1) ([]byte, error) {
-	panic("extraargs: SerializeClientSUIExtraArgsV1 not yet implemented; use chains/evm/deployment/common.SerializeClientSUIExtraArgsV1")
+	return serializeExtraArgs(SUIExtraArgsV1Tag, suiExtraArgsV1ABI, struct {
+		GasLimit                 *big.Int
+		AllowOutOfOrderExecution bool
+		TokenReceiver            [32]byte
+		ReceiverObjectIds        [][32]byte
+	}{
+		GasLimit:                 data.GasLimit,
+		AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+		TokenReceiver:            data.TokenReceiver,
+		ReceiverObjectIds:        data.ReceiverObjectIds,
+	})
 }

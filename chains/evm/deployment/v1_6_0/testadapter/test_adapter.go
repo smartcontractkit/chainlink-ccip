@@ -36,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-	ccipcommon "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -321,7 +320,7 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 				// unsupported arg
 			}
 		}
-		return ccipcommon.SerializeClientGenericExtraArgsV2(extraArgs)
+		return extraargs.SerializeClientGenericExtraArgsV2(extraArgs)
 	case chain_selectors.FamilySolana:
 		// EVM allows empty extraArgs
 		return nil, nil
