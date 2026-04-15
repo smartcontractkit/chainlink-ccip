@@ -15,11 +15,6 @@ type CommitteeVerifierContractAdapter interface {
 		qualifier string,
 	) ([]datastore.AddressRef, error)
 
-	// GetCommitteeVerifierResolver returns datastore refs to use as OnRamp/OffRamp default
-	// inbound and outbound CCVs when the caller omits explicit DefaultInboundCCVs /
-	// DefaultOutboundCCVs. This is typically the verifier-facing resolver only (one
-	// logical CCV slot), not the full set of contracts used to configure the committee
-	// verifier product (see ResolveCommitteeVerifierContracts).
 	GetCommitteeVerifierResolver(
 		ds datastore.DataStore,
 		chainSelector uint64,
