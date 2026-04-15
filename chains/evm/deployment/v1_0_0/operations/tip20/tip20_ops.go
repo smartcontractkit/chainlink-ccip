@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -159,3 +161,28 @@ var Deploy = operations.NewSequence(
 		}, nil
 	},
 )
+
+var GrantIssuerRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
+	Name:         "tip20:grant-issuer-role",
+	Version:      Version,
+	Description:  "Grants ISSUER_ROLE on a TIP-20 token so the account can mint and burn (e.g. a burn-mint pool on Tempo)",
+	ContractType: ContractType,
+	ContractABI:  TIP20TokenABI,
+	NewContract:  NewTIP20Token,
+	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
+		return token.HasRole(opts, caller, DefaultAdminRole)
+	},
+	Validate: func(address common.Address) error {
+		if address == (common.Address{}) {
+			return errors.New("account address is required")
+		}
+		return nil
+	},
+	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+		issuerRole, err := token.ISSUERROLE(&bind.CallOpts{Context: opts.Context})
+		if err != nil {
+			return nil, err
+		}
+		return token.GrantRole(opts, issuerRole, input)
+	},
+})
