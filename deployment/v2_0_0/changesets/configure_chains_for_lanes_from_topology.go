@@ -63,11 +63,20 @@ type FeeQuoterDestChainConfigOverrides struct {
 }
 
 // PartialRemoteChainConfig is the user-facing input for a single remote chain. All fields
-// are optional — nil/zero values fall back to the remote chain family adapter's defaults
-// (via GetDefaultRemoteChainConfig and GetDefaultFeeQuoterDestChainConfig). Contract
-// addresses (OnRamp, OffRamp, Executor) are resolved automatically from the datastore.
+// are optional, but their empty values are resolved from different sources:
+//   - adapter-backed remote-chain settings fall back to the remote chain family adapter's
+//     defaults (via GetDefaultRemoteChainConfig and GetDefaultFeeQuoterDestChainConfig);
+//   - contract addresses (OnRamp, OffRamp, Executor) are resolved automatically from the
+//     datastore; and
+//   - empty DefaultInboundCCVs / DefaultOutboundCCVs do not use adapter defaults and instead
+//     auto-resolve via the committee verifier contract registry.
 //
-// Minimal usage: `remoteChainSelector: {}` — everything is derived from adapter defaults.
+// An empty DefaultInboundCCVs or DefaultOutboundCCVs slice means "use the auto-resolved CCV
+// set for this lane". LaneMandatedInboundCCVs / LaneMandatedOutboundCCVs are additional
+// caller-specified CCVs that are enforced on top of that default resolution.
+//
+// Minimal usage: `remoteChainSelector: {}` — adapter-backed fields use their defaults,
+// contracts are datastore-resolved, and CCVs are auto-resolved.
 type PartialRemoteChainConfig struct {
 	AllowTrafficFrom          *bool
 	DefaultExecutorQualifier  string // defaults to "default" if empty
