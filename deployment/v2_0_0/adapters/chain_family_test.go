@@ -69,6 +69,10 @@ func (m *mockChainFamily) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuote
 	return adapters.FeeQuoterDestChainConfig{}
 }
 
+func (m *mockChainFamily) GetDefaultRemoteChainConfig() adapters.RemoteChainDefaults {
+	return adapters.RemoteChainDefaults{}
+}
+
 func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {
 	registry := adapters.NewChainFamilyRegistry()
 	adapter := &mockChainFamily{}

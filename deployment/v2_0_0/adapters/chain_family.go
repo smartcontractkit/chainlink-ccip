@@ -42,6 +42,18 @@ type ExecutorDestChainConfig struct {
 	Enabled     bool
 }
 
+// RemoteChainDefaults provides sensible defaults for remote chain configuration
+// fields that are chain-family-specific. Each ChainFamily adapter returns its own
+// defaults; callers override individual fields as needed for lane-pair-specific values.
+type RemoteChainDefaults struct {
+	AllowTrafficFrom          bool
+	ExecutorDestChainConfig   ExecutorDestChainConfig
+	BaseExecutionGasCost      uint32
+	TokenReceiverAllowed      bool
+	MessageNetworkFeeUSDCents uint16
+	TokenNetworkFeeUSDCents   uint16
+}
+
 // FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
 type FeeQuoterDestChainConfig struct {
 	OverrideExistingConfig      bool
@@ -110,6 +122,7 @@ type ChainFamily interface {
 	GetAddressBytesLength() uint8
 	GetChainFamilySelector() [4]byte
 	GetDefaultFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
+	GetDefaultRemoteChainConfig() RemoteChainDefaults
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.

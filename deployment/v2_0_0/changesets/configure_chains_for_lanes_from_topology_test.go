@@ -109,6 +109,17 @@ func (m *mockChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() adapters.F
 	}
 }
 
+func (m *mockChainFamilyAdapter) GetDefaultRemoteChainConfig() adapters.RemoteChainDefaults {
+	return adapters.RemoteChainDefaults{
+		AllowTrafficFrom:          true,
+		ExecutorDestChainConfig:   adapters.ExecutorDestChainConfig{USDCentsFee: 0, Enabled: true},
+		BaseExecutionGasCost:      175_000,
+		TokenReceiverAllowed:      false,
+		MessageNetworkFeeUSDCents: 10,
+		TokenNetworkFeeUSDCents:   25,
+	}
+}
+
 func (m *mockChainFamilyAdapter) getAddress(chainSelector uint64, contractType string) ([]byte, error) {
 	if m.addresses != nil {
 		if byType, ok := m.addresses[chainSelector]; ok {
@@ -567,9 +578,8 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				},
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
-						DefaultExecutorQualifier: "default",
 						FeeQuoterDestChainConfig: changesets.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](1000)},
-						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 100, Enabled: true},
+						ExecutorDestChainConfig:  &adapters.ExecutorDestChainConfig{USDCentsFee: 100, Enabled: true},
 					},
 				},
 			},
@@ -580,9 +590,8 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				},
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
-						DefaultExecutorQualifier: "default",
 						FeeQuoterDestChainConfig: changesets.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](2000)},
-						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{USDCentsFee: 200, Enabled: true},
+						ExecutorDestChainConfig:  &adapters.ExecutorDestChainConfig{USDCentsFee: 200, Enabled: true},
 					},
 				},
 			},
@@ -860,20 +869,36 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 	localSelector := chainsel.TEST_90000001.Selector
 	remoteSelector := chainsel.TEST_90000002.Selector
-	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
-	cs := changesets.ConfigureChainsForLanesFromTopology(
-		adapters.NewCommitteeVerifierContractRegistry(),
-		adapters.NewChainFamilyRegistry(),
-		changesetscore.GetRegistry(),
-	)
 
 	t.Run("missing topology", func(t *testing.T) {
+		env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+		cs := changesets.ConfigureChainsForLanesFromTopology(
+			adapters.NewCommitteeVerifierContractRegistry(),
+			adapters.NewChainFamilyRegistry(),
+			changesetscore.GetRegistry(),
+		)
 		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "topology is required")
 	})
 
-	t.Run("empty DefaultExecutorQualifier rejected", func(t *testing.T) {
+	t.Run("empty DefaultExecutorQualifier defaults to 'default'", func(t *testing.T) {
+		env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+		ds := datastore.NewMemoryDataStore()
+		addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+		env.DataStore = ds.Seal()
+
+		committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+		committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+			contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+				fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+			},
+		})
+		cs := changesets.ConfigureChainsForLanesFromTopology(
+			committeeRegistry,
+			adapters.NewChainFamilyRegistry(),
+			changesetscore.GetRegistry(),
+		)
 		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
 			Topology: &offchain.EnvironmentTopology{
 				NOPTopology: &offchain.NOPTopology{
@@ -889,12 +914,198 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 				{
 					ChainSelector: localSelector,
 					RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
-						remoteSelector: {DefaultExecutorQualifier: ""},
+						remoteSelector: {},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("missing CCV adapter rejects early", func(t *testing.T) {
+		env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+		cs := changesets.ConfigureChainsForLanesFromTopology(
+			adapters.NewCommitteeVerifierContractRegistry(),
+			adapters.NewChainFamilyRegistry(),
+			changesetscore.GetRegistry(),
+		)
+		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+			Topology: &offchain.EnvironmentTopology{
+				NOPTopology: &offchain.NOPTopology{
+					NOPs: []offchain.NOPConfig{{Alias: "nop-1"}},
+					Committees: map[string]offchain.CommitteeConfig{
+						"default": {Qualifier: "default", ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						}},
+					},
+				},
+			},
+			Chains: []changesets.PartialChainConfig{
+				{
+					ChainSelector: localSelector,
+					RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+						remoteSelector: {},
 					},
 				},
 			},
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "DefaultExecutorQualifier is required")
+		assert.Contains(t, err.Error(), "auto-resolved CCVs")
 	})
+}
+
+func TestConfigureChainsForLanesFromTopology_EmptyConfigUsesAdapterDefaults(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+		},
+	})
+
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0x11}, "OffRamp": {0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: &offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						},
+					},
+				},
+			},
+		},
+		Chains: []changesets.PartialChainConfig{
+			{
+				ChainSelector: localSelector,
+				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
+				},
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+					remoteSelector: {},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, evmAdapter.inputs, 1)
+
+	remote := evmAdapter.inputs[0].RemoteChains[remoteSelector]
+	assert.Equal(t, "0xexecutor", evmAdapter.inputs[0].RemoteChains[remoteSelector].DefaultExecutor,
+		"empty qualifier should resolve to 'default' executor")
+	assert.NotNil(t, remote.AllowTrafficFrom)
+	assert.True(t, *remote.AllowTrafficFrom, "adapter default AllowTrafficFrom is true")
+	assert.True(t, remote.ExecutorDestChainConfig.Enabled, "adapter default ExecutorDestChainConfig.Enabled is true")
+	assert.Equal(t, uint32(175_000), remote.BaseExecutionGasCost, "adapter default BaseExecutionGasCost")
+	assert.NotNil(t, remote.TokenReceiverAllowed)
+	assert.False(t, *remote.TokenReceiverAllowed, "adapter default TokenReceiverAllowed is false")
+	assert.Equal(t, uint16(10), remote.MessageNetworkFeeUSDCents, "adapter default MessageNetworkFeeUSDCents")
+	assert.Equal(t, uint16(25), remote.TokenNetworkFeeUSDCents, "adapter default TokenNetworkFeeUSDCents")
+	assert.Equal(t, []string{"0xverifier"}, remote.DefaultInboundCCVs, "auto-resolved inbound CCVs from default qualifier")
+	assert.Equal(t, []string{"0xverifier"}, remote.DefaultOutboundCCVs, "auto-resolved outbound CCVs from default qualifier")
+}
+
+func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+		},
+	})
+
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0x01}, "OnRamp": {0x02}, "FeeQuoter": {0x03}, "OffRamp": {0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0x11}, "OffRamp": {0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: &offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						},
+					},
+				},
+			},
+		},
+		Chains: []changesets.PartialChainConfig{
+			{
+				ChainSelector: localSelector,
+				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
+					{CommitteeQualifier: "default", RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{remoteSelector: {}}},
+				},
+				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
+					remoteSelector: {
+						AllowTrafficFrom:          ptrTo(false),
+						BaseExecutionGasCost:      ptrTo[uint32](250_000),
+						TokenReceiverAllowed:      ptrTo(true),
+						MessageNetworkFeeUSDCents: ptrTo[uint16](50),
+						TokenNetworkFeeUSDCents:   ptrTo[uint16](75),
+						ExecutorDestChainConfig:   &adapters.ExecutorDestChainConfig{USDCentsFee: 500, Enabled: false},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, evmAdapter.inputs, 1)
+
+	remote := evmAdapter.inputs[0].RemoteChains[remoteSelector]
+	assert.NotNil(t, remote.AllowTrafficFrom)
+	assert.False(t, *remote.AllowTrafficFrom, "override AllowTrafficFrom=false")
+	assert.Equal(t, uint32(250_000), remote.BaseExecutionGasCost, "override BaseExecutionGasCost")
+	assert.NotNil(t, remote.TokenReceiverAllowed)
+	assert.True(t, *remote.TokenReceiverAllowed, "override TokenReceiverAllowed=true")
+	assert.Equal(t, uint16(50), remote.MessageNetworkFeeUSDCents, "override MessageNetworkFeeUSDCents")
+	assert.Equal(t, uint16(75), remote.TokenNetworkFeeUSDCents, "override TokenNetworkFeeUSDCents")
+	assert.Equal(t, uint16(500), remote.ExecutorDestChainConfig.USDCentsFee, "override ExecutorDestChainConfig.USDCentsFee")
+	assert.False(t, remote.ExecutorDestChainConfig.Enabled, "override ExecutorDestChainConfig.Enabled=false")
 }
