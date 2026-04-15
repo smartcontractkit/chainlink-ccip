@@ -508,7 +508,7 @@ func resolveRemoteChainConfig(
 }
 
 // resolveDefaultCCVs resolves CCVs either from explicit refs or by auto-resolving
-// from the CommitteeVerifier resolver for the "default" qualifier.
+// default lane CCV refs for the "default" qualifier (see CommitteeVerifierContractAdapter.GetCommitteeVerifierResolver).
 func resolveDefaultCCVs(
 	e deployment.Environment,
 	chainSelector uint64,
@@ -522,16 +522,17 @@ func resolveDefaultCCVs(
 	if err != nil {
 		return nil, fmt.Errorf("no committee verifier contract adapter for chain %d: %w", chainSelector, err)
 	}
-	resolverRefs, err := contractAdapter.ResolveCommitteeVerifierContracts(e.DataStore, chainSelector, defaultQualifier)
+	laneCCVRefs, err := contractAdapter.GetCommitteeVerifierResolver(e.DataStore, chainSelector, defaultQualifier)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve committee verifier contracts for %q qualifier on chain %d: %w", defaultQualifier, chainSelector, err)
+		return nil, fmt.Errorf("failed to resolve default lane CCV refs for %q qualifier on chain %d: %w", defaultQualifier, chainSelector, err)
 	}
-	return resolveLocalContractsForTopologyChangeset(e, chainSelector, resolverRefs)
+	return resolveLocalContractsForTopologyChangeset(e, chainSelector, laneCCVRefs)
 }
 
 // validateDefaultCCVsResolvable checks that every remote chain entry that relies on
 // auto-resolved CCVs (i.e. does not provide explicit DefaultInboundCCVs or DefaultOutboundCCVs)
-// can actually resolve committee verifier contracts for the "default" qualifier.
+// can resolve default lane CCV refs for the "default" qualifier via the chain family's
+// CommitteeVerifierContractAdapter (typically the verifier resolver only).
 // This fails early in validation rather than silently producing a lane with no verifiers.
 func validateDefaultCCVsResolvable(
 	chainCfg PartialChainConfig,
@@ -553,13 +554,13 @@ func validateDefaultCCVsResolvable(
 		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but no committee verifier contract adapter is registered: %w",
 			chainCfg.ChainSelector, err)
 	}
-	refs, err := contractAdapter.ResolveCommitteeVerifierContracts(e.DataStore, chainCfg.ChainSelector, defaultQualifier)
+	refs, err := contractAdapter.GetCommitteeVerifierResolver(e.DataStore, chainCfg.ChainSelector, defaultQualifier)
 	if err != nil {
-		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but failed to resolve %q qualifier contracts: %w",
+		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but failed to resolve %q qualifier default lane CCV refs: %w",
 			chainCfg.ChainSelector, defaultQualifier, err)
 	}
 	if len(refs) == 0 {
-		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but no contracts found for %q qualifier",
+		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but no default lane CCV refs for %q qualifier",
 			chainCfg.ChainSelector, defaultQualifier)
 	}
 	return nil
