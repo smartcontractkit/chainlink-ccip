@@ -135,7 +135,11 @@ type ValidateUSDCCLDRolloutHomeChainLiquidityConfig struct {
 }
 
 type ValidateUSDCCLDRolloutLiquidityLaneCheck struct {
-	ExpectedWithdrawAmount    string
+	// ExpectedWithdrawAmount is the raw USDC amount (6 decimals) withdrawn from the hybrid pool for
+	// this lane during the migration step. It is optional, but when provided must be > 0.
+	//
+	// It is intentionally uint64 to align with the migration changeset input type.
+	ExpectedWithdrawAmount    *uint64
 	PreHybridLocked           string
 	ExpectedHybridLocked      string
 	PreLockBoxBalance         string
@@ -222,7 +226,7 @@ func verifyValidateUSDCCLDRollout(e deployment.Environment, cfg ValidateUSDCCLDR
 		for remoteSelector, laneCheck := range home.Checks {
 			verifyEVMChainSelector(v, remoteSelector, "homeChainLiquidity.Checks")
 			verifyHexAddress(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedLiquidityProvider", remoteSelector), laneCheck.ExpectedLiquidityProvider, false)
-			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedWithdrawAmount", remoteSelector), laneCheck.ExpectedWithdrawAmount, true)
+			verifyOptionalUint64(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedWithdrawAmount", remoteSelector), laneCheck.ExpectedWithdrawAmount, true)
 			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].PreHybridLocked", remoteSelector), laneCheck.PreHybridLocked, false)
 			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].ExpectedHybridLocked", remoteSelector), laneCheck.ExpectedHybridLocked, false)
 			verifyOptionalBigInt(v, fmt.Sprintf("homeChainLiquidity.Checks[%d].PreLockBoxBalance", remoteSelector), laneCheck.PreLockBoxBalance, false)
@@ -238,7 +242,7 @@ func applyValidateUSDCCLDRollout(e deployment.Environment, cfg ValidateUSDCCLDRo
 	defer func() {
 		if v.err() == nil {
 			e.Logger.Infof(
-				"ValidateUSDCCLDRollout: completed successfully (chains=%d homeChainLiquidity=%v)",
+				"✅ ValidateUSDCCLDRollout: completed successfully (chains=%d homeChainLiquidity=%v)",
 				len(cfg.Chains),
 				cfg.HomeChainLiquidity != nil,
 			)
@@ -281,7 +285,7 @@ func validateChainState(
 	errsBefore := len(v.errs)
 	defer func() {
 		if len(v.errs) == errsBefore {
-			e.Logger.Infof("ValidateUSDCCLDRollout: chain %d: all configured checks for this chain passed", chain.Selector)
+			e.Logger.Infof("✅ ValidateUSDCCLDRollout: chain %d: all configured checks for this chain passed", chain.Selector)
 		}
 	}()
 
@@ -427,7 +431,7 @@ func validateRemoteChainState(
 	defer func() {
 		if len(v.errs) == errsBefore {
 			e.Logger.Infof(
-				"ValidateUSDCCLDRollout: chain %d -> remote %d: lane validation passed (mechanism=%s)",
+				"✅ ValidateUSDCCLDRollout: chain %d -> remote %d: lane validation passed (mechanism=%s)",
 				chainSelector,
 				remoteSelector,
 				cfg.ExpectedMechanism,
@@ -576,7 +580,7 @@ func validateHomeChainLiquidityState(
 	defer func() {
 		if len(v.errs) == errsBefore {
 			e.Logger.Infof(
-				"ValidateUSDCCLDRollout: homeChainLiquidity chain %d: all configured liquidity checks passed",
+				"✅ ValidateUSDCCLDRollout: homeChainLiquidity chain %d: all configured liquidity checks passed",
 				cfg.ChainSelector,
 			)
 		}
@@ -991,17 +995,14 @@ func deriveExpectedHybridLocked(check ValidateUSDCCLDRolloutLiquidityLaneCheck) 
 	if check.ExpectedHybridLocked != "" {
 		return parseBigInt(check.ExpectedHybridLocked)
 	}
-	if check.PreHybridLocked == "" || check.ExpectedWithdrawAmount == "" {
+	if check.PreHybridLocked == "" || check.ExpectedWithdrawAmount == nil {
 		return nil, nil
 	}
 	pre, err := parseBigInt(check.PreHybridLocked)
 	if err != nil {
 		return nil, fmt.Errorf("invalid PreHybridLocked %q: %w", check.PreHybridLocked, err)
 	}
-	withdraw, err := parseBigInt(check.ExpectedWithdrawAmount)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ExpectedWithdrawAmount %q: %w", check.ExpectedWithdrawAmount, err)
-	}
+	withdraw := new(big.Int).SetUint64(*check.ExpectedWithdrawAmount)
 	if pre.Cmp(withdraw) < 0 {
 		return nil, fmt.Errorf("pre hybrid locked amount %s is smaller than expected withdraw amount %s", pre.String(), withdraw.String())
 	}
@@ -1012,17 +1013,14 @@ func deriveExpectedLockBoxBalance(check ValidateUSDCCLDRolloutLiquidityLaneCheck
 	if check.ExpectedLockBoxBalance != "" {
 		return parseBigInt(check.ExpectedLockBoxBalance)
 	}
-	if check.PreLockBoxBalance == "" || check.ExpectedWithdrawAmount == "" {
+	if check.PreLockBoxBalance == "" || check.ExpectedWithdrawAmount == nil {
 		return nil, nil
 	}
 	pre, err := parseBigInt(check.PreLockBoxBalance)
 	if err != nil {
 		return nil, fmt.Errorf("invalid PreLockBoxBalance %q: %w", check.PreLockBoxBalance, err)
 	}
-	withdraw, err := parseBigInt(check.ExpectedWithdrawAmount)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ExpectedWithdrawAmount %q: %w", check.ExpectedWithdrawAmount, err)
-	}
+	withdraw := new(big.Int).SetUint64(*check.ExpectedWithdrawAmount)
 	return new(big.Int).Add(pre, withdraw), nil
 }
 
@@ -1131,6 +1129,15 @@ func verifyOptionalBigInt(v *validationCollector, field, value string, mustBePos
 	}
 	if !mustBePositive && n.Sign() < 0 {
 		v.addf("%s: must be zero or greater", field)
+	}
+}
+
+func verifyOptionalUint64(v *validationCollector, field string, value *uint64, mustBePositive bool) {
+	if value == nil {
+		return
+	}
+	if mustBePositive && *value == 0 {
+		v.addf("%s: must be greater than zero", field)
 	}
 }
 
@@ -1321,5 +1328,14 @@ func (v *validationCollector) err() error {
 	if len(v.errs) == 0 {
 		return nil
 	}
-	return fmt.Errorf("post-validation failed:\n- %s", strings.Join(v.errs, "\n- "))
+	lines := make([]string, 0, len(v.errs))
+	for _, msg := range v.errs {
+		prefix := "❌"
+		// Some checks explicitly record when a sub-check was skipped due to an upstream failure.
+		if strings.Contains(strings.ToLower(msg), "skipped") {
+			prefix = "⚠️"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s", prefix, msg))
+	}
+	return fmt.Errorf("post-validation failed:\n%s", strings.Join(lines, "\n"))
 }

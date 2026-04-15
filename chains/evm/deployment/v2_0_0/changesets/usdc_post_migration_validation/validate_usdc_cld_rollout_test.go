@@ -146,6 +146,7 @@ func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidRemotePoolKind(t *tes
 
 func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidLiquidityAmount(t *testing.T) {
 	env := newValidateUSDCCLDTestEnv(t)
+	var zero uint64
 	cfg := changesets.ValidateUSDCCLDRolloutConfig{
 		HomeChainLiquidity: &changesets.ValidateUSDCCLDRolloutHomeChainLiquidityConfig{
 			ChainSelector:              chainsel.ETHEREUM_MAINNET.Selector,
@@ -154,7 +155,7 @@ func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidLiquidityAmount(t *te
 			SiloedUSDCTokenPool:        "0x2222222222222222222222222222222222222222",
 			Checks: map[uint64]changesets.ValidateUSDCCLDRolloutLiquidityLaneCheck{
 				chainsel.POLYGON_MAINNET.Selector: {
-					ExpectedWithdrawAmount: "not-a-number",
+					ExpectedWithdrawAmount: &zero,
 				},
 			},
 		},
@@ -162,7 +163,7 @@ func TestValidateUSDCCLDRollout_VerifyPreconditions_InvalidLiquidityAmount(t *te
 
 	err := validateUSDCCLDCS().VerifyPreconditions(env, cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid decimal integer")
+	assert.Contains(t, err.Error(), "must be greater than zero")
 }
 
 func TestValidateUSDCCLDRollout_Apply_MissingEVMChain(t *testing.T) {
