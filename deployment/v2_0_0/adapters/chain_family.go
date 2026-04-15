@@ -42,6 +42,28 @@ type ExecutorDestChainConfig struct {
 	Enabled     bool
 }
 
+// CommitteeVerifierRemoteChainDefaults provides sensible defaults for CommitteeVerifier
+// remote chain configuration fields. Each ChainFamily adapter returns its own defaults;
+// callers override individual fields as needed via pointer overrides.
+type CommitteeVerifierRemoteChainDefaults struct {
+	AllowlistEnabled   bool
+	FeeUSDCents        uint16
+	GasForVerification uint32
+	PayloadSizeBytes   uint16
+}
+
+// RemoteChainDefaults provides sensible defaults for remote chain configuration
+// fields that are chain-family-specific. Each ChainFamily adapter returns its own
+// defaults; callers override individual fields as needed for lane-pair-specific values.
+type RemoteChainDefaults struct {
+	AllowTrafficFrom          bool
+	ExecutorDestChainConfig   ExecutorDestChainConfig
+	BaseExecutionGasCost      uint32
+	TokenReceiverAllowed      bool
+	MessageNetworkFeeUSDCents uint16
+	TokenNetworkFeeUSDCents   uint16
+}
+
 // FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
 type FeeQuoterDestChainConfig struct {
 	OverrideExistingConfig      bool
@@ -110,6 +132,9 @@ type ChainFamily interface {
 	GetAddressBytesLength() uint8
 	GetChainFamilySelector() [4]byte
 	GetDefaultFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
+	GetDefaultRemoteChainConfig() RemoteChainDefaults
+	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
+	GetDefaultFinalityConfig() finality.Config
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.
