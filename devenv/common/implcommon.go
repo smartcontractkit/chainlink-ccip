@@ -53,11 +53,9 @@ import (
 	ccipevm "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 )
 
-var (
-	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
-	// in tests.
-	TestXXXMCMSSigner *ecdsa.PrivateKey
-)
+// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
+// in tests.
+var TestXXXMCMSSigner *ecdsa.PrivateKey
 
 func init() {
 	key, err := crypto.GenerateKey()
@@ -804,9 +802,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					OutboundCCVs:                             []datastore.AddressRef{}, // not needed for for 1.6
-					InboundCCVs:                              []datastore.AddressRef{}, // not needed for for 1.6
-					DefaultFinalityOutboundRateLimiterConfig: disabledRL,
+					OutboundCCVs:              []datastore.AddressRef{}, // not needed for 1.6
+					InboundCCVs:               []datastore.AddressRef{}, // not needed for 1.6
+					OutboundRateLimiterConfig: disabledRL,
 					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
@@ -914,10 +912,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							TokenRef:            tokenRef,
 							TokenPoolRef:        tokenPoolRef,
 							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-								dst.ChainSelector(): {
-									DefaultFinality: rl,
-									CustomFinality:  rl,
-								},
+								dst.ChainSelector(): {RateLimit: rl},
 							},
 						},
 						dst.ChainSelector(): {
@@ -925,10 +920,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							TokenRef:            dstTokenRef,
 							TokenPoolRef:        dstTokenPoolRef,
 							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-								selector: {
-									DefaultFinality: rl,
-									CustomFinality:  rl,
-								},
+								selector: {RateLimit: rl},
 							},
 						},
 					},

@@ -124,14 +124,16 @@ func TestValidate(t *testing.T) {
 			config: Config{WaitForSafe: true, BlockDepth: 50},
 		},
 		{
-			name:    "finality + safe rejected",
-			config:  Config{WaitForFinality: true, WaitForSafe: true},
-			wantErr: "cannot be combined",
+			name:   "finality + safe is valid (allowed finality combo)",
+			config: Config{WaitForFinality: true, WaitForSafe: true},
 		},
 		{
-			name:    "finality + block depth rejected",
-			config:  Config{WaitForFinality: true, BlockDepth: 5},
-			wantErr: "cannot be combined",
+			name:   "finality + block depth is valid (allowed finality combo)",
+			config: Config{WaitForFinality: true, BlockDepth: 5},
+		},
+		{
+			name:   "finality + safe + block depth is valid (allowed finality combo)",
+			config: Config{WaitForFinality: true, WaitForSafe: true, BlockDepth: 5},
 		},
 	}
 	for _, tc := range tests {

@@ -99,9 +99,6 @@ type TestAdapter interface {
 	// // RandomReceiver returns a random receiver for the given chain family.
 	// RandomReceiver() []byte
 
-	// // CCIPReceiver returns a CCIP receiver for the given chain family.
-	CCIPReceiver() []byte
-
 	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is
 	// expected to be an EOA and not a contract.
 	// t parameter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
@@ -117,12 +114,6 @@ type TestAdapter interface {
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
-
-	// GetExtraArgs returns the default extra args for sending messages to this
-	// chain family from the given source family.
-	// Therefore the extra args are source-family encoded, so abi.encode for EVM,
-	// borsch for Solana, etc.
-	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 
 	// LowGasLimit returns a low gas limit value that can be used in tests to trigger out-of-gas errors.
 	LowGasLimit() *big.Int
@@ -157,9 +148,24 @@ type TestAdapter interface {
 
 	// CurrentBlock returns the current block number of the chain, if applicable.
 	CurrentBlock(t *testing.T) uint64
+
+	TestAdapterForFamily
+}
+
+// TestAdapterForFamily narrows TestAdapter to destination-message wiring helpers.
+// It is intentionally chain-agnostic and does not require a live chain client.
+type TestAdapterForFamily interface {
+	// // CCIPReceiver returns a CCIP receiver for the given chain family.
+	CCIPReceiver() []byte
+	// GetExtraArgs returns the default extra args for sending messages to this
+	// chain family from the given source family.
+	// Therefore the extra args are source-family encoded, so abi.encode for EVM,
+	// borsch for Solana, etc.
+	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
+type TestAdapterForFamilyFactory = func(ds datastore.DataStore, selector uint64) TestAdapterForFamily
 
 type testAdapterID string
 
@@ -167,6 +173,7 @@ type testAdapterID string
 type TestAdapterRegistry struct {
 	mu sync.Mutex
 	m  map[testAdapterID]TestAdapterFactory
+	r  map[testAdapterID]TestAdapterForFamilyFactory
 }
 
 // NewTestAdapterRegistry creates a fresh registry.  It is kept unexported
@@ -174,6 +181,7 @@ type TestAdapterRegistry struct {
 func newTestAdapterRegistry() *TestAdapterRegistry {
 	return &TestAdapterRegistry{
 		m: make(map[testAdapterID]TestAdapterFactory),
+		r: make(map[testAdapterID]TestAdapterForFamilyFactory),
 	}
 }
 
@@ -189,6 +197,23 @@ func (r *TestAdapterRegistry) RegisterTestAdapter(chainFamily string, version *s
 	}
 }
 
+// RegisterTestAdapterForFamily registers an adapter factory that only
+// requires datastore-backed state to provide destination receiver and extra args.
+func (r *TestAdapterRegistry) RegisterTestAdapterForFamily(
+	chainFamily string,
+	version *semver.Version,
+	adapter TestAdapterForFamilyFactory,
+) {
+	id := newTestAdapterID(chainFamily, version)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.r[id]; !exists {
+		r.r[id] = adapter
+	}
+}
+
 // GetTestAdapter looks up an adapter; the second return value tells you if it was found.
 func (r *TestAdapterRegistry) GetTestAdapter(chainFamily string, version *semver.Version) (TestAdapterFactory, bool) {
 	id := newTestAdapterID(chainFamily, version)
@@ -197,6 +222,20 @@ func (r *TestAdapterRegistry) GetTestAdapter(chainFamily string, version *semver
 	defer r.mu.Unlock()
 
 	adapter, ok := r.m[id]
+	return adapter, ok
+}
+
+// GetTestAdapterForFamily looks up a family-scoped adapter factory.
+func (r *TestAdapterRegistry) GetTestAdapterForFamily(
+	chainFamily string,
+	version *semver.Version,
+) (TestAdapterForFamilyFactory, bool) {
+	id := newTestAdapterID(chainFamily, version)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	adapter, ok := r.r[id]
 	return adapter, ok
 }
 

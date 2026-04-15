@@ -230,3 +230,392 @@ contracts:
         access: public
       - name: setDynamicConfig
         access: owner
+
+  - contract_name: FeeQuoter
+    version: "2.0.0"
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: updatePrices
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getDestinationChainGasPrice
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
+
+  - contract_name: CrossChainToken
+    version: "2.0.0"
+    package_name: erc20
+    abi_file: cross_chain_token.json
+    no_deployment: true
+    functions:
+      - name: approve
+        access: public
+      - name: balanceOf
+        access: public
+
+  - contract_name: AdvancedPoolHooks
+    version: "2.0.0"
+    functions:
+      - name: applyCCVConfigUpdates
+        access: owner
+      - name: applyAllowListUpdates
+        access: owner
+      - name: setThresholdAmount
+        access: owner
+      - name: setPolicyEngine
+        access: owner
+      - name: setPolicyEngineAllowFailedDetach
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllowListEnabled
+        access: public
+      - name: getAllowList
+        access: public
+      - name: getThresholdAmount
+        access: public
+      - name: getPolicyEngine
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: getAllCCVConfigs
+        access: public
+      - name: getCCVConfig
+        access: public
+      - name: getRequiredCCVs
+        access: public
+
+  - contract_name: OnRamp
+    version: "2.0.0"
+    package_name: onramp
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+
+  - contract_name: OffRamp
+    version: "2.0.0"
+    package_name: offramp
+    functions:
+      - name: applySourceChainConfigUpdates
+        access: owner
+      - name: getSourceChainConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllSourceChainConfigs
+        access: public
+
+  - contract_name: MockReceiverV2
+    version: "2.0.0"
+    functions:
+      - name: getCCVsAndFinalityConfig
+        access: public
+      - name: setAllowedFinalityConfig
+        access: public # Only used in testing, not critical
+
+  # Token Pool contracts (latest / v2.0.0)
+
+  - contract_name: TokenPool
+    version: "2.0.0"
+    abi_file: burn_mint_token_pool.json
+    no_deployment: true
+    functions:
+      - name: setAllowedFinalityConfig
+        access: owner
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: updateAdvancedPoolHooks
+        access: owner
+      - name: applyChainUpdates
+        access: owner
+      - name: setRateLimitConfig
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDynamicConfig
+        access: public
+      - name: getRmnProxy
+        access: public
+      - name: getCurrentRateLimiterState
+        access: public
+      - name: getAllowedFinalityConfig
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getRemotePools
+        access: public
+      - name: getRemoteToken
+        access: public
+      - name: getToken
+        access: public
+      - name: getTokenDecimals
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getAdvancedPoolHooks
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+
+  - contract_name: BurnMintTokenPool
+    version: "2.0.0"
+    functions: []
+
+  - contract_name: BurnFromMintTokenPool
+    version: "2.0.0"
+    functions: []
+
+  - contract_name: BurnWithFromMintTokenPool
+    version: "2.0.0"
+    functions: []
+
+  - contract_name: BurnToAddressMintTokenPool
+    version: "2.0.0"
+    functions: []
+
+  - contract_name: BurnMintWithLockReleaseFlagTokenPool
+    version: "2.0.0"
+    functions: []
+
+  - contract_name: LockReleaseTokenPool
+    version: "2.0.0"
+    functions:
+      - name: getLockBox
+        access: public
+
+  - contract_name: SiloedLockReleaseTokenPool
+    version: "2.0.0"
+    functions:
+      - name: getLockBox
+        access: public
+      - name: getAllLockBoxConfigs
+        access: public
+
+  - contract_name: SiloedUSDCTokenPool
+    version: "2.0.0"
+    functions:
+      - name: configureLockBoxes
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: getAllLockBoxConfigs
+        access: public
+
+  - contract_name: LombardTokenPool
+    version: "2.0.0"
+    functions:
+      - name: setPath
+        access: owner
+      - name: getPath
+        access: public
+
+  - contract_name: CCTPThroughCCVTokenPool
+    version: "2.0.0"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+
+  - contract_name: USDCTokenPoolProxy
+    version: "2.0.0"
+    functions:
+      - name: getPools
+        access: public
+      - name: updateLockOrBurnMechanisms
+        access: owner
+      - name: updatePoolAddresses
+        access: owner
+      - name: setFeeAggregator
+        access: owner
+
+  - contract_name: AdvancedPoolHooksExtractor
+    version: "2.0.0"
+    functions: []
+
+  - contract_name: CCTPMessageTransmitterProxy
+    version: "2.0.0"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+
+  - contract_name: ERC20LockBox
+    version: "2.0.0"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name : transferOwnership
+        access: owner
+
+  - contract_name: MockReceiverV2
+    version: "2.0.0"
+    package_name: mock_receiver
+    abi_file: mock_receiver_v2.json
+    functions: []
+
+  - contract_name: Executor
+    version: "2.0.0"
+    functions:
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getDynamicConfig
+        access: public
+      - name: getDestChains
+        access: public
+      - name: getAllowedCCVs
+        access: public
+      - name: getMaxCCVsPerMessage
+        access: public
+      - name: getAllowedFinalityConfig
+        access: public
+
+  - contract_name: Proxy
+    version: "2.0.0"
+    functions:
+      - name: setTarget
+        access: owner
+      - name: setFeeAggregator
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getTarget
+        access: public
+      - name: getFeeAggregator
+        access: public
+
+  - contract_name: LombardVerifier
+    version: "2.0.0"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setPath
+        access: owner
+      - name: updateSupportedTokens
+        access: owner
+      - name: setRemoteAdapters
+        access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: removePaths
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getPath
+        access: public
+      - name: getRemoteAdapter
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getSupportedTokens
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getFee
+        access: public
+
+  - contract_name: CCTPVerifier
+    version: "2.0.0"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setDomains
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: updateStorageLocations
+        access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getDomain
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getAllowedFinalityConfig
+        access: public
+      - name: getFee
+        access: public
+
+  - contract_name: CommitteeVerifier
+    version: "2.0.0"
+    functions:
+      - name: setDynamicConfig
+        access: owner
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: applySignatureConfigs
+        access: owner
+      - name: getRemoteChainConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getSignatureConfig
+        access: public
+      - name: getAllowedFinalityConfig
+        access: public
+      - name: getFee
+        access: public
+      - name: versionTag
+        access: public

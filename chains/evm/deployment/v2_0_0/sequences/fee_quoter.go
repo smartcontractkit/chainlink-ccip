@@ -70,6 +70,9 @@ func getNetworkFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
 // This value might be wrong in prev versions of the fee quoter, but we want to set it to a reasonable default for the new fee quoter.
 func getDefaultTokenFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
 	destFamily, _ := chain_selectors.GetSelectorFamily(remoteChain)
+	if destFamily == chain_selectors.FamilySolana && isEthChain(sourceChain) {
+		return 60
+	}
 	if destFamily == chain_selectors.FamilySolana {
 		return 35
 	}
