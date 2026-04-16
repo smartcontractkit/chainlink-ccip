@@ -21,11 +21,12 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
+	fq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	fq20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/testhelpers"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	fq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
-	fq20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	cciphooks "github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
 )
 
@@ -157,6 +158,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	var filteredFeeTokens []common.Address
 	// Give the deployer fee token balances by transferring from each token owner via impersonation on forked chains.
 	for _, addr := range addrs {
+		env.Logger.Infof("Processing fee token %s on chain %d", addr.Hex(), srcSel)
 		token, err := burn_mint_erc20.NewBurnMintERC20(addr, chain.Client)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
@@ -165,6 +167,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		if err == nil && deployerBal.Cmp(feeTokenFundingAmount) >= 0 {
 			continue
 		}
+		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
 		tokenOwner, err := discoverFeeTokenFundingAccount(chain.Client, token, addr, feeTokenFundingAmount)
 		if err != nil {
