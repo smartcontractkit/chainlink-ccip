@@ -159,7 +159,10 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	// Give the deployer fee token balances by transferring from each token owner via impersonation on forked chains.
 	for _, addr := range addrs {
 		env.Logger.Infof("Processing fee token %s on chain %d", addr.Hex(), srcSel)
-		token, err := burn_mint_erc20.NewBurnMintERC20(addr, chain.Client)
+		// we are not using chain.client here to avoid using multi client
+		// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
+		// when the node is not fully synced or has issues processing the event filters with anvil
+		token, err := burn_mint_erc20.NewBurnMintERC20(addr, ec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
 		}
@@ -169,9 +172,6 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		}
 		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
-		// we are not using chain.client here to avoid using multi client
-		// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
-		// when the node is not fully synced or has issues processing the event filters with anvil
 		tokenOwner, err := discoverFeeTokenFundingAccount(ec, token, addr, feeTokenFundingAmount)
 		if err != nil {
 			// in case of error continue
