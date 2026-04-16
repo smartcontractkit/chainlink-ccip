@@ -218,7 +218,9 @@ func discoverFeeTokenFundingAccount(
 	if err != nil {
 		return findFundingSenderFromTokenEvents(ctx, backend, token, tokenAddr, fundingAmount)
 	}
-	ownerBal, err := token.BalanceOf(nil, owner)
+	ownerBal, err := token.BalanceOf(&bind.CallOpts{
+		Context: ctx,
+	}, owner)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("fetch owner balance for token %s: %w", tokenAddr.Hex(), err)
 	}
