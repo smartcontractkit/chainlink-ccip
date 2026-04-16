@@ -12,14 +12,16 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
-	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -194,7 +196,7 @@ func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccvadapters.Fe
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          10,
 		LinkFeeMultiplierPercent:    90,
-		USDPerUnitGas:               big.NewInt(1e6),
+		// USDPerUnitGas is not set here to avoid doing a gas price update by default
 	}
 }
 
@@ -215,6 +217,34 @@ func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestCh
 			LinkFeeMultiplierPercent: 90,
 			USDPerUnitGas:            big.NewInt(1e6),
 		},
+	}
+}
+
+func (a *ChainFamilyAdapter) GetDefaultRemoteChainConfig() ccvadapters.RemoteChainDefaults {
+	return ccvadapters.RemoteChainDefaults{
+		AllowTrafficFrom:          true,
+		ExecutorDestChainConfig:   ccvadapters.ExecutorDestChainConfig{USDCentsFee: 0, Enabled: true},
+		BaseExecutionGasCost:      175_000,
+		TokenReceiverAllowed:      false,
+		MessageNetworkFeeUSDCents: 10,
+		TokenNetworkFeeUSDCents:   25,
+	}
+}
+
+func (a *ChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccvadapters.CommitteeVerifierRemoteChainDefaults {
+	return ccvadapters.CommitteeVerifierRemoteChainDefaults{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        0,
+		GasForVerification: 60_000,
+		PayloadSizeBytes:   390,
+	}
+}
+
+func (a *ChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
+	return finality.Config{
+		WaitForFinality: true,
+		WaitForSafe:     true,
+		BlockDepth:      1,
 	}
 }
 
