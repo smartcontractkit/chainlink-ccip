@@ -23,7 +23,7 @@ CCIP 2.0 introduces several architectural changes that affect how chain families
 | Concept | 1.6 | 2.0 |
 |---------|-----|-----|
 | **Execution** | Implicit (part of OffRamp) | Explicit Executor contracts with qualifiers |
-| **OCR** | OCR3 configured on OffRamp | No OCR -- off-chain consensus handled differently |
+| **OCR** | OCR3 configured on OffRamp | No OCR3 on OffRamp -- OCR key bundles still used elsewhere in 2.0 offchain flow |
 | **Lane Configuration** | Per-leg: `ConfigureLaneLegAsSource` / `ConfigureLaneLegAsDest` | Per-chain: `ConfigureChainForLanes` (holistic) |
 | **Contract Deployment** | `Deployer.DeployChainContracts()` via `DeployerRegistry` | `DeployChainContractsAdapter.DeployChainContracts()` via `DeployChainContractsRegistry` |
 | **Lane Adapter** | `LaneAdapter` (required) | `ChainFamily` (replaces LaneAdapter) |
@@ -81,9 +81,9 @@ These are the primary interfaces for 2.0. They live in `deployment/v2_0_0/adapte
 
 #### DeployChainContractsAdapter
 
-**Source:** [v2_0_0/adapters/deploy_chain_contracts.go](../v2_0_0/adapters/deploy_chain_contracts.go)
-**Registry:** `DeployChainContractsRegistry` via `adapters.GetDeployChainContractsRegistry()`
-**Key:** `chainFamily` (version-agnostic within 2.0)
+* **Source:** [v2_0_0/adapters/deploy_chain_contracts.go](../v2_0_0/adapters/deploy_chain_contracts.go)
+* **Registry:** `DeployChainContractsRegistry` via `adapters.GetDeployChainContractsRegistry()`
+* **Key:** `chainFamily` (version-agnostic within 2.0)
 
 Deploys all 2.0 CCIP contracts for a chain: Router, OnRamp, OffRamp, FeeQuoter, CommitteeVerifier(s), Executor(s), Proxy, and RMNRemote (RMN is retained in 2.0 for curse/uncurse).
 
@@ -98,14 +98,14 @@ type DeployChainContractsAdapter interface {
 
 **Registration:**
 ```go
-adapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyMyChain, &MyDeployAdapter{})
+adapters.GetDeployChainContractsRegistry().Register(chain_selectors.FamilyMyChain, &MyDeployAdapter{})
 ```
 
 #### ChainFamily
 
-**Source:** [v2_0_0/adapters/chain_family.go](../v2_0_0/adapters/chain_family.go)
-**Registry:** `ChainFamilyRegistry` via `adapters.GetChainFamilyRegistry()`
-**Key:** `chainFamily` (version-agnostic within 2.0)
+* **Source:** [v2_0_0/adapters/chain_family.go](../v2_0_0/adapters/chain_family.go)
+* **Registry:** `ChainFamilyRegistry` via `adapters.GetChainFamilyRegistry()`
+* **Key:** `chainFamily` (version-agnostic within 2.0)
 
 Handles chain-centric lane configuration. Unlike the 1.6 `LaneAdapter` which configures lanes per-leg (source vs dest separately), `ChainFamily` configures everything for a chain in one shot: committee verifiers, executors, FeeQuoter dest configs, and the full remote chain map.
 
@@ -126,7 +126,7 @@ type ChainFamily interface {
 
 **Registration:**
 ```go
-adapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyMyChain, &MyChainFamilyAdapter{})
+adapters.GetChainFamilyRegistry().RegisterChainFamily(chain_selectors.FamilyMyChain, &MyChainFamilyAdapter{})
 ```
 
 #### Off-Chain Service Config Adapters
@@ -157,7 +157,7 @@ For 2.0, the `Deployer` interface is needed for MCMS governance operations only.
 EVM 2.0 reuses the 1.6 `EVMAdapter` struct for these shared methods since MCMS is not version-specific:
 
 ```go
-deploy.GetRegistry().RegisterDeployer(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &evmseqV1_6.EVMAdapter{})
+deploy.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, semver.MustParse("2.0.0"), &evmseqV1_6.EVMAdapter{})
 ```
 
 Methods you must implement:
@@ -202,7 +202,7 @@ Register one adapter per pool version your chain supports. For example, EVM regi
 
 ## CCV Devenv Interfaces
 
-For local development and e2e testing, chain families implement interfaces in `chainlink-ccv/build/devenv/cciptestinterfaces/`. These are separate from the tooling API and drive the devenv environment setup.
+For local development and e2e testing, chain families implement interfaces in `chainlink-ccv/build/devenv/cciptestinterfaces/`. These are separate from the tooling API and drive the devenv environment setup. Since this guide focuses on the deployment tooling API surfaces, the canonical CCV devenv interfaces live in `chainlink-ccv` (rather than being duplicated here).
 
 ### CCIP17Configuration
 
@@ -341,43 +341,43 @@ func init() {
 
     // Deploy chain contracts (replaces Deployer.DeployChainContracts for 2.0)
     ccvadapters.GetDeployChainContractsRegistry().Register(
-        chainsel.FamilyMyChain, &MyDeployChainContractsAdapter{},
+        chain_selectors.FamilyMyChain, &MyDeployChainContractsAdapter{},
     )
 
     // Chain family (replaces LaneAdapter for 2.0)
     ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(
-        chainsel.FamilyMyChain, &MyChainFamilyAdapter{},
+        chain_selectors.FamilyMyChain, &MyChainFamilyAdapter{},
     )
 
     // Off-chain service config adapters
-    ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyMyChain, &MyCommitteeVerifierAdapter{})
-    ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyMyChain, &MyExecutorConfigAdapter{})
-    ccvadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyMyChain, &MyVerifierConfigAdapter{})
-    ccvadapters.GetIndexerConfigRegistry().Register(chainsel.FamilyMyChain, &MyIndexerConfigAdapter{})
-    ccvadapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyMyChain, &MyAggregatorConfigAdapter{})
-    ccvadapters.GetTokenVerifierConfigRegistry().Register(chainsel.FamilyMyChain, &MyTokenVerifierConfigAdapter{})
+    ccvadapters.GetCommitteeVerifierContractRegistry().Register(chain_selectors.FamilyMyChain, &MyCommitteeVerifierAdapter{})
+    ccvadapters.GetExecutorConfigRegistry().Register(chain_selectors.FamilyMyChain, &MyExecutorConfigAdapter{})
+    ccvadapters.GetVerifierJobConfigRegistry().Register(chain_selectors.FamilyMyChain, &MyVerifierConfigAdapter{})
+    ccvadapters.GetIndexerConfigRegistry().Register(chain_selectors.FamilyMyChain, &MyIndexerConfigAdapter{})
+    ccvadapters.GetAggregatorConfigRegistry().Register(chain_selectors.FamilyMyChain, &MyAggregatorConfigAdapter{})
+    ccvadapters.GetTokenVerifierConfigRegistry().Register(chain_selectors.FamilyMyChain, &MyTokenVerifierConfigAdapter{})
 
     // --- Tier 2: Shared infrastructure registrations ---
 
     // Deployer (for MCMS only -- can reuse a shared adapter struct)
-    deploy.GetRegistry().RegisterDeployer(chainsel.FamilyMyChain, v, &MyMCMSAdapter{})
+    deploy.GetRegistry().RegisterDeployer(chain_selectors.FamilyMyChain, v, &MyMCMSAdapter{})
 
     // MCMS Reader
-    changesets.GetRegistry().RegisterMCMSReader(chainsel.FamilyMyChain, &MyMCMSAdapter{})
+    changesets.GetRegistry().RegisterMCMSReader(chain_selectors.FamilyMyChain, &MyMCMSAdapter{})
 
     // Transfer ownership
-    deploy.GetTransferOwnershipRegistry().RegisterAdapter(chainsel.FamilyMyChain, v, &MyMCMSAdapter{})
+    deploy.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyMyChain, v, &MyMCMSAdapter{})
 
     // Token adapter (register per pool version)
-    tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyMyChain, v, &MyTokenAdapter{})
+    tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyMyChain, v, &MyTokenAdapter{})
 
     // Fee adapters
-    fees.GetRegistry().RegisterFeeAdapter(chainsel.FamilyMyChain, v, &MyFeeAdapter{})
-    fees.GetFeeAggregatorRegistry().RegisterFeeAggregatorAdapter(chainsel.FamilyMyChain, v, &MyFeeAggregatorAdapter{})
+    fees.GetRegistry().RegisterFeeAdapter(chain_selectors.FamilyMyChain, v, &MyFeeAdapter{})
+    fees.GetFeeAggregatorRegistry().RegisterFeeAggregatorAdapter(chain_selectors.FamilyMyChain, v, &MyFeeAggregatorAdapter{})
 
     // Curse adapter
     fastcurse.GetCurseRegistry().RegisterNewCurse(fastcurse.CurseRegistryInput{
-        CursingFamily:       chainsel.FamilyMyChain,
+        CursingFamily:       chain_selectors.FamilyMyChain,
         CursingVersion:      v,
         CurseAdapter:        &MyCurseAdapter{},
         CurseSubjectAdapter: &MyCurseAdapter{},
@@ -429,7 +429,7 @@ sequenceDiagram
 
     Note over Devenv: Phase 2: Token Deployment (per chain)
     Devenv->>CS: TokenExpansion changeset
-    CS->>Reg: TokenAdapterRegistry.GetTokenAdapter()
+    CS->>Reg: TokenAdapterRegistry.GetTokenAdapter(chainFamily, version)
     Reg-->>CS: TokenAdapter
     CS->>Adapter: Deploy token, deploy pool, configure
     Adapter-->>CS: OnChainOutput
