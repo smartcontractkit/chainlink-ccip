@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum"
@@ -155,6 +156,8 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)
 	}
+	ctx, cancel := context.WithTimeout(env.GetContext(), 1*time.Minute)
+	defer cancel()
 	var filteredFeeTokens []common.Address
 	// Give the deployer fee token balances by transferring from each token owner via impersonation on forked chains.
 	for _, addr := range addrs {
@@ -172,7 +175,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		}
 		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
-		tokenOwner, err := discoverFeeTokenFundingAccount(ec, token, addr, feeTokenFundingAmount)
+		tokenOwner, err := discoverFeeTokenFundingAccount(ctx, ec, token, addr, feeTokenFundingAmount)
 		if err != nil {
 			// in case of error continue
 			env.Logger.Warnf("Failed to discover fee token funding account for token %s on chain %d, continuing without it: %v", addr.Hex(), srcSel, err)
@@ -205,14 +208,15 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 // discoverFeeTokenFundingAccount returns an account that can fund fundingAmount
 // of tokenAddr, preferring owner() and falling back to event-derived candidates.
 func discoverFeeTokenFundingAccount(
+	ctx context.Context,
 	backend bind.ContractBackend,
 	token *burn_mint_erc20.BurnMintERC20,
 	tokenAddr common.Address,
 	fundingAmount *big.Int,
 ) (common.Address, error) {
-	owner, err := optionalAddressGetter(backend, tokenAddr, "owner")
+	owner, err := optionalAddressGetter(ctx, backend, tokenAddr, "owner")
 	if err != nil {
-		return findFundingSenderFromTokenEvents(backend, token, tokenAddr, fundingAmount)
+		return findFundingSenderFromTokenEvents(ctx, backend, token, tokenAddr, fundingAmount)
 	}
 	ownerBal, err := token.BalanceOf(nil, owner)
 	if err != nil {
@@ -222,12 +226,13 @@ func discoverFeeTokenFundingAccount(
 		return owner, nil
 	}
 	// if owner does not have sufficient balance, fall back to finding sender from token events
-	return findFundingSenderFromTokenEvents(backend, token, tokenAddr, fundingAmount)
+	return findFundingSenderFromTokenEvents(ctx, backend, token, tokenAddr, fundingAmount)
 }
 
 // optionalAddressGetter calls a no-arg address getter on contractAddr and
 // returns its result.
 func optionalAddressGetter(
+	ctx context.Context,
 	backend bind.ContractBackend,
 	contractAddr common.Address,
 	getter string,
@@ -242,7 +247,9 @@ func optionalAddressGetter(
 	}
 	contract := bind.NewBoundContract(contractAddr, parsed, backend, backend, backend)
 	var out []any
-	if err := contract.Call(nil, &out, getter); err != nil {
+	if err := contract.Call(&bind.CallOpts{
+		Context: ctx,
+	}, &out, getter); err != nil {
 		return common.Address{}, err
 	}
 	if len(out) == 0 {
@@ -254,6 +261,7 @@ func optionalAddressGetter(
 // findFundingSenderFromTokenEvents searches recent Transfer/Approval logs and
 // returns a sender with at least fundingAmount balance.
 func findFundingSenderFromTokenEvents(
+	ctx context.Context,
 	backend bind.ContractBackend,
 	token *burn_mint_erc20.BurnMintERC20,
 	tokenAddr common.Address,
@@ -263,7 +271,6 @@ func findFundingSenderFromTokenEvents(
 		chunkSize   = uint64(20_000)
 		maxLookback = uint64(500_000)
 	)
-	ctx := context.Background()
 	header, err := backend.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("get latest block header: %w", err)
