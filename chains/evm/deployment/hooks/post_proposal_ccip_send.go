@@ -154,6 +154,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)
 	}
+	var filteredFeeTokens []common.Address
 	// Give the deployer fee token balances by transferring from each token owner via impersonation on forked chains.
 	for _, addr := range addrs {
 		token, err := burn_mint_erc20.NewBurnMintERC20(addr, chain.Client)
@@ -167,23 +168,29 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
 		tokenOwner, err := discoverFeeTokenFundingAccount(chain.Client, token, addr, feeTokenFundingAmount)
 		if err != nil {
-			return nil, fmt.Errorf("failed to discover funding account for fee token %s on chain %d: %w", addr.Hex(), srcSel, err)
+			// in case of error continue
+			env.Logger.Warnf("Failed to discover fee token funding account for token %s on chain %d, continuing without it: %v", addr.Hex(), srcSel, err)
+			continue
 		}
 		tx, err := token.Transfer(cldf.SimTransactOpts(), chain.DeployerKey.From, feeTokenFundingAmount)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build transfer tx for fee token %s on chain %d: %w", addr.Hex(), srcSel, err)
+			// in case of error continue
+			env.Logger.Warnf("Failed to create transfer transaction for fee token %s from token owner %s to deployer %s on chain %d, "+
+				"continuing without it: %v", addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err)
+			continue
 		}
 		if err := testhelpers.SendImpersonatedTx(env.GetContext(), ec, rpcUrl, tokenOwner.Hex(), addr.Hex(), tx.Data()); err != nil {
-			return nil, fmt.Errorf(
-				"failed to send impersonated transfer for fee token %s from token owner %s to deployer %s on chain %d: %w",
-				addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err,
-			)
+			// in case of error continue
+			env.Logger.Warnf("Failed to send impersonated transfer transaction for fee token %s from token owner %s to deployer %s on chain %d, "+
+				"continuing without it: %v", addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err)
+			continue
 		}
+		filteredFeeTokens = append(filteredFeeTokens, addr)
 	}
 	out := make([]string, 0, len(addrs)+1)
 	// Keep native token first (empty string) to mirror adapter expectations.
 	out = append(out, "") // native (empty encodes to wrapped native in adapter)
-	for _, a := range addrs {
+	for _, a := range filteredFeeTokens {
 		out = append(out, a.Hex())
 	}
 	return out, nil
