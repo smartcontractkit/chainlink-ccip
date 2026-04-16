@@ -40,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
@@ -596,7 +597,7 @@ func AddNodesToContracts(
 	}
 	dReg := deployops.GetRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
-	csOut, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
+	csOut, err = evmdeploy.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
 		HomeChainSel:    ccipHomeSelector,
 		RemoteChainSels: remoteSelectors,
 		ConfigType:      cciputils.ConfigTypeActive,

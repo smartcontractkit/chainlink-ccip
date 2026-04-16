@@ -187,8 +187,8 @@ type ConfigureTokenForTransfersInput struct {
 // SetAllowedFinalityConfigSequenceInput defines the input for setting the allowed finality config on a V2 token pool.
 type SetAllowedFinalityConfigSequenceInput struct {
 	// Settings are provided as a map of pool address to finality config.
-	Settings map[string][4]byte `json:"settings" yaml:"settings"`
-	// Selector is the chain selector for the chain on which to set the minimum block confirmations.
+	Settings map[string]finality.Config `json:"settings" yaml:"settings"`
+	// Selector is the chain selector for the chain on which to set the allowed finality configs.
 	Selector uint64 `json:"selector" yaml:"selector"`
 }
 
