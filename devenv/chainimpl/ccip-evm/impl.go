@@ -28,8 +28,8 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
 type SourceDestPair struct {
@@ -50,6 +50,7 @@ type CCIP16EVM struct {
 	chainDetails chainsel.ChainDetails
 	ethClients   map[uint64]*ethclient.Client
 	testadapters.TestAdapter
+	testadapters.Curser
 }
 
 func NewEmptyCCIP16EVM(chainDetails chainsel.ChainDetails) *CCIP16EVM {
@@ -73,7 +74,13 @@ func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
 	if !found {
 		panic(fmt.Sprintf("failed to find testadapter factory for %s", chainsel.FamilyEVM))
 	}
-	m.TestAdapter = factory(e, m.chainDetails.ChainSelector)
+	adapter := factory(e, m.chainDetails.ChainSelector)
+	m.TestAdapter = adapter
+	curser, ok := adapter.(testadapters.Curser)
+	if !ok {
+		panic(fmt.Sprintf("expected concrete testadapter type for %s to be a curser, got %T", chainsel.FamilyEVM, adapter))
+	}
+	m.Curser = curser
 }
 
 func (m *CCIP16EVM) ChainSelector() uint64 {
