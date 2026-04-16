@@ -71,11 +71,7 @@ func RunCurseTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 	require.NoError(t, err)
 	t.Logf("sent message with seqNr: %d and messageID: %s", seqNr, messageID)
 
-	// It won't get committed onchain but a buggy implementation will keep trying and reverting.
-	// TODO: whats the best way to assert this? that we see e.g. one revert with an expected reason?
-	// toImpl.ValidateCommit(t, fromImpl.ChainSelector(), &block, ccipocr3.NewSeqNumRange(ccipocr3.SeqNum(seqNr), ccipocr3.SeqNum(seqNr)))
-
-	// Alternatively, if the plugin is reading the curse state correctly, we should see a log from
+	// Assertion: If the plugin is reading the curse state correctly, we should see a log from
 	// the commit plugin that the source chain is being ignored due to being cursed on the destination.
 	// In this particular case, since we only have 2 chains and one is cursed, we should see the log
 	// "nothing to observe from the offRamp, no active source chains exist".
@@ -116,11 +112,7 @@ func RunCurseTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 	t.Logf("found log line asserting that the source chain is being ignored due to being cursed on the destination: %s", logLine)
 
-	// // Uncurse the source selector on the destination chain to restore uncursed state.
-	// TODO: could also wait for the message to commit after being uncursed?
-	// err = curser.Uncurse(ctx, subject)
-	// require.NoError(t, err)
-	// t.Logf("uncursed source selector %d on destination chain %d", fromImpl.ChainSelector(), toImpl.ChainSelector())
+	// TODO: could uncurse and wait for the message to commit/execute?
 }
 
 func selectorToSubject(selector uint64) [16]byte {
