@@ -11,17 +11,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -277,8 +278,8 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 	return decimals, nil
 }
 
-// SetTokenPoolRateLimits has v2.0.0-specific logic: batch call with both
-// default and custom finality rate limits.
+// SetTokenPoolRateLimits has v2.0.0-specific logic it can infer whether the
+// default or custom rate limit should be updated based on the finality config
 func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-2.0-adapter:set-token-pool-rate-limits",
@@ -299,33 +300,44 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref %+v is zero", input.TokenPoolRef)
 			}
 
+			currentFinalityConfig, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, contract.FunctionInput[struct{}]{
+				ChainSelector: input.ChainSelector,
+				Address:       tokenPoolAddr,
+				Args:          struct{}{},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config for token pool at %s on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
+			}
+
+			finalityConfig := currentFinalityConfig.Output
+			if !input.AllowedFinalityConfig.IsZero() {
+				requestedFinalityConfig := input.AllowedFinalityConfig.Raw()
+				if requestedFinalityConfig != currentFinalityConfig.Output {
+					_, err = cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, contract.FunctionInput[[4]byte]{
+						ChainSelector: input.ChainSelector,
+						Address:       tokenPoolAddr,
+						Args:          requestedFinalityConfig,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config on token pool at %s on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
+					}
+					finalityConfig = requestedFinalityConfig
+				}
+			}
+
 			args := []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector: input.RemoteChainSelector,
-					FastFinality:        false,
+					FastFinality:        finalityConfig != finality.RawWaitForFinality,
 					OutboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
-						Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
-						Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
+						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.OutboundRateLimiterConfig.Capacity,
+						Rate:      input.OutboundRateLimiterConfig.Rate,
 					},
 					InboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
-						Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
-						Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
-					},
-				},
-				{
-					RemoteChainSelector: input.RemoteChainSelector,
-					FastFinality:        true,
-					OutboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: input.CustomFinalityOutboundRateLimiterConfig.IsEnabled,
-						Capacity:  input.CustomFinalityOutboundRateLimiterConfig.Capacity,
-						Rate:      input.CustomFinalityOutboundRateLimiterConfig.Rate,
-					},
-					InboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: input.CustomFinalityInboundRateLimiterConfig.IsEnabled,
-						Capacity:  input.CustomFinalityInboundRateLimiterConfig.Capacity,
-						Rate:      input.CustomFinalityInboundRateLimiterConfig.Rate,
+						IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.InboundRateLimiterConfig.Capacity,
+						Rate:      input.InboundRateLimiterConfig.Rate,
 					},
 				},
 			}

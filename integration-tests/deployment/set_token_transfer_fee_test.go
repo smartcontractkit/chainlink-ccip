@@ -13,16 +13,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	evmadaptersv2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
-	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	evmadaptersV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	soladaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -36,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
@@ -518,8 +517,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelB: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
-					evmChainSelC: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelB: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelC: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
 				},
 			},
 		},
@@ -538,8 +537,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelA: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
-					evmChainSelC: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelA: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelC: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
 				},
 			},
 		},
@@ -558,8 +557,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelA: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
-					evmChainSelB: {DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelA: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelB: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
 				},
 			},
 		},
@@ -597,7 +596,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolA.Hex(),
-							MinBlockConfirmations: utils.NewOptional(uint16(12)),
+							AllowedFinalityConfig: finality.Config{BlockDepth: 12},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
@@ -622,7 +621,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolB.Hex(),
-							MinBlockConfirmations: utils.Optional[uint16]{Value: 12, Valid: false},
+							AllowedFinalityConfig: finality.Config{},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
@@ -647,7 +646,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 					TokenPools: []tokens.TokenTransferFeeForPool{
 						{
 							PoolAddress:           poolC.Hex(),
-							MinBlockConfirmations: utils.NewOptional(uint16(0)),
+							AllowedFinalityConfig: finality.Config{WaitForFinality: true},
 							Destinations: []tokens.TokenTransferFeeForDst{
 								{
 									IsReset:  false,
@@ -675,7 +674,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// Get the v2.0 token adapter
-	tokensV2 := evmadaptersv2_0_0.TokenAdapter{}
+	tokensV2 := evmadaptersV2_0_0.TokenAdapter{}
 
 	// Reset the operation cache
 	env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())

@@ -40,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
@@ -53,11 +54,9 @@ import (
 	ccipevm "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 )
 
-var (
-	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
-	// in tests.
-	TestXXXMCMSSigner *ecdsa.PrivateKey
-)
+// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
+// in tests.
+var TestXXXMCMSSigner *ecdsa.PrivateKey
 
 func init() {
 	key, err := crypto.GenerateKey()
@@ -598,7 +597,7 @@ func AddNodesToContracts(
 	}
 	dReg := deployops.GetRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
-	csOut, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
+	csOut, err = evmdeploy.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
 		HomeChainSel:    ccipHomeSelector,
 		RemoteChainSels: remoteSelectors,
 		ConfigType:      cciputils.ConfigTypeActive,
@@ -804,9 +803,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					OutboundCCVs:                             []datastore.AddressRef{}, // not needed for for 1.6
-					InboundCCVs:                              []datastore.AddressRef{}, // not needed for for 1.6
-					DefaultFinalityOutboundRateLimiterConfig: disabledRL,
+					OutboundCCVs:              []datastore.AddressRef{}, // not needed for 1.6
+					InboundCCVs:               []datastore.AddressRef{}, // not needed for 1.6
+					OutboundRateLimiterConfig: disabledRL,
 					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
@@ -914,10 +913,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							TokenRef:            tokenRef,
 							TokenPoolRef:        tokenPoolRef,
 							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-								dst.ChainSelector(): {
-									DefaultFinality: rl,
-									CustomFinality:  rl,
-								},
+								dst.ChainSelector(): {RateLimit: rl},
 							},
 						},
 						dst.ChainSelector(): {
@@ -925,10 +921,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							TokenRef:            dstTokenRef,
 							TokenPoolRef:        dstTokenPoolRef,
 							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-								selector: {
-									DefaultFinality: rl,
-									CustomFinality:  rl,
-								},
+								selector: {RateLimit: rl},
 							},
 						},
 					},
