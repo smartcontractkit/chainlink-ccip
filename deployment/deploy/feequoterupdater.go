@@ -285,6 +285,10 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 						configImporterVersions = append(configImporterVersions, version)
 					}
 				}
+				selectiveChainMap := make(map[uint64]struct{})
+				for _, selector := range perChainInput.RemoteChainSelectors {
+					selectiveChainMap[selector] = struct{}{}
+				}
 				for _, version := range configImporterVersions {
 					configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 					if !ok {
@@ -302,9 +306,19 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get connected chains for chain %d: %w", chainSel, err)
 					}
+					var filteredChains []uint64
+					if len(perChainInput.RemoteChainSelectors) > 0 {
+						for _, selector := range connectedChains {
+							if _, ok := selectiveChainMap[selector]; ok {
+								filteredChains = append(filteredChains, selector)
+							}
+						}
+					} else {
+						filteredChains = connectedChains
+					}
 					populateConfigReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, configImporter.SequenceImportConfig(), e.BlockChains, ImportConfigPerChainInput{
 						ChainSelector:        chainSel,
-						RemoteChains:         connectedChains,
+						RemoteChains:         filteredChains,
 						TokensPerRemoteChain: supportedTokensPerRemoteChain,
 					})
 					if err != nil {
