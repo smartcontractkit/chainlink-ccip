@@ -156,11 +156,14 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)
 	}
-	ctx, cancel := context.WithTimeout(env.GetContext(), 1*time.Minute)
-	defer cancel()
+
 	var filteredFeeTokens []common.Address
-	// Give the deployer fee token balances by transferring from each token owner via impersonation on forked chains.
+	// Best-effort funding: try to give the deployer fee token balances by impersonating each token owner
+	// on forked chains. Tokens that fail discovery, transfer construction, or impersonated send are skipped
+	// and excluded from filteredFeeTokens.
 	for _, addr := range addrs {
+		ctx, cancel := context.WithTimeout(env.GetContext(), 1*time.Minute)
+		defer cancel()
 		env.Logger.Infof("Processing fee token %s on chain %d", addr.Hex(), srcSel)
 		// we are not using chain.client here to avoid using multi client
 		// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
@@ -171,6 +174,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		}
 		deployerBal, err := token.BalanceOf(nil, chain.DeployerKey.From)
 		if err == nil && deployerBal.Cmp(feeTokenFundingAmount) >= 0 {
+			filteredFeeTokens = append(filteredFeeTokens, addr)
 			continue
 		}
 		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
@@ -196,7 +200,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		}
 		filteredFeeTokens = append(filteredFeeTokens, addr)
 	}
-	out := make([]string, 0, len(addrs)+1)
+	out := make([]string, 0, len(filteredFeeTokens)+1)
 	// Keep native token first (empty string) to mirror adapter expectations.
 	out = append(out, "") // native (empty encodes to wrapped native in adapter)
 	for _, a := range filteredFeeTokens {
