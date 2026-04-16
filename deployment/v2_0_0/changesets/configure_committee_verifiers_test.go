@@ -49,6 +49,31 @@ func (m *mockCommitteeVerifierContractAdapter) ResolveCommitteeVerifierContracts
 	return contracts, nil
 }
 
+func (m *mockCommitteeVerifierContractAdapter) GetCommitteeVerifierResolver(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	qualifier string,
+) ([]datastore.AddressRef, error) {
+	refs, err := m.ResolveCommitteeVerifierContracts(ds, chainSelector, qualifier)
+	if err != nil {
+		return nil, err
+	}
+	resolverType := datastore.ContractType("CommitteeVerifierResolver")
+	var out []datastore.AddressRef
+	for _, ref := range refs {
+		if ref.Type == resolverType {
+			out = append(out, ref)
+		}
+	}
+	if len(out) > 0 {
+		return out, nil
+	}
+	if len(refs) == 1 {
+		return refs, nil
+	}
+	return nil, fmt.Errorf("no CommitteeVerifierResolver ref for default lane CCVs (chain %d qualifier %q)", chainSelector, qualifier)
+}
+
 func newResolverTestEnv(t *testing.T, selectors []uint64) deployment.Environment {
 	t.Helper()
 	lggr := logger.Test(t)

@@ -99,7 +99,7 @@ type TransferOwnershipAdapter interface {
 type ConfigImporter interface {
 	InitializeAdapter(e cldf.Environment, selectors uint64) error
 	ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error)
-	SupportedTokensPerRemoteChain(e cldf.Environment, chainSelector uint64) (map[uint64][]common.Address, error)
+	SupportedTokensPerRemoteChain(e cldf.Environment, chainSelector uint64, selectiveRemoteChains []uint64) (map[uint64][]common.Address, error)
 	SequenceImportConfig() *cldf_ops.Sequence[ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
