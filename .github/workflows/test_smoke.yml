@@ -47,6 +47,8 @@ jobs:
                   ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
                   || 'env.toml'
               }}
+          - name: TestE2ECurse
+            config: env.toml,env-anvil.toml
       fail-fast: false
     steps:
       - name: Checkout code
@@ -118,7 +120,7 @@ jobs:
           JD_IMAGE: ${{ secrets.JD_IMAGE }}
         run: |
           cd cmd/ccip && go install . && cd -
-          ccip u ${{ matrix.test.config }}
+          ccip u ${{ matrix.test.config }} && ccip obs up
           sleep 120 # wait for nodes to be ready, need a better way here
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@latest
