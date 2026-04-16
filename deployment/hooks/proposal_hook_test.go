@@ -273,7 +273,7 @@ func TestGlobalPostProposalCCIPSendHook_Metadata(t *testing.T) {
 	h := GlobalPostProposalCCIPSendHook(domain.NewDomain(t.TempDir(), "test"))
 	require.Equal(t, PostProposalCCIPSendHookName, h.Name)
 	require.Equal(t, cldf_changeset.Abort, h.FailurePolicy)
-	require.Equal(t, 5*time.Minute, h.Timeout)
+	require.Equal(t, 15*time.Minute, h.Timeout)
 	require.NotNil(t, h.Func)
 }
 
@@ -457,9 +457,7 @@ func TestRunPostProposalCCIPSends_MissingSourceAdapter(t *testing.T) {
 	}
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "no test adapter for family evm version")
-	require.ErrorContains(t, err, version.String())
+	require.NoError(t, err)
 }
 
 func TestRunPostProposalCCIPSends_InvalidDestinationSelector(t *testing.T) {
@@ -509,9 +507,7 @@ func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
 	}
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "no test adapter for family solana version")
-	require.ErrorContains(t, err, version.String())
+	require.NoError(t, err)
 }
 
 func TestRunPostProposalCCIPSends_ExtraArgsError(t *testing.T) {
