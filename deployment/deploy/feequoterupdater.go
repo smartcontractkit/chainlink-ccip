@@ -431,7 +431,7 @@ func PopulateMetaDataFromConfigImporter(e cldf.Environment, configImporter Confi
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
 	}
-	supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
+	supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel, nil)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
 	}
