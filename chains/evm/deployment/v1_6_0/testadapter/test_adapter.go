@@ -815,6 +815,42 @@ func (a *EVMAdapter) CurrentBlock(t *testing.T) uint64 {
 
 var _ testadapters.Curser = (*EVMAdapter)(nil)
 
+func (a *EVMAdapter) IsCursed(ctx context.Context, subject [16]byte) (bool, error) {
+	l := zerolog.Ctx(ctx)
+	l.
+		Info().
+		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
+		Str("subject", fmt.Sprintf("%x", subject[:])).
+		Msg("Checking if subject is cursed")
+
+	// get the RMN remote address
+	rmnRemoteAddr, err := a.getAddress(datastore.ContractType(rmn_remote_ops.ContractType))
+	if err != nil {
+		return false, fmt.Errorf("failed to get RMNRemote address: %w", err)
+	}
+
+	// get the RMNRemote contract
+	r, err := rmn_remote.NewRMNRemote(rmnRemoteAddr, a.Chain.Client)
+	if err != nil {
+		return false, fmt.Errorf("failed to create RMNRemote contract: %w", err)
+	}
+
+	isCursed, err := r.IsCursed(&bind.CallOpts{
+		Context: ctx,
+	}, subject)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if subject is cursed: %w", err)
+	}
+
+	l.Info().
+		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
+		Str("subject", fmt.Sprintf("%x", subject[:])).
+		Bool("is_cursed", isCursed).
+		Msg("Checked if subject is cursed")
+
+	return isCursed, nil
+}
+
 func (a *EVMAdapter) Curse(ctx context.Context, subject [16]byte) error {
 	l := zerolog.Ctx(ctx)
 	l.

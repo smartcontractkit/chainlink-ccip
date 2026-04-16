@@ -159,6 +159,8 @@ type TestAdapter interface {
 // TestAdapter implementations that don't implement this won't be able to be used
 // in cursing related tests.
 type Curser interface {
+	// IsCursed returns true if the given subject is cursed on the chain.
+	IsCursed(ctx context.Context, subject [16]byte) (bool, error)
 	// Curse curses the given subject on the chain.
 	Curse(ctx context.Context, subject [16]byte) error
 	// Uncurse uncurses the given subject on the chain.
