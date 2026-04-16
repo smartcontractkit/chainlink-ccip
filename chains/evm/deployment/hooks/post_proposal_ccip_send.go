@@ -169,7 +169,10 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		}
 		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
-		tokenOwner, err := discoverFeeTokenFundingAccount(chain.Client, token, addr, feeTokenFundingAmount)
+		// we are not using chain.client here to avoid using multi client
+		// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
+		// when the node is not fully synced or has issues processing the event filters with anvil
+		tokenOwner, err := discoverFeeTokenFundingAccount(ec, token, addr, feeTokenFundingAmount)
 		if err != nil {
 			// in case of error continue
 			env.Logger.Warnf("Failed to discover fee token funding account for token %s on chain %d, continuing without it: %v", addr.Hex(), srcSel, err)
