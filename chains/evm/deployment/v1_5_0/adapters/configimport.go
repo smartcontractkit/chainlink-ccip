@@ -230,11 +230,19 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import price registry config for chain %d: %w", chainSelector, err)
 			}
+			filteredRamps := make(map[uint64]common.Address)
+			for _, selector := range in.RemoteChains {
+				if onRampAddr, ok := ci.OnRamp[selector]; ok {
+					filteredRamps[selector] = onRampAddr
+				} else {
+					b.Logger.Warnf("No onramp address found for remote chain %d, skipping onramp config import for this chain", selector)
+				}
+			}
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OnRampImportConfigSequence,
 				seq1_5.OnRampImportConfigSequenceInput{
 					ChainSelector:           chainSelector,
-					OnRampsPerRemoteChain:   ci.OnRamp,
+					OnRampsPerRemoteChain:   filteredRamps,
 					SupportedTokensPerChain: in.TokensPerRemoteChain,
 					PriceRegistry:           ci.PriceRegistry,
 				}, result)
