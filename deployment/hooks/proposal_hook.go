@@ -96,7 +96,7 @@ func GlobalPostProposalCCIPSendHook(dom domain.Domain) cldf_changeset.PostPropos
 		HookDefinition: cldf_changeset.HookDefinition{
 			Name:          postProposalCCIPSendHookName,
 			FailurePolicy: cldf_changeset.Abort,
-			Timeout:       5 * time.Minute,
+			Timeout:       15 * time.Minute,
 		},
 		Func: verifyCCIPSend(dom),
 	}
