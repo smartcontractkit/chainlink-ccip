@@ -167,7 +167,7 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	return connected, nil
 }
 
-func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64) (map[uint64][]common.Address, error) {
+func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64, selectiveRemoteChains []uint64) (map[uint64][]common.Address, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainsel]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
@@ -176,8 +176,23 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connected chains for chain %d: %w", chainsel, err)
 	}
+	remoteChainMap := make(map[uint64]struct{})
+	for _, selected := range selectiveRemoteChains {
+		remoteChainMap[selected] = struct{}{}
+	}
+	var filteredRemoteChains []uint64
+	if len(selectiveRemoteChains) > 0 {
+		for _, selected := range remoteChains {
+			if _, ok := remoteChainMap[selected]; ok {
+				filteredRemoteChains = append(filteredRemoteChains, selected)
+				e.Logger.Infof("Including remote chain %d in supported tokens import for chain %d", selected, chainsel)
+			}
+		}
+	} else {
+		filteredRemoteChains = remoteChains
+	}
 	// get all supported tokens from token admin registry
-	return GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, remoteChains)
+	return GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, filteredRemoteChains)
 }
 
 func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -215,11 +230,19 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import price registry config for chain %d: %w", chainSelector, err)
 			}
+			filteredRamps := make(map[uint64]common.Address)
+			for _, selector := range in.RemoteChains {
+				if onRampAddr, ok := ci.OnRamp[selector]; ok {
+					filteredRamps[selector] = onRampAddr
+				} else {
+					b.Logger.Warnf("No onramp address found for remote chain %d, skipping onramp config import for this chain", selector)
+				}
+			}
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OnRampImportConfigSequence,
 				seq1_5.OnRampImportConfigSequenceInput{
 					ChainSelector:           chainSelector,
-					OnRampsPerRemoteChain:   ci.OnRamp,
+					OnRampsPerRemoteChain:   filteredRamps,
 					SupportedTokensPerChain: in.TokensPerRemoteChain,
 					PriceRegistry:           ci.PriceRegistry,
 				}, result)
