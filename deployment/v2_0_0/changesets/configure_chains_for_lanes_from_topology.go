@@ -20,23 +20,25 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
+const defaultQualifier = "default"
+
 // CommitteeVerifierRemoteChainConfig is the user-facing input for a single remote chain on a
 // CommitteeVerifier. It intentionally omits SignatureConfig because signers and threshold are
 // derived automatically from the topology (NOPs × committee × chain) — the caller should never
 // have to specify them manually.
 type CommitteeVerifierRemoteChainConfig struct {
-	AllowlistEnabled          bool
+	AllowlistEnabled          *bool
 	AddedAllowlistedSenders   []string
 	RemovedAllowlistedSenders []string
-	FeeUSDCents               uint16
-	GasForVerification        uint32
-	PayloadSizeBytes          uint16
+	FeeUSDCents               *uint16
+	GasForVerification        *uint32
+	PayloadSizeBytes          *uint16
 }
 
 type CommitteeVerifierInputConfig struct {
 	CommitteeQualifier    string
 	RemoteChains          map[uint64]CommitteeVerifierRemoteChainConfig
-	AllowedFinalityConfig finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
+	AllowedFinalityConfig *finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
 // FeeQuoterDestChainConfigOverrides provides lane-pair-specific overrides on top of the
@@ -60,23 +62,34 @@ type FeeQuoterDestChainConfigOverrides struct {
 	USDPerUnitGas               *big.Int
 }
 
-// PartialRemoteChainConfig is the user-facing input for a single remote chain. Contract
-// addresses that can be derived from the datastore (remote OnRamp/OffRamp, local Executor)
-// are resolved automatically — the user only provides the executor qualifier and lane-specific
-// configuration values.
+// PartialRemoteChainConfig is the user-facing input for a single remote chain. All fields
+// are optional, but their empty values are resolved from different sources:
+//   - adapter-backed remote-chain settings fall back to the remote chain family adapter's
+//     defaults (via GetDefaultRemoteChainConfig and GetDefaultFeeQuoterDestChainConfig);
+//   - contract addresses (OnRamp, OffRamp, Executor) are resolved automatically from the
+//     datastore; and
+//   - empty DefaultInboundCCVs / DefaultOutboundCCVs do not use adapter defaults and instead
+//     auto-resolve via the committee verifier contract registry.
+//
+// An empty DefaultInboundCCVs or DefaultOutboundCCVs slice means "use the auto-resolved CCV
+// set for this lane". LaneMandatedInboundCCVs / LaneMandatedOutboundCCVs are additional
+// caller-specified CCVs that are enforced on top of that default resolution.
+//
+// Minimal usage: `remoteChainSelector: {}` — adapter-backed fields use their defaults,
+// contracts are datastore-resolved, and CCVs are auto-resolved.
 type PartialRemoteChainConfig struct {
 	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  string
+	DefaultExecutorQualifier  string // defaults to "default" if empty
 	DefaultInboundCCVs        []datastore.AddressRef
 	LaneMandatedInboundCCVs   []datastore.AddressRef
 	DefaultOutboundCCVs       []datastore.AddressRef
 	LaneMandatedOutboundCCVs  []datastore.AddressRef
 	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
-	ExecutorDestChainConfig   adapters.ExecutorDestChainConfig
-	BaseExecutionGasCost      uint32
+	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig // nil = use adapter default
+	BaseExecutionGasCost      *uint32                           // nil = use adapter default
 	TokenReceiverAllowed      *bool
-	MessageNetworkFeeUSDCents uint16
-	TokenNetworkFeeUSDCents   uint16
+	MessageNetworkFeeUSDCents *uint16 // nil = use adapter default
+	TokenNetworkFeeUSDCents   *uint16 // nil = use adapter default
 }
 
 // PartialChainConfig describes the desired state for a single local chain. Well-known contract
@@ -158,16 +171,14 @@ func ConfigureChainsForLanesFromTopology(
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
 			}
 			for _, cv := range chainCfg.CommitteeVerifiers {
-				if !cv.AllowedFinalityConfig.IsZero() {
+				if cv.AllowedFinalityConfig != nil {
 					if err := cv.AllowedFinalityConfig.Validate(); err != nil {
 						return fmt.Errorf("invalid AllowedFinalityConfig for committee verifier on chain %d: %w", chainCfg.ChainSelector, err)
 					}
 				}
 			}
-			for remoteSelector, remoteCfg := range chainCfg.RemoteChains {
-				if remoteCfg.DefaultExecutorQualifier == "" {
-					return fmt.Errorf("DefaultExecutorQualifier is required for remote chain %d on local chain %d", remoteSelector, chainCfg.ChainSelector)
-				}
+			if err := validateDefaultCCVsResolvable(chainCfg, committeeVerifierContractRegistry, e); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -189,11 +200,19 @@ func ConfigureChainsForLanesFromTopology(
 		// derived from the topology and resolve the verifier contract addresses.
 		chains := make([]enrichedChainConfig, 0, len(cfg.Chains))
 		for _, chainCfg := range cfg.Chains {
+			localFamily, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for local chain %d: %w", chainCfg.ChainSelector, err)
+			}
+			localAdapter, ok := chainFamilyRegistry.GetChainFamily(localFamily)
+			if !ok {
+				return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for local chain family %q", localFamily)
+			}
+
 			committeeVerifiers := make([]adapters.CommitteeVerifierConfig[datastore.AddressRef], 0, len(chainCfg.CommitteeVerifiers))
 			for _, verifierInput := range chainCfg.CommitteeVerifiers {
 				remoteChains := make(map[uint64]adapters.CommitteeVerifierRemoteChainConfig, len(verifierInput.RemoteChains))
 				for remoteSelector, remoteConfig := range verifierInput.RemoteChains {
-					// The signature config shaped in the local chain's context, however the set of signers and threshold are derived from the remote (source) chain
 					signatureConfig, err := getSignatureConfigForLane(
 						e,
 						cfg.Topology,
@@ -205,31 +224,44 @@ func ConfigureChainsForLanesFromTopology(
 					if err != nil {
 						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for lane local chain %d -> remote chain %d: %w", chainCfg.ChainSelector, remoteSelector, err)
 					}
-					remoteChains[remoteSelector] = adapters.CommitteeVerifierRemoteChainConfig{
-						AllowlistEnabled:          remoteConfig.AllowlistEnabled,
-						AddedAllowlistedSenders:   remoteConfig.AddedAllowlistedSenders,
-						RemovedAllowlistedSenders: remoteConfig.RemovedAllowlistedSenders,
-						FeeUSDCents:               remoteConfig.FeeUSDCents,
-						GasForVerification:        remoteConfig.GasForVerification,
-						PayloadSizeBytes:          remoteConfig.PayloadSizeBytes,
-						SignatureConfig:           *signatureConfig,
+
+					remoteFamily, err := chainsel.GetSelectorFamily(remoteSelector)
+					if err != nil {
+						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteSelector, err)
 					}
+					remoteAdapter, ok := chainFamilyRegistry.GetChainFamily(remoteFamily)
+					if !ok {
+						return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for remote chain family %q (remote %d)", remoteFamily, remoteSelector)
+					}
+
+					remoteChains[remoteSelector] = mergeCommitteeVerifierRemoteChainConfig(
+						remoteAdapter.GetDefaultCommitteeVerifierRemoteChainConfig(),
+						remoteConfig,
+						*signatureConfig,
+					)
 				}
 
 				contractAdapter, err := committeeVerifierContractRegistry.GetByChain(chainCfg.ChainSelector)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("no committee verifier contract adapter for chain %d: %w", chainCfg.ChainSelector, err)
 				}
-				// Resolve the committee verifier contracts for the local chain, using the committee qualifier from the verifier input
 				contracts, err := contractAdapter.ResolveCommitteeVerifierContracts(e.DataStore, chainCfg.ChainSelector, verifierInput.CommitteeQualifier)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve committee verifier contracts for chain %d qualifier %q: %w", chainCfg.ChainSelector, verifierInput.CommitteeQualifier, err)
 				}
 
+				allowedFinality := localAdapter.GetDefaultFinalityConfig()
+				if verifierInput.AllowedFinalityConfig != nil {
+					allowedFinality = *verifierInput.AllowedFinalityConfig
+				}
+				if err := allowedFinality.Validate(); err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("invalid effective AllowedFinalityConfig for committee verifier on chain %d: %w", chainCfg.ChainSelector, err)
+				}
+
 				committeeVerifiers = append(committeeVerifiers, adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 					CommitteeVerifier:     contracts,
 					RemoteChains:          remoteChains,
-					AllowedFinalityConfig: verifierInput.AllowedFinalityConfig,
+					AllowedFinalityConfig: allowedFinality,
 				})
 			}
 
@@ -241,7 +273,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, chains, cfg.MCMS, cfg.UseTestRouter)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, chains, cfg.MCMS, cfg.UseTestRouter)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -262,6 +294,7 @@ func applyConfigureChains(
 	e deployment.Environment,
 	chainFamilyRegistry *adapters.ChainFamilyRegistry,
 	mcmsRegistry *changesetscore.MCMSReaderRegistry,
+	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 	chains []enrichedChainConfig,
 	mcmsInput mcms.Input,
 	useTestRouter bool,
@@ -335,7 +368,7 @@ func applyConfigureChains(
 				return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for remote chain family %q", remoteFamily)
 			}
 
-			convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg)
+			convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg, committeeVerifierContractRegistry)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteSelector, err)
 			}
@@ -381,6 +414,7 @@ func applyConfigureChains(
 // resolveRemoteChainConfig resolves a PartialRemoteChainConfig into the form expected by the
 // sequence. Remote contracts (OnRamp, OffRamp) are resolved via the remote chain's adapter.
 // Local contracts (Executor, CCVs) are resolved from the local chain's datastore/adapter.
+// Fields not explicitly set in inCfg fall back to the remote adapter's GetDefaultRemoteChainConfig.
 func resolveRemoteChainConfig(
 	e deployment.Environment,
 	localAdapter adapters.ChainFamily,
@@ -388,6 +422,7 @@ func resolveRemoteChainConfig(
 	localChainSelector uint64,
 	remoteChainSelector uint64,
 	inCfg PartialRemoteChainConfig,
+	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	remoteOnRampBytes, err := remoteAdapter.GetOnRampAddress(e.DataStore, remoteChainSelector)
 	if err != nil {
@@ -397,26 +432,31 @@ func resolveRemoteChainConfig(
 	if err != nil {
 		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve remote offRamp on chain %d: %w", remoteChainSelector, err)
 	}
-	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, inCfg.DefaultExecutorQualifier)
+
+	executorQualifier := inCfg.DefaultExecutorQualifier
+	if executorQualifier == "" {
+		executorQualifier = defaultQualifier
+	}
+	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, executorQualifier)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", inCfg.DefaultExecutorQualifier, localChainSelector, err)
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", executorQualifier, localChainSelector, err)
 	}
 
-	defaultInboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.DefaultInboundCCVs)
+	defaultInboundCCVs, err := resolveDefaultCCVs(e, localChainSelector, inCfg.DefaultInboundCCVs, committeeVerifierContractRegistry)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve default inbound CCVs on chain %d: %w", localChainSelector, err)
 	}
 	laneMandatedInboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.LaneMandatedInboundCCVs)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve lane-mandated inbound CCVs on chain %d: %w", localChainSelector, err)
 	}
-	defaultOutboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.DefaultOutboundCCVs)
+	defaultOutboundCCVs, err := resolveDefaultCCVs(e, localChainSelector, inCfg.DefaultOutboundCCVs, committeeVerifierContractRegistry)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve default outbound CCVs on chain %d: %w", localChainSelector, err)
 	}
 	laneMandatedOutboundCCVs, err := resolveLocalContractsForTopologyChangeset(e, localChainSelector, inCfg.LaneMandatedOutboundCCVs)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, err
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve lane-mandated outbound CCVs on chain %d: %w", localChainSelector, err)
 	}
 
 	fqConfig := mergeFeeQuoterDestChainConfig(
@@ -425,8 +465,40 @@ func resolveRemoteChainConfig(
 	)
 	fqConfig.ChainFamilySelector = remoteAdapter.GetChainFamilySelector()
 
+	defaults := remoteAdapter.GetDefaultRemoteChainConfig()
+
+	allowTrafficFrom := defaults.AllowTrafficFrom
+	if inCfg.AllowTrafficFrom != nil {
+		allowTrafficFrom = *inCfg.AllowTrafficFrom
+	}
+
+	executorConfig := defaults.ExecutorDestChainConfig
+	if inCfg.ExecutorDestChainConfig != nil {
+		executorConfig = *inCfg.ExecutorDestChainConfig
+	}
+
+	baseExecutionGasCost := defaults.BaseExecutionGasCost
+	if inCfg.BaseExecutionGasCost != nil {
+		baseExecutionGasCost = *inCfg.BaseExecutionGasCost
+	}
+
+	tokenReceiverAllowed := defaults.TokenReceiverAllowed
+	if inCfg.TokenReceiverAllowed != nil {
+		tokenReceiverAllowed = *inCfg.TokenReceiverAllowed
+	}
+
+	messageNetworkFeeUSDCents := defaults.MessageNetworkFeeUSDCents
+	if inCfg.MessageNetworkFeeUSDCents != nil {
+		messageNetworkFeeUSDCents = *inCfg.MessageNetworkFeeUSDCents
+	}
+
+	tokenNetworkFeeUSDCents := defaults.TokenNetworkFeeUSDCents
+	if inCfg.TokenNetworkFeeUSDCents != nil {
+		tokenNetworkFeeUSDCents = *inCfg.TokenNetworkFeeUSDCents
+	}
+
 	return adapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:          inCfg.AllowTrafficFrom,
+		AllowTrafficFrom:          &allowTrafficFrom,
 		OnRamps:                   [][]byte{remoteOnRampBytes},
 		OffRamp:                   remoteOffRampBytes,
 		DefaultExecutor:           executorAddr,
@@ -435,13 +507,72 @@ func resolveRemoteChainConfig(
 		DefaultOutboundCCVs:       defaultOutboundCCVs,
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  fqConfig,
-		ExecutorDestChainConfig:   inCfg.ExecutorDestChainConfig,
+		ExecutorDestChainConfig:   executorConfig,
 		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
-		BaseExecutionGasCost:      inCfg.BaseExecutionGasCost,
-		TokenReceiverAllowed:      inCfg.TokenReceiverAllowed,
-		MessageNetworkFeeUSDCents: inCfg.MessageNetworkFeeUSDCents,
-		TokenNetworkFeeUSDCents:   inCfg.TokenNetworkFeeUSDCents,
+		BaseExecutionGasCost:      baseExecutionGasCost,
+		TokenReceiverAllowed:      &tokenReceiverAllowed,
+		MessageNetworkFeeUSDCents: messageNetworkFeeUSDCents,
+		TokenNetworkFeeUSDCents:   tokenNetworkFeeUSDCents,
 	}, nil
+}
+
+// resolveDefaultCCVs resolves CCVs either from explicit refs or by auto-resolving
+// default lane CCV refs for the "default" qualifier (see CommitteeVerifierContractAdapter.GetCommitteeVerifierResolver).
+func resolveDefaultCCVs(
+	e deployment.Environment,
+	chainSelector uint64,
+	explicitRefs []datastore.AddressRef,
+	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
+) ([]string, error) {
+	if len(explicitRefs) > 0 {
+		return resolveLocalContractsForTopologyChangeset(e, chainSelector, explicitRefs)
+	}
+	contractAdapter, err := committeeVerifierContractRegistry.GetByChain(chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("no committee verifier contract adapter for chain %d: %w", chainSelector, err)
+	}
+	laneCCVRefs, err := contractAdapter.GetCommitteeVerifierResolver(e.DataStore, chainSelector, defaultQualifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve default lane CCV refs for %q qualifier on chain %d: %w", defaultQualifier, chainSelector, err)
+	}
+	return resolveLocalContractsForTopologyChangeset(e, chainSelector, laneCCVRefs)
+}
+
+// validateDefaultCCVsResolvable checks that every remote chain entry that relies on
+// auto-resolved CCVs (i.e. does not provide explicit DefaultInboundCCVs or DefaultOutboundCCVs)
+// can resolve default lane CCV refs for the "default" qualifier via the chain family's
+// CommitteeVerifierContractAdapter (typically the verifier resolver only).
+// This fails early in validation rather than silently producing a lane with no verifiers.
+func validateDefaultCCVsResolvable(
+	chainCfg PartialChainConfig,
+	registry *adapters.CommitteeVerifierContractRegistry,
+	e deployment.Environment,
+) error {
+	needsAutoResolve := false
+	for _, remote := range chainCfg.RemoteChains {
+		if len(remote.DefaultInboundCCVs) == 0 || len(remote.DefaultOutboundCCVs) == 0 {
+			needsAutoResolve = true
+			break
+		}
+	}
+	if !needsAutoResolve {
+		return nil
+	}
+	contractAdapter, err := registry.GetByChain(chainCfg.ChainSelector)
+	if err != nil {
+		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but no committee verifier contract adapter is registered: %w",
+			chainCfg.ChainSelector, err)
+	}
+	refs, err := contractAdapter.GetCommitteeVerifierResolver(e.DataStore, chainCfg.ChainSelector, defaultQualifier)
+	if err != nil {
+		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but failed to resolve %q qualifier default lane CCV refs: %w",
+			chainCfg.ChainSelector, defaultQualifier, err)
+	}
+	if len(refs) == 0 {
+		return fmt.Errorf("chain %d has remote chains that need auto-resolved CCVs but no default lane CCV refs for %q qualifier",
+			chainCfg.ChainSelector, defaultQualifier)
+	}
+	return nil
 }
 
 func resolveLocalContractsForTopologyChangeset(
@@ -458,6 +589,38 @@ func resolveLocalContractsForTopologyChangeset(
 		resolved = append(resolved, addr.Address)
 	}
 	return resolved, nil
+}
+
+func mergeCommitteeVerifierRemoteChainConfig(
+	defaults adapters.CommitteeVerifierRemoteChainDefaults,
+	overrides CommitteeVerifierRemoteChainConfig,
+	signatureConfig adapters.CommitteeVerifierSignatureQuorumConfig,
+) adapters.CommitteeVerifierRemoteChainConfig {
+	allowlistEnabled := defaults.AllowlistEnabled
+	if overrides.AllowlistEnabled != nil {
+		allowlistEnabled = *overrides.AllowlistEnabled
+	}
+	feeUSDCents := defaults.FeeUSDCents
+	if overrides.FeeUSDCents != nil {
+		feeUSDCents = *overrides.FeeUSDCents
+	}
+	gasForVerification := defaults.GasForVerification
+	if overrides.GasForVerification != nil {
+		gasForVerification = *overrides.GasForVerification
+	}
+	payloadSizeBytes := defaults.PayloadSizeBytes
+	if overrides.PayloadSizeBytes != nil {
+		payloadSizeBytes = *overrides.PayloadSizeBytes
+	}
+	return adapters.CommitteeVerifierRemoteChainConfig{
+		AllowlistEnabled:          allowlistEnabled,
+		AddedAllowlistedSenders:   overrides.AddedAllowlistedSenders,
+		RemovedAllowlistedSenders: overrides.RemovedAllowlistedSenders,
+		FeeUSDCents:               feeUSDCents,
+		GasForVerification:        gasForVerification,
+		PayloadSizeBytes:          payloadSizeBytes,
+		SignatureConfig:           signatureConfig,
+	}
 }
 
 func mergeFeeQuoterDestChainConfig(

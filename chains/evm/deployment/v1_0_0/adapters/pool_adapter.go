@@ -9,8 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	bnmDripERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -285,9 +287,8 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
-			isToknTypeBnM := toknRef.Type.String() == bnmERC20ops.ContractType.String()
 			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
-			if isPoolTypeBnM && isToknTypeBnM && len(out.Output.Addresses) >= 1 {
+			if isPoolTypeBnM && len(out.Output.Addresses) >= 1 {
 				poolRef := out.Output.Addresses[0]
 
 				poolAddrBytes, addrErr := a.AddressRefToBytes(poolRef)
@@ -313,23 +314,51 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 				}
 
-				report, execErr := cldf_ops.ExecuteOperation(b,
-					bnmERC20ops.GrantMintAndBurnRoles, chain,
-					evm_contract.FunctionInput[common.Address]{
-						ChainSelector: input.ChainSelector,
-						Address:       toknAddr,
-						Args:          poolAddr,
-					},
-				)
-				if execErr != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
+				writes := []evm_contract.WriteOutput{}
+				switch toknRef.Type.String() {
+				case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String():
+					report, execErr := cldf_ops.ExecuteOperation(b,
+						bnmERC20ops.GrantMintAndBurnRoles, chain,
+						evm_contract.FunctionInput[common.Address]{
+							ChainSelector: input.ChainSelector,
+							Address:       toknAddr,
+							Args:          poolAddr,
+						},
+					)
+					if execErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
+					}
+					writes = append(writes, report.Output)
+
+				case tip20ops.ContractType.String():
+					report, execErr := cldf_ops.ExecuteOperation(b,
+						tip20ops.GrantIssuerRole, chain,
+						evm_contract.FunctionInput[common.Address]{
+							ChainSelector: input.ChainSelector,
+							Address:       toknAddr,
+							Args:          poolAddr,
+						},
+					)
+					if execErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant TIP-20 issuer role to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
+					}
+					writes = append(writes, report.Output)
+
+				default:
+					// pass through for unknown token types since we don't want to block pool deployment, but log a warning since it likely indicates a missing case in the adapter
+					b.Logger.Warnf(
+						"token type %q does not have a defined role granting strategy in EVMPoolAdapter, skipping grant of mint and burn roles to token pool %q for token %q on chain %d",
+						toknRef.Type.String(), poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
+					)
 				}
 
-				batchOp, bErr := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
-				if bErr != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles: %w", bErr)
+				if len(writes) > 0 {
+					batchOp, bErr := evm_contract.NewBatchOperationFromWrites(writes)
+					if bErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles: %w", bErr)
+					}
+					result.BatchOps = append(result.BatchOps, batchOp)
 				}
-				result.BatchOps = append(result.BatchOps, batchOp)
 			}
 
 			return result, nil
