@@ -2,6 +2,7 @@ package testhelpers
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
 	"math/big"
 	"slices"
@@ -17,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmsaptossdk "github.com/smartcontractkit/mcms/sdk/aptos"
@@ -391,7 +391,9 @@ func ProcessTimelockProposals(t *testing.T, env cldf.Environment, proposals []mc
 		// We need to supply a salt override, otherwise the validUntil timestamp will be used to generate the salt.
 		// In tests, validUntil is not always guaranteed to produce a unique operation ID because proposals often get generated within the same second.
 		// This has been a cause of flakiness in the past (caused an AlreadyScheduled error).
-		saltOverride := utils.RandomHash()
+		b := make([]byte, 32)
+		_, _ = rand.Read(b) // Assignment for errcheck. Only used in tests so we can ignore.
+		saltOverride := common.BytesToHash(b)
 		prop.SaltOverride = &saltOverride
 
 		p := SignMCMSTimelockProposal(t, env, &prop, realBackend)
