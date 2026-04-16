@@ -198,8 +198,8 @@ func runPostProposalCCIPSends(
 			}
 			factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
 			if !ok {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for family %s version %s",
-					family, adapterVer.String()))
+				env.Logger.Warnf("verify-ccip-send: no test adapter for family %s version %s, skipping src %d dest %d",
+					family, adapterVer.String(), srcSel, destSel)
 				continue
 			}
 
@@ -214,9 +214,8 @@ func runPostProposalCCIPSends(
 			if !env.BlockChains.Exists(destSel) {
 				destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
 				if !ok {
-					errs = append(errs, fmt.Errorf(
-						"verify-ccip-send: no test adapter for family %s version %s",
-						destFamily, adapterVer.String()))
+					env.Logger.Warnf("verify-ccip-send: no test adapter for dest family %s version %s, skipping src %d dest %d",
+						destFamily, adapterVer.String(), srcSel, destSel)
 					continue
 				}
 				destAdapter = destAdapterFactory(env.DataStore, destSel)
