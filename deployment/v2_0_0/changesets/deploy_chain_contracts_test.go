@@ -51,7 +51,7 @@ func (m *mockDeployAdapter) ConnectedChains(_ deployment.Environment, _ uint64) 
 	return []uint64{}, nil
 }
 
-func (m *mockDeployAdapter) SupportedTokensPerRemoteChain(_ deployment.Environment, _ uint64) (map[uint64][]common.Address, error) {
+func (m *mockDeployAdapter) SupportedTokensPerRemoteChain(_ deployment.Environment, _ uint64, _ []uint64) (map[uint64][]common.Address, error) {
 	return map[uint64][]common.Address{}, nil
 }
 

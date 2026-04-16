@@ -294,7 +294,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
 					}
-					supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
+					supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel, perChainInput.RemoteChainSelectors)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
 					}

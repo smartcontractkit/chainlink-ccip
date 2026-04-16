@@ -167,7 +167,7 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	return connected, nil
 }
 
-func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64) (map[uint64][]common.Address, error) {
+func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64, selectiveRemoteChains []uint64) (map[uint64][]common.Address, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainsel]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
@@ -175,6 +175,21 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 	remoteChains, err := ci.ConnectedChains(e, chainsel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connected chains for chain %d: %w", chainsel, err)
+	}
+	remoteChainMap := make(map[uint64]struct{})
+	for _, selected := range selectiveRemoteChains {
+		remoteChainMap[selected] = struct{}{}
+	}
+	var filteredRemoteChains []uint64
+	if len(selectiveRemoteChains) > 0 {
+		for _, selected := range remoteChains {
+			if _, ok := remoteChainMap[selected]; ok {
+				filteredRemoteChains = append(filteredRemoteChains, selected)
+				e.Logger.Infof("Including remote chain %d in supported tokens import for chain %d", selected, chainsel)
+			}
+		}
+	} else {
+		filteredRemoteChains = remoteChains
 	}
 	// get all supported tokens from token admin registry
 	return GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, remoteChains)
