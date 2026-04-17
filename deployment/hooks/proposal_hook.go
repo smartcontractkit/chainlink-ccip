@@ -31,6 +31,14 @@ type laneFailureKey struct {
 	destSel uint64
 }
 
+type groupStatus string
+
+const (
+	groupStatusSuccess groupStatus = "success"
+	groupStatusFailed  groupStatus = "failed"
+	groupStatusSkipped groupStatus = "skipped"
+)
+
 // PostProposalCCIPSendHookName is the hook name for changeset wiring and tests.
 const PostProposalCCIPSendHookName = postProposalCCIPSendHookName
 
@@ -202,31 +210,37 @@ func runPostProposalCCIPSends(
 
 		for _, destSel := range dests {
 			func(destSel uint64) {
-				endDestGroup := beginLogGroup(lggr, "verify-ccip-send: src=%d dest=%d", srcSel, destSel)
-				defer endDestGroup()
+				destGroup := newBufferedLogGroup("verify-ccip-send: src=%d dest=%d", srcSel, destSel)
+				destStatus := groupStatusSuccess
+				defer func() {
+					destGroup.emit(destStatus)
+				}()
 
 				adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
 				if err != nil {
-					lggr.Warnf("verify-ccip-send: failed to resolve adapter version src=%d dest=%d: %v", srcSel, destSel, err)
+					destGroup.warnf("verify-ccip-send: failed to resolve adapter version src=%d dest=%d: %v", srcSel, destSel, err)
 					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
+					destStatus = groupStatusFailed
 					return
 				}
-				lggr.Infof("verify-ccip-send: adapter version for src=%d dest=%d is %s", srcSel, destSel, adapterVer.String())
+				destGroup.infof("verify-ccip-send: adapter version for src=%d dest=%d is %s", srcSel, destSel, adapterVer.String())
 
 				factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
 				if !ok {
-					env.Logger.Warnf("verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter for family %s version %s (src=%d dest=%d)",
+					destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter for family %s version %s (src=%d dest=%d)",
 						family, adapterVer.String(), srcSel, destSel)
+					destStatus = groupStatusSkipped
 					return
 				}
 
 				destFamily, err := chain_selectors.GetSelectorFamily(destSel)
 				if err != nil {
-					lggr.Warnf("verify-ccip-send: failed to resolve destination family for dest=%d: %v", destSel, err)
+					destGroup.warnf("verify-ccip-send: failed to resolve destination family for dest=%d: %v", destSel, err)
 					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
+					destStatus = groupStatusFailed
 					return
 				}
-				lggr.Infof("verify-ccip-send: destination family for dest=%d is %s", destSel, destFamily)
+				destGroup.infof("verify-ccip-send: destination family for dest=%d is %s", destSel, destFamily)
 
 				var destAdapter testadapters.TestAdapterForFamily
 
@@ -234,11 +248,12 @@ func runPostProposalCCIPSends(
 				if !env.BlockChains.Exists(destSel) {
 					destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
 					if !ok {
-						env.Logger.Warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
+						destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
 							destFamily, adapterVer.String(), srcSel, destSel)
+						destStatus = groupStatusSkipped
 						return
 					}
-					lggr.Infof("verify-ccip-send: destination selector %d not in env; using family-only adapter", destSel)
+					destGroup.infof("verify-ccip-send: destination selector %d not in env; using family-only adapter", destSel)
 					destAdapter = destAdapterFactory(env.DataStore, destSel)
 				} else {
 					if family == destFamily {
@@ -247,11 +262,12 @@ func runPostProposalCCIPSends(
 						// Backward compatibility: fall back to full adapters when available.
 						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
 						if !hasFullAdapter {
-							lggr.Warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
+							destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
 								destFamily, adapterVer.String(), srcSel, destSel)
+							destStatus = groupStatusSkipped
 							return
 						}
-						lggr.Infof("verify-ccip-send: using cross-family full destination adapter for %s", destFamily)
+						destGroup.infof("verify-ccip-send: using cross-family full destination adapter for %s", destFamily)
 						destAdapter = fullDestFactory(&env, destSel)
 					}
 				}
@@ -260,47 +276,54 @@ func runPostProposalCCIPSends(
 				srcAdapter := factory(&env, srcSel)
 				extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
 				if err != nil {
-					lggr.Warnf("verify-ccip-send: failed to build extra args for src=%d dest=%d: %v", srcSel, destSel, err)
+					destGroup.warnf("verify-ccip-send: failed to build extra args for src=%d dest=%d: %v", srcSel, destSel, err)
 					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
+					destStatus = groupStatusFailed
 					return
 				}
-				lggr.Infof("verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
+				destGroup.infof("verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
 					srcSel, destSel, len(receiver), len(extraArgs))
 
 				for _, feeTok := range feeTokens {
-					func(feeTok string) {
-						endFeeTokenGroup := beginLogGroup(lggr,
-							"verify-ccip-send: src=%d dest=%d feeToken=%s",
-							srcSel, destSel, formatFeeTokenLogLabel(feeTok),
-						)
-						defer endFeeTokenGroup()
+					feeTokenLabel := formatFeeTokenLogLabel(feeTok)
+					feeTokenGroup := newBufferedLogGroup(
+						"verify-ccip-send: src=%d dest=%d feeToken=%s",
+						srcSel, destSel, feeTokenLabel,
+					)
+					feeTokenStatus := groupStatusSuccess
 
-						// Send one probe per fee token to verify each available fee payment path.
-						msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
-							DestChainSelector: destSel,
-							Receiver:          receiver,
-							Data:              []byte("hello contract"),
-							FeeToken:          feeTok,
-							ExtraArgs:         extraArgs,
-						})
-						if err != nil {
-							lggr.Warnf("verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v", srcSel, destSel, feeTok, err)
-							addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
-							return
-						}
+					// Send one probe per fee token to verify each available fee payment path.
+					msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
+						DestChainSelector: destSel,
+						Receiver:          receiver,
+						Data:              []byte("hello contract"),
+						FeeToken:          feeTok,
+						ExtraArgs:         extraArgs,
+					})
+					if err != nil {
+						feeTokenGroup.warnf("verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v", srcSel, destSel, feeTok, err)
+						addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
+						feeTokenStatus = groupStatusFailed
+						destStatus = groupStatusFailed
+						destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
+						continue
+					}
 
-						lggr.Infof("verify-ccip-send: sending CCIP verify message from chain %d to chain %d (feeToken=%q)",
-							srcSel, destSel, feeTok)
-						_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
-						if err != nil {
-							lggr.Warnf("verify-ccip-send: ❌ failed CCIP send src=%d dest=%d fee=%q: %v",
-								srcSel, destSel, feeTok, err)
-							addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
-							return
-						}
-						lggr.Infof("verify-ccip-send: ✅ successful CCIP send message id %s (src=%d dest=%d fee=%q)",
-							msgID, srcSel, destSel, feeTok)
-					}(feeTok)
+					feeTokenGroup.infof("verify-ccip-send: sending CCIP verify message from chain %d to chain %d (feeToken=%q)",
+						srcSel, destSel, feeTok)
+					_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
+					if err != nil {
+						feeTokenGroup.warnf("verify-ccip-send: ❌ failed CCIP send src=%d dest=%d fee=%q: %v",
+							srcSel, destSel, feeTok, err)
+						addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
+						feeTokenStatus = groupStatusFailed
+						destStatus = groupStatusFailed
+						destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
+						continue
+					}
+					feeTokenGroup.infof("verify-ccip-send: ✅ successful CCIP send message id %s (src=%d dest=%d fee=%q)",
+						msgID, srcSel, destSel, feeTok)
+					destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
 				}
 			}(destSel)
 		}
@@ -312,12 +335,52 @@ func runPostProposalCCIPSends(
 	return errors.Join(errs...)
 }
 
-func beginLogGroup(lggr logger.Logger, format string, args ...any) func() {
-	_ = lggr
-	// Keep group commands on stderr to preserve ordering with logger output in CI.
-	fmt.Fprintf(os.Stderr, "::group::%s\n", fmt.Sprintf(format, args...))
-	return func() {
-		fmt.Fprintln(os.Stderr, "::endgroup::")
+type bufferedLogGroup struct {
+	title string
+	lines []string
+}
+
+func newBufferedLogGroup(format string, args ...any) *bufferedLogGroup {
+	return &bufferedLogGroup{
+		title: fmt.Sprintf(format, args...),
+		lines: make([]string, 0, 8),
+	}
+}
+
+func (g *bufferedLogGroup) infof(format string, args ...any) {
+	g.lines = append(g.lines, fmt.Sprintf("INFO  %s", fmt.Sprintf(format, args...)))
+}
+
+func (g *bufferedLogGroup) warnf(format string, args ...any) {
+	g.lines = append(g.lines, fmt.Sprintf("WARN  %s", fmt.Sprintf(format, args...)))
+}
+
+func (g *bufferedLogGroup) appendGroup(child *bufferedLogGroup, status groupStatus) {
+	g.lines = append(g.lines, child.render(status)...)
+}
+
+func (g *bufferedLogGroup) emit(status groupStatus) {
+	for _, line := range g.render(status) {
+		fmt.Fprintln(os.Stderr, line)
+	}
+}
+
+func (g *bufferedLogGroup) render(status groupStatus) []string {
+	out := make([]string, 0, len(g.lines)+2)
+	out = append(out, fmt.Sprintf("::group::%s %s", groupStatusMarker(status), g.title))
+	out = append(out, g.lines...)
+	out = append(out, "::endgroup::")
+	return out
+}
+
+func groupStatusMarker(status groupStatus) string {
+	switch status {
+	case groupStatusFailed:
+		return "❌"
+	case groupStatusSkipped:
+		return "⏭️"
+	default:
+		return "✅"
 	}
 }
 
