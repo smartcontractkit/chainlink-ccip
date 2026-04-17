@@ -483,7 +483,7 @@ func TestRunPostProposalCCIPSends_InvalidDestinationSelector(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "dest selector 0")
+	require.ErrorContains(t, err, "dest=0")
 }
 
 func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {

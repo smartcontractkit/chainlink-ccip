@@ -314,9 +314,10 @@ func runPostProposalCCIPSends(
 
 func beginLogGroup(lggr logger.Logger, format string, args ...any) func() {
 	_ = lggr
-	fmt.Fprintf(os.Stdout, "::group::%s\n", fmt.Sprintf(format, args...))
+	// Keep group commands on stderr to preserve ordering with logger output in CI.
+	fmt.Fprintf(os.Stderr, "::group::%s\n", fmt.Sprintf(format, args...))
 	return func() {
-		fmt.Fprintln(os.Stdout, "::endgroup::")
+		fmt.Fprintln(os.Stderr, "::endgroup::")
 	}
 }
 
