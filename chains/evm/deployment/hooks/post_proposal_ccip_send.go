@@ -200,6 +200,9 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		staticCfg, err := fq.GetStaticConfig(&bind.CallOpts{
 			Context: env.GetContext(),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("getFeeTokens: %w", err)
+		}
 		linkAddr := staticCfg.LinkToken
 		routerC, err := router.NewRouter(common.HexToAddress(rRef[0].Address), client)
 		if err != nil {
