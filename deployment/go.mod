@@ -2,9 +2,6 @@ module github.com/smartcontractkit/chainlink-ccip/deployment
 
 go 1.25.5
 
-// Make sure we're working with the latest chainlink-ccip/deployment
-replace github.com/smartcontractkit/chainlink-ccip => ../.
-
 require (
 	dario.cat/mergo v1.0.2
 	github.com/BurntSushi/toml v1.5.0
@@ -17,7 +14,6 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260414161822-1708a1043244
 	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
-	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.18.0
 	github.com/smartcontractkit/mcms v0.40.1
 	github.com/stretchr/testify v1.11.1
