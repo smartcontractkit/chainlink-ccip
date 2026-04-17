@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -302,9 +303,10 @@ func runPostProposalCCIPSends(
 }
 
 func beginLogGroup(lggr logger.Logger, format string, args ...any) func() {
-	lggr.Infof("::group::%s", fmt.Sprintf(format, args...))
+	_ = lggr
+	fmt.Fprintf(os.Stdout, "::group::%s\n", fmt.Sprintf(format, args...))
 	return func() {
-		lggr.Infof("::endgroup::")
+		fmt.Fprintln(os.Stdout, "::endgroup::")
 	}
 }
 
