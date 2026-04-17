@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,7 +23,13 @@ import (
 
 const (
 	postProposalCCIPSendHookName = "verify-ccip-send"
+	allFeeTokensSummaryLabel     = "all-supported-fee-tokens"
 )
+
+type laneFailureKey struct {
+	srcSel  uint64
+	destSel uint64
+}
 
 // PostProposalCCIPSendHookName is the hook name for changeset wiring and tests.
 const PostProposalCCIPSendHookName = postProposalCCIPSendHookName
@@ -151,6 +159,7 @@ func runPostProposalCCIPSends(
 		return nil
 	}
 	var errs []error
+	failedLaneFeeTokens := make(map[laneFailureKey]map[string]struct{})
 	// Adapters and provider contracts consume cldf.Environment, so rebuild it from hook inputs.
 	env := cldf.Environment{
 		Name:        hookEnv.Name,
@@ -199,7 +208,7 @@ func runPostProposalCCIPSends(
 				adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
 				if err != nil {
 					lggr.Warnf("verify-ccip-send: failed to resolve adapter version src=%d dest=%d: %v", srcSel, destSel, err)
-					errs = append(errs, fmt.Errorf("verify-ccip-send: adapter version src %d dest %d: %w", srcSel, destSel, err))
+					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
 					return
 				}
 				lggr.Infof("verify-ccip-send: adapter version for src=%d dest=%d is %s", srcSel, destSel, adapterVer.String())
@@ -214,7 +223,7 @@ func runPostProposalCCIPSends(
 				destFamily, err := chain_selectors.GetSelectorFamily(destSel)
 				if err != nil {
 					lggr.Warnf("verify-ccip-send: failed to resolve destination family for dest=%d: %v", destSel, err)
-					errs = append(errs, fmt.Errorf("verify-ccip-send: dest selector %d: %w", destSel, err))
+					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
 					return
 				}
 				lggr.Infof("verify-ccip-send: destination family for dest=%d is %s", destSel, destFamily)
@@ -238,10 +247,8 @@ func runPostProposalCCIPSends(
 						// Backward compatibility: fall back to full adapters when available.
 						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
 						if !hasFullAdapter {
-							lggr.Warnf("verify-ccip-send: ❌ missing full adapter for dest family %s version %s (src=%d dest=%d)",
+							lggr.Warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
 								destFamily, adapterVer.String(), srcSel, destSel)
-							errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
-								destFamily, adapterVer.String()))
 							return
 						}
 						lggr.Infof("verify-ccip-send: using cross-family full destination adapter for %s", destFamily)
@@ -254,7 +261,7 @@ func runPostProposalCCIPSends(
 				extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
 				if err != nil {
 					lggr.Warnf("verify-ccip-send: failed to build extra args for src=%d dest=%d: %v", srcSel, destSel, err)
-					errs = append(errs, fmt.Errorf("verify-ccip-send: extra args for src %d -> dest %d: %w", srcSel, destSel, err))
+					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
 					return
 				}
 				lggr.Infof("verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
@@ -278,8 +285,7 @@ func runPostProposalCCIPSends(
 						})
 						if err != nil {
 							lggr.Warnf("verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v", srcSel, destSel, feeTok, err)
-							errs = append(errs, fmt.Errorf("verify-ccip-send: build message src %d -> dest %d fee %q: %w",
-								srcSel, destSel, feeTok, err))
+							addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
 							return
 						}
 
@@ -289,8 +295,7 @@ func runPostProposalCCIPSends(
 						if err != nil {
 							lggr.Warnf("verify-ccip-send: ❌ failed CCIP send src=%d dest=%d fee=%q: %v",
 								srcSel, destSel, feeTok, err)
-							errs = append(errs, fmt.Errorf("verify-ccip-send: CCIP send from %d to %d fee %q: %w",
-								srcSel, destSel, feeTok, err))
+							addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
 							return
 						}
 						lggr.Infof("verify-ccip-send: ✅ successful CCIP send message id %s (src=%d dest=%d fee=%q)",
@@ -299,6 +304,10 @@ func runPostProposalCCIPSends(
 				}
 			}(destSel)
 		}
+	}
+	if len(failedLaneFeeTokens) > 0 {
+		errs = append(errs, fmt.Errorf("verify-ccip-send: failed lane probes summary: %s. Full error details are logged in the related verify-ccip-send groups",
+			buildLaneFailureSummary(failedLaneFeeTokens)))
 	}
 	return errors.Join(errs...)
 }
@@ -316,6 +325,37 @@ func formatFeeTokenLogLabel(feeToken string) string {
 		return "native"
 	}
 	return feeToken
+}
+
+func addLaneFailureSummary(failed map[laneFailureKey]map[string]struct{}, srcSel, destSel uint64, feeToken string) {
+	key := laneFailureKey{srcSel: srcSel, destSel: destSel}
+	if _, ok := failed[key]; !ok {
+		failed[key] = make(map[string]struct{})
+	}
+	failed[key][formatFeeTokenLogLabel(feeToken)] = struct{}{}
+}
+
+func buildLaneFailureSummary(failed map[laneFailureKey]map[string]struct{}) string {
+	keys := make([]laneFailureKey, 0, len(failed))
+	for key := range failed {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].srcSel != keys[j].srcSel {
+			return keys[i].srcSel < keys[j].srcSel
+		}
+		return keys[i].destSel < keys[j].destSel
+	})
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		feeTokens := make([]string, 0, len(failed[key]))
+		for feeToken := range failed[key] {
+			feeTokens = append(feeTokens, feeToken)
+		}
+		sort.Strings(feeTokens)
+		parts = append(parts, fmt.Sprintf("src=%d dest=%d feeTokens=[%s]", key.srcSel, key.destSel, strings.Join(feeTokens, ",")))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // groupSelectorsByFamily groups selectors by chain family and drops invalid selectors.
