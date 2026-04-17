@@ -73,8 +73,7 @@ func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
 	if !found {
 		panic(fmt.Sprintf("failed to find testadapter factory for %s", chainsel.FamilyEVM))
 	}
-	adapter := factory(e, m.chainDetails.ChainSelector)
-	m.TestAdapter = adapter
+	m.TestAdapter = factory(e, m.chainDetails.ChainSelector)
 }
 
 func (m *CCIP16EVM) ChainSelector() uint64 {
