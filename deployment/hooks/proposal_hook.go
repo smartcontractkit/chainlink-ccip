@@ -285,13 +285,13 @@ func runPostProposalCCIPSends(
 							srcSel, destSel, feeTok)
 						_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
 						if err != nil {
-							lggr.Warnf("verify-ccip-send: failed sending CCIP verify message src=%d dest=%d fee=%q: %v",
+							lggr.Warnf("verify-ccip-send: :x: failed CCIP send src=%d dest=%d fee=%q: %v",
 								srcSel, destSel, feeTok, err)
 							errs = append(errs, fmt.Errorf("verify-ccip-send: CCIP send from %d to %d fee %q: %w",
 								srcSel, destSel, feeTok, err))
 							return
 						}
-						lggr.Infof("verify-ccip-send: successful CCIP send message id %s (src=%d dest=%d fee=%q)",
+						lggr.Infof("verify-ccip-send: :white_check_mark: successful CCIP send message id %s (src=%d dest=%d fee=%q)",
 							msgID, srcSel, destSel, feeTok)
 					}(feeTok)
 				}
