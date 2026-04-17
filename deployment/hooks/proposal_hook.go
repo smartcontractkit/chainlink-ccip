@@ -191,85 +191,128 @@ func runPostProposalCCIPSends(
 		}
 
 		for _, destSel := range dests {
-			adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: adapter version src %d dest %d: %w", srcSel, destSel, err))
-				continue
-			}
-			factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
-			if !ok {
-				env.Logger.Warnf("verify-ccip-send: no test adapter for family %s version %s, skipping src %d dest %d",
-					family, adapterVer.String(), srcSel, destSel)
-				continue
-			}
+			func(destSel uint64) {
+				endDestGroup := beginLogGroup(lggr, "verify-ccip-send: src=%d dest=%d", srcSel, destSel)
+				defer endDestGroup()
 
-			destFamily, err := chain_selectors.GetSelectorFamily(destSel)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: dest selector %d: %w", destSel, err))
-				continue
-			}
-			var destAdapter testadapters.TestAdapterForFamily
+				adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
+				if err != nil {
+					lggr.Warnf("verify-ccip-send: failed to resolve adapter version src=%d dest=%d: %v", srcSel, destSel, err)
+					errs = append(errs, fmt.Errorf("verify-ccip-send: adapter version src %d dest %d: %w", srcSel, destSel, err))
+					return
+				}
+				lggr.Infof("verify-ccip-send: adapter version for src=%d dest=%d is %s", srcSel, destSel, adapterVer.String())
 
-			// if dest sel is not present in env we just load the family specific adapter with the selector, otherwise we load the full adapter with env
-			if !env.BlockChains.Exists(destSel) {
-				destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
+				factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
 				if !ok {
-					env.Logger.Warnf("verify-ccip-send: no test adapter for dest family %s version %s, skipping src %d dest %d",
-						destFamily, adapterVer.String(), srcSel, destSel)
-					continue
+					env.Logger.Warnf("verify-ccip-send: no test adapter for family %s version %s, skipping src %d dest %d",
+						family, adapterVer.String(), srcSel, destSel)
+					return
 				}
-				destAdapter = destAdapterFactory(env.DataStore, destSel)
-			} else {
-				if family == destFamily {
-					destAdapter = factory(&env, destSel)
-				} else {
-					// Backward compatibility: fall back to full adapters when available.
-					fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
-					if !hasFullAdapter {
-						errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
-							destFamily, adapterVer.String()))
-						continue
+
+				destFamily, err := chain_selectors.GetSelectorFamily(destSel)
+				if err != nil {
+					lggr.Warnf("verify-ccip-send: failed to resolve destination family for dest=%d: %v", destSel, err)
+					errs = append(errs, fmt.Errorf("verify-ccip-send: dest selector %d: %w", destSel, err))
+					return
+				}
+				lggr.Infof("verify-ccip-send: destination family for dest=%d is %s", destSel, destFamily)
+
+				var destAdapter testadapters.TestAdapterForFamily
+
+				// if dest sel is not present in env we just load the family specific adapter with the selector, otherwise we load the full adapter with env
+				if !env.BlockChains.Exists(destSel) {
+					destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
+					if !ok {
+						env.Logger.Warnf("verify-ccip-send: no test adapter for dest family %s version %s, skipping src %d dest %d",
+							destFamily, adapterVer.String(), srcSel, destSel)
+						return
 					}
-					destAdapter = fullDestFactory(&env, destSel)
+					lggr.Infof("verify-ccip-send: destination selector %d not in env; using family-only adapter", destSel)
+					destAdapter = destAdapterFactory(env.DataStore, destSel)
+				} else {
+					if family == destFamily {
+						destAdapter = factory(&env, destSel)
+					} else {
+						// Backward compatibility: fall back to full adapters when available.
+						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
+						if !hasFullAdapter {
+							lggr.Warnf("verify-ccip-send: missing full adapter for dest family %s version %s", destFamily, adapterVer.String())
+							errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
+								destFamily, adapterVer.String()))
+							return
+						}
+						lggr.Infof("verify-ccip-send: using cross-family full destination adapter for %s", destFamily)
+						destAdapter = fullDestFactory(&env, destSel)
+					}
 				}
-			}
 
-			receiver := destAdapter.CCIPReceiver()
-
-			srcAdapter := factory(&env, srcSel)
-			extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: extra args for src %d -> dest %d: %w", srcSel, destSel, err))
-				continue
-			}
-
-			for _, feeTok := range feeTokens {
-				// Send one probe per fee token to verify each available fee payment path.
-				msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
-					DestChainSelector: destSel,
-					Receiver:          receiver,
-					Data:              []byte("hello contract"),
-					FeeToken:          feeTok,
-					ExtraArgs:         extraArgs,
-				})
+				receiver := destAdapter.CCIPReceiver()
+				srcAdapter := factory(&env, srcSel)
+				extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
 				if err != nil {
-					errs = append(errs, fmt.Errorf("verify-ccip-send: build message src %d -> dest %d fee %q: %w",
-						srcSel, destSel, feeTok, err))
-					continue
+					lggr.Warnf("verify-ccip-send: failed to build extra args for src=%d dest=%d: %v", srcSel, destSel, err)
+					errs = append(errs, fmt.Errorf("verify-ccip-send: extra args for src %d -> dest %d: %w", srcSel, destSel, err))
+					return
 				}
-				lggr.Infof("verify-ccip-send: sending CCIP verify message from chain %d to chain %d (feeToken=%q)",
-					srcSel, destSel, feeTok)
-				_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("verify-ccip-send: CCIP send from %d to %d fee %q: %w",
-						srcSel, destSel, feeTok, err))
-					continue
+				lggr.Infof("verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
+					srcSel, destSel, len(receiver), len(extraArgs))
+
+				for _, feeTok := range feeTokens {
+					func(feeTok string) {
+						endFeeTokenGroup := beginLogGroup(lggr,
+							"verify-ccip-send: src=%d dest=%d feeToken=%s",
+							srcSel, destSel, formatFeeTokenLogLabel(feeTok),
+						)
+						defer endFeeTokenGroup()
+
+						// Send one probe per fee token to verify each available fee payment path.
+						msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
+							DestChainSelector: destSel,
+							Receiver:          receiver,
+							Data:              []byte("hello contract"),
+							FeeToken:          feeTok,
+							ExtraArgs:         extraArgs,
+						})
+						if err != nil {
+							lggr.Warnf("verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v", srcSel, destSel, feeTok, err)
+							errs = append(errs, fmt.Errorf("verify-ccip-send: build message src %d -> dest %d fee %q: %w",
+								srcSel, destSel, feeTok, err))
+							return
+						}
+
+						lggr.Infof("verify-ccip-send: sending CCIP verify message from chain %d to chain %d (feeToken=%q)",
+							srcSel, destSel, feeTok)
+						_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
+						if err != nil {
+							lggr.Warnf("verify-ccip-send: failed sending CCIP verify message src=%d dest=%d fee=%q: %v",
+								srcSel, destSel, feeTok, err)
+							errs = append(errs, fmt.Errorf("verify-ccip-send: CCIP send from %d to %d fee %q: %w",
+								srcSel, destSel, feeTok, err))
+							return
+						}
+						lggr.Infof("verify-ccip-send: successful CCIP send message id %s (src=%d dest=%d fee=%q)",
+							msgID, srcSel, destSel, feeTok)
+					}(feeTok)
 				}
-				lggr.Infof("verify-ccip-send: Successful CCIP send message id %s (src=%d dest=%d fee=%q)", msgID, srcSel, destSel, feeTok)
-			}
+			}(destSel)
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func beginLogGroup(lggr logger.Logger, format string, args ...any) func() {
+	lggr.Infof("::group::%s", fmt.Sprintf(format, args...))
+	return func() {
+		lggr.Infof("::endgroup::")
+	}
+}
+
+func formatFeeTokenLogLabel(feeToken string) string {
+	if feeToken == "" {
+		return "native"
+	}
+	return feeToken
 }
 
 // groupSelectorsByFamily groups selectors by chain family and drops invalid selectors.
