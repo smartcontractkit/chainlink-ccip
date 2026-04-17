@@ -34,7 +34,7 @@ import (
 var _ cciphooks.PostProposalCCIPSend = (*EVMPostProposalCCIPSend)(nil)
 
 // fund deployer with at least one token unit so forked sends can pay fees.
-var feeTokenFundingAmount = big.NewInt(1e18)
+var feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10)) // 10 tokens with 18 decimals, adjust as needed for tokens with different decimals
 
 func init() {
 	cciphooks.GetPostProposalCCIPSendRegistry().Register(chain_selectors.FamilyEVM, &EVMPostProposalCCIPSend{})
@@ -131,7 +131,12 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	if !ok {
 		return nil, fmt.Errorf("chain %d not in environment EVM chains", srcSel)
 	}
-
+	// get supported chains
+	chains, err := e.SupportedDestinations(env, srcSel)
+	if err != nil {
+		return nil, err
+	}
+	feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(int64(len(chains))), feeTokenFundingAmount)
 	var addrs []common.Address
 	// FeeQuoter bindings differ by major version; select the matching wrapper at runtime.
 	switch fqVer.Major() {
