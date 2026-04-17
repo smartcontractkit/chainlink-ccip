@@ -34,7 +34,7 @@ import (
 var _ cciphooks.PostProposalCCIPSend = (*EVMPostProposalCCIPSend)(nil)
 
 // fund deployer with at least one token unit so forked sends can pay fees.
-var feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10)) // 10 tokens with 18 decimals, adjust as needed for tokens with different decimals
+var feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20)) // 10 tokens with 18 decimals, adjust as needed for tokens with different decimals
 
 func init() {
 	cciphooks.GetPostProposalCCIPSendRegistry().Register(chain_selectors.FamilyEVM, &EVMPostProposalCCIPSend{})
@@ -127,10 +127,15 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	if err != nil {
 		return nil, err
 	}
+	// we are not using chain.client here to avoid using multi client
+	// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
+	// when the node is not fully synced or has issues processing the event filters with anvil
 	chain, ok := env.BlockChains.EVMChains()[srcSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not in environment EVM chains", srcSel)
 	}
+	chain.Client = ec
+
 	// get supported chains
 	chains, err := e.SupportedDestinations(env, srcSel)
 	if err != nil {
@@ -170,9 +175,6 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		ctx, cancel := context.WithTimeout(env.GetContext(), 1*time.Minute)
 		defer cancel()
 		env.Logger.Infof("Processing fee token %s on chain %d", addr.Hex(), srcSel)
-		// we are not using chain.client here to avoid using multi client
-		// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
-		// when the node is not fully synced or has issues processing the event filters with anvil
 		token, err := burn_mint_erc20.NewBurnMintERC20(addr, ec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
