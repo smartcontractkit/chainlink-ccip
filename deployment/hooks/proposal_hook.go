@@ -206,7 +206,7 @@ func runPostProposalCCIPSends(
 
 				factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
 				if !ok {
-					env.Logger.Warnf("verify-ccip-send: :fast_forward: skipped CCIP send, no test adapter for family %s version %s (src=%d dest=%d)",
+					env.Logger.Warnf("verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter for family %s version %s (src=%d dest=%d)",
 						family, adapterVer.String(), srcSel, destSel)
 					return
 				}
@@ -225,7 +225,7 @@ func runPostProposalCCIPSends(
 				if !env.BlockChains.Exists(destSel) {
 					destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
 					if !ok {
-						env.Logger.Warnf("verify-ccip-send: :fast_forward: skipped CCIP send, no test adapter for dest family %s version %s (src=%d dest=%d)",
+						env.Logger.Warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
 							destFamily, adapterVer.String(), srcSel, destSel)
 						return
 					}
@@ -238,7 +238,7 @@ func runPostProposalCCIPSends(
 						// Backward compatibility: fall back to full adapters when available.
 						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
 						if !hasFullAdapter {
-							lggr.Warnf("verify-ccip-send: :x: missing full adapter for dest family %s version %s (src=%d dest=%d)",
+							lggr.Warnf("verify-ccip-send: ❌ missing full adapter for dest family %s version %s (src=%d dest=%d)",
 								destFamily, adapterVer.String(), srcSel, destSel)
 							errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
 								destFamily, adapterVer.String()))
@@ -287,13 +287,13 @@ func runPostProposalCCIPSends(
 							srcSel, destSel, feeTok)
 						_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
 						if err != nil {
-							lggr.Warnf("verify-ccip-send: :x: failed CCIP send src=%d dest=%d fee=%q: %v",
+							lggr.Warnf("verify-ccip-send: ❌ failed CCIP send src=%d dest=%d fee=%q: %v",
 								srcSel, destSel, feeTok, err)
 							errs = append(errs, fmt.Errorf("verify-ccip-send: CCIP send from %d to %d fee %q: %w",
 								srcSel, destSel, feeTok, err))
 							return
 						}
-						lggr.Infof("verify-ccip-send: :white_check_mark: successful CCIP send message id %s (src=%d dest=%d fee=%q)",
+						lggr.Infof("verify-ccip-send: ✅ successful CCIP send message id %s (src=%d dest=%d fee=%q)",
 							msgID, srcSel, destSel, feeTok)
 					}(feeTok)
 				}
