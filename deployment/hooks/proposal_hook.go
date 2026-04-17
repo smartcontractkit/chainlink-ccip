@@ -206,7 +206,7 @@ func runPostProposalCCIPSends(
 
 				factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
 				if !ok {
-					env.Logger.Warnf("verify-ccip-send: no test adapter for family %s version %s, skipping src %d dest %d",
+					env.Logger.Warnf("verify-ccip-send: :fast_forward: skipped CCIP send, no test adapter for family %s version %s (src=%d dest=%d)",
 						family, adapterVer.String(), srcSel, destSel)
 					return
 				}
@@ -225,7 +225,7 @@ func runPostProposalCCIPSends(
 				if !env.BlockChains.Exists(destSel) {
 					destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
 					if !ok {
-						env.Logger.Warnf("verify-ccip-send: no test adapter for dest family %s version %s, skipping src %d dest %d",
+						env.Logger.Warnf("verify-ccip-send: :fast_forward: skipped CCIP send, no test adapter for dest family %s version %s (src=%d dest=%d)",
 							destFamily, adapterVer.String(), srcSel, destSel)
 						return
 					}
@@ -238,7 +238,8 @@ func runPostProposalCCIPSends(
 						// Backward compatibility: fall back to full adapters when available.
 						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
 						if !hasFullAdapter {
-							lggr.Warnf("verify-ccip-send: missing full adapter for dest family %s version %s", destFamily, adapterVer.String())
+							lggr.Warnf("verify-ccip-send: :x: missing full adapter for dest family %s version %s (src=%d dest=%d)",
+								destFamily, adapterVer.String(), srcSel, destSel)
 							errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
 								destFamily, adapterVer.String()))
 							return
