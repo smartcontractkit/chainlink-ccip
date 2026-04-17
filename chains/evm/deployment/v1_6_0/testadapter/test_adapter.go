@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -32,13 +31,11 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	rmn_remote_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -811,141 +808,4 @@ func (a *EVMAdapter) CurrentBlock(t *testing.T) uint64 {
 	}
 	blockNum := header.Number.Uint64()
 	return blockNum
-}
-
-var _ testadapters.Curser = (*EVMAdapter)(nil)
-
-func (a *EVMAdapter) IsCursed(ctx context.Context, subject [16]byte) (bool, error) {
-	l := zerolog.Ctx(ctx)
-	l.
-		Info().
-		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
-		Str("subject", fmt.Sprintf("%x", subject[:])).
-		Msg("Checking if subject is cursed")
-
-	// get the RMN remote address
-	rmnRemoteAddr, err := a.getAddress(datastore.ContractType(rmn_remote_ops.ContractType))
-	if err != nil {
-		return false, fmt.Errorf("failed to get RMNRemote address: %w", err)
-	}
-
-	// get the RMNRemote contract
-	r, err := rmn_remote.NewRMNRemote(rmnRemoteAddr, a.Chain.Client)
-	if err != nil {
-		return false, fmt.Errorf("failed to create RMNRemote contract: %w", err)
-	}
-
-	isCursed, err := r.IsCursed(&bind.CallOpts{
-		Context: ctx,
-	}, subject)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if subject is cursed: %w", err)
-	}
-
-	l.Info().
-		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
-		Str("subject", fmt.Sprintf("%x", subject[:])).
-		Bool("is_cursed", isCursed).
-		Msg("Checked if subject is cursed")
-
-	return isCursed, nil
-}
-
-func (a *EVMAdapter) Curse(ctx context.Context, subject [16]byte) error {
-	l := zerolog.Ctx(ctx)
-	l.
-		Info().
-		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
-		Str("subject", fmt.Sprintf("%x", subject[:])).
-		Msg("Cursing subject")
-
-	// get the RMN remote address
-	rmnRemoteAddr, err := a.getAddress(datastore.ContractType(rmn_remote_ops.ContractType))
-	if err != nil {
-		return fmt.Errorf("failed to get RMNRemote address: %w", err)
-	}
-
-	// get the RMNRemote contract
-	r, err := rmn_remote.NewRMNRemote(rmnRemoteAddr, a.Chain.Client)
-	if err != nil {
-		return fmt.Errorf("failed to create RMNRemote contract: %w", err)
-	}
-
-	// curse the subject
-	tx, err := r.Curse(&bind.TransactOpts{
-		From:   a.Chain.DeployerKey.From,
-		Signer: a.Chain.DeployerKey.Signer,
-	}, subject)
-	if err != nil {
-		return fmt.Errorf("failed to curse subject: %w", err)
-	}
-
-	blockNum, err := a.Confirm(tx)
-	if err != nil {
-		return fmt.Errorf("failed to confirm curse transaction: %w", err)
-	}
-
-	l.
-		Info().
-		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
-		Str("subject", fmt.Sprintf("%x", subject[:])).
-		Int64("block_number", int64(blockNum)).
-		Msg("Cursed subject")
-
-	// Confirm the curse by reading from the contract.
-	cursedSubjects, err := r.GetCursedSubjects(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get cursed subjects: %w", err)
-	}
-	if !slices.Contains(cursedSubjects, subject) {
-		return fmt.Errorf("subject %x not found in cursed subjects despite just cursing: %v", subject[:], cursedSubjects)
-	}
-
-	return nil
-}
-
-func (a *EVMAdapter) Uncurse(ctx context.Context, subject [16]byte) error {
-	l := zerolog.Ctx(ctx)
-	l.
-		Info().
-		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
-		Str("subject", fmt.Sprintf("%x", subject[:])).
-		Msg("Uncursing subject")
-
-	// get the RMN remote address
-	rmnRemoteAddr, err := a.getAddress(datastore.ContractType(rmn_remote_ops.ContractType))
-	if err != nil {
-		return fmt.Errorf("failed to get RMNRemote address: %w", err)
-	}
-
-	// get the RMNRemote contract
-	r, err := rmn_remote.NewRMNRemote(rmnRemoteAddr, a.Chain.Client)
-	if err != nil {
-		return fmt.Errorf("failed to create RMNRemote contract: %w", err)
-	}
-
-	// uncurse the subject
-	tx, err := r.Uncurse(&bind.TransactOpts{
-		From:   a.Chain.DeployerKey.From,
-		Signer: a.Chain.DeployerKey.Signer,
-	}, subject)
-	if err != nil {
-		return fmt.Errorf("failed to uncurse subject: %w", err)
-	}
-
-	blockNum, err := a.Confirm(tx)
-	if err != nil {
-		return fmt.Errorf("failed to confirm uncurse transaction: %w", err)
-	}
-
-	l.
-		Info().
-		Str("chain_selector", strconv.FormatUint(a.Selector, 10)).
-		Str("subject", fmt.Sprintf("%x", subject[:])).
-		Int64("block_number", int64(blockNum)).
-		Msg("Uncursed subject")
-
-	return nil
 }

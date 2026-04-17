@@ -152,21 +152,6 @@ type TestAdapter interface {
 	TestAdapterForFamily
 }
 
-// Curser is an interface that allows tests to curse subjects on a chain.
-// It is used to test the curse and uncurse operations on a chain.
-//
-// This is optionally implemented by TestAdapter implementations.
-// TestAdapter implementations that don't implement this won't be able to be used
-// in cursing related tests.
-type Curser interface {
-	// IsCursed returns true if the given subject is cursed on the chain.
-	IsCursed(ctx context.Context, subject [16]byte) (bool, error)
-	// Curse curses the given subject on the chain.
-	Curse(ctx context.Context, subject [16]byte) error
-	// Uncurse uncurses the given subject on the chain.
-	Uncurse(ctx context.Context, subject [16]byte) error
-}
-
 // TestAdapterForFamily narrows TestAdapter to destination-message wiring helpers.
 // It is intentionally chain-agnostic and does not require a live chain client.
 type TestAdapterForFamily interface {

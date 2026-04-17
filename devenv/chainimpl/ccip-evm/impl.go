@@ -50,7 +50,6 @@ type CCIP16EVM struct {
 	chainDetails chainsel.ChainDetails
 	ethClients   map[uint64]*ethclient.Client
 	testadapters.TestAdapter
-	testadapters.Curser
 }
 
 func NewEmptyCCIP16EVM(chainDetails chainsel.ChainDetails) *CCIP16EVM {
@@ -76,11 +75,6 @@ func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
 	}
 	adapter := factory(e, m.chainDetails.ChainSelector)
 	m.TestAdapter = adapter
-	curser, ok := adapter.(testadapters.Curser)
-	if !ok {
-		panic(fmt.Sprintf("expected concrete testadapter type for %s to be a curser, got %T", chainsel.FamilyEVM, adapter))
-	}
-	m.Curser = curser
 }
 
 func (m *CCIP16EVM) ChainSelector() uint64 {
