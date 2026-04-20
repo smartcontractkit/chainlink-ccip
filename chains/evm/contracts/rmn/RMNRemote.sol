@@ -266,7 +266,10 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   /// @notice Add or remove curse admins.
   /// @param removes Addresses to remove from the curse admin set.
   /// @param adds Addresses to add to the curse admin set.
-  function applyCurseAdminUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+  function applyCurseAdminUpdates(
+    address[] calldata removes,
+    address[] calldata adds
+  ) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       if (s_curseAdmins.remove(removes[i])) {
         emit CurseAdminRemoved(removes[i]);
@@ -285,7 +288,9 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   }
 
   /// @notice Returns true if the given address is a curse admin.
-  function isCurseAdmin(address curseAdmin) external view returns (bool) {
+  function isCurseAdmin(
+    address curseAdmin
+  ) external view returns (bool) {
     return s_curseAdmins.contains(curseAdmin);
   }
 
