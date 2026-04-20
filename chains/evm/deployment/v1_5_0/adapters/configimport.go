@@ -327,7 +327,7 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 					mu.Lock()
 					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
 					mu.Unlock()
-					break
+					continue
 				}
 
 				supported, err := tokenPoolC.IsSupportedChain(&bind.CallOpts{
@@ -344,7 +344,7 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 					mu.Lock()
 					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
 					mu.Unlock()
-					break
+					continue
 				}
 				// we only skip if we can verify the token is not supported for the remote chain
 				if !supported {
