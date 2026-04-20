@@ -20,6 +20,7 @@ bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 /// interface is `isBlessed`. For the `isBlessed` function, this contract relays the call to the legacy RMN contract.
 contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   using EnumerableSet for EnumerableSet.Bytes16Set;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   error AlreadyCursed(bytes16 subject);
   error ConfigNotSet();
@@ -28,6 +29,7 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   error InvalidSignerOrder();
   error NotEnoughSigners();
   error NotCursed(bytes16 subject);
+  error OnlyOwnerOrCurseAdmin(address caller);
   error OutOfOrderSignatures();
   error ThresholdNotMet();
   error UnexpectedSigner();
@@ -35,6 +37,8 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   error IsBlessedNotAvailable();
 
   event ConfigSet(uint32 indexed version, Config config);
+  event CurseAdminAdded(address indexed curseAdmin);
+  event CurseAdminRemoved(address indexed curseAdmin);
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
@@ -78,6 +82,7 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   uint8 private constant ECDSA_RECOVERY_V = 27;
 
   EnumerableSet.Bytes16Set private s_cursedSubjects;
+  EnumerableSet.AddressSet private s_curseAdmins;
   mapping(address signer => bool exists) private s_signers; // for more gas efficient verify.
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to.
@@ -89,6 +94,13 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
     i_localChainSelector = localChainSelector;
 
     i_legacyRMN = legacyRMN;
+  }
+
+  modifier onlyOwnerOrCurseAdmin() {
+    if (msg.sender != owner() && !s_curseAdmins.contains(msg.sender)) {
+      revert OnlyOwnerOrCurseAdmin(msg.sender);
+    }
+    _;
   }
 
   // ================================================================
@@ -213,7 +225,7 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   /// @dev reverts if any of the subjects are already cursed or if there is a duplicate.
   function curse(
     bytes16[] memory subjects
-  ) public onlyOwner {
+  ) public onlyOwnerOrCurseAdmin {
     for (uint256 i = 0; i < subjects.length; ++i) {
       if (!s_cursedSubjects.add(subjects[i])) {
         revert AlreadyCursed(subjects[i]);
@@ -249,6 +261,32 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   /// @inheritdoc IRMNRemote
   function getCursedSubjects() external view returns (bytes16[] memory subjects) {
     return s_cursedSubjects.values();
+  }
+
+  /// @notice Add or remove curse admins.
+  /// @param removes Addresses to remove from the curse admin set.
+  /// @param adds Addresses to add to the curse admin set.
+  function applyCurseAdminUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+    for (uint256 i = 0; i < removes.length; ++i) {
+      if (s_curseAdmins.remove(removes[i])) {
+        emit CurseAdminRemoved(removes[i]);
+      }
+    }
+    for (uint256 i = 0; i < adds.length; ++i) {
+      if (s_curseAdmins.add(adds[i])) {
+        emit CurseAdminAdded(adds[i]);
+      }
+    }
+  }
+
+  /// @notice Returns all current curse admins.
+  function getCurseAdmins() external view returns (address[] memory) {
+    return s_curseAdmins.values();
+  }
+
+  /// @notice Returns true if the given address is a curse admin.
+  function isCurseAdmin(address curseAdmin) external view returns (bool) {
+    return s_curseAdmins.contains(curseAdmin);
   }
 
   /// @inheritdoc IRMNRemote
