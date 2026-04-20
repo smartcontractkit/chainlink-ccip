@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -229,4 +230,13 @@ func TestEVMTokenDeployments(t *testing.T) {
 			require.True(t, tokenFound, "Token %s should be found in deployed addresses", tc.name)
 		})
 	}
+}
+
+func TestTokenSupportsAdminRole(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, tokenSupportsAdminRole(burn_mint_erc20.ContractType))
+	require.True(t, tokenSupportsAdminRole(burn_mint_erc20_with_drip.ContractType))
+	require.True(t, tokenSupportsAdminRole(tip20.ContractType))
+	require.False(t, tokenSupportsAdminRole(erc20.ContractType))
 }
