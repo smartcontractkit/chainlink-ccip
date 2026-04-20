@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IRMN} from "../interfaces/IRMN.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -15,10 +14,7 @@ import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/Enu
 bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
-/// @dev This contract implements both the new IRMNRemote interface and the legacy IRMN interface. This is to allow for
-/// a seamless migration from the legacy RMN contract to this one. The only function that has been dropped in the newer
-/// interface is `isBlessed`. For the `isBlessed` function, this contract relays the call to the legacy RMN contract.
-contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
+contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
   using EnumerableSet for EnumerableSet.Bytes16Set;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -34,7 +30,6 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   error ThresholdNotMet();
   error UnexpectedSigner();
   error ZeroValueNotAllowed();
-  error IsBlessedNotAvailable();
 
   event ConfigSet(uint32 indexed version, Config config);
   event CurseAdminAdded(address indexed curseAdmin);
@@ -71,7 +66,6 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
 
   string public constant override typeAndVersion = "RMNRemote 1.6.0";
   uint64 internal immutable i_localChainSelector;
-  IRMN internal immutable i_legacyRMN;
 
   Config private s_config;
   uint32 private s_configCount;
@@ -87,13 +81,10 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to.
   constructor(
-    uint64 localChainSelector,
-    IRMN legacyRMN
+    uint64 localChainSelector
   ) {
     if (localChainSelector == 0) revert ZeroValueNotAllowed();
     i_localChainSelector = localChainSelector;
-
-    i_legacyRMN = legacyRMN;
   }
 
   modifier onlyOwnerOrCurseAdmin() {
@@ -295,7 +286,7 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   }
 
   /// @inheritdoc IRMNRemote
-  function isCursed() external view override(IRMN, IRMNRemote) returns (bool) {
+  function isCursed() external view override returns (bool) {
     // There are zero curses under normal circumstances, which means it's cheaper to check for the absence of curses.
     // than to check the subject list for the global curse subject.
     if (s_cursedSubjects.length() == 0) {
@@ -307,28 +298,12 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   /// @inheritdoc IRMNRemote
   function isCursed(
     bytes16 subject
-  ) external view override(IRMN, IRMNRemote) returns (bool) {
+  ) external view override returns (bool) {
     // There are zero curses under normal circumstances, which means it's cheaper to check for the absence of curses.
     // than to check the subject list twice, as we have to check for both the given and global curse subjects.
     if (s_cursedSubjects.length() == 0) {
       return false;
     }
     return s_cursedSubjects.contains(subject) || s_cursedSubjects.contains(GLOBAL_CURSE_SUBJECT);
-  }
-
-  // ================================================================
-  // │                     Legacy pass through                      │
-  // ================================================================
-
-  /// @inheritdoc IRMN
-  /// @dev This function is only expected to be used for messages from CCIP versions below 1.6.
-  function isBlessed(
-    TaggedRoot calldata taggedRoot
-  ) external view returns (bool) {
-    if (i_legacyRMN == IRMN(address(0))) {
-      revert IsBlessedNotAvailable();
-    }
-
-    return i_legacyRMN.isBlessed(taggedRoot);
   }
 }
