@@ -13,7 +13,7 @@ import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/Enu
 /// using the local chain selector as a subject.
 bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
-/// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
+/// @notice This contract supports cursing and uncursing of chains.
 contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
   using EnumerableSet for EnumerableSet.Bytes16Set;
   using EnumerableSet for EnumerableSet.AddressSet;
