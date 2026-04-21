@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {RMNRemote} from "../../../rmn/RMNRemote.sol";
+import {RMN} from "../../../rmn/RMN.sol";
 import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -13,7 +13,7 @@ contract RMNRemote_uncurse is RMNRemoteSetup {
 
   function test_uncurse() public {
     vm.expectEmit();
-    emit RMNRemote.Uncursed(s_curseSubjects);
+    emit RMN.Uncursed(s_curseSubjects);
 
     s_rmnRemote.uncurse(s_curseSubjects);
 
@@ -25,7 +25,7 @@ contract RMNRemote_uncurse is RMNRemoteSetup {
   function test_RevertWhen_uncurse_NotCursed_duplicatedUncurseSubject() public {
     s_curseSubjects.push(CURSE_SUBJ_1);
 
-    vm.expectRevert(abi.encodeWithSelector(RMNRemote.NotCursed.selector, CURSE_SUBJ_1));
+    vm.expectRevert(abi.encodeWithSelector(RMN.NotCursed.selector, CURSE_SUBJ_1));
     s_rmnRemote.uncurse(s_curseSubjects);
   }
 

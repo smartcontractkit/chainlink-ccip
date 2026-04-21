@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {RMNRemote} from "../../../rmn/RMNRemote.sol";
+import {RMN} from "../../../rmn/RMN.sol";
 import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
@@ -9,7 +9,7 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract RMNRemote_curse is RMNRemoteSetup {
   function test_curse() public {
     vm.expectEmit();
-    emit RMNRemote.Cursed(s_curseSubjects);
+    emit RMN.Cursed(s_curseSubjects);
 
     s_rmnRemote.curse(s_curseSubjects);
 
@@ -23,7 +23,7 @@ contract RMNRemote_curse is RMNRemoteSetup {
   function test_RevertWhen_curse_AlreadyCursed_duplicateSubject() public {
     s_curseSubjects.push(CURSE_SUBJ_1);
 
-    vm.expectRevert(abi.encodeWithSelector(RMNRemote.AlreadyCursed.selector, CURSE_SUBJ_1));
+    vm.expectRevert(abi.encodeWithSelector(RMN.AlreadyCursed.selector, CURSE_SUBJ_1));
     s_rmnRemote.curse(s_curseSubjects);
   }
 
@@ -49,7 +49,7 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
 
   function test_curse_byCurseAdmin_Success() public {
     vm.expectEmit();
-    emit RMNRemote.Cursed(s_curseSubjects);
+    emit RMN.Cursed(s_curseSubjects);
 
     vm.stopPrank();
     vm.prank(s_curseAdmin);
@@ -104,7 +104,7 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
 
   function test_curse_byOwner_SuccessWhenCurseAdminsExist() public {
     vm.expectEmit();
-    emit RMNRemote.Cursed(s_curseSubjects);
+    emit RMN.Cursed(s_curseSubjects);
     s_rmnRemote.curse(s_curseSubjects);
 
     assertTrue(s_rmnRemote.isCursed(CURSE_SUBJ_1));
@@ -120,7 +120,7 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
     );
 
     vm.expectEmit();
-    emit RMNRemote.Cursed(s_curseSubjects);
+    emit RMN.Cursed(s_curseSubjects);
 
     vm.stopPrank();
     vm.prank(newAdmin);

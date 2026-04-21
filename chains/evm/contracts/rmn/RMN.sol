@@ -13,7 +13,7 @@ import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/Enu
 bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
 /// @notice This contract supports cursing and uncursing of chains.
-contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMN {
+contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
   using EnumerableSet for EnumerableSet.Bytes16Set;
 
   error AlreadyCursed(bytes16 subject);
@@ -22,7 +22,7 @@ contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMN {
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
-  string public constant override typeAndVersion = "RMNRemote 2.1.0";
+  string public constant override typeAndVersion = "RMN 2.1.0";
 
   EnumerableSet.Bytes16Set private s_cursedSubjects;
 

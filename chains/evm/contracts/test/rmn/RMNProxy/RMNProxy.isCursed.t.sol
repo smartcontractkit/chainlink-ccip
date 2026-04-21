@@ -3,16 +3,16 @@ pragma solidity ^0.8.24;
 
 import {IRMN} from "../../../interfaces/IRMN.sol";
 
+import {GLOBAL_CURSE_SUBJECT, RMN} from "../../../rmn/RMN.sol";
 import {RMNProxy} from "../../../rmn/RMNProxy.sol";
-import {GLOBAL_CURSE_SUBJECT, RMNRemote} from "../../../rmn/RMNRemote.sol";
 import {RMNProxyTestSetup} from "./RMNProxyTestSetup.t.sol";
 
 contract RMNProxy_isCursed is RMNProxyTestSetup {
-  RMNRemote internal s_mockRMNRemote;
+  RMN internal s_mockRMNRemote;
 
   function setUp() public virtual override {
     super.setUp();
-    s_mockRMNRemote = new RMNRemote(new address[](0));
+    s_mockRMNRemote = new RMN(new address[](0));
     s_rmnProxy = new RMNProxy(address(s_mockRMNRemote));
   }
 

@@ -403,7 +403,7 @@ ExtraArgsCodecV3_Test:test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_ARG
 ExtraArgsCodecV3_Test:test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_RECEIVER_LENGTH() (gas: 5104)
 ExtraArgsCodecV3_Test:test__getBasicEncodedExtraArgsV3FastConfirmationRule() (gas: 4438)
 ExtraArgsCodecV3_Test:test__getBasicEncodedExtraArgsV3_ReturnsCorrectLength() (gas: 3984)
-ExtraArgsCodec_Test:testFuzz__encodeGenericExtraArgsV3_Differential_Identical(uint32,uint16,address[9],bytes[9],address,bytes,bytes,bytes) (runs: 4096, μ: 184951, ~: 186668)
+ExtraArgsCodec_Test:testFuzz__encodeGenericExtraArgsV3_Differential_Identical(uint32,uint16,address[9],bytes[9],address,bytes,bytes,bytes) (runs: 4096, μ: 184950, ~: 186668)
 ExtraArgsCodec_Test:test_GENERIC_EXTRA_ARGS_V3_TAG_keccak256_tag() (gas: 3298)
 ExtraArgsCodec_Test:test__decodeGenericExtraArgsV3_RevertWhen_InvalidExecutorLength() (gas: 16033)
 ExtraArgsCodec_Test:test__encodeGenericExtraArgsV3_AllDynamicArgsDefaultValues() (gas: 22105)

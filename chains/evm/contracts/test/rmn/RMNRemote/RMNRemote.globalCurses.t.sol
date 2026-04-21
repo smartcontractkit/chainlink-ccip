@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {GLOBAL_CURSE_SUBJECT} from "../../../rmn/RMNRemote.sol";
+import {GLOBAL_CURSE_SUBJECT} from "../../../rmn/RMN.sol";
 import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
 
 contract RMNRemote_global_curses is RMNRemoteSetup {
