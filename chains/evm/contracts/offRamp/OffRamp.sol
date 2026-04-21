@@ -7,7 +7,7 @@ import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierReso
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -69,7 +69,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   struct StaticConfig {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
-    IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
+    IRMN rmnRemote; // ───────╯ RMN Verification Contract
     address tokenAdminRegistry; // ───────╮ Token admin registry address
     uint32 maxGasBufferToUpdateState; // ─╯ Max Gas Buffer to Update State
   }
@@ -102,7 +102,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev ChainSelector of this chain.
   uint64 internal immutable i_chainSelector;
   /// @dev The RMN verification contract.
-  IRMNRemote internal immutable i_rmnRemote;
+  IRMN internal immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address internal immutable i_tokenAdminRegistry;
   /// @dev The minimum amount of gas to perform the call with exact gas.

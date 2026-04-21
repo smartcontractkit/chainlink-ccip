@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -13,7 +13,7 @@ import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/Enu
 bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
 /// @notice This contract supports cursing and uncursing of chains.
-contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMNRemote {
+contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMN {
   using EnumerableSet for EnumerableSet.Bytes16Set;
 
   error AlreadyCursed(bytes16 subject);
@@ -90,12 +90,12 @@ contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMNRemote {
     emit Uncursed(subjects);
   }
 
-  /// @inheritdoc IRMNRemote
+  /// @inheritdoc IRMN
   function getCursedSubjects() external view returns (bytes16[] memory subjects) {
     return s_cursedSubjects.values();
   }
 
-  /// @inheritdoc IRMNRemote
+  /// @inheritdoc IRMN
   function isCursed() external view override returns (bool) {
     // There are zero curses under normal circumstances, which means it's cheaper to check for the absence of curses.
     // than to check the subject list for the global curse subject.
@@ -105,7 +105,7 @@ contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMNRemote {
     return s_cursedSubjects.contains(GLOBAL_CURSE_SUBJECT);
   }
 
-  /// @inheritdoc IRMNRemote
+  /// @inheritdoc IRMN
   function isCursed(
     bytes16 subject
   ) external view override returns (bool) {
