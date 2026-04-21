@@ -31,13 +31,6 @@ contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMN {
     address[] memory curseAdmins
   ) AuthorizedCallers(curseAdmins) {}
 
-  modifier onlyOwnerOrCurseAdmin() {
-    if (msg.sender != owner()) {
-      _validateCaller();
-    }
-    _;
-  }
-
   // ================================================================
   // │                           Cursing                            │
   // ================================================================
@@ -57,7 +50,8 @@ contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMN {
   /// @dev reverts if any of the subjects are already cursed or if there is a duplicate.
   function curse(
     bytes16[] memory subjects
-  ) public onlyOwnerOrCurseAdmin {
+  ) public {
+    if (msg.sender != owner()) _validateCaller();
     for (uint256 i = 0; i < subjects.length; ++i) {
       if (!s_cursedSubjects.add(subjects[i])) {
         revert AlreadyCursed(subjects[i]);
