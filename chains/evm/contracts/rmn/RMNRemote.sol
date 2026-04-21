@@ -5,7 +5,7 @@ import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Internal} from "../libraries/Internal.sol";
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/EnumerableSetWithBytes16.sol";
 
 /// @dev An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject
@@ -14,9 +14,8 @@ import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/Enu
 bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
 /// @notice This contract supports cursing and uncursing of chains.
-contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
+contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMNRemote {
   using EnumerableSet for EnumerableSet.Bytes16Set;
-  using EnumerableSet for EnumerableSet.AddressSet;
 
   error AlreadyCursed(bytes16 subject);
   error ConfigNotSet();
@@ -25,15 +24,12 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
   error InvalidSignerOrder();
   error NotEnoughSigners();
   error NotCursed(bytes16 subject);
-  error OnlyOwnerOrCurseAdmin(address caller);
   error OutOfOrderSignatures();
   error ThresholdNotMet();
   error UnexpectedSigner();
   error ZeroValueNotAllowed();
 
   event ConfigSet(uint32 indexed version, Config config);
-  event CurseAdminAdded(address indexed curseAdmin);
-  event CurseAdminRemoved(address indexed curseAdmin);
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
@@ -64,7 +60,7 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
   /// @dev this is included in the preimage of the digest that RMN nodes sign.
   bytes32 private constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
-  string public constant override typeAndVersion = "RMNRemote 1.6.0";
+  string public constant override typeAndVersion = "RMNRemote 2.1.0";
   uint64 internal immutable i_localChainSelector;
 
   Config private s_config;
@@ -76,20 +72,21 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
   uint8 private constant ECDSA_RECOVERY_V = 27;
 
   EnumerableSet.Bytes16Set private s_cursedSubjects;
-  EnumerableSet.AddressSet private s_curseAdmins;
   mapping(address signer => bool exists) private s_signers; // for more gas efficient verify.
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to.
+  /// @param curseAdmins initial set of addresses authorized to call curse.
   constructor(
-    uint64 localChainSelector
-  ) {
+    uint64 localChainSelector,
+    address[] memory curseAdmins
+  ) AuthorizedCallers(curseAdmins) {
     if (localChainSelector == 0) revert ZeroValueNotAllowed();
     i_localChainSelector = localChainSelector;
   }
 
   modifier onlyOwnerOrCurseAdmin() {
-    if (msg.sender != owner() && !s_curseAdmins.contains(msg.sender)) {
-      revert OnlyOwnerOrCurseAdmin(msg.sender);
+    if (msg.sender != owner()) {
+      _validateCaller();
     }
     _;
   }
@@ -252,37 +249,6 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote {
   /// @inheritdoc IRMNRemote
   function getCursedSubjects() external view returns (bytes16[] memory subjects) {
     return s_cursedSubjects.values();
-  }
-
-  /// @notice Add or remove curse admins.
-  /// @param removes Addresses to remove from the curse admin set.
-  /// @param adds Addresses to add to the curse admin set.
-  function applyCurseAdminUpdates(
-    address[] calldata removes,
-    address[] calldata adds
-  ) external onlyOwner {
-    for (uint256 i = 0; i < removes.length; ++i) {
-      if (s_curseAdmins.remove(removes[i])) {
-        emit CurseAdminRemoved(removes[i]);
-      }
-    }
-    for (uint256 i = 0; i < adds.length; ++i) {
-      if (s_curseAdmins.add(adds[i])) {
-        emit CurseAdminAdded(adds[i]);
-      }
-    }
-  }
-
-  /// @notice Returns all current curse admins.
-  function getCurseAdmins() external view returns (address[] memory) {
-    return s_curseAdmins.values();
-  }
-
-  /// @notice Returns true if the given address is a curse admin.
-  function isCurseAdmin(
-    address curseAdmin
-  ) external view returns (bool) {
-    return s_curseAdmins.contains(curseAdmin);
   }
 
   /// @inheritdoc IRMNRemote

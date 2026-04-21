@@ -12,7 +12,7 @@ contract RMNProxy_isCursed is RMNProxyTestSetup {
 
   function setUp() public virtual override {
     super.setUp();
-    s_mockRMNRemote = new RMNRemote(1);
+    s_mockRMNRemote = new RMNRemote(1, new address[](0));
     s_rmnProxy = new RMNProxy(address(s_mockRMNRemote));
   }
 

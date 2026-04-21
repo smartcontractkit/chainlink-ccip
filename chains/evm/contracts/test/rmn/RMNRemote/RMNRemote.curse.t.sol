@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {RMNRemote} from "../../../rmn/RMNRemote.sol";
 import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract RMNRemote_curse is RMNRemoteSetup {
@@ -27,7 +28,7 @@ contract RMNRemote_curse is RMNRemoteSetup {
   }
 
   function test_RevertWhen_curse_calledByNonOwner() public {
-    vm.expectRevert(abi.encodeWithSelector(RMNRemote.OnlyOwnerOrCurseAdmin.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
     vm.stopPrank();
     vm.prank(STRANGER);
     s_rmnRemote.curse(s_curseSubjects);
@@ -41,7 +42,9 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
     super.setUp();
     address[] memory adds = new address[](1);
     adds[0] = s_curseAdmin;
-    s_rmnRemote.applyCurseAdminUpdates(new address[](0), adds);
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: adds, removedCallers: new address[](0)})
+    );
   }
 
   function test_curse_byCurseAdmin_Success() public {
@@ -56,43 +59,47 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
     assertTrue(s_rmnRemote.isCursed(CURSE_SUBJ_2));
   }
 
-  function test_applyCurseAdminUpdates_addsAndRemoves() public {
+  function test_applyAuthorizedCallerUpdates_addsAndRemoves() public {
     address newAdmin = makeAddr("newAdmin");
     address[] memory adds = new address[](1);
     adds[0] = newAdmin;
 
     vm.expectEmit();
-    emit RMNRemote.CurseAdminAdded(newAdmin);
-    s_rmnRemote.applyCurseAdminUpdates(new address[](0), adds);
-    assertTrue(s_rmnRemote.isCurseAdmin(newAdmin));
+    emit AuthorizedCallers.AuthorizedCallerAdded(newAdmin);
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: adds, removedCallers: new address[](0)})
+    );
 
-    address[] memory adminList = s_rmnRemote.getCurseAdmins();
+    address[] memory adminList = s_rmnRemote.getAllAuthorizedCallers();
     assertEq(adminList.length, 2); // s_curseAdmin (from setUp) + newAdmin
-
-    // Duplicate add is idempotent (no event emitted)
-    vm.recordLogs();
-    s_rmnRemote.applyCurseAdminUpdates(new address[](0), adds);
-    assertEq(vm.getRecordedLogs().length, 0);
 
     // Remove
     address[] memory toRemove = new address[](1);
     toRemove[0] = newAdmin;
     vm.expectEmit();
-    emit RMNRemote.CurseAdminRemoved(newAdmin);
-    s_rmnRemote.applyCurseAdminUpdates(toRemove, new address[](0));
-    assertFalse(s_rmnRemote.isCurseAdmin(newAdmin));
+    emit AuthorizedCallers.AuthorizedCallerRemoved(newAdmin);
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](0), removedCallers: toRemove})
+    );
+
+    adminList = s_rmnRemote.getAllAuthorizedCallers();
+    assertEq(adminList.length, 1); // only s_curseAdmin remains
 
     // Remove of non-member is idempotent (no event emitted)
     vm.recordLogs();
-    s_rmnRemote.applyCurseAdminUpdates(toRemove, new address[](0));
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](0), removedCallers: toRemove})
+    );
     assertEq(vm.getRecordedLogs().length, 0);
   }
 
-  function test_RevertWhen_applyCurseAdminUpdates_calledByNonOwner() public {
+  function test_RevertWhen_applyAuthorizedCallerUpdates_calledByNonOwner() public {
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     vm.stopPrank();
     vm.prank(STRANGER);
-    s_rmnRemote.applyCurseAdminUpdates(new address[](0), new address[](0));
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](0), removedCallers: new address[](0)})
+    );
   }
 
   function test_curse_byOwner_SuccessWhenCurseAdminsExist() public {
@@ -108,7 +115,9 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
     address newAdmin = makeAddr("newAdmin");
     address[] memory adds = new address[](1);
     adds[0] = newAdmin;
-    s_rmnRemote.applyCurseAdminUpdates(new address[](0), adds);
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: adds, removedCallers: new address[](0)})
+    );
 
     vm.expectEmit();
     emit RMNRemote.Cursed(s_curseSubjects);
@@ -124,9 +133,11 @@ contract RMNRemote_curseAdmin is RMNRemoteSetup {
   function test_RevertWhen_curse_calledByRemovedCurseAdmin() public {
     address[] memory toRemove = new address[](1);
     toRemove[0] = s_curseAdmin;
-    s_rmnRemote.applyCurseAdminUpdates(toRemove, new address[](0));
+    s_rmnRemote.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](0), removedCallers: toRemove})
+    );
 
-    vm.expectRevert(abi.encodeWithSelector(RMNRemote.OnlyOwnerOrCurseAdmin.selector, s_curseAdmin));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_curseAdmin));
     vm.stopPrank();
     vm.prank(s_curseAdmin);
     s_rmnRemote.curse(s_curseSubjects);

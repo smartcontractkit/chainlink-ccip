@@ -24,7 +24,7 @@ contract RMNRemoteSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_rmnRemote = new RMNRemote(1);
+    s_rmnRemote = new RMNRemote(1, new address[](0));
     OFF_RAMP_ADDRESS = makeAddr("OFF RAMP");
     s_curseSubjects = [CURSE_SUBJ_1, CURSE_SUBJ_2];
 
