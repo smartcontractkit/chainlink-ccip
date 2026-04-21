@@ -49,7 +49,6 @@ contract BaseTest is Test {
     // setup RMNRemote
     s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
     vm.etch(address(s_mockRMNRemote), bytes("fake bytecode"));
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encode(false));
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
 

@@ -1,27 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {Internal} from "../libraries/Internal.sol";
-
 /// @notice This interface contains the only RMN-related functions that might be used on-chain by other CCIP contracts.
 interface IRMNRemote {
-  /// @notice signature components from RMN nodes.
-  struct Signature {
-    bytes32 r;
-    bytes32 s;
-  }
-
-  /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport.
-  /// @param offRampAddress is not inferred by msg.sender, in case the call is made through RMNProxy.
-  /// @param merkleRoots must be well formed, and is a representation of the CommitReport received from the oracles.
-  /// @param signatures rmnNodes ECDSA sigs, only r & s, must be sorted in ascending order by signer address.
-  /// @dev Will revert if verification fails.
-  function verify(
-    address offRampAddress,
-    Internal.MerkleRoot[] memory merkleRoots,
-    Signature[] memory signatures
-  ) external view;
-
   /// @notice gets the current set of cursed subjects.
   /// @return subjects the list of cursed subjects.
   function getCursedSubjects() external view returns (bytes16[] memory subjects);

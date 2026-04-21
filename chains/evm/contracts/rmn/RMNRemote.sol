@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {Internal} from "../libraries/Internal.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {EnumerableSet} from "@chainlink/contracts/src/v0.8/shared/enumerable/EnumerableSetWithBytes16.sol";
 
@@ -18,180 +17,25 @@ contract RMNRemote is AuthorizedCallers, ITypeAndVersion, IRMNRemote {
   using EnumerableSet for EnumerableSet.Bytes16Set;
 
   error AlreadyCursed(bytes16 subject);
-  error ConfigNotSet();
-  error DuplicateOnchainPublicKey();
-  error InvalidSignature();
-  error InvalidSignerOrder();
-  error NotEnoughSigners();
   error NotCursed(bytes16 subject);
-  error OutOfOrderSignatures();
-  error ThresholdNotMet();
-  error UnexpectedSigner();
-  error ZeroValueNotAllowed();
 
-  event ConfigSet(uint32 indexed version, Config config);
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
-  /// @dev the configuration of an RMN signer.
-  struct Signer {
-    address onchainPublicKey; // ─╮ For signing reports.
-    uint64 nodeIndex; // ─────────╯ Maps to nodes in home chain config, should be strictly increasing.
-  }
-
-  /// @dev the contract config.
-  struct Config {
-    bytes32 rmnHomeContractConfigDigest; // Digest of the RMNHome contract config.
-    Signer[] signers; // List of signers.
-    uint64 fSign; // Max number of faulty RMN nodes; f+1 signers are required to verify a report, must configure 2f+1 signers in total.
-  }
-
-  /// @dev part of the payload that RMN nodes sign: keccak256(abi.encode(RMN_V1_6_ANY2EVM_REPORT, report)).
-  /// @dev this struct is only ever abi-encoded and hashed; it is never stored.
-  struct Report {
-    uint256 destChainId; //                 To guard against chain selector misconfiguration.
-    uint64 destChainSelector; //  ────────╮ The chain selector of the destination chain.
-    address rmnRemoteContractAddress; // ─╯ The address of this contract.
-    address offrampAddress; //              The address of the offramp on the same chain as this contract.
-    bytes32 rmnHomeContractConfigDigest; // The digest of the RMNHome contract config.
-    Internal.MerkleRoot[] merkleRoots; //   The dest lane updates.
-  }
-
-  /// @dev this is included in the preimage of the digest that RMN nodes sign.
-  bytes32 private constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
-
   string public constant override typeAndVersion = "RMNRemote 2.1.0";
-  uint64 internal immutable i_localChainSelector;
-
-  Config private s_config;
-  uint32 private s_configCount;
-
-  /// @dev RMN nodes only generate sigs with v=27; making this constant allows us to save gas by not transmitting v.
-  /// @dev Any valid ECDSA sig (r, s, v) can be "flipped" into (r, s*, v*) without knowing the private key (where v=27 or 28 for secp256k1)
-  /// https://github.com/kadenzipfel/smart-contract-vulnerabilities/blob/master/vulnerabilities/signature-malleability.md.
-  uint8 private constant ECDSA_RECOVERY_V = 27;
 
   EnumerableSet.Bytes16Set private s_cursedSubjects;
-  mapping(address signer => bool exists) private s_signers; // for more gas efficient verify.
 
-  /// @param localChainSelector the chain selector of the chain this contract is deployed to.
   /// @param curseAdmins initial set of addresses authorized to call curse.
   constructor(
-    uint64 localChainSelector,
     address[] memory curseAdmins
-  ) AuthorizedCallers(curseAdmins) {
-    if (localChainSelector == 0) revert ZeroValueNotAllowed();
-    i_localChainSelector = localChainSelector;
-  }
+  ) AuthorizedCallers(curseAdmins) {}
 
   modifier onlyOwnerOrCurseAdmin() {
     if (msg.sender != owner()) {
       _validateCaller();
     }
     _;
-  }
-
-  // ================================================================
-  // │                         Verification                         │
-  // ================================================================
-
-  /// @inheritdoc IRMNRemote
-  function verify(
-    address offRampAddress,
-    Internal.MerkleRoot[] calldata merkleRoots,
-    Signature[] calldata signatures
-  ) external view {
-    if (s_configCount == 0) {
-      revert ConfigNotSet();
-    }
-    if (signatures.length < s_config.fSign + 1) revert ThresholdNotMet();
-
-    bytes32 digest = keccak256(
-      abi.encode(
-        RMN_V1_6_ANY2EVM_REPORT,
-        Report({
-          destChainId: block.chainid,
-          destChainSelector: i_localChainSelector,
-          rmnRemoteContractAddress: address(this),
-          offrampAddress: offRampAddress,
-          rmnHomeContractConfigDigest: s_config.rmnHomeContractConfigDigest,
-          merkleRoots: merkleRoots
-        })
-      )
-    );
-
-    address prevAddress;
-    address signerAddress;
-    for (uint256 i = 0; i < signatures.length; ++i) {
-      signerAddress = ecrecover(digest, ECDSA_RECOVERY_V, signatures[i].r, signatures[i].s);
-      if (signerAddress == address(0)) revert InvalidSignature();
-      if (prevAddress >= signerAddress) revert OutOfOrderSignatures();
-      if (!s_signers[signerAddress]) revert UnexpectedSigner();
-      prevAddress = signerAddress;
-    }
-  }
-
-  // ================================================================
-  // │                            Config                            │
-  // ================================================================
-
-  /// @notice Sets the configuration of the contract.
-  /// @param newConfig the new configuration.
-  /// @dev setting config is atomic; we delete all pre-existing config and set everything from scratch.
-  function setConfig(
-    Config calldata newConfig
-  ) external onlyOwner {
-    if (newConfig.rmnHomeContractConfigDigest == bytes32(0)) {
-      revert ZeroValueNotAllowed();
-    }
-
-    // signers are in ascending order of nodeIndex.
-    for (uint256 i = 1; i < newConfig.signers.length; ++i) {
-      if (!(newConfig.signers[i - 1].nodeIndex < newConfig.signers[i].nodeIndex)) {
-        revert InvalidSignerOrder();
-      }
-    }
-
-    // min signers requirement is tenable.
-    if (newConfig.signers.length < 2 * newConfig.fSign + 1) {
-      revert NotEnoughSigners();
-    }
-
-    // clear the old signers.
-    for (uint256 i = s_config.signers.length; i > 0; --i) {
-      delete s_signers[s_config.signers[i - 1].onchainPublicKey];
-    }
-
-    // set the new signers.
-    for (uint256 i = 0; i < newConfig.signers.length; ++i) {
-      if (s_signers[newConfig.signers[i].onchainPublicKey]) {
-        revert DuplicateOnchainPublicKey();
-      }
-      s_signers[newConfig.signers[i].onchainPublicKey] = true;
-    }
-
-    s_config = newConfig;
-    uint32 newConfigCount = ++s_configCount;
-    emit ConfigSet(newConfigCount, newConfig);
-  }
-
-  /// @notice Returns the current configuration of the contract and a version number.
-  /// @return version the current configs version.
-  /// @return config the current config.
-  function getVersionedConfig() external view returns (uint32 version, Config memory config) {
-    return (s_configCount, s_config);
-  }
-
-  /// @notice Returns the chain selector configured at deployment time.
-  /// @return localChainSelector the chain selector, not the chain ID.
-  function getLocalChainSelector() external view returns (uint64 localChainSelector) {
-    return i_localChainSelector;
-  }
-
-  /// @notice Returns the 32 byte header used in computing the report digest.
-  /// @return digestHeader the digest header.
-  function getReportDigestHeader() external pure returns (bytes32 digestHeader) {
-    return RMN_V1_6_ANY2EVM_REPORT;
   }
 
   // ================================================================
