@@ -11,6 +11,7 @@ import (
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
@@ -316,7 +317,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 
 				writes := []evm_contract.WriteOutput{}
 				switch toknRef.Type.String() {
-				case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String():
+				case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String(), bnmDripOps150.ContractType.String():
 					report, execErr := cldf_ops.ExecuteOperation(b,
 						bnmERC20ops.GrantMintAndBurnRoles, chain,
 						evm_contract.FunctionInput[common.Address]{

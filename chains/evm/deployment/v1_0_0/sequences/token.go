@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
+	drip_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -29,6 +30,7 @@ func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
 		burn_mint_erc20_with_drip.ContractType,
+		drip_v150.ContractType,
 		tip20.ContractType:
 		return true
 	default:
@@ -39,7 +41,8 @@ func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
-		burn_mint_erc20_with_drip.ContractType:
+		burn_mint_erc20_with_drip.ContractType,
+		drip_v150.ContractType:
 		return true
 	default:
 		return false
@@ -48,6 +51,7 @@ func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 
 func tokenSupportsPreMint(tokenType deployment.ContractType) bool {
 	switch tokenType {
+	// drip_v150 has no supply/decimals in its constructor so pre-mint is not supported
 	case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType:
 		return true
 	default:
@@ -140,6 +144,20 @@ var DeployToken = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC20WithDrip token: %w", err)
 			}
 
+		case drip_v150.ContractType:
+			tokenRef, err = contract.MaybeDeployContract(b, drip_v150.Deploy, chain, contract.DeployInput[drip_v150.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(drip_v150.ContractType, *drip_v150.Version),
+				ChainSelector:  chain.Selector,
+				Args: drip_v150.ConstructorArgs{
+					Name:   input.Name,
+					Symbol: input.Symbol,
+				},
+				Qualifier: &qualifier,
+			}, nil)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC20WithDrip (v1.5.0) token: %w", err)
+			}
+
 		case tip20.ContractType:
 			// Initial admin must be the deployer so subsequent ops (e.g. GrantIssuerRole) run as the same
 			// identity pass IsAllowedCaller; ExternalAdmin receives DEFAULT_ADMIN_ROLE in a follow-up grant.
@@ -206,7 +224,7 @@ var DeployToken = cldf_ops.NewSequence(
 
 		if input.ExternalAdmin != "" && tokenSupportsAdminRole(input.Type) {
 			switch input.Type {
-			case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType:
+			case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType, drip_v150.ContractType:
 				token, err := bnm_erc20_bindings.NewBurnMintERC20(tokenAddr, chain.Client)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)

@@ -19,6 +19,7 @@ import (
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 
@@ -464,5 +465,7 @@ func isLockReleasePoolType(poolType deployment.ContractType) bool {
 }
 
 func isBurnMintTokenType(typ datastore.ContractType) bool {
-	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
+	return typ.String() == bnmOps.ContractType.String() ||
+		typ.String() == bnmDripOps.ContractType.String() ||
+		typ.String() == bnmDripOps150.ContractType.String()
 }
