@@ -35,6 +35,7 @@ onramp: ../solc/ccip/OnRamp/OnRamp.sol/OnRamp.abi.json ../solc/ccip/OnRamp/OnRam
 ping_pong_demo: ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.abi.json ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.bin e192d15c42dc8655806b487a4abeeb60f59f7d1d4f3a8b0a63052565d4afe039
 proxy: ../solc/ccip/Proxy/Proxy.sol/Proxy.abi.json ../solc/ccip/Proxy/Proxy.sol/Proxy.bin 96c64564909933986584e28f07ffeacd26a07be2b329145e93b3f85d59e4102a
 registry_module_owner_custom: ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.abi.json ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.bin ce04722cdea2e96d791e48c6a99f64559125d34cd24e19cfd5281892d2ed8ef0
+rmn: ../solc/ccip/RMN/RMN.sol/RMN.abi.json ../solc/ccip/RMN/RMN.sol/RMN.bin 471d245f1744018175826c5f26203a1749db596833d386347c8405e93e1a7fb5
 rmn_proxy_contract: ../solc/ccip/RMNProxy/RMNProxy.sol/RMNProxy.abi.json ../solc/ccip/RMNProxy/RMNProxy.sol/RMNProxy.bin 4d06f9e5c6f72daef745e6114faed3bae57ad29758d75de5a4eefcd5f0172328
 rmn_remote: ../solc/ccip/RMNRemote/RMNRemote.sol/RMNRemote.abi.json ../solc/ccip/RMNRemote/RMNRemote.sol/RMNRemote.bin a09407e77c5b8655f55554c020d4086aea22e542cc333306138fe6caff6748bb
 router: ../solc/ccip/Router/Router.sol/Router.abi.json ../solc/ccip/Router/Router.sol/Router.bin 4048d8be7531670b5e054b7dc18aa8394f2b6dd44fd7fff83aa0cb4aeb38e926
