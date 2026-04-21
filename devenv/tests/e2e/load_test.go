@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/chaos"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
@@ -20,6 +19,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	f "github.com/smartcontractkit/chainlink-testing-framework/framework"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
@@ -38,52 +38,47 @@ type GasTestCase struct {
 	waitBetweenTests time.Duration
 }
 
-// SentMessage represents a message that was sent and needs verification.
-type SentMessage struct {
-	SeqNo     uint64
-	MessageID [32]byte
-	SentTime  time.Time
+type CCIPTxGun struct {
+	e       *deployment.Environment
+	srcImpl ccip.CCIP16ProductConfiguration
+	dstImpl ccip.CCIP16ProductConfiguration
 }
 
-type EVMTXGun struct {
-	cfg  *ccip.Cfg
-	e    *deployment.Environment
-	impl ccip.CCIP16ProductConfiguration
-}
-
-func NewEVMTransactionGun(cfg *ccip.Cfg, e *deployment.Environment, selectors []uint64, impl ccip.CCIP16ProductConfiguration, s, d evm.Chain) *EVMTXGun {
-	return &EVMTXGun{
-		cfg:  cfg,
-		e:    e,
-		impl: impl,
+func NewCCIPTxGun(e *deployment.Environment, srcImpl, dstImpl ccip.CCIP16ProductConfiguration) *CCIPTxGun {
+	return &CCIPTxGun{
+		e:       e,
+		srcImpl: srcImpl,
+		dstImpl: dstImpl,
 	}
 }
 
-// Call implements example gun call, assertions on response bodies should be done here.
-func (m *EVMTXGun) Call(_ *wasp.Generator) *wasp.Response {
+// Call sends a CCIP message from srcImpl to dstImpl via the testadapter pattern.
+// Family-agnostic: works for any src/dst pair whose impls are registered.
+func (m *CCIPTxGun) Call(_ *wasp.Generator) *wasp.Response {
+	ctx := context.Background()
 	b := ccip.NewDefaultCLDFBundle(m.e)
 	m.e.OperationsBundle = b
 
-	chainIDs := make([]string, 0)
-	for _, bc := range m.cfg.Blockchains {
-		chainIDs = append(chainIDs, bc.ChainID)
-	}
-
-	srcChain, err := chainsel.GetChainDetailsByChainIDAndFamily(chainIDs[0], chainsel.FamilyEVM)
-	if err != nil {
-		return &wasp.Response{Error: err.Error(), Failed: true}
-	}
-	dstChain, err := chainsel.GetChainDetailsByChainIDAndFamily(chainIDs[1], chainsel.FamilyEVM)
+	receiver := m.dstImpl.CCIPReceiver()
+	extraArgs, err := m.dstImpl.GetExtraArgs(receiver, m.srcImpl.Family())
 	if err != nil {
 		return &wasp.Response{Error: err.Error(), Failed: true}
 	}
 
-	_, _ = srcChain, dstChain
+	msg, err := m.srcImpl.BuildMessage(testadapters.MessageComponents{
+		DestChainSelector: m.dstImpl.ChainSelector(),
+		Receiver:          receiver,
+		Data:              []byte("load test"),
+		FeeToken:          "",
+		ExtraArgs:         extraArgs,
+	})
+	if err != nil {
+		return &wasp.Response{Error: err.Error(), Failed: true}
+	}
 
-	// err := m.impl.SendMessage(...)
-	// if err != nil {
-	// 	return &wasp.Response{Error: error.New("something"), Failed: true}
-	// }
+	if _, _, err := m.srcImpl.SendMessage(ctx, m.dstImpl.ChainSelector(), msg); err != nil {
+		return &wasp.Response{Error: err.Error(), Failed: true}
+	}
 	return &wasp.Response{Data: "ok"}
 }
 
@@ -114,8 +109,8 @@ func gasControlFunc(t *testing.T, r *rpc.RPCClient, blockPace time.Duration) {
 	}
 }
 
-func createLoadProfile(in *ccip.Cfg, rps int64, testDuration time.Duration, e *deployment.Environment, selectors []uint64, impl ccip.CCIP16ProductConfiguration, s, d evm.Chain) (*wasp.Profile, *EVMTXGun) {
-	gun := NewEVMTransactionGun(in, e, selectors, impl, s, d)
+func createLoadProfile(rps int64, testDuration time.Duration, e *deployment.Environment, srcImpl, dstImpl ccip.CCIP16ProductConfiguration) (*wasp.Profile, *CCIPTxGun) {
+	gun := NewCCIPTxGun(e, srcImpl, dstImpl)
 	profile := wasp.NewProfile().
 		Add(wasp.NewGenerator(&wasp.Config{
 			LoadType: wasp.RPS,
@@ -148,20 +143,8 @@ func TestE2ELoad(t *testing.T) {
 
 	selectors, e, err := ccip.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
-	chains := e.BlockChains.EVMChains()
-	require.NotNil(t, chains)
-	srcChain := chains[selectors[0]]
-	dstChain := chains[selectors[1]]
 	b := ccip.NewDefaultCLDFBundle(e)
 	e.OperationsBundle = b
-
-	// ctx := ccip.Plog.WithContext(context.Background())
-
-	chainIDs, wsURLs := make([]string, 0), make([]string, 0)
-	for _, bc := range in.Blockchains {
-		chainIDs = append(chainIDs, bc.ChainID)
-		wsURLs = append(wsURLs, bc.Out.Nodes[0].ExternalWSUrl)
-	}
 
 	impls := make([]ccip.CCIP16ProductConfiguration, 0)
 	for _, selector := range selectors {
@@ -177,10 +160,10 @@ func TestE2ELoad(t *testing.T) {
 
 	t.Run("clean", func(t *testing.T) {
 		// just a clean load test to measure performance
-		rps := int64(5)
-		loadDuration := 30 * time.Second
+		rps := int64(1)
+		loadDuration := 15 * time.Minute
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
+		p, _ := createLoadProfile(rps, loadDuration, e, impls[0], impls[1])
 
 		_, err = p.Run(true)
 		require.NoError(t, err)
@@ -197,7 +180,7 @@ func TestE2ELoad(t *testing.T) {
 		rps := int64(1)
 		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
+		p, _ := createLoadProfile(rps, loadDuration, e, impls[0], impls[1])
 
 		_, err = p.Run(true)
 		require.NoError(t, err)
@@ -210,7 +193,7 @@ func TestE2ELoad(t *testing.T) {
 		rps := int64(1)
 		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
+		p, _ := createLoadProfile(rps, loadDuration, e, impls[0], impls[1])
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
@@ -272,7 +255,7 @@ func TestE2ELoad(t *testing.T) {
 		rps := int64(1)
 		loadDuration := 120 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
+		p, _ := createLoadProfile(rps, loadDuration, e, impls[0], impls[1])
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
@@ -383,7 +366,7 @@ func TestE2ELoad(t *testing.T) {
 			},
 		}
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
+		p, _ := createLoadProfile(rps, loadDuration, e, impls[0], impls[1])
 
 		_, err = p.Run(false)
 		require.NoError(t, err)

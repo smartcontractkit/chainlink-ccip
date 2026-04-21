@@ -21,6 +21,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -443,9 +444,33 @@ func AddNodesToContracts(
 	}
 
 	for _, chain := range remoteSelectors {
+		family, _ := chainsel.GetSelectorFamily(chain)
 		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
 			if ocrParams.CommitOffChainConfig != nil {
 				ocrParams.CommitOffChainConfig.RMNEnabled = false
+			}
+			// Source of truth: chainlink-deployments/domains/ccip/shared/chainconfigs.go:1076
+			// TON offramp enforces one root per commit report + one message per exec report.
+			if family == chainsel.FamilyTon {
+				if ocrParams.CommitOffChainConfig != nil {
+					ocrParams.CommitOffChainConfig.MultipleReportsEnabled = true
+					ocrParams.CommitOffChainConfig.MaxMerkleRootsPerReport = 1
+					ocrParams.CommitOffChainConfig.MaxPricesPerReport = 3
+					ocrParams.CommitOffChainConfig.MaxMerkleTreeSize = 10
+					ocrParams.CommitOffChainConfig.TransmissionDelayMultiplier = 2 * time.Minute
+					ocrParams.CommitOffChainConfig.MaxReportTransmissionCheckAttempts = 2
+				}
+				if ocrParams.ExecuteOffChainConfig != nil {
+					ocrParams.ExecuteOffChainConfig.MaxReportMessages = 1
+					ocrParams.ExecuteOffChainConfig.MaxSingleChainReports = 1
+					ocrParams.ExecuteOffChainConfig.BatchGasLimit = 1_000_000
+					ocrParams.ExecuteOffChainConfig.TransmissionDelayMultiplier = 2 * time.Minute
+					ocrParams.ExecuteOffChainConfig.MaxCommitReportsToFetch = 250
+					ocrParams.ExecuteOffChainConfig.InflightCacheExpiry = *config.MustNewDuration(1 * time.Minute)
+					ocrParams.ExecuteOffChainConfig.MessageVisibilityInterval = *config.MustNewDuration(8 * time.Hour)
+					ocrParams.ExecuteOffChainConfig.RootSnoozeTime = *config.MustNewDuration(5 * time.Minute)
+					ocrParams.ExecuteOffChainConfig.MultipleReportsEnabled = true
+				}
 			}
 			return ocrParams
 		}
