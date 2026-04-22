@@ -7,11 +7,11 @@ interface IRMN {
   /// @return subjects the list of cursed subjects.
   function getCursedSubjects() external view returns (bytes16[] memory subjects);
 
-  /// @notice If there is an active global or legacy curse, this function returns true.
+  /// @notice Iff there is an active global or legacy curse, this function returns true.
   /// @return bool true if there is an active global curse.
   function isCursed() external view returns (bool);
 
-  /// @notice If there is an active global curse, or an active curse for `subject`, this function returns true.
+  /// @notice Iff there is an active global curse, or an active curse for `subject`, this function returns true.
   /// @param subject To check whether a particular chain is cursed, set to bytes16(uint128(chainSelector)).
   /// @return bool true if the provided subject is cursed *or* if there is an active global curse.
   function isCursed(

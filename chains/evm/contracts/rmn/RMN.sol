@@ -36,7 +36,7 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
   // ================================================================
 
   /// @notice Curse a single subject.
-  /// @param subject the subject to curse.
+  /// @param subject The subject to curse.
   function curse(
     bytes16 subject
   ) external {
@@ -51,7 +51,11 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
   function curse(
     bytes16[] memory subjects
   ) public {
-    if (msg.sender != owner()) _validateCaller();
+    // Allow both the owner and authorized callers to curse subjects.
+    // Skip validation for the owner; validate authorization for others.
+    if (msg.sender != owner()) {
+        _validateCaller();
+    }
     for (uint256 i = 0; i < subjects.length; ++i) {
       if (!s_cursedSubjects.add(subjects[i])) {
         revert AlreadyCursed(subjects[i]);
