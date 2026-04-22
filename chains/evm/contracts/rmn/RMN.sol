@@ -54,7 +54,7 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
     // Allow both the owner and authorized callers to curse subjects.
     // Skip validation for the owner; validate authorization for others.
     if (msg.sender != owner()) {
-        _validateCaller();
+      _validateCaller();
     }
     for (uint256 i = 0; i < subjects.length; ++i) {
       if (!s_cursedSubjects.add(subjects[i])) {
