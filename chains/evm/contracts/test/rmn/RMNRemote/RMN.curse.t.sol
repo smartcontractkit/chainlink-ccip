@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {RMN} from "../../../rmn/RMN.sol";
-import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
+import {RMNRemoteSetup} from "./RMNSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract RMNRemote_curse is RMNRemoteSetup {

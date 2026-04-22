@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {GLOBAL_CURSE_SUBJECT} from "../../../rmn/RMN.sol";
-import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
+import {RMNRemoteSetup} from "./RMNSetup.t.sol";
 
 contract RMNRemote_global_curses is RMNRemoteSetup {
   function test_isCursed_globalCurseSubject() public {
