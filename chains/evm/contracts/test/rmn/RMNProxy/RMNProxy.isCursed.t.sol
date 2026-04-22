@@ -8,18 +8,18 @@ import {RMNProxy} from "../../../rmn/RMNProxy.sol";
 import {RMNProxyTestSetup} from "./RMNProxyTestSetup.t.sol";
 
 contract RMNProxy_isCursed is RMNProxyTestSetup {
-  RMN internal s_mockRMNRemote;
+  RMN internal s_mockRmn;
 
   function setUp() public virtual override {
     super.setUp();
-    s_mockRMNRemote = new RMN(new address[](0));
-    s_rmnProxy = new RMNProxy(address(s_mockRMNRemote));
+    s_mockRmn = new RMN(new address[](0));
+    s_rmnProxy = new RMNProxy(address(s_mockRmn));
   }
 
   function test_IsCursed_GlobalCurseSubject() public {
     assertFalse(IRMN(address(s_rmnProxy)).isCursed());
 
-    s_mockRMNRemote.curse(GLOBAL_CURSE_SUBJECT);
+    s_mockRmn.curse(GLOBAL_CURSE_SUBJECT);
     vm.assertTrue(IRMN(address(s_rmnProxy)).isCursed());
   }
 
@@ -28,10 +28,10 @@ contract RMNProxy_isCursed is RMNProxyTestSetup {
   function test_isCursed_RevertWhen_isCursedReasonForwarded() public {
     bytes memory err = bytes("revert");
     vm.mockCallRevert(
-      address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encodeWithSelector(CustomError.selector, err)
+      address(s_mockRmn), abi.encodeWithSignature("isCursed()"), abi.encodeWithSelector(CustomError.selector, err)
     );
 
-    s_rmnProxy.setARM(address(s_mockRMNRemote));
+    s_rmnProxy.setARM(address(s_mockRmn));
     vm.expectRevert(abi.encodeWithSelector(CustomError.selector, err));
     IRMN(address(s_rmnProxy)).isCursed();
   }
