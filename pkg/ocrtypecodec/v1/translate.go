@@ -44,8 +44,8 @@ func (t *protoTranslator) rmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.Signat
 	sigs := make([]*rmnpb.EcdsaSignature, len(pbSigs))
 	for i := range pbSigs {
 		sigs[i] = &rmnpb.EcdsaSignature{
-			R: pbSigs[i].R,
-			S: pbSigs[i].S,
+			R: pbSigs[i].GetR(),
+			S: pbSigs[i].GetS(),
 		}
 	}
 	return sigs
@@ -73,12 +73,12 @@ func (t *protoTranslator) ccipRmnSignaturesFromProto(
 	}
 
 	for i := range pbSigs {
-		if len(pbSigs[i].R) != 32 || len(pbSigs[i].S) != 32 {
+		if len(pbSigs[i].GetR()) != 32 || len(pbSigs[i].GetS()) != 32 {
 			return nil, fmt.Errorf("signature must be 32 bytes: %v", pbSigs[i])
 		}
 		sigs[i] = cciptypes.RMNECDSASignature{
-			R: cciptypes.Bytes32(pbSigs[i].R),
-			S: cciptypes.Bytes32(pbSigs[i].S),
+			R: cciptypes.Bytes32(pbSigs[i].GetR()),
+			S: cciptypes.Bytes32(pbSigs[i].GetS()),
 		}
 	}
 	return sigs, nil
@@ -605,10 +605,10 @@ func (t *protoTranslator) commitDataSliceFromProto(
 	commitData := make([]exectypes.CommitData, len(pbCommits))
 
 	for i, commit := range pbCommits {
-		if len(commit.MerkleRoot) != 32 {
-			return nil, fmt.Errorf("merkle root length is not 32: %d", len(commit.MerkleRoot))
+		if len(commit.GetMerkleRoot()) != 32 {
+			return nil, fmt.Errorf("merkle root length is not 32: %d", len(commit.GetMerkleRoot()))
 		}
-		hashes, err := t.bytes32SliceFromProto(commit.Hashes)
+		hashes, err := t.bytes32SliceFromProto(commit.GetHashes())
 		if err != nil {
 			return nil, err
 		}
@@ -617,19 +617,19 @@ func (t *protoTranslator) commitDataSliceFromProto(
 			return nil, err
 		}
 		commitData[i] = exectypes.CommitData{
-			SourceChain:   cciptypes.ChainSelector(commit.SourceChain),
-			OnRampAddress: commit.OnRampAddress,
-			Timestamp:     commit.Timestamp.AsTime(),
-			BlockNum:      commit.BlockNum,
-			MerkleRoot:    cciptypes.Bytes32(commit.MerkleRoot),
+			SourceChain:   cciptypes.ChainSelector(commit.GetSourceChain()),
+			OnRampAddress: commit.GetOnRampAddress(),
+			Timestamp:     commit.GetTimestamp().AsTime(),
+			BlockNum:      commit.GetBlockNum(),
+			MerkleRoot:    cciptypes.Bytes32(commit.GetMerkleRoot()),
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(commit.SequenceNumberRange.MinMsgNr),
-				cciptypes.SeqNum(commit.SequenceNumberRange.MaxMsgNr),
+				cciptypes.SeqNum(commit.GetSequenceNumberRange().GetMinMsgNr()),
+				cciptypes.SeqNum(commit.GetSequenceNumberRange().GetMaxMsgNr()),
 			),
-			ExecutedMessages: t.decodeSeqNums(commit.ExecutedMessages),
+			ExecutedMessages: t.decodeSeqNums(commit.GetExecutedMessages()),
 			Messages:         messages,
 			Hashes:           hashes,
-			MessageTokenData: t.decodeMessageTokenData(commit.MessageTokenData),
+			MessageTokenData: t.decodeMessageTokenData(commit.GetMessageTokenData()),
 		}
 	}
 
@@ -1029,14 +1029,14 @@ func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) (cciptypes.
 	}
 	return cciptypes.Message{
 		Header:         header,
-		Sender:         msg.Sender,
-		Data:           msg.Data,
-		Receiver:       msg.Receiver,
-		ExtraArgs:      msg.ExtraArgs,
-		FeeToken:       msg.FeeToken,
-		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeTokenAmount)),
-		FeeValueJuels:  cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeValueJuels)),
-		TokenAmounts:   t.decodeRampTokenAmounts(msg.TokenAmounts),
+		Sender:         msg.GetSender(),
+		Data:           msg.GetData(),
+		Receiver:       msg.GetReceiver(),
+		ExtraArgs:      msg.GetExtraArgs(),
+		FeeToken:       msg.GetFeeToken(),
+		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.GetFeeTokenAmount())),
+		FeeValueJuels:  cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.GetFeeValueJuels())),
+		TokenAmounts:   t.decodeRampTokenAmounts(msg.GetTokenAmounts()),
 	}, nil
 }
 
@@ -1053,10 +1053,10 @@ func (t *protoTranslator) decodeMessageHeader(
 		SourceChainSelector: cciptypes.ChainSelector(header.SourceChainSelector),
 		DestChainSelector:   cciptypes.ChainSelector(header.DestChainSelector),
 		SequenceNumber:      cciptypes.SeqNum(header.SequenceNumber),
-		Nonce:               header.Nonce,
+		Nonce:               header.GetNonce(),
 		MsgHash:             cciptypes.Bytes32(header.MsgHash),
-		OnRamp:              header.OnRamp,
-		TxHash:              header.TxHash,
+		OnRamp:              header.GetOnRamp(),
+		TxHash:              header.GetTxHash(),
 	}, nil
 }
 
@@ -1066,11 +1066,11 @@ func (t *protoTranslator) decodeRampTokenAmounts(
 	result := make([]cciptypes.RampTokenAmount, len(tokenAmounts))
 	for i, token := range tokenAmounts {
 		result[i] = cciptypes.RampTokenAmount{
-			SourcePoolAddress: token.SourcePoolAddress,
-			DestTokenAddress:  token.DestTokenAddress,
-			ExtraData:         token.ExtraData,
-			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetBytes(token.Amount)),
-			DestExecData:      token.DestExecData,
+			SourcePoolAddress: token.GetSourcePoolAddress(),
+			DestTokenAddress:  token.GetDestTokenAddress(),
+			ExtraData:         token.GetExtraData(),
+			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetBytes(token.GetAmount())),
+			DestExecData:      token.GetDestExecData(),
 		}
 	}
 	return result
@@ -1079,11 +1079,11 @@ func (t *protoTranslator) decodeRampTokenAmounts(
 func (t *protoTranslator) decodeMessageTokenDataEntry(
 	data *ocrtypecodecpb.MessageTokenData,
 ) exectypes.MessageTokenData {
-	tokenData := make([]exectypes.TokenData, len(data.TokenData))
-	for i, td := range data.TokenData {
+	tokenData := make([]exectypes.TokenData, len(data.GetTokenData()))
+	for i, td := range data.GetTokenData() {
 		tokenData[i] = exectypes.TokenData{
-			Ready: td.Ready,
-			Data:  td.Data,
+			Ready: td.GetReady(),
+			Data:  td.GetData(),
 		}
 	}
 	return exectypes.MessageTokenData{TokenData: tokenData}

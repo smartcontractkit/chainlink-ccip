@@ -19,7 +19,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   using EnumerableSet for EnumerableSet.UintSet;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "AdvancedPoolHooks 2.0.0-dev";
+    return "AdvancedPoolHooks 2.0.0";
   }
 
   error AllowListNotEnabled();
@@ -95,7 +95,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @dev Performs allowlist check and policy engine validation for outbound transfers.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16,
+    bytes4,
     bytes calldata tokenArgs,
     uint256
   ) external {
@@ -117,7 +117,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256,
-    uint16
+    bytes4
   ) external {
     _validateCaller();
 
@@ -309,7 +309,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     address,
     uint64 remoteChainSelector,
     uint256 amount,
-    uint16,
+    bytes4,
     bytes calldata,
     IPoolV2.MessageDirection direction
   ) external view returns (address[] memory requiredCCVs) {

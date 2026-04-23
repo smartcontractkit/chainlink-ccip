@@ -18,7 +18,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SiloedLockReleaseTokenPool 2.0.0-dev";
+    return "SiloedLockReleaseTokenPool 2.0.0";
   }
 
   error LockBoxNotConfigured(uint64 remoteChainSelector);
@@ -109,13 +109,13 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
-    uint16
+    bytes4
   ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
-    uint16,
+    bytes4,
     bytes memory,
     uint256
   ) internal virtual override {}

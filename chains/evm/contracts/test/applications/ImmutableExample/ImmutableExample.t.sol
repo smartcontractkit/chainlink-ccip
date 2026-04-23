@@ -4,6 +4,7 @@ import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiv
 
 import {CCIPClientExample} from "../../../applications/CCIPClientExample.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -21,8 +22,8 @@ contract CCIPClientExample_sanity is RouterSetup {
     // Can set chain
     Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: 300_000});
     bytes memory encodedExtraArgs = Client._argsToBytes(extraArgs);
-    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs);
-    assertEq(exampleContract.s_chains(DEST_CHAIN_SELECTOR), encodedExtraArgs);
+    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    assertEq(exampleContract.getRemoteChainConfig(DEST_CHAIN_SELECTOR).extraArgs, encodedExtraArgs);
 
     address toAddress = makeAddr("toAddress");
 

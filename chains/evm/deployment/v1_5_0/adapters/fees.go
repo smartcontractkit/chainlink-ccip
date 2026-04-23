@@ -12,6 +12,8 @@ import (
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -161,23 +163,39 @@ func (a *FeesAdapter) cacheOnRampAddress(e cldf.Environment, src uint64, dst uin
 	return nil
 }
 
-func (a *FeesAdapter) getOnRampAddress(e cldf.Environment, src uint64, dst uint64) (common.Address, error) {
+func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
 	err := a.cacheOnRampAddress(e, src, dst)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to cache OnRamp address for src %d and dst %d: %w", src, dst, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to cache OnRamp address for src %d and dst %d: %w", src, dst, err)
 	}
 
 	maybeAddr := a.getOnRampAddressInCache(src, dst)
 	if maybeAddr == nil {
-		return common.Address{}, fmt.Errorf("impossible state reached - OnRamp address for src %d and dst %d not found in cache after caching", src, dst)
+		return datastore.AddressRef{}, fmt.Errorf("impossible state reached - OnRamp address for src %d and dst %d not found in cache after caching", src, dst)
 	}
 
 	cacheAddr := *maybeAddr
 	if cacheAddr == (common.Address{}) {
-		return common.Address{}, fmt.Errorf("no OnRamp address found for src %d and dst %d", src, dst)
+		return datastore.AddressRef{}, fmt.Errorf("no OnRamp address found for src %d and dst %d", src, dst)
 	}
 
-	return cacheAddr, nil
+	filter := datastore.AddressRef{
+		Type:          datastore.ContractType(onramp.ContractType),
+		Address:       cacheAddr.Hex(),
+		ChainSelector: src,
+	}
+	feecontractref, err := datastore_utils.FindAndFormatRef(
+		e.DataStore,
+		filter,
+		src,
+		datastore_utils.FullRef,
+	)
+
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find EVM2EVMOnRamp address ref for chain selector %d: %w", src, err)
+	}
+
+	return feecontractref, nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
@@ -190,11 +208,12 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("chain with selector %d not defined", src)
 	}
 
-	onRampAddr, err := a.getOnRampAddress(e, src, dst)
+	onRampRef, err := a.GetFeeContractRef(e, src, dst)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get OnRamp address for src %d and dst %d: %w", src, dst, err)
 	}
 
+	onRampAddr := common.HexToAddress(onRampRef.Address)
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, chain.Client)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate OnRamp contract at address %s on chain selector %d: %w", onRampAddr.Hex(), src, err)
@@ -232,10 +251,11 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			src := input.Selector
 
 			for dst, dstCfg := range input.Settings {
-				onRampAddr, err := a.getOnRampAddress(e, src, dst)
+				onRampRef, err := a.GetFeeContractRef(e, src, dst)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get OnRamp address for src %d and dst %d: %w", src, dst, err)
 				}
+				onRampAddr := common.HexToAddress(onRampRef.Address)
 
 				updatesByChain := onramp.SetTokenTransferFeeConfigInput{}
 				for rawTokenAddress, feeCfg := range dstCfg {
@@ -284,6 +304,28 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			}
 
 			return result, nil
+		},
+	)
+}
+
+// GetDefaultDestChainConfig is not supported for v1.5 (no FeeQuoter contract).
+func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{}
+}
+
+// GetOnchainDestChainConfig is not supported for v1.5 (no FeeQuoter contract).
+func (a *FeesAdapter) GetOnchainDestChainConfig(_ cldf.Environment, _, _ uint64) (lanes.FeeQuoterDestChainConfig, error) {
+	return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("FeeQuoter dest chain config reads are not supported for v1.5 (no FeeQuoter contract)")
+}
+
+// ApplyDestChainConfigUpdates is not supported for v1.5 (no FeeQuoter contract).
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"ApplyDestChainConfigUpdatesV1_5",
+		semver.MustParse("1.5.0"),
+		"Not supported for v1.5 — no FeeQuoter contract exists",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.ApplyDestChainConfigSequenceInput) (sequences.OnChainOutput, error) {
+			return sequences.OnChainOutput{}, fmt.Errorf("FeeQuoter dest chain config updates are not supported for v1.5 (no FeeQuoter contract)")
 		},
 	)
 }

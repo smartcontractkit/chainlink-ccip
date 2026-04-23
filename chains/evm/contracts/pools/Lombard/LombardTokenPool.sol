@@ -2,10 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
+import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -62,7 +64,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     bytes32 remoteAdapter;
   }
 
-  string public constant override typeAndVersion = "LombardTokenPool 2.0.0-dev";
+  string public constant override typeAndVersion = "LombardTokenPool 2.0.0";
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
@@ -128,11 +130,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @notice For IPoolV2.lockOrBurn call, this contract only forwards tokens to the verifier.
   /// @dev Forward the net amount to the verifier; actual burn/bridge is done there.
   /// @param lockOrBurnIn The lock or burn input parameters.
-  /// @param blockConfirmationsRequested Requested block confirmations.
+  /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver)
@@ -145,7 +147,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     // destTokenAmount.
     i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
 
-    return super.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+    return super.lockOrBurn(lockOrBurnIn, requestedFinalityConfig, tokenArgs);
   }
 
   /// @notice Backwards compatible lockOrBurn for lanes using the V1 flow.
@@ -155,7 +157,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override(TokenPool) returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
+    _validateLockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 0);
 
     Path memory path = s_chainSelectorToPath[lockOrBurnIn.remoteChainSelector];
     if (path.allowedCaller == bytes32(0)) {
@@ -209,7 +211,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, WAIT_FOR_FINALITY);
+    _validateReleaseOrMint(
+      releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
 
     (bytes memory rawPayload, bytes memory proof) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));
 
@@ -291,6 +295,21 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     delete s_chainSelectorToPath[remoteChainSelector];
 
     emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteAdapter);
+  }
+
+  function getRequiredCCVs(
+    address,
+    uint64,
+    uint256,
+    bytes4,
+    bytes calldata,
+    IPoolV2.MessageDirection
+  ) public view virtual override returns (address[] memory requiredCCVs) {
+    requiredCCVs = new address[](2);
+    requiredCCVs[0] = i_lombardVerifierResolver;
+    requiredCCVs[1] = address(0);
+
+    return requiredCCVs;
   }
 
   // ================================================================

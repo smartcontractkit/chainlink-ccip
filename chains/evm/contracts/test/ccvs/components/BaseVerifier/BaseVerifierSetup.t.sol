@@ -4,14 +4,17 @@ pragma solidity ^0.8.24;
 import {IRouter} from "../../../../interfaces/IRouter.sol";
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../../libraries/MessageV1Codec.sol";
+import {BaseERC20} from "../../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../../tokens/CrossChainToken.sol";
 import {FeeQuoterSetup} from "../../../feeQuoter/FeeQuoterSetup.t.sol";
 import {BaseVerifierTestHelper} from "../../../helpers/BaseVerifierTestHelper.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract BaseVerifierSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   address internal constant ALLOWLIST_ADMIN = 0x1234567890123456789012345678901234567890;
+  bytes4 internal constant BASE_VERIFIER_TEST_VERSION_TAG = bytes4(keccak256("BaseVerifierTestHelper"));
 
   BaseVerifierTestHelper internal s_baseVerifier;
 
@@ -32,9 +35,24 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       address(s_router), abi.encodeWithSelector(IRouter.getOnRamp.selector, DEST_CHAIN_SELECTOR), abi.encode(s_onRamp)
     );
     s_offRamp = makeAddr("OffRamp");
-    s_sourceFeeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));
+    s_sourceFeeToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Chainlink Token",
+          symbol: "LINK",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
-    s_baseVerifier = new BaseVerifierTestHelper(s_storageLocations, address(s_mockRMNRemote));
+    s_baseVerifier =
+      new BaseVerifierTestHelper(s_storageLocations, address(s_mockRMNRemote), BASE_VERIFIER_TEST_VERSION_TAG);
 
     // Set up initial destination chain config.
     BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
@@ -91,7 +109,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
@@ -107,7 +125,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   function _createMessageV1WithTokenTransfer(
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint16 finality,
+    bytes4 finality,
     address sourceTokenAddress,
     uint256 amount,
     bytes memory tokenReceiver

@@ -10,7 +10,7 @@ echo " └───────────────────────�
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_ONRAMP=1500
-OPTIMIZE_RUNS_OFFRAMP=25000
+OPTIMIZE_RUNS_OFFRAMP=23000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
 OPTIMIZE_RUNS_CCV_POOL=17000
 
@@ -70,10 +70,16 @@ function getOptimizations() {
       "LombardTokenPool")
           optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
           ;;
+      "MockE2ELBTCTokenPool")
+          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+          ;;
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
       "SiloedUSDCTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+        ;;
+      "CrossChainPoolToken")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
         ;;
     esac
@@ -83,7 +89,6 @@ function getOptimizations() {
 
 
 compileContract Proxy
-compileContract CREATE2Factory
 compileContract ccvs/CommitteeVerifier
 compileContract ccvs/CCTPVerifier
 compileContract ccvs/LombardVerifier
@@ -97,10 +102,13 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
-compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
-compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
 compileContract rmn/RMNRemote
 compileContract rmn/RMNProxy
+
+if [ "$ZKSYNC" != "true" ]; then
+  compileContract CREATE2Factory
+  compileContract TokenPoolFactory
+fi
 
 # Pools
 compileContract pools/LockReleaseTokenPool
@@ -117,8 +125,11 @@ compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 compileContract pools/USDC/CCTPThroughCCVTokenPool
 compileContract pools/Lombard/LombardTokenPool
+compileContract pools/CrossChainPoolToken
 compileContract pools/AdvancedPoolHooks
 compileContract pools/extractors/AdvancedPoolHooksExtractor
+
+compileContract tokens/CrossChainToken
 
 # Test helpers
 compileContract test/helpers/USDCReaderTester

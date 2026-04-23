@@ -2,7 +2,9 @@ package testutils
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -134,4 +136,26 @@ func MustSerializeExtraArgs(t *testing.T, data any, tag string) []byte {
 func MustDeserializeExtraArgs[A any](t *testing.T, obj A, data []byte, tag string) A {
 	require.NoError(t, ccip.DeserializeExtraArgs(obj, data, tag))
 	return obj
+}
+
+// RetryIfErrContains runs fn, retrying up to maxRetries times when the returned
+// error contains errSubstring. Useful for transient validator issues like
+// "not a recent slot" during lookup table initialization under load.
+func RetryIfErrContains(t *testing.T, maxRetries int, errSubstring string, fn func() error) {
+	t.Helper()
+	var err error
+	for attempt := range maxRetries {
+		err = fn()
+		if err == nil {
+			return
+		}
+		if !strings.Contains(err.Error(), errSubstring) {
+			break
+		}
+		if attempt < maxRetries-1 {
+			t.Logf("transient error %q (attempt %d/%d), retrying...", errSubstring, attempt+1, maxRetries)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	require.NoError(t, err)
 }

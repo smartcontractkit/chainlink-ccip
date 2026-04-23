@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
-import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
@@ -36,7 +36,7 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
     address verifier; // ─────────╯ Address of the verifier contract.
   }
 
-  string public constant override typeAndVersion = "VersionedVerifierResolver 2.0.0-dev";
+  string public constant override typeAndVersion = "VersionedVerifierResolver 2.0.0";
 
   /// @notice maps verifier versions to their implementation addresses, applied to inbound traffic.
   mapping(bytes4 version => address verifier) private s_versionToInboundImplementation;

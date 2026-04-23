@@ -105,47 +105,7 @@ func TestDeployTokenPool(t *testing.T) {
 		// NOTE: v1.6.0 external minter pools (BurnMintWithExternalMinterTokenPool, HybridWithExternalMinterTokenPool)
 		// are excluded from unit tests because they require a real minter contract (token governor) to be deployed.
 		// These pools should be tested in integration tests with proper minter contract setup.
-
-		// v1.5.1 pools (using same ContractType constants since they're identical strings)
-		{
-			name:                "BurnMintTokenPool_v1_5_1",
-			poolType:            burn_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			expectedTypeVersion: "BurnMintTokenPool 1.5.1",
-		},
-		{
-			name:                "BurnFromMintTokenPool_v1_5_1",
-			poolType:            burn_from_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			expectedTypeVersion: "BurnFromMintTokenPool 1.5.1",
-		},
-		{
-			name:                "BurnToAddressMintTokenPool_v1_5_1",
-			poolType:            burn_to_address_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			burnAddress:         "0x000000000000000000000000000000000000dead",
-			expectedTypeVersion: "BurnToAddressTokenPool 1.5.1",
-		},
-		{
-			name:                "BurnWithFromMintTokenPool_v1_5_1",
-			poolType:            burn_with_from_mint_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			expectedTypeVersion: "BurnWithFromMintTokenPool 1.5.1",
-		},
-		{
-			name:                "LockReleaseTokenPool_v1_5_1_accept_liquidity",
-			poolType:            lock_release_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			acceptLiquidity:     boolPtr(true),
-			expectedTypeVersion: "LockReleaseTokenPool 1.5.1",
-		},
-		{
-			name:                "LockReleaseTokenPool_v1_5_1_no_liquidity",
-			poolType:            lock_release_token_pool.ContractType,
-			poolVersion:         utils.Version_1_5_1,
-			acceptLiquidity:     boolPtr(false),
-			expectedTypeVersion: "LockReleaseTokenPool 1.5.1",
-		},
+		// NOTE: v1.5.1 pools are tested in chains/evm/deployment/v1_5_1/sequences/deploy_token_pool_test.go.
 	}
 
 	for _, tc := range testCases {
@@ -197,10 +157,9 @@ func TestDeployTokenPool(t *testing.T) {
 			e.DataStore = ds.Seal()
 
 			// Build input for DeployTokenPool sequence
-			poolQualifier := tc.poolType.String() + "-" + tc.poolVersion.String()
 			input := tokenapi.DeployTokenPoolInput{
 				TokenRef:           &ref,
-				TokenPoolQualifier: poolQualifier,
+				TokenPoolQualifier: "", // generate a sensible default
 				PoolType:           string(tc.poolType),
 				TokenPoolVersion:   tc.poolVersion,
 				Allowlist:          tc.allowlist,
@@ -219,19 +178,8 @@ func TestDeployTokenPool(t *testing.T) {
 			require.GreaterOrEqual(t, len(report.Output.Addresses), 1, "Should have at least one deployed address")
 
 			// Find the pool address in the output
-			var poolRef datastore.AddressRef
-			poolFound := false
-			for _, addr := range report.Output.Addresses {
-				if addr.Type == datastore.ContractType(tc.poolType) &&
-					addr.ChainSelector == chainSelector &&
-					addr.Qualifier == poolQualifier {
-					poolRef = addr
-					poolFound = true
-					break
-				}
-			}
-			require.True(t, poolFound, "Pool %s should be found in deployed addresses", tc.name)
-			require.NotEmpty(t, poolRef.Address, "Pool address should not be empty")
+			poolRef := report.Output.Addresses[0]
+			require.Equal(t, input.TokenRef.Address, poolRef.Qualifier)
 			t.Logf("Deployed %s at address: %s", tc.name, poolRef.Address)
 
 			// Make on-chain calls to verify the pool was deployed correctly
@@ -354,10 +302,12 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		PoolType:          string(poolType),
-		TokenPoolVersion:  utils.Version_1_6_1,
-		ChainSelector:     chainSelector,
-		ExistingDataStore: e.DataStore,
+		PoolType:           string(poolType),
+		TokenPoolVersion:   utils.Version_1_6_1,
+		TokenRef:           &ref,
+		ChainSelector:      chainSelector,
+		TokenPoolQualifier: tokenSymbol,
+		ExistingDataStore:  e.DataStore,
 	}
 
 	// Execute the sequence - it should return early without deploying

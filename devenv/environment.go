@@ -42,7 +42,7 @@ func getCommonNodeConfig(capRegAddr string) string {
 	return fmt.Sprintf(`
 			[Log]
 			JSONConsole = true
-			Level = 'debug'
+			Level = 'info'
 			[Pyroscope]
 			ServerAddress = 'http://host.docker.internal:4040'
 			Environment = 'local'
@@ -360,10 +360,36 @@ func NewEnvironment() (*Cfg, error) {
 
 	// deploy all the contracts
 	for i, impl := range impls {
-		// Create node key bundles for this chain type
-		nkb, err := devenvcommon.CreateNodeKeysBundle(allNodeClients, in.Blockchains[i].Type, in.Blockchains[i].ChainID)
-		if err != nil {
-			return nil, fmt.Errorf("creating node keys bundle: %w", err)
+		// Map the blockchain type (e.g. "anvil", "geth") to the chain family
+		// name the Chainlink node API expects (e.g. "evm", "solana").
+		// The node registers key endpoints under these family names, so using
+		// the raw blockchain type would hit a 404 and trigger the HTTP client's
+		// retry loop.
+		var family string
+		switch in.Blockchains[i].Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
+		}
+
+		// For EVM chains the Chainlink node auto-creates tx keys at startup,
+		// and FundNodes reads them independently via ReadPrimaryETHKey. Calling
+		// CreateNodeKeysBundle would fail because the node returns all EVM keys
+		// (one per configured chain) and the helper rejects >1. Non-EVM chains
+		// still need explicit key creation and the bundles are stored for OCR
+		// configuration.
+		var nkb map[string]clclient.NodeKeysBundle
+		if family != chainsel.FamilyEVM {
+			nkb, err = devenvcommon.CreateNodeKeysBundle(allNodeClients, family, in.Blockchains[i].ChainID)
+			if err != nil {
+				return nil, fmt.Errorf("creating node keys bundle: %w", err)
+			}
+			nodeKeyBundles[family] = nkb
 		}
 
 		// Fund nodes with native token
@@ -372,21 +398,6 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
 		selector := impl.ChainSelector()
-
-		var family string
-		switch in.Blockchains[i].Type {
-		case "anvil", "geth":
-			// NOTE: this seems like a massive hack, why not for EVM?
-			family = chainsel.FamilyEVM
-		case "solana":
-			family = chainsel.FamilySolana
-			nodeKeyBundles[family] = nkb
-		case "ton":
-			family = chainsel.FamilyTon
-			nodeKeyBundles[family] = nkb
-		default:
-			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
-		}
 		if in.ForkedEnvConfig != nil {
 			// Skip deployment on forked environments
 			L.Info().Str("ChainID", in.Blockchains[i].ChainID).Msg("Skipping contract deployment on forked environment")
@@ -473,11 +484,6 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 
-	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
-	}
-
 	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, homeChainType, in.Blockchains)
 	if err != nil {
 		return nil, err
@@ -509,13 +515,38 @@ func NewEnvironment() (*Cfg, error) {
 					selsToConnect = append(selsToConnect, sel)
 				}
 			}
-			err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
+			err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect, in.Blockchains, in.Blockchains[i].Type)
 			if err != nil {
 				return nil, err
 			}
 		}
+		// FeeQuoter 2.0 upgrade uses LaneVersionResolver (router onramps/offramps); run only after lanes exist.
+		// Single-chain CCIP envs never get router lane wiring, so skip (would fail the resolver).
+		if len(selectors) > 1 {
+			evmSelectors := make([]uint64, 0)
+			evmChainTypeBySel := make(map[uint64]string)
+			for i := range impls {
+				switch in.Blockchains[i].Type {
+				case "anvil", "geth":
+					sel := impls[i].ChainSelector()
+					evmSelectors = append(evmSelectors, sel)
+					evmChainTypeBySel[sel] = in.Blockchains[i].Type
+				}
+			}
+			if err := devenvcommon.UpgradeEVMFeeQuotersTo2_0AfterLanes(ctx, e, in.Blockchains, evmSelectors, evmChainTypeBySel); err != nil {
+				return nil, err
+			}
+		} else {
+			L.Info().Msg("Skipping FeeQuoter 2.0 upgrade: single-chain environment (no cross-chain lanes)")
+		}
 		tr.Record("[changeset] deployed product contracts")
 	}
+
+	// Propose CCIP jobs after on-chain setup is complete (lanes, FeeQuoter 2.0, etc.) so nodes observe final config.
+	if err = CreateJobs(ctx, allNodeClients, nodeKeyBundles); err != nil {
+		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
+	}
+
 	tr.Record("[infra] deployed CL nodes")
 
 	Plog.Info().Str("BootstrapNode", in.NodeSets[0].Out.CLNodes[0].Node.ExternalURL).Send()

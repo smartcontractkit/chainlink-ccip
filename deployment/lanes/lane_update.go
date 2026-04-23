@@ -1,15 +1,14 @@
 package lanes
 
 import (
-	"encoding/binary"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type ChainDefinition struct {
@@ -24,22 +23,29 @@ type ChainDefinition struct {
 	// This is provided by the user
 	// 1.6 only
 	TokenPrices map[string]*big.Int
-	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
-	// This is provided by the user
-	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
+	// FeeQuoterDestChainConfigOverrides is a functional option that mutates a
+	// FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
+	FeeQuoterDestChainConfigOverrides *FeeQuoterDestChainConfigOverride
 	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
 	// This is provided by the user
 	// 1.6 only
 	RMNVerificationEnabled bool
-	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
+	// AllowListEnabled is true if we want an allowlist to restrict who on this chain can send outbound messages.
 	// This is provided by the user
 	AllowListEnabled bool
-	// AllowList is the list of addresses that are allowed to send messages TO this chain.
+	// AllowList is the list of addresses on this chain that are allowed to send outbound messages.
+	// Addresses must be in this chain's native format (e.g. hex for EVM, base58 for Solana).
 	// This is provided by the user
 	AllowList []string
-	// The CommitteeVerifiers on the chain being configured.
-	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
+	// CommitteeVerifiers holds fully resolved committee verifier configuration.
+	// For v2.0 lanes, either this or CommitteeVerifierInputs must be populated.
+	// Mutually exclusive with CommitteeVerifierInputs.
 	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
+	// CommitteeVerifierInputs holds raw committee verifier configuration that
+	// requires resolution (contract lookup + signing key fetch) during apply.
+	// When set, ConnectChainsConfig.CommitteePopulator must also be provided.
+	// Mutually exclusive with CommitteeVerifiers.
+	CommitteeVerifierInputs []CommitteeVerifierInput
 	// The addresses of CCVs that will be applied to messages FROM this chain if no receiver is specified.
 	DefaultInboundCCVs []datastore.AddressRef
 	// Addresses of any CCVs that must always be used for messages FROM this chain.
@@ -76,6 +82,11 @@ type ChainDefinition struct {
 	// FeeQuoter is the address of the FeeQuoter contract on this chain.
 	// This is populated programmatically
 	FeeQuoter []byte
+	// FeeQuoterDestChainConfig is the configuration that should be applied to this chain's FeeQuoter for it to be a destination in the lane.
+	// This is populated programmatically and is based on the chain family, with possible overrides from the user.
+	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
+	// FeeQuoterVersion is the contract version of the FeeQuoter (e.g. 1.6.0 or 2.0.0).
+	FeeQuoterVersion *semver.Version
 }
 
 // CantonLaneConfig holds Canton-specific configuration for lane setup.
@@ -156,7 +167,7 @@ type CommitteeVerifierRemoteChainConfig struct {
 	// The gas required to execute the verification call on the destination chain (used for billing).
 	GasForVerification uint32
 	// The size of the CCV specific payload in bytes (used for billing).
-	PayloadSizeBytes uint32
+	PayloadSizeBytes uint16
 	// SignatureConfig specifies the signature configuration for the remote chain.
 	SignatureConfig CommitteeVerifierSignatureQuorumConfig
 }
@@ -180,6 +191,10 @@ type ExecutorDestChainConfig struct {
 type ConnectChainsConfig struct {
 	Lanes []LaneConfig
 	MCMS  mcms.Input
+	// CommitteePopulator populates CommitteeVerifierInputs into fully configured
+	// CommitteeVerifierConfig values during apply. Required when any ChainDefinition
+	// in Lanes has CommitteeVerifierInputs set. Nil for 1.6-only usage.
+	CommitteePopulator CommitteeConfigPopulator
 }
 type LaneConfig struct {
 	ChainA       ChainDefinition
@@ -202,49 +217,37 @@ type UpdateLanesInput struct {
 	ExtraConfigs ExtraConfigs
 }
 
-func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuoterDestChainConfig {
-	chainHex := utils.GetSelectorHex(selector)
-	params := FeeQuoterDestChainConfig{
-		IsEnabled:               configEnabled,
-		MaxDataBytes:            30_000,
-		MaxPerMsgGasLimit:       3_000_000,
-		DestGasOverhead:         300_000,
-		DefaultTokenFeeUSDCents: 25,
-		DestGasPerPayloadByteBase:   16,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
-		V1Params: &FeeQuoterV1Params{
-			MaxNumberOfTokensPerMsg:           10,
-			DestGasPerPayloadByteHigh:         40,
-			DestGasPerPayloadByteThreshold:    3000,
-			DestDataAvailabilityOverheadGas:   100,
-			DestGasPerDataAvailabilityByte:    16,
-			DestDataAvailabilityMultiplierBps: 1,
-			GasMultiplierWeiPerEth:            11e17,
-		},
-		V2Params: &FeeQuoterV2Params{
-			LinkFeeMultiplierPercent: 90,
-			USDPerUnitGas:            big.NewInt(1e6),
-		},
-	}
-	family, _ := chain_selectors.GetSelectorFamily(selector)
-	switch family {
-	case chain_selectors.FamilyTon:
-		params.MaxPerMsgGasLimit = 4_200_000_000 // 4_200_000_000 nano TON = 4.2 TON
-	}
-	return params
+// FeeQuoterDestChainConfigOverride is a functional option that mutates a
+// FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
+type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
+
+// CommitteeConfigPopulator populates raw CommitteeVerifierInput values into
+// fully configured CommitteeVerifierConfig values. Implementations encapsulate
+// contract registry lookup, signing key fetch, and topology mapping.
+type CommitteeConfigPopulator interface {
+	PopulateCommitteeConfig(
+		e cldf.Environment,
+		chainSelector uint64,
+		inputs []CommitteeVerifierInput,
+	) ([]CommitteeVerifierConfig[datastore.AddressRef], error)
 }
 
-func DefaultGasPrice(selector uint64) *big.Int {
-	family, _ := chain_selectors.GetSelectorFamily(selector)
-	switch family {
-	case chain_selectors.FamilyTon:
-		return big.NewInt(2.12e9) // 1 TON ~2.13 USD -> 1 nanoTON = 2.13e−9 USD -> 1 nanoTON expressed in 1e18 (1 USD) = 2.13e9
-	}
-	// Gas price in USD (18 decimals) per unit of gas
-	// 2e12 = $0.000002 per gas unit
-	// With ~500,000 gas, this results in ~$1 USD fee per message
-	return big.NewInt(2e12)
+// CommitteeVerifierInput describes raw committee verifier configuration before
+// resolution. The resolver transforms these into CommitteeVerifierConfig values
+// by looking up contracts and computing signing quorums.
+type CommitteeVerifierInput struct {
+	CommitteeQualifier string
+	RemoteChains       map[uint64]CommitteeVerifierRemoteChainInput
+}
+
+// CommitteeVerifierRemoteChainInput is the user-provided portion of remote
+// chain config. The resolver adds SignatureConfig (signers + threshold) during
+// resolution to produce CommitteeVerifierRemoteChainConfig.
+type CommitteeVerifierRemoteChainInput struct {
+	AllowlistEnabled          bool
+	AddedAllowlistedSenders   []string
+	RemovedAllowlistedSenders []string
+	FeeUSDCents               uint16
+	GasForVerification        uint32
+	PayloadSizeBytes          uint16
 }

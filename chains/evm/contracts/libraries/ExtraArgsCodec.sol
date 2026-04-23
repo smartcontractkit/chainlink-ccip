@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import {FinalityCodec} from "./FinalityCodec.sol";
+
 /// @notice Gas-optimized assembly version of ExtraArgsCodec library.
 library ExtraArgsCodec {
   error InvalidDataLength(EncodingErrorLocation location, uint256 offset);
@@ -14,10 +16,10 @@ library ExtraArgsCodec {
 
   // Base size excludes all variable-length fields (CCV addresses/args, executor address, executorArgs, tokenReceiver,
   // tokenArgs).
-  // Encoding order: tag(4) + gasLimit(4) + blockConfirmations(2) + ccvsLength(1) + executorLength(1) +
-  // executorArgsLength(2) + tokenReceiverLength(1) + tokenArgsLength(2) = 17 bytes.
-  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 2 + 1 + 1 + 2 + 1 + 2;
-  uint256 public constant GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE = 4 + 4 + 2 + 1;
+  // Encoding order: tag(4) + gasLimit(4) + requestedFinalityConfig(4) + ccvsLength(1) + executorLength(1) +
+  // executorArgsLength(2) + tokenReceiverLength(1) + tokenArgsLength(2) = 19 bytes.
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 4 + 1 + 1 + 2 + 1 + 2;
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE = 4 + 4 + 4 + 1;
   // Base size: tag(4) + useATA(1) + accountIsWritableBitmap(8) + accountsLength(1) = 14 bytes.
   uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1 + 8 + 1;
   // Base size: tag(4) + objectIdsLength(1) = 5 bytes.
@@ -49,7 +51,7 @@ library ExtraArgsCodec {
   /// Static length fields.
   ///   bytes4 tag;                     Version tag.
   ///   uint32 gasLimit;                Gas limit for the callback on the destination chain.
-  ///   uint16 blockConfirmations;      Number of block confirmations to wait for (0 = default finality).
+  ///   bytes4 requestedFinalityConfig;           Finality config (see `FinalityCodec`): block depth and/or flags.
   ///   uint8 ccvsLength;               Number of cross-chain verifiers.
   ///
   /// Variable length fields (per CCV, repeated ccvsLength times).
@@ -78,12 +80,9 @@ library ExtraArgsCodec {
     /// There are various ways to estimate the gas required for a callback on the destination chain, depending on the
     /// chain family. Please refer to the documentation for each chain for more details.
     uint32 gasLimit;
-    /// @notice The number of block confirmations to wait for. 0 means the default finality that the CCV considers
-    /// final. Any non-zero value means a block depth. CCVs, Pools and the executor may all reject this value by
-    /// reverting the transaction on the source chain if they do not want to take on the risk of the block confirmations
-    /// specified.
+    /// @notice The finality config, see FinalityCodec for encoding details.
     /// @dev May be zero to indicate waiting for finality is desired.
-    uint16 blockConfirmations;
+    bytes4 requestedFinalityConfig;
     /// @notice An array of CCV addresses representing the cross-chain verifiers to be used for the message.
     /// @dev May be empty to specify the default verifier(s) should be used.
     address[] ccvs;
@@ -116,15 +115,37 @@ library ExtraArgsCodec {
     bytes tokenArgs;
   }
 
-  /// @notice Creates a basic encoded GenericExtraArgsV3 with only gasLimit and blockConfirmations set.
+  /// @notice Creates a basic encoded GenericExtraArgsV3 with only gasLimit and finality config set.
   /// @param gasLimit The gas limit for the callback on the destination chain.
-  /// @param blockConfirmations The user requested number of block confirmations.
+  /// @param finalityConfig The finality config, encoded via `FinalityCodec`.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
   function _getBasicEncodedExtraArgsV3(
     uint32 gasLimit,
-    uint16 blockConfirmations
+    bytes4 finalityConfig
   ) internal pure returns (bytes memory) {
-    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, blockConfirmations, bytes7(0));
+    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, finalityConfig, bytes7(0));
+  }
+
+  /// @notice Creates a basic encoded GenericExtraArgsV3 with only gasLimit and block-depth finality set.
+  /// @param gasLimit The gas limit for the callback on the destination chain.
+  /// @param blockDepth Block depth encoded via `FinalityCodec._encodeBlockDepth` (no upper flag bits).
+  /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
+  function _getBasicEncodedExtraArgsV3BlockDepth(
+    uint32 gasLimit,
+    uint16 blockDepth
+  ) internal pure returns (bytes memory) {
+    return _getBasicEncodedExtraArgsV3(gasLimit, FinalityCodec._encodeBlockDepth(blockDepth));
+  }
+
+  /// @notice Creates a basic encoded GenericExtraArgsV3 with a given gasLimit and the Fast Confirmation Rule as
+  /// the finality config. The Fast Confirmation Rule is a special finality config that signals to wait for the `safe`
+  /// tag.
+  /// @param gasLimit The gas limit for the callback on the destination chain.
+  /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
+  function _getBasicEncodedExtraArgsV3FastConfirmationRule(
+    uint32 gasLimit
+  ) internal pure returns (bytes memory) {
+    return _getBasicEncodedExtraArgsV3(gasLimit, FinalityCodec.WAIT_FOR_SAFE_FLAG);
   }
 
   enum SVMTokenReceiverUsage {
@@ -394,8 +415,9 @@ library ExtraArgsCodec {
         + tokenArgsLength + 32
     );
 
-    bytes memory staticFields =
-      abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs.gasLimit, extraArgs.blockConfirmations, uint8(ccvsLength));
+    bytes memory staticFields = abi.encodePacked(
+      GENERIC_EXTRA_ARGS_V3_TAG, extraArgs.gasLimit, extraArgs.requestedFinalityConfig, uint8(ccvsLength)
+    );
 
     uint256 ptr;
     // This block is memory safe because it only writes to the allocated `encoded` bytes.
@@ -462,15 +484,17 @@ library ExtraArgsCodec {
       let gasLimit := calldataload(add(encoded.offset, 4))
       mstore(extraArgs, and(shr(224, gasLimit), 0xFFFFFFFF))
 
-      // Read block confirmations (2 bytes).
-      let blockConfirmations := calldataload(add(encoded.offset, 8))
-      mstore(add(extraArgs, 32), and(shr(240, blockConfirmations), 0xFFFF))
+      // Read requestedFinalityConfig (4 bytes).
+      // bytes4 is left-aligned in memory, so mask the top 4 bytes of the loaded word directly
+      // instead of shifting right (which would produce a right-aligned uint that reads back as zero).
+      let finalityWord := calldataload(add(encoded.offset, 8))
+      mstore(add(extraArgs, 32), and(finalityWord, shl(224, 0xFFFFFFFF)))
 
       // Read ccvs length (1 byte).
-      ccvsLength := byte(0, calldataload(add(encoded.offset, 10)))
+      ccvsLength := byte(0, calldataload(add(encoded.offset, 12)))
     }
 
-    uint256 offset = GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE; // Skip tag, gasLimit, blockConfirmations, ccvsLength.
+    uint256 offset = GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE; // Skip tag, gasLimit, requestedFinalityConfig, ccvsLength.
 
     // Allocate arrays for CCVs.
     extraArgs.ccvs = new address[](ccvsLength);
@@ -537,11 +561,13 @@ library ExtraArgsCodec {
       }
 
       uint256 accountsLength;
-      bytes1 useATA;
+      // uint8, not bytes1: byte(0,...) returns a right-aligned value (low 8 bits set).
+      uint8 useATA;
 
       // Read static-length fields.
       assembly ("memory-safe") {
         // Read useATA (1 byte) - enum value.
+        // byte(0, x) extracts the MSB of x and places it right-aligned, matching uint8 layout.
         useATA := byte(0, calldataload(add(encoded.offset, 4)))
         mstore(executorArgs, useATA)
 
@@ -553,7 +579,7 @@ library ExtraArgsCodec {
         accountsLength := byte(0, calldataload(add(encoded.offset, 13)))
       }
 
-      if (useATA > bytes1(uint8(SVMTokenReceiverUsage.USE_AS_IS))) {
+      if (useATA > uint8(SVMTokenReceiverUsage.USE_AS_IS)) {
         revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, 4);
       }
 

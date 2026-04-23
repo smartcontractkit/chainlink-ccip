@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -21,27 +22,47 @@ type TPRLInput struct {
 }
 
 type RemoteOutbounds struct {
-	DefaultFinality RateLimiterConfigFloatInput
-	CustomFinality  RateLimiterConfigFloatInput
+	// RateLimit is the rate limiter config. For CCIP v2.0, there are two types of rate limits: custom and default.
+	// Originally, this struct had two separate fields (one for each rate limit type), which isn't ideal because:
+	// ---
+	//   1. Only one of these rate limits is ever active at a time depending on the value of `allowedFinality`
+	//   2. It forces the user to configure more than they actually need on-chain leading to higher risk of misconfiguration
+	//   3. The user is forced to provide both rate limits up front; failure to provide one of them will lead to the unspecified one being reset by mistake
+	// ---
+	// For v2.0, it is possible to avoid these hazards entirely by collapsing both fields into one. With one
+	// rate limit config, we simply need to read the allowedFinalityConfig from the chain and if it is zero,
+	// then we update the default rate limit; otherwise we update the custom rate limit. This not only makes
+	// the operation safer and easier to run, but also reduces the mental overhead involved in keeping track
+	// of different rate limit semantics between versions v1.5, v1.6, and v2.0.
+	RateLimit RateLimiterConfigFloatInput `yaml:"rateLimit" json:"rateLimit"`
 }
 
 type TPRLConfig struct {
-	ChainAdapterVersion *semver.Version            `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
-	TokenRef            datastore.AddressRef       `yaml:"tokenRef" json:"tokenRef"`
-	TokenPoolRef        datastore.AddressRef       `yaml:"tokenPoolRef" json:"tokenPoolRef"`
-	RemoteOutbounds     map[uint64]RemoteOutbounds `yaml:"remoteOutbounds" json:"remoteOutbounds"`
+	ChainAdapterVersion      *semver.Version            `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
+	TokenRef                 datastore.AddressRef       `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolRef             datastore.AddressRef       `yaml:"tokenPoolRef" json:"tokenPoolRef"`
+	AllowedFinalityConfig    finality.Config            `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
+	RemoteOutbounds          map[uint64]RemoteOutbounds `yaml:"remoteOutbounds" json:"remoteOutbounds"`
+	SkipIfMissingPermissions bool                       `yaml:"skipIfMissingPermissions" json:"skipIfMissingPermissions"`
 }
 
 type TPRLRemotes struct {
-	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
-	DefaultFinalityInboundRateLimiterConfig  RateLimiterConfig
-	CustomFinalityOutboundRateLimiterConfig  RateLimiterConfig
-	CustomFinalityInboundRateLimiterConfig   RateLimiterConfig
-	ChainSelector                            uint64
-	RemoteChainSelector                      uint64
-	TokenRef                                 datastore.AddressRef
-	TokenPoolRef                             datastore.AddressRef
-	ExistingDataStore                        datastore.DataStore
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	AllowedFinalityConfig     finality.Config
+	ChainSelector             uint64
+	RemoteChainSelector       uint64
+	TokenRef                  datastore.AddressRef
+	TokenPoolRef              datastore.AddressRef
+	ExistingDataStore         datastore.DataStore
+
+	// If true, the changeset will check if timelock or the deployer key has sufficient permissions to set rate limits
+	// on the token pool. If both accounts are missing permissions (i.e. not the pool owner or rate limit admin), then
+	// a warning will be logged and the changeset will NOT perform the rate limit update since it has a high chance of
+	// failure. This flag is disabled by default so that it still allows flexibility for callers to schedule both rate
+	// limit permission updates AND token pool rate limit updates in parallel / in the same batch. At the time of this
+	// writing, this flag is only applicable for EVM, but can be extended to other chains in the future if needed.
+	SkipIfMissingPermissions bool
 }
 
 // SetTokenPoolRateLimits returns a changeset that sets rate limits for token pools on multiple chains.
@@ -53,14 +74,12 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
 		for _, config := range cfg.Configs {
 			for remoteSelector, input := range config.RemoteOutbounds {
-				if input.DefaultFinality.IsEnabled {
-					if input.DefaultFinality.Capacity <= 0 || input.DefaultFinality.Rate <= 0 {
+				if input.RateLimit.IsEnabled {
+					if input.RateLimit.Capacity <= 0 || input.RateLimit.Rate <= 0 {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
-				}
-				if input.CustomFinality.IsEnabled {
-					if input.CustomFinality.Capacity <= 0 || input.CustomFinality.Rate <= 0 {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
+					if input.RateLimit.Rate > input.RateLimit.Capacity {
+						return fmt.Errorf("outbound rate limiter config for remote chain %d has rate greater than capacity", remoteSelector)
 					}
 				}
 			}
@@ -103,11 +122,13 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			}
 			for remoteSelector, inputs := range config.RemoteOutbounds {
 				tprlRemote := TPRLRemotes{
-					ChainSelector:       selector,
-					RemoteChainSelector: remoteSelector,
-					TokenRef:            tokenFull,
-					TokenPoolRef:        tokenPool,
-					ExistingDataStore:   e.DataStore,
+					SkipIfMissingPermissions: config.SkipIfMissingPermissions,
+					AllowedFinalityConfig:    config.AllowedFinalityConfig,
+					ChainSelector:            selector,
+					RemoteChainSelector:      remoteSelector,
+					TokenRef:                 tokenFull,
+					TokenPoolRef:             tokenPool,
+					ExistingDataStore:        e.DataStore,
 				}
 
 				// We derive the inbound rate limiter config from counterpart's outbound config for simplicity
@@ -142,8 +163,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
 				}
-				tprlRemote.DefaultFinalityOutboundRateLimiterConfig, tprlRemote.DefaultFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.DefaultFinality, remoteInputs.DefaultFinality, decimals, remoteDecimals, family, tokenPool.Version)
-				tprlRemote.CustomFinalityOutboundRateLimiterConfig, tprlRemote.CustomFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.CustomFinality, remoteInputs.CustomFinality, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs.RateLimit, remoteInputs.RateLimit, decimals, remoteDecimals, family, tokenPool.Version)
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {

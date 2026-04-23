@@ -7,10 +7,12 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
@@ -19,6 +21,22 @@ import (
 )
 
 type LaneVersionResolver struct{}
+
+func (r *LaneVersionResolver) IsSupportedChain(e cldf.Environment, chainSel uint64) bool {
+	family, err := chain_selectors.GetSelectorFamily(chainSel)
+	if err != nil || family != chain_selectors.FamilyEVM {
+		return false
+	}
+	_, err = datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		Type:          datastore.ContractType(routerops.ContractType),
+		Version:       routerops.Version,
+		ChainSelector: chainSel,
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return false
+	}
+	return true
+}
 
 // DeriveLaneVersionsForChain derives the versions of the lanes for a given chain by looking at the router's offramps and onramps.
 // It returns a map of remote chain selector to lane version, a list of unique lane versions, and an error if any.
@@ -53,7 +71,15 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 		if offRamp.OffRamp == (common.Address{}) {
 			continue
 		}
-		remoteChains[offRamp.SourceChainSelector] = struct{}{}
+		supported, err := routerC.IsChainSupported(&bind.CallOpts{
+			Context: e.GetContext(),
+		}, offRamp.SourceChainSelector)
+		if err != nil {
+			return nil, nil, err
+		}
+		if supported {
+			remoteChains[offRamp.SourceChainSelector] = struct{}{}
+		}
 	}
 	versions := make(map[string]*semver.Version)
 	laneVersionForRemoteChain := make(map[uint64]*semver.Version)

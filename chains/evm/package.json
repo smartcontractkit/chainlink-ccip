@@ -1,12 +1,13 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.4",
+  "version": "2.0.0",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
   "repository": "github:smartcontractkit/chainlink-ccip",
   "license": "BUSL-1.1",
   "private": false,
   "scripts": {
+    "test": "FOUNDRY_PROFILE=ccip forge test",
     "publish-beta": "pnpm publish --tag beta",
     "publish-prod": "pnpm publish --tag latest",
     "compile": "./scripts/compile_all",
@@ -17,7 +18,7 @@
     "foundry.toml",
     "contracts/**/*.sol",
     "contracts/LICENSE.md",
-    "contracts/v1.5-CCIP-License-grants.md",
+    "contracts/v2.0-CCIP-License-grants.md",
     "!contracts/test/**/*",
     "contracts/test/mocks/**/*",
     "contracts/test/helpers/**/*",

@@ -119,9 +119,4 @@ pin_deployment_dependencies:
 	@cd chains/evm/deployment && \
 	go get github.com/smartcontractkit/chainlink-ccip@$(SHA) && \
 	go get github.com/smartcontractkit/chainlink-ccip/deployment@$(SHA)
-	@cd ccv/chains/evm/deployment && \
-	go get github.com/smartcontractkit/chainlink-ccip@$(SHA) && \
-	go get github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm@$(SHA) && \
-	go get github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment@$(SHA) && \
-	go get github.com/smartcontractkit/chainlink-ccip/deployment@$(SHA)
 	@$(MAKE) gomodtidy

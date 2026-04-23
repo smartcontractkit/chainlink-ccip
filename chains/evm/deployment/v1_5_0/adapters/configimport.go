@@ -14,13 +14,16 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
@@ -165,7 +168,7 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	return connected, nil
 }
 
-func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64) (map[uint64][]common.Address, error) {
+func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64, selectiveRemoteChains []uint64) (map[uint64][]common.Address, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainsel]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
@@ -174,8 +177,23 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connected chains for chain %d: %w", chainsel, err)
 	}
+	remoteChainMap := make(map[uint64]struct{})
+	for _, selected := range selectiveRemoteChains {
+		remoteChainMap[selected] = struct{}{}
+	}
+	var filteredRemoteChains []uint64
+	if len(selectiveRemoteChains) > 0 {
+		for _, selected := range remoteChains {
+			if _, ok := remoteChainMap[selected]; ok {
+				filteredRemoteChains = append(filteredRemoteChains, selected)
+				e.Logger.Infof("Including remote chain %d in supported tokens import for chain %d", selected, chainsel)
+			}
+		}
+	} else {
+		filteredRemoteChains = remoteChains
+	}
 	// get all supported tokens from token admin registry
-	return GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, remoteChains)
+	return GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, filteredRemoteChains)
 }
 
 func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -190,19 +208,50 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			}
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for chain %d (%s)", chainSelector, evmChain.Name())
+			allTokens := make(map[common.Address]struct{})
+			for _, tokens := range in.TokensPerRemoteChain {
+				for _, token := range tokens {
+					if token == (common.Address{}) {
+						continue
+					}
+					if _, exists := allTokens[token]; !exists {
+						allTokens[token] = struct{}{}
+					}
+				}
+			}
 			var result sequences.OnChainOutput
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				sequences1_2.PriceRegistryImportConfigSequence,
+				sequences1_2.PriceRegistryImportConfigSequenceInput{
+					ChainSelector:   chainSelector,
+					PriceRegistry:   ci.PriceRegistry,
+					SupportedTokens: maps.Keys(allTokens),
+					RemoteChains:    in.RemoteChains,
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to import price registry config for chain %d: %w", chainSelector, err)
+			}
+			filteredRamps := make(map[uint64]common.Address)
+			for _, selector := range in.RemoteChains {
+				if onRampAddr, ok := ci.OnRamp[selector]; ok {
+					filteredRamps[selector] = onRampAddr
+				} else {
+					b.Logger.Warnf("No onramp address found for remote chain %d, skipping onramp config import for this chain", selector)
+				}
+			}
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OnRampImportConfigSequence,
 				seq1_5.OnRampImportConfigSequenceInput{
 					ChainSelector:           chainSelector,
-					OnRampsPerRemoteChain:   ci.OnRamp,
+					OnRampsPerRemoteChain:   filteredRamps,
 					SupportedTokensPerChain: in.TokensPerRemoteChain,
 					PriceRegistry:           ci.PriceRegistry,
 				}, result)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import onramp config for chain %d: %w", chainSelector, err)
 			}
-			result, err = sequences.RunAndMergeSequence(b, chains,
+			// this is not required as of now, commenting it out to save time during import, can be uncommented in future if we want to import offramp config as well
+			/*result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_5.OffRampImportConfigSequence,
 				seq1_5.OffRampImportConfigSequenceInput{
 					ChainSelector:          chainSelector,
@@ -211,6 +260,7 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import offramp config for chain %d: %w", chainSelector, err)
 			}
+			*/
 			return result, nil
 		})
 }
@@ -253,6 +303,10 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 				return fmt.Errorf("failed to get pool for token %s from token admin registry at %s on chain %d: %w",
 					tokenAddr.String(), tokenAdminRegAddr.String(), chain.Selector, err)
 			}
+			if poolAddr == (common.Address{}) {
+				// no pool configured for this token, skip
+				return nil
+			}
 			tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 			if err != nil {
 				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
@@ -268,8 +322,12 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			for _, remoteChain := range remoteChains {
 				// If we've already determined that IsSupportedChain
 				// is unsupported for this pool, stop checking further chains.
+				// in this case we just add the token as supported to avoid the risk of missing config
 				if isSupportedChainUnsupported {
-					break
+					mu.Lock()
+					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+					mu.Unlock()
+					continue
 				}
 
 				supported, err := tokenPoolC.IsSupportedChain(&bind.CallOpts{
@@ -282,8 +340,13 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 					// spamming warnings for every remote chain.
 					l.Warnf("failed to check if token pool at %s on chain %d supports remote chain %d: %v", poolAddr.String(), chain.Selector, remoteChain, err)
 					isSupportedChainUnsupported = true
-					break
+					// in this case we just add the token as supported to avoid the risk of missing config
+					mu.Lock()
+					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+					mu.Unlock()
+					continue
 				}
+				// we only skip if we can verify the token is not supported for the remote chain
 				if !supported {
 					continue
 				}

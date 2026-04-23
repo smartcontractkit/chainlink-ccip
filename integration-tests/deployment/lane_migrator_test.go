@@ -22,6 +22,7 @@ import (
 )
 
 func TestMigrateTo1_6_0(t *testing.T) {
+	t.Parallel()
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,
@@ -69,7 +70,6 @@ func TestMigrateTo1_6_0(t *testing.T) {
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
 		Router:                   testRouterRefChain1.Bytes(),
 	}
 	testRouterRefChain2, err := datastore_utils.FindAndFormatRef(
@@ -83,7 +83,6 @@ func TestMigrateTo1_6_0(t *testing.T) {
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.AVALANCHE_MAINNET.Selector),
 		Router:                   testRouterRefChain2.Bytes(),
 	}
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{

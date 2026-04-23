@@ -11,6 +11,15 @@ import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.so
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 /// @notice The CommitteeVerifier is a contract that handles lane-specific fee logic and message verification.
+/// @dev The committeeVerifier does NOT have built in domain separation. This means that if you want to run multiple
+/// instances, you should ensure that each has a distinct set of signers. Additional defence in depth can be achieved by
+/// ensuring that each instance uses a non-overlapping version tag, as the version tag is included in the signed data
+/// and can therefore function as a domain separator. The committeeVerifier is designed to be used with a
+/// VersionedVerifierResolver, which will route messages to the correct verifier implementation based on the version tag
+/// included in the signed data. Using a version tag for the wrong verifier would likely result in a failure in the
+/// resolver, serving as additional protection against exploiting overlapping signer sets. We still highly recommend
+/// using non-overlapping signer sets regardless of version tag usage, as this would provide the strongest protection
+/// against potential signature replay attacks across different instances of the committeeVerifier.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidVerifierResults();
@@ -30,9 +39,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "CommitteeVerifier 2.0.0-dev";
-  /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 2.0.0")).
-  bytes4 internal constant VERSION_TAG_V2_0_0 = 0xe9a05a20;
+  string public constant override typeAndVersion = "CommitteeVerifier 2.0.0";
+
   /// @dev The number of bytes allocated to encoding the verifier version.
   uint256 internal constant VERIFIER_VERSION_BYTES = 4;
   /// @dev The number of bytes allocated to encoding the signature length within the verifierResults.
@@ -49,8 +57,9 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   constructor(
     DynamicConfig memory dynamicConfig,
     string[] memory storageLocations,
-    address rmn
-  ) BaseVerifier(storageLocations, rmn) {
+    address rmn,
+    bytes4 versionTag
+  ) BaseVerifier(storageLocations, rmn, versionTag) {
     _setDynamicConfig(dynamicConfig);
     s_storageLocationsAdmin = msg.sender;
   }
@@ -69,7 +78,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     address senderAddress = abi.decode(message.sender, (address));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
-    return abi.encodePacked(VERSION_TAG_V2_0_0);
+    return abi.encodePacked(versionTag());
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -85,7 +94,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
     // Any verifierResults submitted to this verifier should have the expected version.
     bytes4 verifierVersion = bytes4(verifierResults[:VERIFIER_VERSION_BYTES]);
-    if (verifierVersion != VERSION_TAG_V2_0_0) {
+    if (verifierVersion != versionTag()) {
       revert InvalidCCVVersion(verifierVersion);
     }
 
@@ -163,6 +172,14 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
+  /// @notice Sets the finality config according to the FinalityCodec library encoding.
+  /// @param allowedFinality The finality settings allowed by this verifier.
+  function setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) external onlyOwner {
+    _setAllowedFinalityConfig(allowedFinality);
+  }
+
   /// @notice Returns the account currently authorized to manage the storage location.
   /// @return storageLocationsAdmin The active storage locations admin.
   function getStorageLocationsAdmin() external view returns (address storageLocationsAdmin) {
@@ -210,11 +227,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     if (msg.sender != s_storageLocationsAdmin) revert OnlyCallableByStorageLocationsAdmin();
 
     _setStorageLocations(newLocations);
-  }
-
-  /// @notice Exposes the version tag.
-  function versionTag() public pure override returns (bytes4 tag) {
-    return VERSION_TAG_V2_0_0;
   }
 
   // ================================================================

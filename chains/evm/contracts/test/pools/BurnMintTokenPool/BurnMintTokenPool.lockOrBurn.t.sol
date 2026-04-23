@@ -7,8 +7,8 @@ import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -25,7 +25,7 @@ contract BurnMintTokenPoolSetup is TokenPoolSetup {
       address(s_mockRMNRemote),
       address(s_sourceRouter)
     );
-    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
+    CrossChainToken(address(s_token)).grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }
@@ -120,8 +120,8 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   }
 
   function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
-    uint16 defaultBlockConfirmationsTransferFeeBps = 100;
-    uint16 customBlockConfirmationsTransferFeeBps = 500;
+    uint16 finalityTransferFeeBps = 100;
+    uint16 fastFinalityTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
     // Mint tokens to the pool so they can be burned
@@ -133,10 +133,10 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationsFeeUSDCents: 0,
-        customBlockConfirmationsFeeUSDCents: 0,
-        defaultBlockConfirmationsTransferFeeBps: defaultBlockConfirmationsTransferFeeBps,
-        customBlockConfirmationsTransferFeeBps: customBlockConfirmationsTransferFeeBps,
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: finalityTransferFeeBps,
+        fastFinalityTransferFeeBps: fastFinalityTransferFeeBps,
         isEnabled: true
       })
     });

@@ -10,6 +10,7 @@ import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.so
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
@@ -20,6 +21,8 @@ import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitt
 import {CCTPThroughCCVTokenPool} from "../../pools/USDC/CCTPThroughCCVTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {BaseERC20} from "../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../tokens/CrossChainToken.sol";
 import {CCTPHelper} from "../helpers/CCTPHelper.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
@@ -27,11 +30,12 @@ import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is OnRampSetup {
+  bytes4 private constant CCTP_VERSION_TAG_V2_0_0 = bytes4(keccak256("CCTPVerifier 2.0.0"));
+
   uint32 private constant CCTP_VERSION = 1;
   uint16 private constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
@@ -160,7 +164,7 @@ contract cctp_e2e is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: userCCVAddresses,
           ccvArgs: new bytes[](1),
-          blockConfirmations: 0,
+          requestedFinalityConfig: FinalityCodec._encodeBlockDepth(0),
           gasLimit: GAS_LIMIT,
           executor: address(0),
           executorArgs: "",
@@ -279,7 +283,23 @@ contract cctp_e2e is OnRampSetup {
     setup.router = router;
     setup.tokenAdminRegistry = tokenAdminRegistry;
     setup.verifierResolver = new VersionedVerifierResolver();
-    setup.token = IERC20(address(new BurnMintERC20("USD Coin", "USDC", 6, 0, 0)));
+    setup.token = IERC20(
+      address(
+        new CrossChainToken(
+          BaseERC20.ConstructorParams({
+            name: "USD Coin",
+            symbol: "USDC",
+            decimals: 6,
+            maxSupply: 0,
+            preMint: 0,
+            preMintRecipient: address(0),
+            ccipAdmin: OWNER
+          }),
+          OWNER,
+          OWNER
+        )
+      )
+    );
     setup.tokenPool = new CCTPThroughCCVTokenPool(
       IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0)
     );
@@ -291,11 +311,10 @@ contract cctp_e2e is OnRampSetup {
       setup.tokenMessenger,
       setup.messageTransmitterProxy,
       IERC20(address(setup.token)),
-      new string[](0),
       CCTPVerifier.DynamicConfig({
         feeAggregator: s_feeAggregator, allowlistAdmin: s_allowlistAdmin, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
-      rmn
+      CCTPVerifier.BaseVerifierArgs({storageLocations: new string[](0), rmn: rmn, versionTag: CCTP_VERSION_TAG_V2_0_0})
     );
     setup.tokenPoolProxy = new USDCTokenPoolProxy(
       IERC20(address(setup.token)),
@@ -456,10 +475,10 @@ contract cctp_e2e is OnRampSetup {
       .setPool(address(s_destCCTPSetup.token), address(s_destCCTPSetup.tokenPoolProxy));
 
     // Grant burn and mint roles on the source token to the source token messenger.
-    BurnMintERC20(address(s_sourceCCTPSetup.token)).grantMintAndBurnRoles(address(s_sourceCCTPSetup.tokenMessenger));
+    CrossChainToken(address(s_sourceCCTPSetup.token)).grantMintAndBurnRoles(address(s_sourceCCTPSetup.tokenMessenger));
 
     // Grant burn and mint roles on the dest token to the dest message transmitter.
-    BurnMintERC20(address(s_destCCTPSetup.token)).grantMintAndBurnRoles(address(s_destCCTPSetup.messageTransmitter));
+    CrossChainToken(address(s_destCCTPSetup.token)).grantMintAndBurnRoles(address(s_destCCTPSetup.messageTransmitter));
   }
 
   // External so we can pass `bytes memory` as calldata (for MessageV1Codec._decodeMessageV1).

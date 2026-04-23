@@ -9,11 +9,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // Based on unfinished implementation at https://github.com/smartcontractkit/chainlink/blob/f0432dc777d33b83a621da2b042657601d5db8b6/integration-tests/smoke/ccip/canonical/types/types.go
@@ -47,8 +48,10 @@ type MessageComponents struct {
 	TokenAmounts []TokenAmount
 }
 
-const ExtraArgGasLimit = "gasLimit|computeUnits"
-const ExtraArgOOO = "outOfOrderExecutionEnabled"
+const (
+	ExtraArgGasLimit = "gasLimit|computeUnits"
+	ExtraArgOOO      = "outOfOrderExecutionEnabled"
+)
 
 // ExtraArgOpt is a generic representation of an extra arg that can be applied
 // to any kind of ccip message.
@@ -90,26 +93,30 @@ type TestAdapter interface {
 	// and for Solana, the message type is ccip_router.SVM2AnyMessage.
 	BuildMessage(components MessageComponents) (any, error)
 
-	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, error)
+	// Send message returns the sequence number and message ID of the sent message, or an error if the send failed.
+	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, string, error)
 
 	// // RandomReceiver returns a random receiver for the given chain family.
 	// RandomReceiver() []byte
 
-	// // CCIPReceiver returns a CCIP receiver for the given chain family.
-	CCIPReceiver() []byte
+	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is
+	// expected to be an EOA and not a contract.
+	// t parameter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
+	EOAReceiver(t *testing.T) []byte
+
+	// InvalidAddresses returns a slice of invalid addresses for the given chain family, to be used in negative
+	// test cases.
+	InvalidAddresses() [][]byte
 
 	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
-	// This is used for test cases with a a failing receiver.
-	SetReceiverRejectAll(ctx context.Context, rejectAll bool) error
+	// This is used for test cases with a failing receiver.
+	SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
 
-	// GetExtraArgs returns the default extra args for sending messages to this
-	// chain family from the given source family.
-	// Therefore the extra args are source-family encoded, so abi.encode for EVM,
-	// borsch for Solana, etc.
-	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
+	// LowGasLimit returns a low gas limit value that can be used in tests to trigger out-of-gas errors.
+	LowGasLimit() *big.Int
 
 	// GetInboundNonce returns the inbound nonce for the given sender and source chain selector.
 	// For chains that don't have the concept of nonces, this will always return 0.
@@ -118,23 +125,47 @@ type TestAdapter interface {
 	// ValidateCommit validates that the message specified by the given send event was committed.
 	ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange)
 
-	// ValidateExec validates that the message specified by the given send event was executed.
-	ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
+	// ValidateExecSucceeds validates that the message specified by the given send event was executed.
+	ValidateExecSucceeds(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
 
-	// AllowRouterToWithdrawTokens allows the router to withdraw tokens of the given address and amount from the deployer account.
+	// ValidateExecFails validates that the message specified by the given send event failed to execute.
+	ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64)
+
+	// AllowRouterToWithdrawTokens allows the router to withdraw tokens of the given address and amount from the deployer
+	// account.
 	AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error
 
 	// GetTokenBalance gets the token balance of the given owner address for the given token address.
 	GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error)
 
-	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing cross-chain token transfers.
-	GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain
+	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing
+	// cross-chain token transfers.
+	// If Token Transfers are not supported for that chain family, return nil and https://pkg.go.dev/errors#ErrUnsupported.
+	GetTokenExpansionConfig() (*tokensapi.TokenExpansionInputPerChain, error)
 
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
 	GetRegistryAddress() (string, error)
+
+	// CurrentBlock returns the current block number of the chain, if applicable.
+	CurrentBlock(t *testing.T) uint64
+
+	TestAdapterForFamily
+}
+
+// TestAdapterForFamily narrows TestAdapter to destination-message wiring helpers.
+// It is intentionally chain-agnostic and does not require a live chain client.
+type TestAdapterForFamily interface {
+	// // CCIPReceiver returns a CCIP receiver for the given chain family.
+	CCIPReceiver() []byte
+	// GetExtraArgs returns the default extra args for sending messages to this
+	// chain family from the given source family.
+	// Therefore the extra args are source-family encoded, so abi.encode for EVM,
+	// borsch for Solana, etc.
+	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
+type TestAdapterForFamilyFactory = func(ds datastore.DataStore, selector uint64) TestAdapterForFamily
 
 type testAdapterID string
 
@@ -142,6 +173,7 @@ type testAdapterID string
 type TestAdapterRegistry struct {
 	mu sync.Mutex
 	m  map[testAdapterID]TestAdapterFactory
+	r  map[testAdapterID]TestAdapterForFamilyFactory
 }
 
 // NewTestAdapterRegistry creates a fresh registry.  It is kept unexported
@@ -149,20 +181,37 @@ type TestAdapterRegistry struct {
 func newTestAdapterRegistry() *TestAdapterRegistry {
 	return &TestAdapterRegistry{
 		m: make(map[testAdapterID]TestAdapterFactory),
+		r: make(map[testAdapterID]TestAdapterForFamilyFactory),
 	}
 }
 
-// RegisterTestAdapter registers a new adapter; panics if the key already exists.
+// RegisterTestAdapter registers a new adapter.
 func (r *TestAdapterRegistry) RegisterTestAdapter(chainFamily string, version *semver.Version, adapter TestAdapterFactory) {
 	id := newTestAdapterID(chainFamily, version)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("TestAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
+}
+
+// RegisterTestAdapterForFamily registers an adapter factory that only
+// requires datastore-backed state to provide destination receiver and extra args.
+func (r *TestAdapterRegistry) RegisterTestAdapterForFamily(
+	chainFamily string,
+	version *semver.Version,
+	adapter TestAdapterForFamilyFactory,
+) {
+	id := newTestAdapterID(chainFamily, version)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.r[id]; !exists {
+		r.r[id] = adapter
+	}
 }
 
 // GetTestAdapter looks up an adapter; the second return value tells you if it was found.
@@ -173,6 +222,20 @@ func (r *TestAdapterRegistry) GetTestAdapter(chainFamily string, version *semver
 	defer r.mu.Unlock()
 
 	adapter, ok := r.m[id]
+	return adapter, ok
+}
+
+// GetTestAdapterForFamily looks up a family-scoped adapter factory.
+func (r *TestAdapterRegistry) GetTestAdapterForFamily(
+	chainFamily string,
+	version *semver.Version,
+) (TestAdapterForFamilyFactory, bool) {
+	id := newTestAdapterID(chainFamily, version)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	adapter, ok := r.r[id]
 	return adapter, ok
 }
 

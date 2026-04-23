@@ -3,6 +3,7 @@ package ccip_home
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/ethereum/go-ethereum/core/types"
 
@@ -15,6 +16,7 @@ import (
 )
 
 var (
+	ContractType                = cldf.ContractType("CCIPHome")
 	CCIPHomeVersion             = semver.MustParse("1.6.0")
 	CapabilitiesRegistryVersion = semver.MustParse("1.0.0")
 )

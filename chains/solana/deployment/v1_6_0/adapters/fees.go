@@ -7,10 +7,13 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -30,13 +33,32 @@ func NewFeesAdapter(solAdapter *solseq.SolanaAdapter) *FeesAdapter {
 	}
 }
 
-func (a *FeesAdapter) getFeeQuoterAddress(ds datastore.DataStore, src uint64) (solana.PublicKey, error) {
+func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
+	ds := e.DataStore
 	fqAddr, err := a.sol.GetFQAddress(ds, src)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
 
-	return solana.PublicKeyFromBytes(fqAddr), nil
+	filter := datastore.AddressRef{
+		Type:          datastore.ContractType(fqops.ContractType),
+		Address:       solana.PublicKeyFromBytes(fqAddr).String(),
+		ChainSelector: src,
+	}
+
+	feeContractRef, err := datastore_utils.FindAndFormatRef(
+		ds,
+		filter,
+		src,
+		datastore_utils.FullRef,
+	)
+
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find FeeQuoter address ref for chain selector %d: %w", src, err)
+
+	}
+
+	return feeContractRef, nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
@@ -49,10 +71,12 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("solana chain not found for selector %d", src)
 	}
 
-	fqAddr, err := a.getFeeQuoterAddress(e.DataStore, src)
+	fqRef, err := a.GetFeeContractRef(e, src, dst)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
+
+	fqAddr := solana.MustPublicKeyFromBase58(fqRef.Address)
 
 	token, err := solana.PublicKeyFromBase58(address)
 	if err != nil {
@@ -91,10 +115,12 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			var result sequences.OnChainOutput
 			src := input.Selector
 
-			fqAddr, err := a.getFeeQuoterAddress(e.DataStore, src)
+			fqRef, err := a.GetFeeContractRef(e, src, 0)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 			}
+
+			fqAddr := solana.MustPublicKeyFromBase58(fqRef.Address)
 
 			remoteChainConfigs := map[uint64]map[solana.PublicKey]fee_quoter.TokenTransferFeeConfig{}
 			for dst, dstCfg := range input.Settings {
@@ -147,6 +173,83 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set token transfer fee config on FeeQuoter %s for chain selector %d: %w", fqAddr, src, err)
+			}
+
+			return result, nil
+		},
+	)
+}
+
+func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig {
+	return a.sol.GetFeeQuoterDestChainConfig()
+}
+
+func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error) {
+	chain, ok := e.BlockChains.SolanaChains()[src]
+	if !ok {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("solana chain not found for selector %d", src)
+	}
+
+	fqAddr, err := a.sol.GetFQAddress(e.DataStore, src)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
+	}
+	fqPubkey := solana.PublicKeyFromBytes(fqAddr)
+
+	destChainPDA, _, err := state.FindFqDestChainPDA(dst, fqPubkey)
+	if err != nil {
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to derive DestChain PDA for dst %d on chain %d: %w", dst, src, err)
+	}
+
+	var destChainAccount fee_quoter.DestChain
+	err = chain.GetAccountDataBorshInto(e.GetContext(), destChainPDA, &destChainAccount)
+	if err != nil {
+		if errors.Is(err, rpc.ErrNotFound) {
+			return lanes.FeeQuoterDestChainConfig{}, nil
+		}
+		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to read DestChain account for dst %d on chain %d: %w", dst, src, err)
+	}
+
+	return solseq.ReverseTranslateFQ(destChainAccount.Config), nil
+}
+
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"ApplyDestChainConfigUpdatesSolana",
+		semver.MustParse("1.6.0"),
+		"Applies FeeQuoter destination chain config updates on Solana",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.ApplyDestChainConfigSequenceInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+
+			solChain, ok := chains.SolanaChains()[input.Selector]
+			if !ok {
+				return result, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
+			}
+
+			fqAddr, err := a.sol.GetFQAddress(e.DataStore, input.Selector)
+			if err != nil {
+				return result, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", input.Selector, err)
+			}
+			fqPubkey := solana.PublicKeyFromBytes(fqAddr)
+
+			offRampAddr, err := a.sol.GetOffRampAddress(e.DataStore, input.Selector)
+			if err != nil {
+				return result, fmt.Errorf("failed to get OffRamp address for chain %d: %w", input.Selector, err)
+			}
+			offRampPubkey := solana.PublicKeyFromBytes(offRampAddr)
+
+			for dst, cfg := range input.Settings {
+				report, err := operations.ExecuteOperation(b, fqops.ConnectChains, solChain, fqops.ConnectChainsParams{
+					FeeQuoter:           fqPubkey,
+					OffRamp:             offRampPubkey,
+					RemoteChainSelector: dst,
+					DestChainConfig:     solseq.TranslateFQ(cfg),
+				})
+				if err != nil {
+					return result, fmt.Errorf("failed to apply dest chain config for dst %d on Solana chain %d: %w", dst, input.Selector, err)
+				}
+				result.Addresses = append(result.Addresses, report.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, report.Output.BatchOps...)
 			}
 
 			return result, nil

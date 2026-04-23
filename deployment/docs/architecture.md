@@ -205,7 +205,7 @@ Token adapters have a special versioning requirement: any token pool version mus
 
 ### Lane Adapter Versioning
 
-Lane adapters are version-scoped -- a v1.6.0 lane and a v1.7.0 lane may have different configuration requirements. Separate registries can exist per major API version.
+Lane adapters are version-scoped -- a v1.6.0 lane and a v2.0.0 lane may have different configuration requirements. Separate registries can exist per major API version.
 
 ### Chain Family Selectors
 

@@ -45,7 +45,7 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelect
 			datastore.AddressRefByChainSelector(chainSelector),
 			datastore.AddressRefByType(datastore.ContractType(fqops.ContractType)),
 		),
-		chainSelector)
+		chainSelector, semver.MustParse("2.0.0"))
 	if err != nil {
 		return fmt.Errorf("failed to find fee quoter contract ref for chain %d: %w", chainSelector, err)
 	}
@@ -90,7 +90,7 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelect
 	return nil
 }
 
-func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64) (map[uint64][]common.Address, error) {
+func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64, selectiveRemoteChains []uint64) (map[uint64][]common.Address, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainsel]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
@@ -99,8 +99,23 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connected chains for chain %d: %w", chainsel, err)
 	}
+	remoteChainMap := make(map[uint64]struct{})
+	for _, selected := range selectiveRemoteChains {
+		remoteChainMap[selected] = struct{}{}
+	}
+	var filteredRemoteChains []uint64
+	if len(selectiveRemoteChains) > 0 {
+		for _, selected := range remoteChains {
+			if _, ok := remoteChainMap[selected]; ok {
+				filteredRemoteChains = append(filteredRemoteChains, selected)
+				e.Logger.Infof("Including remote chain %d in supported tokens import for chain %d", selected, chainsel)
+			}
+		}
+	} else {
+		filteredRemoteChains = remoteChains
+	}
 	// get all supported tokens from token admin registry
-	return adapters1_5.GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, remoteChains)
+	return adapters1_5.GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain, filteredRemoteChains)
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
@@ -188,21 +203,25 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import onramp config on chain %d: %w", chainSelector, err)
 			}
-			// fetch offramp config
-			offRampAddress := ci.OffRamp
-			if offRampAddress == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("offramp address not initialized for chain %d", chainSelector)
-			}
-			result, err = sequences.RunAndMergeSequence(b, chains,
-				seq1_6.OffRampImportConfigSequence,
-				seq1_6.OffRampImportConfigSequenceInput{
-					Address:       offRampAddress,
-					ChainSelector: chainSelector,
-					RemoteChains:  in.RemoteChains,
-				}, result)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to import offramp config on chain %d: %w", chainSelector, err)
-			}
+			// Fetching offRamp config is not required as of now,
+			// commenting out to avoid unnecessary RPC calls. Can be uncommented in future if offRamp config is needed in future.
+			/*
+				// fetch offramp config
+				offRampAddress := ci.OffRamp
+				if offRampAddress == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("offramp address not initialized for chain %d", chainSelector)
+				}
+				result, err = sequences.RunAndMergeSequence(b, chains,
+					seq1_6.OffRampImportConfigSequence,
+					seq1_6.OffRampImportConfigSequenceInput{
+						Address:       offRampAddress,
+						ChainSelector: chainSelector,
+						RemoteChains:  in.RemoteChains,
+					}, result)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to import offramp config on chain %d: %w", chainSelector, err)
+				}
+			*/
 			return result, nil
 		},
 	)

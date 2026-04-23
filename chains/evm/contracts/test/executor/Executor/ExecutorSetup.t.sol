@@ -2,16 +2,18 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract ExecutorSetup is BaseTest {
   address internal constant INITIAL_CCV = address(121212);
   address internal constant FEE_AGGREGATOR = address(999999);
   uint8 internal constant INITIAL_MAX_CCVS = 1;
   uint16 internal constant DEFAULT_EXEC_FEE_USD_CENTS = 89;
-  uint16 internal constant MIN_BLOCK_CONFIRMATIONS = 50;
+  bytes4 internal s_minFinalityConfig = FinalityCodec._encodeBlockDepth(50);
 
   uint8 internal constant EVM_ADDRESS_LENGTH = 20;
 
@@ -22,11 +24,25 @@ contract ExecutorSetup is BaseTest {
     super.setUp();
 
     Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
-      feeAggregator: FEE_AGGREGATOR, minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS, ccvAllowlistEnabled: true
+      feeAggregator: FEE_AGGREGATOR, allowedFinalityConfig: s_minFinalityConfig, ccvAllowlistEnabled: true
     });
 
     s_executor = new Executor(INITIAL_MAX_CCVS, dynamicConfig);
-    s_sourceFeeToken = address(new BurnMintERC20("test", "test", 18, 0, 0));
+    s_sourceFeeToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "test",
+          symbol: "test",
+          decimals: 18,
+          maxSupply: 0,
+          preMint: 0,
+          preMintRecipient: address(0),
+          ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     address[] memory ccvs = new address[](1);
     ccvs[0] = INITIAL_CCV;

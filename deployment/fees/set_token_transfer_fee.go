@@ -36,7 +36,9 @@ type SetTokenTransferFeeInput struct {
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
-func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeInput] {
+func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput] {
+	feeRegistry := GetRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	return cldf.CreateChangeSet(makeApply(feeRegistry, mcmsRegistry), makeVerify(feeRegistry, mcmsRegistry))
 }
 
@@ -44,49 +46,27 @@ func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cl
 	return func(_ cldf.Environment, cfg SetTokenTransferFeeInput) error {
 		seenSrc := utils.NewSet[uint64]()
 		for i, src := range cfg.Args {
-			// Disallow duplicate src selectors
 			if exists := seenSrc.Add(src.Selector); exists {
 				return fmt.Errorf("duplicate src chain selector at args[%d]: %d", i, src.Selector)
 			}
 
 			seenDst := utils.NewSet[uint64]()
 			for j, dst := range src.Settings {
-				// Disallow cyclic src/dst selectors
 				if src.Selector == dst.Selector {
 					return fmt.Errorf("src and dst chain selectors cannot be the same at args[%d].settings[%d]: %d", i, j, src.Selector)
 				}
-
-				// Disallow duplicate dst selectors within the same src
 				if exists := seenDst.Add(dst.Selector); exists {
 					return fmt.Errorf("duplicate dst chain selector at args[%d].settings[%d] (src=%d): %d", i, j, src.Selector, dst.Selector)
 				}
 
-				// Duplicate tracking
-				updateSet := utils.NewSet[string]() // Track addresses for IsReset == false
-				resetsSet := utils.NewSet[string]() // Track addresses for IsReset == true
+				seenAddresses := utils.NewSet[string]()
 				for k, entry := range dst.Settings {
-					// Disallow empty token address
 					trimmed := strings.TrimSpace(entry.Address)
 					if trimmed == "" {
 						return fmt.Errorf("empty token address at args[%d].settings[%d].settings[%d] (src=%d,dst=%d)", i, j, k, src.Selector, dst.Selector)
 					}
-
-					// Track by update vs reset to catch overlaps and duplicates
-					addr := entry.Address
-					if entry.IsReset {
-						if updateSet.Has(addr) {
-							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
-						}
-						if exists := resetsSet.Add(addr); exists {
-							return fmt.Errorf("duplicate reset for address at (src=%d,dst=%d) args[%d].settings[%d].settings[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
-						}
-					} else {
-						if resetsSet.Has(addr) {
-							return fmt.Errorf("the same address cannot be referenced in both updates and resets (src=%d,dst=%d,addr=%q)", src.Selector, dst.Selector, addr)
-						}
-						if exists := updateSet.Add(addr); exists {
-							return fmt.Errorf("duplicate update for address at (src=%d,dst=%d) args[%d].settings[%d].settings[%d]: %q", src.Selector, dst.Selector, i, j, k, addr)
-						}
+					if exists := seenAddresses.Add(trimmed); exists {
+						return fmt.Errorf("duplicate token address at args[%d].settings[%d].settings[%d] (src=%d,dst=%d): %q", i, j, k, src.Selector, dst.Selector, trimmed)
 					}
 				}
 			}
@@ -101,6 +81,11 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
+		type FeeGroup struct {
+			adapter  FeeAdapter
+			settings map[uint64]map[string]*TokenTransferFeeArgs
+		}
+
 		for _, src := range cfg.Args {
 			srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
 			if err != nil {
@@ -112,33 +97,64 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
 			}
 
+			// Build version-grouped settings: version -> settings map
+			versionGroups := map[string]FeeGroup{}
+
 			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
+
+				feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, dst.Selector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
+				}
+
+				lookupVersion := utils.StripPatchVersion(feeContractRef.Version)
+
+				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
+				if !exists {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, feeContractRef.Version.String())
+				}
+
 				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					if args, err := inferTokenTransferFeeArgs(adapter, e, src.Selector, dst.Selector, feeCfg); err != nil {
+					if args, err := inferTokenTransferFeeArgs(updater, e, src.Selector, dst.Selector, feeCfg); err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
 					} else {
 						settings[dst.Selector][feeCfg.Address] = args
 					}
 				}
+
+				versionKey := lookupVersion.String()
+				if _, exists := versionGroups[versionKey]; !exists {
+					versionGroups[versionKey] = FeeGroup{
+						adapter:  updater,
+						settings: map[uint64]map[string]*TokenTransferFeeArgs{},
+					}
+				}
+
+				// Process settings for this dst with its version's adapter
+				versionGroups[versionKey].settings[dst.Selector] = settings[dst.Selector]
 			}
 
-			report, err := cldf_ops.ExecuteSequence(
-				e.OperationsBundle,
-				adapter.SetTokenTransferFee(e),
-				e.BlockChains,
-				SetTokenTransferFeeSequenceInput{
-					Selector: src.Selector,
-					Settings: settings,
-				},
-			)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to set token transfer fee config for selector %d: %w", src.Selector, err)
+			// Execute updates grouped by adapter version
+			for _, group := range versionGroups {
+				report, err := cldf_ops.ExecuteSequence(
+					e.OperationsBundle,
+					group.adapter.SetTokenTransferFee(e),
+					e.BlockChains,
+					SetTokenTransferFeeSequenceInput{
+						Selector: src.Selector,
+						Settings: group.settings,
+					},
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to set token transfer fee config for selector %d: %w", src.Selector, err)
+				}
+
+				batchOps = append(batchOps, report.Output.BatchOps...)
+				reports = append(reports, report.ExecutionReports...)
 			}
 
-			batchOps = append(batchOps, report.Output.BatchOps...)
-			reports = append(reports, report.ExecutionReports...)
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
@@ -169,5 +185,5 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
-	return cfg.FeeArgs.Infer(fallbacks), nil
+	return cfg.FeeArgs.Resolve(fallbacks), nil
 }

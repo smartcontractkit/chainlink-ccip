@@ -1,10 +1,12 @@
 package sequences
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -12,9 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -24,28 +27,19 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func init() {
 	v := semver.MustParse("1.6.0")
-	// Use a single EVMAdapter instance so the shared transferOwnershipAdapter state is used by
-	// both InitializeTimelockAddress and SequenceTransferOwnershipViaMCMS.
 	evmAdapter := &EVMAdapter{transferOwnershipAdapter: &evm1_0_0.EVMTransferOwnershipAdapter{}}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
 	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, evmAdapter)
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, evmAdapter)
-	// 1.5.1 token pools use the same abstract TokenPool; use the 1.6.0 adapter for config/transfers.
-	v151 := semver.MustParse("1.5.1")
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v151, evmAdapter)
 }
 
 type EVMAdapter struct {
-	// transferOwnershipAdapter is shared so InitializeTimelockAddress populates the same instance
-	// used by SequenceTransferOwnershipViaMCMS / SequenceAcceptOwnership.
 	transferOwnershipAdapter *evm1_0_0.EVMTransferOwnershipAdapter
 }
 
@@ -79,17 +73,37 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
 	)
-	ref, err := GetFeeQuoterAddress(refs, chainSelector)
+	ref, err := GetFeeQuoterAddress(refs, chainSelector, nil)
 	if err != nil {
 		return nil, err
 	}
 	return evm_datastore_utils.ToEVMAddressBytes(ref)
 }
 
+func (a *EVMAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) ([]byte, error) {
+	fqAddress, _, err := GetFeeQuoterAddressAndVersionFromOnRamp(ds, chainSelector, chains)
+	if err != nil {
+		return nil, err
+	}
+	return fqAddress.Bytes(), nil
+}
+
 func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
+		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *EVMAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.TestRouterContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
@@ -161,9 +175,9 @@ var ConfigurePingPongSequence = operations.NewSequence(
 )
 
 // GetFeeQuoterAddress returns the address of the fee quoter contract for a given chain selector.
-// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version below 1.7.0
+// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version
 // (the next major version on or after 1.6.0).
-func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64) (datastore.AddressRef, error) {
+func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64, tooHighVersion *semver.Version) (datastore.AddressRef, error) {
 	var refs []datastore.AddressRef
 	for _, ref := range addresses {
 		if ref.ChainSelector == chainSelector &&
@@ -172,13 +186,13 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		}
 	}
 	latestVersion := semver.MustParse("1.6.0")
-	tooHighVersion := semver.MustParse("1.7.0")
 	feeQRef := datastore.AddressRef{}
 	for _, ref := range refs {
 		v := ref.Version
-		// we want the latest version below 1.7.0
-		if v.GreaterThanEqual(latestVersion) &&
-			v.LessThan(tooHighVersion) {
+		if tooHighVersion != nil && v.GreaterThanEqual(tooHighVersion) {
+			continue
+		}
+		if v.GreaterThanEqual(latestVersion) {
 			latestVersion = v
 			feeQRef = ref
 		}
@@ -187,4 +201,105 @@ func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64)
 		return datastore.AddressRef{}, fmt.Errorf("no fee quoter address found for chain selector %d", chainSelector)
 	}
 	return feeQRef, nil
+}
+
+// evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
+var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
+func (a *EVMAdapter) GetFeeQuoterDestChainConfig() ccipapi.FeeQuoterDestChainConfig {
+	return ccipapi.FeeQuoterDestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             225_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         binary.BigEndian.Uint32(evmFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		V1Params: &ccipapi.FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           1,
+			DestGasPerPayloadByteHigh:         40,
+			DestGasPerPayloadByteThreshold:    3_000,
+			DestDataAvailabilityOverheadGas:   0,
+			DestGasPerDataAvailabilityByte:    16,
+			DestDataAvailabilityMultiplierBps: 0,
+			GasMultiplierWeiPerEth:            11e17,
+			GasPriceStalenessThreshold:        90_000,
+		},
+		V2Params: &ccipapi.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
+	}
+}
+
+func (a *EVMAdapter) GetDefaultGasPrice() *big.Int {
+	return big.NewInt(2e12)
+}
+
+func (a *EVMAdapter) GetChainFamilySelector() [4]byte {
+	return evmFamilySelector
+}
+
+// GetFQVersion implements the optional FeeQuoterVersionProvider interface so that
+// update_lanes can choose 1.6 vs 2.0 FeeQuoter operations based on the deployed contract version.
+func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainSelector uint64, chains cldf_chain.BlockChains) (*semver.Version, error) {
+	addressOnChain, err := a.GetFQAddressDynamic(ds, chainSelector, chains)
+	if err != nil {
+		return nil, err
+	}
+	// Sanity check that the AddressRef we found matches the one we expect.
+	if common.BytesToAddress(addressOnChain).Hex() != common.BytesToAddress(address).Hex() {
+		return nil, fmt.Errorf("fee quoter address mismatch for chain selector %d: expected %s, got %s", chainSelector, common.BytesToAddress(address).Hex(), common.BytesToAddress(addressOnChain).Hex())
+	}
+
+	ref := ds.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByAddress(common.BytesToAddress(address).Hex()),
+	)
+	if len(ref) == 0 {
+		return nil, fmt.Errorf("no fee quoter address found for chain selector %d at address %s", chainSelector, common.BytesToAddress(address).Hex())
+	}
+	if len(ref) > 1 {
+		return nil, fmt.Errorf("multiple fee quoter addresses found for chain selector %d at address %s", chainSelector, common.BytesToAddress(address).Hex())
+	}
+	return ref[0].Version, nil
+}
+
+func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) (common.Address, *semver.Version, error) {
+	onRampAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(onramp.ContractType),
+		Version:       onramp.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to find onramp address for chain selector %d: %w", chainSelector, err)
+	}
+
+	chain, ok := chains.EVMChains()[chainSelector]
+	if !ok {
+		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
+	}
+
+	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
+	}
+	dynamicConfig, err := onrampContract.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to call GetDynamicConfig on onramp contract for chain selector %d: %w", chainSelector, err)
+	}
+
+	fqAddress := dynamicConfig.FeeQuoter
+	if fqAddress == (common.Address{}) {
+		return common.Address{}, nil, fmt.Errorf("fee quoter address is zero in onramp dynamic config for chain selector %d", chainSelector)
+	}
+	_, fqVersion, err := utils.TypeAndVersion(fqAddress, chain.Client)
+	if err != nil {
+		return fqAddress, nil, fmt.Errorf("failed to get type and version for fee quoter at address %s on chain selector %d: %w", fqAddress.Hex(), chainSelector, err)
+	}
+	return fqAddress, fqVersion, nil
 }

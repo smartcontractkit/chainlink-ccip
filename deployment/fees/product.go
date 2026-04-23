@@ -5,8 +5,10 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -24,6 +26,11 @@ type FeeAdapter interface {
 	SetTokenTransferFee(e cldf.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
+	GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error)
+
+	ApplyDestChainConfigUpdates(e cldf.Environment) *cldf_ops.Sequence[ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig
+	GetOnchainDestChainConfig(e cldf.Environment, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error)
 }
 
 // FeeAdapterRegistry maintains a registry of FeeAdapters for different chain families and versions.
@@ -44,17 +51,16 @@ func newFeeAdapterRegistry() *FeeAdapterRegistry {
 	}
 }
 
-// RegisterFeeAdapter registers a new adapter; panics if the key already exists.
+// RegisterFeeAdapter registers a new adapter.
 func (r *FeeAdapterRegistry) RegisterFeeAdapter(chainFamily string, version *semver.Version, adapter FeeAdapter) {
 	id := newFeeAdapterID(chainFamily, version)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("FeeAdapter '%s %s' already registered", chainFamily, version))
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = adapter
 	}
-	r.m[id] = adapter
 }
 
 // GetFeeAdapter looks up an adapter; the second return value tells you if it was found.

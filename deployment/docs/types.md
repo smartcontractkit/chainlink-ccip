@@ -191,8 +191,8 @@ type ChainDefinition struct {
     TokenPrices                map[string]*big.Int          // Token USD prices (18 decimals)
     FeeQuoterDestChainConfig   FeeQuoterDestChainConfig     // Fee config when this chain is a destination
     RMNVerificationEnabled     bool                         // RMN blessing for messages FROM this chain
-    AllowListEnabled           bool                         // Allowlist for messages TO this chain
-    AllowList                  []string                     // Allowed sender addresses
+    AllowListEnabled           bool                         // Restrict who on this chain can send outbound messages
+    AllowList                  []string                     // Addresses on this chain allowed to send outbound messages
 
     // Populated programmatically (do not set)
     OnRamp    []byte  // OnRamp contract address
@@ -343,8 +343,8 @@ type DeployTokenInput struct {
     Name                  string              // Token name
     Symbol                string              // Token symbol
     Decimals              uint8               // Token decimals
-    Supply                *big.Int            // Total supply
-    PreMint               *big.Int            // Amount to pre-mint
+    Supply                *uint64             // Total supply (decimal scaling happens automatically, nil or 0 means unlimited supply)
+    PreMint               *uint64             // Amount to pre-mint (decimal scaling happens automatically, nil or 0 means no pre-mint)
     ExternalAdmin         string              // External admin address (chain-agnostic string)
     CCIPAdmin             string              // CCIP admin address (defaults to timelock)
     Senders               []string            // Addresses needing special processing (e.g., Solana ATAs)

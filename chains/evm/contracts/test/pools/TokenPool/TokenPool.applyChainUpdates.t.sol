@@ -3,10 +3,11 @@ pragma solidity ^0.8.24;
 
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -16,7 +17,23 @@ contract TokenPool_applyChainUpdates is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
+    s_token = IERC20(
+      address(
+        new CrossChainToken(
+          BaseERC20.ConstructorParams({
+            name: "LINK",
+            symbol: "LNK",
+            decimals: 18,
+            maxSupply: 0,
+            preMint: 0,
+            preMintRecipient: address(0),
+            ccipAdmin: OWNER
+          }),
+          OWNER,
+          OWNER
+        )
+      )
+    );
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_tokenPool = new TokenPoolHelper(
@@ -114,12 +131,12 @@ contract TokenPool_applyChainUpdates is BaseTest {
     // State remains
     assertState(chainUpdates);
 
-    // Configure custom block confirmation rate limiters on the chain we're about to remove.
+    // Configure fast finality rate limiters on the chain we're about to remove.
     {
       TokenPool.RateLimitConfigArgs[] memory customRLArgs = new TokenPool.RateLimitConfigArgs[](1);
       customRLArgs[0] = TokenPool.RateLimitConfigArgs({
         remoteChainSelector: evmChainSelector,
-        customBlockConfirmations: true,
+        fastFinality: true,
         outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18}),
         inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18})
       });
@@ -139,7 +156,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
 
     s_tokenPool.applyChainUpdates(chainRemoves, new TokenPool.ChainUpdate[](0));
 
-    // Custom block confirmation buckets should be deleted along with the chain.
+    // Fast finality buckets should be deleted along with the chain.
     {
       (RateLimiter.TokenBucket memory outPost, RateLimiter.TokenBucket memory inPost) =
         s_tokenPool.getCurrentRateLimiterState(evmChainSelector, true);

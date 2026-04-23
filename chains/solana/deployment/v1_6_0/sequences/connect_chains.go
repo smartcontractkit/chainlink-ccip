@@ -43,6 +43,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		result.BatchOps = append(result.BatchOps, fqOut.Output.BatchOps...)
 
 		// Add Router
+		// Allowlist controls who on this chain can send outbound messages.
 		routerOut, err := operations.ExecuteOperation(b, routerops.ConnectChains, chains.SolanaChains()[input.Source.Selector], routerops.ConnectChainsParams{
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
@@ -75,8 +76,6 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
 			RemoteChainSelector: input.Source.Selector,
-			AllowlistEnabled:    input.Source.AllowListEnabled,
-			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to add OffRamp to Router: %w", err)
@@ -86,10 +85,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Source.Selector,
-			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OnRamp,
-			EnabledAsSource:     !input.IsDisabled,
+			RemoteChainSelector:       input.Source.Selector,
+			OffRamp:                   offRampAddress,
+			SourceOnRamp:              input.Source.OnRamp,
+			EnabledAsSource:           !input.IsDisabled,
 			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {
@@ -136,6 +135,34 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig 
 		GasMultiplierWeiPerEth:            v1.GasMultiplierWeiPerEth,
 		GasPriceStalenessThreshold:        v1.GasPriceStalenessThreshold,
 		NetworkFeeUsdcents:                uint32(fqc.NetworkFeeUSDCents),
+	}
+}
+
+// ReverseTranslateFQ is the inverse of TranslateFQ: it maps the Solana on-chain
+// DestChainConfig back to the product-level FeeQuoterDestChainConfig.
+func ReverseTranslateFQ(dc fee_quoter.DestChainConfig) lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{
+		IsEnabled:                   dc.IsEnabled,
+		MaxDataBytes:                dc.MaxDataBytes,
+		MaxPerMsgGasLimit:           dc.MaxPerMsgGasLimit,
+		DestGasOverhead:             dc.DestGasOverhead,
+		DestGasPerPayloadByteBase:   uint8(dc.DestGasPerPayloadByteBase),
+		ChainFamilySelector:         binary.BigEndian.Uint32(dc.ChainFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     dc.DefaultTokenFeeUsdcents,
+		DefaultTokenDestGasOverhead: dc.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           dc.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          uint16(dc.NetworkFeeUsdcents),
+		V1Params: &lanes.FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           dc.MaxNumberOfTokensPerMsg,
+			DestGasPerPayloadByteHigh:         uint8(dc.DestGasPerPayloadByteHigh),
+			DestGasPerPayloadByteThreshold:    uint16(dc.DestGasPerPayloadByteThreshold),
+			DestDataAvailabilityOverheadGas:   dc.DestDataAvailabilityOverheadGas,
+			DestGasPerDataAvailabilityByte:    dc.DestGasPerDataAvailabilityByte,
+			DestDataAvailabilityMultiplierBps: dc.DestDataAvailabilityMultiplierBps,
+			EnforceOutOfOrder:                 dc.EnforceOutOfOrder,
+			GasMultiplierWeiPerEth:            dc.GasMultiplierWeiPerEth,
+			GasPriceStalenessThreshold:        dc.GasPriceStalenessThreshold,
+		},
 	}
 }
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
-import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -21,7 +21,7 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 /// CCTPVerifier contract. This token pool should never have a balance of USDC at any point during a transaction.
 /// The caller of lockOrBurn is responsible for sending USDC to the CCTPVerifier contract instead.
 contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
-  string public constant override typeAndVersion = "CCTPThroughCCVTokenPool 2.0.0-dev";
+  string public constant override typeAndVersion = "CCTPThroughCCVTokenPool 2.0.0";
 
   error IPoolV1NotSupported();
   error CCVNotSetOnResolver(address resolver);
@@ -47,10 +47,10 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   /// LockedOrBurned is still emitted for consumers that expect it.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationsRequested,
+    bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, 0);
+    _validateLockOrBurn(lockOrBurnIn, requestedFinalityConfig, tokenArgs, 0);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -74,9 +74,9 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   /// ReleasedOrMinted is still emitted for consumers that expect it.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationsRequested
+    bytes4 requestedFinalityConfig
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationsRequested);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, requestedFinalityConfig);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -114,7 +114,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    uint16, // blockConfirmationsRequested,
+    bytes4, // requestedFinalityConfig
     bytes calldata // tokenArgs
   ) external view override returns (TokenTransferFeeConfig memory feeConfig) {
     TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector];
@@ -125,7 +125,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     }
 
     CCTPVerifier.DynamicConfig memory dynamicConfig = CCTPVerifier(verifierImpl).getDynamicConfig();
-    transferFeeConfig.customBlockConfirmationsTransferFeeBps = dynamicConfig.fastFinalityBps;
+    transferFeeConfig.fastFinalityTransferFeeBps = dynamicConfig.fastFinalityBps;
 
     return transferFeeConfig;
   }
@@ -160,13 +160,13 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
-    uint16
+    bytes4
   ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
-    uint16,
+    bytes4,
     bytes memory,
     uint256
   ) internal virtual override {}

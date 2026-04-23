@@ -115,8 +115,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 
 		inputORL, inputIRL := tokensapi.GenerateTPRLConfigs(
-			input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
-			input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
+			input.RemoteChainConfig.OutboundRateLimiterConfig,
+			input.RemoteChainConfig.InboundRateLimiterConfig,
 			localDecimals,
 			input.RemoteChainConfig.RemoteDecimals,
 			chain.Family(),

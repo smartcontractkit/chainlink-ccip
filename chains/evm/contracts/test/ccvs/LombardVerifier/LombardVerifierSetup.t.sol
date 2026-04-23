@@ -6,13 +6,15 @@ import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 
 contract LombardVerifierSetup is BaseVerifierSetup {
   bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
@@ -20,7 +22,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   LombardVerifier internal s_lombardVerifier;
   MockLombardBridge internal s_mockBridge;
   MockLombardMailbox internal s_mockMailbox;
-  BurnMintERC20 internal s_testToken;
+  CrossChainToken internal s_testToken;
 
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10000));
   bytes32 internal constant ALLOWED_CALLER = bytes32(uint256(0x123456));
@@ -39,11 +41,24 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       IBridgeV3(address(s_mockBridge)),
       s_storageLocations,
-      address(s_mockRMNRemote)
+      address(s_mockRMNRemote),
+      VERSION_TAG_V2_0_0
     );
 
     // Deploy test token and add it as a supported token.
-    s_testToken = new BurnMintERC20("Test Token", "TEST", 18, 0, 0);
+    s_testToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "Test Token",
+        symbol: "TEST",
+        decimals: 18,
+        maxSupply: 0,
+        preMint: 0,
+        preMintRecipient: address(0),
+        ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     deal(address(s_testToken), address(s_lombardVerifier), TRANSFER_AMOUNT);
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(s_testToken), localAdapter: address(0)});
@@ -91,7 +106,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
-      finality: 0,
+      finality: FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encode(s_onRamp),
       offRampAddress: abi.encodePacked(s_offRamp),

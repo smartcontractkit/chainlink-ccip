@@ -1,12 +1,16 @@
+.PHONY: test
+test: ## Run the full Foundry test suite (always uses the `ccip` profile).
+	FOUNDRY_PROFILE=ccip forge test
+
 # Creates a gas snapshot
 # note `make snapshot` skips fuzz/fork/reverting tests.
 .PHONY: snapshot
 snapshot: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=ccip && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*"
+	FOUNDRY_PROFILE=ccip forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*"
 
 .PHONY: snapshot-diff
 snapshot-diff: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=ccip && forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --diff
+	FOUNDRY_PROFILE=ccip forge snapshot --nmt "test?(Fuzz|Fork|.*_RevertWhen)_.*" --diff
 
 .PHONY: foundry
 foundry: ## Install foundry.
@@ -65,14 +69,8 @@ extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to b
 
 .PHONY: operations
 operations: pnpmdep wrappers
-    # Pre v2
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
-    # v2
-	go run cmd/operations-gen/main.go -config ../../ccv/chains/evm/deployment/operations_gen_config.yaml
 
 .PHONY: operations-fast
 operations-fast:
-    # Pre v2
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
-    # v2
-	go run cmd/operations-gen/main.go -config ../../ccv/chains/evm/deployment/operations_gen_config.yaml

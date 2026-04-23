@@ -14,9 +14,9 @@ library MessageV1Codec {
   uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
   // Base size of a MessageV1 without variable length fields.
   // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (msgNum) + 4 (executionGasLimit) +
-  // 4 (ccipReceiveGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
-  // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77.
-  uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
+  // 4 (ccipReceiveGasLimit) + 4 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
+  // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 79.
+  uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 4 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
   // The base size plus 32 bytes for abi.encoded(sender) and 32 bytes for abi.encoded(onRamp) addresses.
   // To be added:
   // - receiver, offRamp and destBlob are dest chain specific.
@@ -90,7 +90,7 @@ library MessageV1Codec {
   ///   uint64 messageNumber;       Auto-incrementing number for the message.
   ///   uint32 executionGasLimit;   Gas limit for message execution on the destination chain.
   ///   uint32 ccipReceiveGasLimit; Gas limit for the user callback on the destination chain.
-  ///   uint16 finality;            Configurable per-message finality value.
+  ///   bytes4 finality;            Configurable per-message finality value (see `FinalityCodec`).
   ///   bytes32 ccvAndExecutorHash; Hash of the verifiers and executor addresses.
   ///
   /// Variable length fields.
@@ -134,9 +134,9 @@ library MessageV1Codec {
     // Gas limit for the user callback on the destination chain.
     uint32 ccipReceiveGasLimit;
     // Configurable per-message finality value.
-    uint16 finality;
+    bytes4 finality;
     // A hash of the verifiers and executor addresses. This is used by the offchain systems to validate the list of CCVs
-    // and executor that should be used for this message. This has no meaning on the destination chain ans is not
+    // and executor that should be used for this message. This has no meaning on the destination chain and is not
     // checked against anything.
     bytes32 ccvAndExecutorHash;
     // Variable length fields - must match wire format order.
@@ -427,13 +427,13 @@ library MessageV1Codec {
       // ccipReceiveGasLimit (4 bytes, big endian).
       message.ccipReceiveGasLimit = uint32(bytes4(encoded[29:33]));
 
-      // finality (2 bytes, big endian).
-      message.finality = uint16(bytes2(encoded[33:35]));
+      // finality (4 bytes, big endian).
+      message.finality = bytes4(encoded[33:37]);
 
-      message.ccvAndExecutorHash = bytes32(encoded[35:67]);
+      message.ccvAndExecutorHash = bytes32(encoded[37:69]);
 
       // onRampAddressLength and onRampAddress.
-      uint256 offset = 67;
+      uint256 offset = 69;
       if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_LENGTH);
       uint8 onRampAddressLength = uint8(encoded[offset++]);
       if (offset + onRampAddressLength > encoded.length) {

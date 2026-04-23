@@ -1,0 +1,2910 @@
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
+
+package lombard_verifier
+
+import (
+	"errors"
+	"math/big"
+	"strings"
+
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+)
+
+var (
+	_ = errors.New
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+	_ = abi.ConvertType
+)
+
+type BaseVerifierAllowlistConfigArgs struct {
+	DestChainSelector         uint64
+	AllowlistEnabled          bool
+	AddedAllowlistedSenders   []common.Address
+	RemovedAllowlistedSenders []common.Address
+}
+
+type BaseVerifierRemoteChainConfigArgs struct {
+	Router              common.Address
+	RemoteChainSelector uint64
+	AllowlistEnabled    bool
+	FeeUSDCents         uint16
+	GasForVerification  uint32
+	PayloadSizeBytes    uint16
+}
+
+type ClientEVM2AnyMessage struct {
+	Receiver     []byte
+	Data         []byte
+	TokenAmounts []ClientEVMTokenAmount
+	FeeToken     common.Address
+	ExtraArgs    []byte
+}
+
+type ClientEVMTokenAmount struct {
+	Token  common.Address
+	Amount *big.Int
+}
+
+type LombardVerifierDynamicConfig struct {
+	FeeAggregator common.Address
+}
+
+type LombardVerifierPath struct {
+	AllowedCaller [32]byte
+	LChainId      [32]byte
+}
+
+type LombardVerifierRemoteAdapterArgs struct {
+	RemoteChainSelector uint64
+	Token               common.Address
+	RemoteAdapter       [32]byte
+}
+
+type LombardVerifierSupportedTokenArgs struct {
+	LocalToken   common.Address
+	LocalAdapter common.Address
+}
+
+type MessageV1CodecMessageV1 struct {
+	SourceChainSelector uint64
+	DestChainSelector   uint64
+	MessageNumber       uint64
+	ExecutionGasLimit   uint32
+	CcipReceiveGasLimit uint32
+	Finality            [4]byte
+	CcvAndExecutorHash  [32]byte
+	OnRampAddress       []byte
+	OffRampAddress      []byte
+	Sender              []byte
+	Receiver            []byte
+	DestBlob            []byte
+	TokenTransfer       []MessageV1CodecTokenTransferV1
+	Data                []byte
+}
+
+type MessageV1CodecTokenTransferV1 struct {
+	Amount             *big.Int
+	SourcePoolAddress  []byte
+	SourceTokenAddress []byte
+	DestTokenAddress   []byte
+	TokenReceiver      []byte
+	ExtraData          []byte
+}
+
+var LombardVerifierMetaData = &bind.MetaData{
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"dynamicConfig\",\"type\":\"tuple\",\"internalType\":\"struct LombardVerifier.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"name\":\"bridge\",\"type\":\"address\",\"internalType\":\"contract IBridgeV3\"},{\"name\":\"storageLocation\",\"type\":\"string[]\",\"internalType\":\"string[]\"},{\"name\":\"rmn\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"versionTag\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowlistUpdates\",\"inputs\":[{\"name\":\"allowlistConfigArgsItems\",\"type\":\"tuple[]\",\"internalType\":\"struct BaseVerifier.AllowlistConfigArgs[]\",\"components\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"addedAllowlistedSenders\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removedAllowlistedSenders\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyRemoteChainConfigUpdates\",\"inputs\":[{\"name\":\"remoteChainConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct BaseVerifier.RemoteChainConfigArgs[]\",\"components\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"contract IRouter\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"feeUSDCents\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"gasForVerification\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"payloadSizeBytes\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"forwardToVerifier\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"struct MessageV1Codec.MessageV1\",\"components\":[{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"messageNumber\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"executionGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"ccipReceiveGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"finality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"ccvAndExecutorHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"onRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destBlob\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenTransfer\",\"type\":\"tuple[]\",\"internalType\":\"struct MessageV1Codec.TokenTransferV1[]\",\"components\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourceTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenReceiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"verifierData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllowedFinalityConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDynamicConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct LombardVerifier.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFee\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Client.EVM2AnyMessage\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"requestedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"feeUSDCents\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"gasForVerification\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"payloadSizeBytes\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getPath\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct LombardVerifier.Path\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"lChainId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteAdapter\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteChainConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"remoteChainConfig\",\"type\":\"tuple\",\"internalType\":\"struct BaseVerifier.RemoteChainConfigArgs\",\"components\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"contract IRouter\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"feeUSDCents\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"gasForVerification\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"payloadSizeBytes\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"name\":\"allowedSendersList\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStorageLocations\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedTokens\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_bridge\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contract IBridgeV3\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removePaths\",\"inputs\":[{\"name\":\"remoteChainSelectors\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setAllowedFinalityConfig\",\"inputs\":[{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDynamicConfig\",\"inputs\":[{\"name\":\"dynamicConfig\",\"type\":\"tuple\",\"internalType\":\"struct LombardVerifier.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setPath\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"lChainId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"allowedCaller\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRemoteAdapters\",\"inputs\":[{\"name\":\"remoteAdapterArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct LombardVerifier.RemoteAdapterArgs[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"remoteAdapter\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"updateStorageLocations\",\"inputs\":[{\"name\":\"newLocations\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"updateSupportedTokens\",\"inputs\":[{\"name\":\"tokensToRemove\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"tokensToSet\",\"type\":\"tuple[]\",\"internalType\":\"struct LombardVerifier.SupportedTokenArgs[]\",\"components\":[{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"localAdapter\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"verifyMessage\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"struct MessageV1Codec.MessageV1\",\"components\":[{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"messageNumber\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"executionGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"ccipReceiveGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"finality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"ccvAndExecutorHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"onRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destBlob\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenTransfer\",\"type\":\"tuple[]\",\"internalType\":\"struct MessageV1Codec.TokenTransferV1[]\",\"components\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourceTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenReceiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"ccvData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"versionTag\",\"inputs\":[],\"outputs\":[{\"name\":\"tag\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdrawFeeTokens\",\"inputs\":[{\"name\":\"feeTokens\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AllowListSendersAdded\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"senders\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListSendersRemoved\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"senders\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListStateChanged\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DynamicConfigSet\",\"inputs\":[{\"name\":\"dynamicConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct LombardVerifier.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTokenWithdrawn\",\"inputs\":[{\"name\":\"receiver\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"feeToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FinalityConfigSet\",\"inputs\":[{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"indexed\":false,\"internalType\":\"bytes4\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"PathRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"lChainId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"PathSet\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"lChainId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemoteAdapterSet\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"remoteAdapter\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemoteChainConfigSet\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"router\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StorageLocationsUpdated\",\"inputs\":[{\"name\":\"oldLocations\",\"type\":\"string[]\",\"indexed\":false,\"internalType\":\"string[]\"},{\"name\":\"newLocations\",\"type\":\"string[]\",\"indexed\":false,\"internalType\":\"string[]\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SupportedTokenRemoved\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SupportedTokenSet\",\"inputs\":[{\"name\":\"localToken\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"localAdapter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"DestGasCannotBeZero\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"EnumerableMapNonexistentKey\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"ExecutionError\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"Invalid32ByteAddress\",\"inputs\":[{\"name\":\"encodedAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidAllowListRequest\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidAmount\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"actual\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidCCVVersion\",\"inputs\":[{\"name\":\"expected\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"actual\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageId\",\"inputs\":[{\"name\":\"messageMessageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"bridgeMessageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageLength\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"actual\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageVersion\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"actual\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"type\":\"error\",\"name\":\"InvalidReceiver\",\"inputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidRequestedFinality\",\"inputs\":[{\"name\":\"requestedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"InvalidSender\",\"inputs\":[{\"name\":\"expected\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"actual\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidToken\",\"inputs\":[{\"name\":\"expected\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"actual\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidVerifierResults\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustTransferTokens\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"PathNotExist\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"RemoteChainNotSupported\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"RemoteTokenOrAdapterMismatch\",\"inputs\":[{\"name\":\"bridgeToken\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"remoteToken\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"remoteAdapter\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"RequestedFinalityCanOnlyHaveOneMode\",\"inputs\":[{\"name\":\"encodedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"SenderNotAllowed\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenNotSupported\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"VersionTagCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAllowedCaller\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroBridge\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroLombardChainId\",\"inputs\":[]}]",
+	Bin: "0x60e08060405234610640576158eb803803809161001c82856106bd565b833981019080820360a081126106405760201361064057604051602081016001600160401b038111828210176104c557604052610058826106e0565b81526020820151926001600160a01b038416928385036106405760408101516001600160401b03811161064057810182601f820112156106405780519061009e826106f4565b936100ac60405195866106bd565b82855260208086019360051b830101918183116106405760208101935b83851061064557505050505060806100e3606083016106e0565b9101519063ffffffff60e01b82169283830361064057600154908051610108836106f4565b9261011660405194856106bd565b808452600160009081527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf690602086015b83821061059b5750505060005b81811061050757505060005b8181106103785750507fec9f9416b098576351ada0c342c1381ca08990ee094978ddd1003ef013d07586916101b46101a69260405193849360408552604085019061079a565b90838203602085015261079a565b0390a16001600160a01b031691821561036757156103565760a05260805233156103455760038054336001600160a01b0319918216179091559051600b80546001600160a01b039092169190921681179091556040519081527ff6c55d191ab03af25fd3025708a62a6038eb78ea86b0afb256fc3df66c860f6090602090a180156103345760206004916040519283809263353c26b760e01b82525afa908115610328576000916102e4575b5060ff16600281036102cb575060c0526040516150df908161080c823960805181613645015260a0518181816115c20152818161266201526139c1015260c0518181816110030152818161177101528181612c2601528181612d3301528181612e6101526138ce0152f35b63398bbe0560e11b600052600260045260245260446000fd5b6020813d602011610320575b816102fd602093836106bd565b8101031261031c57519060ff82168203610319575060ff610260565b80fd5b5080fd5b3d91506102f0565b6040513d6000823e3d90fd5b63361106cd60e01b60005260046000fd5b639b15e16f60e01b60005260046000fd5b631027401f60e21b60005260046000fd5b6342bcdf7f60e11b60005260046000fd5b82518110156104f15760208160051b84010151600154680100000000000000008110156104c5578060016103af920160015561072e565b9190916104db578051906001600160401b0382116104c5576103d18354610749565b601f8111610488575b50602090601f831160011461041d5760019493929160009183610412575b5050600019600383901b1c191690841b1790555b01610160565b0151905038806103f8565b90601f1983169184600052816000209260005b818110610470575091600196959492918388959310610457575b505050811b01905561040c565b015160001960f88460031b161c1916905538808061044a565b92936020600181928786015181550195019301610430565b6104b590846000526020600020601f850160051c810191602086106104bb575b601f0160051c0190610783565b386103da565b90915081906104a8565b634e487b7160e01b600052604160045260246000fd5b634e487b7160e01b600052600060045260246000fd5b634e487b7160e01b600052603260045260246000fd5b600154801561058557600019019061051e8261072e565b9290926104db578261053260019454610749565b9081610543575b5050825501610154565b81601f60009311861461055a5750555b3880610539565b8183526020832061057591601f0160051c8101908701610783565b8082528160208120915555610553565b634e487b7160e01b600052603160045260246000fd5b604051600084546105ab81610749565b808452906001811690811561061d57506001146105e5575b50600192826105d7859460209403826106bd565b815201930191019091610147565b6000868152602081209092505b818310610607575050810160200160016105c3565b60018160209254838688010152019201916105f2565b60ff191660208581019190915291151560051b84019091019150600190506105c3565b600080fd5b84516001600160401b0381116106405782019083603f83011215610640576020820151906001600160401b0382116104c55760405161068e601f8401601f1916602001826106bd565b8281526040848401018610610640576106b26020949385946040868501910161070b565b8152019401936100c9565b601f909101601f19168101906001600160401b038211908210176104c557604052565b51906001600160a01b038216820361064057565b6001600160401b0381116104c55760051b60200190565b60005b83811061071e5750506000910152565b818101518382015260200161070e565b6001548110156104f157600160005260206000200190600090565b90600182811c92168015610779575b602083101461076357565b634e487b7160e01b600052602260045260246000fd5b91607f1691610758565b81811061078e575050565b60008155600101610783565b9080602083519182815201916020808360051b8301019401926000915b8383106107c657505050505090565b909192939460208080600193601f1986820301875289516107f28151809281855285808601910161070b565b601f01601f1916010197019594919091019201906107b756fe6080604052600436101561001257600080fd5b60003560e01c806301ffc9a7146101e7578063181f5a77146101e2578063240028e8146101dd57806329694706146101d8578063384ff3b7146101d357806338ff8c38146101ce578063597b95c3146101c95780635cb80c5d146101c45780635ef2c64b146101bf5780635fa13565146101ba578063708e1f79146101b5578063737037e8146101b05780637437ff9f146101ab57806379ba5097146101a657806387ae9292146101a1578063898068fc1461019c57806389e364c7146101975780638da5cb5b146101925780638e0b87181461018d5780638f2aaea414610188578063b6cfa3b714610183578063bcb6d4f71461017e578063c4bffe2b14610179578063c9b146b314610174578063d3c7c2c71461016f578063ec6ae7a71461016a578063f2fde38b14610165578063f4cdd89e146101605763fe163eed1461015b57600080fd5b61260b565b612478565b6122c0565b61225f565b6121d3565b611e56565b611d93565b611c9f565b611be5565b611b16565b611a9b565b611a49565b611515565b6113d3565b6112c3565b61113f565b6110c5565b611027565b610fb8565b610e56565b610d7e565b610bc4565b610ac9565b610a28565b610997565b61061d565b610559565b6104af565b61024f565b600435907fffffffff000000000000000000000000000000000000000000000000000000008216820361021b57565b600080fd5b606435907fffffffff000000000000000000000000000000000000000000000000000000008216820361021b57565b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760207fffffffff000000000000000000000000000000000000000000000000000000006102a96101ec565b167fd3e969cd0000000000000000000000000000000000000000000000000000000081149081156102e0575b506040519015158152f35b7f01ffc9a700000000000000000000000000000000000000000000000000000000915014386102d5565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040810190811067ffffffffffffffff82111761035557604052565b61030a565b6020810190811067ffffffffffffffff82111761035557604052565b60c0810190811067ffffffffffffffff82111761035557604052565b6080810190811067ffffffffffffffff82111761035557604052565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761035557604052565b604051906103fe60c0836103ae565b565b604051906103fe60a0836103ae565b67ffffffffffffffff811161035557601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe01660200190565b60005b83811061045c5750506000910152565b818101518382015260200161044c565b907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f6020936104a881518092818752878088019101610449565b0116010190565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5761052c60408051906104f081836103ae565b601582527f4c6f6d62617264566572696669657220322e302e30000000000000000000000060208301525191829160208352602083019061046c565b0390f35b73ffffffffffffffffffffffffffffffffffffffff81160361021b57565b35906103fe82610530565b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760206105c273ffffffffffffffffffffffffffffffffffffffff6004356105ae81610530565b166000526005602052604060002054151590565b6040519015158152f35b90816101c091031261021b5790565b9181601f8401121561021b5782359167ffffffffffffffff831161021b576020838186019501011161021b57565b90602061061a92818152019061046c565b90565b3461021b5760a07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b5761066c9036906004016105cc565b6024359061067b604435610530565b60843567ffffffffffffffff811161021b5761069b9036906004016105db565b505060208101803560006106ae82610985565b6106b7826135f3565b6101808401906106c78286612690565b90501561095d576106d783610985565b61012085019273ffffffffffffffffffffffffffffffffffffffff6107076106ff86896126e4565b810190612735565b16906107278167ffffffffffffffff166000526000602052604060002090565b8054909161075f73ffffffffffffffffffffffffffffffffffffffff83165b73ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff811615610927576040517fa8d87a3b00000000000000000000000000000000000000000000000000000000815267ffffffffffffffff929092166004830152602090829060249082905afa80156109225773ffffffffffffffffffffffffffffffffffffffff9186916108f3575b501633036108c75760e01c60ff16610838575b61052c61082c8989896108248a61081e6108186108128d87612690565b90612779565b93612686565b936126e4565b9290916137d6565b60405191829182610609565b61087861087c9160016108616107468673ffffffffffffffffffffffffffffffffffffffff1690565b910160019160005201602052604060002054151590565b1590565b61088657806107f5565b7fd0d2597600000000000000000000000000000000000000000000000000000000825273ffffffffffffffffffffffffffffffffffffffff16600452602490fd5b7f728fe07b00000000000000000000000000000000000000000000000000000000845233600452602484fd5b610915915060203d60201161091b575b61090d81836103ae565b8101906131ff565b386107e2565b503d610903565b613214565b7f4d1aff7e00000000000000000000000000000000000000000000000000000000865267ffffffffffffffff8216600452602486fd5b807f4f73dc4d0000000000000000000000000000000000000000000000000000000060049252fd5b67ffffffffffffffff81160361021b57565b3461021b5760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b576020610a1f6004356109d781610985565b67ffffffffffffffff602435916109ed83610530565b16600052600a835260406000209073ffffffffffffffffffffffffffffffffffffffff16600052602052604060002090565b54604051908152f35b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5767ffffffffffffffff600435610a6c81610985565b60006020604051610a7c81610339565b828152015216600052600960205261052c6040600020600160405191610aa183610339565b8054835201546020820152604051918291829190916020806040830194805184520151910152565b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b573660238201121561021b57806004013567ffffffffffffffff811161021b5736602460c083028401011161021b576024610b4492016127d5565b005b9181601f8401121561021b5782359167ffffffffffffffff831161021b576020808501948460051b01011161021b57565b60207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc82011261021b576004359067ffffffffffffffff821161021b57610bc091600401610b46565b9091565b3461021b57610bd236610b77565b9073ffffffffffffffffffffffffffffffffffffffff600b5416918215610d055760005b818110610bff57005b610c15610746610c10838587612ea2565b612eb2565b6040517f70a0823100000000000000000000000000000000000000000000000000000000815230600482015290919073ffffffffffffffffffffffffffffffffffffffff831690602081602481855afa8015610922576001948892600092610cd5575b5081610c89575b5050505001610bf6565b81610cb97f508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e9385610cc994614b0a565b6040519081529081906020820190565b0390a338858180610c7f565b610cf791925060203d8111610cfe575b610cef81836103ae565b81019061370a565b9038610c78565b503d610ce5565b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b67ffffffffffffffff81116103555760051b60200190565b929192610d538261040f565b91610d6160405193846103ae565b82948184528183011161021b578281602093846000960137010152565b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b573660238201121561021b57806004013590610dd982610d2f565b90610de760405192836103ae565b8282526024602083019360051b8201019036821161021b5760248101935b828510610e1557610b44846128cd565b843567ffffffffffffffff811161021b5782013660438201121561021b57602091610e4b83923690604460248201359101610d47565b815201940193610e05565b3461021b5760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b57600435610e9181610985565b6024359060443567ffffffffffffffff811161021b57610eb59036906004016105db565b610ebd613bd9565b8315610f8e57610ed791610ed2913691610d47565b614195565b8015610f6457610f5f7f83eda38165c92f401f97217d5ead82ef163d0b716c3979eff4670361bc2dc0c991610f4567ffffffffffffffff60405195610f1b87610339565b83875287602088015216948560005260096020526040600020906020600191805184550151910155565b610f4e84614b6c565b506040519081529081906020820190565b0390a3005b7f55622b8a0000000000000000000000000000000000000000000000000000000060005260046000fd5b7f5a39e3030000000000000000000000000000000000000000000000000000000060005260046000fd5b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b3461021b5760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b57611076903690600401610b46565b6024359167ffffffffffffffff831161021b573660238401121561021b5782600401359167ffffffffffffffff831161021b573660248460061b8601011161021b576024610b44940191612a37565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760006040516111028161035a565b5261052c6040516111128161035a565b600b5473ffffffffffffffffffffffffffffffffffffffff16908190526040519081529081906020820190565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5773ffffffffffffffffffffffffffffffffffffffff60025460201c16330361122257600354337fffffffffffffffffffffffff00000000000000000000000000000000000000008216176003557fffffffffffffffff0000000000000000000000000000000000000000ffffffff6002541660025573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b9080602083519182815201916020808360051b8301019401926000915b83831061127857505050505090565b90919293946020806112b4837fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08660019603018752895161046c565b97019301930191939290611269565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5761052c6112fd612f58565b60405191829160208352602083019061124c565b906020808351928381520192019060005b81811061132f5750505090565b825173ffffffffffffffffffffffffffffffffffffffff16845260209384019390920191600101611322565b60e09061ffff60a061061a959473ffffffffffffffffffffffffffffffffffffffff815116845267ffffffffffffffff602082015116602085015260408101511515604085015282606082015116606085015263ffffffff608082015116608085015201511660a08201528160c08201520190611311565b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043561140e81610985565b60405161141a81610376565b60008152602081016000905260408101600090526060810160009052608081016000905260a001600090526114638167ffffffffffffffff166000526000602052604060002090565b80549173ffffffffffffffffffffffffffffffffffffffff83169260e081901c60ff1660a082901c61ffff169060b083901c63ffffffff169260d01c61ffff16936114ac6103ef565b73ffffffffffffffffffffffffffffffffffffffff909716875267ffffffffffffffff1660208701521515604086015261ffff16606085015263ffffffff16608084015261ffff1660a083015260010161150590614d62565b60405191829161052c918361135b565b3461021b5760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b576115649036906004016105cc565b6024359060443567ffffffffffffffff811161021b576115889036906004016105db565b919061159b61159683612686565b6135f3565b6115ac6115a783612686565b6144fa565b6115bf6115b98483613075565b906130d6565b927f0000000000000000000000000000000000000000000000000000000000000000917fffffffff00000000000000000000000000000000000000000000000000000000831694857fffffffff000000000000000000000000000000000000000000000000000000008216036119f457506006938483106119ca5761166161165a61165461164e888787613083565b90613199565b60f01c90565b61ffff1690565b61167361166e828861318c565b61316b565b84106119ca576116866116f6918761318c565b91611693838887876130be565b90916116a36101208201826126e4565b926101808301936116c46116ba6108128787612690565b60608101906126e4565b9390926116ef6108126116e76116dd6108128b8b612690565b60808101906126e4565b999098612690565b35976146f6565b61171361165a61165461164e61170b8561316b565b8588886130be565b9161171d8261316b565b611727848261318c565b85106119ca57604051947fd5438eae00000000000000000000000000000000000000000000000000000000865260208660048173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa9384156109225773ffffffffffffffffffffffffffffffffffffffff986000978896611993575b5092826117d186938a966117e0966117da996130be565b9690988361318c565b926130be565b97909461181c604051998a97889687947fa6208506000000000000000000000000000000000000000000000000000000008652600486016132d5565b0393165af19182156109225760009060009361196a575b501561194057602482510361190c5760246020830151920151927fffffffff000000000000000000000000000000000000000000000000000000008316036118b757505081810361188057005b7f6c86fa3a0000000000000000000000000000000000000000000000000000000060005260049190915260245260446000fd5b6000fd5b7fadaf7739000000000000000000000000000000000000000000000000000000006000527fffffffff000000000000000000000000000000000000000000000000000000009081166004521660245260446000fd5b81517fc2fdac9800000000000000000000000000000000000000000000000000000000600052602460048190525260446000fd5b7f2532cf450000000000000000000000000000000000000000000000000000000060005260046000fd5b905061198a9192503d806000833e61198281836103ae565b810190613220565b92915038611833565b8894919650926117d16117da96936119bc6117e09660203d60201161091b5761090d81836103ae565b9893965093965050926117ba565b7f1ede477b0000000000000000000000000000000000000000000000000000000060005260046000fd5b7fadaf7739000000000000000000000000000000000000000000000000000000006000527fffffffff000000000000000000000000000000000000000000000000000000008085166004521660245260446000fd5b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b57602073ffffffffffffffffffffffffffffffffffffffff60035416604051908152f35b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b573660238201121561021b57806004013567ffffffffffffffff811161021b57366024606083028401011161021b576024610b4492016132fc565b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b577ff6c55d191ab03af25fd3025708a62a6038eb78ea86b0afb256fc3df66c860f60611be0604051611b758161035a565b600435611b8181610530565b8152611b8b613bd9565b51600b80547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff9290921691821790556040519081529081906020820190565b0390a1005b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b577f307cf716eade81675bea3ccb6917b0f91baa2160056765d9a83d76f819caf06a6020611c3f6101ec565b611c47613bd9565b8060e01c7fffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000060025416176002557fffffffff0000000000000000000000000000000000000000000000000000000060405191168152a1005b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760043567ffffffffffffffff811161021b573660238201121561021b57806004013590611cfa82610d2f565b91611d0860405193846103ae565b8083526024602084019160051b8301019136831161021b57602401905b828210611d3557610b44846133ef565b602080918335611d4481610985565b815201910190611d25565b602060408183019282815284518094520192019060005b818110611d735750505090565b825167ffffffffffffffff16845260209384019390920191600101611d66565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b57600754611dce81610d2f565b90611ddc60405192836103ae565b8082527fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0611e0982610d2f565b0136602084013760005b818110611e28576040518061052c8582611d4f565b8067ffffffffffffffff611e3d600193613f77565b90549060031b1c16611e4f82866134f9565b5201611e13565b3461021b57611e6436610b77565b611e6c613bd9565b6000905b808210611e7957005b611e8c611e878383866148fd565b6149a4565b92611ebc611ea2855167ffffffffffffffff1690565b67ffffffffffffffff166000526000602052604060002090565b92611ecc845460ff9060e01c1690565b916020860192611edc8451151590565b908115159015150361212b575b506060860194600101939060005b86518051821015611fd15790611f2c611f12826001946134f9565b5173ffffffffffffffffffffffffffffffffffffffff1690565b611f54611f4e73ffffffffffffffffffffffffffffffffffffffff8316610746565b89614eee565b611f60575b5001611ef7565b7f9ac16e02c9a455144d35e2f0d80817a608340dee3c104f547ceb4433df418d82611fc867ffffffffffffffff611f9f8d5167ffffffffffffffff1690565b60405173ffffffffffffffffffffffffffffffffffffffff909516855216929081906020820190565b0390a238611f59565b50509450949190926040830191825151611ff4575b505050506001019091611e70565b5192959194909392156121165760005b8551805182101561210357611f128261201c926134f9565b73ffffffffffffffffffffffffffffffffffffffff8116156120b8576001919061206461205e73ffffffffffffffffffffffffffffffffffffffff8316610746565b88614bfd565b612070575b5001612004565b7f85682793ee26ba7d2d073ce790a50b388a1791aab25fc368bcce99d3b1d4da806120af67ffffffffffffffff611f9f8c5167ffffffffffffffff1690565b0390a238612069565b6118b36120cd895167ffffffffffffffff1690565b7f463258ff0000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff16600452602490565b5050935093506001915090388080611fe6565b6118b36120cd875167ffffffffffffffff1690565b85547fffffff00ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1681151560e01b7cff00000000000000000000000000000000000000000000000000000000161786557f8504171b9fc8a6c38617bdd508715ec759043b69df1608d7b0db90c0f85234926121ca67ffffffffffffffff6121b68a5167ffffffffffffffff1690565b604051941515855216929081906020820190565b0390a238611ee9565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b576040516004548082526020820190600460005260206000209060005b8181106122495761052c85612235818703826103ae565b604051918291602083526020830190611311565b825484526020909301926001928301920161221e565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b57602060025460e01b7fffffffff0000000000000000000000000000000000000000000000000000000060405191168152f35b3461021b5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b576004356122fb81610530565b612303613bd9565b73ffffffffffffffffffffffffffffffffffffffff8116903382146123aa577fffffffffffffffff0000000000000000000000000000000000000000ffffffff77ffffffffffffffffffffffffffffffffffffffff000000006002549260201b1691161760025573ffffffffffffffffffffffffffffffffffffffff600354167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b9080601f8301121561021b5781602061061a93359101610d47565b81601f8201121561021b5780359061240682610d2f565b9261241460405194856103ae565b82845260208085019360061b8301019181831161021b57602001925b82841061243e575050505090565b60408483031261021b576020604091825161245881610339565b863561246381610530565b81528287013583820152815201930192612430565b3461021b5760807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b576004356124b381610985565b60243567ffffffffffffffff811161021b5760a07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc823603011261021b576124f9610400565b90806004013567ffffffffffffffff811161021b5761251e90600436918401016123d4565b8252602481013567ffffffffffffffff811161021b5761254490600436918401016123d4565b6020830152604481013567ffffffffffffffff811161021b5761256d90600436918401016123ef565b604083015261257e6064820161054e565b6060830152608481013567ffffffffffffffff811161021b5760809160046125a992369201016123d4565b91015260443567ffffffffffffffff811161021b5761052c916125d36125e29236906004016123d4565b506125dc610220565b90613549565b6040805161ffff909416845263ffffffff92831660208501529116908201529081906060820190565b3461021b5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021b5760206040517fffffffff000000000000000000000000000000000000000000000000000000007f0000000000000000000000000000000000000000000000000000000000000000168152f35b3561061a81610985565b9035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18136030182121561021b570180359067ffffffffffffffff821161021b57602001918160051b3603831361021b57565b9035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18136030182121561021b570180359067ffffffffffffffff821161021b5760200191813603831361021b57565b9081602091031261021b573561061a81610530565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b90156127b2578035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff418136030182121561021b570190565b61274a565b906040516127c481610339565b602060018294805484520154910152565b906127de613bd9565b6127e781610d2f565b916127f560405193846103ae565b81835260c060208401920281019036821161021b57915b81831061281f575050506103fe90613c24565b60c08336031261021b576040519061283682610376565b833561284181610530565b8252602084013561285181610985565b60208301526040840135612864816128b4565b6040830152612875606085016128be565b606083015260808401359063ffffffff8216820361021b5782602092608060c09501526128a460a087016128be565b60a082015281520192019161280c565b8015150361021b57565b359061ffff8216820361021b57565b906128d6613bd9565b60015482516128e3612f58565b9160005b81811061295057505060005b818110612934575050917fec9f9416b098576351ada0c342c1381ca08990ee094978ddd1003ef013d07586919261292f60405192839283614170565b0390a1565b8061294a612944600193886134f9565b51614021565b016128f3565b6001548015612a03577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff019061298582613f92565b9290926129fe578261299960019454612f05565b90816129aa575b50508255016128e7565b601f821185146129c15760009055505b38806129a0565b6129e86129f99286601f6129da85600052602060002090565b920160051c82019101613fc5565b600081815260208120918190559055565b6129ba565b612a08565b613f48565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052600060045260246000fd5b90929192612a43613bd9565b60005b818110612d5e5750505060005b818110612a5f57505050565b807f086dcdf32d9aaaee4446c7bcf02b41c0d3b4923bf9d0265b033974e09d5f05e3612a96612a916001948688612ebc565b612ecc565b612ae3612ab7825173ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff166000526001600401602052604060002054151590565b612c51575b612bbd612ba2612b0c835173ffffffffffffffffffffffffffffffffffffffff1690565b92612b396020820194612b33865173ffffffffffffffffffffffffffffffffffffffff1690565b906144c6565b50612b5b610746855173ffffffffffffffffffffffffffffffffffffffff1690565b15612beb57611f12612b84610746835173ffffffffffffffffffffffffffffffffffffffff1690565b855173ffffffffffffffffffffffffffffffffffffffff1690614444565b915173ffffffffffffffffffffffffffffffffffffffff1690565b6040805173ffffffffffffffffffffffffffffffffffffffff9384168152919092166020820152a101612a53565b612c4c612c0f610746835173ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001690614444565b611f12565b612c77612c72825173ffffffffffffffffffffffffffffffffffffffff1690565b61423a565b612c9b610746602084015173ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff8216908103612cc1575b5050612ae8565b15612cf757612cf090612ceb610746845173ffffffffffffffffffffffffffffffffffffffff1690565b6142c7565b3880612cba565b50612d59612d1c610746835173ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016906142c7565b612cf0565b80612d6f610c106001938587612ea2565b612d8e73ffffffffffffffffffffffffffffffffffffffff8216610746565b612da6612da061074661074684614c59565b91614cbc565b612db3575b505001612a46565b7fbea12876694c4055c71f74308f752b9027cf3d554194000a366abddfc239a30691612e3c9173ffffffffffffffffffffffffffffffffffffffff811615612e4657612e159073ffffffffffffffffffffffffffffffffffffffff83166142c7565b60405173ffffffffffffffffffffffffffffffffffffffff90911681529081906020820190565b0390a13880612dab565b50612e9d73ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83166142c7565b612e15565b91908110156127b25760051b0190565b3561061a81610530565b91908110156127b25760061b0190565b60408136031261021b57602060405191612ee583610339565b8035612ef081610530565b83520135612efd81610530565b602082015290565b90600182811c92168015612f4e575b6020831014612f1f57565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b91607f1691612f14565b60015490612f6582610d2f565b91612f7360405193846103ae565b808352600160009081527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf69190602085015b828210612fb25750505050565b60405160008554612fc281612f05565b80845290600181169081156130345750600114612ffc575b5060019282612fee859460209403826103ae565b815201940191019092612fa5565b6000878152602081209092505b81831061301e57505081016020016001612fda565b6001816020925483868801015201920191613009565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff001660208581019190915291151560051b8401909101915060019050612fda565b9060041161021b5790600490565b909291928360041161021b57831161021b57600401917ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0190565b9093929384831161021b57841161021b578101920390565b919091357fffffffff000000000000000000000000000000000000000000000000000000008116926004811061310a575050565b7fffffffff00000000000000000000000000000000000000000000000000000000929350829060040360031b1b161690565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b906002820180921161317957565b61313c565b906001820180921161317957565b9190820180921161317957565b919091357fffff000000000000000000000000000000000000000000000000000000000000811692600281106131cd575050565b7fffff000000000000000000000000000000000000000000000000000000000000929350829060020360031b1b161690565b9081602091031261021b575161061a81610530565b6040513d6000823e3d90fd5b909160608284031261021b57815192602083015161323d816128b4565b9260408101519067ffffffffffffffff821161021b570181601f8201121561021b57805161326a8161040f565b9261327860405194856103ae565b8184526020828401011161021b5761061a9160208085019101610449565b601f82602094937fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0938186528686013760008582860101520116010190565b92906132ee9061061a9593604086526040860191613296565b926020818503910152613296565b613304613bd9565b60005b828110156133ea5760019060006060820284017ff2bb53a7e6aae800a85fba961b2bc3124a23dd44d95fefe0b7b29bd90975a97660408201359180359361334d85610985565b836133a460206133718867ffffffffffffffff16600052600a602052604060002090565b940135809461337f82610530565b9073ffffffffffffffffffffffffffffffffffffffff16600052602052604060002090565b556133ae85610985565b6133b782610530565b5060405192835273ffffffffffffffffffffffffffffffffffffffff169267ffffffffffffffff1691602090a301613307565b505050565b906133f8613bd9565b6000915b80518310156134f45767ffffffffffffffff61341884836134f9565b51169261344161343c8567ffffffffffffffff166000526009602052604060002090565b6127b7565b61344a85614e11565b156134bb5784613481613475600195969767ffffffffffffffff166000526009602052604060002090565b60016000918281550155565b60208281015192516040519081527f8a8e4c676433747219d2fee4ea128776522bb0177478e1e0a375e880948ed37b9190a30191906133fc565b847fa28cbf380000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff602491166004526000fd5b509050565b80518210156127b25760209160051b010190565b91613545918354907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b9055565b67ffffffffffffffff16908160005260006020526040600020549173ffffffffffffffffffffffffffffffffffffffff8316156135b157506135919060025460e01b90614a2a565b63ffffffff8160b01c169161ffff80808460d01c169360a01c1693921690565b7f4d1aff7e0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b9081602091031261021b575161061a816128b4565b6040517f2cbc26bb000000000000000000000000000000000000000000000000000000008152608082901b77ffffffffffffffff000000000000000000000000000000001660048201526020816024817f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff165afa908115610922576000916136ca575b506136935750565b7ffdbd6a720000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff1660045260246000fd5b6136ec915060203d6020116136f2575b6136e481836103ae565b8101906135de565b3861368b565b503d6136da565b91602061061a938181520191613296565b9081602091031261021b575190565b91907fffffffff00000000000000000000000000000000000000000000000000000000604051931660208401526024830152602482526103fe6044836103ae565b919082604091031261021b576020825192015190565b939061061a97969373ffffffffffffffffffffffffffffffffffffffff60e09794819388521660208701521660408501526060840152608083015260a08201528160c0820152019061046c565b90604051916020830152602082526103fe6040836103ae565b9291949390608084019260206137ec85876126e4565b905011613b95576138066107466106ff60408801886126e4565b9261383761087873ffffffffffffffffffffffffffffffffffffffff86166000526005602052604060002054151590565b613b515761385c61343c8467ffffffffffffffff166000526009602052604060002090565b94855115613b1957613950959697986138996107466107466138946107468a73ffffffffffffffffffffffffffffffffffffffff1690565b614c59565b73ffffffffffffffffffffffffffffffffffffffff811615613b1157945b73ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000169660208a019160208884516040519c8d9283927f6e48b60d0000000000000000000000000000000000000000000000000000000084526004840190929173ffffffffffffffffffffffffffffffffffffffff6020916040840195845216910152565b03818c5afa918215610922578c9a600093613af0575b50613981610ed261397a60608e018e6126e4565b3691610d47565b91828403613a67575b50505050926139e56139ba610ed261397a613a1a966139b460409e9760009b9a519a810190612735565b9c6126e4565b9a359251917f0000000000000000000000000000000000000000000000000000000000000000613719565b9189519a8b998a9889977e8a119800000000000000000000000000000000000000000000000000000000895260048901613770565b03925af180156109225761061a91600091613a36575b506137bd565b613a58915060403d604011613a60575b613a5081836103ae565b81019061375a565b905038613a30565b503d613a46565b613a94929394959697989a9c999b5061337f9067ffffffffffffffff16600052600a602052604060002090565b549182158015613ae6575b613ab357808c9a989b99979695949361398a565b7fbce7b6cd0000000000000000000000000000000000000000000000000000000060005260045260245260445260646000fd5b5082811415613a9f565b613b0a91935060203d602011610cfe57610cef81836103ae565b9138613966565b5085946138b7565b7fa28cbf380000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff841660045260246000fd5b7f06439c6b0000000000000000000000000000000000000000000000000000000060005273ffffffffffffffffffffffffffffffffffffffff841660045260246000fd5b613b9f84866126e4565b90613bd56040519283927fa3c8cf09000000000000000000000000000000000000000000000000000000008452600484016136f9565b0390fd5b73ffffffffffffffffffffffffffffffffffffffff600354163303613bfa57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b60005b8151811015613f4457613c3a81836134f9565b51602081015167ffffffffffffffff169081908115613f0c57613c718267ffffffffffffffff166000526000602052604060002090565b91613cd4613c93835173ffffffffffffffffffffffffffffffffffffffff1690565b849073ffffffffffffffffffffffffffffffffffffffff167fffffffffffffffffffffffff0000000000000000000000000000000000000000825416179055565b613d32613ce46040840151151590565b84547fffffff00ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1690151560e01b7cff0000000000000000000000000000000000000000000000000000000016178455565b613d8b613d44606084015161ffff1690565b84547fffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffffffff1660a09190911b75ffff000000000000000000000000000000000000000016178455565b6080820190613daa613da1835163ffffffff1690565b63ffffffff1690565b15613ed5575091613ea6613e9b6107467f4cef55db91890720ca3d94563535726752813bffa29490d6d41218acb6831cc994613e3c613df160019a99985163ffffffff1690565b86547fffffffffffff00000000ffffffffffffffffffffffffffffffffffffffffffff1660b09190911b79ffffffff0000000000000000000000000000000000000000000016178655565b611f12613e4e60a083015161ffff1690565b86547fffffffff0000ffffffffffffffffffffffffffffffffffffffffffffffffffff1660d09190911b7bffff000000000000000000000000000000000000000000000000000016178655565b915460e01c60ff1690565b6040805173ffffffffffffffffffffffffffffffffffffffff939093168352901515602083015290a201613c27565b7f9e7205510000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff1660045260246000fd5b7f97ccaab70000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff821660045260246000fd5b5050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b6007548110156127b257600760005260206000200190600090565b6001548110156127b257600160005260206000200190600090565b80548210156127b25760005260206000200190600090565b818110613fd0575050565b60008155600101613fc5565b9190601f8111613feb57505050565b6103fe926000526020600020906020601f840160051c83019310614017575b601f0160051c0190613fc5565b909150819061400a565b90600154680100000000000000008110156103555780600161404892016001556001613fad565b6129fe57825167ffffffffffffffff8111610355576140718161406b8454612f05565b84613fdc565b6020601f82116001146140cb5781906135459394956000926140c0575b50507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8260011b9260031b1c19161790565b01519050388061408e565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08216906140fe84600052602060002090565b9160005b81811061415857509583600195969710614121575b505050811b019055565b01517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff60f88460031b161c19169055388080614117565b9192602060018192868b015181550194019201614102565b909161418761061a9360408452604084019061124c565b91602081840391015261124c565b6020815111614204576020815191015190602081106141d3575b8060031b908082046008149015171561317957610100036101008111613179571c90565b907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8260200360031b1b16906141af565b613bd5906040519182917fe0d7fb0200000000000000000000000000000000000000000000000000000000835260048301610609565b73ffffffffffffffffffffffffffffffffffffffff16600081815260066020526040812054918215806142b3575b61428757505073ffffffffffffffffffffffffffffffffffffffff1690565b602492507f02b56686000000000000000000000000000000000000000000000000000000008252600452fd5b508082526005602052604082205415614268565b60405190602060008184017f095ea7b30000000000000000000000000000000000000000000000000000000081526143568561432a8489602484016020909392919373ffffffffffffffffffffffffffffffffffffffff60408201951681520152565b037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe081018752866103ae565b84519082855af1600051903d8161440b575b501590505b61437657505050565b6040517f095ea7b300000000000000000000000000000000000000000000000000000000602082015273ffffffffffffffffffffffffffffffffffffffff9093166024840152600060448401526103fe926144069061440081606481015b037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe081018352826103ae565b82614cd7565b614cd7565b15159050614438575061436d73ffffffffffffffffffffffffffffffffffffffff82163b15155b38614368565b600161436d9114614432565b6040517f095ea7b300000000000000000000000000000000000000000000000000000000602080830191825273ffffffffffffffffffffffffffffffffffffffff851660248401527fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff604484015291929190600090614356856064810161432a565b9073ffffffffffffffffffffffffffffffffffffffff8061061a931691826000526006602052166040600020556004614bfd565b61453861074661451e8367ffffffffffffffff166000526000602052604060002090565b5473ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff811615614602576040517f83826b2b00000000000000000000000000000000000000000000000000000000815267ffffffffffffffff929092166004830152336024830152602090829060449082905afa908115610922576000916145e3575b50156145b557565b7f728fe07b000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b6145fc915060203d6020116136f2576136e481836103ae565b386145ad565b7f4d1aff7e0000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff821660045260246000fd5b9160c08383031261021b57823592602081013592604082013592606083013561466281610530565b92608081013561467181610530565b9260a082013567ffffffffffffffff811161021b5761061a92016123d4565b919091357fffffffffffffffffffffffffffffffffffffffff000000000000000000000000811692601481106146c4575050565b7fffffffffffffffffffffffffffffffffffffffff000000000000000000000000929350829060140360031b1b161690565b816147149261470c929a9998979a969596613083565b81019061463a565b97945050505050602184015160418501519373ffffffffffffffffffffffffffffffffffffffff614766614760608160618a01519901519c61475a610ed2368388610d47565b94614690565b60601c90565b1661477e816000526005602052604060002054151590565b61488a575b5080820361485a57505061479c91610ed2913691610d47565b80820361482a5750506147b3610ed2368585610d47565b036147f55750508082036147c5575050565b7f7c83fcf00000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b613bd56040519283927fa3c8cf09000000000000000000000000000000000000000000000000000000008452600484016136f9565b7fda5a0ce50000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b7fd27ededb0000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b61074661074661489992614c59565b73ffffffffffffffffffffffffffffffffffffffff8116156147835760405160609190911b7fffffffffffffffffffffffffffffffffffffffff0000000000000000000000001660208201526148f79150610ed281603481016143d4565b38614783565b91908110156127b25760051b810135907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff818136030182121561021b570190565b9080601f8301121561021b57813561495481610d2f565b9261496260405194856103ae565b81845260208085019260051b82010192831161021b57602001905b82821061498a5750505090565b60208091833561499981610530565b81520191019061497d565b60808136031261021b57604051906149bb82610392565b80356149c681610985565b825260208101356149d6816128b4565b6020830152604081013567ffffffffffffffff811161021b576149fc903690830161493d565b604083015260608101359067ffffffffffffffff821161021b57614a229136910161493d565b606082015290565b7fffffffff00000000000000000000000000000000000000000000000000000000811615613f4457614a5b81614fcf565b601082811c9082901c167dffff0000000000000000000000000000000000000000000000000000000016613f445761ffff8260e01c168015908115614af9575b50614aa4575050565b7fdf63778f000000000000000000000000000000000000000000000000000000006000527fffffffff000000000000000000000000000000000000000000000000000000009081166004521660245260446000fd5b905061ffff8260e01c161038614a9b565b6040517fa9059cbb00000000000000000000000000000000000000000000000000000000602082015273ffffffffffffffffffffffffffffffffffffffff9290921660248301526044808301939093529181526103fe916144066064836103ae565b600081815260086020526040902054614bf7576007546801000000000000000081101561035557614bde614ba98260018594016007556007613fad565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b9055600754906000526008602052604060002055600190565b50600090565b6000828152600182016020526040902054614c5257805490680100000000000000008210156103555782614c3b614ba9846001809601855584613fad565b905580549260005201602052604060002055600190565b5050600090565b80600052600660205260406000205490811580614ca6575b614c79575090565b7f02b566860000000000000000000000000000000000000000000000000000000060005260045260246000fd5b5060008181526005602052604090205415614c71565b61061a90806000526006602052600060408120556004614eee565b906000602091828151910182855af115613214576000513d614d59575073ffffffffffffffffffffffffffffffffffffffff81163b155b614d155750565b73ffffffffffffffffffffffffffffffffffffffff907f5274afe7000000000000000000000000000000000000000000000000000000006000521660045260246000fd5b60011415614d0e565b906040519182815491828252602082019060005260206000209260005b818110614d945750506103fe925003836103ae565b8454835260019485019487945060209093019201614d7f565b80548015612a03577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0190614de28282613fad565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b1916905555565b600081815260086020526040902054908115614c52577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82019082821161317957600754927fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8401938411613179578383600095614ead9503614eb3575b505050614e9c6007614dad565b600890600052602052604060002090565b55600190565b614e9c614edf91614ed5614ecb614ee5956007613fad565b90549060031b1c90565b9283916007613fad565b9061350d565b55388080614e8f565b6001810191806000528260205260406000205492831515600014614fc6577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8401848111613179578354937fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8501948511613179576000958583614ead97614f7e9503614f8d575b505050614dad565b90600052602052604060002090565b614fad614edf91614fa4614ecb614fbd9588613fad565b92839187613fad565b8590600052602052604060002090565b55388080614f76565b50505050600090565b7fffffffff000000000000000000000000000000000000000000000000000000008116156150cf577dffff000000000000000000000000000000000000000000000000000000008116156150c65760ff60015b1660f082901c80615088575b506001036150395750565b7fc512f96c000000000000000000000000000000000000000000000000000000006000527fffffffff000000000000000000000000000000000000000000000000000000001660045260246000fd5b60005b60108110615099575061502e565b63ffffffff6001821b8316166150b2575b60010161508b565b916150be60019161317e565b9290506150aa565b60ff6000615022565b5056fea164736f6c634300081a000a",
+}
+
+var LombardVerifierABI = LombardVerifierMetaData.ABI
+
+var LombardVerifierBin = LombardVerifierMetaData.Bin
+
+func DeployLombardVerifier(auth *bind.TransactOpts, backend bind.ContractBackend, dynamicConfig LombardVerifierDynamicConfig, bridge common.Address, storageLocation []string, rmn common.Address, versionTag [4]byte) (common.Address, *types.Transaction, *LombardVerifier, error) {
+	parsed, err := LombardVerifierMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(LombardVerifierBin), backend, dynamicConfig, bridge, storageLocation, rmn, versionTag)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &LombardVerifier{address: address, abi: *parsed, LombardVerifierCaller: LombardVerifierCaller{contract: contract}, LombardVerifierTransactor: LombardVerifierTransactor{contract: contract}, LombardVerifierFilterer: LombardVerifierFilterer{contract: contract}}, nil
+}
+
+type LombardVerifier struct {
+	address common.Address
+	abi     abi.ABI
+	LombardVerifierCaller
+	LombardVerifierTransactor
+	LombardVerifierFilterer
+}
+
+type LombardVerifierCaller struct {
+	contract *bind.BoundContract
+}
+
+type LombardVerifierTransactor struct {
+	contract *bind.BoundContract
+}
+
+type LombardVerifierFilterer struct {
+	contract *bind.BoundContract
+}
+
+type LombardVerifierSession struct {
+	Contract     *LombardVerifier
+	CallOpts     bind.CallOpts
+	TransactOpts bind.TransactOpts
+}
+
+type LombardVerifierCallerSession struct {
+	Contract *LombardVerifierCaller
+	CallOpts bind.CallOpts
+}
+
+type LombardVerifierTransactorSession struct {
+	Contract     *LombardVerifierTransactor
+	TransactOpts bind.TransactOpts
+}
+
+type LombardVerifierRaw struct {
+	Contract *LombardVerifier
+}
+
+type LombardVerifierCallerRaw struct {
+	Contract *LombardVerifierCaller
+}
+
+type LombardVerifierTransactorRaw struct {
+	Contract *LombardVerifierTransactor
+}
+
+func NewLombardVerifier(address common.Address, backend bind.ContractBackend) (*LombardVerifier, error) {
+	abi, err := abi.JSON(strings.NewReader(LombardVerifierABI))
+	if err != nil {
+		return nil, err
+	}
+	contract, err := bindLombardVerifier(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifier{address: address, abi: abi, LombardVerifierCaller: LombardVerifierCaller{contract: contract}, LombardVerifierTransactor: LombardVerifierTransactor{contract: contract}, LombardVerifierFilterer: LombardVerifierFilterer{contract: contract}}, nil
+}
+
+func NewLombardVerifierCaller(address common.Address, caller bind.ContractCaller) (*LombardVerifierCaller, error) {
+	contract, err := bindLombardVerifier(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierCaller{contract: contract}, nil
+}
+
+func NewLombardVerifierTransactor(address common.Address, transactor bind.ContractTransactor) (*LombardVerifierTransactor, error) {
+	contract, err := bindLombardVerifier(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierTransactor{contract: contract}, nil
+}
+
+func NewLombardVerifierFilterer(address common.Address, filterer bind.ContractFilterer) (*LombardVerifierFilterer, error) {
+	contract, err := bindLombardVerifier(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierFilterer{contract: contract}, nil
+}
+
+func bindLombardVerifier(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := LombardVerifierMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
+}
+
+func (_LombardVerifier *LombardVerifierRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _LombardVerifier.Contract.LombardVerifierCaller.contract.Call(opts, result, method, params...)
+}
+
+func (_LombardVerifier *LombardVerifierRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.LombardVerifierTransactor.contract.Transfer(opts)
+}
+
+func (_LombardVerifier *LombardVerifierRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.LombardVerifierTransactor.contract.Transact(opts, method, params...)
+}
+
+func (_LombardVerifier *LombardVerifierCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _LombardVerifier.Contract.contract.Call(opts, result, method, params...)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.contract.Transfer(opts)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.contract.Transact(opts, method, params...)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetAllowedFinalityConfig(opts *bind.CallOpts) ([4]byte, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getAllowedFinalityConfig")
+
+	if err != nil {
+		return *new([4]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([4]byte)).(*[4]byte)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetAllowedFinalityConfig() ([4]byte, error) {
+	return _LombardVerifier.Contract.GetAllowedFinalityConfig(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetAllowedFinalityConfig() ([4]byte, error) {
+	return _LombardVerifier.Contract.GetAllowedFinalityConfig(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetDynamicConfig(opts *bind.CallOpts) (LombardVerifierDynamicConfig, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getDynamicConfig")
+
+	if err != nil {
+		return *new(LombardVerifierDynamicConfig), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(LombardVerifierDynamicConfig)).(*LombardVerifierDynamicConfig)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetDynamicConfig() (LombardVerifierDynamicConfig, error) {
+	return _LombardVerifier.Contract.GetDynamicConfig(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetDynamicConfig() (LombardVerifierDynamicConfig, error) {
+	return _LombardVerifier.Contract.GetDynamicConfig(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+	error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getFee", destChainSelector, arg1, arg2, requestedFinality)
+
+	outstruct := new(GetFee)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.FeeUSDCents = *abi.ConvertType(out[0], new(uint16)).(*uint16)
+	outstruct.GasForVerification = *abi.ConvertType(out[1], new(uint32)).(*uint32)
+	outstruct.PayloadSizeBytes = *abi.ConvertType(out[2], new(uint32)).(*uint32)
+
+	return *outstruct, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetFee(destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+	error) {
+	return _LombardVerifier.Contract.GetFee(&_LombardVerifier.CallOpts, destChainSelector, arg1, arg2, requestedFinality)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetFee(destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+	error) {
+	return _LombardVerifier.Contract.GetFee(&_LombardVerifier.CallOpts, destChainSelector, arg1, arg2, requestedFinality)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetPath(opts *bind.CallOpts, remoteChainSelector uint64) (LombardVerifierPath, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getPath", remoteChainSelector)
+
+	if err != nil {
+		return *new(LombardVerifierPath), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(LombardVerifierPath)).(*LombardVerifierPath)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetPath(remoteChainSelector uint64) (LombardVerifierPath, error) {
+	return _LombardVerifier.Contract.GetPath(&_LombardVerifier.CallOpts, remoteChainSelector)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetPath(remoteChainSelector uint64) (LombardVerifierPath, error) {
+	return _LombardVerifier.Contract.GetPath(&_LombardVerifier.CallOpts, remoteChainSelector)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetRemoteAdapter(opts *bind.CallOpts, remoteChainSelector uint64, token common.Address) ([32]byte, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getRemoteAdapter", remoteChainSelector, token)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetRemoteAdapter(remoteChainSelector uint64, token common.Address) ([32]byte, error) {
+	return _LombardVerifier.Contract.GetRemoteAdapter(&_LombardVerifier.CallOpts, remoteChainSelector, token)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetRemoteAdapter(remoteChainSelector uint64, token common.Address) ([32]byte, error) {
+	return _LombardVerifier.Contract.GetRemoteAdapter(&_LombardVerifier.CallOpts, remoteChainSelector, token)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetRemoteChainConfig(opts *bind.CallOpts, remoteChainSelector uint64) (GetRemoteChainConfig,
+
+	error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getRemoteChainConfig", remoteChainSelector)
+
+	outstruct := new(GetRemoteChainConfig)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.RemoteChainConfig = *abi.ConvertType(out[0], new(BaseVerifierRemoteChainConfigArgs)).(*BaseVerifierRemoteChainConfigArgs)
+	outstruct.AllowedSendersList = *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
+
+	return *outstruct, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetRemoteChainConfig(remoteChainSelector uint64) (GetRemoteChainConfig,
+
+	error) {
+	return _LombardVerifier.Contract.GetRemoteChainConfig(&_LombardVerifier.CallOpts, remoteChainSelector)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetRemoteChainConfig(remoteChainSelector uint64) (GetRemoteChainConfig,
+
+	error) {
+	return _LombardVerifier.Contract.GetRemoteChainConfig(&_LombardVerifier.CallOpts, remoteChainSelector)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetStorageLocations(opts *bind.CallOpts) ([]string, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getStorageLocations")
+
+	if err != nil {
+		return *new([]string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetStorageLocations() ([]string, error) {
+	return _LombardVerifier.Contract.GetStorageLocations(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetStorageLocations() ([]string, error) {
+	return _LombardVerifier.Contract.GetStorageLocations(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetSupportedChains(opts *bind.CallOpts) ([]uint64, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getSupportedChains")
+
+	if err != nil {
+		return *new([]uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]uint64)).(*[]uint64)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetSupportedChains() ([]uint64, error) {
+	return _LombardVerifier.Contract.GetSupportedChains(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetSupportedChains() ([]uint64, error) {
+	return _LombardVerifier.Contract.GetSupportedChains(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) GetSupportedTokens(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "getSupportedTokens")
+
+	if err != nil {
+		return *new([]common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) GetSupportedTokens() ([]common.Address, error) {
+	return _LombardVerifier.Contract.GetSupportedTokens(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) GetSupportedTokens() ([]common.Address, error) {
+	return _LombardVerifier.Contract.GetSupportedTokens(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) IBridge(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "i_bridge")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) IBridge() (common.Address, error) {
+	return _LombardVerifier.Contract.IBridge(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) IBridge() (common.Address, error) {
+	return _LombardVerifier.Contract.IBridge(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) IsSupportedToken(opts *bind.CallOpts, token common.Address) (bool, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "isSupportedToken", token)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) IsSupportedToken(token common.Address) (bool, error) {
+	return _LombardVerifier.Contract.IsSupportedToken(&_LombardVerifier.CallOpts, token)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) IsSupportedToken(token common.Address) (bool, error) {
+	return _LombardVerifier.Contract.IsSupportedToken(&_LombardVerifier.CallOpts, token)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) Owner() (common.Address, error) {
+	return _LombardVerifier.Contract.Owner(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) Owner() (common.Address, error) {
+	return _LombardVerifier.Contract.Owner(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "supportsInterface", interfaceId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _LombardVerifier.Contract.SupportsInterface(&_LombardVerifier.CallOpts, interfaceId)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _LombardVerifier.Contract.SupportsInterface(&_LombardVerifier.CallOpts, interfaceId)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "typeAndVersion")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) TypeAndVersion() (string, error) {
+	return _LombardVerifier.Contract.TypeAndVersion(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) TypeAndVersion() (string, error) {
+	return _LombardVerifier.Contract.TypeAndVersion(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCaller) VersionTag(opts *bind.CallOpts) ([4]byte, error) {
+	var out []interface{}
+	err := _LombardVerifier.contract.Call(opts, &out, "versionTag")
+
+	if err != nil {
+		return *new([4]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([4]byte)).(*[4]byte)
+
+	return out0, err
+
+}
+
+func (_LombardVerifier *LombardVerifierSession) VersionTag() ([4]byte, error) {
+	return _LombardVerifier.Contract.VersionTag(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierCallerSession) VersionTag() ([4]byte, error) {
+	return _LombardVerifier.Contract.VersionTag(&_LombardVerifier.CallOpts)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "acceptOwnership")
+}
+
+func (_LombardVerifier *LombardVerifierSession) AcceptOwnership() (*types.Transaction, error) {
+	return _LombardVerifier.Contract.AcceptOwnership(&_LombardVerifier.TransactOpts)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) AcceptOwnership() (*types.Transaction, error) {
+	return _LombardVerifier.Contract.AcceptOwnership(&_LombardVerifier.TransactOpts)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) ApplyAllowlistUpdates(opts *bind.TransactOpts, allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "applyAllowlistUpdates", allowlistConfigArgsItems)
+}
+
+func (_LombardVerifier *LombardVerifierSession) ApplyAllowlistUpdates(allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.ApplyAllowlistUpdates(&_LombardVerifier.TransactOpts, allowlistConfigArgsItems)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) ApplyAllowlistUpdates(allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.ApplyAllowlistUpdates(&_LombardVerifier.TransactOpts, allowlistConfigArgsItems)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) ApplyRemoteChainConfigUpdates(opts *bind.TransactOpts, remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "applyRemoteChainConfigUpdates", remoteChainConfigArgs)
+}
+
+func (_LombardVerifier *LombardVerifierSession) ApplyRemoteChainConfigUpdates(remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.ApplyRemoteChainConfigUpdates(&_LombardVerifier.TransactOpts, remoteChainConfigArgs)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) ApplyRemoteChainConfigUpdates(remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.ApplyRemoteChainConfigUpdates(&_LombardVerifier.TransactOpts, remoteChainConfigArgs)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) ForwardToVerifier(opts *bind.TransactOpts, message MessageV1CodecMessageV1, messageId [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "forwardToVerifier", message, messageId, arg2, arg3, arg4)
+}
+
+func (_LombardVerifier *LombardVerifierSession) ForwardToVerifier(message MessageV1CodecMessageV1, messageId [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.ForwardToVerifier(&_LombardVerifier.TransactOpts, message, messageId, arg2, arg3, arg4)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) ForwardToVerifier(message MessageV1CodecMessageV1, messageId [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.ForwardToVerifier(&_LombardVerifier.TransactOpts, message, messageId, arg2, arg3, arg4)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) RemovePaths(opts *bind.TransactOpts, remoteChainSelectors []uint64) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "removePaths", remoteChainSelectors)
+}
+
+func (_LombardVerifier *LombardVerifierSession) RemovePaths(remoteChainSelectors []uint64) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.RemovePaths(&_LombardVerifier.TransactOpts, remoteChainSelectors)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) RemovePaths(remoteChainSelectors []uint64) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.RemovePaths(&_LombardVerifier.TransactOpts, remoteChainSelectors)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) SetAllowedFinalityConfig(opts *bind.TransactOpts, allowedFinality [4]byte) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "setAllowedFinalityConfig", allowedFinality)
+}
+
+func (_LombardVerifier *LombardVerifierSession) SetAllowedFinalityConfig(allowedFinality [4]byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetAllowedFinalityConfig(&_LombardVerifier.TransactOpts, allowedFinality)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) SetAllowedFinalityConfig(allowedFinality [4]byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetAllowedFinalityConfig(&_LombardVerifier.TransactOpts, allowedFinality)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) SetDynamicConfig(opts *bind.TransactOpts, dynamicConfig LombardVerifierDynamicConfig) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "setDynamicConfig", dynamicConfig)
+}
+
+func (_LombardVerifier *LombardVerifierSession) SetDynamicConfig(dynamicConfig LombardVerifierDynamicConfig) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetDynamicConfig(&_LombardVerifier.TransactOpts, dynamicConfig)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) SetDynamicConfig(dynamicConfig LombardVerifierDynamicConfig) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetDynamicConfig(&_LombardVerifier.TransactOpts, dynamicConfig)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) SetPath(opts *bind.TransactOpts, remoteChainSelector uint64, lChainId [32]byte, allowedCaller []byte) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "setPath", remoteChainSelector, lChainId, allowedCaller)
+}
+
+func (_LombardVerifier *LombardVerifierSession) SetPath(remoteChainSelector uint64, lChainId [32]byte, allowedCaller []byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetPath(&_LombardVerifier.TransactOpts, remoteChainSelector, lChainId, allowedCaller)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) SetPath(remoteChainSelector uint64, lChainId [32]byte, allowedCaller []byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetPath(&_LombardVerifier.TransactOpts, remoteChainSelector, lChainId, allowedCaller)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) SetRemoteAdapters(opts *bind.TransactOpts, remoteAdapterArgs []LombardVerifierRemoteAdapterArgs) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "setRemoteAdapters", remoteAdapterArgs)
+}
+
+func (_LombardVerifier *LombardVerifierSession) SetRemoteAdapters(remoteAdapterArgs []LombardVerifierRemoteAdapterArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetRemoteAdapters(&_LombardVerifier.TransactOpts, remoteAdapterArgs)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) SetRemoteAdapters(remoteAdapterArgs []LombardVerifierRemoteAdapterArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.SetRemoteAdapters(&_LombardVerifier.TransactOpts, remoteAdapterArgs)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "transferOwnership", to)
+}
+
+func (_LombardVerifier *LombardVerifierSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.TransferOwnership(&_LombardVerifier.TransactOpts, to)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.TransferOwnership(&_LombardVerifier.TransactOpts, to)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) UpdateStorageLocations(opts *bind.TransactOpts, newLocations []string) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "updateStorageLocations", newLocations)
+}
+
+func (_LombardVerifier *LombardVerifierSession) UpdateStorageLocations(newLocations []string) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.UpdateStorageLocations(&_LombardVerifier.TransactOpts, newLocations)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) UpdateStorageLocations(newLocations []string) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.UpdateStorageLocations(&_LombardVerifier.TransactOpts, newLocations)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) UpdateSupportedTokens(opts *bind.TransactOpts, tokensToRemove []common.Address, tokensToSet []LombardVerifierSupportedTokenArgs) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "updateSupportedTokens", tokensToRemove, tokensToSet)
+}
+
+func (_LombardVerifier *LombardVerifierSession) UpdateSupportedTokens(tokensToRemove []common.Address, tokensToSet []LombardVerifierSupportedTokenArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.UpdateSupportedTokens(&_LombardVerifier.TransactOpts, tokensToRemove, tokensToSet)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) UpdateSupportedTokens(tokensToRemove []common.Address, tokensToSet []LombardVerifierSupportedTokenArgs) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.UpdateSupportedTokens(&_LombardVerifier.TransactOpts, tokensToRemove, tokensToSet)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) VerifyMessage(opts *bind.TransactOpts, message MessageV1CodecMessageV1, messageId [32]byte, ccvData []byte) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "verifyMessage", message, messageId, ccvData)
+}
+
+func (_LombardVerifier *LombardVerifierSession) VerifyMessage(message MessageV1CodecMessageV1, messageId [32]byte, ccvData []byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.VerifyMessage(&_LombardVerifier.TransactOpts, message, messageId, ccvData)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) VerifyMessage(message MessageV1CodecMessageV1, messageId [32]byte, ccvData []byte) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.VerifyMessage(&_LombardVerifier.TransactOpts, message, messageId, ccvData)
+}
+
+func (_LombardVerifier *LombardVerifierTransactor) WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error) {
+	return _LombardVerifier.contract.Transact(opts, "withdrawFeeTokens", feeTokens)
+}
+
+func (_LombardVerifier *LombardVerifierSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.WithdrawFeeTokens(&_LombardVerifier.TransactOpts, feeTokens)
+}
+
+func (_LombardVerifier *LombardVerifierTransactorSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _LombardVerifier.Contract.WithdrawFeeTokens(&_LombardVerifier.TransactOpts, feeTokens)
+}
+
+type LombardVerifierAllowListSendersAddedIterator struct {
+	Event *LombardVerifierAllowListSendersAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierAllowListSendersAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierAllowListSendersAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierAllowListSendersAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierAllowListSendersAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierAllowListSendersAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierAllowListSendersAdded struct {
+	DestChainSelector uint64
+	Senders           common.Address
+	Raw               types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterAllowListSendersAdded(opts *bind.FilterOpts, destChainSelector []uint64) (*LombardVerifierAllowListSendersAddedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "AllowListSendersAdded", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierAllowListSendersAddedIterator{contract: _LombardVerifier.contract, event: "AllowListSendersAdded", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchAllowListSendersAdded(opts *bind.WatchOpts, sink chan<- *LombardVerifierAllowListSendersAdded, destChainSelector []uint64) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "AllowListSendersAdded", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierAllowListSendersAdded)
+				if err := _LombardVerifier.contract.UnpackLog(event, "AllowListSendersAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseAllowListSendersAdded(log types.Log) (*LombardVerifierAllowListSendersAdded, error) {
+	event := new(LombardVerifierAllowListSendersAdded)
+	if err := _LombardVerifier.contract.UnpackLog(event, "AllowListSendersAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierAllowListSendersRemovedIterator struct {
+	Event *LombardVerifierAllowListSendersRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierAllowListSendersRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierAllowListSendersRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierAllowListSendersRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierAllowListSendersRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierAllowListSendersRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierAllowListSendersRemoved struct {
+	DestChainSelector uint64
+	Senders           common.Address
+	Raw               types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterAllowListSendersRemoved(opts *bind.FilterOpts, destChainSelector []uint64) (*LombardVerifierAllowListSendersRemovedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "AllowListSendersRemoved", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierAllowListSendersRemovedIterator{contract: _LombardVerifier.contract, event: "AllowListSendersRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchAllowListSendersRemoved(opts *bind.WatchOpts, sink chan<- *LombardVerifierAllowListSendersRemoved, destChainSelector []uint64) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "AllowListSendersRemoved", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierAllowListSendersRemoved)
+				if err := _LombardVerifier.contract.UnpackLog(event, "AllowListSendersRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseAllowListSendersRemoved(log types.Log) (*LombardVerifierAllowListSendersRemoved, error) {
+	event := new(LombardVerifierAllowListSendersRemoved)
+	if err := _LombardVerifier.contract.UnpackLog(event, "AllowListSendersRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierAllowListStateChangedIterator struct {
+	Event *LombardVerifierAllowListStateChanged
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierAllowListStateChangedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierAllowListStateChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierAllowListStateChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierAllowListStateChangedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierAllowListStateChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierAllowListStateChanged struct {
+	DestChainSelector uint64
+	AllowlistEnabled  bool
+	Raw               types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterAllowListStateChanged(opts *bind.FilterOpts, destChainSelector []uint64) (*LombardVerifierAllowListStateChangedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "AllowListStateChanged", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierAllowListStateChangedIterator{contract: _LombardVerifier.contract, event: "AllowListStateChanged", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchAllowListStateChanged(opts *bind.WatchOpts, sink chan<- *LombardVerifierAllowListStateChanged, destChainSelector []uint64) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "AllowListStateChanged", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierAllowListStateChanged)
+				if err := _LombardVerifier.contract.UnpackLog(event, "AllowListStateChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseAllowListStateChanged(log types.Log) (*LombardVerifierAllowListStateChanged, error) {
+	event := new(LombardVerifierAllowListStateChanged)
+	if err := _LombardVerifier.contract.UnpackLog(event, "AllowListStateChanged", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierDynamicConfigSetIterator struct {
+	Event *LombardVerifierDynamicConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierDynamicConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierDynamicConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierDynamicConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierDynamicConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierDynamicConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierDynamicConfigSet struct {
+	DynamicConfig LombardVerifierDynamicConfig
+	Raw           types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterDynamicConfigSet(opts *bind.FilterOpts) (*LombardVerifierDynamicConfigSetIterator, error) {
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "DynamicConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierDynamicConfigSetIterator{contract: _LombardVerifier.contract, event: "DynamicConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchDynamicConfigSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierDynamicConfigSet) (event.Subscription, error) {
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "DynamicConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierDynamicConfigSet)
+				if err := _LombardVerifier.contract.UnpackLog(event, "DynamicConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseDynamicConfigSet(log types.Log) (*LombardVerifierDynamicConfigSet, error) {
+	event := new(LombardVerifierDynamicConfigSet)
+	if err := _LombardVerifier.contract.UnpackLog(event, "DynamicConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierFeeTokenWithdrawnIterator struct {
+	Event *LombardVerifierFeeTokenWithdrawn
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierFeeTokenWithdrawnIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierFeeTokenWithdrawn)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierFeeTokenWithdrawn)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierFeeTokenWithdrawnIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierFeeTokenWithdrawnIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierFeeTokenWithdrawn struct {
+	Receiver common.Address
+	FeeToken common.Address
+	Amount   *big.Int
+	Raw      types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*LombardVerifierFeeTokenWithdrawnIterator, error) {
+
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierFeeTokenWithdrawnIterator{contract: _LombardVerifier.contract, event: "FeeTokenWithdrawn", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *LombardVerifierFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error) {
+
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierFeeTokenWithdrawn)
+				if err := _LombardVerifier.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseFeeTokenWithdrawn(log types.Log) (*LombardVerifierFeeTokenWithdrawn, error) {
+	event := new(LombardVerifierFeeTokenWithdrawn)
+	if err := _LombardVerifier.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierFinalityConfigSetIterator struct {
+	Event *LombardVerifierFinalityConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierFinalityConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierFinalityConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierFinalityConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierFinalityConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierFinalityConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierFinalityConfigSet struct {
+	AllowedFinality [4]byte
+	Raw             types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterFinalityConfigSet(opts *bind.FilterOpts) (*LombardVerifierFinalityConfigSetIterator, error) {
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "FinalityConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierFinalityConfigSetIterator{contract: _LombardVerifier.contract, event: "FinalityConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchFinalityConfigSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierFinalityConfigSet) (event.Subscription, error) {
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "FinalityConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierFinalityConfigSet)
+				if err := _LombardVerifier.contract.UnpackLog(event, "FinalityConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseFinalityConfigSet(log types.Log) (*LombardVerifierFinalityConfigSet, error) {
+	event := new(LombardVerifierFinalityConfigSet)
+	if err := _LombardVerifier.contract.UnpackLog(event, "FinalityConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierOwnershipTransferRequestedIterator struct {
+	Event *LombardVerifierOwnershipTransferRequested
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierOwnershipTransferRequestedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierOwnershipTransferRequested)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierOwnershipTransferRequested)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierOwnershipTransferRequestedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierOwnershipTransferRequestedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierOwnershipTransferRequested struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*LombardVerifierOwnershipTransferRequestedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierOwnershipTransferRequestedIterator{contract: _LombardVerifier.contract, event: "OwnershipTransferRequested", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *LombardVerifierOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierOwnershipTransferRequested)
+				if err := _LombardVerifier.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseOwnershipTransferRequested(log types.Log) (*LombardVerifierOwnershipTransferRequested, error) {
+	event := new(LombardVerifierOwnershipTransferRequested)
+	if err := _LombardVerifier.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierOwnershipTransferredIterator struct {
+	Event *LombardVerifierOwnershipTransferred
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierOwnershipTransferredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierOwnershipTransferred struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*LombardVerifierOwnershipTransferredIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierOwnershipTransferredIterator{contract: _LombardVerifier.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *LombardVerifierOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierOwnershipTransferred)
+				if err := _LombardVerifier.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseOwnershipTransferred(log types.Log) (*LombardVerifierOwnershipTransferred, error) {
+	event := new(LombardVerifierOwnershipTransferred)
+	if err := _LombardVerifier.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierPathRemovedIterator struct {
+	Event *LombardVerifierPathRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierPathRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierPathRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierPathRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierPathRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierPathRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierPathRemoved struct {
+	RemoteChainSelector uint64
+	LChainId            [32]byte
+	AllowedCaller       [32]byte
+	Raw                 types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterPathRemoved(opts *bind.FilterOpts, remoteChainSelector []uint64, lChainId [][32]byte) (*LombardVerifierPathRemovedIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var lChainIdRule []interface{}
+	for _, lChainIdItem := range lChainId {
+		lChainIdRule = append(lChainIdRule, lChainIdItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "PathRemoved", remoteChainSelectorRule, lChainIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierPathRemovedIterator{contract: _LombardVerifier.contract, event: "PathRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchPathRemoved(opts *bind.WatchOpts, sink chan<- *LombardVerifierPathRemoved, remoteChainSelector []uint64, lChainId [][32]byte) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var lChainIdRule []interface{}
+	for _, lChainIdItem := range lChainId {
+		lChainIdRule = append(lChainIdRule, lChainIdItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "PathRemoved", remoteChainSelectorRule, lChainIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierPathRemoved)
+				if err := _LombardVerifier.contract.UnpackLog(event, "PathRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParsePathRemoved(log types.Log) (*LombardVerifierPathRemoved, error) {
+	event := new(LombardVerifierPathRemoved)
+	if err := _LombardVerifier.contract.UnpackLog(event, "PathRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierPathSetIterator struct {
+	Event *LombardVerifierPathSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierPathSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierPathSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierPathSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierPathSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierPathSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierPathSet struct {
+	RemoteChainSelector uint64
+	LChainId            [32]byte
+	AllowedCaller       [32]byte
+	Raw                 types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterPathSet(opts *bind.FilterOpts, remoteChainSelector []uint64, lChainId [][32]byte) (*LombardVerifierPathSetIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var lChainIdRule []interface{}
+	for _, lChainIdItem := range lChainId {
+		lChainIdRule = append(lChainIdRule, lChainIdItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "PathSet", remoteChainSelectorRule, lChainIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierPathSetIterator{contract: _LombardVerifier.contract, event: "PathSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchPathSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierPathSet, remoteChainSelector []uint64, lChainId [][32]byte) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var lChainIdRule []interface{}
+	for _, lChainIdItem := range lChainId {
+		lChainIdRule = append(lChainIdRule, lChainIdItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "PathSet", remoteChainSelectorRule, lChainIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierPathSet)
+				if err := _LombardVerifier.contract.UnpackLog(event, "PathSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParsePathSet(log types.Log) (*LombardVerifierPathSet, error) {
+	event := new(LombardVerifierPathSet)
+	if err := _LombardVerifier.contract.UnpackLog(event, "PathSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierRemoteAdapterSetIterator struct {
+	Event *LombardVerifierRemoteAdapterSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierRemoteAdapterSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierRemoteAdapterSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierRemoteAdapterSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierRemoteAdapterSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierRemoteAdapterSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierRemoteAdapterSet struct {
+	RemoteChainSelector uint64
+	Token               common.Address
+	RemoteAdapter       [32]byte
+	Raw                 types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterRemoteAdapterSet(opts *bind.FilterOpts, remoteChainSelector []uint64, token []common.Address) (*LombardVerifierRemoteAdapterSetIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var tokenRule []interface{}
+	for _, tokenItem := range token {
+		tokenRule = append(tokenRule, tokenItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "RemoteAdapterSet", remoteChainSelectorRule, tokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierRemoteAdapterSetIterator{contract: _LombardVerifier.contract, event: "RemoteAdapterSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchRemoteAdapterSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierRemoteAdapterSet, remoteChainSelector []uint64, token []common.Address) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var tokenRule []interface{}
+	for _, tokenItem := range token {
+		tokenRule = append(tokenRule, tokenItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "RemoteAdapterSet", remoteChainSelectorRule, tokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierRemoteAdapterSet)
+				if err := _LombardVerifier.contract.UnpackLog(event, "RemoteAdapterSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseRemoteAdapterSet(log types.Log) (*LombardVerifierRemoteAdapterSet, error) {
+	event := new(LombardVerifierRemoteAdapterSet)
+	if err := _LombardVerifier.contract.UnpackLog(event, "RemoteAdapterSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierRemoteChainConfigSetIterator struct {
+	Event *LombardVerifierRemoteChainConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierRemoteChainConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierRemoteChainConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierRemoteChainConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierRemoteChainConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierRemoteChainConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierRemoteChainConfigSet struct {
+	RemoteChainSelector uint64
+	Router              common.Address
+	AllowlistEnabled    bool
+	Raw                 types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterRemoteChainConfigSet(opts *bind.FilterOpts, remoteChainSelector []uint64) (*LombardVerifierRemoteChainConfigSetIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "RemoteChainConfigSet", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierRemoteChainConfigSetIterator{contract: _LombardVerifier.contract, event: "RemoteChainConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchRemoteChainConfigSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierRemoteChainConfigSet, remoteChainSelector []uint64) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "RemoteChainConfigSet", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierRemoteChainConfigSet)
+				if err := _LombardVerifier.contract.UnpackLog(event, "RemoteChainConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseRemoteChainConfigSet(log types.Log) (*LombardVerifierRemoteChainConfigSet, error) {
+	event := new(LombardVerifierRemoteChainConfigSet)
+	if err := _LombardVerifier.contract.UnpackLog(event, "RemoteChainConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierStorageLocationsUpdatedIterator struct {
+	Event *LombardVerifierStorageLocationsUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierStorageLocationsUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierStorageLocationsUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierStorageLocationsUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierStorageLocationsUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierStorageLocationsUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierStorageLocationsUpdated struct {
+	OldLocations []string
+	NewLocations []string
+	Raw          types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterStorageLocationsUpdated(opts *bind.FilterOpts) (*LombardVerifierStorageLocationsUpdatedIterator, error) {
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "StorageLocationsUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierStorageLocationsUpdatedIterator{contract: _LombardVerifier.contract, event: "StorageLocationsUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchStorageLocationsUpdated(opts *bind.WatchOpts, sink chan<- *LombardVerifierStorageLocationsUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "StorageLocationsUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierStorageLocationsUpdated)
+				if err := _LombardVerifier.contract.UnpackLog(event, "StorageLocationsUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseStorageLocationsUpdated(log types.Log) (*LombardVerifierStorageLocationsUpdated, error) {
+	event := new(LombardVerifierStorageLocationsUpdated)
+	if err := _LombardVerifier.contract.UnpackLog(event, "StorageLocationsUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierSupportedTokenRemovedIterator struct {
+	Event *LombardVerifierSupportedTokenRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierSupportedTokenRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierSupportedTokenRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierSupportedTokenRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierSupportedTokenRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierSupportedTokenRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierSupportedTokenRemoved struct {
+	Token common.Address
+	Raw   types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterSupportedTokenRemoved(opts *bind.FilterOpts) (*LombardVerifierSupportedTokenRemovedIterator, error) {
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "SupportedTokenRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierSupportedTokenRemovedIterator{contract: _LombardVerifier.contract, event: "SupportedTokenRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchSupportedTokenRemoved(opts *bind.WatchOpts, sink chan<- *LombardVerifierSupportedTokenRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "SupportedTokenRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierSupportedTokenRemoved)
+				if err := _LombardVerifier.contract.UnpackLog(event, "SupportedTokenRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseSupportedTokenRemoved(log types.Log) (*LombardVerifierSupportedTokenRemoved, error) {
+	event := new(LombardVerifierSupportedTokenRemoved)
+	if err := _LombardVerifier.contract.UnpackLog(event, "SupportedTokenRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardVerifierSupportedTokenSetIterator struct {
+	Event *LombardVerifierSupportedTokenSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardVerifierSupportedTokenSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardVerifierSupportedTokenSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardVerifierSupportedTokenSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardVerifierSupportedTokenSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardVerifierSupportedTokenSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardVerifierSupportedTokenSet struct {
+	LocalToken   common.Address
+	LocalAdapter common.Address
+	Raw          types.Log
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) FilterSupportedTokenSet(opts *bind.FilterOpts) (*LombardVerifierSupportedTokenSetIterator, error) {
+
+	logs, sub, err := _LombardVerifier.contract.FilterLogs(opts, "SupportedTokenSet")
+	if err != nil {
+		return nil, err
+	}
+	return &LombardVerifierSupportedTokenSetIterator{contract: _LombardVerifier.contract, event: "SupportedTokenSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) WatchSupportedTokenSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierSupportedTokenSet) (event.Subscription, error) {
+
+	logs, sub, err := _LombardVerifier.contract.WatchLogs(opts, "SupportedTokenSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardVerifierSupportedTokenSet)
+				if err := _LombardVerifier.contract.UnpackLog(event, "SupportedTokenSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardVerifier *LombardVerifierFilterer) ParseSupportedTokenSet(log types.Log) (*LombardVerifierSupportedTokenSet, error) {
+	event := new(LombardVerifierSupportedTokenSet)
+	if err := _LombardVerifier.contract.UnpackLog(event, "SupportedTokenSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type GetFee struct {
+	FeeUSDCents        uint16
+	GasForVerification uint32
+	PayloadSizeBytes   uint32
+}
+type GetRemoteChainConfig struct {
+	RemoteChainConfig  BaseVerifierRemoteChainConfigArgs
+	AllowedSendersList []common.Address
+}
+
+func (LombardVerifierAllowListSendersAdded) Topic() common.Hash {
+	return common.HexToHash("0x85682793ee26ba7d2d073ce790a50b388a1791aab25fc368bcce99d3b1d4da80")
+}
+
+func (LombardVerifierAllowListSendersRemoved) Topic() common.Hash {
+	return common.HexToHash("0x9ac16e02c9a455144d35e2f0d80817a608340dee3c104f547ceb4433df418d82")
+}
+
+func (LombardVerifierAllowListStateChanged) Topic() common.Hash {
+	return common.HexToHash("0x8504171b9fc8a6c38617bdd508715ec759043b69df1608d7b0db90c0f8523492")
+}
+
+func (LombardVerifierDynamicConfigSet) Topic() common.Hash {
+	return common.HexToHash("0xf6c55d191ab03af25fd3025708a62a6038eb78ea86b0afb256fc3df66c860f60")
+}
+
+func (LombardVerifierFeeTokenWithdrawn) Topic() common.Hash {
+	return common.HexToHash("0x508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e")
+}
+
+func (LombardVerifierFinalityConfigSet) Topic() common.Hash {
+	return common.HexToHash("0x307cf716eade81675bea3ccb6917b0f91baa2160056765d9a83d76f819caf06a")
+}
+
+func (LombardVerifierOwnershipTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
+}
+
+func (LombardVerifierOwnershipTransferred) Topic() common.Hash {
+	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
+}
+
+func (LombardVerifierPathRemoved) Topic() common.Hash {
+	return common.HexToHash("0x8a8e4c676433747219d2fee4ea128776522bb0177478e1e0a375e880948ed37b")
+}
+
+func (LombardVerifierPathSet) Topic() common.Hash {
+	return common.HexToHash("0x83eda38165c92f401f97217d5ead82ef163d0b716c3979eff4670361bc2dc0c9")
+}
+
+func (LombardVerifierRemoteAdapterSet) Topic() common.Hash {
+	return common.HexToHash("0xf2bb53a7e6aae800a85fba961b2bc3124a23dd44d95fefe0b7b29bd90975a976")
+}
+
+func (LombardVerifierRemoteChainConfigSet) Topic() common.Hash {
+	return common.HexToHash("0x4cef55db91890720ca3d94563535726752813bffa29490d6d41218acb6831cc9")
+}
+
+func (LombardVerifierStorageLocationsUpdated) Topic() common.Hash {
+	return common.HexToHash("0xec9f9416b098576351ada0c342c1381ca08990ee094978ddd1003ef013d07586")
+}
+
+func (LombardVerifierSupportedTokenRemoved) Topic() common.Hash {
+	return common.HexToHash("0xbea12876694c4055c71f74308f752b9027cf3d554194000a366abddfc239a306")
+}
+
+func (LombardVerifierSupportedTokenSet) Topic() common.Hash {
+	return common.HexToHash("0x086dcdf32d9aaaee4446c7bcf02b41c0d3b4923bf9d0265b033974e09d5f05e3")
+}
+
+func (_LombardVerifier *LombardVerifier) Address() common.Address {
+	return _LombardVerifier.address
+}
+
+type LombardVerifierInterface interface {
+	GetAllowedFinalityConfig(opts *bind.CallOpts) ([4]byte, error)
+
+	GetDynamicConfig(opts *bind.CallOpts) (LombardVerifierDynamicConfig, error)
+
+	GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+		error)
+
+	GetPath(opts *bind.CallOpts, remoteChainSelector uint64) (LombardVerifierPath, error)
+
+	GetRemoteAdapter(opts *bind.CallOpts, remoteChainSelector uint64, token common.Address) ([32]byte, error)
+
+	GetRemoteChainConfig(opts *bind.CallOpts, remoteChainSelector uint64) (GetRemoteChainConfig,
+
+		error)
+
+	GetStorageLocations(opts *bind.CallOpts) ([]string, error)
+
+	GetSupportedChains(opts *bind.CallOpts) ([]uint64, error)
+
+	GetSupportedTokens(opts *bind.CallOpts) ([]common.Address, error)
+
+	IBridge(opts *bind.CallOpts) (common.Address, error)
+
+	IsSupportedToken(opts *bind.CallOpts, token common.Address) (bool, error)
+
+	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
+
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+
+	VersionTag(opts *bind.CallOpts) ([4]byte, error)
+
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	ApplyAllowlistUpdates(opts *bind.TransactOpts, allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error)
+
+	ApplyRemoteChainConfigUpdates(opts *bind.TransactOpts, remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error)
+
+	ForwardToVerifier(opts *bind.TransactOpts, message MessageV1CodecMessageV1, messageId [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) (*types.Transaction, error)
+
+	RemovePaths(opts *bind.TransactOpts, remoteChainSelectors []uint64) (*types.Transaction, error)
+
+	SetAllowedFinalityConfig(opts *bind.TransactOpts, allowedFinality [4]byte) (*types.Transaction, error)
+
+	SetDynamicConfig(opts *bind.TransactOpts, dynamicConfig LombardVerifierDynamicConfig) (*types.Transaction, error)
+
+	SetPath(opts *bind.TransactOpts, remoteChainSelector uint64, lChainId [32]byte, allowedCaller []byte) (*types.Transaction, error)
+
+	SetRemoteAdapters(opts *bind.TransactOpts, remoteAdapterArgs []LombardVerifierRemoteAdapterArgs) (*types.Transaction, error)
+
+	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
+
+	UpdateStorageLocations(opts *bind.TransactOpts, newLocations []string) (*types.Transaction, error)
+
+	UpdateSupportedTokens(opts *bind.TransactOpts, tokensToRemove []common.Address, tokensToSet []LombardVerifierSupportedTokenArgs) (*types.Transaction, error)
+
+	VerifyMessage(opts *bind.TransactOpts, message MessageV1CodecMessageV1, messageId [32]byte, ccvData []byte) (*types.Transaction, error)
+
+	WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error)
+
+	FilterAllowListSendersAdded(opts *bind.FilterOpts, destChainSelector []uint64) (*LombardVerifierAllowListSendersAddedIterator, error)
+
+	WatchAllowListSendersAdded(opts *bind.WatchOpts, sink chan<- *LombardVerifierAllowListSendersAdded, destChainSelector []uint64) (event.Subscription, error)
+
+	ParseAllowListSendersAdded(log types.Log) (*LombardVerifierAllowListSendersAdded, error)
+
+	FilterAllowListSendersRemoved(opts *bind.FilterOpts, destChainSelector []uint64) (*LombardVerifierAllowListSendersRemovedIterator, error)
+
+	WatchAllowListSendersRemoved(opts *bind.WatchOpts, sink chan<- *LombardVerifierAllowListSendersRemoved, destChainSelector []uint64) (event.Subscription, error)
+
+	ParseAllowListSendersRemoved(log types.Log) (*LombardVerifierAllowListSendersRemoved, error)
+
+	FilterAllowListStateChanged(opts *bind.FilterOpts, destChainSelector []uint64) (*LombardVerifierAllowListStateChangedIterator, error)
+
+	WatchAllowListStateChanged(opts *bind.WatchOpts, sink chan<- *LombardVerifierAllowListStateChanged, destChainSelector []uint64) (event.Subscription, error)
+
+	ParseAllowListStateChanged(log types.Log) (*LombardVerifierAllowListStateChanged, error)
+
+	FilterDynamicConfigSet(opts *bind.FilterOpts) (*LombardVerifierDynamicConfigSetIterator, error)
+
+	WatchDynamicConfigSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierDynamicConfigSet) (event.Subscription, error)
+
+	ParseDynamicConfigSet(log types.Log) (*LombardVerifierDynamicConfigSet, error)
+
+	FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*LombardVerifierFeeTokenWithdrawnIterator, error)
+
+	WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *LombardVerifierFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error)
+
+	ParseFeeTokenWithdrawn(log types.Log) (*LombardVerifierFeeTokenWithdrawn, error)
+
+	FilterFinalityConfigSet(opts *bind.FilterOpts) (*LombardVerifierFinalityConfigSetIterator, error)
+
+	WatchFinalityConfigSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierFinalityConfigSet) (event.Subscription, error)
+
+	ParseFinalityConfigSet(log types.Log) (*LombardVerifierFinalityConfigSet, error)
+
+	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*LombardVerifierOwnershipTransferRequestedIterator, error)
+
+	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *LombardVerifierOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferRequested(log types.Log) (*LombardVerifierOwnershipTransferRequested, error)
+
+	FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*LombardVerifierOwnershipTransferredIterator, error)
+
+	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *LombardVerifierOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferred(log types.Log) (*LombardVerifierOwnershipTransferred, error)
+
+	FilterPathRemoved(opts *bind.FilterOpts, remoteChainSelector []uint64, lChainId [][32]byte) (*LombardVerifierPathRemovedIterator, error)
+
+	WatchPathRemoved(opts *bind.WatchOpts, sink chan<- *LombardVerifierPathRemoved, remoteChainSelector []uint64, lChainId [][32]byte) (event.Subscription, error)
+
+	ParsePathRemoved(log types.Log) (*LombardVerifierPathRemoved, error)
+
+	FilterPathSet(opts *bind.FilterOpts, remoteChainSelector []uint64, lChainId [][32]byte) (*LombardVerifierPathSetIterator, error)
+
+	WatchPathSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierPathSet, remoteChainSelector []uint64, lChainId [][32]byte) (event.Subscription, error)
+
+	ParsePathSet(log types.Log) (*LombardVerifierPathSet, error)
+
+	FilterRemoteAdapterSet(opts *bind.FilterOpts, remoteChainSelector []uint64, token []common.Address) (*LombardVerifierRemoteAdapterSetIterator, error)
+
+	WatchRemoteAdapterSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierRemoteAdapterSet, remoteChainSelector []uint64, token []common.Address) (event.Subscription, error)
+
+	ParseRemoteAdapterSet(log types.Log) (*LombardVerifierRemoteAdapterSet, error)
+
+	FilterRemoteChainConfigSet(opts *bind.FilterOpts, remoteChainSelector []uint64) (*LombardVerifierRemoteChainConfigSetIterator, error)
+
+	WatchRemoteChainConfigSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierRemoteChainConfigSet, remoteChainSelector []uint64) (event.Subscription, error)
+
+	ParseRemoteChainConfigSet(log types.Log) (*LombardVerifierRemoteChainConfigSet, error)
+
+	FilterStorageLocationsUpdated(opts *bind.FilterOpts) (*LombardVerifierStorageLocationsUpdatedIterator, error)
+
+	WatchStorageLocationsUpdated(opts *bind.WatchOpts, sink chan<- *LombardVerifierStorageLocationsUpdated) (event.Subscription, error)
+
+	ParseStorageLocationsUpdated(log types.Log) (*LombardVerifierStorageLocationsUpdated, error)
+
+	FilterSupportedTokenRemoved(opts *bind.FilterOpts) (*LombardVerifierSupportedTokenRemovedIterator, error)
+
+	WatchSupportedTokenRemoved(opts *bind.WatchOpts, sink chan<- *LombardVerifierSupportedTokenRemoved) (event.Subscription, error)
+
+	ParseSupportedTokenRemoved(log types.Log) (*LombardVerifierSupportedTokenRemoved, error)
+
+	FilterSupportedTokenSet(opts *bind.FilterOpts) (*LombardVerifierSupportedTokenSetIterator, error)
+
+	WatchSupportedTokenSet(opts *bind.WatchOpts, sink chan<- *LombardVerifierSupportedTokenSet) (event.Subscription, error)
+
+	ParseSupportedTokenSet(log types.Log) (*LombardVerifierSupportedTokenSet, error)
+
+	Address() common.Address
+}

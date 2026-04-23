@@ -57,7 +57,7 @@ func (p *PeerID) UnmarshalText(bs []byte) error {
 	var peerID libocrtypes.PeerID
 	err := peerID.UnmarshalText([]byte(input))
 	if err != nil {
-		return errors.New(fmt.Sprintf(`PeerID#UnmarshalText("%v"): %v`, input, err))
+		return fmt.Errorf("PeerID#UnmarshalText(%q): %w", input, err)
 	}
 	*p = PeerID(peerID)
 	return nil
@@ -103,12 +103,22 @@ func MustPeerIDFromString(s string) PeerID {
 	return p
 }
 
+func normalizeChainTypeForKeys(chainName string) string {
+	switch chainName {
+	case "anvil", "geth":
+		return "evm"
+	default:
+		return chainName
+	}
+}
+
 func CreateNodeKeysBundle(
 	nodes []*clclient.ChainlinkClient,
 	chainName string,
 	chainID string,
 ) (map[string]clclient.NodeKeysBundle, error) {
 	nkb := make(map[string]clclient.NodeKeysBundle)
+	nChainName := normalizeChainTypeForKeys(chainName)
 	for _, n := range nodes {
 		p2pkeys, err := n.MustReadP2PKeys()
 		if err != nil {
@@ -121,34 +131,45 @@ func CreateNodeKeysBundle(
 		var txKey *clclient.TxKey
 		var ocrKey *clclient.OCR2Key
 		for _, key := range existingOCR2Keys.Data {
-			if key.Attributes.ChainType == chainName {
+			if key.Attributes.ChainType == nChainName {
 				ocrKey = &clclient.OCR2Key{
 					Data: key,
 				}
 				break
 			}
 		}
-		existingTxnKeys, _, err := n.ReadTxKeys(chainName)
+		existingTxnKeys, _, err := n.ReadTxKeys(nChainName)
 		if err != nil {
 			return nil, err
 		}
-		if len(existingTxnKeys.Data) > 1 {
-			return nil, fmt.Errorf("more than one txn key for chain %s on node %s", chainName, n.Config.URL)
-		} else if len(existingTxnKeys.Data) == 1 {
-			txKey = &clclient.TxKey{
-				Data: existingTxnKeys.Data[0],
+
+		if len(existingTxnKeys.Data) > 0 {
+			if nChainName == "evm" {
+				primaryETHKey, primaryErr := n.ReadPrimaryETHKey(chainID)
+				if primaryErr == nil {
+					for _, key := range existingTxnKeys.Data {
+						if strings.EqualFold(key.Attributes.Address, primaryETHKey.Attributes.Address) {
+							txKey = &clclient.TxKey{Data: key}
+							break
+						}
+					}
+				}
+			}
+
+			if txKey == nil {
+				txKey = &clclient.TxKey{Data: existingTxnKeys.Data[0]}
 			}
 		}
 
 		peerID := p2pkeys.Data[0].Attributes.PeerID
 		if txKey == nil {
-			txKey, _, err = n.CreateTxKey(chainName, chainID)
+			txKey, _, err = n.CreateTxKey(nChainName, chainID)
 			if err != nil {
 				return nil, err
 			}
 		}
 		if ocrKey == nil {
-			ocrKey, _, err = n.CreateOCR2Key(chainName)
+			ocrKey, _, err = n.CreateOCR2Key(nChainName)
 			if err != nil {
 				return nil, err
 			}

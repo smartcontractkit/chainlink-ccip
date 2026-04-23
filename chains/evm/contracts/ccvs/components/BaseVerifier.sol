@@ -7,6 +7,7 @@ import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../../libraries/Client.sol";
+import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
@@ -22,19 +23,22 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error CallerIsNotARampOnRouter(address caller);
   error RemoteChainNotSupported(uint64 remoteChainSelector);
   error ZeroAddressNotAllowed();
+  error VersionTagCannotBeZero();
 
   event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address senders);
   event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
+  event FinalityConfigSet(bytes4 allowedFinality);
 
+  // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
-    IRouter router; // ──────────╮ Local router to use for messages to/fom this chain.
-    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
-    uint32 gasForVerification; //│ The gas to reserve for verification of messages on the remote chain.
-    uint32 payloadSizeBytes; //  │ The size of the verification payload on the remote chain.
-    bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
+    IRouter router; // ─────────────╮ Local router to use for messages to/from this chain.
+    uint16 feeUSDCents; //          │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
+    uint32 gasForVerification; //   │ The gas to reserve for verification of messages on the remote chain.
+    uint16 payloadSizeBytes; //     │ The size of the verification payload on the remote chain.
+    bool allowlistEnabled; // ──────╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
@@ -44,7 +48,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     bool allowlistEnabled; //      │ True if the allowlist is enabled.
     uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this remote chain.
     uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the remote chain.
-    uint32 payloadSizeBytes; // ───╯ The size of the verification payload on the remote chain.
+    uint16 payloadSizeBytes; // ───╯ The size of the verification payload on the remote chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -57,6 +61,13 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @dev The rmn contract.
   IRMNRemote internal immutable i_rmn;
+  /// @dev The version tag that this instance of the verifier supports. This could be used as a domain separator, but
+  /// should never be the primary defense against signature replay attacks across different verifiers. The primary
+  /// defense should be using non-overlapping signer sets for different verifiers, and the version tag should only be
+  /// used to prevent accidental misuse of signatures in the wrong verifier.
+  /// A schema for domain separation could be to use the first two bytes as unique verifier ID, and the second two bytes
+  /// for versioning within the same verifier. For example, 0xAABBCCDD could represent verifier ID AABB, version CCDD.
+  bytes4 internal immutable i_versionTag;
 
   /// @dev The remote chain specific configs.
   mapping(uint64 remoteChainSelector => RemoteChainConfig remoteChainConfig) private s_remoteChainConfigs;
@@ -65,15 +76,22 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// implement a way to update this value if needed.
   string[] internal s_storageLocations;
 
+  /// @dev Allowed finality config for fast finality transfers (see `FinalityCodec`).
+  /// FinalityCodec.WAIT_FOR_FINALITY_FLAG means wait for finality.
+  bytes4 internal s_allowedFinalityConfig;
+
   constructor(
     string[] memory storageLocations,
-    address rmnAddress
+    address rmnAddress,
+    bytes4 _versionTag
   ) {
     _setStorageLocations(storageLocations);
 
     if (rmnAddress == address(0)) {
       revert ZeroAddressNotAllowed();
     }
+    if (_versionTag == bytes4(0)) revert VersionTagCannotBeZero();
+    i_versionTag = _versionTag;
 
     i_rmn = IRMNRemote(rmnAddress);
   }
@@ -106,19 +124,49 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     return s_storageLocations;
   }
 
+  /// @notice Gets the finality config as defined in the FinalityCodec library. This value does NOT 1:1 translate to
+  /// a block depth. The finality config contains special flags and should only be encoded/decoded using the
+  /// FinalityCodec library. Checks must happen by calling `FinalityCodec._ensureRequestedFinalityAllowed`.
+  function getAllowedFinalityConfig() public view virtual returns (bytes4 allowedFinality) {
+    return s_allowedFinalityConfig;
+  }
+
+  /// @notice Sets the finality config according to the FinalityCodec library encoding.
+  /// @param allowedFinality The finality settings allowed in this verifier, according to the FinalityCodec encoding.
+  function _setAllowedFinalityConfig(
+    bytes4 allowedFinality
+  ) internal virtual {
+    // Any bytes4 value is accepted as allowedFinality; the FinalityCodec semantics are enforced when requests are
+    // checked against this value via FinalityCodec._ensureRequestedFinalityAllowed.
+    s_allowedFinalityConfig = allowedFinality;
+
+    emit FinalityConfigSet(allowedFinality);
+  }
+
   /// @notice get ChainConfig configured for the remoteChainSelector.
   /// @param remoteChainSelector The remote chain selector.
-  /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
-  /// @return router address of the local router.
+  /// @return remoteChainConfig The struct containing the remote chain settings.
   /// @return allowedSendersList list of addresses that are allowed to send messages to the remote chain.
   function getRemoteChainConfig(
     uint64 remoteChainSelector
-  ) external view virtual returns (bool allowlistEnabled, address router, address[] memory allowedSendersList) {
+  )
+    external
+    view
+    virtual
+    returns (RemoteChainConfigArgs memory remoteChainConfig, address[] memory allowedSendersList)
+  {
     RemoteChainConfig storage config = _getRemoteChainConfig(remoteChainSelector);
-    allowlistEnabled = config.allowlistEnabled;
-    router = address(config.router);
-    allowedSendersList = config.allowedSendersList.values();
-    return (allowlistEnabled, router, allowedSendersList);
+    return (
+      RemoteChainConfigArgs({
+        router: config.router,
+        remoteChainSelector: remoteChainSelector,
+        allowlistEnabled: config.allowlistEnabled,
+        feeUSDCents: config.feeUSDCents,
+        gasForVerification: config.gasForVerification,
+        payloadSizeBytes: config.payloadSizeBytes
+      }),
+      config.allowedSendersList.values()
+    );
   }
 
   function _getRemoteChainConfig(
@@ -241,16 +289,16 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
-    uint16 // blockConfirmations
+    bytes4 requestedFinality
   ) external view virtual returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
-    if (s_remoteChainConfigs[destChainSelector].router == IRouter(address(0))) {
+    RemoteChainConfig storage config = _getRemoteChainConfig(destChainSelector);
+
+    if (config.router == IRouter(address(0))) {
       revert RemoteChainNotSupported(destChainSelector);
     }
-    return (
-      s_remoteChainConfigs[destChainSelector].feeUSDCents,
-      s_remoteChainConfigs[destChainSelector].gasForVerification,
-      s_remoteChainConfigs[destChainSelector].payloadSizeBytes
-    );
+    FinalityCodec._ensureRequestedFinalityAllowed(requestedFinality, getAllowedFinalityConfig());
+
+    return (config.feeUSDCents, config.gasForVerification, config.payloadSizeBytes);
   }
 
   function _assertNotCursedByRMN(
@@ -263,7 +311,9 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @notice Exposes the version tag for outbound requests.
   /// @dev Used by operational tooling. Verifiers implemented by CLL override this function.
-  function versionTag() public pure virtual returns (bytes4);
+  function versionTag() public view virtual returns (bytes4 tag) {
+    return i_versionTag;
+  }
 
   /// @inheritdoc IERC165
   function supportsInterface(

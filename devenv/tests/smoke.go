@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -21,12 +22,7 @@ import (
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
-var supportedTokenFamilies = map[string]bool{
-	chainsel.FamilyEVM:    true,
-	chainsel.FamilySolana: true,
-}
-
-func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
+func buildImplsMap(t *testing.T, e *deployment.Environment, selectors []uint64) map[uint64]ccip.CCIP16ProductConfiguration {
 	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
 	for _, selector := range selectors {
 		family, err := chainsel.GetSelectorFamily(selector)
@@ -38,6 +34,11 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		i.SetCLDF(e)
 		selectorsToImpl[selector] = i
 	}
+	return selectorsToImpl
+}
+
+func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
+	selectorsToImpl := buildImplsMap(t, e, selectors)
 
 	if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
 		t.Parallel()
@@ -65,8 +66,30 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		toImpl := tc.toChain
 		laneTag := fmt.Sprintf("%s->%s", fromImpl.Family(), toImpl.Family())
 
-		t.Run(fmt.Sprintf("%s message", laneTag), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s message to contract", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello contract"),
+				FeeToken:          "",
+				ExtraArgs:         extraArgs,
+				TokenAmounts:      nil,
+			})
+			require.NoError(t, err)
+
+			sendMsgRequireNoError(t, fromImpl, toImpl, msg)
+		})
+
+		t.Run(fmt.Sprintf("%s message to eoa", laneTag), func(t *testing.T) {
+			if toImpl.Family() == chainsel.FamilyTon {
+				t.Skip("This will hang")
+			}
+
+			receiver := toImpl.EOAReceiver(t)
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
 
@@ -80,12 +103,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			})
 			require.NoError(t, err)
 
-			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.NoError(t, err)
-			seqNr := ccipocr3.SeqNum(seq)
-			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
-			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
-			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+			sendMsgRequireNoError(t, fromImpl, toImpl, msg)
 		})
 
 		t.Run(fmt.Sprintf("%s token transfer", laneTag), func(t *testing.T) {
@@ -93,14 +111,18 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
 
-			_, fromSupported := supportedTokenFamilies[fromImpl.Family()]
-			_, toSupported := supportedTokenFamilies[toImpl.Family()]
-			if !fromSupported || !toSupported {
-				t.Skip("Token transfers not supported on " + laneTag)
+			fromImplTokenExpansionConfig, err := fromImpl.GetTokenExpansionConfig()
+			if errors.Is(err, errors.ErrUnsupported) {
+				t.Skip("source chain does not support token transfers")
 			}
-
-			srcChainSel, srcTokenCfg := fromImpl.ChainSelector(), fromImpl.GetTokenExpansionConfig().DeployTokenInput
-			dstChainSel, dstTokenCfg := toImpl.ChainSelector(), toImpl.GetTokenExpansionConfig().DeployTokenInput
+			require.NoError(t, err)
+			srcChainSel, srcTokenCfg := fromImpl.ChainSelector(), fromImplTokenExpansionConfig.DeployTokenInput
+			toImplTokenExpansionConfig, err := toImpl.GetTokenExpansionConfig()
+			if errors.Is(err, errors.ErrUnsupported) {
+				t.Skip("destination chain does not support token transfers")
+			}
+			require.NoError(t, err)
+			dstChainSel, dstTokenCfg := toImpl.ChainSelector(), toImplTokenExpansionConfig.DeployTokenInput
 
 			srcTokenFilterDS := datastore.AddressRef{ChainSelector: srcChainSel, Qualifier: srcTokenCfg.Symbol, Type: datastore.ContractType(srcTokenCfg.Type)}
 			srcTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, srcTokenFilterDS, srcChainSel, datastore_utils.FullRef)
@@ -158,12 +180,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			})
 			require.NoError(t, err)
 
-			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.NoError(t, err)
-			seqNr := ccipocr3.SeqNum(seq)
-			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
-			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
-			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+			sendMsgRequireNoError(t, fromImpl, toImpl, msg)
 			require.Eventually(t, balanceCheck, 5*time.Second, time.Second)
 		})
 
@@ -184,11 +201,28 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			})
 			require.NoError(t, err)
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.Error(t, err)
+			sendMsgRequireErrorOnSrcChain(t, fromImpl, toImpl, msg)
 		})
 
-		// TODO: send data payload larger than limit
+		t.Run(fmt.Sprintf("%s payload larger than limit", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			// Construct a payload that exceeds the typical 32KB limit
+			oversizedData := make([]byte, 33*1024) // 33 KB of data
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              oversizedData,
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			sendMsgRequireErrorOnSrcChain(t, fromImpl, toImpl, msg)
+		})
 
 		t.Run(fmt.Sprintf("%s invalid extra args tag", laneTag), func(t *testing.T) {
 			if fromImpl.Family() == chainsel.FamilyTon {
@@ -203,8 +237,29 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			})
 			require.NoError(t, err)
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.Error(t, err)
+			sendMsgRequireErrorOnSrcChain(t, fromImpl, toImpl, msg)
+		})
+
+		t.Run(fmt.Sprintf("%s empty extra args tag", laneTag), func(t *testing.T) {
+			if toImpl.Family() == chainsel.FamilyTon {
+				t.Skip("TODO: Debug why message is committed but not executed. Haven't been able to find the log.")
+			}
+			if fromImpl.Family() == chainsel.FamilyTon {
+				t.Skip("TON expects a well-formatted BOC or BuildMessage will fail")
+			}
+			if toImpl.Family() == chainsel.FamilyEVM {
+				t.Skip("Any->EVM still uses default extraArgs when empty.")
+			}
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          toImpl.CCIPReceiver(),
+				Data:              []byte("hello world"),
+				ExtraArgs:         []byte{}, // empty extraArgs
+			})
+			require.NoError(t, err)
+
+			sendMsgRequireErrorOnSrcChain(t, fromImpl, toImpl, msg)
 		})
 
 		t.Run(fmt.Sprintf("%s invalid/unconfigured chain selector", laneTag), func(t *testing.T) {
@@ -221,40 +276,38 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			})
 			require.NoError(t, err)
 
-			_, err = fromImpl.SendMessage(t.Context(), invalidUnconfiguredChainSelector, msg)
-			require.Error(t, err)
+			_, messageID, err := fromImpl.SendMessage(t.Context(), invalidUnconfiguredChainSelector, msg)
+			if err == nil {
+				t.Fatalf("expected error when sending message to invalid/unconfigured chain selector, but got success with messageId: %s", messageID)
+			}
 		})
 
 		t.Run(fmt.Sprintf("%s invalid receiver", laneTag), func(t *testing.T) {
-			switch {
-
-			case fromImpl.Family() == chainsel.FamilySolana:
-				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
-			case toImpl.Family() == chainsel.FamilySolana:
-				// TODO call skip in a getInvalidReceivers interface maybe
+			if fromImpl.Family() == chainsel.FamilySolana {
 				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
 			}
-			invalidReceiver := []byte{99}
 
-			extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
-			require.NoError(t, err)
+			invalidReceivers := toImpl.InvalidAddresses()
+			if len(invalidReceivers) == 0 {
+				t.Skip("destination chain provided no invalid addresses to test against")
+			}
 
-			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
-				DestChainSelector: toImpl.ChainSelector(),
-				Receiver:          invalidReceiver,
-				Data:              []byte("hello world"),
-				ExtraArgs:         extraArgs,
-			})
-			require.NoError(t, err)
+			for _, invalidReceiver := range invalidReceivers {
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.Error(t, err)
+				extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          invalidReceiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				sendMsgRequireErrorOnSrcChain(t, fromImpl, toImpl, msg)
+			}
 		})
-
-		// TODO: message with not enough gas
-		// then manual re-exec with higher limit
-
-		// TODO: test whitelisting
 
 		t.Run(fmt.Sprintf("%s OOO flag is required on non-EVMs", laneTag), func(t *testing.T) {
 			if fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyEVM {
@@ -265,6 +318,11 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				t.Skip("TODO: Setup lane block OOO on Solana->EVM")
 				// 1. evm adapter returns nil adapter
 				// 2. solana setup lane seems not to be setting enforeceOOO on the contract side
+			}
+
+			if (fromImpl.Family() == chainsel.FamilyTon && toImpl.Family() == chainsel.FamilyEVM) ||
+				(fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyTon) {
+				t.Skip("Skipping OOO test: FeeQuoter v2.0 defaults OOO=true on TON<->EVM lanes")
 			}
 
 			receiver := toImpl.CCIPReceiver()
@@ -279,8 +337,27 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			})
 			require.NoError(t, err)
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.Error(t, err)
+			sendMsgRequireErrorOnSrcChain(t, fromImpl, toImpl, msg)
 		})
 	}
+}
+
+func sendMsgRequireNoError(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) (uint64, string) {
+	block := toImpl.CurrentBlock(t)
+	seqNr, messageID, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+	t.Logf("sendMsgRequireNoError got messageID: %s", messageID)
+	if err != nil {
+		t.Fatalf("failed to send message (id: %s): %v", messageID, err)
+	}
+	seqNrUint := ccipocr3.SeqNum(seqNr)
+	seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
+	toImpl.ValidateCommit(t, fromImpl.ChainSelector(), &block, seqNumRange)
+	toImpl.ValidateExecSucceeds(t, fromImpl.ChainSelector(), &block, []uint64{seqNr})
+	return seqNr, messageID
+}
+
+func sendMsgRequireErrorOnSrcChain(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) {
+	t.Helper()
+	_, messageID, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+	require.Error(t, err, "sendMsgRequireErrorOnSrcChain got messageID: %s", messageID)
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
@@ -14,7 +15,7 @@ contract TokenPool_constructor is TokenPoolSetup {
     assertEq(address(s_mockRMNRemote), s_tokenPool.getRmnProxy());
     (address router, address rateLimitAdmin, address feeAggregator) = s_tokenPool.getDynamicConfig();
     assertEq(address(s_sourceRouter), router);
-    assertEq(0, s_tokenPool.getMinBlockConfirmations());
+    assertEq(FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_tokenPool.getAllowedFinalityConfig());
     assertEq(address(0), rateLimitAdmin);
     assertEq(address(0), feeAggregator);
     assertEq(DEFAULT_TOKEN_DECIMALS, s_tokenPool.getTokenDecimals());

@@ -3,7 +3,6 @@ package ccip
 //go:generate go run ./wrap ccip OnRamp onramp
 //go:generate go run ./wrap ccip OffRamp offramp
 //go:generate go run ./wrap ccip Proxy proxy
-//go:generate go run ./wrap ccip CREATE2Factory create2_factory
 //go:generate go run ./wrap ccip CommitteeVerifier committee_verifier
 //go:generate go run ./wrap ccip CCTPVerifier cctp_verifier
 //go:generate go run ./wrap ccip LombardVerifier lombard_verifier
@@ -13,12 +12,14 @@ package ccip
 //go:generate go run ./wrap ccip Router router
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
-//go:generate go run ./wrap ccip TokenPoolFactory token_pool_factory
-//go:generate go run ./wrap ccip FactoryBurnMintERC20 factory_burn_mint_erc20
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
+
+// Skip these for ZKSync as it doesn't support the create2 opcode
+//go:generate go run ./wrap ccip CREATE2Factory create2_factory
+//go:generate go run ./wrap ccip TokenPoolFactory token_pool_factory
 
 // Pools
 //go:generate go run ./wrap ccip TokenPool token_pool
@@ -29,7 +30,7 @@ package ccip
 //go:generate go run ./wrap ccip BurnFromMintTokenPool burn_from_mint_token_pool
 //go:generate go run ./wrap ccip BurnWithFromMintTokenPool burn_with_from_mint_token_pool
 //go:generate go run ./wrap ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool
-
+//go:generate go run ./wrap ccip CrossChainPoolToken cross_chain_pool_token
 //go:generate go run ./wrap ccip LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./wrap ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool
 //go:generate go run ./wrap ccip ERC20LockBox erc20_lock_box
@@ -39,6 +40,8 @@ package ccip
 //go:generate go run ./wrap ccip SiloedUSDCTokenPool siloed_usdc_token_pool
 //go:generate go run ./wrap ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool
 //go:generate go run ./wrap ccip LombardTokenPool lombard_token_pool
+
+//go:generate go run ./wrap ccip CrossChainToken cross_chain_token
 
 // Helpers
 //go:generate go run ./wrap ccip MaybeRevertMessageReceiver maybe_revert_message_receiver
@@ -54,5 +57,4 @@ package ccip
 //go:generate go run ./wrap ccip MockLombardBridge mock_lombard_bridge
 
 // Extract bytecode and ABI from generated wrappers
-//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi
-//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=../../../ccv/chains/evm/gobindings/generated -bytecode=../bytecode -abi=../abi -include-latest
+//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi -include-latest

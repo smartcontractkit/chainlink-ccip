@@ -27,11 +27,11 @@ contract CommitteeVerifier_applyRemoteChainConfigUpdates is CommitteeVerifierSet
 
     s_committeeVerifier.applyRemoteChainConfigUpdates(args);
 
-    (bool allowlistEnabled, address newRouter, address[] memory allowedSenders) =
+    (BaseVerifier.RemoteChainConfigArgs memory config, address[] memory allowedSenders) =
       s_committeeVerifier.getRemoteChainConfig(NEW_DEST_SELECTOR);
 
-    assertEq(allowlistEnabled, true);
-    assertEq(newRouter, router);
+    assertEq(config.allowlistEnabled, true);
+    assertEq(address(config.router), router);
     assertEq(allowedSenders.length, 0);
   }
 
