@@ -119,7 +119,7 @@ The API is structured in three levels of granularity:
 | [Types](types.md) | All input/output types, config structs, and constants |
 | [Changesets](changesets.md) | Reference for all changesets (entry points) with config types and usage |
 | [Implementing Adapters](implementing-adapters.md) | Step-by-step guide for adding a new chain family |
-| [2.0 Integration Guide](ccip-2.0-integration-guide.md) | CCIP 2.0-specific interfaces, deployment flow, and integration checklist |
+| [2.0 Integration Guide](https://docs.google.com/document/d/1R_6LUfFlfJGayosR3Tf-Iql4iCsQ0XCPGJj80pOUpec/edit?tab=t.n5zfx7ozrtxa#heading=h.m1tfywbyiedh) | CCIP 2.0-specific interfaces, deployment flow, and integration checklist |
 | [MCMS and Utilities](mcms-and-utilities.md) | MCMS integration, `OutputBuilder`, DataStore and sequence utilities |
 
 ## Chain-Specific Documentation

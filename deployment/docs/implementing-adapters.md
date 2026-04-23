@@ -10,7 +10,7 @@ This guide provides a step-by-step walkthrough for adding support for a new chai
 
 For the complete interface definitions, see [Interfaces Reference](interfaces.md). For type definitions, see [Types Reference](types.md).
 
-> **Integrating for CCIP 2.0?** This guide focuses on the shared adapter pattern with 1.6 examples. For 2.0-specific interfaces (`DeployChainContractsAdapter`, `ChainFamily`, off-chain service config adapters), the CCV devenv integration surface, and a full integration checklist, see the [CCIP 2.0 Integration Guide](ccip-2.0-integration-guide.md).
+> **Integrating for CCIP 2.0?** This guide focuses on the shared adapter pattern with 1.6 examples. For 2.0-specific interfaces (`DeployChainContractsAdapter`, `ChainFamily`, off-chain service config adapters), the CCV devenv integration surface, and a full integration checklist, see the [CCIP 2.0 Integration Guide](https://docs.google.com/document/d/1R_6LUfFlfJGayosR3Tf-Iql4iCsQ0XCPGJj80pOUpec/edit?tab=t.n5zfx7ozrtxa#heading=h.m1tfywbyiedh).
 
 ## Prerequisites
 
