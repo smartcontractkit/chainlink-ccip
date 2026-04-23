@@ -96,6 +96,7 @@ type DeployTokenPoolInput struct {
 	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
 	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
+	// If empty, then this remains unconfigured on the token pool (i.e. the zero address).
 	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
@@ -117,9 +118,6 @@ type DeployTokenPoolInput struct {
 }
 
 type UpdateAuthoritiesInput struct {
-	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
-	// If empty, then this remains unconfigured on the token pool (i.e. the zero address).
-	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector uint64
 	TokenRef      datastore.AddressRef
