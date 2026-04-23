@@ -241,21 +241,19 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
 		}
-		if len(cctpThroughCCVRemoteChainConfigs) > 0 {
-			configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
-				ChainSelector:            input.ChainSelector,
-				TokenAddress:             input.USDCToken,
-				TokenPoolAddress:         refs.CCTPV2WithCCVsPool.Address,
-				RegistryTokenPoolAddress: refs.RegisteredPool.Address,
-				RegistryAddress:          refs.TokenAdminRegistry.Address,
-				AllowedFinalityConfig:    finality.Config{BlockDepth: 1},
-				RemoteChains:             cctpThroughCCVRemoteChainConfigs,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)
-			}
-			batchOps = append(batchOps, configureTokenForTransfersReport.Output.BatchOps...)
+		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
+			ChainSelector:            input.ChainSelector,
+			TokenAddress:             input.USDCToken,
+			TokenPoolAddress:         refs.CCTPV2WithCCVsPool.Address,
+			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
+			RegistryAddress:          refs.TokenAdminRegistry.Address,
+			AllowedFinalityConfig:    finality.Config{BlockDepth: 1},
+			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)
 		}
+		batchOps = append(batchOps, configureTokenForTransfersReport.Output.BatchOps...)
 
 		return sequences.OnChainOutput{
 			Addresses: addresses,
