@@ -1,97 +1,75 @@
-# Chainlink Solana contracts (programs)
+# Chainlink Solana Contracts (Programs)
 
 ## Prerequisites
 
-Install Rust, Solana & Anchor. See https://solana.com/docs/intro/installation
+- [Rust](https://www.rust-lang.org/tools/install) (version pinned via `rust-toolchain.toml`)
+- [Solana CLI](https://docs.anza.xyz/cli/install) (provides `solana-test-validator`)
+- [Anchor CLI](https://www.anchor-lang.com/docs/installation)
+- [Go](https://go.dev/doc/install) (see `go.mod` for required version)
+- [anchor-go](https://github.com/gagliardetto/anchor-go) v0.2.3 — `GOTOOLCHAIN=go1.20 go install github.com/gagliardetto/anchor-go@v0.2.3`
 
 ## Build
 
 To build on the host:
 
-```
+```bash
 anchor build
+# or from the repo root:
+make build-contracts
 ```
 
-To build inside a docker environment:
+To build inside a Docker environment (reproducible builds):
 
 ```bash
-anchor build --verifiable
+make docker-build-contracts
 ```
-
-To build for a specific network, specify via a cargo feature:
-
-```bash
-anchor build -- --features mainnet
-```
-
-Available networks with declared IDs:
-
-- mainnet
-- testnet
-- devnet
-- localnet (default)
 
 ## Test
 
-Make sure to run `pnpm i` to fetch mocha and other test dependencies.
-
-Start a dockerized shell that contains Solana and Anchor:
+### Rust unit tests
 
 ```bash
-./scripts/anchor-shell.sh
+cargo test
+# or from the repo root:
+make rust-tests
 ```
 
-Next, generate a keypair for anchor:
+### Go integration tests
+
+The Go tests spin up a local `solana-test-validator`, deploy the compiled programs, and run
+integration tests against them.
+
+Prerequisites:
+
+- `solana-test-validator` installed and on your PATH
+- Contracts built (`anchor build` or `make build-contracts`)
+- Vendor programs present in `target/vendor/` (pre-built CCTP `.so` files, committed to git)
 
 ```bash
-solana-keygen new -o id.json
+# from the repo root:
+make go-tests
 ```
 
-### Run anchor TypeScript tests (automatically tests against a local node)
+To run specific test suites:
 
 ```bash
-anchor test
+go test ./tests/ccip/ -run TestCCIPRouter -v -count=1
+go test ./tests/mcms/ -run TestMcmSetConfig -v -count=1
+go test ./tests/examples/ -run TestBaseTokenPoolHappyPath -v -count=1
 ```
 
-### Run GoLang tests (automatically tests against a local node)
+Note: subtests within a single top-level `Test*` function share sequential state, so running
+an individual subtest in isolation (e.g. `-run TestCCIPRouter/Config`) will likely fail because
+earlier setup subtests won't have executed.
 
-Pre-requisites:
+## Go bindings generation
 
-- Have the `solana-test-validator` command installed
-- Run `anchor build` if there have been any changes to the program under test.
+Install `anchor-go` and regenerate bindings after contract changes:
 
 ```bash
-make contracts-go-tests
+GOTOOLCHAIN=go1.20 go install github.com/gagliardetto/anchor-go@v0.2.3
+make anchor-go-gen
 ```
 
-#### `anchor-go` bindings generation
-
-Install `https://github.com/gagliardetto/anchor-go`
-
-Current version: [v0.2.3](https://github.com/gagliardetto/anchor-go/tree/v0.2.3)
-
-To install `anchor-go` locally so that you can use the `anchor-go` command globally, follow these steps:
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/gagliardetto/anchor-go.git
-   cd anchor-go
-   git checkout v0.2.3
-   ```
-
-2. **Install the command globally:**
-
-   Run the following command to install the `anchor-go` command globally:
-
-   ```bash
-   go install
-   ```
-
-   This will install the `anchor-go` binary to your `$GOPATH/bin` directory. Make sure that this directory is included in your system's `PATH` environment variable.
-
-3. **Then run the following command to generate the Go bindings:**
-
-   ```bash
-   make anchor-go-gen
-   ```
+This builds the contracts, generates Go bindings from the IDL files in `target/idl/` and
+`target/vendor/`, and outputs them to `gobindings/`.
