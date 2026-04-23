@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -131,6 +131,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					ChainSel:       5009297550715157269,
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					Params:         testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			})
 			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
@@ -172,6 +173,7 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			Params:           testsetup.CreateBasicContractParams(),
 			DeployTestRouter: true,
+			DeployerKeyOwned:  true,
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")

@@ -32,7 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
@@ -110,6 +110,7 @@ func TestTokenAdapter(t *testing.T) {
 						ChainSel:       chainSel,
 						CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 						Params:         testsetup.CreateBasicContractParams(),
+						DeployerKeyOwned: true,
 					},
 				})
 				require.NoError(t, err, "Failed to apply DeployChainContracts changeset")

@@ -80,7 +80,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       amount: TRANSFER_AMOUNT,
       sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encode(sourceToken),
-      destTokenAddress: abi.encode(s_destToken),
+      destTokenAddress: abi.encodePacked(s_destToken),
       tokenReceiver: abi.encodePacked(receiver),
       extraData: ""
     });

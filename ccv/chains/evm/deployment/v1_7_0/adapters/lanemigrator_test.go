@@ -14,14 +14,12 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
@@ -43,8 +41,7 @@ func TestLaneMigrator(t *testing.T) {
 			require.NoError(t, err, "Failed to create test environment")
 			require.NotNil(t, e, "Environment should be created")
 
-			chainFamilyRegistry := adapters.NewChainFamilyRegistry()
-			chainFamilyRegistry.RegisterChainFamily("evm", &evm_adapters.ChainFamilyAdapter{})
+			chainFamilyRegistry := lanes.GetLaneAdapterRegistry()
 			mcmsRegistry := changesets.GetRegistry()
 
 			// On each chain, deploy chain contracts
@@ -64,6 +61,7 @@ func TestLaneMigrator(t *testing.T) {
 						ChainSel:       chainSel,
 						CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 						Params:         testsetup.CreateBasicContractParams(),
+						DeployerKeyOwned: true,
 					},
 				})
 				require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
@@ -76,13 +74,16 @@ func TestLaneMigrator(t *testing.T) {
 
 			// Configure chains for lanes
 			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-			_, err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).Apply(*e, v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					makeChainConfig(chainA, chainB),
-					makeChainConfig(chainB, chainA),
+			_, err = lanes.ConnectChains(chainFamilyRegistry, mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+				Lanes: []lanes.LaneConfig{
+					{
+						ChainA:  makeChainConfig(chainA, chainB),
+						ChainB:  makeChainConfig(chainB, chainA),
+						Version: semver.MustParse("2.0.0"),
+					},
 				},
 			})
-			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
+			require.NoError(t, err, "Failed to apply ConnectChains changeset")
 			// now apply the lane migrator
 			mReg := deploy.GetLaneMigratorRegistry()
 			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)

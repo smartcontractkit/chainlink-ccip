@@ -20,7 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -217,6 +217,7 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 					ChainSelector:  chainSel,
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					ContractParams: testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -298,6 +299,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 			ChainSelector:  chainSel,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			ContractParams: testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")

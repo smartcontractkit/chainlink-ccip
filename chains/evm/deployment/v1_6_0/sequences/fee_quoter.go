@@ -2,10 +2,12 @@ package sequences
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -152,51 +154,89 @@ var (
 			b.Logger.Infof("Importing configuration for FeeQuoter %s on chain %d (%s)", fqAddress.Hex(), chainSelector, evmChain.Name())
 			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain)
 			destChainConfigs := make(map[uint64]fqops.DestChainConfig)
+			var destChainMu sync.Mutex
+			destGrp, _ := errgroup.WithContext(b.GetContext())
+			destGrp.SetLimit(10)
 			for _, remoteChain := range in.RemoteChains {
-				opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-					Address:       fqAddress,
-					ChainSelector: chainSelector,
-					Args:          remoteChain,
+				remoteChain := remoteChain
+				destGrp.Go(func() error {
+					opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+						Address:       fqAddress,
+						ChainSelector: chainSelector,
+						Args:          remoteChain,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to get dest chain config for "+
+							"remote chain %d from feequoter %s on chain %d: %w",
+							remoteChain, fqAddress.Hex(), chainSelector, err)
+					}
+					if !opsOutput.Output.IsEnabled {
+						return nil // skip disabled dest chain configs
+					}
+					destChainMu.Lock()
+					destChainConfigs[remoteChain] = opsOutput.Output
+					defer destChainMu.Unlock()
+					return nil
 				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get dest chain config for "+
-						"remote chain %d from feequoter %s on chain %d: %w",
-						remoteChain, fqAddress.Hex(), chainSelector, err)
-				}
-				if !opsOutput.Output.IsEnabled {
-					continue // skip disabled dest chain configs
-				}
-
-				destChainConfigs[remoteChain] = opsOutput.Output
+			}
+			if err := destGrp.Wait(); err != nil {
+				return sequences.OnChainOutput{}, err
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
-
+			var ttfcMu sync.Mutex
+			tokenGrp, _ := errgroup.WithContext(b.GetContext())
+			tokenGrp.SetLimit(10)
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
-				if _, ok := destChainConfigs[remoteChain]; !ok {
-					continue // skip token transfer fee config fetching if dest chain config is not enabled
-				}
-				tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
-				for _, token := range tokens {
-					opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
-						contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
-							Address:       fqAddress,
-							ChainSelector: chainSelector,
-							Args: fqops.GetTokenTransferFeeConfigArgs{
-								Token:             token,
-								DestChainSelector: remoteChain,
-							},
+				remoteChain := remoteChain
+				tokens := tokens
+				tokenGrp.Go(func() error {
+					destChainMu.Lock()
+					_, enabled := destChainConfigs[remoteChain]
+					defer destChainMu.Unlock()
+					if !enabled {
+						return nil // skip token transfer fee config fetching if dest chain config is not enabled
+					}
+					tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
+					var tokenTransferFeeCfgsMu sync.Mutex
+					innerTokenGrp, _ := errgroup.WithContext(b.GetContext())
+					innerTokenGrp.SetLimit(10)
+					for _, token := range tokens {
+						token := token
+						innerTokenGrp.Go(func() error {
+							opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
+								contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
+									Address:       fqAddress,
+									ChainSelector: chainSelector,
+									Args: fqops.GetTokenTransferFeeConfigArgs{
+										Token:             token,
+										DestChainSelector: remoteChain,
+									},
+								})
+							if err != nil {
+								return fmt.Errorf("failed to get token transfer fee config for "+
+									"token %s to remote chain %d from feequoter %s on chain %d: %w",
+									token.Hex(), remoteChain, fqAddress.Hex(), chainSelector, err)
+							}
+							if opsOutput.Output.IsEnabled {
+								tokenTransferFeeCfgsMu.Lock()
+								tokenTransferFeeCfgs[token] = opsOutput.Output
+								defer tokenTransferFeeCfgsMu.Unlock()
+							}
+							return nil
 						})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token transfer fee config for "+
-							"token %s to remote chain %d from feequoter %s on chain %d: %w",
-							token.Hex(), remoteChain, fqAddress.Hex(), chainSelector, err)
 					}
-					if opsOutput.Output.IsEnabled {
-						tokenTransferFeeCfgs[token] = opsOutput.Output
+					if err := innerTokenGrp.Wait(); err != nil {
+						return err
 					}
-				}
-				tokenTransferFeeCfgsPerChain[remoteChain] = tokenTransferFeeCfgs
+					ttfcMu.Lock()
+					tokenTransferFeeCfgsPerChain[remoteChain] = tokenTransferFeeCfgs
+					defer ttfcMu.Unlock()
+					return nil
+				})
+			}
+			if err := tokenGrp.Wait(); err != nil {
+				return sequences.OnChainOutput{}, err
 			}
 			for remoteChain, destCfg := range destChainConfigs {
 				fqOutput[remoteChain] = FeeQuoterImportConfigSequenceOutputPerRemoteChain{

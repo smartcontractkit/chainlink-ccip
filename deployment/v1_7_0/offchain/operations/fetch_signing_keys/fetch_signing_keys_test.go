@@ -156,26 +156,11 @@ func TestFetchNOPSigningKeys_MultipleNOPs_DifferentChains_ReturnsAllKeys(t *test
 	assert.Equal(t, "0xevm-key-2", report.Output.SigningKeysByNOP["nop-2"][chainsel.FamilyEVM])
 }
 
-func TestFetchNOPSigningKeys_NOPNotFound_ContinuesWithOtherNOPs(t *testing.T) {
+func TestFetchNOPSigningKeys_NOPNotFound_ReturnsError(t *testing.T) {
 	mockClient := ccvmocks.NewMockJDClient(t)
 	mockClient.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
 		&nodev1.ListNodesResponse{
 			Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop-1"}},
-		}, nil,
-	)
-	mockClient.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				{
-					NodeId: "node-1",
-					Chain:  &nodev1.Chain{Type: nodev1.ChainType_CHAIN_TYPE_EVM},
-					Ocr2Config: &nodev1.OCR2Config{
-						OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{
-							OnchainSigningAddress: "key-1",
-						},
-					},
-				},
-			},
 		}, nil,
 	)
 
@@ -185,15 +170,15 @@ func TestFetchNOPSigningKeys_NOPNotFound_ContinuesWithOtherNOPs(t *testing.T) {
 		NOPAliases: []string{"nop-1", "non-existent-nop"},
 	}
 
-	report, err := operations.ExecuteOperation(bundle, FetchNOPSigningKeys, FetchSigningKeysDeps{
+	_, err := operations.ExecuteOperation(bundle, FetchNOPSigningKeys, FetchSigningKeysDeps{
 		JDClient: mockClient,
 		Logger:   newTestLogger(t),
 		NodeIDs:  []string{"node-1"},
 	}, input)
 
-	require.NoError(t, err)
-	require.Len(t, report.Output.SigningKeysByNOP, 1)
-	assert.Contains(t, report.Output.SigningKeysByNOP, "nop-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "non-existent-nop")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestFetchNOPSigningKeys_ListNodesError_ReturnsError(t *testing.T) {
@@ -358,7 +343,7 @@ func TestFetchNOPSigningKeys_UnsupportedChainType_Skipped(t *testing.T) {
 	assert.Empty(t, report.Output.SigningKeysByNOP)
 }
 
-func TestFetchNOPSigningKeys_AllNOPsNotFound_ReturnsEmpty(t *testing.T) {
+func TestFetchNOPSigningKeys_AllNOPsNotFound_ReturnsError(t *testing.T) {
 	mockClient := ccvmocks.NewMockJDClient(t)
 	mockClient.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
 		&nodev1.ListNodesResponse{
@@ -372,12 +357,13 @@ func TestFetchNOPSigningKeys_AllNOPsNotFound_ReturnsEmpty(t *testing.T) {
 		NOPAliases: []string{"nop-1", "nop-2"},
 	}
 
-	report, err := operations.ExecuteOperation(bundle, FetchNOPSigningKeys, FetchSigningKeysDeps{
+	_, err := operations.ExecuteOperation(bundle, FetchNOPSigningKeys, FetchSigningKeysDeps{
 		JDClient: mockClient,
 		Logger:   newTestLogger(t),
 		NodeIDs:  []string{"node-1"},
 	}, input)
 
-	require.NoError(t, err)
-	assert.Empty(t, report.Output.SigningKeysByNOP)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nop-1")
+	assert.Contains(t, err.Error(), "not found")
 }

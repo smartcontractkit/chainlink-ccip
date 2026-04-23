@@ -2,6 +2,7 @@ package fetch_signing_keys
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -52,19 +53,18 @@ var FetchNOPSigningKeys = operations.NewOperation(
 
 		nodeIDs := make([]string, 0, len(input.NOPAliases))
 		nodeIDToAlias := make(map[string]string)
+		seenNodeIDs := make(map[string]string)
 		for _, nopAlias := range input.NOPAliases {
 			node, ok := lookup.FindByName(nopAlias)
 			if !ok {
-				lggr.Warnw("Node not found for NOP alias",
-					"nopAlias", nopAlias)
-				continue
+				return output, fmt.Errorf("NOP alias %q not found in node lookup (node IDs: %v)", nopAlias, deps.NodeIDs)
 			}
+			if existing, ok := seenNodeIDs[node.Id]; ok && existing != nopAlias {
+				return output, fmt.Errorf("duplicate node ID %q: NOP aliases %q and %q both resolve to the same node", node.Id, existing, nopAlias)
+			}
+			seenNodeIDs[node.Id] = nopAlias
 			nodeIDs = append(nodeIDs, node.Id)
 			nodeIDToAlias[node.Id] = nopAlias
-		}
-
-		if len(nodeIDs) == 0 {
-			return output, nil
 		}
 
 		chainConfigsResp, err := deps.JDClient.ListNodeChainConfigs(ctx, &nodev1.ListNodeChainConfigsRequest{
@@ -101,7 +101,14 @@ var FetchNOPSigningKeys = operations.NewOperation(
 			if output.SigningKeysByNOP[nopAlias] == nil {
 				output.SigningKeysByNOP[nopAlias] = make(map[string]string)
 			}
-			output.SigningKeysByNOP[nopAlias][chainFamily] = fmt.Sprintf("0x%s", signerAddress)
+			addr := strings.ToLower(signerAddress)
+			if !strings.HasPrefix(addr, "0x") {
+				addr = "0x" + addr
+			}
+			if existing, ok := output.SigningKeysByNOP[nopAlias][chainFamily]; ok && existing != addr {
+				return output, fmt.Errorf("NOP %q has conflicting OCR key bundles for family %s: address %s vs %s — the job spec requires a single signing address (per-chain scoping not supported yet)", nopAlias, chainFamily, existing, addr)
+			}
+			output.SigningKeysByNOP[nopAlias][chainFamily] = addr
 
 			lggr.Debugw("Found signing address",
 				"nopAlias", nopAlias,
