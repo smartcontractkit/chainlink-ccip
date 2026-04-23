@@ -380,6 +380,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 				tp, err := bnmpool.NewBurnMintTokenPool(tpAddress, data.Chain.Client)
 				require.NoError(t, err)
+				rla, err := tp.GetRateLimitAdmin(&bind.CallOpts{Context: t.Context()})
+				require.NoError(t, err)
 				dec, err := tp.GetTokenDecimals(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 				tok, err := tp.GetToken(&bind.CallOpts{Context: t.Context()})
@@ -387,9 +389,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 				tpo, err := tp.Owner(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 				if data.RateLimitAdmin != "" {
-					rla, err := tp.GetRateLimitAdmin(&bind.CallOpts{Context: t.Context()})
-					require.NoError(t, err)
 					require.Equal(t, 0, common.HexToAddress(data.RateLimitAdmin).Cmp(rla), fmt.Sprintf("expected rate limit admin %q to match", data.RateLimitAdmin))
+				} else {
+					require.Equal(t, 0, (common.Address{}).Cmp(rla), fmt.Sprintf("expected rate limit admin to be zero address, got %q", rla.Hex()))
 				}
 
 				// Verify on-chain token pool info is consistent
