@@ -42,7 +42,7 @@ func getCommonNodeConfig(capRegAddr string) string {
 	return fmt.Sprintf(`
 			[Log]
 			JSONConsole = true
-			Level = 'debug'
+			Level = 'info'
 			[Pyroscope]
 			ServerAddress = 'http://host.docker.internal:4040'
 			Environment = 'local'

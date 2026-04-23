@@ -47,6 +47,10 @@ jobs:
                   ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
                   || 'env.toml'
               }}
+          # Won't currently work because proper curse detection is not in a chainlink release and
+          # we aren't building a fresh chainlink image from source in PRs.
+          # - name: TestE2ECurse
+          #   config: env.toml,env-anvil.toml
       fail-fast: false
     steps:
       - name: Checkout code

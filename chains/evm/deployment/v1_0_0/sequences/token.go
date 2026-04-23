@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
+	drip_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -28,7 +29,9 @@ import (
 func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
-		burn_mint_erc20_with_drip.ContractType:
+		burn_mint_erc20_with_drip.ContractType,
+		drip_v150.ContractType,
+		tip20.ContractType:
 		return true
 	default:
 		return false
@@ -38,7 +41,8 @@ func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
-		burn_mint_erc20_with_drip.ContractType:
+		burn_mint_erc20_with_drip.ContractType,
+		drip_v150.ContractType:
 		return true
 	default:
 		return false
@@ -47,6 +51,7 @@ func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 
 func tokenSupportsPreMint(tokenType deployment.ContractType) bool {
 	switch tokenType {
+	// drip_v150 has no supply/decimals in its constructor so pre-mint is not supported
 	case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType:
 		return true
 	default:
@@ -139,13 +144,29 @@ var DeployToken = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC20WithDrip token: %w", err)
 			}
 
+		case drip_v150.ContractType:
+			tokenRef, err = contract.MaybeDeployContract(b, drip_v150.Deploy, chain, contract.DeployInput[drip_v150.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(drip_v150.ContractType, *drip_v150.Version),
+				ChainSelector:  chain.Selector,
+				Args: drip_v150.ConstructorArgs{
+					Name:   input.Name,
+					Symbol: input.Symbol,
+				},
+				Qualifier: &qualifier,
+			}, nil)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC20WithDrip (v1.5.0) token: %w", err)
+			}
+
 		case tip20.ContractType:
+			// Initial admin must be the deployer so subsequent ops (e.g. GrantIssuerRole) run as the same
+			// identity pass IsAllowedCaller; ExternalAdmin receives DEFAULT_ADMIN_ROLE in a follow-up grant.
 			report, err := cldf_ops.ExecuteSequence(b, tip20.Deploy, chain, tip20.FactoryDeployArgs{
 				QuoteToken: common.Address{}, // defaults to sensible value
 				Currency:   "",               // defaults to sensible value
 				Salt:       [32]byte{},       // defaults to random salt
 				Symbol:     input.Symbol,
-				Admin:      externalAdmin,
+				Admin:      chain.DeployerKey.From,
 				Name:       input.Name,
 			})
 			if err != nil {
@@ -202,27 +223,44 @@ var DeployToken = cldf_ops.NewSequence(
 		}
 
 		if input.ExternalAdmin != "" && tokenSupportsAdminRole(input.Type) {
-			token, err := bnm_erc20_bindings.NewBurnMintERC20(tokenAddr, chain.Client)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
-			}
-			role, err := token.DEFAULTADMINROLE(&bind.CallOpts{Context: b.GetContext()})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role constant: %w", err)
-			}
+			switch input.Type {
+			case burn_mint_erc20.ContractType, burn_mint_erc20_with_drip.ContractType, drip_v150.ContractType:
+				token, err := bnm_erc20_bindings.NewBurnMintERC20(tokenAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
+				}
+				role, err := token.DEFAULTADMINROLE(&bind.CallOpts{Context: b.GetContext()})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role constant: %w", err)
+				}
 
-			grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
-				ChainSelector: chain.Selector,
-				Address:       tokenAddr,
-				Args: burn_mint_erc20.RoleAssignment{
-					Role: role,
-					To:   externalAdmin,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
+				grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
+					ChainSelector: chain.Selector,
+					Address:       tokenAddr,
+					Args: burn_mint_erc20.RoleAssignment{
+						Role: role,
+						To:   externalAdmin,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
+				}
+				writes = append(writes, grantReport.Output)
+
+			case tip20.ContractType:
+				grantReport, err := cldf_ops.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       tokenAddr,
+					Args:          externalAdmin,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
+				}
+				writes = append(writes, grantReport.Output)
+
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type for admin role grant: %s", input.Type)
 			}
-			writes = append(writes, grantReport.Output)
 		}
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
