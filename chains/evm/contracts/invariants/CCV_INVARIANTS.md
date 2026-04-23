@@ -77,7 +77,7 @@ See FEE_INVARIANTS.md for overall fee structure, distribution, and conversion to
 
 ### 3.1 Receiver-Required CCVs
 
-- **INV-DST-1**: If the receiver implements `IAny2EVMMessageReceiverV2`, its `getCCVsAndMinBlockDepth` is called to get `requiredCCVs`, `optionalCCVs`, `optionalThreshold`, and `minBlockDepth`.
+- **INV-DST-1**: If the receiver implements `IAny2EVMMessageReceiverV2`, `getCCVsAndFinalityConfig` is called to get `requiredCCVs`, `optionalCCVs`, `optionalThreshold`, and `allowedFinalityConfig` (`bytes4`, see `FinalityCodec`).
 - **INV-DST-2**: If the receiver does NOT implement `IAny2EVMMessageReceiverV2`, it cannot specify custom CCVs. Default CCVs are used. FTF is also not supported.
 - **INV-DST-3**: `requiredCCVs` returned by the receiver must not contain duplicates. Enforced by `CCVConfigValidation._assertNoDuplicates`.
 - **INV-DST-4**: `optionalCCVs` returned by the receiver must not contain duplicates. Enforced by `CCVConfigValidation._assertNoDuplicates`.

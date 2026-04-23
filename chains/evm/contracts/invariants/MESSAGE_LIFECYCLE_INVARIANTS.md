@@ -77,7 +77,7 @@
 - **INV-TO-2**: For token-only transfers, `ccipReceive` is not called.
 - **INV-TO-3**: CCV verification and `releaseOrMint` still apply to token-only transfers.
 - **INV-TO-4**: For token-only transfers, receiver CCVs and default CCVs are excluded on both source and destination. Only pool-required CCVs and lane-mandated CCVs apply. See CCV_INVARIANTS.md for details.
-- **INV-TO-5**: Receiver finality requirements (`minBlockDepth`) are not checked for token-only transfers. See FINALITY_INVARIANTS.md for details.
+- **INV-TO-5**: The receiver's allowed finality is not consulted for token-only transfers; pool and lane finality rules still apply. See FINALITY_INVARIANTS.md.
 
 ---
 

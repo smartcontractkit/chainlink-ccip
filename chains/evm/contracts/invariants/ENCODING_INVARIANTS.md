@@ -11,7 +11,7 @@
 
 ### 1.2 Static Fields
 
-The static header is 77 bytes, encoded in big-endian order:
+A fixed 69-byte big-endian header starts every encoded message:
 
 | Offset | Size | Field |
 |--------|------|-------|
@@ -21,10 +21,12 @@ The static header is 77 bytes, encoded in big-endian order:
 | 17 | 8 | `messageNumber` (uint64) |
 | 25 | 4 | `executionGasLimit` (uint32) |
 | 29 | 4 | `ccipReceiveGasLimit` (uint32) |
-| 33 | 2 | `finality` (uint16) |
-| 35 | 32 | `ccvAndExecutorHash` (bytes32) |
+| 33 | 4 | `finality` (bytes4, see FINALITY_INVARIANTS.md) |
+| 37 | 32 | `ccvAndExecutorHash` (bytes32) |
 
-- **INV-MSG-5**: `MESSAGE_V1_BASE_SIZE = 77`. Decoding rejects any input shorter than 77 bytes.
+The header is followed by length prefixes for each variable-length section (4 uint8 for the address fields, 3 uint16 for `destBlob`, `tokenTransfer` and `data`). Together these account for an additional 10 bytes when every payload is empty.
+
+- **INV-MSG-5**: The minimum encoded message size is **79 bytes** (69-byte header + 10 bytes of length prefixes). Decoding rejects any shorter input.
 
 ### 1.3 Variable-Length Fields
 
@@ -41,8 +43,8 @@ After the static header, variable-length fields are encoded in order. Each uses 
 | uint16 | `data` | Arbitrary user payload |
 
 - **INV-MSG-6**: All variable-length fields use a length prefix followed by content: `uint8` for addresses, `uint16` for data blobs. This applies uniformly across MessageV1, TokenTransferV1, and ExtraArgsV3.
-- **INV-MSG-7**: All addresses use the minimal native byte length for their chain family (e.g. 20 bytes for EVM, 32 bytes for Solana). The only exception is source-side EVM addresses (`onRampAddress`, `sender`, `sourcePoolAddress`, `sourceTokenAddress`), which are abi-encoded (32 bytes, left-padded) for legacy reasons.
-- **INV-MSG-8**: Destination-side addresses on the OnRamp are validated against the configured `addressBytesLength` for the destination chain. If a 32-byte abi-encoded address is provided, it is trimmed to `addressBytesLength` after verifying no non-zero padding exists outside the expected range.
+- **INV-MSG-7**: Addresses use the minimal native byte length for their chain family. Source-side addresses on must be padded for legacy reasons (e.g. 20-byte EVM addresses encoded as 32 bytes). Destination-side addresses are always unpadded.
+- **INV-MSG-8**: Destination-side addresses must match the configured native byte length for the destination chain. Padded inputs are rejected unless the padding bytes are all zero, in which case they are trimmed to the native length.
 
 ### 1.4 TokenTransferV1 Encoding
 
@@ -52,10 +54,10 @@ Token transfers are encoded with their own version byte and field structure:
 |---------------|-------|----------|
 | — | `version` (1 byte, always `1`) | |
 | — | `amount` (32 bytes, uint256) | |
-| uint8 | `sourcePoolAddress` | Source-side, padded |
-| uint8 | `sourceTokenAddress` | Source-side, padded |
-| uint8 | `destTokenAddress` | Dest-side, unpadded |
-| uint8 | `tokenReceiver` | Dest-side, unpadded |
+| uint8 | `sourcePoolAddress` | Source-side address |
+| uint8 | `sourceTokenAddress` | Source-side address |
+| uint8 | `destTokenAddress` | Destination-side address |
+| uint8 | `tokenReceiver` | Destination-side address |
 | uint16 | `extraData` | Pool-specific data |
 
 - **INV-MSG-9**: Token transfer encoding follows the same address conventions as the message (INV-MSG-6, INV-MSG-7).
@@ -72,18 +74,8 @@ Token transfers are encoded with their own version byte and field structure:
 - **INV-ENC-2**: The number of CCVs is encoded as a single `uint8`, limiting a message to 255 user-specified CCVs.
 - **INV-ENC-3**: `ccvs` and `ccvArgs` must have the same length. Encoding rejects a mismatch.
 
-Static fields (17 bytes total):
+A 13-byte leading prefix (`tag`, `gasLimit`, `requestedFinalityConfig`, `ccvsLength`) is followed by `ccvsLength` repetitions of:
 
-| Offset | Size | Field |
-|--------|------|-------|
-| 0 | 4 | `tag` (`0xa69dd4aa`) |
-| 4 | 4 | `gasLimit` (uint32) |
-| 8 | 2 | `blockConfirmations` (uint16) |
-| 10 | 1 | `ccvsLength` (uint8) |
-
-Followed by variable-length fields:
-
-| Repeated `ccvsLength` times | |
 |------------------------------|--|
 | `uint8 ccvAddressLength` + `bytes ccvAddress` | CCV address |
 | `uint16 ccvArgsLength` + `bytes ccvArgs` | CCV-specific args |
@@ -94,11 +86,11 @@ Then:
 |---------------|-------|
 | uint8 | `executor` address |
 | uint16 | `executorArgs` |
-| uint8 | `tokenReceiver` address |
+| uint8 | `tokenReceiver` |
 | uint16 | `tokenArgs` |
 
-- **INV-ENC-4**: `GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 17`. Decoding rejects any input shorter than 17 bytes.
-- **INV-ENC-5**: All addresses in ExtraArgsV3 (CCVs, executor, tokenReceiver) use the same `uint8 addressLength + bytes` encoding. `addressLength == 0` encodes the zero-value address (default placeholder for CCVs, default executor, or "use message receiver" for tokenReceiver).
+- **INV-ENC-4**: The minimum encoded ExtraArgsV3 size is **19 bytes** (the 13-byte prefix plus the five trailing length fields when no CCVs and no payloads are present). Decoding rejects any shorter input.
+- **INV-ENC-5**: All addresses in ExtraArgsV3 use the same `uint8 addressLength + bytes` encoding. `addressLength == 0` is the zero-value address sentinel, which means: "use the default" for CCV and executor entries, and "use the message receiver" for `tokenReceiver`.
 - **INV-ENC-6**: Decoding is strict: all bytes must be consumed exactly. Trailing bytes cause a revert.
 
 ### 2.2 Executor Args
@@ -114,7 +106,8 @@ Then:
 - **INV-ENC-10**: All numeric fields in the wire format must survive a round-trip through the implementation's native type system without overflow, truncation, or precision loss. Specifically:
   - `amount` (uint256) must be representable in the implementation's token amount type at its full range. If the native type has a smaller range than uint256, the implementation must validate the value fits before processing.
   - `messageNumber` (uint64) must be representable without overflow.
-  - `executionGasLimit`, `ccipReceiveGasLimit` (uint32), and `finality` (uint16) must be representable without overflow.
+  - `executionGasLimit` and `ccipReceiveGasLimit` (uint32) must be representable without overflow.
+  - `finality` is a 32-bit packed bit pattern (see FINALITY_INVARIANTS.md) and must round-trip without altering bits.
 - **INV-ENC-11**: Encoding functions must reject values that exceed the wire format's range. `encodeUint256` must reject values > 2^256 - 1. `encodeUint64` must reject values > 2^64 - 1. Encoding must never silently produce output longer or shorter than the specified field width.
 - **INV-ENC-12**: Intermediate type conversions during encoding/decoding must not narrow the value range. If a conversion path routes a wide type through a narrower intermediate type (e.g., 256-bit → 64-bit → decimal), the narrowing must either be validated or eliminated.
 
