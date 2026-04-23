@@ -26,7 +26,7 @@
 
 ## 4. Fee Deduction (V2)
 
-- **INV-POOL-10**: V2 pools deduct a proportional fee from the token amount before lock/burn: `destTokenAmount = amount - (amount * feeBps / 10000)`. The fee stays in the pool.
+- **INV-POOL-10**: If a non-zero bps fee is set, the V2 pools deduct a proportional fee from the token amount before lock/burn: `destTokenAmount = amount - (amount * feeBps / 10000)`. The fee stays in the pool.
 - **INV-POOL-11**: The fee rate (`feeBps`) depends on finality: `defaultBlockConfirmationsTransferFeeBps` for finalized transfers, `customBlockConfirmationsTransferFeeBps` for FTF. See FINALITY_INVARIANTS.md for details.
 - **INV-POOL-12**: All `feeBps` values (default and custom block confirmations) must be less than 10,000 (100%). Validated at config time.
 - **INV-POOL-13**: When fee config is not enabled for a remote chain, `feeBps` defaults to `0` and no fee is deducted.
@@ -72,7 +72,7 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 
 - **INV-RL-7**: Rate limiter configuration is per-remote-chain. Each remote chain can have its own outbound and inbound bucket parameters.
 - **INV-RL-8**: When a bucket is enabled, `rate` must not exceed `capacity`.
-- **INV-RL-9**: When a bucket is disabled, both `rate` and `capacity` must be zero.
+- **INV-RL-9**: When a bucket is disabled, both `rate` and `capacity` must be zero. This means the rate limits are turned off, allowing any transfer size to go through.
 - **INV-RL-10**: Rate limit configuration can be updated by the contract owner or a designated rate limit admin.
 - **INV-RL-11**: When rate limiter configuration is updated, the current token count must not increase beyond what time-based refill would naturally produce. A config update must reset the bucket to full capacity.
 

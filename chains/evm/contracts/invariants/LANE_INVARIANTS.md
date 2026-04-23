@@ -24,7 +24,7 @@
 
 ### 2.2 OnRamp Allowlist
 
-- **INV-LCFG-11**: OnRamp addresses in the allowlist must be non-empty.
+- **INV-LCFG-11**: OnRamp addresses in the allowlist must be validated to not be empty/default value.
 
 ---
 
@@ -32,7 +32,7 @@
 
 ### 3.1 Source-Side Pause
 
-- **INV-PAUSE-1**: There must be a mechanism to pause a lane on the source side. On EVM, this is achieved by setting the router to the zero-value address. Pausing prevents new messages from being sent.
+- **INV-PAUSE-1**: There must be a mechanism to pause a lane on the source side. On EVM, this is achieved by setting the router for that chain to the zero-value address. Pausing prevents new messages from being sent.
 - **INV-PAUSE-2**: When a lane is paused, fee quoting also reverts. The lane is fully inactive for senders.
 
 ### 3.2 Destination-Side Disable

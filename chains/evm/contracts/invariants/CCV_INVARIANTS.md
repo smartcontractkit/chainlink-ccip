@@ -29,7 +29,7 @@
 - **INV-SRC-1**: User-provided CCVs (from `ExtraArgsV3`) must not contain duplicates.
 - **INV-SRC-2**: The zero-value address in the user CCV list is a placeholder meaning "include defaults". There can be at most one (since duplicates are rejected).
 - **INV-SRC-3**: Legacy extraArgs (pre-V3) do not include CCVs. The user gets defaults applied automatically.
-- **INV-SRC-4**: If the user provides no CCVs (empty list), defaults are applied for data/receiver messages. For token-only transfers, an empty list results in no user/default CCVs (only pool + lane-mandated apply).
+- **INV-SRC-4**: If the user provides no CCVs (empty list), defaults are applied for data/receiver messages. For token-only transfers, an empty list results in no user/default CCVs (only pool related + lane-mandated apply).
 
 ### 2.2 Default CCVs
 
@@ -69,7 +69,7 @@ See FEE_INVARIANTS.md for overall fee structure, distribution, and conversion to
 
 ### 2.8 Token-Only Transfer Behavior
 
-- **INV-SRC-22**: For token-only transfers (see MESSAGE_LIFECYCLE_INVARIANTS.md INV-TO-1) with no user-specified CCVs, only pool-required CCVs and lane-mandated CCVs are included. Default CCVs and receiver CCVs are excluded, since only the token issuer (pool) bears risk, not the receiver.
+- **INV-SRC-22**: For token-only transfers (see MESSAGE_LIFECYCLE_INVARIANTS.md INV-TO-1) with no user-specified CCVs, only pool-related CCVs and lane-mandated CCVs are included. Default CCVs and receiver CCVs are excluded, since only the token issuer (pool) bears risk, not the receiver.
 
 ---
 
@@ -103,7 +103,7 @@ See FEE_INVARIANTS.md for overall fee structure, distribution, and conversion to
 ### 3.5 Token-Only Transfer Behavior (Inbound)
 
 - **INV-DST-14**: For token-only transfers with tokens, receiver CCVs and defaults are skipped. Only pool-required CCVs and lane-mandated CCVs are used.
-- **INV-DST-15**: For token-only transfers without tokens (no-op), defaults are used.
+- **INV-DST-15**: For no-op tx (no token, no execution), defaults are used.
 
 ### 3.6 Deduplication and Overlap
 

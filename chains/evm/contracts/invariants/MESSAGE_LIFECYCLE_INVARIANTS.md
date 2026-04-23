@@ -85,4 +85,3 @@
 
 - **INV-NOEXEC-1**: The no-execution address is `address(bytes20(0xeba517d2))` — the address-width representation of the `NO_EXECUTION_TAG` (`keccak256("NO_EXECUTION_TAG")[:4]`). This value is protocol-wide and must be the same on all chains.
 - **INV-NOEXEC-2**: When the no-execution address is specified as the executor, no automated execution is expected on the destination. The executor fee is zero and execution cost is not added to the message fee.
-- **INV-NOEXEC-3**: Tokens are still released/minted for no-execution messages. Only the automated execution is skipped — manual execution is still possible.
