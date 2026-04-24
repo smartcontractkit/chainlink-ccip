@@ -231,7 +231,11 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)
 	}
-
+	// set balance for the deployer key
+	err = testhelpers.SetImpersonatedBalance(rpcUrl, chain.DeployerKey.From.Hex(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
+	if err != nil {
+		return nil, fmt.Errorf("set impersonated balance for chain %d: %w", srcSel, err)
+	}
 	var filteredFeeTokens []common.Address
 	// Best-effort funding: try to give the deployer fee token balances by impersonating each token owner
 	// on forked chains. Tokens that fail discovery, transfer construction, or impersonated send are skipped
@@ -239,7 +243,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	for _, addr := range addrs {
 		ctx, cancel := context.WithTimeout(env.GetContext(), 1*time.Minute)
 		defer cancel()
-		env.Logger.Infof("Processing fee token %s on chain %d", addr.Hex(), srcSel)
+		env.Logger.Debugf("Processing fee token %s on chain %d", addr.Hex(), srcSel)
 		token, err := burn_mint_erc20.NewBurnMintERC20(addr, client)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
@@ -249,7 +253,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 			filteredFeeTokens = append(filteredFeeTokens, addr)
 			continue
 		}
-		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
+		env.Logger.Debugf("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
 		tokenOwner, err := discoverFeeTokenFundingAccount(ctx, client, token, addr, feeTokenFundingAmount)
 		if err != nil {
