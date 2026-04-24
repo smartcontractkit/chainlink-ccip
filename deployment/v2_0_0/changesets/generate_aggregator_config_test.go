@@ -62,15 +62,23 @@ func newAggregatorConfigRegistry() *adapters.AggregatorConfigRegistry {
 func newTopologyForCommittee(qualifier string, selectors []uint64) *offchain.EnvironmentTopology {
 	chainConfigs := make(map[string]offchain.ChainCommitteeConfig, len(selectors))
 	for _, sel := range selectors {
-		chainConfigs[strconv.FormatUint(sel, 10)] = offchain.ChainCommitteeConfig{}
+		chainConfigs[strconv.FormatUint(sel, 10)] = offchain.ChainCommitteeConfig{
+			NOPAliases: []string{"nop1"},
+			Threshold:  1,
+		}
 	}
 
 	return &offchain.EnvironmentTopology{
+		IndexerAddress: []string{"http://indexer:8080"},
 		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{{Alias: "nop1", Name: "nop1-name"}},
 			Committees: map[string]offchain.CommitteeConfig{
 				qualifier: {
 					Qualifier:    qualifier,
 					ChainConfigs: chainConfigs,
+					Aggregators: []offchain.AggregatorConfig{
+						{Name: "agg-1", Address: "http://aggregator:8080"},
+					},
 				},
 			},
 		},
@@ -118,7 +126,7 @@ func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 				CommitteeQualifier: "default",
 				Topology:           &offchain.EnvironmentTopology{},
 			},
-			errContains: "NOP topology is required",
+			errContains: "nop_topology is required",
 		},
 		{
 			name: "missing committee in topology",
@@ -126,7 +134,11 @@ func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 				ServiceIdentifier:  "agg",
 				CommitteeQualifier: "default",
 				Topology: &offchain.EnvironmentTopology{
-					NOPTopology: &offchain.NOPTopology{Committees: map[string]offchain.CommitteeConfig{}},
+					IndexerAddress: []string{"http://indexer:8080"},
+					NOPTopology: &offchain.NOPTopology{
+						NOPs:       []offchain.NOPConfig{{Alias: "nop1", Name: "nop1-name"}},
+						Committees: map[string]offchain.CommitteeConfig{},
+					},
 				},
 			},
 			errContains: `committee "default" not found in topology`,

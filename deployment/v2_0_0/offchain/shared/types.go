@@ -200,7 +200,12 @@ func ConvertStringToNopAliases(strs []string) []NOPAlias {
 }
 
 func IsProductionEnvironment(env string) bool {
-	return env == "mainnet"
+	switch env {
+	case "mainnet", "prod_mainnet", "prod_testnet":
+		return true
+	default:
+		return false
+	}
 }
 
 func NOPAliasSliceToSet(slice []NOPAlias) map[NOPAlias]bool {

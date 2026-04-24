@@ -65,6 +65,9 @@ func resolveAggregatorChainSelectors(e deployment.Environment, cfg GenerateAggre
 	if cfg.Topology == nil {
 		return nil, fmt.Errorf("topology is required")
 	}
+	if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+		return nil, fmt.Errorf("topology validation failed: %w", err)
+	}
 	if cfg.Topology.NOPTopology == nil {
 		return nil, fmt.Errorf("NOP topology is required")
 	}
