@@ -25,7 +25,7 @@ type ChainDefinition struct {
 	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfigOverrides is a functional option that mutates a
 	// FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
-	FeeQuoterDestChainConfigOverrides *FeeQuoterDestChainConfigOverride
+	FeeQuoterDestChainConfigOverrides *FeeQuoterDestChainConfigOverride `json:"-"`
 	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
 	// This is provided by the user
 	// 1.6 only
