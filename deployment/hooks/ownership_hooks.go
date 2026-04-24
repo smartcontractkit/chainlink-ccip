@@ -156,7 +156,6 @@ func IterateOwnershipCheckers(
 			// TODO: filter this further when chains are available in hookEnv
 			chainRefs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(network.ChainSelector))
 			if len(chainRefs) == 0 {
-				lggr.Infof("no address refs for network %d in datastore, skipping ownership check", network.ChainSelector)
 				return nil
 			}
 			refsToCheck := make([]datastore.AddressRef, 0, len(chainRefs))
