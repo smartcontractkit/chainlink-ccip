@@ -125,7 +125,7 @@ func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) (co
 }
 
 func (e *EVMContractOwnership) VerifyContractOwnership(
-	_ context.Context,
+	ctx context.Context,
 	lggr logger.Logger,
 	ds datastore.DataStore,
 	network cfgnet.Network,
@@ -150,7 +150,7 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 			PreferredURLScheme: p,
 		})
 	}
-	client, err := rpcclient.NewMultiClient(lggr, rpcCfg)
+	client, err := rpcclient.NewMultiClient(ctx, lggr, rpcCfg)
 	if err != nil {
 		return fmt.Errorf("dial RPC for chain %d: %w", network.ChainSelector, err)
 	}
