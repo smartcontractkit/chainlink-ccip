@@ -24,7 +24,7 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
-func TestInitializeTimelocksInOwnershipCheck_LoadsAndCaches(t *testing.T) {
+func TestTimelocksInOwnershipCheck_LoadsAndCaches(t *testing.T) {
 	selector := chainsel.ETHEREUM_MAINNET.Selector
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
@@ -41,44 +41,65 @@ func TestInitializeTimelocksInOwnershipCheck_LoadsAndCaches(t *testing.T) {
 	}))
 
 	e := &EVMContractOwnership{}
-	require.NoError(t, e.initializeTimelocksInOwnershipCheck(ds.Seal(), selector))
-	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000A1"), e.cllccipTimelockAddr[selector])
-	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000B1"), e.rmntimelockAddr[selector])
+	require.NoError(t, e.timelocksInOwnershipCheck(ds.Seal(), selector))
+
+	cll, ok := e.cllccipTimelockAddr.Load(selector)
+	require.True(t, ok)
+	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000A1"), cll.(common.Address))
+	rmn, ok := e.rmntimelockAddr.Load(selector)
+	require.True(t, ok)
+	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000B1"), rmn.(common.Address))
 
 	// cache hit should not need datastore lookups again.
-	require.NoError(t, e.initializeTimelocksInOwnershipCheck(datastore.NewMemoryDataStore().Seal(), selector))
+	require.NoError(t, e.timelocksInOwnershipCheck(datastore.NewMemoryDataStore().Seal(), selector))
 }
 
-func TestInitializeTimelocksInOwnershipCheck_MissingCLLTimelock(t *testing.T) {
+func TestTimelocksInOwnershipCheck_MissingCLLTimelock(t *testing.T) {
 	selector := chainsel.ETHEREUM_MAINNET.Selector
 	ds := datastore.NewMemoryDataStore()
 	e := &EVMContractOwnership{}
-	err := e.initializeTimelocksInOwnershipCheck(ds.Seal(), selector)
+	err := e.timelocksInOwnershipCheck(ds.Seal(), selector)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "ownership transfer requires CLLCCIP RBACTimelock")
 }
 
 func TestExpectedOwnerForRef_UsesRMNTimelockForRMNRemote(t *testing.T) {
 	selector := chainsel.ETHEREUM_MAINNET.Selector
-	e := &EVMContractOwnership{
-		cllccipTimelockAddr: map[uint64]common.Address{
-			selector: common.HexToAddress("0x00000000000000000000000000000000000000A1"),
-		},
-		rmntimelockAddr: map[uint64]common.Address{
-			selector: common.HexToAddress("0x00000000000000000000000000000000000000B1"),
-		},
-	}
+	e := &EVMContractOwnership{}
+	e.cllccipTimelockAddr.Store(selector, common.HexToAddress("0x00000000000000000000000000000000000000A1"))
+	e.rmntimelockAddr.Store(selector, common.HexToAddress("0x00000000000000000000000000000000000000B1"))
 
-	normal := e.expectedOwnerForRef(datastore.AddressRef{
+	normal, err := e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          "AnyType",
 	})
-	rmn := e.expectedOwnerForRef(datastore.AddressRef{
+	require.NoError(t, err)
+	rmn, err := e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType(rmn_remote.ContractType),
 	})
+	require.NoError(t, err)
 	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000A1"), normal)
 	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000B1"), rmn)
+}
+
+func TestExpectedOwnerForRef_MissingTimelockReturnsError(t *testing.T) {
+	selector := chainsel.ETHEREUM_MAINNET.Selector
+	e := &EVMContractOwnership{}
+
+	_, err := e.expectedOwnerForRef(datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          "AnyType",
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "CLLCCIP RBACTimelock address not found")
+
+	_, err = e.expectedOwnerForRef(datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(rmn_remote.ContractType),
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "RMNMCMS RBACTimelock address not found")
 }
 
 func TestNeedsOwnershipCheck_UsesLaneMigratorContractTypes(t *testing.T) {
@@ -104,7 +125,7 @@ func TestNeedsOwnershipCheck_UsesLaneMigratorContractTypes(t *testing.T) {
 
 func TestVerifyContractOwnership_NoRPCConfigured(t *testing.T) {
 	e := &EVMContractOwnership{}
-	err := e.VerifyContractOwnership(t.Context(), logger.Test(t), cfgnet.Network{
+	err := e.VerifyContractOwnership(t.Context(), logger.Test(t), datastore.NewMemoryDataStore().Seal(), cfgnet.Network{
 		ChainSelector: chainsel.ETHEREUM_MAINNET.Selector,
 		RPCs:          nil,
 	}, nil)
@@ -114,7 +135,7 @@ func TestVerifyContractOwnership_NoRPCConfigured(t *testing.T) {
 
 func TestVerifyContractOwnership_InvalidPreferredURLScheme(t *testing.T) {
 	e := &EVMContractOwnership{}
-	err := e.VerifyContractOwnership(t.Context(), logger.Test(t), cfgnet.Network{
+	err := e.VerifyContractOwnership(t.Context(), logger.Test(t), datastore.NewMemoryDataStore().Seal(), cfgnet.Network{
 		ChainSelector: chainsel.ETHEREUM_MAINNET.Selector,
 		RPCs: []cfgnet.RPC{{
 			RPCName:            "bad-rpc",
@@ -124,4 +145,18 @@ func TestVerifyContractOwnership_InvalidPreferredURLScheme(t *testing.T) {
 	}, nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid preferred URL scheme")
+}
+
+func TestVerifyContractOwnership_DialRPCFailure(t *testing.T) {
+	e := &EVMContractOwnership{}
+	err := e.VerifyContractOwnership(t.Context(), logger.Test(t), datastore.NewMemoryDataStore().Seal(), cfgnet.Network{
+		ChainSelector: chainsel.ETHEREUM_MAINNET.Selector,
+		RPCs: []cfgnet.RPC{{
+			RPCName:            "local",
+			HTTPURL:            "http://localhost:8545",
+			PreferredURLScheme: "http",
+		}},
+	}, nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "dial RPC for chain")
 }

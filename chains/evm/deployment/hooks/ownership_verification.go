@@ -3,6 +3,7 @@ package hooks
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -51,19 +52,13 @@ var laneMigratorContractTypesForOwnershipCheck = map[datastore.ContractType]stru
 
 // EVMContractOwnership validates that contracts are owned by expected timelocks.
 type EVMContractOwnership struct {
-	cllccipTimelockAddr map[uint64]common.Address
-	rmntimelockAddr     map[uint64]common.Address
+	cllccipTimelockAddr sync.Map // map[chainSelector]timelockAddress for CLLCCIP RBACTimelock
+	rmntimelockAddr     sync.Map // map[chainSelector]timelockAddress for RMNMCMS RBACTimelock
 }
 
-func (e *EVMContractOwnership) initializeTimelocksInOwnershipCheck(ds datastore.DataStore, chainSelector uint64) error {
-	if e.rmntimelockAddr == nil {
-		e.rmntimelockAddr = make(map[uint64]common.Address)
-	}
-	if e.cllccipTimelockAddr == nil {
-		e.cllccipTimelockAddr = make(map[uint64]common.Address)
-	}
-	cllTL, clltlExists := e.cllccipTimelockAddr[chainSelector]
-	rmnTL, rmntlExists := e.rmntimelockAddr[chainSelector]
+func (e *EVMContractOwnership) timelocksInOwnershipCheck(ds datastore.DataStore, chainSelector uint64) error {
+	cllTL, clltlExists := e.loadTimelockFromCache(&e.cllccipTimelockAddr, chainSelector)
+	rmnTL, rmntlExists := e.loadTimelockFromCache(&e.rmntimelockAddr, chainSelector)
 	if clltlExists && rmntlExists && cllTL != (common.Address{}) && rmnTL != (common.Address{}) {
 		return nil
 	}
@@ -82,9 +77,21 @@ func (e *EVMContractOwnership) initializeTimelocksInOwnershipCheck(ds datastore.
 	if err != nil {
 		return fmt.Errorf("ownership transfer requires RMNMCMS RBACTimelock in ExistingAddresses: %w", err)
 	}
-	e.cllccipTimelockAddr[chainSelector] = cllccipTimelockAddr
-	e.rmntimelockAddr[chainSelector] = rmnTimelockAddr
+	e.cllccipTimelockAddr.Store(chainSelector, cllccipTimelockAddr)
+	e.rmntimelockAddr.Store(chainSelector, rmnTimelockAddr)
 	return nil
+}
+
+func (e *EVMContractOwnership) loadTimelockFromCache(cache *sync.Map, chainSelector uint64) (common.Address, bool) {
+	value, ok := cache.Load(chainSelector)
+	if !ok {
+		return common.Address{}, false
+	}
+	addr, isAddress := value.(common.Address)
+	if !isAddress {
+		return common.Address{}, false
+	}
+	return addr, true
 }
 
 func (e *EVMContractOwnership) FilterNetworks(envName string, dom domain.Domain, lggr logger.Logger) (*cfgnet.Config, error) {
@@ -100,18 +107,27 @@ func (e *EVMContractOwnership) NeedsOwnershipCheck(ref datastore.AddressRef) boo
 	return exists
 }
 
-func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) common.Address {
+func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) (common.Address, error) {
 	switch ref.Type {
 	case datastore.ContractType(rmn_remote.ContractType):
-		return e.rmntimelockAddr[ref.ChainSelector]
+		addr, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, ref.ChainSelector)
+		if !ok {
+			return common.Address{}, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+		}
+		return addr, nil
 	default:
-		return e.cllccipTimelockAddr[ref.ChainSelector]
+		addr, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, ref.ChainSelector)
+		if !ok {
+			return common.Address{}, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+		}
+		return addr, nil
 	}
 }
 
 func (e *EVMContractOwnership) VerifyContractOwnership(
-	ctx context.Context,
+	_ context.Context,
 	lggr logger.Logger,
+	ds datastore.DataStore,
 	network cfgnet.Network,
 	refsToCheck []datastore.AddressRef,
 ) error {
@@ -139,6 +155,9 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 		return fmt.Errorf("dial RPC for chain %d: %w", network.ChainSelector, err)
 	}
 	defer client.Close()
+	if err := e.timelocksInOwnershipCheck(ds, network.ChainSelector); err != nil {
+		return fmt.Errorf("initialize timelocks for chain %d: %w", network.ChainSelector, err)
+	}
 
 	for _, ref := range refsToCheck {
 		addr, err := evm_datastore_utils.ToEVMAddress(ref)
@@ -150,9 +169,13 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 		if err != nil {
 			return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
 		}
-		if currentOwner != e.expectedOwnerForRef(ref) {
+		expectedOwner, err := e.expectedOwnerForRef(ref)
+		if err != nil {
+			return fmt.Errorf("failed to determine expected owner for contract %s (%s): %w", addr, ref.Type, err)
+		}
+		if currentOwner != expectedOwner {
 			return fmt.Errorf("ownership check failed for contract %s (%s): expected owner %s, got %s",
-				addr, ref.Type, e.expectedOwnerForRef(ref), currentOwner)
+				addr, ref.Type, expectedOwner, currentOwner)
 		}
 		lggr.Infof("ownership check passed for contract %s (%s): owner is %s", addr, ref.Type, currentOwner)
 	}

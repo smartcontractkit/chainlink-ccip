@@ -36,6 +36,7 @@ type ContractOwnership interface {
 	VerifyContractOwnership(
 		ctx context.Context,
 		lggr logger.Logger,
+		ds datastore.DataStore,
 		network cfgnet.Network,
 		refsToCheck []datastore.AddressRef,
 	) error
@@ -176,7 +177,7 @@ func IterateOwnershipCheckers(
 				lggr.Infof("no ownership checks required for network %d after filtering", network.ChainSelector)
 				return nil
 			}
-			if err := verifier.VerifyContractOwnership(ctx, lggr, network, refsToCheck); err != nil {
+			if err := verifier.VerifyContractOwnership(ctx, lggr, ds, network, refsToCheck); err != nil {
 				errsMu.Lock()
 				errs = append(errs, fmt.Errorf("ownership check err: network %d: %w", network.ChainSelector, err))
 				errsMu.Unlock()

@@ -44,6 +44,7 @@ func (s *stubContractOwnership) NeedsOwnershipCheck(_ datastore.AddressRef) bool
 func (s *stubContractOwnership) VerifyContractOwnership(
 	_ context.Context,
 	_ logger.Logger,
+	_ datastore.DataStore,
 	_ cfgnet.Network,
 	_ []datastore.AddressRef,
 ) error {
@@ -70,6 +71,7 @@ func (c *configurableContractOwnership) NeedsOwnershipCheck(ref datastore.Addres
 func (c *configurableContractOwnership) VerifyContractOwnership(
 	_ context.Context,
 	_ logger.Logger,
+	_ datastore.DataStore,
 	network cfgnet.Network,
 	refsToCheck []datastore.AddressRef,
 ) error {
