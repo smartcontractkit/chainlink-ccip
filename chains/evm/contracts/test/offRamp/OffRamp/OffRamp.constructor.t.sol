@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
+import {IRMN} from "../../../interfaces/IRMN.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
@@ -32,7 +32,7 @@ contract OffRamp_constructor is BaseTest {
     OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
-      rmnRemote: IRMNRemote(address(0)),
+      rmnRemote: IRMN(address(0)),
       tokenAdminRegistry: address(0x123),
       maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });

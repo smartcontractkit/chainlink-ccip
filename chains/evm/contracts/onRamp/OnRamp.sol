@@ -8,7 +8,7 @@ import {IExecutor} from "../interfaces/IExecutor.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -78,7 +78,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ─────────╮ Local chain selector.
-    IRMNRemote rmnRemote; //          │ RMN remote address.
+    IRMN rmnRemote; //          │ RMN remote address.
     uint32 maxUSDCentsPerMessage; // ─╯ Maximum USD cent value per message.
     address tokenAdminRegistry; // Token admin registry address.
   }
@@ -150,7 +150,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev The chain ID of the source chain that this contract is deployed to.
   uint64 private immutable i_localChainSelector;
   /// @dev The rmn contract.
-  IRMNRemote private immutable i_rmnRemote;
+  IRMN private immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address private immutable i_tokenAdminRegistry;
   /// @dev The maximum USD cent value per message. Used to reduce impact of potential misconfigurations.

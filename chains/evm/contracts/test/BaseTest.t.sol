@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 // Imports to any non-library are not allowed due to the significant cascading
 // compile time increase they cause when imported into this base test.
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 
 import {Router} from "../Router.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -31,7 +31,7 @@ contract BaseTest is Test {
 
   bool private s_baseTestInitialized;
 
-  IRMNRemote internal s_mockRMNRemote;
+  IRMN internal s_mockRMNRemote;
   Router internal s_sourceRouter;
   Router internal s_destRouter;
 
@@ -47,9 +47,8 @@ contract BaseTest is Test {
     vm.label(STRANGER, "Stranger");
 
     // setup RMNRemote
-    s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
+    s_mockRMNRemote = IRMN(makeAddr("MOCK RMN REMOTE"));
     vm.etch(address(s_mockRMNRemote), bytes("fake bytecode"));
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encode(false));
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
 

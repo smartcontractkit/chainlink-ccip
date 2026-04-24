@@ -102,7 +102,7 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
-compileContract rmn/RMNRemote
+compileContract rmn/RMN
 compileContract rmn/RMNProxy
 
 if [ "$ZKSYNC" != "true" ]; then
