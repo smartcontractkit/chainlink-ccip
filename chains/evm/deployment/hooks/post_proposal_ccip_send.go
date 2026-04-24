@@ -231,10 +231,12 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)
 	}
-	// set balance for the deployer key
+	// Best-effort on forked/anvil-backed chains: try to set native balance for the deployer key
+	// so impersonated token-owner transfers can pay gas. Environments without impersonation support
+	// should not fail the entire post-proposal verification flow here.
 	err = testhelpers.SetImpersonatedBalance(rpcUrl, chain.DeployerKey.From.Hex(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
 	if err != nil {
-		return nil, fmt.Errorf("set impersonated balance for chain %d: %w", srcSel, err)
+		env.Logger.Warnf("Failed to set impersonated balance for chain %d; continuing without fork balance setup: %v", srcSel, err)
 	}
 	var filteredFeeTokens []common.Address
 	// Best-effort funding: try to give the deployer fee token balances by impersonating each token owner
