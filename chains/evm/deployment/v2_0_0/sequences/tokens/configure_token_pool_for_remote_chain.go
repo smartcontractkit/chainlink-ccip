@@ -664,6 +664,61 @@ func v2FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig)
 	}
 }
 
+func importTokenTransferFeeConfigFromV160OnRampFeeQuoter(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	feeQuoterAddr common.Address,
+	tokenAddress common.Address,
+	remoteChainSelector uint64,
+) (*tokens.TokenTransferFeeConfig, error) {
+	feeQuoterTAVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       feeQuoterAddr,
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type and version of fee quoter %s on chain %s: %w", feeQuoterAddr.Hex(), chain.String(), err)
+	}
+
+	feeQuoterVersion := feeQuoterTAVReport.Output.Version
+	if feeQuoterVersion.Major() == 1 && feeQuoterVersion.Minor() == 6 {
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: chainSelector,
+			Address:       feeQuoterAddr,
+			Args: fqops_v163.GetTokenTransferFeeConfigArgs{
+				Token:             tokenAddress,
+				DestChainSelector: remoteChainSelector,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
+				feeQuoterAddr.Hex(), tokenAddress.Hex(), remoteChainSelector, chain.String(), err)
+		}
+		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	}
+
+	switch feeQuoterVersion.String() {
+	case fqops.Version.String():
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: chainSelector,
+			Address:       feeQuoterAddr,
+			Args: fqops.GetTokenTransferFeeConfigArgs{
+				Token:             tokenAddress,
+				DestChainSelector: remoteChainSelector,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
+				feeQuoterAddr.Hex(), tokenAddress.Hex(), remoteChainSelector, chain.String(), err)
+		}
+		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	default:
+		return nil, fmt.Errorf("unsupported fee quoter version %s for fee quoter %s referenced by onRamp 1.6.0 on chain %s",
+			feeQuoterTAVReport.Output.Version.String(), feeQuoterAddr.Hex(), chain.String())
+	}
+}
+
 func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (*tokens.TokenTransferFeeConfig, error) {
 	// get router from token
 	dCfgReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
@@ -730,20 +785,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		if feeQuoterAddr == (common.Address{}) {
 			return nil, nil
 		}
-		// get token transfer fee config from fee quoter
-		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       feeQuoterAddr,
-			Args: fqops_v163.GetTokenTransferFeeConfigArgs{
-				Token:             input.TokenAddress,
-				DestChainSelector: input.RemoteChainSelector,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
-				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
-		}
-		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+		return importTokenTransferFeeConfigFromV160OnRampFeeQuoter(b, chain, input.ChainSelector, feeQuoterAddr, input.TokenAddress, input.RemoteChainSelector)
 	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
