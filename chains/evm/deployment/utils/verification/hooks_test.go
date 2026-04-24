@@ -468,6 +468,8 @@ func TestVerifyDeployed_PostHook_Blockscout_CallsVerifyWhenNotVerified(t *testin
 	registerMyContractV1(t)
 	var verifyPOSTs int
 	var isVerifiedGETs int
+	var txListGETs int
+	var checkStatusGETs int
 	// After the first successful verify POST, getabi should report the contract as verified so a
 	// second hook run does not POST again (mirrors explorer state after verification).
 	var verifyCompleted bool
@@ -483,10 +485,33 @@ func TestVerifyDeployed_PostHook_Blockscout_CallsVerifyWhenNotVerified(t *testin
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]string{"status": "0", "result": ""})
-		case r.Method == http.MethodPost && action == "verify":
+		case r.Method == http.MethodGet && action == "txlist":
+			txListGETs++
+			w.Header().Set("Content-Type", "application/json")
+			// Return a creation tx whose input does not share the metadata bytecode prefix.
+			// This makes constructor args empty and keeps the test focused on hook behavior.
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status":  "1",
+				"message": "OK",
+				"result":  []map[string]string{{"input": "0xdeadbeef"}},
+			})
+		case r.Method == http.MethodPost && action == "verifysourcecode":
 			verifyPOSTs++
 			verifyCompleted = true
-			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"status":  "1",
+				"message": "OK",
+				"result":  "test-guid",
+			})
+		case r.Method == http.MethodGet && action == "checkverifystatus":
+			checkStatusGETs++
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"status":  "1",
+				"message": "OK",
+				"result":  "Pass - Verified",
+			})
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.RequestURI())
 		}
@@ -517,6 +542,8 @@ func TestVerifyDeployed_PostHook_Blockscout_CallsVerifyWhenNotVerified(t *testin
 	// Post-hook step calls IsVerified, then Verify (which calls IsVerified again), then POST verify.
 	require.Equal(t, 1, verifyPOSTs, "first run should submit verification once")
 	require.Equal(t, 2, isVerifiedGETs, "IsVerified: once in hook step, once inside blockscout Verify()")
+	require.Equal(t, 1, txListGETs, "first run should fetch creation tx to derive constructor args")
+	require.Equal(t, 1, checkStatusGETs, "first run should poll checkverifystatus once")
 
 	err = h.Func(t.Context(), changeset.PostHookParams{
 		Env: changeset.HookEnv{Name: verificationHookEnv, Logger: logger.Test(t)},
@@ -527,6 +554,8 @@ func TestVerifyDeployed_PostHook_Blockscout_CallsVerifyWhenNotVerified(t *testin
 	require.NoError(t, err)
 	require.Equal(t, 1, verifyPOSTs, "second run should not POST again when explorer reports verified")
 	require.Equal(t, 3, isVerifiedGETs, "second run: one IsVerified in step; Verify returns early without another GET")
+	require.Equal(t, 1, txListGETs, "second run should not fetch txlist again")
+	require.Equal(t, 1, checkStatusGETs, "second run should not poll checkverifystatus again")
 }
 
 func TestRequireVerified_PreHook_Sourcify_ExplorerError(t *testing.T) {
