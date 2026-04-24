@@ -375,6 +375,10 @@ func importConfigFromActivePool(
 		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
 	}
 	tav := typeAndVersionReport.Output
+	if tav.Version.GreaterThanEqual(semver.MustParse("1.7.0")) {
+		// Configuration import from another 1.7.0 pool is not currently supported
+		return nil, nil
+	}
 	if tav.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
 		// Configuration import from another 2.0.0 pool is not currently supported
 		return nil, nil
