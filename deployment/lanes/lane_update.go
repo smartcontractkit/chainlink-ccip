@@ -25,7 +25,7 @@ type ChainDefinition struct {
 	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfigOverrides is a functional option that mutates a
 	// FeeQuoterDestChainConfig in place. Pass one or more overrides to selectively change default values.
-	FeeQuoterDestChainConfigOverrides *FeeQuoterDestChainConfigOverride
+	FeeQuoterDestChainConfigOverrides *FeeQuoterDestChainConfigOverride `json:"-" yaml:"-"`
 	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
 	// This is provided by the user
 	// 1.6 only
@@ -194,7 +194,7 @@ type ConnectChainsConfig struct {
 	// CommitteePopulator populates CommitteeVerifierInputs into fully configured
 	// CommitteeVerifierConfig values during apply. Required when any ChainDefinition
 	// in Lanes has CommitteeVerifierInputs set. Nil for 1.6-only usage.
-	CommitteePopulator CommitteeConfigPopulator
+	CommitteePopulator CommitteeConfigPopulator `json:"-" yaml:"-"`
 }
 type LaneConfig struct {
 	ChainA       ChainDefinition
