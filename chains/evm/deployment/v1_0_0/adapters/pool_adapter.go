@@ -11,8 +11,8 @@ import (
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
-	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -35,6 +35,7 @@ type PoolOps interface {
 	GetTokenDecimals(ctx context.Context, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error)
+	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
 
@@ -264,6 +265,10 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			if a.DeployTokenPoolSeq == nil {
 				return sequences.OnChainOutput{}, errors.New("DeployTokenPoolSeq is not set on EVMPoolAdapter")
 			}
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
 			out, err := cldf_ops.ExecuteSequence(b, a.DeployTokenPoolSeq, chains, input)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token pool on chain %d: %w", input.ChainSelector, err)
@@ -288,6 +293,36 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
+			if input.RateLimitAdmin != "" && len(out.Output.Addresses) >= 1 {
+				poolBytes, err := a.AddressRefToBytes(out.Output.Addresses[0])
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+				}
+				poolAddr := common.BytesToAddress(poolBytes)
+				if poolAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero address")
+				}
+
+				rlAdminHex := input.RateLimitAdmin
+				if !common.IsHexAddress(rlAdminHex) {
+					return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
+				}
+				rlAdminAddr := common.HexToAddress(rlAdminHex)
+				if rlAdminAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, errors.New("rate limit admin address cannot be the zero address")
+				}
+
+				output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, rlAdminAddr)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
+				}
+				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
+				}
+				result.BatchOps = append(result.BatchOps, batchOp)
+			}
+
 			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
 			if isPoolTypeBnM && len(out.Output.Addresses) >= 1 {
 				poolRef := out.Output.Addresses[0]
@@ -308,11 +343,6 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				toknAddr := common.BytesToAddress(toknAddrBytes)
 				if toknAddr == (common.Address{}) {
 					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenRef.Qualifier)
-				}
-
-				chain, ok := chains.EVMChains()[input.ChainSelector]
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 				}
 
 				writes := []evm_contract.WriteOutput{}

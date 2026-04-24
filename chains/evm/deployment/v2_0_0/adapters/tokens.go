@@ -19,9 +19,9 @@ import (
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
-	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -447,6 +447,10 @@ func (p *poolOpsV200) GetPoolAdmins(_ context.Context, _ *evm.Chain, _ common.Ad
 
 func (p *poolOpsV200) SetRateLimiterConfig(_ cldf_ops.Bundle, _ evm.Chain, _ common.Address, _ uint64, _, _ tokens.RateLimiterConfig) (contract.WriteOutput, error) {
 	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimiterConfig: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+}
+
+func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (contract.WriteOutput, error) {
+	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimitAdmin: not used; v2.0.0 adapter overrides SetRateLimitAdmin")
 }
 
 func (p *poolOpsV200) Version() *semver.Version {
