@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum"
@@ -14,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20"
 	"golang.org/x/exp/maps"
@@ -21,18 +24,20 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/testhelpers"
-	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	fq20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/testhelpers"
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	cciphooks "github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
 )
 
 var _ cciphooks.PostProposalCCIPSend = (*EVMPostProposalCCIPSend)(nil)
 
 // fund deployer with at least one token unit so forked sends can pay fees.
-var feeTokenFundingAmount = big.NewInt(1e18)
+var feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20)) // 10 tokens with 18 decimals, adjust as needed for tokens with different decimals
 
 func init() {
 	cciphooks.GetPostProposalCCIPSendRegistry().Register(chain_selectors.FamilyEVM, &EVMPostProposalCCIPSend{})
@@ -115,26 +120,62 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	if evmForkContext.ChainConfig.HTTPRPCs == nil || len(evmForkContext.ChainConfig.HTTPRPCs) == 0 {
 		return nil, errors.New("invalid fork context: no http rpcs found")
 	}
-	rpcUrl := evmForkContext.ChainConfig.HTTPRPCs[0].External
-	ec, err := ethclient.Dial(rpcUrl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to eth client for chain %d at rpc %s: %w", srcSel, evmForkContext.ChainConfig.HTTPRPCs[0].External, err)
-	}
-	defer ec.Close()
-	fqAddr, fqVer, err := sequences.GetFeeQuoterAddressAndVersionFromOnRamp(env.DataStore, srcSel, env.BlockChains)
-	if err != nil {
-		return nil, err
-	}
+
+	// we are not using chain.client by default to avoid using multi client
+	// multi client attempts a lot of retries on failed transactions which causes significant delay in this loop
+	// when the node is not fully synced or has issues processing the event filters with anvil
 	chain, ok := env.BlockChains.EVMChains()[srcSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not in environment EVM chains", srcSel)
 	}
 
+	rpcUrl := evmForkContext.ChainConfig.HTTPRPCs[0].External
+	client := chain.Client
+	ec, err := ethclient.Dial(rpcUrl)
+	// in case of error fallback to env chain client
+	if err != nil {
+		env.Logger.Warnf("failed to connect to eth client for chain %d at rpc %s, using env chain client instead: %v", srcSel, rpcUrl, err)
+	} else {
+		// try to query the client to make sure it's working, if not fallback to env chain client
+		// it's needed for the e2e test where full forked set up is not done
+		_, err = ec.ChainID(env.GetContext())
+		if err != nil {
+			env.Logger.Warnf("failed to connect to eth client for chain %d at rpc %s, using env chain client instead: %v", srcSel, rpcUrl, err)
+		} else {
+			defer ec.Close()
+			client = ec
+		}
+	}
+
+	if client == nil {
+		return nil, fmt.Errorf("failed to resolve an eth client for chain %d", srcSel)
+	}
+
+	fqAddr, fqVer, err := sequences.GetFeeQuoterAddressAndVersionFromOnRamp(env.DataStore, srcSel, env.BlockChains)
+	if err != nil {
+		return nil, err
+	}
+	// get router
+	rRef := env.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(srcSel),
+		datastore.AddressRefByType(datastore.ContractType(routerops.ContractType)),
+		datastore.AddressRefByVersion(routerops.Version),
+	)
+	if len(rRef) != 1 {
+		return nil, fmt.Errorf("router contract ref not found or not unique for chain selector %d: found %d", srcSel, len(rRef))
+	}
+
+	// get supported chains
+	chains, err := e.SupportedDestinations(env, srcSel)
+	if err != nil {
+		return nil, err
+	}
+	feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(int64(len(chains))), feeTokenFundingAmount)
 	var addrs []common.Address
 	// FeeQuoter bindings differ by major version; select the matching wrapper at runtime.
 	switch fqVer.Major() {
 	case 1:
-		fq, err := fq16.NewFeeQuoter(fqAddr, chain.Client)
+		fq, err := fq16.NewFeeQuoter(fqAddr, client)
 		if err != nil {
 			return nil, fmt.Errorf("fee quoter 1.x binding: %w", err)
 		}
@@ -143,47 +184,102 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 			return nil, fmt.Errorf("getFeeTokens: %w", err)
 		}
 	case 2:
-		fq, err := fq20.NewFeeQuoter(fqAddr, chain.Client)
+		fq, err := fq20.NewFeeQuoter(fqAddr, client)
 		if err != nil {
 			return nil, fmt.Errorf("fee quoter 2.x binding: %w", err)
 		}
-		addrs, err = fq.GetFeeTokens(nil)
+		feeTokens, err := fq.GetFeeTokens(&bind.CallOpts{
+			Context: env.GetContext(),
+		})
 		if err != nil {
 			return nil, fmt.Errorf("getFeeTokens: %w", err)
+		}
+		// 2.0 fee quoter returns all tokens as fee token which has price
+		// for now just use wrapped native and link
+		// TODO enable it for all fee tokens later
+		staticCfg, err := fq.GetStaticConfig(&bind.CallOpts{
+			Context: env.GetContext(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("getFeeTokens: %w", err)
+		}
+		linkAddr := staticCfg.LinkToken
+		routerC, err := router.NewRouter(common.HexToAddress(rRef[0].Address), client)
+		if err != nil {
+			return nil, fmt.Errorf("new router contract: %w", err)
+		}
+		wrappedNative, err := routerC.GetWrappedNative(&bind.CallOpts{
+			Context: env.GetContext(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("get wrapped native contract: %w", err)
+		}
+		feeTokenMap := make(map[common.Address]struct{})
+		for _, addr := range feeTokens {
+			feeTokenMap[addr] = struct{}{}
+		}
+		if _, ok := feeTokenMap[linkAddr]; ok {
+			addrs = append(addrs, linkAddr)
+		} else {
+			return nil, fmt.Errorf("link %s is not enabled as fee token for chain %d, found fee tokens: %v", linkAddr, srcSel, feeTokens)
+		}
+		if _, ok := feeTokenMap[wrappedNative]; ok {
+			addrs = append(addrs, wrappedNative)
+		} else {
+			return nil, fmt.Errorf("wrappedNative %s is not enabled as fee token for chain %d, found fee tokens: %v", wrappedNative, srcSel, feeTokens)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)
 	}
-	// Give the deployer fee token balances by transferring from each token owner via impersonation on forked chains.
+
+	var filteredFeeTokens []common.Address
+	// Best-effort funding: try to give the deployer fee token balances by impersonating each token owner
+	// on forked chains. Tokens that fail discovery, transfer construction, or impersonated send are skipped
+	// and excluded from filteredFeeTokens.
 	for _, addr := range addrs {
-		token, err := burn_mint_erc20.NewBurnMintERC20(addr, chain.Client)
+		ctx, cancel := context.WithTimeout(env.GetContext(), 1*time.Minute)
+		defer cancel()
+		env.Logger.Infof("Processing fee token %s on chain %d", addr.Hex(), srcSel)
+		token, err := burn_mint_erc20.NewBurnMintERC20(addr, client)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
 		}
 		deployerBal, err := token.BalanceOf(nil, chain.DeployerKey.From)
 		if err == nil && deployerBal.Cmp(feeTokenFundingAmount) >= 0 {
+			filteredFeeTokens = append(filteredFeeTokens, addr)
 			continue
 		}
+		env.Logger.Infof("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
-		tokenOwner, err := discoverFeeTokenFundingAccount(chain.Client, token, addr, feeTokenFundingAmount)
+		tokenOwner, err := discoverFeeTokenFundingAccount(ctx, client, token, addr, feeTokenFundingAmount)
 		if err != nil {
-			return nil, fmt.Errorf("failed to discover funding account for fee token %s on chain %d: %w", addr.Hex(), srcSel, err)
+			// in case of error continue
+			env.Logger.Warnf("Failed to discover fee token funding account for token %s on chain %d, continuing without it: %v", addr.Hex(), srcSel, err)
+			continue
 		}
 		tx, err := token.Transfer(cldf.SimTransactOpts(), chain.DeployerKey.From, feeTokenFundingAmount)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build transfer tx for fee token %s on chain %d: %w", addr.Hex(), srcSel, err)
+			// in case of error continue
+			env.Logger.Warnf("Failed to create transfer transaction for fee token %s from token owner %s to deployer %s on chain %d, "+
+				"continuing without it: %v", addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err)
+			continue
+		}
+		if ec == nil {
+			env.Logger.Warnf("Failed to fund fee token %s on chain %d: no direct fork RPC client available for impersonation, continuing without it", addr.Hex(), srcSel)
+			continue
 		}
 		if err := testhelpers.SendImpersonatedTx(env.GetContext(), ec, rpcUrl, tokenOwner.Hex(), addr.Hex(), tx.Data()); err != nil {
-			return nil, fmt.Errorf(
-				"failed to send impersonated transfer for fee token %s from token owner %s to deployer %s on chain %d: %w",
-				addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err,
-			)
+			// in case of error continue
+			env.Logger.Warnf("Failed to send impersonated transfer transaction for fee token %s from token owner %s to deployer %s on chain %d, "+
+				"continuing without it: %v", addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err)
+			continue
 		}
+		filteredFeeTokens = append(filteredFeeTokens, addr)
 	}
-	out := make([]string, 0, len(addrs)+1)
+	out := make([]string, 0, len(filteredFeeTokens)+1)
 	// Keep native token first (empty string) to mirror adapter expectations.
 	out = append(out, "") // native (empty encodes to wrapped native in adapter)
-	for _, a := range addrs {
+	for _, a := range filteredFeeTokens {
 		out = append(out, a.Hex())
 	}
 	return out, nil
@@ -192,16 +288,19 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 // discoverFeeTokenFundingAccount returns an account that can fund fundingAmount
 // of tokenAddr, preferring owner() and falling back to event-derived candidates.
 func discoverFeeTokenFundingAccount(
+	ctx context.Context,
 	backend bind.ContractBackend,
 	token *burn_mint_erc20.BurnMintERC20,
 	tokenAddr common.Address,
 	fundingAmount *big.Int,
 ) (common.Address, error) {
-	owner, err := optionalAddressGetter(backend, tokenAddr, "owner")
+	owner, err := optionalAddressGetter(ctx, backend, tokenAddr, "owner")
 	if err != nil {
-		return findFundingSenderFromTokenEvents(backend, token, tokenAddr, fundingAmount)
+		return findFundingSenderFromTokenEvents(ctx, backend, token, tokenAddr, fundingAmount)
 	}
-	ownerBal, err := token.BalanceOf(nil, owner)
+	ownerBal, err := token.BalanceOf(&bind.CallOpts{
+		Context: ctx,
+	}, owner)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("fetch owner balance for token %s: %w", tokenAddr.Hex(), err)
 	}
@@ -209,12 +308,13 @@ func discoverFeeTokenFundingAccount(
 		return owner, nil
 	}
 	// if owner does not have sufficient balance, fall back to finding sender from token events
-	return findFundingSenderFromTokenEvents(backend, token, tokenAddr, fundingAmount)
+	return findFundingSenderFromTokenEvents(ctx, backend, token, tokenAddr, fundingAmount)
 }
 
 // optionalAddressGetter calls a no-arg address getter on contractAddr and
 // returns its result.
 func optionalAddressGetter(
+	ctx context.Context,
 	backend bind.ContractBackend,
 	contractAddr common.Address,
 	getter string,
@@ -229,7 +329,9 @@ func optionalAddressGetter(
 	}
 	contract := bind.NewBoundContract(contractAddr, parsed, backend, backend, backend)
 	var out []any
-	if err := contract.Call(nil, &out, getter); err != nil {
+	if err := contract.Call(&bind.CallOpts{
+		Context: ctx,
+	}, &out, getter); err != nil {
 		return common.Address{}, err
 	}
 	if len(out) == 0 {
@@ -241,6 +343,7 @@ func optionalAddressGetter(
 // findFundingSenderFromTokenEvents searches recent Transfer/Approval logs and
 // returns a sender with at least fundingAmount balance.
 func findFundingSenderFromTokenEvents(
+	ctx context.Context,
 	backend bind.ContractBackend,
 	token *burn_mint_erc20.BurnMintERC20,
 	tokenAddr common.Address,
@@ -250,7 +353,6 @@ func findFundingSenderFromTokenEvents(
 		chunkSize   = uint64(20_000)
 		maxLookback = uint64(500_000)
 	)
-	ctx := context.Background()
 	header, err := backend.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("get latest block header: %w", err)

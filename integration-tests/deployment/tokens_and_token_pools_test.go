@@ -169,8 +169,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 		TAR                *tarbindings.TokenAdminRegistry
 		Chain              evmchain.Chain
 		Deploy             deployapi.ContractDeploymentConfigPerChain
+		RateLimitAdmin     string
 	}{
 		{
+			RateLimitAdmin:     evmutils.RandomAddress().Hex(),
 			TokenPoolQualifier: "EVM_TEST_POOL_A",
 			Deployer:           evmChainA.DeployerKey.From,
 			Chain:              evmChainA,
@@ -191,6 +193,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			},
 		},
 		{
+			RateLimitAdmin:     "",
 			TokenPoolQualifier: "EVM_TEST_POOL_B",
 			Deployer:           evmChainB.DeployerKey.From,
 			Chain:              evmChainB,
@@ -283,6 +286,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DeployTokenInput: data.Token,
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: data.TokenPoolQualifier,
+					RateLimitAdmin:     data.RateLimitAdmin,
 					PoolType:           evmTokenPoolType.String(),
 				},
 			}
@@ -376,12 +380,19 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 				tp, err := bnmpool.NewBurnMintTokenPool(tpAddress, data.Chain.Client)
 				require.NoError(t, err)
+				rla, err := tp.GetRateLimitAdmin(&bind.CallOpts{Context: t.Context()})
+				require.NoError(t, err)
 				dec, err := tp.GetTokenDecimals(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 				tok, err := tp.GetToken(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 				tpo, err := tp.Owner(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
+				if data.RateLimitAdmin != "" {
+					require.Equal(t, 0, common.HexToAddress(data.RateLimitAdmin).Cmp(rla), fmt.Sprintf("expected rate limit admin %q to match", data.RateLimitAdmin))
+				} else {
+					require.Equal(t, 0, (common.Address{}).Cmp(rla), fmt.Sprintf("expected rate limit admin to be zero address, got %q", rla.Hex()))
+				}
 
 				// Verify on-chain token pool info is consistent
 				require.Equal(t, 0, data.Deployer.Cmp(tpo), fmt.Sprintf("expected EVM deployer to be the owner of the deployed token pool (deployer = %q, token pool owner = %q", data.Deployer.Hex(), tpo.Hex()))
