@@ -31,6 +31,9 @@ func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry) deployment.C
 		if cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
+		if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+			return fmt.Errorf("topology validation failed: %w", err)
+		}
 
 		if cfg.ExecutorQualifier == "" {
 			return fmt.Errorf("executor qualifier is required")
