@@ -177,7 +177,7 @@ func TestApplyVerifierConfig_Validation(t *testing.T) {
 				CommitteeQualifier:       "c1",
 				DefaultExecutorQualifier: "pool1",
 			},
-			wantErr: "NOP topology with at least one NOP is required",
+			wantErr: "nop_topology is required",
 		},
 		{
 			name: "committee with no aggregators returns error",
@@ -208,7 +208,7 @@ func TestApplyVerifierConfig_Validation(t *testing.T) {
 			env:  deployment.Environment{Name: "mainnet", BlockChains: cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{sel1: cldfevm.Chain{Selector: sel1}})},
 			input: changesets.ApplyVerifierConfigInput{
 				Topology: func() *offchain.EnvironmentTopology {
-					topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, "")
+					topo := newVerifierTopology(makeTestNOPAliases(16), "c1", []uint64{sel1}, "")
 					topo.PyroscopeURL = "http://pyroscope"
 					return topo
 				}(),

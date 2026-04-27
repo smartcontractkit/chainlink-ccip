@@ -60,6 +60,9 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 		if cfg.Cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
+		if err := cfg.Cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+			return fmt.Errorf("topology validation failed: %w", err)
+		}
 
 		if cfg.Cfg.Topology.NOPTopology == nil || len(cfg.Cfg.Topology.NOPTopology.Committees) == 0 {
 			return fmt.Errorf("no committees defined in topology")
