@@ -160,6 +160,9 @@ func ConfigureChainsForLanesFromTopology(
 		if cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
+		if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+			return fmt.Errorf("topology validation failed: %w", err)
+		}
 		if cfg.Topology.NOPTopology == nil || len(cfg.Topology.NOPTopology.Committees) == 0 {
 			return fmt.Errorf("no committees defined in topology")
 		}
