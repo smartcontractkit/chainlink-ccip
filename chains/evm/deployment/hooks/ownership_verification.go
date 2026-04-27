@@ -28,6 +28,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	seq2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	cciphooks "github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -40,19 +41,24 @@ func init() {
 }
 
 var contractTypesForOwnershipCheck = map[datastore.ContractType]struct{}{
-	datastore.ContractType(committee_verifier.ContractType):         {},
-	datastore.ContractType(executor.ContractType):                   {},
-	datastore.ContractType(seq2_0.ExecutorProxyType):                {},
-	datastore.ContractType(onrampops.ContractType):                  {},
-	datastore.ContractType(offrampops.ContractType):                 {},
-	datastore.ContractType(fqops.ContractType):                      {},
-	datastore.ContractType(routerops.ContractType):                  {},
-	datastore.ContractType(rmn_remote.ContractType):                 {},
-	datastore.ContractType(rmn_proxy.ContractType):                  {},
-	datastore.ContractType(token_admin_registry.ContractType):       {},
-	datastore.ContractType(common_utils.BypasserManyChainMultisig):  {},
-	datastore.ContractType(common_utils.CancellerManyChainMultisig): {},
-	datastore.ContractType(common_utils.ProposerManyChainMultisig):  {},
+	datastore.ContractType(committee_verifier.ContractType):                           {},
+	datastore.ContractType(executor.ContractType):                                     {},
+	datastore.ContractType(seq2_0.ExecutorProxyType):                                  {},
+	datastore.ContractType(onrampops.ContractType):                                    {},
+	datastore.ContractType(offrampops.ContractType):                                   {},
+	datastore.ContractType(fqops.ContractType):                                        {},
+	datastore.ContractType(routerops.ContractType):                                    {},
+	datastore.ContractType(rmn_remote.ContractType):                                   {},
+	datastore.ContractType(rmn_proxy.ContractType):                                    {},
+	datastore.ContractType(token_admin_registry.ContractType):                         {},
+	datastore.ContractType(common_utils.BypasserManyChainMultisig):                    {},
+	datastore.ContractType(common_utils.CancellerManyChainMultisig):                   {},
+	datastore.ContractType(common_utils.ProposerManyChainMultisig):                    {},
+	datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType):      {},
+	datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType): {},
+	datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType):   {},
+	datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierContractType): {},
+	datastore.ContractType(versioned_verifier_resolver.ContractType):                  {},
 }
 
 // EVMContractOwnership validates that contracts are owned by expected timelocks.
