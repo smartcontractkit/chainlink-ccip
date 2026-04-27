@@ -43,6 +43,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+
+	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 )
 
 func init() {
@@ -73,6 +75,18 @@ func init() {
 
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
 	ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyEVM, &ChainFamilyAdapter{})
+
+	// Register the EVM CommitteeVerifierOnchain adapter into the ccv singleton registry.
+	// This is the only adapter that requires onchain (RPC) access; all other ccv EVM
+	// adapters (Aggregator, Executor, etc.) are registered by chainlink-ccv/evm.
+	ccvdeploymentadapters.GetRegistry().Register(chainsel.FamilyEVM, ccvdeploymentadapters.ChainAdapters{
+		Aggregator:               &EVMCCVAggregatorConfigAdapter{},
+		Executor:                 &EVMCCVExecutorConfigAdapter{},
+		Verifier:                 &EVMCCVVerifierConfigAdapter{},
+		Indexer:                  &EVMCCVIndexerConfigAdapter{},
+		TokenVerifier:            &EVMCCVTokenVerifierConfigAdapter{},
+		CommitteeVerifierOnchain: &EVMCCVCommitteeVerifierOnchainAdapter{},
+	})
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
 	ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyEVM, &EVMExecutorConfigAdapter{})
 	ccvadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyEVM, &EVMVerifierJobConfigAdapter{})
