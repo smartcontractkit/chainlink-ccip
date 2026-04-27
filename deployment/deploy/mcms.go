@@ -149,6 +149,7 @@ func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSRea
 
 				mcmsContracts = append(mcmsContracts, mcmsRef)
 			}
+			chainCfg.MCMContracts = mcmsContracts
 
 			// find existing addresses for this chain from the env
 			existingAddrs := d.ExistingAddressesForChain(e, selector)
