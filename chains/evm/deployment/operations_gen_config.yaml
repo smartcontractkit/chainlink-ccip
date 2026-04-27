@@ -619,3 +619,20 @@ contracts:
         access: public
       - name: versionTag
         access: public
+
+  - contract_name: RMN
+    version: "2.1.0"
+    version_path: "latest"
+    functions:
+      - name: curse
+        access: public
+      - name: uncurse
+        access: owner
+      - name: isCursed
+        access: public
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: getCursedSubjects
+        access: public
