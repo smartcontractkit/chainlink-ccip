@@ -861,6 +861,10 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 	}
 	// merge imported config with desired config, giving precedence to desired config values when they are non-zero (i.e. non-default)
 	desiredTokenTransferFeeConfig = *mergeTokenTransferFeeConfig(&desiredTokenTransferFeeConfig, importedConfig)
+	// TEMP: force token-pool transfer overheads during CCTP rollout debugging.
+	desiredTokenTransferFeeConfig.IsEnabled = true
+	desiredTokenTransferFeeConfig.DestGasOverhead = 35_000
+	desiredTokenTransferFeeConfig.DestBytesOverhead = 1_000
 	if !desiredTokenTransferFeeConfig.IsEnabled {
 		return nil, nil
 	}
@@ -874,29 +878,39 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 			Arg3:              []byte{},
 		},
 	})
+	currentTokenTransferFeeConfig := token_pool.TokenTransferFeeConfig{}
+	readCurrentConfig := true
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token transfer fee config: %w", err)
+		if !isCCVNotSetOnResolverError(err) {
+			return nil, fmt.Errorf("failed to get token transfer fee config: %w", err)
+		}
+		// TEMP: CCTP-through-CCV pools derive fast-finality bps by reading the
+		// outbound verifier from the resolver. During initial rollout, this
+		// resolver entry may be emitted in the same pending proposal, so the read
+		// can revert before the fee config write is prepared. Treat the current
+		// pool config as empty and emit the desired/imported config.
+		readCurrentConfig = false
+	} else {
+		currentTokenTransferFeeConfig = report.Output
 	}
-
-	currentTokenTransferFeeConfig := report.Output
 
 	// Fall back to on-chain values if inputted values are empty
-	if desiredTokenTransferFeeConfig.DestGasOverhead == 0 {
+	if readCurrentConfig && desiredTokenTransferFeeConfig.DestGasOverhead == 0 {
 		desiredTokenTransferFeeConfig.DestGasOverhead = currentTokenTransferFeeConfig.DestGasOverhead
 	}
-	if desiredTokenTransferFeeConfig.DestBytesOverhead == 0 {
+	if readCurrentConfig && desiredTokenTransferFeeConfig.DestBytesOverhead == 0 {
 		desiredTokenTransferFeeConfig.DestBytesOverhead = currentTokenTransferFeeConfig.DestBytesOverhead
 	}
-	if desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents == 0 {
+	if readCurrentConfig && desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents == 0 {
 		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents = currentTokenTransferFeeConfig.FinalityFeeUSDCents
 	}
-	if desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents == 0 {
+	if readCurrentConfig && desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents == 0 {
 		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents = currentTokenTransferFeeConfig.FastFinalityFeeUSDCents
 	}
-	if desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps == 0 {
+	if readCurrentConfig && desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps == 0 {
 		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps = currentTokenTransferFeeConfig.FinalityTransferFeeBps
 	}
-	if desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps == 0 {
+	if readCurrentConfig && desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps == 0 {
 		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps = currentTokenTransferFeeConfig.FastFinalityTransferFeeBps
 	}
 
@@ -923,6 +937,14 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 	}
 
 	return updates, nil
+}
+
+func isCCVNotSetOnResolverError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "CCVNotSetOnResolver") || strings.Contains(errMsg, "0x4172d660")
 }
 
 // makeCCVUpdates returns the CCV config update to apply for the remote chain, or (nil, false, nil) if on-chain
