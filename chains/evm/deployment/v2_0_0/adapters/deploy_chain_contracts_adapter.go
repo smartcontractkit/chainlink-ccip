@@ -141,6 +141,15 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 		return output, fmt.Errorf("failed to convert metadata to "+
 			"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 	}
+	feeAggr := onRampCfg16.DynamicConfig.FeeAggregator.String()
+	output.OnRamp.FeeAggregator = feeAggr
+
+	for i := range output.Executors {
+		output.Executors[i].DynamicConfig.FeeAggregator = feeAggr
+	}
+	for i := range output.CommitteeVerifiers {
+		output.CommitteeVerifiers[i].FeeAggregator = feeAggr
+	}
 	offRampAddr := datastore_utils.GetAddressRef(
 		input.ExistingAddresses,
 		input.ChainSelector,
@@ -150,6 +159,26 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 	)
 	if offRampAddr.Address == "" {
 		return output, fmt.Errorf("offRamp v1.6.0 address not found for chain selector %d, expected to find it since onRamp v1.6.0 was found", input.ChainSelector)
+	}
+	// see if offRamp metadata is found, if not fetch it directly, fail if both are unsuccessful
+	metadataForoffRamp16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
+		input.ExistingAddresses,
+		input.ContractMeta,
+		offrampops_v160.ContractType,
+		offrampops_v160.Version,
+		"",
+		input.ChainSelector,
+	)
+	if err == nil {
+		if len(metadataForoffRamp16) == 1 {
+			offRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OffRampImportConfigSequenceOutput](metadataForoffRamp16[0].Metadata)
+			if err != nil {
+				return output, fmt.Errorf("failed to convert metadata to "+
+					"OffRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+			}
+			output.OffRamp.GasForCallExactCheck = offRampCfg16.StaticConfig.GasForCallExactCheck
+			return output, nil
+		}
 	}
 	// directly fetch offRamp static config
 	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, upstream.FunctionInput[struct{}]{
@@ -161,15 +190,6 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 		return output, fmt.Errorf("failed to execute operation to get offRamp v1.6.0 static config for chain selector %d: %w", input.ChainSelector, err)
 	}
 	output.OffRamp.GasForCallExactCheck = offRampCfg16Rep.Output.GasForCallExactCheck
-	feeAggr := onRampCfg16.DynamicConfig.FeeAggregator.String()
-	output.OnRamp.FeeAggregator = feeAggr
-
-	for i := range output.Executors {
-		output.Executors[i].DynamicConfig.FeeAggregator = feeAggr
-	}
-	for i := range output.CommitteeVerifiers {
-		output.CommitteeVerifiers[i].FeeAggregator = feeAggr
-	}
 	return output, nil
 }
 
