@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/strategy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
@@ -196,7 +197,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 						}
 					}
 
-					tokenSupportsAdmin := tokenSupportsAdminRole(tc.tokenType)
+					tokenSupportsAdmin := strategy.GetRegistry().CapabilitiesEVM(tc.tokenType).SupportsAdminRole
 					if tokenSupportsAdmin {
 						// Verify CCIP Admin was set correctly
 						t.Log("  Verifying CCIP Admin...")
@@ -235,8 +236,11 @@ func TestEVMTokenDeployments(t *testing.T) {
 func TestTokenSupportsAdminRole(t *testing.T) {
 	t.Parallel()
 
-	require.True(t, tokenSupportsAdminRole(burn_mint_erc20.ContractType))
-	require.True(t, tokenSupportsAdminRole(burn_mint_erc20_with_drip.ContractType))
-	require.True(t, tokenSupportsAdminRole(tip20.ContractType))
-	require.False(t, tokenSupportsAdminRole(erc20.ContractType))
+	caps := func(ct cldf.ContractType) bool {
+		return strategy.GetRegistry().CapabilitiesEVM(ct).SupportsAdminRole
+	}
+	require.True(t, caps(burn_mint_erc20.ContractType))
+	require.True(t, caps(burn_mint_erc20_with_drip.ContractType))
+	require.True(t, caps(tip20.ContractType))
+	require.False(t, caps(erc20.ContractType))
 }

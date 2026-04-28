@@ -8,11 +8,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/strategy"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	bnmDripERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
-	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
-	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -345,42 +342,22 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenRef.Qualifier)
 				}
 
-				writes := []evm_contract.WriteOutput{}
-				switch toknRef.Type.String() {
-				case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String(), bnmDripOps150.ContractType.String():
-					report, execErr := cldf_ops.ExecuteOperation(b,
-						bnmERC20ops.GrantMintAndBurnRoles, chain,
-						evm_contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       toknAddr,
-							Args:          poolAddr,
-						},
-					)
-					if execErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
-					}
-					writes = append(writes, report.Output)
-
-				case tip20ops.ContractType.String():
-					report, execErr := cldf_ops.ExecuteOperation(b,
-						tip20ops.GrantIssuerRole, chain,
-						evm_contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       toknAddr,
-							Args:          poolAddr,
-						},
-					)
-					if execErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant TIP-20 issuer role to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
-					}
-					writes = append(writes, report.Output)
-
-				default:
-					// pass through for unknown token types since we don't want to block pool deployment, but log a warning since it likely indicates a missing case in the adapter
+				var writes []evm_contract.WriteOutput
+				strat, ok := strategy.GetRegistry().GetEVM(deployment.ContractType(toknRef.Type))
+				if !ok || !strat.Capabilities().ParticipatesInPoolRoleGrant {
+					// Pass through for unknown / non-participating token types; we don't want
+					// to block pool deployment, but log a warning since an unknown type likely
+					// indicates a missing strategy registration.
 					b.Logger.Warnf(
-						"token type %q does not have a defined role granting strategy in EVMPoolAdapter, skipping grant of mint and burn roles to token pool %q for token %q on chain %d",
+						"token type %q has no pool role grant strategy registered, skipping grant for token pool %q on token %q on chain %d",
 						toknRef.Type.String(), poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
 					)
+				} else {
+					grantWrites, grantErr := strat.GrantPoolRoles(b, chain, toknAddr, poolAddr, input.ChainSelector)
+					if grantErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", toknRef.Type, input.TokenRef.Qualifier, poolAddr.Hex(), input.ChainSelector, grantErr)
+					}
+					writes = append(writes, grantWrites...)
 				}
 
 				if len(writes) > 0 {
