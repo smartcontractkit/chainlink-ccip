@@ -1,6 +1,7 @@
 package fees
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -81,6 +82,14 @@ func GetRegistry() *FeeAdapterRegistry {
 	})
 	return singletonRegistry
 }
+
+// ErrNoLiveLane is returned (wrapped) by a FeeContractResolver implementation
+// when the (src, dst) lane has no live router-level mapping — e.g. for EVM,
+// when Router.GetOnRamp(dst) yields the zero address. Callers may use
+// errors.Is to detect this and fall back to a non-Router discovery path
+// (e.g. the legacy FeeAdapter.GetFeeContractRef using a supplied Version)
+// when configuring fees before a lane is wired.
+var ErrNoLiveLane = errors.New("no live lane on the source chain's router for the given dst")
 
 // FeeContractResolver discovers, for a given (src, dst) lane, the AddressRef
 // of the contract that holds token-transfer fee config — without requiring the

@@ -14,6 +14,7 @@ import (
 
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	routerbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	feesapi "github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
@@ -57,6 +58,15 @@ func newEVMFeeContractResolver() *EVMFeeContractResolver {
 // Patch components of the version are stripped before keying, so 1.6.x all map
 // to the same Ops. First registration wins.
 func (r *EVMFeeContractResolver) RegisterOnRampOps(t datastore.ContractType, v *semver.Version, ops OnRampFeeContractOps) {
+	if t == "" {
+		panic("RegisterOnRampOps: empty ContractType")
+	}
+	if v == nil {
+		panic(fmt.Sprintf("RegisterOnRampOps: nil version for type=%q", t))
+	}
+	if ops == nil {
+		panic(fmt.Sprintf("RegisterOnRampOps: nil ops for type=%q version=%s", t, v.String()))
+	}
 	key := newOnRampOpsKey(t, v)
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -65,6 +75,11 @@ func (r *EVMFeeContractResolver) RegisterOnRampOps(t datastore.ContractType, v *
 	}
 }
 
+// ResolveFeeContractRef returns the AddressRef of the contract that holds
+// token-transfer fee config for the (src, dst) lane. Callers select the
+// per-version FeeAdapter from the returned AddressRef.Version after
+// StripPatchVersion; the returned Address is informational because each
+// adapter re-derives its own write target.
 func (r *EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
 	ds := e.DataStore
 
@@ -72,17 +87,18 @@ func (r *EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src u
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("EVM chain with selector %d not found", src)
 	}
+	if chain.Client == nil {
+		return datastore.AddressRef{}, fmt.Errorf("EVM chain %d has nil Client; cannot read live Router state", src)
+	}
 
-	routerRef, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:    datastore.ContractType(routerops.ContractType),
-		Version: routerops.Version,
-	}, src, datastore_utils.FullRef)
+	routerRef, err := findRouterRef(ds, src)
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to find Router (v%s) for src %d: %w", routerops.Version.String(), src, err)
+		return datastore.AddressRef{}, err
 	}
 	if !common.IsHexAddress(routerRef.Address) {
 		return datastore.AddressRef{}, fmt.Errorf("invalid Router address %q for src %d", routerRef.Address, src)
 	}
+	e.Logger.Infof("EVMFeeContractResolver: src=%d using %s at %s (v%s) to resolve OnRamp for dst=%d", src, routerRef.Type, routerRef.Address, routerRef.Version.String(), dst)
 
 	rc, err := routerbind.NewRouter(common.HexToAddress(routerRef.Address), chain.Client)
 	if err != nil {
@@ -91,20 +107,20 @@ func (r *EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src u
 
 	onRampAddr, err := rc.GetOnRamp(&bind.CallOpts{Context: e.GetContext()}, dst)
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to call Router.getOnRamp(dst=%d) on src %d at %s: %w", dst, src, routerRef.Address, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to call Router.GetOnRamp(dst=%d) on src %d at %s: %w", dst, src, routerRef.Address, err)
 	}
 	if onRampAddr == (common.Address{}) {
-		return datastore.AddressRef{}, fmt.Errorf("Router.getOnRamp(dst=%d) on src %d returned the zero address (no live lane)", dst, src)
+		return datastore.AddressRef{}, fmt.Errorf("Router.GetOnRamp(dst=%d) on src %d at %s returned the zero address: %w", dst, src, routerRef.Address, feesapi.ErrNoLiveLane)
 	}
 
 	onRampRef, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Address: onRampAddr.Hex(),
 	}, src, datastore_utils.FullRef)
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("on-ramp address %s returned by Router.getOnRamp(dst=%d) on src %d is not present in the datastore: %w", onRampAddr.Hex(), dst, src, err)
+		return datastore.AddressRef{}, fmt.Errorf("OnRamp address %s returned by Router.GetOnRamp(dst=%d) on src %d is not present in the datastore: %w", onRampAddr.Hex(), dst, src, err)
 	}
 	if onRampRef.Version == nil {
-		return datastore.AddressRef{}, fmt.Errorf("on-ramp at %s on src %d has no Version metadata in datastore", onRampAddr.Hex(), src)
+		return datastore.AddressRef{}, fmt.Errorf("OnRamp at %s on src %d has no Version metadata in datastore", onRampAddr.Hex(), src)
 	}
 
 	key := newOnRampOpsKey(onRampRef.Type, onRampRef.Version)
@@ -112,28 +128,67 @@ func (r *EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src u
 	ops, ok := r.onRamps[key]
 	r.mu.RUnlock()
 	if !ok {
-		return datastore.AddressRef{}, fmt.Errorf("no OnRampFeeContractOps registered for type=%q version=%s", onRampRef.Type, onRampRef.Version.String())
+		return datastore.AddressRef{}, fmt.Errorf(
+			"no OnRampFeeContractOps registered for type=%q version=%s (lookup key %s) at OnRamp %s on src %d, dst %d",
+			onRampRef.Type,
+			onRampRef.Version.String(),
+			cciputils.StripPatchVersion(onRampRef.Version).String(),
+			onRampAddr.Hex(),
+			src,
+			dst,
+		)
 	}
 
 	feeContractAddr, err := ops.GetFeeContractAddress(e.GetContext(), chain, onRampAddr)
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to resolve fee-contract address for on-ramp %s on src %d: %w", onRampAddr.Hex(), src, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve fee-contract address for OnRamp %s on src %d: %w", onRampAddr.Hex(), src, err)
 	}
 	if feeContractAddr == (common.Address{}) {
-		return datastore.AddressRef{}, fmt.Errorf("OnRampFeeContractOps returned the zero address for on-ramp %s on src %d", onRampAddr.Hex(), src)
+		return datastore.AddressRef{}, fmt.Errorf("OnRampFeeContractOps returned the zero address for OnRamp %s on src %d", onRampAddr.Hex(), src)
 	}
 
+	// v1.5 short-circuit: the EVM2EVMOnRamp itself holds fee config, so the
+	// onramp ref already points at the fee contract. Skip the second datastore
+	// lookup; the returned ref's Type will be the OnRamp's type
+	// (e.g. EVM2EVMOnRamp), which is intentional for v1.5.
 	if feeContractAddr == onRampAddr {
 		return onRampRef, nil
 	}
 
 	feeRef, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType(cciputils.FeeQuoter),
 		Address: feeContractAddr.Hex(),
 	}, src, datastore_utils.FullRef)
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("fee-contract address %s reported by OnRamp at %s on src %d is not present in the datastore: %w", feeContractAddr.Hex(), onRampAddr.Hex(), src, err)
+		return datastore.AddressRef{}, fmt.Errorf("FeeQuoter address %s reported by OnRamp at %s on src %d is not present in the datastore (filtered by Type=FeeQuoter): %w", feeContractAddr.Hex(), onRampAddr.Hex(), src, err)
+	}
+	if feeRef.Version == nil {
+		return datastore.AddressRef{}, fmt.Errorf("FeeQuoter at %s on src %d (reported by OnRamp %s) has no Version metadata in datastore", feeContractAddr.Hex(), src, onRampAddr.Hex())
 	}
 	return feeRef, nil
+}
+
+// findRouterRef looks up the active Router for src in the datastore, falling
+// back to TestRouter when the production Router is not registered. Production
+// is preferred when both exist; this matches the broader codebase pattern of
+// keeping Router and TestRouter as separate ContractTypes that callers select
+// between explicitly (see v1_6_0/sequences/adapter.go GetRouter / GetTestRouter).
+func findRouterRef(ds datastore.DataStore, src uint64) (datastore.AddressRef, error) {
+	ref, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType(routerops.ContractType),
+		Version: routerops.Version,
+	}, src, datastore_utils.FullRef)
+	if err == nil {
+		return ref, nil
+	}
+	testRef, testErr := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType(routerops.TestRouterContractType),
+		Version: routerops.Version,
+	}, src, datastore_utils.FullRef)
+	if testErr == nil {
+		return testRef, nil
+	}
+	return datastore.AddressRef{}, fmt.Errorf("no Router or TestRouter (v%s) for src %d: router lookup error: %w; testRouter lookup error: %v", routerops.Version.String(), src, err, testErr)
 }
 
 var (
