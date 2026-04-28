@@ -21,8 +21,6 @@ func (c DeployRMNCfg) ChainSelector() uint64 {
 	return c.ChainSel
 }
 
-// DeployRMN is a changeset that deploys RMN (IRMN / curse) or reuses an existing address in the datastore.
-// Wire with: changesets.DeployRMN(mcmsRegistry).
 var DeployRMN = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
 	sequences.DeployRMNInput,
 	evm.Chain,

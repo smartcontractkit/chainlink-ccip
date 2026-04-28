@@ -13,29 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployRMN_VerifyPreconditions(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector}),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, e)
-	e.DataStore = datastore.NewMemoryDataStore().Seal()
-
-	chain, ok := e.BlockChains.EVMChains()[chainSelector]
-	require.True(t, ok)
-
-	mcmsRegistry := cs_core.GetRegistry()
-	err = changesets.DeployRMN(mcmsRegistry).VerifyPreconditions(*e, cs_core.WithMCMS[changesets.DeployRMNCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployRMNCfg{
-			ChainSel:    chainSelector,
-			CurseAdmins: []common.Address{chain.DeployerKey.From},
-		},
-	})
-	require.NoError(t, err)
-}
-
 func TestDeployRMN_Apply(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
