@@ -622,7 +622,6 @@ contracts:
 
   - contract_name: RMN
     version: "2.1.0"
-    version_path: "latest"
     functions:
       - name: curse
         access: public
