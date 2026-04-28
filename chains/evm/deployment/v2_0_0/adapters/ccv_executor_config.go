@@ -27,6 +27,7 @@ func (a *EVMCCVExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, 
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByQualifier(qualifier),
 		datastore.AddressRefByType(datastore.ContractType(sequences.ExecutorProxyType)),
+		datastore.AddressRefByVersion(execop.Version),
 	)
 	seen := make(map[uint64]struct{}, len(refs))
 	chains := make([]uint64, 0, len(refs))

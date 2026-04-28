@@ -113,6 +113,9 @@ func (a *EVMCCVCommitteeVerifierOnchainAdapter) ApplySignatureConfigs(
 	for _, c := range change.NewConfigs {
 		signers := make([]common.Address, 0, len(c.Signers))
 		for _, s := range c.Signers {
+			if !common.IsHexAddress(s) {
+				return fmt.Errorf("invalid signer address %q for source chain %d", s, c.SourceChainSelector)
+			}
 			signers = append(signers, common.HexToAddress(s))
 		}
 		sigConfigs = append(sigConfigs, cv.SignatureQuorumValidatorSignatureConfig{

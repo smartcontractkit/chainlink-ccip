@@ -26,14 +26,16 @@ func (a *EVMCCVTokenVerifierConfigAdapter) ResolveTokenVerifierAddresses(
 	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
 
 	onRampAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type: datastore.ContractType(onrampop.ContractType),
+		Type:    datastore.ContractType(onrampop.ContractType),
+		Version: onrampop.Version,
 	}, chainSelector, toAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get on ramp address for chain %d: %w", chainSelector, err)
 	}
 
 	rmnRemoteAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type: datastore.ContractType(rmnremote.ContractType),
+		Type:    datastore.ContractType(rmnremote.ContractType),
+		Version: rmnremote.Version,
 	}, chainSelector, toAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rmn remote address for chain %d: %w", chainSelector, err)
@@ -44,35 +46,48 @@ func (a *EVMCCVTokenVerifierConfigAdapter) ResolveTokenVerifierAddresses(
 		RMNRemoteAddress: rmnRemoteAddr,
 	}
 
-	cctpVerifierAddr, cctpVerifierErr := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:      datastore.ContractType(cctpverifier.ContractType),
-		Qualifier: cctpQualifier,
-	}, chainSelector, toAddress)
+	cctpVerifierRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(cctpverifier.ContractType)),
+		datastore.AddressRefByQualifier(cctpQualifier),
+		datastore.AddressRefByVersion(cctpverifier.Version),
+	)
+	if len(cctpVerifierRefs) > 1 {
+		return nil, fmt.Errorf("chain %d: expected at most 1 CCTPVerifier with qualifier %q, found %d", chainSelector, cctpQualifier, len(cctpVerifierRefs))
+	}
 
-	cctpResolverAddr, cctpResolverErr := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:      datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
-		Qualifier: cctpQualifier,
-	}, chainSelector, toAddress)
+	cctpResolverRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType)),
+		datastore.AddressRefByQualifier(cctpQualifier),
+		datastore.AddressRefByVersion(versioned_verifier_resolver.Version),
+	)
+	if len(cctpResolverRefs) > 1 {
+		return nil, fmt.Errorf("chain %d: expected at most 1 CCTPVerifierResolver with qualifier %q, found %d", chainSelector, cctpQualifier, len(cctpResolverRefs))
+	}
 
-	if (cctpVerifierErr == nil) != (cctpResolverErr == nil) {
+	if (len(cctpVerifierRefs) == 1) != (len(cctpResolverRefs) == 1) {
 		return nil, fmt.Errorf(
-			"chain %d: cctp verifier and resolver must both exist or both be absent (verifier error: %v, resolver error: %v)",
-			chainSelector, cctpVerifierErr, cctpResolverErr,
+			"chain %d: CCTP verifier and resolver must both exist or both be absent (verifier found: %v, resolver found: %v)",
+			chainSelector, len(cctpVerifierRefs) == 1, len(cctpResolverRefs) == 1,
 		)
 	}
-
-	if cctpVerifierErr == nil {
-		result.CCTPVerifierAddress = cctpVerifierAddr
-		result.CCTPVerifierResolverAddress = cctpResolverAddr
+	if len(cctpVerifierRefs) == 1 {
+		result.CCTPVerifierAddress = cctpVerifierRefs[0].Address
+		result.CCTPVerifierResolverAddress = cctpResolverRefs[0].Address
 	}
 
-	lombardResolverAddr, lombardResolverErr := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:      datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
-		Qualifier: lombardQualifier,
-	}, chainSelector, toAddress)
-
-	if lombardResolverErr == nil {
-		result.LombardVerifierResolverAddress = lombardResolverAddr
+	lombardResolverRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType)),
+		datastore.AddressRefByQualifier(lombardQualifier),
+		datastore.AddressRefByVersion(versioned_verifier_resolver.Version),
+	)
+	if len(lombardResolverRefs) > 1 {
+		return nil, fmt.Errorf("chain %d: expected at most 1 LombardVerifierResolver with qualifier %q, found %d", chainSelector, lombardQualifier, len(lombardResolverRefs))
+	}
+	if len(lombardResolverRefs) == 1 {
+		result.LombardVerifierResolverAddress = lombardResolverRefs[0].Address
 	}
 
 	return result, nil
