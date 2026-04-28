@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/chains/solana
 
-go 1.25.3
+go 1.25.7
 
 replace github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ./gobindings
 
