@@ -148,7 +148,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 						tokenAddr, input.ChainSelector, probeErr)
 				}
 			}
-			if string(guardType) == string(tip20ops.ContractType) {
+			if guardType.String() == tip20ops.ContractType.String() {
 				return sequences.OnChainOutput{}, fmt.Errorf("TIP-20 tokens are not supported on CCIP v2.0 (v1.6-only by product decision)")
 			}
 
