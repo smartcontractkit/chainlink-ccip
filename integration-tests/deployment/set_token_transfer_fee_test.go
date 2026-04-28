@@ -405,6 +405,47 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	require.Equal(t, dstCfg.MinFeeUSDCents, dstSensibleDefaults.MinFeeUSDCents)
 	require.True(t, dstCfg.IsEnabled)
 
+	out, err = fees.
+		SetTokenTransferFee().
+		Apply(*e, fees.SetTokenTransferFeeInput{
+			Version: utils.Version_2_0_0,
+			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
+			Args: []fees.TokenTransferFeeForSrc{
+				{
+					Selector: src,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: dst,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: srcLinkRef.Address,
+									IsReset: false,
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
+								},
+							},
+						},
+					},
+				},
+				{
+					Selector: dst,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: src,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: dstLinkRef.Address,
+									IsReset: false,
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	require.NoError(t, err)
+	require.Empty(t, out.MCMSTimelockProposals)
+
 	// Now reset the configs
 	out, err = fees.
 		SetTokenTransferFee().
