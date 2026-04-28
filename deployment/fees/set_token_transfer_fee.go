@@ -36,6 +36,11 @@ type SetTokenTransferFeeInput struct {
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
+type tokenTransferFeeReader interface {
+	GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
+	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
+}
+
 func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput] {
 	feeRegistry := GetRegistry()
 	mcmsRegistry := changesets.GetRegistry()
@@ -100,7 +105,6 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			// Build version-grouped settings: version -> settings map
 			versionGroups := map[string]FeeGroup{}
 
-			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
 
 				feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, dst.Selector)
@@ -115,13 +119,20 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, feeContractRef.Version.String())
 				}
 
-				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
+				dstSettings := map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					if args, err := inferTokenTransferFeeArgs(updater, e, src.Selector, dst.Selector, feeCfg); err != nil {
+					args, shouldApply, err := inferTokenTransferFeeArgs(updater, e, src.Selector, dst.Selector, feeCfg)
+					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
-					} else {
-						settings[dst.Selector][feeCfg.Address] = args
 					}
+					if !shouldApply {
+						continue
+					}
+
+					dstSettings[feeCfg.Address] = args
+				}
+				if len(dstSettings) == 0 {
+					continue
 				}
 
 				versionKey := lookupVersion.String()
@@ -133,7 +144,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				}
 
 				// Process settings for this dst with its version's adapter
-				versionGroups[versionKey].settings[dst.Selector] = settings[dst.Selector]
+				versionGroups[versionKey].settings[dst.Selector] = dstSettings
 			}
 
 			// Execute updates grouped by adapter version
@@ -164,16 +175,21 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 	}
 }
 
-func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, error) {
-	if cfg.IsReset {
-		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and token %s; skipping inference", src, dst, cfg.Address)
-		return nil, nil
-	}
-
+func inferTokenTransferFeeArgs(adapter tokenTransferFeeReader, e cldf.Environment, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
 	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, src, dst, cfg.Address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
+		return nil, false, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
+	}
+
+	if cfg.IsReset {
+		if !onchainCfg.IsEnabled {
+			e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is already disabled on-chain; skipping reset", src, dst, cfg.Address)
+			return nil, false, nil
+		}
+
+		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
+		return nil, true, nil
 	}
 
 	var fallbacks TokenTransferFeeArgs
@@ -185,5 +201,11 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
-	return cfg.FeeArgs.Resolve(fallbacks), nil
+	resolved := cfg.FeeArgs.Resolve(fallbacks)
+	if *resolved == onchainCfg {
+		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s already matches on-chain config; skipping update", src, dst, cfg.Address)
+		return nil, false, nil
+	}
+
+	return resolved, true, nil
 }
