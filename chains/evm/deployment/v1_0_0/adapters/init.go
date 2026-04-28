@@ -5,6 +5,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	feesapi "github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
@@ -18,4 +19,5 @@ func init() {
 	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMTransferOwnershipAdapter{})
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilyEVM, &EVMMCMSReader{})
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMTokenBase{})
+	feesapi.GetFeeContractResolverRegistry().RegisterFeeContractResolver(chain_selectors.FamilyEVM, EVMFeeContractResolver{})
 }

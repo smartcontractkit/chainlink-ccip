@@ -38,8 +38,9 @@ type SetTokenTransferFeeInput struct {
 
 func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput] {
 	feeRegistry := GetRegistry()
+	resolverRegistry := GetFeeContractResolverRegistry()
 	mcmsRegistry := changesets.GetRegistry()
-	return cldf.CreateChangeSet(makeApply(feeRegistry, mcmsRegistry), makeVerify(feeRegistry, mcmsRegistry))
+	return cldf.CreateChangeSet(makeApply(feeRegistry, resolverRegistry, mcmsRegistry), makeVerify(feeRegistry, mcmsRegistry))
 }
 
 func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeInput) error {
@@ -76,8 +77,12 @@ func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cl
 	}
 }
 
-func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
+func makeApply(feeRegistry *FeeAdapterRegistry, resolverRegistry *FeeContractResolverRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
+		if cfg.Version != nil {
+			e.Logger.Warnf("SetTokenTransferFeeInput.Version is deprecated and ignored; the fee contract version is inferred per-lane from Router.getOnRamp() (got %s)", cfg.Version.String())
+		}
+
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
@@ -92,9 +97,9 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
 			}
 
-			adapter, exists := feeRegistry.GetFeeAdapter(srcFamily, cfg.Version)
+			resolver, exists := resolverRegistry.GetFeeContractResolver(srcFamily)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
+				return cldf.ChangesetOutput{}, fmt.Errorf("no fee contract resolver registered for chain family %s", srcFamily)
 			}
 
 			// Build version-grouped settings: version -> settings map
@@ -103,7 +108,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
 
-				feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, dst.Selector)
+				feeContractRef, err := resolver.ResolveFeeContractRef(e, src.Selector, dst.Selector)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}

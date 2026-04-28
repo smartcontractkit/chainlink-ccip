@@ -81,3 +81,57 @@ func GetRegistry() *FeeAdapterRegistry {
 	})
 	return singletonRegistry
 }
+
+// FeeContractResolver discovers, for a given (src, dst) lane, the AddressRef
+// of the contract that holds token-transfer fee config — without requiring the
+// caller to know which CCIP version that lane is on. Implementations are
+// registered per chain family.
+type FeeContractResolver interface {
+	ResolveFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error)
+}
+
+// FeeContractResolverRegistry maintains a per-chain-family map of
+// FeeContractResolvers.
+type FeeContractResolverRegistry struct {
+	mu sync.Mutex
+	m  map[string]FeeContractResolver
+}
+
+func newFeeContractResolverRegistry() *FeeContractResolverRegistry {
+	return &FeeContractResolverRegistry{
+		m: make(map[string]FeeContractResolver),
+	}
+}
+
+// RegisterFeeContractResolver registers the resolver for a chain family. The
+// first registration for a given family wins; subsequent calls are ignored.
+func (r *FeeContractResolverRegistry) RegisterFeeContractResolver(chainFamily string, resolver FeeContractResolver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = resolver
+	}
+}
+
+// GetFeeContractResolver returns the resolver for a chain family.
+func (r *FeeContractResolverRegistry) GetFeeContractResolver(chainFamily string) (FeeContractResolver, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	resolver, ok := r.m[chainFamily]
+	return resolver, ok
+}
+
+var (
+	singletonResolverRegistry *FeeContractResolverRegistry
+	resolverOnce              sync.Once
+)
+
+// GetFeeContractResolverRegistry returns the global singleton instance.
+func GetFeeContractResolverRegistry() *FeeContractResolverRegistry {
+	resolverOnce.Do(func() {
+		singletonResolverRegistry = newFeeContractResolverRegistry()
+	})
+	return singletonResolverRegistry
+}
