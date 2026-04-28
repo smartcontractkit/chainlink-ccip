@@ -36,11 +36,6 @@ type SetTokenTransferFeeInput struct {
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
-type tokenTransferFeeReader interface {
-	GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
-	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
-}
-
 func SetTokenTransferFee() cldf.ChangeSetV2[SetTokenTransferFeeInput] {
 	feeRegistry := GetRegistry()
 	mcmsRegistry := changesets.GetRegistry()
@@ -175,7 +170,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 	}
 }
 
-func inferTokenTransferFeeArgs(adapter tokenTransferFeeReader, e cldf.Environment, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
+func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
 	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, src, dst, cfg.Address)
 	if err != nil {

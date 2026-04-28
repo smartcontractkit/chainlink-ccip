@@ -73,11 +73,6 @@ type SetTokenTransferFeeInput struct {
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
-type tokenTransferFeeReader interface {
-	GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (TokenTransferFeeConfig, error)
-	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
-}
-
 func SetTokenTransferFee() deployment.ChangeSetV2[SetTokenTransferFeeInput] {
 	return deployment.CreateChangeSet(setTokenTransferFeeApply(), setTokenTransferFeeVerify())
 }
@@ -150,20 +145,13 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 					finConfigSettings[poolAddress] = pool.AllowedFinalityConfig
 				}
 				if len(pool.Destinations) > 0 {
-					dstSettings := map[uint64]*TokenTransferFeeConfig{}
+					feeConfigSettings[poolAddress] = map[uint64]*TokenTransferFeeConfig{}
 					for _, dst := range pool.Destinations {
-						args, shouldApply, err := inferTokenTransferFeeArgs(feesAdapter, e, poolAddress, src.Selector, dst.Selector, dst)
-						if err != nil {
+						if args, err := inferTokenTransferFeeArgs(feesAdapter, e, poolAddress, src.Selector, dst.Selector, dst); err != nil {
 							return deployment.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for src %d, dst %d, and pool %s: %w", src.Selector, dst.Selector, poolAddress, err)
+						} else {
+							feeConfigSettings[poolAddress][dst.Selector] = args
 						}
-						if !shouldApply {
-							continue
-						}
-
-						dstSettings[dst.Selector] = args
-					}
-					if len(dstSettings) > 0 {
-						feeConfigSettings[poolAddress] = dstSettings
 					}
 				}
 			}
@@ -210,21 +198,16 @@ func setTokenTransferFeeApply() func(deployment.Environment, SetTokenTransferFee
 	}
 }
 
-func inferTokenTransferFeeArgs(adapter tokenTransferFeeReader, e deployment.Environment, poolAddress string, src uint64, dst uint64, cfg TokenTransferFeeForDst) (*TokenTransferFeeConfig, bool, error) {
+func inferTokenTransferFeeArgs(adapter TokenFeeAdapter, e deployment.Environment, poolAddress string, src uint64, dst uint64, cfg TokenTransferFeeForDst) (*TokenTransferFeeConfig, error) {
+	if cfg.IsReset {
+		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and pool %s; skipping inference", src, dst, poolAddress)
+		return nil, nil
+	}
+
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and pool %s", src, dst, poolAddress)
 	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, poolAddress, src, dst)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and pool %s: %w", src, dst, poolAddress, err)
-	}
-
-	if cfg.IsReset {
-		if !onchainCfg.IsEnabled {
-			e.Logger.Infof("Token transfer fee config for src %d, dst %d, and pool %s is already disabled on-chain; skipping reset", src, dst, poolAddress)
-			return nil, false, nil
-		}
-
-		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and pool %s", src, dst, poolAddress)
-		return nil, true, nil
+		return nil, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and pool %s: %w", src, dst, poolAddress, err)
 	}
 
 	var fallbacks TokenTransferFeeConfig
@@ -236,13 +219,7 @@ func inferTokenTransferFeeArgs(adapter tokenTransferFeeReader, e deployment.Envi
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and pool %s is not set on-chain; using adapter defaults: %+v", src, dst, poolAddress, fallbacks)
 	}
 
-	resolved := cfg.Settings.Resolve(fallbacks)
-	if *resolved == onchainCfg {
-		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and pool %s already matches on-chain config; skipping update", src, dst, poolAddress)
-		return nil, false, nil
-	}
-
-	return resolved, true, nil
+	return cfg.Settings.Resolve(fallbacks), nil
 }
 
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeConfig)) TokenTransferFeeConfig {
