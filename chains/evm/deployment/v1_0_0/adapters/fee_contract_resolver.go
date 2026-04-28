@@ -1,41 +1,71 @@
 package adapters
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	onrampOpsV15 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
-	onrampOpsV16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	onrampOpsV20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	routerbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
-// EVMFeeContractResolver implements fees.FeeContractResolver for EVM chains by
-// reading the live Router on the source chain to infer the on-ramp version.
-type EVMFeeContractResolver struct{}
-
-// ResolveFeeContractRef discovers the AddressRef of the contract that holds
-// token-transfer fee config for a given (src, dst) lane, by:
-//  1. Loading the v1.2.0 Router for src from the datastore.
-//  2. Calling Router.getOnRamp(dst).
-//  3. Reverse-looking-up the returned on-ramp address in the datastore for its
-//     Type and Version.
-//  4. For an EVM2EVMOnRamp (v1.5) the on-ramp itself is the fee contract.
-//     For an OnRamp (v1.6+) the FeeQuoter — reachable via getDynamicConfig — is
-//     the fee contract; the v1.6 and v2.0 OnRamp ABIs both expose a FeeQuoter
-//     field on their dynamic config but the generated bindings differ, so we
-//     dispatch on the on-ramp's major version.
+// OnRampFeeContractOps abstracts the version-specific call that, given an
+// on-ramp address, returns the address of the contract that holds
+// token-transfer fee config.
 //
-// The Router (v1.2.0) is a stable hub that maps dst chain selectors to live
-// on-ramp addresses, so the operator does not need to know which CCIP version
-// each lane is on.
-func (EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
+// For v1.5 (EVM2EVMOnRamp) the on-ramp is itself the fee contract.
+// For v1.6 and v2.0 (OnRamp) the FeeQuoter is the fee contract, reachable via
+// OnRamp.getDynamicConfig(). The two OnRamp versions expose the same field
+// name on different generated DynamicConfig structs, so each version supplies
+// its own implementation that imports its own bindings.
+type OnRampFeeContractOps interface {
+	GetFeeContractAddress(ctx context.Context, chain evm.Chain, onRampAddr common.Address) (common.Address, error)
+}
+
+type onRampOpsKey struct {
+	Type    datastore.ContractType
+	Version string
+}
+
+func newOnRampOpsKey(t datastore.ContractType, v *semver.Version) onRampOpsKey {
+	return onRampOpsKey{Type: t, Version: cciputils.StripPatchVersion(v).String()}
+}
+
+// EVMFeeContractResolver implements fees.FeeContractResolver for EVM lanes by
+// reading the live Router on the source chain. Per-version on-ramp logic is
+// supplied via RegisterOnRampOps so this file imports only the v1.2.0 Router
+// and never the per-version on-ramp packages.
+type EVMFeeContractResolver struct {
+	mu      sync.RWMutex
+	onRamps map[onRampOpsKey]OnRampFeeContractOps
+}
+
+func newEVMFeeContractResolver() *EVMFeeContractResolver {
+	return &EVMFeeContractResolver{onRamps: make(map[onRampOpsKey]OnRampFeeContractOps)}
+}
+
+// RegisterOnRampOps wires a per-version OnRampFeeContractOps into the resolver.
+// Patch components of the version are stripped before keying, so 1.6.x all map
+// to the same Ops. First registration wins.
+func (r *EVMFeeContractResolver) RegisterOnRampOps(t datastore.ContractType, v *semver.Version, ops OnRampFeeContractOps) {
+	key := newOnRampOpsKey(t, v)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.onRamps[key]; !exists {
+		r.onRamps[key] = ops
+	}
+}
+
+func (r *EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error) {
 	ds := e.DataStore
 
 	chain, ok := e.BlockChains.EVMChains()[src]
@@ -54,12 +84,12 @@ func (EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src uint
 		return datastore.AddressRef{}, fmt.Errorf("invalid Router address %q for src %d", routerRef.Address, src)
 	}
 
-	routerContract, err := routerbind.NewRouter(common.HexToAddress(routerRef.Address), chain.Client)
+	rc, err := routerbind.NewRouter(common.HexToAddress(routerRef.Address), chain.Client)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to bind Router at %s on src %d: %w", routerRef.Address, src, err)
 	}
 
-	onRampAddr, err := routerContract.GetOnRamp(&bind.CallOpts{Context: e.GetContext()}, dst)
+	onRampAddr, err := rc.GetOnRamp(&bind.CallOpts{Context: e.GetContext()}, dst)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to call Router.getOnRamp(dst=%d) on src %d at %s: %w", dst, src, routerRef.Address, err)
 	}
@@ -73,55 +103,50 @@ func (EVMFeeContractResolver) ResolveFeeContractRef(e cldf.Environment, src uint
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("on-ramp address %s returned by Router.getOnRamp(dst=%d) on src %d is not present in the datastore: %w", onRampAddr.Hex(), dst, src, err)
 	}
-
-	switch onRampRef.Type {
-	case datastore.ContractType(onrampOpsV15.ContractType):
-		return onRampRef, nil
-
-	case datastore.ContractType(onrampOpsV16.ContractType):
-		if onRampRef.Version == nil {
-			return datastore.AddressRef{}, fmt.Errorf("on-ramp at %s on src %d has no Version metadata in datastore", onRampAddr.Hex(), src)
-		}
-
-		var fqAddr common.Address
-		switch onRampRef.Version.Major() {
-		case 1:
-			c, err := onrampOpsV16.NewOnRampContract(onRampAddr, chain.Client)
-			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to bind v1.6 OnRamp at %s on src %d: %w", onRampAddr.Hex(), src, err)
-			}
-			cfg, err := c.GetDynamicConfig(&bind.CallOpts{Context: e.GetContext()})
-			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to call v1.6 OnRamp.getDynamicConfig at %s on src %d: %w", onRampAddr.Hex(), src, err)
-			}
-			fqAddr = cfg.FeeQuoter
-		case 2:
-			c, err := onrampOpsV20.NewOnRampContract(onRampAddr, chain.Client)
-			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to bind v2.0 OnRamp at %s on src %d: %w", onRampAddr.Hex(), src, err)
-			}
-			cfg, err := c.GetDynamicConfig(&bind.CallOpts{Context: e.GetContext()})
-			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to call v2.0 OnRamp.getDynamicConfig at %s on src %d: %w", onRampAddr.Hex(), src, err)
-			}
-			fqAddr = cfg.FeeQuoter
-		default:
-			return datastore.AddressRef{}, fmt.Errorf("unsupported OnRamp major version %d (%s) at %s on src %d", onRampRef.Version.Major(), onRampRef.Version.String(), onRampAddr.Hex(), src)
-		}
-
-		if fqAddr == (common.Address{}) {
-			return datastore.AddressRef{}, fmt.Errorf("FeeQuoter address is zero in OnRamp.getDynamicConfig at %s on src %d", onRampAddr.Hex(), src)
-		}
-
-		fqRef, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-			Address: fqAddr.Hex(),
-		}, src, datastore_utils.FullRef)
-		if err != nil {
-			return datastore.AddressRef{}, fmt.Errorf("FeeQuoter address %s reported by OnRamp at %s on src %d is not present in the datastore: %w", fqAddr.Hex(), onRampAddr.Hex(), src, err)
-		}
-		return fqRef, nil
-
-	default:
-		return datastore.AddressRef{}, fmt.Errorf("unsupported on-ramp type %q at address %s on src %d", onRampRef.Type, onRampAddr.Hex(), src)
+	if onRampRef.Version == nil {
+		return datastore.AddressRef{}, fmt.Errorf("on-ramp at %s on src %d has no Version metadata in datastore", onRampAddr.Hex(), src)
 	}
+
+	key := newOnRampOpsKey(onRampRef.Type, onRampRef.Version)
+	r.mu.RLock()
+	ops, ok := r.onRamps[key]
+	r.mu.RUnlock()
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("no OnRampFeeContractOps registered for type=%q version=%s", onRampRef.Type, onRampRef.Version.String())
+	}
+
+	feeContractAddr, err := ops.GetFeeContractAddress(e.GetContext(), chain, onRampAddr)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve fee-contract address for on-ramp %s on src %d: %w", onRampAddr.Hex(), src, err)
+	}
+	if feeContractAddr == (common.Address{}) {
+		return datastore.AddressRef{}, fmt.Errorf("OnRampFeeContractOps returned the zero address for on-ramp %s on src %d", onRampAddr.Hex(), src)
+	}
+
+	if feeContractAddr == onRampAddr {
+		return onRampRef, nil
+	}
+
+	feeRef, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Address: feeContractAddr.Hex(),
+	}, src, datastore_utils.FullRef)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("fee-contract address %s reported by OnRamp at %s on src %d is not present in the datastore: %w", feeContractAddr.Hex(), onRampAddr.Hex(), src, err)
+	}
+	return feeRef, nil
+}
+
+var (
+	evmFeeContractResolverOnce sync.Once
+	evmFeeContractResolver     *EVMFeeContractResolver
+)
+
+// GetEVMFeeContractResolver returns the singleton EVMFeeContractResolver. The
+// per-version /adapters packages register their OnRampFeeContractOps into this
+// instance from their own init() functions.
+func GetEVMFeeContractResolver() *EVMFeeContractResolver {
+	evmFeeContractResolverOnce.Do(func() {
+		evmFeeContractResolver = newEVMFeeContractResolver()
+	})
+	return evmFeeContractResolver
 }

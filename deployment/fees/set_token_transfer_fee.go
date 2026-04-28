@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -79,8 +80,23 @@ func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cl
 
 func makeApply(feeRegistry *FeeAdapterRegistry, resolverRegistry *FeeContractResolverRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
-		if cfg.Version != nil {
-			e.Logger.Warnf("SetTokenTransferFeeInput.Version is deprecated and ignored; the fee contract version is inferred per-lane from Router.getOnRamp() (got %s)", cfg.Version.String())
+		// The Version field is deprecated only for chain families that have a
+		// FeeContractResolver registered (today: EVM). Families without one
+		// still rely on Version + FeeAdapter.GetFeeContractRef as a fallback,
+		// so suppress the warning unless every source family has migrated.
+		allFamiliesHaveResolver := true
+		for _, src := range cfg.Args {
+			family, err := chain_selectors.GetSelectorFamily(src.Selector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
+			}
+			if _, ok := resolverRegistry.GetFeeContractResolver(family); !ok {
+				allFamiliesHaveResolver = false
+				break
+			}
+		}
+		if cfg.Version != nil && allFamiliesHaveResolver {
+			e.Logger.Warnf("SetTokenTransferFeeInput.Version is deprecated for migrated chain families and ignored; the fee contract version is inferred per-lane from Router.getOnRamp() (got %s)", cfg.Version.String())
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -97,9 +113,20 @@ func makeApply(feeRegistry *FeeAdapterRegistry, resolverRegistry *FeeContractRes
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
 			}
 
-			resolver, exists := resolverRegistry.GetFeeContractResolver(srcFamily)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no fee contract resolver registered for chain family %s", srcFamily)
+			resolver, hasResolver := resolverRegistry.GetFeeContractResolver(srcFamily)
+
+			// Legacy fallback: families without a registered resolver continue
+			// to use the user-supplied Version with FeeAdapter.GetFeeContractRef.
+			var legacyAdapter FeeAdapter
+			if !hasResolver {
+				if cfg.Version == nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no FeeContractResolver registered for chain family %s; legacy path requires Version on the input", srcFamily)
+				}
+				a, ok := feeRegistry.GetFeeAdapter(srcFamily, cfg.Version)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no FeeAdapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
+				}
+				legacyAdapter = a
 			}
 
 			// Build version-grouped settings: version -> settings map
@@ -108,7 +135,12 @@ func makeApply(feeRegistry *FeeAdapterRegistry, resolverRegistry *FeeContractRes
 			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
 			for _, dst := range src.Settings {
 
-				feeContractRef, err := resolver.ResolveFeeContractRef(e, src.Selector, dst.Selector)
+				var feeContractRef datastore.AddressRef
+				if hasResolver {
+					feeContractRef, err = resolver.ResolveFeeContractRef(e, src.Selector, dst.Selector)
+				} else {
+					feeContractRef, err = legacyAdapter.GetFeeContractRef(e, src.Selector, dst.Selector)
+				}
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
