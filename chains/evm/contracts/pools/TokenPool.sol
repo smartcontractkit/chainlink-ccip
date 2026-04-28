@@ -60,6 +60,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
   error CallerIsNotOwnerOrFeeAdmin(address caller);
+  error InvalidPauseFlags(uint8 flags);
+  error PauseUpdatesLengthMismatch();
+  error OutboundPoolPaused(uint64 remoteChainSelector);
+  error InboundPoolPaused(uint64 remoteChainSelector);
 
   event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
   event ReleasedOrMinted(
@@ -74,7 +78,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   event ChainRemoved(uint64 remoteChainSelector);
   event RemotePoolAdded(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
-  event DynamicConfigSet(address router, address rateLimitAdmin, address feeAdmin);
+  event DynamicConfigSet(address router, address rateLimitAdmin, address feeAdmin, address pauseAdmin);
+  event GlobalPauseUpdated(bool outboundPaused, bool inboundPaused);
+  event LanePauseUpdated(uint64 indexed remoteChainSelector, uint8 pauseFlags);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
@@ -120,6 +126,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @notice The division factor for bps. This also represents the maximum bps fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
+  /// @dev Lane pause bitmask: bit 0 pauses outbound (lock/burn), bit 1 pauses inbound (release/mint).
+  uint8 internal constant PAUSE_LANE_OUTBOUND = 1;
+  uint8 internal constant PAUSE_LANE_INBOUND = 2;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -158,6 +167,15 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice The address of the fee admin.
   /// @dev Constructor does not set this value so it is opt in only.
   address internal s_feeAdmin;
+  /// @notice The address of the pause admin.
+  /// @dev Can be address(0) if none is configured; only the owner may then call `applyPauseUpdates`.
+  address internal s_pauseAdmin;
+  /// @dev When true, outbound transfers are paused for every supported lane.
+  bool internal s_globalOutboundPaused;
+  /// @dev When true, inbound transfers are paused for every supported lane.
+  bool internal s_globalInboundPaused;
+  /// @dev Per-lane pause bitmask; see `PAUSE_LANE_OUTBOUND` / `PAUSE_LANE_INBOUND`. Global flags apply in addition.
+  mapping(uint64 remoteChainSelector => uint8 pauseFlags) internal s_lanePauseFlags;
 
   constructor(
     IERC20 token,
@@ -210,8 +228,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the pools dynamic configuration.
-  function getDynamicConfig() public view virtual returns (address router, address rateLimitAdmin, address feeAdmin) {
-    return (address(s_router), s_rateLimitAdmin, s_feeAdmin);
+  function getDynamicConfig()
+    public
+    view
+    virtual
+    returns (address router, address rateLimitAdmin, address feeAdmin, address pauseAdmin)
+  {
+    return (address(s_router), s_rateLimitAdmin, s_feeAdmin, s_pauseAdmin);
   }
 
   /// @notice Gets the finality config as defined in the FinalityCodec library. This value does NOT 1:1 translate to
@@ -230,19 +253,23 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param router The address of the router contract.
   /// @param rateLimitAdmin The address of the rate limiter admin.
   /// @param feeAdmin An additional address that can withdraw fees from this contract.
+  /// @param pauseAdmin An additional address that may update pause state via `applyPauseUpdates`.
   /// @dev FeeTokenHandler will revert if feeAdmin is zero when withdrawing fees.
   /// @dev If only the owner can withdraw fees, set feeAdmin to address(0).
+  /// @dev If pauseAdmin is address(0), only the owner may call `applyPauseUpdates`.
   function setDynamicConfig(
     address router,
     address rateLimitAdmin,
-    address feeAdmin
+    address feeAdmin,
+    address pauseAdmin
   ) public virtual onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
     s_router = IRouter(router);
     s_rateLimitAdmin = rateLimitAdmin;
     s_feeAdmin = feeAdmin;
+    s_pauseAdmin = pauseAdmin;
 
-    emit DynamicConfigSet(router, rateLimitAdmin, feeAdmin);
+    emit DynamicConfigSet(router, rateLimitAdmin, feeAdmin, pauseAdmin);
   }
 
   /// @notice Sets the finality config according to the FinalityCodec library encoding.
@@ -423,6 +450,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
 
+    if (_isOutboundPaused(lockOrBurnIn.remoteChainSelector)) {
+      revert OutboundPoolPaused(lockOrBurnIn.remoteChainSelector);
+    }
+
     uint256 amount = lockOrBurnIn.amount - feeAmount;
 
     // If FTF is requested, validate against the allowed and apply the custom rate limit.
@@ -478,6 +509,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     }
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+
+    if (_isInboundPaused(releaseOrMintIn.remoteChainSelector)) {
+      revert InboundPoolPaused(releaseOrMintIn.remoteChainSelector);
+    }
 
     // Validates that the source pool address is configured on this pool.
     if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
@@ -691,6 +726,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       delete s_remoteChainConfigs[remoteChainSelectorToRemove];
       delete s_fastFinalityOutboundRateLimiterConfig[remoteChainSelectorToRemove];
       delete s_fastFinalityInboundRateLimiterConfig[remoteChainSelectorToRemove];
+      delete s_lanePauseFlags[remoteChainSelectorToRemove];
 
       emit ChainRemoved(remoteChainSelectorToRemove);
     }
@@ -940,6 +976,73 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) {
       revert Unauthorized(msg.sender);
     }
+  }
+
+  /// @notice Checks whether the msg.sender is either the owner or the pause admin.
+  function _onlyOwnerOrPauseAdmin() internal view virtual {
+    if (msg.sender != s_pauseAdmin && msg.sender != owner()) {
+      revert Unauthorized(msg.sender);
+    }
+  }
+
+  /// @notice Updates global and per-lane pause state.
+  /// @param globalOutboundPaused When true, all outbound (lock/burn) transfers are rejected.
+  /// @param globalInboundPaused When true, all inbound (release/mint) transfers are rejected.
+  /// @param remoteChainSelectors Selectors to update lane pause flags for (must be supported chains).
+  /// @param lanePauseFlags Parallel to `remoteChainSelectors`: bitmask with `PAUSE_LANE_OUTBOUND` and/or
+  /// `PAUSE_LANE_INBOUND`; use 0 to clear lane-only pauses for that selector. Global flags are independent.
+  function applyPauseUpdates(
+    bool globalOutboundPaused,
+    bool globalInboundPaused,
+    uint64[] calldata remoteChainSelectors,
+    uint8[] calldata lanePauseFlags
+  ) external virtual {
+    _onlyOwnerOrPauseAdmin();
+
+    if (remoteChainSelectors.length != lanePauseFlags.length) {
+      revert PauseUpdatesLengthMismatch();
+    }
+
+    s_globalOutboundPaused = globalOutboundPaused;
+    s_globalInboundPaused = globalInboundPaused;
+    emit GlobalPauseUpdated(globalOutboundPaused, globalInboundPaused);
+
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint8 flags = lanePauseFlags[i];
+      if (flags > PAUSE_LANE_OUTBOUND + PAUSE_LANE_INBOUND) {
+        revert InvalidPauseFlags(flags);
+      }
+      uint64 remoteChainSelector = remoteChainSelectors[i];
+      if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+      s_lanePauseFlags[remoteChainSelector] = flags;
+      emit LanePauseUpdated(remoteChainSelector, flags);
+    }
+  }
+
+  /// @notice Returns global pause flags (apply to every supported lane in addition to per-lane flags).
+  function getGlobalPauseState() external view virtual returns (bool outboundPaused, bool inboundPaused) {
+    return (s_globalOutboundPaused, s_globalInboundPaused);
+  }
+
+  /// @notice Returns the per-lane pause bitmask for a remote chain selector.
+  function getLanePauseFlags(
+    uint64 remoteChainSelector
+  ) external view virtual returns (uint8) {
+    return s_lanePauseFlags[remoteChainSelector];
+  }
+
+  function _isOutboundPaused(
+    uint64 remoteChainSelector
+  ) internal view virtual returns (bool) {
+    if (s_globalOutboundPaused) return true;
+    return (s_lanePauseFlags[remoteChainSelector] & PAUSE_LANE_OUTBOUND) != 0;
+  }
+
+  function _isInboundPaused(
+    uint64 remoteChainSelector
+  ) internal view virtual returns (bool) {
+    if (s_globalInboundPaused) return true;
+    return (s_lanePauseFlags[remoteChainSelector] & PAUSE_LANE_INBOUND) != 0;
   }
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.

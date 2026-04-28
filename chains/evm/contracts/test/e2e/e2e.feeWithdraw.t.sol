@@ -108,7 +108,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Set fee aggregator for TokenPool via setDynamicConfig
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), s_feeAdmin);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), s_feeAdmin, address(0));
 
     // Set up router with onRamp
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);

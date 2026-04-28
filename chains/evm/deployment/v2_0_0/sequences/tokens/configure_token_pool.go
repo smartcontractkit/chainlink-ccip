@@ -35,6 +35,9 @@ type ConfigureTokenPoolInput struct {
 	RateLimitAdmin common.Address
 	// FeeAggregator is the address that will receive fee tokens when WithdrawFeeTokens is called.
 	FeeAggregator common.Address
+	// PauseAdmin is an additional address allowed to call applyPauseUpdates.
+	// If left empty, pause admin will not be changed via this sequence.
+	PauseAdmin common.Address
 }
 
 var ConfigureTokenPool = cldf_ops.NewSequence(
@@ -67,7 +70,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Set dynamic config (if necessary)
-		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
+		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) || input.PauseAdmin != (common.Address{}) {
 			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
@@ -93,7 +96,12 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				desiredFeeAdmin = input.FeeAggregator
 			}
 
-			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
+			desiredPauseAdmin := currentDynamicConfig.PauseAdmin
+			if input.PauseAdmin != (common.Address{}) {
+				desiredPauseAdmin = input.PauseAdmin
+			}
+
+			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin || desiredPauseAdmin != currentDynamicConfig.PauseAdmin {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
@@ -101,6 +109,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
 						FeeAdmin:       desiredFeeAdmin,
+						PauseAdmin:     desiredPauseAdmin,
 					},
 				})
 				if err != nil {

@@ -71,7 +71,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0), address(0));
     // Enable fast finality handling so consumption emits.
     s_tokenPool.setAllowedFinalityConfig(FinalityCodec._encodeBlockDepth(1));
     s_tokenPool.setRateLimitConfig(rateLimitArgs);

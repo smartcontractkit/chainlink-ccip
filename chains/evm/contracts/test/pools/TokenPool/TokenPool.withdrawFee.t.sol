@@ -18,7 +18,7 @@ contract TokenPool_withdrawFee is AdvancedPoolHooksSetup {
     s_feeAdmin = makeAddr("fee_admin");
 
     vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), s_feeAdmin);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), s_feeAdmin, address(0));
   }
 
   function test_withdrawFeeTokens() public {
@@ -103,7 +103,7 @@ contract TokenPool_withdrawFee is AdvancedPoolHooksSetup {
     // Add more fees and update fee admin
     deal(address(s_token), address(s_tokenPool), feeAmount2);
     vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), newFeeAdmin);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), newFeeAdmin, address(0));
 
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount2);
