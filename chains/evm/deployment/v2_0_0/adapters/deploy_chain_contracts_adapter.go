@@ -5,12 +5,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	upstream "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -132,35 +134,13 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 	if len(metadataForonRamp16) > 1 {
 		return output, fmt.Errorf("multiple metadata entries found for onRamp v1.6.0 on chain selector %d", input.ChainSelector)
 	}
-	metadataForoffRamp16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
-		input.ExistingAddresses,
-		input.ContractMeta,
-		offrampops_v160.ContractType,
-		offrampops_v160.Version,
-		"",
-		input.ChainSelector,
-	)
-	if err != nil {
-		return output, fmt.Errorf("failed to get offRamp metadata for chain selector %d: %w", input.ChainSelector, err)
-	}
-	if len(metadataForoffRamp16) == 0 {
-		return output, fmt.Errorf("no metadata found for offRamp v1.6.0 on chain selector %d", input.ChainSelector)
-	}
-	if len(metadataForoffRamp16) > 1 {
-		return output, fmt.Errorf("multiple metadata entries found for offRamp v1.6.0 on chain selector %d", input.ChainSelector)
-	}
+
 	// Convert metadata to typed struct if needed
 	onRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OnRampImportConfigSequenceOutput](metadataForonRamp16[0].Metadata)
 	if err != nil {
 		return output, fmt.Errorf("failed to convert metadata to "+
 			"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 	}
-	offRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OffRampImportConfigSequenceOutput](metadataForoffRamp16[0].Metadata)
-	if err != nil {
-		return output, fmt.Errorf("failed to convert metadata to "+
-			"OffRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
-	}
-
 	feeAggr := onRampCfg16.DynamicConfig.FeeAggregator.String()
 	output.OnRamp.FeeAggregator = feeAggr
 
@@ -170,7 +150,46 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 	for i := range output.CommitteeVerifiers {
 		output.CommitteeVerifiers[i].FeeAggregator = feeAggr
 	}
-	output.OffRamp.GasForCallExactCheck = offRampCfg16.StaticConfig.GasForCallExactCheck
+	offRampAddr := datastore_utils.GetAddressRef(
+		input.ExistingAddresses,
+		input.ChainSelector,
+		offrampops_v160.ContractType,
+		offrampops_v160.Version,
+		"",
+	)
+	if offRampAddr.Address == "" {
+		return output, fmt.Errorf("offRamp v1.6.0 address not found for chain selector %d, expected to find it since onRamp v1.6.0 was found", input.ChainSelector)
+	}
+	// see if offRamp metadata is found, if not fetch it directly, fail if both are unsuccessful
+	metadataForoffRamp16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
+		input.ExistingAddresses,
+		input.ContractMeta,
+		offrampops_v160.ContractType,
+		offrampops_v160.Version,
+		"",
+		input.ChainSelector,
+	)
+	if err == nil {
+		if len(metadataForoffRamp16) == 1 {
+			offRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OffRampImportConfigSequenceOutput](metadataForoffRamp16[0].Metadata)
+			if err != nil {
+				return output, fmt.Errorf("failed to convert metadata to "+
+					"OffRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+			}
+			output.OffRamp.GasForCallExactCheck = offRampCfg16.StaticConfig.GasForCallExactCheck
+			return output, nil
+		}
+	}
+	// directly fetch offRamp static config
+	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, upstream.FunctionInput[struct{}]{
+		ChainSelector: input.ChainSelector,
+		Address:       common.HexToAddress(offRampAddr.Address),
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return output, fmt.Errorf("failed to execute operation to get offRamp v1.6.0 static config for chain selector %d: %w", input.ChainSelector, err)
+	}
+	output.OffRamp.GasForCallExactCheck = offRampCfg16Rep.Output.GasForCallExactCheck
 	return output, nil
 }
 
