@@ -100,14 +100,17 @@ func TestExpectedOwnerForRef_UsesRMNTimelockForRMNRemote(t *testing.T) {
 func TestExpectedOwnerForRef_MissingTimelockReturnsError(t *testing.T) {
 	selector := chainsel.ETHEREUM_MAINNET.Selector
 	e := &EVMContractOwnership{}
-
+	rmnTL := common.HexToAddress("0x00000000000000000000000000000000000000B1")
+	cllTL := common.HexToAddress("0x000000000000000000000000000000A1")
+	e.rmntimelockAddr.Store(selector, rmnTL)
 	_, err := e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          "AnyType",
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "CLLCCIP RBACTimelock address not found")
-
+	e.cllccipTimelockAddr.Store(selector, cllTL)
+	e.rmntimelockAddr.Store(selector, common.Address{})
 	_, err = e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType(rmn_remote.ContractType),

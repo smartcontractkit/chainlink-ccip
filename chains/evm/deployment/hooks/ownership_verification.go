@@ -102,6 +102,9 @@ func (e *EVMContractOwnership) loadTimelockFromCache(cache *sync.Map, chainSelec
 	if !isAddress {
 		return common.Address{}, false
 	}
+	if addr == (common.Address{}) {
+		return common.Address{}, false
+	}
 	return addr, true
 }
 
