@@ -785,16 +785,23 @@ func ResolveOwnershipDeps(
 		common_utils.BypasserManyChainMultisig,
 		common_utils.CancellerManyChainMultisig,
 	}
+	requiredQualifiers := []string{
+		common_utils.CLLQualifier,
+		common_utils.RMNTimelockQualifier,
+	}
 	for _, ct := range mcmTypes {
-		addresses := mcmsDS.Addresses().Filter(
-			datastore.AddressRefByType(datastore.ContractType(ct)),
-			datastore.AddressRefByChainSelector(chainSelector),
-		)
-		if len(addresses) == 0 {
-			return common.Address{}, common.Address{}, nil,
-				fmt.Errorf("ownership transfer requires MCM contracts of type %s in ExistingAddresses", ct)
+		for _, qualifier := range requiredQualifiers {
+			addresses := mcmsDS.Addresses().Filter(
+				datastore.AddressRefByType(datastore.ContractType(ct)),
+				datastore.AddressRefByQualifier(qualifier),
+				datastore.AddressRefByChainSelector(chainSelector),
+			)
+			if len(addresses) == 0 {
+				return common.Address{}, common.Address{}, nil,
+					fmt.Errorf("ownership transfer requires MCM contract of type %s with qualifier %s in ExistingAddresses", ct, qualifier)
+			}
+			mcmContracts = append(mcmContracts, addresses...)
 		}
-		mcmContracts = append(mcmContracts, addresses...)
 	}
 
 	return cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, nil
