@@ -199,7 +199,7 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				ownershipBatchOps, ownershipReports, err := deploy.TransferToTimelock(sel, e, cfg.MCMS, report.Output.RefsToTransferOwnership)
 				if err != nil {
 					return deployment.ChangesetOutput{Reports: allReports},
-						fmt.Errorf("failed to transfer to time lock for chain %d: %w", sel, err)
+						fmt.Errorf("failed to transfer to timelock for chain %d: %w", sel, err)
 				}
 				allReports = append(allReports, ownershipReports...)
 				allBatchOps = append(allBatchOps, ownershipBatchOps...)
