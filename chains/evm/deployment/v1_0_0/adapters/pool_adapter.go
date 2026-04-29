@@ -503,6 +503,14 @@ func tidyTokenRoles(
 
 	}
 
+	b.Logger.Warnf(
+		"unsupported token type %q for token %q on chain %d; timelock %q is present but admin-role hardening was not applied and deployer may remain token admin",
+		tokenRef.Type.String(),
+		tokenAddr.Hex(),
+		input.ChainSelector,
+		timelockAddr.Hex(),
+	)
+
 	return nil, nil
 }
 

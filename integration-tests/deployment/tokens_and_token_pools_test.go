@@ -368,7 +368,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				defaultAdminRole, err := tokn.DEFAULTADMINROLE(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 
-				// Timelock should have DEFAULT_ADMIN_ROLE (this is the default when no external admin / CCIP admin is specified)
+				// Timelock should have DEFAULT_ADMIN_ROLE (this is a security feature of the changeset)
 				timelockHasDefaultAdminRole, err := tokn.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, common.HexToAddress(timelockRef.Address))
 				require.NoError(t, err)
 				require.True(t, timelockHasDefaultAdminRole, fmt.Sprintf("expected timelock %q to have default admin role on token", timelockRef.Address))
