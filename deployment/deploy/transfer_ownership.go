@@ -120,7 +120,7 @@ func transferOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry 
 	}
 }
 
-func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcmsInput mcms.Input, addressRefs []datastore.AddressRef, ownerOverride map[datastore.ContractType]string) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Input, addressRefs []datastore.AddressRef) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	mcmsRegistry := changesets.GetRegistry()
 	transferOwnershipReg := GetTransferOwnershipRegistry()
 	family, err := chain_selectors.GetSelectorFamily(chainSel)
@@ -131,7 +131,7 @@ func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcmsInput mcms.Inp
 	if !ok {
 		return nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
 	}
-	timelockRef, err := mcmsReader.GetTimelockRef(*e, chainSel, mcmsInput)
+	timelockRef, err := mcmsReader.GetTimelockRef(e, chainSel, mcmsInput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get timelock ref for chain %d: %w", chainSel, err)
 	}
@@ -140,37 +140,13 @@ func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcmsInput mcms.Inp
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get transfer ownership adapter for chain %d: %w", chainSel, err)
 	}
-	proposedOwner := timelockRef.Address
 
-	ownerShipInputByProposedOwner := make(map[string]TransferOwnershipPerChainInput)
-	for _, contractRef := range addressRefs {
-		if override, exists := ownerOverride[contractRef.Type]; exists {
-			proposedOwner = override
-		}
-		input, exists := ownerShipInputByProposedOwner[proposedOwner]
-		if !exists {
-			input = TransferOwnershipPerChainInput{
-				ChainSelector: chainSel,
-				ContractRef:   []datastore.AddressRef{contractRef},
-				ProposedOwner: proposedOwner,
-			}
-		} else {
-			input.ContractRef = append(input.ContractRef, contractRef)
-		}
-		ownerShipInputByProposedOwner[proposedOwner] = input
+	ownershipInput := TransferOwnershipPerChainInput{
+		ChainSelector: chainSel,
+		ContractRef:   addressRefs,
+		ProposedOwner: timelockRef.Address,
 	}
-	var batchOps []mcms_types.BatchOperation
-	var reports []cldf_ops.Report[any, any]
-	for _, ownershipInput := range ownerShipInputByProposedOwner {
-		ops, rep, err := transferAndAcceptOwnership(*e, adapter, ownershipInput, mcmsInput)
-		if err != nil {
-			return nil, nil, err
-		}
-		batchOps = append(batchOps, ops...)
-		reports = append(reports, rep...)
-	}
-
-	return batchOps, reports, nil
+	return transferAndAcceptOwnership(e, adapter, ownershipInput, mcmsInput)
 }
 
 // transferAndAcceptOwnership executes the transfer ownership sequence via MCMS and,
