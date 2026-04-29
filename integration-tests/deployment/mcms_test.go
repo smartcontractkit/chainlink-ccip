@@ -56,7 +56,6 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	DeployMCMS(t, env, solanaChains[0], []string{deploymentutils.CLLQualifier})
 
 	// get recently deployed MCMS addresses
-	mcmsRefs := []datastore.AddressRef{}
 	cancellerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: solanaChains[0],
 		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
@@ -66,39 +65,43 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	require.NoError(t, err)
 	bypasserRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: solanaChains[0],
-		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+		Type:          datastore.ContractType(deploymentutils.BypasserManyChainMultisig),
 		Qualifier:     deploymentutils.CLLQualifier,
 		Version:       semver.MustParse("1.6.0"),
 	}, solanaChains[0], datastore_utils.FullRef)
 	require.NoError(t, err)
 	proposerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: solanaChains[0],
-		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+		Type:          datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
 		Qualifier:     deploymentutils.CLLQualifier,
 		Version:       semver.MustParse("1.6.0"),
 	}, solanaChains[0], datastore_utils.FullRef)
 	require.NoError(t, err)
-	mcmsRefs = append(mcmsRefs, cancellerRef, bypasserRef, proposerRef)
 
-	// check that deployed config is correct
-	for _, ref := range mcmsRefs {
+	getSignerCount := func(ref datastore.AddressRef) int {
 		var mcmConfig mcm.MultisigConfig
-		id, seed, _ := mcms_solana.ParseContractAddress(ref.Address)
-		err := chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(id, state.PDASeed([]byte(seed[:]))), &mcmConfig)
+		id, seed, err := mcms_solana.ParseContractAddress(ref.Address)
+		require.NoError(t, err)
+		err = chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(id, state.PDASeed([]byte(seed[:]))), &mcmConfig)
 		require.NoError(t, err)
 
-		numOfSigners := len(mcmConfig.Signers)
-		require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMS().Signers)) // should be 1
+		return len(mcmConfig.Signers)
 	}
 
-	// update the config for each MCMS contract
+	// check that deployed config is correct
+	mcmsRefs := []datastore.AddressRef{cancellerRef, bypasserRef, proposerRef}
+	for _, ref := range mcmsRefs {
+		require.Equal(t, len(testhelpers.SingleGroupMCMS().Signers), getSignerCount(ref)) // should be 1
+	}
+
+	// update the config for only the proposer MCMS contract
 	updateMcmsConfigMCMS := mcmsapi.UpdateMCMSConfig(dReg, nil)
 	output, err := updateMcmsConfigMCMS.Apply(*env, mcmsapi.UpdateMCMSConfigInput{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]mcmsapi.UpdateMCMSConfigInputPerChain{
 			solanaChains[0]: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
-				MCMContracts: mcmsRefs,
+				MCMContracts: []datastore.AddressRef{proposerRef},
 			},
 		},
 		MCMS: mcms.Input{
@@ -113,15 +116,8 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 
-	// check that MCMS configs are updated correctly
-	for _, ref := range mcmsRefs {
-		var mcmConfig mcm.MultisigConfig
-		id, seed, _ := mcms_solana.ParseContractAddress(ref.Address)
-		err := chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(id, state.PDASeed([]byte(seed[:]))), &mcmConfig)
-		require.NoError(t, err)
-
-		numOfSigners := len(mcmConfig.Signers)
-		require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 2
-	}
-
+	// check that only the requested MCMS config was updated
+	require.Equal(t, len(testhelpers.SingleGroupMCMSTwoSigners().Signers), getSignerCount(proposerRef)) // should be 2
+	require.Equal(t, len(testhelpers.SingleGroupMCMS().Signers), getSignerCount(cancellerRef))          // should still be 1
+	require.Equal(t, len(testhelpers.SingleGroupMCMS().Signers), getSignerCount(bypasserRef))           // should still be 1
 }
