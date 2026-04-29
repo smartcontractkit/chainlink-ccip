@@ -118,24 +118,27 @@ func (e *EVMContractOwnership) NeedsOwnershipCheck(ref datastore.AddressRef) boo
 	return exists
 }
 
-func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) ([]common.Address, error) {
+func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) (common.Address, error) {
 	rmnTL, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, ref.ChainSelector)
 	if !ok {
-		return nil, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+		return common.Address{}, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
 	}
 	cllTL, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, ref.ChainSelector)
 	if !ok {
-		return nil, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+		return common.Address{}, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
 	}
 	switch ref.Type {
 	case datastore.ContractType(rmn_remote.ContractType):
-		return []common.Address{rmnTL}, nil
+		return rmnTL, nil
 	case datastore.ContractType(common_utils.BypasserManyChainMultisig),
 		datastore.ContractType(common_utils.CancellerManyChainMultisig),
 		datastore.ContractType(common_utils.ProposerManyChainMultisig):
-		return []common.Address{cllTL, rmnTL}, nil
+		if ref.Qualifier == common_utils.RMNTimelockQualifier {
+			return rmnTL, nil
+		}
+		return cllTL, nil
 	default:
-		return []common.Address{cllTL}, nil
+		return cllTL, nil
 	}
 }
 
@@ -174,13 +177,13 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 		return fmt.Errorf("initialize timelocks for chain %d: %w", network.ChainSelector, err)
 	}
 	var acceptableAdmins []common.Address
-	cllTL, ok := e.cllccipTimelockAddr.Load(network.ChainSelector)
+	cllTL, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, network.ChainSelector)
 	if ok {
-		acceptableAdmins = append(acceptableAdmins, cllTL.(common.Address))
+		acceptableAdmins = append(acceptableAdmins, cllTL)
 	}
-	rmnTL, ok := e.rmntimelockAddr.Load(network.ChainSelector)
+	rmnTL, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, network.ChainSelector)
 	if ok {
-		acceptableAdmins = append(acceptableAdmins, rmnTL.(common.Address))
+		acceptableAdmins = append(acceptableAdmins, rmnTL)
 	}
 	for _, ref := range refsToCheck {
 		if ref.Type == datastore.ContractType(common_utils.RBACTimelock) {
@@ -216,20 +219,13 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 		if err != nil {
 			return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
 		}
-		expectedOwners, err := e.expectedOwnerForRef(ref)
+		expectedOwner, err := e.expectedOwnerForRef(ref)
 		if err != nil {
 			return fmt.Errorf("failed to determine expected owner for contract %s (%s): %w", addr, ref.Type, err)
 		}
-		ownerFound := false
-		for _, expectedOwner := range expectedOwners {
-			if currentOwner == expectedOwner {
-				ownerFound = true
-				break
-			}
-		}
-		if !ownerFound {
-			return fmt.Errorf("ownership check failed for contract %s (%s): expected owner %v, got %s",
-				addr, ref.Type, expectedOwners, currentOwner)
+		if currentOwner != expectedOwner {
+			return fmt.Errorf("ownership check failed for contract %s (%s): expected owner %s, got %s",
+				addr, ref.Type, expectedOwner, currentOwner)
 		}
 		lggr.Infof("ownership check passed for contract %s (%s): owner is %s", addr, ref.Type, currentOwner)
 	}
