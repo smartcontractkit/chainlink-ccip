@@ -171,6 +171,7 @@ func TestUpdateMCMSConfig(t *testing.T) {
 
 	// get recently deployed MCMS addresses
 	mcmsRefs := make(map[uint64][]datastore.AddressRef)
+	partialMCMSRefs := make(map[uint64][]datastore.AddressRef)
 	for _, sel := range []uint64{selector1, selector2} {
 		cancellerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			ChainSelector: sel,
@@ -181,19 +182,26 @@ func TestUpdateMCMSConfig(t *testing.T) {
 		require.NoError(t, err)
 		bypasserRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			ChainSelector: sel,
-			Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+			Type:          datastore.ContractType(deploymentutils.BypasserManyChainMultisig),
 			Qualifier:     "CLLCCIP",
 			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		proposerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			ChainSelector: sel,
-			Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+			Type:          datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
 			Qualifier:     "CLLCCIP",
 			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		mcmsRefs[sel] = append(mcmsRefs[sel], cancellerRef, bypasserRef, proposerRef)
+		for _, ref := range mcmsRefs[sel] {
+			partialMCMSRefs[sel] = append(partialMCMSRefs[sel], datastore.AddressRef{
+				Type:      ref.Type,
+				Qualifier: ref.Qualifier,
+				Version:   ref.Version,
+			})
+		}
 	}
 
 	// check that deployed config is correct
@@ -221,11 +229,11 @@ func TestUpdateMCMSConfig(t *testing.T) {
 		Chains: map[uint64]deployops.UpdateMCMSConfigInputPerChain{
 			selector1: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
-				MCMContracts: mcmsRefs[selector1],
+				MCMContracts: partialMCMSRefs[selector1],
 			},
 			selector2: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
-				MCMContracts: mcmsRefs[selector2],
+				MCMContracts: partialMCMSRefs[selector2],
 			},
 		},
 		MCMS: mcms.Input{

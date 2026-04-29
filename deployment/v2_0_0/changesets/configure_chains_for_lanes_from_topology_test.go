@@ -289,10 +289,10 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 				CommitteeVerifiers: []changesets.CommitteeVerifierInputConfig{
 					{
 						CommitteeQualifier: "default",
-					RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
-						remoteEVM:    {FeeUSDCents: ptrTo[uint16](10), GasForVerification: ptrTo[uint32](20), PayloadSizeBytes: ptrTo[uint16](30)},
-						remoteSolana: {FeeUSDCents: ptrTo[uint16](40), GasForVerification: ptrTo[uint32](50), PayloadSizeBytes: ptrTo[uint16](60)},
-					},
+						RemoteChains: map[uint64]changesets.CommitteeVerifierRemoteChainConfig{
+							remoteEVM:    {FeeUSDCents: ptrTo[uint16](10), GasForVerification: ptrTo[uint32](20), PayloadSizeBytes: ptrTo[uint16](30)},
+							remoteSolana: {FeeUSDCents: ptrTo[uint16](40), GasForVerification: ptrTo[uint32](50), PayloadSizeBytes: ptrTo[uint16](60)},
+						},
 					},
 				},
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
@@ -919,12 +919,19 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 		)
 		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
 			Topology: &offchain.EnvironmentTopology{
+				IndexerAddress: []string{"http://indexer:8080"},
 				NOPTopology: &offchain.NOPTopology{
-					NOPs: []offchain.NOPConfig{{Alias: "nop-1"}},
+					NOPs: []offchain.NOPConfig{{Alias: "nop-1", Name: "nop-1-name"}},
 					Committees: map[string]offchain.CommitteeConfig{
-						"default": {Qualifier: "default", ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
-						}},
+						"default": {
+							Qualifier: "default",
+							Aggregators: []offchain.AggregatorConfig{
+								{Name: "agg-1", Address: "http://aggregator:8080"},
+							},
+							ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+								fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							},
+						},
 					},
 				},
 			},
@@ -949,12 +956,19 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 		)
 		err := cs.VerifyPreconditions(env, changesets.ConfigureChainsForLanesFromTopologyConfig{
 			Topology: &offchain.EnvironmentTopology{
+				IndexerAddress: []string{"http://indexer:8080"},
 				NOPTopology: &offchain.NOPTopology{
-					NOPs: []offchain.NOPConfig{{Alias: "nop-1"}},
+					NOPs: []offchain.NOPConfig{{Alias: "nop-1", Name: "nop-1-name"}},
 					Committees: map[string]offchain.CommitteeConfig{
-						"default": {Qualifier: "default", ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
-						}},
+						"default": {
+							Qualifier: "default",
+							Aggregators: []offchain.AggregatorConfig{
+								{Name: "agg-1", Address: "http://aggregator:8080"},
+							},
+							ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+								fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							},
+						},
 					},
 				},
 			},
