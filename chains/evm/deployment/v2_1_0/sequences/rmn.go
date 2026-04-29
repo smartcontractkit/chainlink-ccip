@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -26,7 +25,7 @@ type ConfigureRMNCurseAdminsInput struct {
 // ConfigureRMNCurseAdmins applies authorized caller (curse admin) updates to an already-deployed RMN contract.
 var ConfigureRMNCurseAdmins = cldf_ops.NewSequence(
 	"configure-rmn-curse-admins",
-	semver.MustParse("1.0.0"),
+	rmnops.Version,
 	"Applies authorized caller (curse admin) updates to the RMN contract",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureRMNCurseAdminsInput) (output sequences.OnChainOutput, err error) {
 		if input.ChainSelector != chain.Selector {
@@ -66,7 +65,7 @@ type DeployRMNInput struct {
 // DeployRMN deploys a new RMN contract or returns the existing address from the datastore.
 var DeployRMN = cldf_ops.NewSequence(
 	"deploy-rmn",
-	semver.MustParse("1.0.0"),
+	rmnops.Version,
 	"Deploys the RMN (curse / IRMN) contract",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployRMNInput) (output sequences.OnChainOutput, err error) {
 		if input.ChainSelector != chain.Selector {
@@ -89,3 +88,57 @@ var DeployRMN = cldf_ops.NewSequence(
 		return output, nil
 	},
 )
+
+// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.1.0 contract.
+type SeqCurseInput struct {
+	RMNAddress common.Address
+	Subjects   [][16]byte
+}
+
+// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.1.0 contract.
+type SeqUncurseInput struct {
+	RMNAddress common.Address
+	Subjects   [][16]byte
+}
+
+// RmnCurse curses one or more subjects on an RMN v2.1.0 contract.
+var RmnCurse = cldf_ops.NewSequence(
+	"rmn-curse",
+	rmnops.Version,
+	"Cursing subjects with RMN",
+	func(b cldf_ops.Bundle, chain evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
+		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
+			Address:       in.RMNAddress,
+			ChainSelector: chain.Selector,
+			Args:          in.Subjects,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMN at %s on chain %d: %w", in.RMNAddress.String(), chain.Selector, err)
+		}
+		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{opOutput.Output})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+	})
+
+// RmnUncurse uncurses one or more subjects on an RMN v2.1.0 contract.
+var RmnUncurse = cldf_ops.NewSequence(
+	"rmn-uncurse",
+	rmnops.Version,
+	"Uncursing subjects with RMN",
+	func(b cldf_ops.Bundle, chain evm.Chain, in SeqUncurseInput) (output sequences.OnChainOutput, err error) {
+		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Uncurse0, chain, contract.FunctionInput[[][16]byte]{
+			Address:       in.RMNAddress,
+			ChainSelector: chain.Selector,
+			Args:          in.Subjects,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse with RMN at %s on chain %d: %w", in.RMNAddress.String(), chain.Selector, err)
+		}
+		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{opOutput.Output})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+	})
