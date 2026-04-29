@@ -66,8 +66,10 @@ func TestTimelocksInOwnershipCheck_MissingCLLTimelock(t *testing.T) {
 func TestExpectedOwnerForRef_UsesRMNTimelockForRMNRemote(t *testing.T) {
 	selector := chainsel.ETHEREUM_MAINNET.Selector
 	e := &EVMContractOwnership{}
-	e.cllccipTimelockAddr.Store(selector, common.HexToAddress("0x00000000000000000000000000000000000000A1"))
-	e.rmntimelockAddr.Store(selector, common.HexToAddress("0x00000000000000000000000000000000000000B1"))
+	rmnTL := common.HexToAddress("0x00000000000000000000000000000000000000B1")
+	cllTL := common.HexToAddress("0x000000000000000000000000000000A1")
+	e.cllccipTimelockAddr.Store(selector, cllTL)
+	e.rmntimelockAddr.Store(selector, rmnTL)
 
 	normal, err := e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
@@ -78,9 +80,21 @@ func TestExpectedOwnerForRef_UsesRMNTimelockForRMNRemote(t *testing.T) {
 		ChainSelector: selector,
 		Type:          datastore.ContractType(rmn_remote.ContractType),
 	})
+	mcmsRmn, err := e.expectedOwnerForRef(datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(common_utils.BypasserManyChainMultisig),
+		Qualifier:     common_utils.RMNTimelockQualifier,
+	})
+	mcmsCll, err := e.expectedOwnerForRef(datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(common_utils.ProposerManyChainMultisig),
+		Qualifier:     common_utils.CLLQualifier,
+	})
 	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000A1"), normal)
-	require.Equal(t, common.HexToAddress("0x00000000000000000000000000000000000000B1"), rmn)
+	require.Equal(t, cllTL, normal)
+	require.Equal(t, rmnTL, rmn)
+	require.Equal(t, rmnTL, mcmsRmn)
+	require.Equal(t, cllTL, mcmsCll)
 }
 
 func TestExpectedOwnerForRef_MissingTimelockReturnsError(t *testing.T) {
