@@ -664,7 +664,7 @@ func v2FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig)
 	}
 }
 
-func importTokenTransferFeeConfigFromV160OnRampFeeQuoter(
+func importTokenTransferFeeConfigFromFeeQuoter(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	chainSelector uint64,
@@ -682,7 +682,8 @@ func importTokenTransferFeeConfigFromV160OnRampFeeQuoter(
 	}
 
 	feeQuoterVersion := feeQuoterTAVReport.Output.Version
-	if feeQuoterVersion.Major() == 1 && feeQuoterVersion.Minor() == 6 {
+	switch {
+	case feeQuoterVersion.Major() == 1 && feeQuoterVersion.Minor() == 6:
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
 			ChainSelector: chainSelector,
 			Address:       feeQuoterAddr,
@@ -696,10 +697,7 @@ func importTokenTransferFeeConfigFromV160OnRampFeeQuoter(
 				feeQuoterAddr.Hex(), tokenAddress.Hex(), remoteChainSelector, chain.String(), err)
 		}
 		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	}
-
-	switch feeQuoterVersion.String() {
-	case fqops.Version.String():
+	case feeQuoterVersion.String() == fqops.Version.String():
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
 			ChainSelector: chainSelector,
 			Address:       feeQuoterAddr,
@@ -714,8 +712,8 @@ func importTokenTransferFeeConfigFromV160OnRampFeeQuoter(
 		}
 		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
 	default:
-		return nil, fmt.Errorf("unsupported fee quoter version %s for fee quoter %s referenced by onRamp 1.6.0 on chain %s",
-			feeQuoterTAVReport.Output.Version.String(), feeQuoterAddr.Hex(), chain.String())
+		return nil, fmt.Errorf("unsupported fee quoter version %s for fee quoter %s on chain %s",
+			feeQuoterVersion.String(), feeQuoterAddr.Hex(), chain.String())
 	}
 }
 
@@ -785,7 +783,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		if feeQuoterAddr == (common.Address{}) {
 			return nil, nil
 		}
-		return importTokenTransferFeeConfigFromV160OnRampFeeQuoter(b, chain, input.ChainSelector, feeQuoterAddr, input.TokenAddress, input.RemoteChainSelector)
+		return importTokenTransferFeeConfigFromFeeQuoter(b, chain, input.ChainSelector, feeQuoterAddr, input.TokenAddress, input.RemoteChainSelector)
 	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
@@ -800,20 +798,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		if feeQuoterAddr == (common.Address{}) {
 			return nil, nil
 		}
-		// get token transfer fee config from fee quoter
-		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       feeQuoterAddr,
-			Args: fqops.GetTokenTransferFeeConfigArgs{
-				Token:             input.TokenAddress,
-				DestChainSelector: input.RemoteChainSelector,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
-				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
-		}
-		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+		return importTokenTransferFeeConfigFromFeeQuoter(b, chain, input.ChainSelector, feeQuoterAddr, input.TokenAddress, input.RemoteChainSelector)
 	default:
 		// Unsupported onRamp version, nothing to import.
 		return nil, nil
