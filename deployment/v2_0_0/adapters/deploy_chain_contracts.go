@@ -115,6 +115,10 @@ type DeployChainConfigCreatorInput struct {
 	UserProvidedConfig DeployContractParams
 }
 
+type DeployChainContractsOutput struct {
+	sequences.OnChainOutput
+}
+
 type DeployChainContractsAdapter interface {
 	// SetContractParamsFromImportedConfig is used when ImportConfig is true in DeployChainContractsInput.
 	// It should read the necessary contract parameters from the datastore contract metadata based on the chain selector and
