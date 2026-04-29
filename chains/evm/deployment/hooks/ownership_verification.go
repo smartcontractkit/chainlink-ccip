@@ -118,20 +118,24 @@ func (e *EVMContractOwnership) NeedsOwnershipCheck(ref datastore.AddressRef) boo
 	return exists
 }
 
-func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) (common.Address, error) {
+func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) ([]common.Address, error) {
+	rmnTL, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, ref.ChainSelector)
+	if !ok {
+		return nil, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+	}
+	cllTL, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, ref.ChainSelector)
+	if !ok {
+		return nil, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+	}
 	switch ref.Type {
 	case datastore.ContractType(rmn_remote.ContractType):
-		addr, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, ref.ChainSelector)
-		if !ok {
-			return common.Address{}, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
-		}
-		return addr, nil
+		return []common.Address{rmnTL}, nil
+	case datastore.ContractType(common_utils.BypasserManyChainMultisig),
+		datastore.ContractType(common_utils.CancellerManyChainMultisig),
+		datastore.ContractType(common_utils.ProposerManyChainMultisig):
+		return []common.Address{cllTL, rmnTL}, nil
 	default:
-		addr, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, ref.ChainSelector)
-		if !ok {
-			return common.Address{}, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
-		}
-		return addr, nil
+		return []common.Address{cllTL}, nil
 	}
 }
 
@@ -212,13 +216,20 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 		if err != nil {
 			return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
 		}
-		expectedOwner, err := e.expectedOwnerForRef(ref)
+		expectedOwners, err := e.expectedOwnerForRef(ref)
 		if err != nil {
 			return fmt.Errorf("failed to determine expected owner for contract %s (%s): %w", addr, ref.Type, err)
 		}
-		if currentOwner != expectedOwner {
-			return fmt.Errorf("ownership check failed for contract %s (%s): expected owner %s, got %s",
-				addr, ref.Type, expectedOwner, currentOwner)
+		ownerFound := false
+		for _, expectedOwner := range expectedOwners {
+			if currentOwner == expectedOwner {
+				ownerFound = true
+				break
+			}
+		}
+		if !ownerFound {
+			return fmt.Errorf("ownership check failed for contract %s (%s): expected owner %v, got %s",
+				addr, ref.Type, expectedOwners, currentOwner)
 		}
 		lggr.Infof("ownership check passed for contract %s (%s): owner is %s", addr, ref.Type, currentOwner)
 	}
