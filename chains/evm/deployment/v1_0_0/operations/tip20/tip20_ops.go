@@ -207,3 +207,24 @@ var GrantAdminRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP
 		return token.GrantRole(opts, DefaultAdminRole, input)
 	},
 })
+
+var RevokeAdminRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
+	Name:         "tip20:revoke-admin-role",
+	Version:      Version,
+	Description:  "Revokes DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
+	ContractType: ContractType,
+	ContractABI:  TIP20TokenABI,
+	NewContract:  NewTIP20Token,
+	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
+		return token.HasRole(opts, caller, DefaultAdminRole)
+	},
+	Validate: func(address common.Address) error {
+		if address == (common.Address{}) {
+			return errors.New("account address is required")
+		}
+		return nil
+	},
+	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+		return token.RevokeRole(opts, DefaultAdminRole, input)
+	},
+})

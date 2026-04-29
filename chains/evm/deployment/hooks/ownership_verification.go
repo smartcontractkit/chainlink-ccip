@@ -102,6 +102,9 @@ func (e *EVMContractOwnership) loadTimelockFromCache(cache *sync.Map, chainSelec
 	if !isAddress {
 		return common.Address{}, false
 	}
+	if addr == (common.Address{}) {
+		return common.Address{}, false
+	}
 	return addr, true
 }
 
@@ -119,19 +122,26 @@ func (e *EVMContractOwnership) NeedsOwnershipCheck(ref datastore.AddressRef) boo
 }
 
 func (e *EVMContractOwnership) expectedOwnerForRef(ref datastore.AddressRef) (common.Address, error) {
+	rmnTL, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, ref.ChainSelector)
+	if !ok {
+		return common.Address{}, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+	}
+	cllTL, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, ref.ChainSelector)
+	if !ok {
+		return common.Address{}, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+	}
 	switch ref.Type {
 	case datastore.ContractType(rmn_remote.ContractType):
-		addr, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, ref.ChainSelector)
-		if !ok {
-			return common.Address{}, fmt.Errorf("RMNMCMS RBACTimelock address not found for chain selector %d", ref.ChainSelector)
+		return rmnTL, nil
+	case datastore.ContractType(common_utils.BypasserManyChainMultisig),
+		datastore.ContractType(common_utils.CancellerManyChainMultisig),
+		datastore.ContractType(common_utils.ProposerManyChainMultisig):
+		if ref.Qualifier == common_utils.RMNTimelockQualifier {
+			return rmnTL, nil
 		}
-		return addr, nil
+		return cllTL, nil
 	default:
-		addr, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, ref.ChainSelector)
-		if !ok {
-			return common.Address{}, fmt.Errorf("CLLCCIP RBACTimelock address not found for chain selector %d", ref.ChainSelector)
-		}
-		return addr, nil
+		return cllTL, nil
 	}
 }
 
@@ -170,13 +180,13 @@ func (e *EVMContractOwnership) VerifyContractOwnership(
 		return fmt.Errorf("initialize timelocks for chain %d: %w", network.ChainSelector, err)
 	}
 	var acceptableAdmins []common.Address
-	cllTL, ok := e.cllccipTimelockAddr.Load(network.ChainSelector)
+	cllTL, ok := e.loadTimelockFromCache(&e.cllccipTimelockAddr, network.ChainSelector)
 	if ok {
-		acceptableAdmins = append(acceptableAdmins, cllTL.(common.Address))
+		acceptableAdmins = append(acceptableAdmins, cllTL)
 	}
-	rmnTL, ok := e.rmntimelockAddr.Load(network.ChainSelector)
+	rmnTL, ok := e.loadTimelockFromCache(&e.rmntimelockAddr, network.ChainSelector)
 	if ok {
-		acceptableAdmins = append(acceptableAdmins, rmnTL.(common.Address))
+		acceptableAdmins = append(acceptableAdmins, rmnTL)
 	}
 	for _, ref := range refsToCheck {
 		if ref.Type == datastore.ContractType(common_utils.RBACTimelock) {
