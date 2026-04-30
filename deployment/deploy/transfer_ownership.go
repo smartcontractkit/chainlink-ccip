@@ -120,7 +120,7 @@ func transferOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry 
 	}
 }
 
-func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcmsInput mcms.Input, addressRefs []datastore.AddressRef) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Input, addressRefs []datastore.AddressRef) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	mcmsRegistry := changesets.GetRegistry()
 	transferOwnershipReg := GetTransferOwnershipRegistry()
 	family, err := chain_selectors.GetSelectorFamily(chainSel)
@@ -131,7 +131,7 @@ func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcmsInput mcms.Inp
 	if !ok {
 		return nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
 	}
-	timelockRef, err := mcmsReader.GetTimelockRef(*e, chainSel, mcmsInput)
+	timelockRef, err := mcmsReader.GetTimelockRef(e, chainSel, mcmsInput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get timelock ref for chain %d: %w", chainSel, err)
 	}
@@ -146,7 +146,7 @@ func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcmsInput mcms.Inp
 		ContractRef:   addressRefs,
 		ProposedOwner: timelockRef.Address,
 	}
-	return transferAndAcceptOwnership(*e, adapter, ownershipInput, mcmsInput)
+	return transferAndAcceptOwnership(e, adapter, ownershipInput, mcmsInput)
 }
 
 // transferAndAcceptOwnership executes the transfer ownership sequence via MCMS and,

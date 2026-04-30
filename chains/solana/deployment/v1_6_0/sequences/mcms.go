@@ -373,26 +373,41 @@ func (a *SolanaAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.Update
 
 			// Set config for each inputted contract
 			for _, contract := range in.MCMContracts {
+				var contractType cldf_deployment.ContractType
+				switch contract.Type.String() {
+				case common_utils.BypasserManyChainMultisig.String():
+					contractType = utils.BypasserSeed
+				case common_utils.CancellerManyChainMultisig.String():
+					contractType = utils.CancellerSeed
+				case common_utils.ProposerManyChainMultisig.String():
+					contractType = utils.ProposerSeed
+				default:
+					return sequences.OnChainOutput{}, fmt.Errorf("unsupported MCM contract type: %s", contract.Type)
+				}
+
 				deps := mcmsops.Deps{
 					Chain:             chain,
 					ExistingAddresses: in.ExistingAddresses,
 					Qualifier:         contract.Qualifier,
 				}
-				configureOpInput := ccipapi.MCMSDeploymentConfigPerChain{
-					Canceller:       in.MCMConfig,
-					Bypasser:        in.MCMConfig,
-					Proposer:        in.MCMConfig,
-					Qualifier:       &contract.Qualifier,
-					ContractVersion: contract.Version.String(),
-				}
-				id, _, _ := mcms_solana.ParseContractAddress(contract.Address)
-				configureOpOutput, err := configureMCM(b, deps, configureOpInput, id)
+				id, _, err := mcms_solana.ParseContractAddress(contract.Address)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse MCM contract address %q: %w", contract.Address, err)
+				}
+				configureOpOutput, err := operations.ExecuteOperation(b, mcmsops.ConfigureMCMOp, deps,
+					mcmsops.InitMCMInput{
+						ContractType: contractType,
+						MCMConfig:    in.MCMConfig,
+						ChainSel:     in.ChainSelector,
+						MCM:          id,
+						Qualifier:    contract.Qualifier,
+					})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCM %s: %w", contract.Type, err)
 				}
 
-				output.Addresses = append(output.Addresses, configureOpOutput.NewAddresses...)
-				output.BatchOps = append(output.BatchOps, configureOpOutput.BatchOps...)
+				output.Addresses = append(output.Addresses, configureOpOutput.Output.NewAddresses...)
+				output.BatchOps = append(output.BatchOps, configureOpOutput.Output.BatchOps...)
 			}
 
 			return output, nil

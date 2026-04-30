@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment
 
-go 1.25.5
+go 1.25.7
 
 replace (
 	// Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
