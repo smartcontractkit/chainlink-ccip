@@ -1,7 +1,9 @@
 package cctp
 
 import (
+	"bytes"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
+	evm_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -38,6 +41,8 @@ const (
 	mechanismLockRelease   = "LOCK_RELEASE"
 	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 )
+
+var v162 = semver.MustParse("1.6.2")
 
 // configureCCTPChainRefs holds resolved address refs for ConfigureCCTPChainForLanes.
 type configureCCTPChainRefs struct {
@@ -178,6 +183,14 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			writes = append(writes, w...)
 		}
+
+		// If a legacy USDCTokenPool v1.6.2 exists on this chain, register each supported
+		// remote's USDCTokenPoolProxy on it via usdc_token_pool.AddRemotePool.
+		v162Writes, err := addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(b, chain, dep, input, remoteChainConfigs)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		writes = append(writes, v162Writes...)
 
 		// Create batch operation from writes
 		if len(writes) > 0 {
@@ -347,6 +360,100 @@ func resolveConfigureCCTPChainRefs(
 		siloedRef = &siloed
 	}
 	return refs, siloedRef, nil
+}
+
+// addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool registers each remote chain's USDCTokenPoolProxy
+// on the legacy USDCTokenPool v1.6.2 via usdc_token_pool.AddRemotePool.
+// Skips when there is no v1.6.2 pool on this chain (net new lane), the remote's registered pool
+// ref is not a USDCTokenPoolProxy, the remote chain is not yet supported on the v1.6.2 pool, or the
+// proxy is already listed as a remote pool.
+func addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	dep adapters.ConfigureCCTPChainForLanesDeps,
+	input adapters.ConfigureCCTPChainForLanesInput,
+	remoteChainConfigs map[uint64]tokens_core.RemoteChainConfig[[]byte, string],
+) ([]contract_utils.WriteOutput, error) {
+	refs := dep.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(input.ChainSelector),
+		datastore.AddressRefByType(datastore.ContractType(usdc_token_pool.ContractType)),
+		datastore.AddressRefByVersion(v162),
+	)
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	if len(refs) > 1 {
+		return nil, fmt.Errorf("expected at most one USDCTokenPool v%s on chain %d, found %d", v162.String(), input.ChainSelector, len(refs))
+	}
+	localV162 := common.HexToAddress(refs[0].Address)
+
+	supportedChainsReport, err := cldf_ops.ExecuteOperation[contract_utils.FunctionInput[struct{}], []uint64, evm.Chain](
+		b, evm_token_pool.GetSupportedChains, chain, contract_utils.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       localV162,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("getSupportedChains on USDCTokenPool v1.6.2 %s: %w", localV162.Hex(), err)
+	}
+	supportedChains := supportedChainsReport.Output
+
+	var writes []contract_utils.WriteOutput
+	for remoteSel := range input.RemoteChains {
+		poolRef := input.RemoteRegisteredPoolRefs[remoteSel]
+		if poolRef.Type != datastore.ContractType(usdc_token_pool_proxy.ContractType) {
+			continue
+		}
+		cfg, ok := remoteChainConfigs[remoteSel]
+		if !ok {
+			continue
+		}
+		if !slices.Contains(supportedChains, remoteSel) {
+			continue
+		}
+		w, err := maybeAddRemotePoolUSDCTokenPoolV162(b, chain, input.ChainSelector, localV162, remoteSel, cfg.RemotePool)
+		if err != nil {
+			return nil, err
+		}
+		if w.ChainSelector != 0 {
+			writes = append(writes, w)
+		}
+	}
+	return writes, nil
+}
+
+func maybeAddRemotePoolUSDCTokenPoolV162(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	localPool common.Address,
+	remoteChainSelector uint64,
+	remotePoolPadded []byte,
+) (contract_utils.WriteOutput, error) {
+	poolsRep, err := cldf_ops.ExecuteOperation[contract_utils.FunctionInput[uint64], [][]byte, evm.Chain](
+		b, evm_token_pool.GetRemotePools, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chainSelector,
+			Address:       localPool,
+			Args:          remoteChainSelector,
+		})
+	if err != nil {
+		return contract_utils.WriteOutput{}, fmt.Errorf("getRemotePools on USDCTokenPool v1.6.2 %s for remote %d: %w", localPool.Hex(), remoteChainSelector, err)
+	}
+	if slices.ContainsFunc(poolsRep.Output, func(p []byte) bool { return bytes.Equal(p, remotePoolPadded) }) {
+		return contract_utils.WriteOutput{}, nil
+	}
+	addRep, err := cldf_ops.ExecuteOperation[contract_utils.FunctionInput[usdc_token_pool.AddRemotePoolArgs], contract_utils.WriteOutput, evm.Chain](
+		b, usdc_token_pool.AddRemotePool, chain, contract_utils.FunctionInput[usdc_token_pool.AddRemotePoolArgs]{
+			ChainSelector: chainSelector,
+			Address:       localPool,
+			Args: usdc_token_pool.AddRemotePoolArgs{
+				RemoteChainSelector: remoteChainSelector,
+				RemotePoolAddress:   remotePoolPadded,
+			},
+		})
+	if err != nil {
+		return contract_utils.WriteOutput{}, fmt.Errorf("addRemotePool on USDCTokenPool v1.6.2 %s for remote %d: %w", localPool.Hex(), remoteChainSelector, err)
+	}
+	return addRep.Output, nil
 }
 
 // buildRemoteChainConfigs builds the remote chain config map used by token pools and configure-token-for-transfers.
