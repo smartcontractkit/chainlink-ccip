@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
@@ -33,21 +32,21 @@ var (
 		"evm-deploy-chain-contracts",
 		semver.MustParse("2.0.0"),
 		"Wraps the EVM DeployChainContracts sequence with chain-agnostic input conversion",
-		func(b cldf_ops.Bundle, chains chain.BlockChains, input ccvadapters.DeployChainContractsInput) (seq_core.OnChainOutput, error) {
+		func(b cldf_ops.Bundle, chains chain.BlockChains, input ccvadapters.DeployChainContractsInput) (ccvadapters.DeployChainContractsOutput, error) {
 			evmChains := chains.EVMChains()
 			evmChain, ok := evmChains[input.ChainSelector]
 			if !ok {
-				return seq_core.OnChainOutput{}, fmt.Errorf("EVM chain not found for selector %d", input.ChainSelector)
+				return ccvadapters.DeployChainContractsOutput{}, fmt.Errorf("EVM chain not found for selector %d", input.ChainSelector)
 			}
 
 			evmInput, err := toEVMDeployInput(input)
 			if err != nil {
-				return seq_core.OnChainOutput{}, fmt.Errorf("failed to convert deploy input to EVM types: %w", err)
+				return ccvadapters.DeployChainContractsOutput{}, fmt.Errorf("failed to convert deploy input to EVM types: %w", err)
 			}
 
 			report, err := cldf_ops.ExecuteSequence(b, sequences.DeployChainContracts, evmChain, evmInput)
 			if err != nil {
-				return seq_core.OnChainOutput{}, fmt.Errorf("failed to execute EVM deploy chain contracts sequence: %w", err)
+				return ccvadapters.DeployChainContractsOutput{}, fmt.Errorf("failed to execute EVM deploy chain contracts sequence: %w", err)
 			}
 
 			return report.Output, nil
@@ -80,7 +79,7 @@ func (a *EVMDeployChainContractsAdapter) SetContractParamsFromImportedConfig() *
 	return importConfigForDeployContracts
 }
 
-func (a *EVMDeployChainContractsAdapter) DeployChainContracts() *cldf_ops.Sequence[ccvadapters.DeployChainContractsInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (a *EVMDeployChainContractsAdapter) DeployChainContracts() *cldf_ops.Sequence[ccvadapters.DeployChainContractsInput, ccvadapters.DeployChainContractsOutput, chain.BlockChains] {
 	return evmDeployChainContracts
 }
 
