@@ -93,6 +93,38 @@ jobs:
           git add --all
           git diff --minimal --color --cached --exit-code
 
+  native-compile-check:
+    name: Native Compilation Required Check
+    runs-on: ubuntu-latest
+    needs: [native-compile]
+    if: always()
+    steps:
+      - name: Check native-compile result
+        run: |
+          result="${{ needs.native-compile.result }}"
+          if [[ "$result" == "success" || "$result" == "skipped" ]]; then
+            echo "Native compilation passed or was skipped"
+          else
+            echo "::error::Native compilation did not succeed (result: $result)"
+            exit 1
+          fi
+
+  lint-check:
+    name: Solidity Lint Required Check
+    runs-on: ubuntu-latest
+    needs: [lint]
+    if: always()
+    steps:
+      - name: Check lint result
+        run: |
+          result="${{ needs.lint.result }}"
+          if [[ "$result" == "success" || "$result" == "skipped" ]]; then
+            echo "Solidity lint passed or was skipped"
+          else
+            echo "::error::Solidity lint did not succeed (result: $result)"
+            exit 1
+          fi
+
   # The if statements for steps after checkout repo is a workaround for
   # passing required check for PRs that don't have filtered changes.
   lint:

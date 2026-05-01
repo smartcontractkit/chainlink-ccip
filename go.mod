@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip
 
-go 1.25.3
+go 1.25.7
 
 require (
 	github.com/deckarep/golang-set/v2 v2.8.0

@@ -34,6 +34,9 @@ func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry) deployment.C
 		if cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
+		if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+			return fmt.Errorf("topology validation failed: %w", err)
+		}
 
 		if cfg.Topology.NOPTopology == nil || len(cfg.Topology.NOPTopology.NOPs) == 0 {
 			return fmt.Errorf("NOP topology with at least one NOP is required")

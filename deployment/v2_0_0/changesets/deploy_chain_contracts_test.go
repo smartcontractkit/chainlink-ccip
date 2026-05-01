@@ -80,23 +80,25 @@ func (m *mockDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequ
 		})
 }
 
-func (m *mockDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (m *mockDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, adapters.DeployChainContractsOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"mock-deploy-chain-contracts",
 		semver.MustParse("2.0.0"),
 		"Mock deploy sequence for testing",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (sequences.OnChainOutput, error) {
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (adapters.DeployChainContractsOutput, error) {
 			if m.errByChain != nil {
 				if err, ok := m.errByChain[input.ChainSelector]; ok {
-					return sequences.OnChainOutput{}, err
+					return adapters.DeployChainContractsOutput{}, err
 				}
 			}
 			if m.outputByChain != nil {
 				if out, ok := m.outputByChain[input.ChainSelector]; ok {
-					return out, nil
+					return adapters.DeployChainContractsOutput{
+						OnChainOutput: out,
+					}, nil
 				}
 			}
-			return sequences.OnChainOutput{}, nil
+			return adapters.DeployChainContractsOutput{}, nil
 		},
 	)
 }
@@ -155,6 +157,7 @@ func newDeployTestTopology(chainSelectors ...uint64) *offchain.EnvironmentTopolo
 func newDefaultPerChainCfg() changesets.DeployChainContractsPerChainCfg {
 	return changesets.DeployChainContractsPerChainCfg{
 		DeployerContract: "0x0000000000000000000000000000000000001234",
+		DeployerKeyOwned: true,
 	}
 }
 
@@ -456,14 +459,14 @@ func (c *capturingDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops
 
 var _ adapters.DeployChainContractsAdapter = (*capturingDeployAdapter)(nil)
 
-func (c *capturingDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (c *capturingDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, adapters.DeployChainContractsOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"capturing-deploy",
 		semver.MustParse("2.0.0"),
 		"Captures inputs for testing",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (sequences.OnChainOutput, error) {
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (adapters.DeployChainContractsOutput, error) {
 			*c.captured = append(*c.captured, input)
-			return sequences.OnChainOutput{}, nil
+			return adapters.DeployChainContractsOutput{}, nil
 		},
 	)
 }

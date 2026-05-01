@@ -71,7 +71,15 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 		if offRamp.OffRamp == (common.Address{}) {
 			continue
 		}
-		remoteChains[offRamp.SourceChainSelector] = struct{}{}
+		supported, err := routerC.IsChainSupported(&bind.CallOpts{
+			Context: e.GetContext(),
+		}, offRamp.SourceChainSelector)
+		if err != nil {
+			return nil, nil, err
+		}
+		if supported {
+			remoteChains[offRamp.SourceChainSelector] = struct{}{}
+		}
 	}
 	versions := make(map[string]*semver.Version)
 	laneVersionForRemoteChain := make(map[uint64]*semver.Version)

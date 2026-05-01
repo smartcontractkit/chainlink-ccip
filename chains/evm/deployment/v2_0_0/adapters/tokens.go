@@ -21,6 +21,7 @@ import (
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -448,6 +449,10 @@ func (p *poolOpsV200) SetRateLimiterConfig(_ cldf_ops.Bundle, _ evm.Chain, _ com
 	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimiterConfig: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
 }
 
+func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (contract.WriteOutput, error) {
+	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimitAdmin: not used; v2.0.0 adapter overrides SetRateLimitAdmin")
+}
+
 func (p *poolOpsV200) Version() *semver.Version {
 	return cciputils.Version_2_0_0
 }
@@ -464,5 +469,7 @@ func isLockReleasePoolType(poolType deployment.ContractType) bool {
 }
 
 func isBurnMintTokenType(typ datastore.ContractType) bool {
-	return typ.String() == bnmOps.ContractType.String() || typ.String() == bnmDripOps.ContractType.String()
+	return typ.String() == bnmOps.ContractType.String() ||
+		typ.String() == bnmDripOps.ContractType.String() ||
+		typ.String() == bnmDripOps150.ContractType.String()
 }
