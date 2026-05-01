@@ -311,7 +311,19 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			if err != nil {
 				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
 			}
-
+			supportedChains, err := tokenPoolC.GetSupportedChains(&bind.CallOpts{
+				Context: grpCtx,
+			})
+			// if GetSupportedChains fails move to IsSupportedChain to check if the pool supports the remote chain,
+			// this is to handle the case where pools might not have GetSupportedChains implemented
+			if err == nil {
+				for _, supportedChain := range supportedChains {
+					mu.Lock()
+					tokensPerRemoteChain[supportedChain] = append(tokensPerRemoteChain[supportedChain], tokenAddr)
+					mu.Unlock()
+				}
+				return nil
+			}
 			// Cache the token address per pool so we only fetch it once, and
 			// track when certain pool methods appear to be unsupported so we
 			// can avoid repeated failed calls and warning spam.
