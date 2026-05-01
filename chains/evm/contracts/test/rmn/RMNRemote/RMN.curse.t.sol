@@ -71,11 +71,31 @@ contract RMNRemote_curse is RMNRemoteSetup {
     assertTrue(s_rmn.isCursed(CURSE_SUBJ_2));
   }
 
-  function test_RevertWhen_curse_AlreadyCursed_duplicateSubject() public {
-    s_curseSubjects.push(CURSE_SUBJ_1);
+  function test_curse_SkipsAlreadyCursedSubjects_AppliesRemainingInBatch() public {
+    s_rmn.curse(CURSE_SUBJ_1);
 
-    vm.expectRevert(abi.encodeWithSelector(RMN.AlreadyCursed.selector, CURSE_SUBJ_1));
+    bytes16[] memory batch = new bytes16[](3);
+    batch[0] = CURSE_SUBJ_1;
+    batch[1] = CURSE_SUBJ_2;
+    batch[2] = CURSE_SUBJ_1;
+
+    bytes16[] memory expectedEmit = new bytes16[](1);
+    expectedEmit[0] = CURSE_SUBJ_2;
+
+    vm.expectEmit();
+    emit RMN.Cursed(expectedEmit);
+    s_rmn.curse(batch);
+
+    assertTrue(s_rmn.isCursed(CURSE_SUBJ_1));
+    assertTrue(s_rmn.isCursed(CURSE_SUBJ_2));
+  }
+
+  function test_curse_NoEventWhenAllSubjectsAlreadyCursed() public {
     s_rmn.curse(s_curseSubjects);
+
+    vm.recordLogs();
+    s_rmn.curse(s_curseSubjects);
+    assertEq(vm.getRecordedLogs().length, 0);
   }
 
   function test_RevertWhen_curse_calledByNonOwner() public {

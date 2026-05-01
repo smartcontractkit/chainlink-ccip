@@ -16,7 +16,6 @@ bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
   using EnumerableSet for EnumerableSet.Bytes16Set;
 
-  error AlreadyCursed(bytes16 subject);
   error NotCursed(bytes16 subject);
 
   event Cursed(bytes16[] subjects);
@@ -45,9 +44,9 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
     curse(subjects);
   }
 
-  /// @notice Curse an array of subjects.
+  /// @notice Curse an array of subjects. Already-cursed subjects (including duplicates within the array) are silently
+  /// skipped so that a single redundant entry does not block the remaining subjects from being cursed.
   /// @param subjects the subjects to curse.
-  /// @dev reverts if any of the subjects are already cursed or if there is a duplicate.
   function curse(
     bytes16[] memory subjects
   ) public {
@@ -56,12 +55,20 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
     if (msg.sender != owner()) {
       _validateCaller();
     }
+    // Pre-allocate scratch space equal to the input length; track how many were actually new.
+    bytes16[] memory newSubjects = new bytes16[](subjects.length);
+    uint256 count = 0;
     for (uint256 i = 0; i < subjects.length; ++i) {
-      if (!s_cursedSubjects.add(subjects[i])) {
-        revert AlreadyCursed(subjects[i]);
+      if (s_cursedSubjects.add(subjects[i])) {
+        newSubjects[count++] = subjects[i];
       }
     }
-    emit Cursed(subjects);
+    if (count == 0) return;
+    // Truncate the memory array to the number of newly cursed subjects before emitting
+    assembly {
+      mstore(newSubjects, count)
+    }
+    emit Cursed(newSubjects);
   }
 
   /// @notice Uncurse a single subject.
