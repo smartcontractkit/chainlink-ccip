@@ -19,6 +19,7 @@ import (
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	bnmERC677Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -215,14 +216,20 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 						return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero")
 					}
 
-					grantReport, grantErr := cldf_ops.ExecuteOperation(b,
-						bnmOps.GrantMintAndBurnRoles, evmChain,
-						contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       common.HexToAddress(tokenAddr),
-							Args:          poolAddr,
-						},
-					)
+					grantInput := contract.FunctionInput[common.Address]{
+						ChainSelector: input.ChainSelector,
+						Address:       common.HexToAddress(tokenAddr),
+						Args:          poolAddr,
+					}
+					var grantReport cldf_ops.Report[contract.FunctionInput[common.Address], contract.WriteOutput]
+					var grantErr error
+					if isBurnMintERC677TokenType(toknRef.Type) {
+						grantReport, grantErr = cldf_ops.ExecuteOperation(b,
+							bnmERC677Ops.GrantMintAndBurnRoles, evmChain, grantInput)
+					} else {
+						grantReport, grantErr = cldf_ops.ExecuteOperation(b,
+							bnmOps.GrantMintAndBurnRoles, evmChain, grantInput)
+					}
 					if grantErr != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
 					}
@@ -471,5 +478,11 @@ func isLockReleasePoolType(poolType deployment.ContractType) bool {
 func isBurnMintTokenType(typ datastore.ContractType) bool {
 	return typ.String() == bnmOps.ContractType.String() ||
 		typ.String() == bnmDripOps.ContractType.String() ||
-		typ.String() == bnmDripOps150.ContractType.String()
+		typ.String() == bnmDripOps150.ContractType.String() ||
+		isBurnMintERC677TokenType(typ)
+}
+
+func isBurnMintERC677TokenType(typ datastore.ContractType) bool {
+	return typ.String() == cciputils.BurnMintToken.String() ||
+		typ.String() == cciputils.ERC677TokenHelper.String()
 }
