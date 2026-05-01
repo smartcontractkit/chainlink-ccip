@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -318,9 +319,11 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			// this is to handle the case where pools might not have GetSupportedChains implemented
 			if err == nil {
 				for _, supportedChain := range supportedChains {
-					mu.Lock()
-					tokensPerRemoteChain[supportedChain] = append(tokensPerRemoteChain[supportedChain], tokenAddr)
-					mu.Unlock()
+					if slices.Contains(remoteChains, supportedChain) {
+						mu.Lock()
+						tokensPerRemoteChain[supportedChain] = append(tokensPerRemoteChain[supportedChain], tokenAddr)
+						mu.Unlock()
+					}
 				}
 				return nil
 			}
