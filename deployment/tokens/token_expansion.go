@@ -48,8 +48,10 @@ type DeployTokenInput struct {
 	// Customer admin who will be granted admin rights on the token
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
 	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`
-	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
+	// CCIPAdmin is the address to be set as the CCIP admin on the token contract, defaults to the timelock address. Only applicable for EVM BnM ERC20 tokens.
 	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
+	// Currency is the TIP20 token currency. This field is only applicable for TIP20 tokens on Tempo. If this field is empty, then a sensible default will be chosen.
+	Currency string `yaml:"currency" json:"currency"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
