@@ -1,9 +1,12 @@
 package adapters
 
 import (
+	"strings"
+
 	"github.com/Masterminds/semver/v3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	cctpthroughccvtokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
@@ -43,10 +46,23 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+
+	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
+	"github.com/smartcontractkit/chainlink-ccv/deployment/shared"
 )
 
 func init() {
 	v := semver.MustParse("2.0.0")
+
+	// EVM chain-type and address registration for the ccv deployment layer.
+	shared.RegisterChainTypeFamily(nodev1.ChainType_CHAIN_TYPE_EVM, chainsel.FamilyEVM)
+	shared.RegisterAddressNormalizer(chainsel.FamilyEVM, func(addr string) string {
+		lower := strings.ToLower(addr)
+		if !strings.HasPrefix(lower, "0x") {
+			return "0x" + lower
+		}
+		return lower
+	})
 
 	// CCIP deployment registrations
 	evmAdapter := evmseqV1_6.EVMAdapter{}
@@ -73,6 +89,16 @@ func init() {
 
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
 	ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyEVM, &ChainFamilyAdapter{})
+
+	// Register all EVM ccv adapter implementations into the ccv singleton registry.
+	ccvdeploymentadapters.GetRegistry().Register(chainsel.FamilyEVM, ccvdeploymentadapters.ChainAdapters{
+		Aggregator:               &EVMCCVAggregatorConfigAdapter{},
+		Executor:                 &EVMCCVExecutorConfigAdapter{},
+		Verifier:                 &EVMCCVVerifierConfigAdapter{},
+		Indexer:                  &EVMCCVIndexerConfigAdapter{},
+		TokenVerifier:            &EVMCCVTokenVerifierConfigAdapter{},
+		CommitteeVerifierOnchain: &EVMCCVCommitteeVerifierOnchainAdapter{},
+	})
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
 	ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyEVM, &EVMExecutorConfigAdapter{})
 	ccvadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyEVM, &EVMVerifierJobConfigAdapter{})

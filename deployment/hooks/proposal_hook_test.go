@@ -273,7 +273,7 @@ func TestGlobalPostProposalCCIPSendHook_Metadata(t *testing.T) {
 	h := GlobalPostProposalCCIPSendHook(domain.NewDomain(t.TempDir(), "test"))
 	require.Equal(t, PostProposalCCIPSendHookName, h.Name)
 	require.Equal(t, cldf_changeset.Abort, h.FailurePolicy)
-	require.Equal(t, 5*time.Minute, h.Timeout)
+	require.Equal(t, 15*time.Minute, h.Timeout)
 	require.NotNil(t, h.Func)
 }
 
@@ -435,8 +435,9 @@ func TestRunPostProposalCCIPSends_AdapterVersionError(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "adapter version src")
-	require.ErrorContains(t, err, adapterVersionErr.Error())
+	require.ErrorContains(t, err, "failed lane probes summary")
+	require.ErrorContains(t, err, fmt.Sprintf("src=%d dest=%d feeTokens=[all-supported-fee-tokens]", srcSel, destSel))
+	require.ErrorContains(t, err, "Full error details are logged in the related verify-ccip-send groups")
 }
 
 func TestRunPostProposalCCIPSends_MissingSourceAdapter(t *testing.T) {
@@ -457,9 +458,7 @@ func TestRunPostProposalCCIPSends_MissingSourceAdapter(t *testing.T) {
 	}
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "no test adapter for family evm version")
-	require.ErrorContains(t, err, version.String())
+	require.NoError(t, err)
 }
 
 func TestRunPostProposalCCIPSends_InvalidDestinationSelector(t *testing.T) {
@@ -484,7 +483,7 @@ func TestRunPostProposalCCIPSends_InvalidDestinationSelector(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "dest selector 0")
+	require.ErrorContains(t, err, "dest=0")
 }
 
 func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
@@ -509,9 +508,7 @@ func TestRunPostProposalCCIPSends_MissingCrossFamilyAdapter(t *testing.T) {
 	}
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "no test adapter for family solana version")
-	require.ErrorContains(t, err, version.String())
+	require.NoError(t, err)
 }
 
 func TestRunPostProposalCCIPSends_ExtraArgsError(t *testing.T) {
@@ -547,8 +544,9 @@ func TestRunPostProposalCCIPSends_ExtraArgsError(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "extra args for src")
-	require.ErrorContains(t, err, extraArgsErr.Error())
+	require.ErrorContains(t, err, "failed lane probes summary")
+	require.ErrorContains(t, err, fmt.Sprintf("src=%d dest=%d feeTokens=[all-supported-fee-tokens]", srcSel, destSel))
+	require.ErrorContains(t, err, "Full error details are logged in the related verify-ccip-send groups")
 }
 
 func TestRunPostProposalCCIPSends_BuildMessageError(t *testing.T) {
@@ -584,8 +582,9 @@ func TestRunPostProposalCCIPSends_BuildMessageError(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "build message src")
-	require.ErrorContains(t, err, buildErr.Error())
+	require.ErrorContains(t, err, "failed lane probes summary")
+	require.ErrorContains(t, err, fmt.Sprintf("src=%d dest=%d feeTokens=[native]", srcSel, destSel))
+	require.ErrorContains(t, err, "Full error details are logged in the related verify-ccip-send groups")
 }
 
 func TestRunPostProposalCCIPSends_SendMessageError(t *testing.T) {
@@ -621,8 +620,9 @@ func TestRunPostProposalCCIPSends_SendMessageError(t *testing.T) {
 
 	err := runWithTestHookEnv(t, chain_selectors.FamilyEVM, provider, []uint64{srcSel})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "CCIP send from")
-	require.ErrorContains(t, err, sendErr.Error())
+	require.ErrorContains(t, err, "failed lane probes summary")
+	require.ErrorContains(t, err, fmt.Sprintf("src=%d dest=%d feeTokens=[native]", srcSel, destSel))
+	require.ErrorContains(t, err, "Full error details are logged in the related verify-ccip-send groups")
 }
 
 func TestRunPostProposalCCIPSends_UsesNativeFeeWhenProviderReturnsNone(t *testing.T) {

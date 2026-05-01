@@ -28,8 +28,8 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
 type SourceDestPair struct {

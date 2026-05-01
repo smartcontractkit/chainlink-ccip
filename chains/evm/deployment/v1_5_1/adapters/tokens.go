@@ -9,16 +9,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
-	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	v1_5_1_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
+	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -178,6 +178,22 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 		})
 	if err != nil {
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.5.1: %w", err)
+	}
+	return report.Output, nil
+}
+
+func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {
+	report, err := cldf_ops.ExecuteOperation(b,
+		tpOps.SetRateLimitAdmin, chain,
+		evm_contract.FunctionInput[tpOps.SetRateLimitAdminArgs]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args: tpOps.SetRateLimitAdminArgs{
+				NewAdmin: newAdmin,
+			},
+		})
+	if err != nil {
+		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
 	}
 	return report.Output, nil
 }

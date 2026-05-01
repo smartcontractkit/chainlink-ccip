@@ -12,6 +12,7 @@ import (
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -34,6 +35,7 @@ type PoolOps interface {
 	GetTokenDecimals(ctx context.Context, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error)
+	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
 
@@ -263,6 +265,10 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			if a.DeployTokenPoolSeq == nil {
 				return sequences.OnChainOutput{}, errors.New("DeployTokenPoolSeq is not set on EVMPoolAdapter")
 			}
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
 			out, err := cldf_ops.ExecuteSequence(b, a.DeployTokenPoolSeq, chains, input)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token pool on chain %d: %w", input.ChainSelector, err)
@@ -287,6 +293,36 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
+			if input.RateLimitAdmin != "" && len(out.Output.Addresses) >= 1 {
+				poolBytes, err := a.AddressRefToBytes(out.Output.Addresses[0])
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+				}
+				poolAddr := common.BytesToAddress(poolBytes)
+				if poolAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero address")
+				}
+
+				rlAdminHex := input.RateLimitAdmin
+				if !common.IsHexAddress(rlAdminHex) {
+					return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
+				}
+				rlAdminAddr := common.HexToAddress(rlAdminHex)
+				if rlAdminAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, errors.New("rate limit admin address cannot be the zero address")
+				}
+
+				output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, rlAdminAddr)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
+				}
+				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
+				}
+				result.BatchOps = append(result.BatchOps, batchOp)
+			}
+
 			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
 			if isPoolTypeBnM && len(out.Output.Addresses) >= 1 {
 				poolRef := out.Output.Addresses[0]
@@ -309,14 +345,9 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenRef.Qualifier)
 				}
 
-				chain, ok := chains.EVMChains()[input.ChainSelector]
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-				}
-
 				writes := []evm_contract.WriteOutput{}
 				switch toknRef.Type.String() {
-				case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String():
+				case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String(), bnmDripOps150.ContractType.String():
 					report, execErr := cldf_ops.ExecuteOperation(b,
 						bnmERC20ops.GrantMintAndBurnRoles, chain,
 						evm_contract.FunctionInput[common.Address]{
@@ -361,9 +392,126 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				}
 			}
 
+			writes, err := tidyTokenRoles(b, chain, input, toknRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token roles: %w", err)
+			}
+			if len(writes) > 0 {
+				batchOp, bErr := evm_contract.NewBatchOperationFromWrites(writes)
+				if bErr != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for token role adjustments: %w", bErr)
+				}
+				result.BatchOps = append(result.BatchOps, batchOp)
+			}
+
 			return result, nil
 		},
 	)
+}
+
+// tidyTokenRoles will grant timelock admin rights on the token and remove
+// the deployer EOA as an admin. If timelock is not found in the datastore
+// (i.e. not deployed/not applicable which can be the case in test cases),
+// then it leaves the deployer account as an admin so the token isn't left
+// without an operator.
+//
+// TODO: we should refactor this such that we follow a token-type adapter
+// pattern thereby avoiding this switch statement altogether.
+func tidyTokenRoles(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	input tokensapi.DeployTokenPoolInput,
+	tokenRef datastore.AddressRef,
+) ([]evm_contract.WriteOutput, error) {
+	timelockRef := datastore_utils.GetAddressRef(
+		input.ExistingDataStore.Addresses().Filter(),
+		input.ChainSelector,
+		cciputils.RBACTimelock,
+		cciputils.Version_1_0_0,
+		cciputils.CLLQualifier,
+	)
+	if datastore_utils.IsAddressRefEmpty(timelockRef) {
+		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin", input.ChainSelector)
+		return nil, nil
+	}
+
+	timelockAddr, err := datastore_utils_evm.ToEVMAddress(timelockRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert timelock ref to EVM address for chain %d: %w", input.ChainSelector, err)
+	}
+
+	tokenAddr, err := datastore_utils_evm.ToEVMAddress(tokenRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
+	}
+
+	switch tokenRef.Type.String() {
+
+	// BnM ERC-20
+	case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String(), bnmDripOps150.ContractType.String():
+		defaultAdminRole, err := cldf_ops.ExecuteOperation(b, bnmERC20ops.GetDefaultAdminRole, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       tokenAddr,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		grantReport, err := cldf_ops.ExecuteOperation(b, bnmERC20ops.GrantAdminRole, chain, evm_contract.FunctionInput[bnmERC20ops.RoleAssignment]{
+			ChainSelector: input.ChainSelector,
+			Address:       tokenAddr,
+			Args: bnmERC20ops.RoleAssignment{
+				Role: defaultAdminRole.Output,
+				To:   timelockAddr,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to grant default admin role to timelock %q for token %q on chain %d: %w", timelockAddr.Hex(), tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		revokeReport, err := cldf_ops.ExecuteOperation(b, bnmERC20ops.RevokeAdminRole, chain, evm_contract.FunctionInput[bnmERC20ops.RoleAssignment]{
+			ChainSelector: input.ChainSelector,
+			Address:       tokenAddr,
+			Args: bnmERC20ops.RoleAssignment{
+				Role: defaultAdminRole.Output,
+				To:   chain.DeployerKey.From,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to revoke default admin role from deployer %q for token %q on chain %d: %w", chain.DeployerKey.From.Hex(), tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		return []evm_contract.WriteOutput{grantReport.Output, revokeReport.Output}, nil
+
+	// TIP-20
+	case tip20ops.ContractType.String():
+		grantReport, err := cldf_ops.ExecuteOperation(b, tip20ops.GrantAdminRole, chain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       tokenAddr,
+			Args:          timelockAddr,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to grant TIP-20 default admin role to timelock %q for token %q on chain %d: %w", timelockAddr.Hex(), tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		revokeReport, err := cldf_ops.ExecuteOperation(b, tip20ops.RevokeAdminRole, chain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       tokenAddr,
+			Args:          chain.DeployerKey.From,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to revoke TIP-20 default admin role from deployer %q for token %q on chain %d: %w", chain.DeployerKey.From.Hex(), tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		return []evm_contract.WriteOutput{grantReport.Output, revokeReport.Output}, nil
+
+	}
+
+	b.Logger.Warnf(
+		"unsupported token type %q for token %q on chain %d; timelock %q is present but admin-role hardening was not applied and deployer may remain token admin",
+		tokenRef.Type.String(),
+		tokenAddr.Hex(),
+		input.ChainSelector,
+		timelockAddr.Hex(),
+	)
+
+	return nil, nil
 }
 
 // GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.

@@ -11,6 +11,22 @@
 - solana: https://docs.anza.xyz/cli/install
 - anchor: https://www.anchor-lang.com/docs/installation
 
+## Environment Setup
+
+Run the setup script to install and configure the required toolchain (Anchor `0.29.0`, Solana CLI `1.17.25`, and `anchor-go`):
+
+```bash
+./scripts/setup-contract-env.sh
+```
+
+The script will:
+1. Verify that `rustc`, `cargo`, and `go` are installed
+2. Install [AVM](https://github.com/coral-xyz/anchor) (Anchor Version Manager) and switch to the required Anchor version
+3. Install the required Solana CLI version
+4. Build and install `anchor-go` from source (with patched dependencies for Go 1.22+ compatibility)
+
+> **Note:** You must have Rust, Cargo, and Go installed beforehand (see [Dependencies](#dependencies)).
+
 ## Development
 
 ```bash

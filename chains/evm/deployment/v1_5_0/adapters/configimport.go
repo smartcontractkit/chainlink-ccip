@@ -17,12 +17,13 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
-	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	sequences1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/sequences"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
@@ -321,8 +322,12 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			for _, remoteChain := range remoteChains {
 				// If we've already determined that IsSupportedChain
 				// is unsupported for this pool, stop checking further chains.
+				// in this case we just add the token as supported to avoid the risk of missing config
 				if isSupportedChainUnsupported {
-					break
+					mu.Lock()
+					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+					mu.Unlock()
+					continue
 				}
 
 				supported, err := tokenPoolC.IsSupportedChain(&bind.CallOpts{
@@ -335,8 +340,13 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 					// spamming warnings for every remote chain.
 					l.Warnf("failed to check if token pool at %s on chain %d supports remote chain %d: %v", poolAddr.String(), chain.Selector, remoteChain, err)
 					isSupportedChainUnsupported = true
-					break
+					// in this case we just add the token as supported to avoid the risk of missing config
+					mu.Lock()
+					tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+					mu.Unlock()
+					continue
 				}
+				// we only skip if we can verify the token is not supported for the remote chain
 				if !supported {
 					continue
 				}

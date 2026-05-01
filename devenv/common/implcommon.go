@@ -87,7 +87,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	// Directory needs to exist at ../contracts/build relative to chainlink-ccip/devenv for TON
 	contractVersion := os.Getenv("DEPLOY_CONTRACT_VERSION")
 	if contractVersion == "" {
-		contractVersion = "054376f21418" // Feb 19, 2026 commit hash
+		contractVersion = "github.com/smartcontractkit/chainlink-ton@contracts/1.6.0" // Feb 19 2026
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},

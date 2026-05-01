@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +23,20 @@ import (
 
 const (
 	postProposalCCIPSendHookName = "verify-ccip-send"
+	allFeeTokensSummaryLabel     = "all-supported-fee-tokens"
+)
+
+type laneFailureKey struct {
+	srcSel  uint64
+	destSel uint64
+}
+
+type groupStatus string
+
+const (
+	groupStatusSuccess groupStatus = "success"
+	groupStatusFailed  groupStatus = "failed"
+	groupStatusSkipped groupStatus = "skipped"
 )
 
 // PostProposalCCIPSendHookName is the hook name for changeset wiring and tests.
@@ -96,7 +113,7 @@ func GlobalPostProposalCCIPSendHook(dom domain.Domain) cldf_changeset.PostPropos
 		HookDefinition: cldf_changeset.HookDefinition{
 			Name:          postProposalCCIPSendHookName,
 			FailurePolicy: cldf_changeset.Abort,
-			Timeout:       5 * time.Minute,
+			Timeout:       15 * time.Minute,
 		},
 		Func: verifyCCIPSend(dom),
 	}
@@ -150,6 +167,7 @@ func runPostProposalCCIPSends(
 		return nil
 	}
 	var errs []error
+	failedLaneFeeTokens := make(map[laneFailureKey]map[string]struct{})
 	// Adapters and provider contracts consume cldf.Environment, so rebuild it from hook inputs.
 	env := cldf.Environment{
 		Name:        hookEnv.Name,
@@ -191,86 +209,217 @@ func runPostProposalCCIPSends(
 		}
 
 		for _, destSel := range dests {
-			adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: adapter version src %d dest %d: %w", srcSel, destSel, err))
-				continue
-			}
-			factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
-			if !ok {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for family %s version %s",
-					family, adapterVer.String()))
-				continue
-			}
+			func(destSel uint64) {
+				destGroup := newBufferedLogGroup("verify-ccip-send: src=%d dest=%d", srcSel, destSel)
+				destStatus := groupStatusSuccess
+				defer func() {
+					destGroup.emit(destStatus)
+				}()
 
-			destFamily, err := chain_selectors.GetSelectorFamily(destSel)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: dest selector %d: %w", destSel, err))
-				continue
-			}
-			var destAdapter testadapters.TestAdapterForFamily
-
-			// if dest sel is not present in env we just load the family specific adapter with the selector, otherwise we load the full adapter with env
-			if !env.BlockChains.Exists(destSel) {
-				destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
-				if !ok {
-					errs = append(errs, fmt.Errorf(
-						"verify-ccip-send: no test adapter for family %s version %s",
-						destFamily, adapterVer.String()))
-					continue
+				adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
+				if err != nil {
+					destGroup.warnf("verify-ccip-send: failed to resolve adapter version src=%d dest=%d: %v", srcSel, destSel, err)
+					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
+					destStatus = groupStatusFailed
+					return
 				}
-				destAdapter = destAdapterFactory(env.DataStore, destSel)
-			} else {
-				if family == destFamily {
-					destAdapter = factory(&env, destSel)
+				destGroup.infof("verify-ccip-send: adapter version for src=%d dest=%d is %s", srcSel, destSel, adapterVer.String())
+
+				factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
+				if !ok {
+					destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter for family %s version %s (src=%d dest=%d)",
+						family, adapterVer.String(), srcSel, destSel)
+					destStatus = groupStatusSkipped
+					return
+				}
+
+				destFamily, err := chain_selectors.GetSelectorFamily(destSel)
+				if err != nil {
+					destGroup.warnf("verify-ccip-send: failed to resolve destination family for dest=%d: %v", destSel, err)
+					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
+					destStatus = groupStatusFailed
+					return
+				}
+				destGroup.infof("verify-ccip-send: destination family for dest=%d is %s", destSel, destFamily)
+
+				var destAdapter testadapters.TestAdapterForFamily
+
+				// if dest sel is not present in env we just load the family specific adapter with the selector, otherwise we load the full adapter with env
+				if !env.BlockChains.Exists(destSel) {
+					destAdapterFactory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapterForFamily(destFamily, adapterVer)
+					if !ok {
+						destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
+							destFamily, adapterVer.String(), srcSel, destSel)
+						destStatus = groupStatusSkipped
+						return
+					}
+					destGroup.infof("verify-ccip-send: destination selector %d not in env; using family-only adapter", destSel)
+					destAdapter = destAdapterFactory(env.DataStore, destSel)
 				} else {
-					// Backward compatibility: fall back to full adapters when available.
-					fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
-					if !hasFullAdapter {
-						errs = append(errs, fmt.Errorf("verify-ccip-send: no test adapter for dest family %s version %s",
-							destFamily, adapterVer.String()))
+					if family == destFamily {
+						destAdapter = factory(&env, destSel)
+					} else {
+						// Backward compatibility: fall back to full adapters when available.
+						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
+						if !hasFullAdapter {
+							destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
+								destFamily, adapterVer.String(), srcSel, destSel)
+							destStatus = groupStatusSkipped
+							return
+						}
+						destGroup.infof("verify-ccip-send: using cross-family full destination adapter for %s", destFamily)
+						destAdapter = fullDestFactory(&env, destSel)
+					}
+				}
+
+				receiver := destAdapter.CCIPReceiver()
+				srcAdapter := factory(&env, srcSel)
+				extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
+				if err != nil {
+					destGroup.warnf("verify-ccip-send: failed to build extra args for src=%d dest=%d: %v", srcSel, destSel, err)
+					addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
+					destStatus = groupStatusFailed
+					return
+				}
+				destGroup.infof("verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
+					srcSel, destSel, len(receiver), len(extraArgs))
+
+				for _, feeTok := range feeTokens {
+					feeTokenLabel := formatFeeTokenLogLabel(feeTok)
+					feeTokenGroup := newBufferedLogGroup(
+						"verify-ccip-send: src=%d dest=%d feeToken=%s",
+						srcSel, destSel, feeTokenLabel,
+					)
+					feeTokenStatus := groupStatusSuccess
+
+					// Send one probe per fee token to verify each available fee payment path.
+					msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
+						DestChainSelector: destSel,
+						Receiver:          receiver,
+						Data:              []byte("hello contract"),
+						FeeToken:          feeTok,
+						ExtraArgs:         extraArgs,
+					})
+					if err != nil {
+						feeTokenGroup.warnf("verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v", srcSel, destSel, feeTok, err)
+						addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
+						feeTokenStatus = groupStatusFailed
+						destStatus = groupStatusFailed
+						destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
 						continue
 					}
-					destAdapter = fullDestFactory(&env, destSel)
-				}
-			}
 
-			receiver := destAdapter.CCIPReceiver()
-
-			srcAdapter := factory(&env, srcSel)
-			extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("verify-ccip-send: extra args for src %d -> dest %d: %w", srcSel, destSel, err))
-				continue
-			}
-
-			for _, feeTok := range feeTokens {
-				// Send one probe per fee token to verify each available fee payment path.
-				msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
-					DestChainSelector: destSel,
-					Receiver:          receiver,
-					Data:              []byte("hello contract"),
-					FeeToken:          feeTok,
-					ExtraArgs:         extraArgs,
-				})
-				if err != nil {
-					errs = append(errs, fmt.Errorf("verify-ccip-send: build message src %d -> dest %d fee %q: %w",
-						srcSel, destSel, feeTok, err))
-					continue
+					feeTokenGroup.infof("verify-ccip-send: sending CCIP verify message from chain %d to chain %d (feeToken=%q)",
+						srcSel, destSel, feeTok)
+					_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
+					if err != nil {
+						feeTokenGroup.warnf("verify-ccip-send: ❌ failed CCIP send src=%d dest=%d fee=%q: %v",
+							srcSel, destSel, feeTok, err)
+						addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
+						feeTokenStatus = groupStatusFailed
+						destStatus = groupStatusFailed
+						destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
+						continue
+					}
+					feeTokenGroup.infof("verify-ccip-send: ✅ successful CCIP send message id %s (src=%d dest=%d fee=%q)",
+						msgID, srcSel, destSel, feeTok)
+					destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
 				}
-				lggr.Infof("verify-ccip-send: sending CCIP verify message from chain %d to chain %d (feeToken=%q)",
-					srcSel, destSel, feeTok)
-				_, msgID, err := srcAdapter.SendMessage(ctx, destSel, msg)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("verify-ccip-send: CCIP send from %d to %d fee %q: %w",
-						srcSel, destSel, feeTok, err))
-					continue
-				}
-				lggr.Infof("verify-ccip-send: Successful CCIP send message id %s (src=%d dest=%d fee=%q)", msgID, srcSel, destSel, feeTok)
-			}
+			}(destSel)
 		}
 	}
+	if len(failedLaneFeeTokens) > 0 {
+		errs = append(errs, fmt.Errorf("verify-ccip-send: failed lane probes summary: %s. Full error details are logged in the related verify-ccip-send groups",
+			buildLaneFailureSummary(failedLaneFeeTokens)))
+	}
 	return errors.Join(errs...)
+}
+
+type bufferedLogGroup struct {
+	title string
+	lines []string
+}
+
+func newBufferedLogGroup(format string, args ...any) *bufferedLogGroup {
+	return &bufferedLogGroup{
+		title: fmt.Sprintf(format, args...),
+		lines: make([]string, 0, 8),
+	}
+}
+
+func (g *bufferedLogGroup) infof(format string, args ...any) {
+	g.lines = append(g.lines, fmt.Sprintf("INFO  %s", fmt.Sprintf(format, args...)))
+}
+
+func (g *bufferedLogGroup) warnf(format string, args ...any) {
+	g.lines = append(g.lines, fmt.Sprintf("WARN  %s", fmt.Sprintf(format, args...)))
+}
+
+func (g *bufferedLogGroup) appendGroup(child *bufferedLogGroup, status groupStatus) {
+	g.lines = append(g.lines, child.render(status)...)
+}
+
+func (g *bufferedLogGroup) emit(status groupStatus) {
+	for _, line := range g.render(status) {
+		fmt.Fprintln(os.Stderr, line)
+	}
+}
+
+func (g *bufferedLogGroup) render(status groupStatus) []string {
+	out := make([]string, 0, len(g.lines)+2)
+	out = append(out, fmt.Sprintf("::group::%s %s", groupStatusMarker(status), g.title))
+	out = append(out, g.lines...)
+	out = append(out, "::endgroup::")
+	return out
+}
+
+func groupStatusMarker(status groupStatus) string {
+	switch status {
+	case groupStatusFailed:
+		return "❌"
+	case groupStatusSkipped:
+		return "⏭️"
+	default:
+		return "✅"
+	}
+}
+
+func formatFeeTokenLogLabel(feeToken string) string {
+	if feeToken == "" {
+		return "native"
+	}
+	return feeToken
+}
+
+func addLaneFailureSummary(failed map[laneFailureKey]map[string]struct{}, srcSel, destSel uint64, feeToken string) {
+	key := laneFailureKey{srcSel: srcSel, destSel: destSel}
+	if _, ok := failed[key]; !ok {
+		failed[key] = make(map[string]struct{})
+	}
+	failed[key][formatFeeTokenLogLabel(feeToken)] = struct{}{}
+}
+
+func buildLaneFailureSummary(failed map[laneFailureKey]map[string]struct{}) string {
+	keys := make([]laneFailureKey, 0, len(failed))
+	for key := range failed {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].srcSel != keys[j].srcSel {
+			return keys[i].srcSel < keys[j].srcSel
+		}
+		return keys[i].destSel < keys[j].destSel
+	})
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		feeTokens := make([]string, 0, len(failed[key]))
+		for feeToken := range failed[key] {
+			feeTokens = append(feeTokens, feeToken)
+		}
+		sort.Strings(feeTokens)
+		parts = append(parts, fmt.Sprintf("src=%d dest=%d feeTokens=[%s]", key.srcSel, key.destSel, strings.Join(feeTokens, ",")))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // groupSelectorsByFamily groups selectors by chain family and drops invalid selectors.

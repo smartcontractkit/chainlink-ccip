@@ -408,7 +408,11 @@ var (
 				})
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
-			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(fqOutput.TokenPrices, lastKnownGasPriceUpdates)
+			inputGasPrices := make(map[uint64]string)
+			if input.AdditionalConfig != nil && len(input.AdditionalConfig.GasPricesPerRemoteChain) > 0 {
+				inputGasPrices = input.AdditionalConfig.GasPricesPerRemoteChain
+			}
+			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(fqOutput.TokenPrices, lastKnownGasPriceUpdates, inputGasPrices)
 			if err != nil {
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates: %w", err)
 			}
@@ -543,7 +547,7 @@ var (
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 					"PriceRegistryImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 			}
-			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(priceRegConfig.TokenPrices, priceRegConfig.GasPrices)
+			lastKnownPriceUpdates, err := GetLastKnownPriceUpdates(priceRegConfig.TokenPrices, priceRegConfig.GasPrices, nil)
 			if err != nil {
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to get last known price updates from price registry config: %w", err)
 			}
@@ -985,7 +989,7 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) BatchedFeeQu
 	}
 }
 
-func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int) (fqops.PriceUpdates, error) {
+func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int, inputPrices map[uint64]string) (fqops.PriceUpdates, error) {
 	var tokenPriceUpdates []fqops.TokenPriceUpdate
 	for token, price := range tokenPrices {
 		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
@@ -1003,6 +1007,19 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 			priceStr := "nil"
 			if price != nil {
 				priceStr = price.String()
+			}
+			// if we are already setting gas prices from user input additional config,
+			// we skip the error and rely on the user provided gas price to be used in the import sequence
+			if _, exist := inputPrices[chainSelector]; exist {
+				continue
+			}
+			family, err := chain_selectors.GetSelectorFamily(chainSelector)
+			if err != nil {
+				return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", chainSelector, err)
+			}
+			if _, exists := staticGasPriceByChainFamily[family]; exists {
+				// if the chain family has a hardcoded static price, we skip the error and rely on that static price to be used in the import sequence
+				continue
 			}
 			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d", priceStr, chainSelector)
 		}

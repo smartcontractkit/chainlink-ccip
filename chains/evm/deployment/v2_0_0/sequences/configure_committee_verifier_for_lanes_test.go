@@ -8,17 +8,17 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
-	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -29,11 +29,11 @@ import (
 func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 	tests := []struct {
 		desc      string
-		makeInput func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput
+		makeInput func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
 				var routerAddress string
 				var committeeVerifier string
 				var committeeVerifierResolver string
@@ -73,7 +73,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 		},
 		{
 			desc: "multiple remote chains",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
 				var routerAddress string
 				var committeeVerifier string
 				var committeeVerifierResolver string
@@ -115,7 +115,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 		},
 		{
 			desc: "with allowlist enabled",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
 				var routerAddress string
 				var committeeVerifier string
 				var committeeVerifierResolver string
@@ -237,11 +237,11 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 	tests := []struct {
 		desc      string
-		makeInput func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsDestInput
+		makeInput func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsDestInput
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
 				var committeeVerifier string
 				var committeeVerifierResolver string
 				for _, addr := range chainReport.Output.Addresses {
@@ -277,7 +277,7 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 		},
 		{
 			desc: "multiple remote chains",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
 				var committeeVerifier string
 				var committeeVerifierResolver string
 				for _, addr := range chainReport.Output.Addresses {
@@ -407,12 +407,12 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContracts(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput
+		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput
 		expectedErr string
 	}{
 		{
 			desc: "no supporting contracts",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
 				var routerAddress string
 				var committeeVerifier string
 				for _, addr := range chainReport.Output.Addresses {
@@ -445,7 +445,7 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 		},
 		{
 			desc: "wrong contract type",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsSourceInput {
 				var routerAddress string
 				var committeeVerifier string
 				for _, addr := range chainReport.Output.Addresses {
@@ -532,12 +532,12 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsDestInput
+		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsDestInput
 		expectedErr string
 	}{
 		{
 			desc: "no supporting contracts",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
 				var committeeVerifier string
 				for _, addr := range chainReport.Output.Addresses {
 					switch addr.Type {
@@ -566,7 +566,7 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 		},
 		{
 			desc: "wrong contract type",
-			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
+			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) sequences.ConfigureCommitteeVerifierAsDestInput {
 				var routerAddress string
 				var committeeVerifier string
 				for _, addr := range chainReport.Output.Addresses {

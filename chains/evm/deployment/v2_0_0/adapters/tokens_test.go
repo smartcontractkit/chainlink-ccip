@@ -39,6 +39,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	drip_v150_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
+
+	drip_v150_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 )
 
 const (
@@ -523,5 +526,149 @@ func TestTokenExpansion(t *testing.T) {
 		hasBurnerRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, burnerRole, poolAddr)
 		require.NoError(t, err)
 		require.True(t, hasBurnerRole, "Token pool should have burner role on the token")
+	}
+}
+
+// TestTokenExpansionPoolOnlyForExistingV150BurnMintToken verifies that when TokenExpansion is
+// called twice — first to deploy a v1.5.0 BurnMintERC20WithDrip token, then a second time with
+// only DeployTokenPoolInput to deploy the pool — burn/mint roles are correctly granted to the
+// pool. This is the production pattern and a regression test for the type-string mismatch
+// ("BurnMintERC20WithDrip" vs "BurnMintERC20WithDripToken") that caused roles to be silently
+// skipped on both the v2.0.0 adapter (isBurnMintTokenType) and the v1.6.1 adapter (EVMPoolAdapter switch).
+func TestTokenExpansionPoolOnlyForExistingV150BurnMintToken(t *testing.T) {
+	chainA := uint64(5009297550715157269) // v2.0.0 adapter
+	chainB := uint64(4949039107694359620) // v1.6.1 adapter
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainA, chainB}),
+	)
+	require.NoError(t, err)
+
+	mcmsRegistry := changesets.GetRegistry()
+	ds := datastore.NewMemoryDataStore()
+
+	for _, chainSel := range []uint64{chainA, chainB} {
+		create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+			ChainSelector:  chainSel,
+			Args: create2_factory.ConstructorArgs{
+				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+			},
+		}, nil)
+		require.NoError(t, err)
+
+		deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+			Cfg: v2_0_0.DeployChainContractsCfg{
+				ChainSel:         chainSel,
+				CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+				Params:           testsetup.CreateBasicContractParams(),
+				DeployerKeyOwned: true,
+			},
+		})
+		require.NoError(t, err)
+		require.NoError(t, ds.Merge(deployChainOut.DataStore.Seal()))
+		e.DataStore = ds.Seal()
+	}
+
+	type adapterCase struct {
+		chainSel         uint64
+		adapterVersion   *semver.Version
+		poolContractType string
+		poolVersion      *semver.Version
+	}
+	cases := []adapterCase{
+		{
+			chainSel:         chainA,
+			adapterVersion:   semver.MustParse("2.0.0"),
+			poolContractType: string(burn_mint_token_pool.ContractType),
+			poolVersion:      burn_mint_token_pool.Version,
+		},
+		{
+			chainSel:         chainB,
+			adapterVersion:   semver.MustParse("1.6.1"),
+			poolContractType: string(burn_mint_token_pool_v1_6_1.ContractType),
+			poolVersion:      burn_mint_token_pool_v1_6_1.Version,
+		},
+	}
+
+	for _, tc := range cases {
+		deployer := e.BlockChains.EVMChains()[tc.chainSel].DeployerKey.From.Hex()
+
+		// Step 1: deploy the v1.5.0 BurnMintERC20WithDrip token via TokenExpansion (no pool).
+		tokenOut, err := tokens.TokenExpansion().Apply(*e, tokens.TokenExpansionInput{
+			ChainAdapterVersion: tc.adapterVersion,
+			MCMS:                mcms.Input{},
+			TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+				tc.chainSel: {
+					TokenPoolVersion:      tc.poolVersion,
+					SkipOwnershipTransfer: true,
+					DeployTokenInput: &tokens.DeployTokenInput{
+						Name:          "TEST Token",
+						Symbol:        "TEST",
+						Type:          drip_v150_ops.ContractType,
+						ExternalAdmin: deployer,
+						CCIPAdmin:     deployer,
+					},
+					DeployTokenPoolInput: nil,
+				},
+			},
+		})
+		require.NoError(t, err, "TokenExpansion token-only should succeed for adapter %s", tc.adapterVersion)
+		require.NoError(t, ds.Merge(tokenOut.DataStore.Seal()))
+		e.DataStore = ds.Seal()
+
+		// Step 2: deploy the pool for the existing token via a second TokenExpansion (no token).
+		poolOut, err := tokens.TokenExpansion().Apply(*e, tokens.TokenExpansionInput{
+			ChainAdapterVersion: tc.adapterVersion,
+			MCMS:                mcms.Input{},
+			TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+				tc.chainSel: {
+					TokenPoolVersion:      tc.poolVersion,
+					SkipOwnershipTransfer: true,
+					DeployTokenInput:      nil,
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						TokenRef: &datastore.AddressRef{
+							Type:      datastore.ContractType(drip_v150_ops.ContractType),
+							Version:   drip_v150_ops.Version,
+							Qualifier: "TEST",
+						},
+						PoolType:           tc.poolContractType,
+						TokenPoolQualifier: "TEST",
+					},
+				},
+			},
+		})
+		require.NoError(t, err, "TokenExpansion pool-only should succeed for adapter %s", tc.adapterVersion)
+		require.NoError(t, ds.Merge(poolOut.DataStore.Seal()))
+		e.DataStore = ds.Seal()
+
+		evmChain := e.BlockChains.EVMChains()[tc.chainSel]
+		e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
+
+		tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: tc.chainSel,
+			Type:          datastore.ContractType(drip_v150_ops.ContractType),
+			Qualifier:     "TEST",
+		}, tc.chainSel, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err)
+
+		poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: tc.chainSel,
+			Type:          datastore.ContractType(tc.poolContractType),
+			Version:       tc.poolVersion,
+			Qualifier:     "TEST",
+		}, tc.chainSel, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err, "deployed pool should be in datastore for adapter %s", tc.adapterVersion)
+
+		tokenContract, err := drip_v150_bindings.NewBurnMintERC20WithDrip(tokenAddr, evmChain.Client)
+		require.NoError(t, err)
+
+		hasMinterRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, drip_v150_ops.MintRole, poolAddr)
+		require.NoError(t, err)
+		require.True(t, hasMinterRole, "pool should have minter role on v1.5.0 BurnMintERC20WithDrip token (adapter %s)", tc.adapterVersion)
+
+		hasBurnerRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, drip_v150_ops.BurnRole, poolAddr)
+		require.NoError(t, err)
+		require.True(t, hasBurnerRole, "pool should have burner role on v1.5.0 BurnMintERC20WithDrip token (adapter %s)", tc.adapterVersion)
 	}
 }

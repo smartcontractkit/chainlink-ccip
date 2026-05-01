@@ -523,6 +523,15 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
+	// Helpful log for operators to know which source chains are being ignored due to being cursed on the destination.
+	if len(curseInfo.CursedSourceChains) > 0 {
+		lggr.Infow(
+			"ignoring some cursed source chains, won't read their messages",
+			"cursedSourceChainsToIgnore", curseInfo.CursedSourceChains,
+			"sourceChainsToRead", sourceChains,
+		)
+	}
+
 	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
 	if err != nil {
 		lggr.Warnw("call to NextSeqNum failed", "err", err)

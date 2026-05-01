@@ -104,6 +104,17 @@ var RevokeAdminRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *bu
 	},
 })
 
+var GetDefaultAdminRole = contract.NewRead(contract.ReadParams[struct{}, [32]byte, *burn_mint_erc20.BurnMintERC20]{
+	Name:         "burn_mint_erc20:get-default-admin-role",
+	Version:      utils.Version_1_0_0,
+	Description:  "Gets the default admin role on BurnMintERC20 token contract",
+	ContractType: ContractType,
+	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	CallContract: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, input struct{}) ([32]byte, error) {
+		return token.DEFAULTADMINROLE(opts)
+	},
+})
+
 var RenounceAdminRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *burn_mint_erc20.BurnMintERC20]{
 	Name:         "burn_mint_erc20:renounce-admin-role",
 	Version:      utils.Version_1_0_0,
