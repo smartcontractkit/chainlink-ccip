@@ -38,8 +38,8 @@ var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 		// Deploy resolver via CREATE2Factory to ensure deterministic addresses.
 		// Fetch and save the expected address of the resolver.
 		expectedAddressReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract_utils.FunctionInput[create2_factory.ComputeAddressArgs]{
-			Address:       input.CREATE2Factory,
-			ChainSelector: chain.Selector,
+			// Address:       input.CREATE2Factory,
+			// ChainSelector: chain.Selector,
 			Args: create2_factory.ComputeAddressArgs{
 				ABI:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.ABI,
 				Bin:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.Bin,
@@ -60,8 +60,8 @@ var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 
 		// Then, actually deploy and transfer ownership of the resolver to the deployer key.
 		deployAndTransferResolverReport, err := cldf_ops.ExecuteOperation(b, create2_factory.CreateAndTransferOwnership, chain, contract_utils.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CREATE2Factory,
+			// ChainSelector: chain.Selector,
+			// Address:       input.CREATE2Factory,
 			Args: create2_factory.CreateAndTransferOwnershipArgs{
 				ComputeAddressArgs: create2_factory.ComputeAddressArgs{
 					ABI:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.ABI,
@@ -79,8 +79,8 @@ var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 
 		// Finally, accept ownership of the resolver
 		acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.AcceptOwnership, chain, contract_utils.FunctionInput[versioned_verifier_resolver.AcceptOwnershipArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(expectedAddressReport.Output.Hex()),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(expectedAddressReport.Output.Hex()),
 			Args: versioned_verifier_resolver.AcceptOwnershipArgs{
 				IsProposedOwner: true,
 			},

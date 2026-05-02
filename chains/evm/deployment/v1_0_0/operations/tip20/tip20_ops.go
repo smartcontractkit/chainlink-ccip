@@ -98,8 +98,8 @@ var Deploy = operations.NewSequence(
 
 		b.Logger.Infof("Validating quote token address: %s", input.QuoteToken.Hex())
 		isQuoteTokenValid, err := operations.ExecuteOperation(b, IsTIP20, chain, contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       factoryAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       factoryAddr,
 			Args:          input.QuoteToken,
 		})
 		if err != nil {
@@ -111,8 +111,8 @@ var Deploy = operations.NewSequence(
 
 		b.Logger.Infof("Deploying TIP20 token: %+v", input)
 		createTokenReport, err := operations.ExecuteOperation(b, CreateToken, chain, contract.FunctionInput[CreateTokenArgs]{
-			ChainSelector: chain.Selector,
-			Address:       factoryAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       factoryAddr,
 			Args: CreateTokenArgs{
 				QuoteToken: input.QuoteToken,
 				Currency:   input.Currency,
@@ -128,8 +128,8 @@ var Deploy = operations.NewSequence(
 
 		b.Logger.Info("Retrieving address of deployed token via factory's getTokenAddress function")
 		tokenAddrReport, err := operations.ExecuteOperation(b, GetTokenAddress, chain, contract.FunctionInput[GetTokenAddressArgs]{
-			ChainSelector: chain.Selector,
-			Address:       factoryAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       factoryAddr,
 			Args: GetTokenAddressArgs{
 				Sender: deployerKey,
 				Salt:   input.Salt,
@@ -168,7 +168,7 @@ var GrantIssuerRole = contract.NewWrite(contract.WriteParams[common.Address, *TI
 	Description:  "Grants ISSUER_ROLE on a TIP-20 token so the account can mint and burn (e.g. a burn-mint pool on Tempo)",
 	ContractType: ContractType,
 	ContractABI:  TIP20TokenABI,
-	NewContract:  NewTIP20Token,
+	// NewContract:  NewTIP20Token,
 	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return token.HasRole(opts, caller, DefaultAdminRole)
 	},
@@ -193,7 +193,7 @@ var GrantAdminRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP
 	Description:  "Grants DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
 	ContractType: ContractType,
 	ContractABI:  TIP20TokenABI,
-	NewContract:  NewTIP20Token,
+	// NewContract:  NewTIP20Token,
 	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return token.HasRole(opts, caller, DefaultAdminRole)
 	},
@@ -214,7 +214,7 @@ var RevokeAdminRole = contract.NewWrite(contract.WriteParams[common.Address, *TI
 	Description:  "Revokes DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
 	ContractType: ContractType,
 	ContractABI:  TIP20TokenABI,
-	NewContract:  NewTIP20Token,
+	// NewContract:  NewTIP20Token,
 	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return token.HasRole(opts, caller, DefaultAdminRole)
 	},

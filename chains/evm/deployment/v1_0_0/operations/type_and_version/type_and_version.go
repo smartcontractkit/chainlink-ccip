@@ -65,7 +65,7 @@ var GetTypeAndVersion = contract.NewRead(contract.ReadParams[struct{}, TypeAndVe
 	Version:      Version,
 	Description:  "Gets the type and version of the contract",
 	ContractType: ContractType,
-	NewContract:  NewTypeAndVersionContract,
+	// NewContract:  NewTypeAndVersionContract,
 	CallContract: func(c *TypeAndVersionContract, opts *bind.CallOpts, args struct{}) (TypeAndVersion, error) {
 		typeAndVersion, err := c.TypeAndVersion(opts)
 		if err != nil {

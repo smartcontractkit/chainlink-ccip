@@ -34,7 +34,7 @@ func TestConfigureCREATE2Factory_Apply(t *testing.T) {
 		create2_factory_ops.Deploy,
 		chain,
 		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *create2_factory_ops.Version),
 			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: initialAllowList,
@@ -175,7 +175,7 @@ func TestConfigureCREATE2Factory_EmptyUpdates(t *testing.T) {
 		create2_factory_ops.Deploy,
 		chain,
 		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *create2_factory_ops.Version),
 			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: []common.Address{chain.DeployerKey.From},

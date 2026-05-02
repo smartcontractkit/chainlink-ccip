@@ -158,8 +158,8 @@ var ConfigurePingPongSequence = operations.NewSequence(
 		paddedDestAddr := common.LeftPadBytes(input.DestPingPongAddr, 32)
 
 		_, err := operations.ExecuteOperation(b, pingpongdapp.SetCounterpart, chain, contract.FunctionInput[pingpongdapp.SetCounterpartArgs]{
-			ChainSelector: input.SourceSelector,
-			Address:       common.BytesToAddress(input.SourcePingPongAddr),
+			// ChainSelector: input.SourceSelector,
+			// Address:       common.BytesToAddress(input.SourcePingPongAddr),
 			Args: pingpongdapp.SetCounterpartArgs{
 				CounterpartChainSelector: input.DestSelector,
 				CounterpartAddress:       paddedDestAddr,

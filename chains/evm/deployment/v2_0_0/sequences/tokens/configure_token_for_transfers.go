@@ -54,8 +54,9 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			tokenAddress = common.HexToAddress(input.TokenAddress)
 		} else {
 			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.TokenPoolAddress),
+				// ChainSelector: input.ChainSelector,
+				// Address:       common.HexToAddress(input.TokenPoolAddress),
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
@@ -75,8 +76,8 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			}
 
 			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, tar_ops.GetTokenConfig, evmChain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       registryAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       registryAddress,
 				Args:          tokenAddress,
 			})
 			if err != nil {
@@ -104,8 +105,8 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 
 		// Validate the pool supports the token
 		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, evmChain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenPoolAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenPoolAddress,
 			Args:          tokenAddress,
 		})
 		if err != nil {
@@ -118,16 +119,17 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		if !input.AllowedFinalityConfig.IsZero() {
 			desiredFinalityConfig := input.AllowedFinalityConfig.Raw()
 			currentAllowedFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       tokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       tokenPoolAddress,
+				Args:          struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
 			}
 			if currentAllowedFinalityReport.Output != desiredFinalityConfig {
 				configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[[4]byte]{
-					ChainSelector: input.ChainSelector,
-					Address:       tokenPoolAddress,
+					// ChainSelector: input.ChainSelector,
+					// Address:       tokenPoolAddress,
 					Args:          desiredFinalityConfig,
 				})
 				if err != nil {
@@ -147,8 +149,9 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 
 		// Get the advanced pool hooks address
 		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, evmChain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenPoolAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenPoolAddress,
+			Args:          struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get advanced pool hooks address from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)

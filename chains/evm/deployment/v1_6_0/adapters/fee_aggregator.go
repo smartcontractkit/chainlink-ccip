@@ -106,17 +106,18 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			}
 			newFeeAggregator := common.HexToAddress(input.FeeAggregator)
 
-			onRampRef, err := a.resolveOnRampRef(e, input)
-			if err != nil {
-				return result, err
-			}
-			onRampAddr := common.HexToAddress(onRampRef.Address)
+			// onRampRef, err := a.resolveOnRampRef(e, input)
+			// if err != nil {
+			// 	return result, err
+			// }
+			// onRampAddr := common.HexToAddress(onRampRef.Address)
 
 			readReport, err := operations.ExecuteOperation(
 				b, onrampops.GetDynamicConfig, evmChain,
 				contract.FunctionInput[struct{}]{
-					ChainSelector: evmChain.Selector,
-					Address:       onRampAddr,
+					// ChainSelector: evmChain.Selector,
+					// Address:       onRampAddr,
+					Args: struct{}{},
 				},
 			)
 			if err != nil {
@@ -129,8 +130,8 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			writeReport, err := operations.ExecuteOperation(
 				b, onrampops.SetDynamicConfig, evmChain,
 				contract.FunctionInput[onrampops.DynamicConfig]{
-					ChainSelector: evmChain.Selector,
-					Address:       onRampAddr,
+					// ChainSelector: evmChain.Selector,
+					// Address:       onRampAddr,
 					Args:          currentCfg,
 				},
 			)

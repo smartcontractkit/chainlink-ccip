@@ -12,11 +12,11 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	proxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	usdcproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -185,9 +185,9 @@ func setFeeAggregatorDirect(
 	report, err := operations.ExecuteOperation(
 		b, op, chain,
 		contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-			Args:          newFeeAggregator,
+			// ChainSelector: chain.Selector,
+			// Address:       addr,
+			Args: newFeeAggregator,
 		},
 	)
 	if err != nil {
@@ -205,8 +205,8 @@ func setFeeAggregatorViaOnRampDynamicConfig(
 	readReport, err := operations.ExecuteOperation(
 		b, onrampops.GetDynamicConfig, chain,
 		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
+			// ChainSelector: chain.Selector,
+			// Address:       addr,
 		},
 	)
 	if err != nil {
@@ -219,9 +219,9 @@ func setFeeAggregatorViaOnRampDynamicConfig(
 	writeReport, err := operations.ExecuteOperation(
 		b, onrampops.SetDynamicConfig, chain,
 		contract.FunctionInput[onrampops.DynamicConfig]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-			Args:          cfg,
+			// ChainSelector: chain.Selector,
+			// Address:       addr,
+			Args: cfg,
 		},
 	)
 	if err != nil {
@@ -239,8 +239,9 @@ func setFeeAggregatorViaExecutorDynamicConfig(
 	readReport, err := operations.ExecuteOperation(
 		b, executorops.GetDynamicConfig, chain,
 		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
+			// ChainSelector: chain.Selector,
+			// Address:       addr,
+			Args: struct{}{},
 		},
 	)
 	if err != nil {
@@ -253,8 +254,8 @@ func setFeeAggregatorViaExecutorDynamicConfig(
 	writeReport, err := operations.ExecuteOperation(
 		b, executorops.SetDynamicConfig, chain,
 		contract.FunctionInput[executorops.DynamicConfig]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
+			// ChainSelector: chain.Selector,
+			// Address:       addr,
 			Args:          cfg,
 		},
 	)

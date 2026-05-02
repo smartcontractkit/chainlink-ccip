@@ -74,8 +74,9 @@ func (p *poolOpsV161) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr comm
 	res, err := cldf_ops.ExecuteOperation(b,
 		tpOpsV1_6_1.GetToken, chain,
 		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       poolAddr,
+			Args: struct{}{},
 		},
 	)
 	if err != nil {
@@ -112,8 +113,8 @@ func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
 		evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       poolAddr,
 			Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
 				OutboundConfig: tpOpsV1_6_1.Config{
 					IsEnabled: outbound.IsEnabled,
@@ -138,8 +139,8 @@ func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOpsV1_6_1.SetRateLimitAdmin, chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       poolAddr,
 			Args:          newAdmin,
 		})
 	if err != nil {

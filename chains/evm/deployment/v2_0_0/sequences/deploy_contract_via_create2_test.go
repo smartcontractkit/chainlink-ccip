@@ -31,7 +31,7 @@ func deployTestCreate2Factory(t *testing.T, e *deployment.Environment) string {
 		chain,
 		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  create2TestChainSel,
+			// ChainSelector:  create2TestChainSel,
 			// Deployer must be in the allow list to call CreateAndTransferOwnership.
 			Args: create2_factory.ConstructorArgs{AllowList: []common.Address{chain.DeployerKey.From}},
 		},

@@ -33,8 +33,8 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, routerops.ApplyRampUpdates, chain, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
 				Args:          input.UpdatesByChain,
 			})
 			if err != nil {

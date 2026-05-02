@@ -46,9 +46,9 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: input.UpdatesByChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampApplyDestChainConfigUpdatesOp on %s: %w", chain, err)
@@ -75,9 +75,9 @@ var (
 			onRampDestConfigs := make(map[uint64]onrampops.GetDestChainConfigResult)
 			for _, remoteChain := range input.RemoteChains {
 				report, err := operations.ExecuteOperation(b, onrampops.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
-					Args:          remoteChain,
+					// ChainSelector: chain.Selector,
+					// Address:       input.Address,
+					Args: remoteChain,
 				})
 				onRampDestConfigs[remoteChain] = report.Output
 				if err != nil {
@@ -85,16 +85,18 @@ var (
 				}
 			}
 			report, err := operations.ExecuteOperation(b, onrampops.GetStaticConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from OnRamp at %s on %s: %w", input.Address.String(), chain, err)
 			}
 			staticConfig := report.Output
 			out, err := operations.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config from OnRamp at %s on %s: %w", input.Address.String(), chain, err)

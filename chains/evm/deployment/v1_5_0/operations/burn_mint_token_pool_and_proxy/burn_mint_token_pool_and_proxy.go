@@ -135,7 +135,7 @@ var GetRemotePool = contract.NewRead(contract.ReadParams[uint64, []byte, *BurnMi
 	Version:      Version,
 	Description:  "Calls getRemotePool on the contract",
 	ContractType: ContractType,
-	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	// NewContract:  NewBurnMintTokenPoolAndProxyContract,
 	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args uint64) ([]byte, error) {
 		return c.GetRemotePool(opts, args)
 	},
@@ -146,7 +146,7 @@ var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uin
 	Version:      Version,
 	Description:  "Calls getCurrentInboundRateLimiterState on the contract",
 	ContractType: ContractType,
-	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	// NewContract:  NewBurnMintTokenPoolAndProxyContract,
 	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args uint64) (TokenBucket, error) {
 		return c.GetCurrentInboundRateLimiterState(opts, args)
 	},
@@ -157,7 +157,7 @@ var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[ui
 	Version:      Version,
 	Description:  "Calls getCurrentOutboundRateLimiterState on the contract",
 	ContractType: ContractType,
-	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	// NewContract:  NewBurnMintTokenPoolAndProxyContract,
 	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args uint64) (TokenBucket, error) {
 		return c.GetCurrentOutboundRateLimiterState(opts, args)
 	},
@@ -168,7 +168,7 @@ var GetPreviousPool = contract.NewRead(contract.ReadParams[struct{}, common.Addr
 	Version:      Version,
 	Description:  "Calls getPreviousPool on the contract",
 	ContractType: ContractType,
-	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	// NewContract:  NewBurnMintTokenPoolAndProxyContract,
 	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetPreviousPool(opts)
 	},

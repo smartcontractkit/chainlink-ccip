@@ -104,7 +104,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		case v1_5_1_burn_mint_token_pool.TypeAndVersion.String():
 			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_5_1_burn_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -121,7 +121,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		case v1_5_1_burn_from_mint_token_pool.TypeAndVersion.String():
 			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_5_1_burn_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -138,7 +138,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		case v1_5_1_burn_to_address_mint_token_pool.TypeAndVersion.String():
 			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_to_address_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_to_address_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_5_1_burn_to_address_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_to_address_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -156,7 +156,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		case v1_5_1_burn_with_from_mint_token_pool.TypeAndVersion.String():
 			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_burn_with_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_burn_with_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_5_1_burn_with_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -173,7 +173,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		case v1_5_1_lock_release_token_pool.TypeAndVersion.String():
 			poolRef, err = contract.MaybeDeployContract(b, v1_5_1_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_5_1_lock_release_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_5_1_lock_release_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: v1_5_1_lock_release_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,

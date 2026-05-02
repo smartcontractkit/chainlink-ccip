@@ -38,8 +38,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
-	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	drip_v150_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
+	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	drip_v150_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 )
@@ -104,7 +104,7 @@ func TestTokenAdapter(t *testing.T) {
 			for _, chainSel := range []uint64{chainA, chainB} {
 				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-					ChainSelector:  chainSel,
+					// ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 					},
@@ -299,12 +299,12 @@ func TestTokenAdapter(t *testing.T) {
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed token ref in datastore")
-				registryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(token_admin_registry.ContractType),
-					Version:       semver.MustParse("1.5.0"),
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
+				// registryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				// 	ChainSelector: chainSel,
+				// 	Type:          datastore.ContractType(token_admin_registry.ContractType),
+				// 	Version:       semver.MustParse("1.5.0"),
+				// }, chainSel, evm_datastore_utils.ToEVMAddress)
+				// require.NoError(t, err, "Failed to find deployed registry ref in datastore")
 				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
@@ -313,17 +313,18 @@ func TestTokenAdapter(t *testing.T) {
 				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
 
 				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       registryAddr,
-					Args:          tokenAddr,
+					// ChainSelector: chainSel,
+					// Address:       registryAddr,
+					Args: tokenAddr,
 				})
 				require.NoError(t, err, "Failed to get token config from token admin registry")
 				require.Equal(t, tokenPoolAddr, tokenConfigReport.Output.TokenPool, "Token pool address in registry should match deployed token pool address")
 				require.Equal(t, evmChain.DeployerKey.From, tokenConfigReport.Output.Administrator, "Deployer should be the admin of the token in the registry")
 
 				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       tokenPoolAddr,
+					// ChainSelector: chainSel,
+					// Address:       tokenPoolAddr,
+					Args: struct{}{},
 				})
 				require.NoError(t, err, "Failed to get supported chains from token pool")
 				require.Len(t, chainSupportReport.Output, 1, "There should be 1 supported remote chain in the token pool")
@@ -338,8 +339,8 @@ func TestTokenAdapter(t *testing.T) {
 				// GetCurrentRateLimiterState is only available in version 2.0.0+
 				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
 					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
-						ChainSelector: chainSel,
-						Address:       tokenPoolAddr,
+						// ChainSelector: chainSel,
+						// Address:       tokenPoolAddr,
 						Args: token_pool.GetCurrentRateLimiterStateArgs{
 							RemoteChainSelector: remoteChainSel,
 						},
@@ -389,7 +390,7 @@ func TestTokenExpansion(t *testing.T) {
 	for _, chainSel := range []uint64{chainA, chainB} {
 		create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
@@ -500,16 +501,18 @@ func TestTokenExpansion(t *testing.T) {
 
 		// Verify token pool points to the correct token
 		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
+			// ChainSelector: chainSel,
+			// Address:       poolAddr,
+			Args: struct{}{},
 		})
 		require.NoError(t, err)
 		require.Equal(t, tokenAddr, getTokenReport.Output, "Token pool should point to the deployed token")
 
 		// Verify token pool decimals
 		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
+			// ChainSelector: chainSel,
+			// Address:       poolAddr,
+			Args: struct{}{},
 		})
 		require.NoError(t, err)
 		require.Equal(t, uint8(18), getDecimalsReport.Output, "Token pool decimals should match token decimals")
@@ -550,7 +553,7 @@ func TestTokenExpansionPoolOnlyForExistingV150BurnMintToken(t *testing.T) {
 	for _, chainSel := range []uint64{chainA, chainB} {
 		create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},

@@ -21,7 +21,7 @@ var ApproveProposalOnly = contract.NewWrite(contract.WriteParams[ApproveArgs, *e
 	Description:     "Approves a spender for ERC20 transfers (proposal-only, never executed directly)",
 	ContractType:    ContractType,
 	ContractABI:     erc20_bindings.ERC20ABI,
-	NewContract:     erc20_bindings.NewERC20,
+	//NewContract:     erc20_bindings.NewERC20,
 	IsAllowedCaller: contract.NoCallersAllowed[*erc20_bindings.ERC20, ApproveArgs],
 	Validate:        validateApproveArgs,
 	CallContract: func(token *erc20_bindings.ERC20, opts *bind.TransactOpts, args ApproveArgs) (*types.Transaction, error) {

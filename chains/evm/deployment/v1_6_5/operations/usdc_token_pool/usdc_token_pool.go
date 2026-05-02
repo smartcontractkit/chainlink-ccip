@@ -176,7 +176,7 @@ var SetDomains = contract.NewWrite(contract.WriteParams[[]DomainUpdate, *USDCTok
 	Description:     "Calls setDomains on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolABI,
-	NewContract:     NewUSDCTokenPoolContract,
+	// NewContract:     NewUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolContract, []DomainUpdate],
 	Validate:        func([]DomainUpdate) error { return nil },
 	CallContract: func(
@@ -193,7 +193,7 @@ var GetDomain = contract.NewRead(contract.ReadParams[uint64, Domain, *USDCTokenP
 	Version:      Version,
 	Description:  "Calls getDomain on the contract",
 	ContractType: ContractType,
-	NewContract:  NewUSDCTokenPoolContract,
+	// NewContract:  NewUSDCTokenPoolContract,
 	CallContract: func(c *USDCTokenPoolContract, opts *bind.CallOpts, args uint64) (Domain, error) {
 		return c.GetDomain(opts, args)
 	},
@@ -205,7 +205,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolABI,
-	NewContract:     NewUSDCTokenPoolContract,
+	// NewContract:     NewUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(
@@ -223,7 +223,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	Description:     "Calls applyChainUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolABI,
-	NewContract:     NewUSDCTokenPoolContract,
+	// NewContract:     NewUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolContract, ApplyChainUpdatesArgs],
 	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
 	CallContract: func(
@@ -241,7 +241,7 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *U
 	Description:     "Calls addRemotePool on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolABI,
-	NewContract:     NewUSDCTokenPoolContract,
+	// NewContract:     NewUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolContract, AddRemotePoolArgs],
 	Validate:        func(AddRemotePoolArgs) error { return nil },
 	CallContract: func(
@@ -259,7 +259,7 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolAr
 	Description:     "Calls removeRemotePool on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolABI,
-	NewContract:     NewUSDCTokenPoolContract,
+	// NewContract:     NewUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolContract, RemoveRemotePoolArgs],
 	Validate:        func(RemoveRemotePoolArgs) error { return nil },
 	CallContract: func(
@@ -277,7 +277,7 @@ var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *
 	Description:     "Calls transferOwnership on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolABI,
-	NewContract:     NewUSDCTokenPoolContract,
+	// NewContract:     NewUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(

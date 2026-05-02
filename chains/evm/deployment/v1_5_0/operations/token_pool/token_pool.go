@@ -17,7 +17,7 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_
 	Version:      Version,
 	Description:  "Gets the local token address for a TokenPool",
 	ContractType: ContractType,
-	NewContract:  token_pool.NewTokenPool,
+	// NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
 		return tokenPool.GetToken(opts)
 	},

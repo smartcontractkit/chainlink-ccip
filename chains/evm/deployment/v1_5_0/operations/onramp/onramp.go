@@ -51,7 +51,7 @@ var OnRampSetTokenTransferFeeConfig = contract.NewWrite(contract.WriteParams[Set
 	Description:     "Sets token transfer fee configs on the OnRamp 1.5.0 contract",
 	ContractType:    ContractType,
 	ContractABI:     evm_2_evm_onramp.EVM2EVMOnRampABI,
-	NewContract:     evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	// NewContract:     evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	IsAllowedCaller: contract.OnlyOwner[*evm_2_evm_onramp.EVM2EVMOnRamp, SetTokenTransferFeeConfigInput],
 	Validate:        func(args SetTokenTransferFeeConfigInput) error { return nil },
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.TransactOpts, args SetTokenTransferFeeConfigInput) (*types.Transaction, error) {
@@ -64,7 +64,7 @@ var OnRampGetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[commo
 	Version:      Version,
 	Description:  "Reads the token transfer fee config from the OnRamp 1.5.0 contract",
 	ContractType: ContractType,
-	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	// NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args common.Address) (evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig, error) {
 		return onRamp.GetTokenTransferFeeConfig(opts, args)
 	},
@@ -75,7 +75,7 @@ var OnRampStaticConfig = contract.NewRead(contract.ReadParams[any, evm_2_evm_onr
 	Version:      Version,
 	Description:  "Reads the static config from the OnRamp 1.5.0 contract",
 	ContractType: ContractType,
-	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	// NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args any) (evm_2_evm_onramp.EVM2EVMOnRampStaticConfig, error) {
 		return onRamp.GetStaticConfig(opts)
 	},
@@ -86,7 +86,7 @@ var OnRampDynamicConfig = contract.NewRead(contract.ReadParams[any, evm_2_evm_on
 	Version:      Version,
 	Description:  "Reads the dynamic config from the OnRamp 1.5.0 contract",
 	ContractType: ContractType,
-	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	// NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args any) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
 		return onRamp.GetDynamicConfig(opts)
 	},
@@ -97,7 +97,7 @@ var OnRampFeeTokenConfig = contract.NewRead(contract.ReadParams[common.Address, 
 	Version:      Version,
 	Description:  "Reads the fee token config for a given token from the OnRamp 1.5.0 contract",
 	ContractType: ContractType,
-	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	// NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args common.Address) (evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig, error) {
 		return onRamp.GetFeeTokenConfig(opts, args)
 	},

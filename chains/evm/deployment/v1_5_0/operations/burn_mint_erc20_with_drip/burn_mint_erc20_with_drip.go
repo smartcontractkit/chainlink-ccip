@@ -51,7 +51,7 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 	Description:  "Grants mint and burn roles on the token to an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
-	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
+	// NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
@@ -67,7 +67,7 @@ var RevokeBurnRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 	Description:  "Revokes the burn role on the token from an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
-	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
+	// NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
@@ -83,7 +83,7 @@ var RevokeMintRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 	Description:  "Revokes the mint role on the token from an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
-	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
+	// NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
@@ -99,7 +99,7 @@ var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *burn_mint_erc20_wit
 	Description:  "Mint tokens to an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
-	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
+	// NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input MintArgs) (bool, error) {
 		return contract.HasRole(opts, [32]byte(MintRole), caller)
 	},

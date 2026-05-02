@@ -206,7 +206,7 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			// Deploy chain
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSel,
+				// ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 				},
@@ -282,7 +282,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	// Deploy chain (includes TokenAdminRegistry)
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
+		// ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
@@ -369,8 +369,8 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	// Verify registration: GetTokenConfig(registry, tokenB) must return pool B as active pool (required for import).
 	// If not set, the framework may not execute RegisterToken's batch in this test env; skip the rest.
 	getCfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, e.BlockChains.EVMChains()[chainSel], contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       registryAddress,
+		// ChainSelector: chainSel,
+		// Address:       registryAddress,
 		Args:          tokenBAddress,
 	})
 	require.NoError(t, err, "GetTokenConfig should not error")
@@ -471,7 +471,7 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	// Deploy chain contracts
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
+		// ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
@@ -540,8 +540,8 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 		token_pool.SetAllowedFinalityConfig,
 		e.BlockChains.EVMChains()[chainSel],
 		contract_utils.FunctionInput[[4]byte]{
-			ChainSelector: chainSel,
-			Address:       tokenPoolAddress,
+			// ChainSelector: chainSel,
+			// Address:       tokenPoolAddress,
 			Args:          finality.Config{BlockDepth: 12}.Raw(),
 		},
 	)

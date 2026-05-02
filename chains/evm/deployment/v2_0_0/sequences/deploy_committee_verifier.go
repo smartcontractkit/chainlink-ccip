@@ -53,7 +53,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract_utils.DeployInput[committee_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
-			ChainSelector:  chain.Selector,
+			// ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
 					FeeAggregator:  input.Params.FeeAggregator,
@@ -72,8 +72,8 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 
 		// Fetch dynamic config on the CommitteeVerifier
 		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(committeeVerifierRef.Address),
 			Args:          struct{}{},
 		})
 		if err != nil {
@@ -91,8 +91,8 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator || desiredAllowlistAdmin != dynamicConfigReport.Output.AllowlistAdmin {
 			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.DynamicConfig]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierRef.Address),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifierRef.Address),
 				Args: committee_verifier.DynamicConfig{
 					AllowlistAdmin: desiredAllowlistAdmin,
 					FeeAggregator:  desiredFeeAggregator,

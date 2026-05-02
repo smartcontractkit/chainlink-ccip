@@ -160,7 +160,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *Ex
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ExecutorABI,
-	NewContract:     NewExecutorContract,
+	//NewContract:     NewExecutorContract,
 	IsAllowedCaller: contract.OnlyOwner[*ExecutorContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
 	CallContract: func(
@@ -178,7 +178,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address,
 	Description:     "Calls withdrawFeeTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ExecutorABI,
-	NewContract:     NewExecutorContract,
+	//NewContract:     NewExecutorContract,
 	IsAllowedCaller: contract.OnlyOwner[*ExecutorContract, []common.Address],
 	Validate:        func([]common.Address) error { return nil },
 	CallContract: func(
@@ -195,7 +195,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewExecutorContract,
+	//NewContract:  NewExecutorContract,
 	CallContract: func(c *ExecutorContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -206,7 +206,7 @@ var GetDestChains = contract.NewRead(contract.ReadParams[struct{}, []RemoteChain
 	Version:      Version,
 	Description:  "Calls getDestChains on the contract",
 	ContractType: ContractType,
-	NewContract:  NewExecutorContract,
+	//NewContract:  NewExecutorContract,
 	CallContract: func(c *ExecutorContract, opts *bind.CallOpts, args struct{}) ([]RemoteChainConfigArgs, error) {
 		return c.GetDestChains(opts)
 	},
@@ -217,7 +217,7 @@ var GetAllowedCCVs = contract.NewRead(contract.ReadParams[struct{}, []common.Add
 	Version:      Version,
 	Description:  "Calls getAllowedCCVs on the contract",
 	ContractType: ContractType,
-	NewContract:  NewExecutorContract,
+	//NewContract:  NewExecutorContract,
 	CallContract: func(c *ExecutorContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllowedCCVs(opts)
 	},
@@ -228,7 +228,7 @@ var GetMaxCCVsPerMessage = contract.NewRead(contract.ReadParams[struct{}, uint8,
 	Version:      Version,
 	Description:  "Calls getMaxCCVsPerMessage on the contract",
 	ContractType: ContractType,
-	NewContract:  NewExecutorContract,
+	//NewContract:  NewExecutorContract,
 	CallContract: func(c *ExecutorContract, opts *bind.CallOpts, args struct{}) (uint8, error) {
 		return c.GetMaxCCVsPerMessage(opts)
 	},
@@ -239,7 +239,7 @@ var GetAllowedFinalityConfig = contract.NewRead(contract.ReadParams[struct{}, [4
 	Version:      Version,
 	Description:  "Calls getAllowedFinalityConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewExecutorContract,
+	//NewContract:  NewExecutorContract,
 	CallContract: func(c *ExecutorContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.GetAllowedFinalityConfig(opts)
 	},

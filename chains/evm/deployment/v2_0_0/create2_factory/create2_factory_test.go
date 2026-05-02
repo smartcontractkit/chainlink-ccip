@@ -80,7 +80,7 @@ func TestCREATE2Factory(t *testing.T) {
 		evmChains[chain1Sel],
 		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chain1Sel,
+			// ChainSelector:  chain1Sel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{evmChains[chain1Sel].DeployerKey.From},
 			},
@@ -109,7 +109,7 @@ func TestCREATE2Factory(t *testing.T) {
 		evmChains[chain2Sel],
 		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chain2Sel,
+			// ChainSelector:  chain2Sel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{prevChain2DeployerKey.From},
 			},
@@ -144,8 +144,8 @@ func TestCREATE2Factory(t *testing.T) {
 		create2_factory.CreateAndTransferOwnership,
 		evmChains[chain1Sel],
 		contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-			ChainSelector: chain1Sel,
-			Address:       common.HexToAddress(factory1Report.Output.Address),
+			// ChainSelector: chain1Sel,
+			// Address:       common.HexToAddress(factory1Report.Output.Address),
 			Args: create2_factory.CreateAndTransferOwnershipArgs{
 				ComputeAddressArgs: create2_factory.ComputeAddressArgs{
 					ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,
@@ -159,8 +159,8 @@ func TestCREATE2Factory(t *testing.T) {
 	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain1")
 
 	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-		ChainSelector: chain2Sel,
-		Address:       common.HexToAddress(factory2Report.Output.Address),
+		// ChainSelector: chain2Sel,
+		// Address:       common.HexToAddress(factory2Report.Output.Address),
 		Args: create2_factory.CreateAndTransferOwnershipArgs{
 			ComputeAddressArgs: create2_factory.ComputeAddressArgs{
 				ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,

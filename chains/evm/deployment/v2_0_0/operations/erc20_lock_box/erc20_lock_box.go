@@ -108,7 +108,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ERC20LockBoxABI,
-	NewContract:     NewERC20LockBoxContract,
+	//NewContract:     NewERC20LockBoxContract,
 	IsAllowedCaller: contract.OnlyOwner[*ERC20LockBoxContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(
@@ -125,7 +125,7 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	Version:      Version,
 	Description:  "Calls getAllAuthorizedCallers on the contract",
 	ContractType: ContractType,
-	NewContract:  NewERC20LockBoxContract,
+	//NewContract:  NewERC20LockBoxContract,
 	CallContract: func(c *ERC20LockBoxContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
 	},
@@ -137,7 +137,7 @@ var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *
 	Description:     "Calls transferOwnership on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ERC20LockBoxABI,
-	NewContract:     NewERC20LockBoxContract,
+	//NewContract:     NewERC20LockBoxContract,
 	IsAllowedCaller: contract.OnlyOwner[*ERC20LockBoxContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(

@@ -139,8 +139,9 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 			// form the curse ID
 			// get config version
 			cfgDetailsOp, err := cldf_ops.ExecuteOperation(b, ops.GetConfigDetails, chain, contract.FunctionInput[any]{
-				Address:       rmnAddr,
-				ChainSelector: chain.Selector,
+				// Address:       rmnAddr,
+				// ChainSelector: chain.Selector,
+				Args: nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get config details for RMN at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
@@ -189,8 +190,8 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 			requests := make([]rmn_contract.RMNOwnerUnvoteToCurseRequest, 0)
 			for _, subject := range in.Subjects {
 				curseProgressRep, err := cldf_ops.ExecuteOperation(b, ops.GetCurseProgress, chain, contract.FunctionInput[api.Subject]{
-					Address:       rmnAddr,
-					ChainSelector: chain.Selector,
+					// Address:       rmnAddr,
+					// ChainSelector: chain.Selector,
 					Args:          subject,
 				})
 				if err != nil {

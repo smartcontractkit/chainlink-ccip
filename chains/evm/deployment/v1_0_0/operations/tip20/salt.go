@@ -22,8 +22,8 @@ func generateValidSalt(b operations.Bundle, chain evm.Chain, factoryAddr common.
 		// NOTE: GetTokenAddress will revert if the salt is already used, so we can
 		// use it to check if the salt is valid without actually deploying a token.
 		_, err := operations.ExecuteOperation(b, GetTokenAddress, chain, contract.FunctionInput[GetTokenAddressArgs]{
-			ChainSelector: chain.Selector,
-			Address:       factoryAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       factoryAddr,
 			Args: GetTokenAddressArgs{
 				Sender: deployer,
 				Salt:   salt,

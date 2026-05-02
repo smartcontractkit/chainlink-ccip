@@ -113,7 +113,7 @@ func TestTransferOwnership(t *testing.T) {
 		wNative := utils.RandomAddress()
 		rmnProxy := utils.RandomAddress()
 		deployRouterOp, err := cldf_ops.ExecuteOperation(env.OperationsBundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
-			ChainSelector:  evmChain.Selector,
+			// ChainSelector:  evmChain.Selector,
 			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
 			Args: routerops1_2.ConstructorArgs{
 				WrappedNative: wNative,

@@ -44,7 +44,7 @@ var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *t
 	Version:      Version,
 	Description:  "Gets the token address managed by the TokenPool 1.5.1 contract",
 	ContractType: ContractType,
-	NewContract:  token_pool.NewTokenPool,
+	// NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return tp.GetToken(opts)
 	},
@@ -56,7 +56,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	Description:     "Applies chain updates to the TokenPool 1.5.1 contract",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
-	NewContract:     token_pool.NewTokenPool,
+	// NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyChainUpdatesArgs],
 	Validate:        func(args ApplyChainUpdatesArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
@@ -70,7 +70,7 @@ var SetChainRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetChainR
 	Description:  "Sets the rate limiter configuration for a remote chain on the TokenPool 1.5.1 contract",
 	ContractType: ContractType,
 	ContractABI:  token_pool.TokenPoolABI,
-	NewContract:  token_pool.NewTokenPool,
+	// NewContract:  token_pool.NewTokenPool,
 	IsAllowedCaller: func(tp *token_pool.TokenPool, opts *bind.CallOpts, caller common.Address, input SetChainRateLimiterConfigArgs) (bool, error) {
 		admin, err := tp.GetRateLimitAdmin(opts)
 		if err != nil {
@@ -97,7 +97,7 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *t
 	Description:     "Adds a remote pool for a given chain selector on the TokenPool 1.5.1 contract",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
-	NewContract:     token_pool.NewTokenPool,
+	// NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, AddRemotePoolArgs],
 	Validate:        func(args AddRemotePoolArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args AddRemotePoolArgs) (*types.Transaction, error) {
@@ -111,7 +111,7 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[SetRateLimitAdmin
 	Description:     "Sets the rate limit admin for the TokenPool 1.5.1 contract",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
-	NewContract:     token_pool.NewTokenPool,
+	// NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, SetRateLimitAdminArgs],
 	Validate:        func(args SetRateLimitAdminArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetRateLimitAdminArgs) (*types.Transaction, error) {

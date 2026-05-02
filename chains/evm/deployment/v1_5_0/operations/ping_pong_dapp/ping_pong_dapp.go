@@ -46,7 +46,7 @@ var SetCounterpart = contract.NewWrite(contract.WriteParams[SetCounterpartArgs, 
 	Description:     "Sets the counterpart chain selector and address for the PingPongDemo contract",
 	ContractType:    ContractType,
 	ContractABI:     ping_pong_demo.PingPongDemoABI,
-	NewContract:     ping_pong_demo.NewPingPongDemo,
+	// NewContract:     ping_pong_demo.NewPingPongDemo,
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartArgs],
 	Validate:        func(SetCounterpartArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartArgs) (*types.Transaction, error) {
@@ -65,7 +65,7 @@ var SetCounterpartChainSelector = contract.NewWrite(contract.WriteParams[SetCoun
 	Description:     "Sets the counterpart chain selector for the PingPongDemo contract",
 	ContractType:    ContractType,
 	ContractABI:     ping_pong_demo.PingPongDemoABI,
-	NewContract:     ping_pong_demo.NewPingPongDemo,
+	// NewContract:     ping_pong_demo.NewPingPongDemo,
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartChainSelectorArgs],
 	Validate:        func(SetCounterpartChainSelectorArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartChainSelectorArgs) (*types.Transaction, error) {
@@ -84,7 +84,7 @@ var SetCounterpartAddress = contract.NewWrite(contract.WriteParams[SetCounterpar
 	Description:     "Sets the counterpart address for the PingPongDemo contract",
 	ContractType:    ContractType,
 	ContractABI:     ping_pong_demo.PingPongDemoABI,
-	NewContract:     ping_pong_demo.NewPingPongDemo,
+	// NewContract:     ping_pong_demo.NewPingPongDemo,
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartAddressArgs],
 	Validate:        func(SetCounterpartAddressArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartAddressArgs) (*types.Transaction, error) {
@@ -103,7 +103,7 @@ var SetPaused = contract.NewWrite(contract.WriteParams[SetPausedArgs, *ping_pong
 	Description:     "Pauses or unpauses the PingPongDemo contract",
 	ContractType:    ContractType,
 	ContractABI:     ping_pong_demo.PingPongDemoABI,
-	NewContract:     ping_pong_demo.NewPingPongDemo,
+	// NewContract:     ping_pong_demo.NewPingPongDemo,
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetPausedArgs],
 	Validate:        func(SetPausedArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetPausedArgs) (*types.Transaction, error) {
@@ -122,7 +122,7 @@ var SetOutOfOrderExecution = contract.NewWrite(contract.WriteParams[SetOutOfOrde
 	Description:     "Enables or disables out of order execution for the PingPongDemo contract",
 	ContractType:    ContractType,
 	ContractABI:     ping_pong_demo.PingPongDemoABI,
-	NewContract:     ping_pong_demo.NewPingPongDemo,
+	// NewContract:     ping_pong_demo.NewPingPongDemo,
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetOutOfOrderExecutionArgs],
 	Validate:        func(SetOutOfOrderExecutionArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetOutOfOrderExecutionArgs) (*types.Transaction, error) {
@@ -139,7 +139,7 @@ var StartPingPong = contract.NewWrite(contract.WriteParams[StartPingPongArgs, *p
 	Description:     "Starts the ping pong messaging loop",
 	ContractType:    ContractType,
 	ContractABI:     ping_pong_demo.PingPongDemoABI,
-	NewContract:     ping_pong_demo.NewPingPongDemo,
+	// NewContract:     ping_pong_demo.NewPingPongDemo,
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, StartPingPongArgs],
 	Validate:        func(StartPingPongArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, _ StartPingPongArgs) (*types.Transaction, error) {

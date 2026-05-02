@@ -47,16 +47,17 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		// Set threshold amount for additional CCVs (if necessary)
 		if input.ThresholdAmountForAdditionalCCVs != nil {
 			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.AdvancedPoolHooks,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.AdvancedPoolHooks,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
 			if currentThresholdAmountReport.Output.Cmp(input.ThresholdAmountForAdditionalCCVs) != 0 {
 				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.AdvancedPoolHooks,
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.AdvancedPoolHooks,
 					Args:          input.ThresholdAmountForAdditionalCCVs,
 				})
 				if err != nil {
@@ -69,8 +70,9 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		// Set dynamic config (if necessary)
 		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
 			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current dynamic config from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -95,8 +97,8 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.TokenPoolAddress,
 					Args: token_pool.SetDynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,

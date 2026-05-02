@@ -227,7 +227,7 @@ func TestDeployTokenPool(t *testing.T) {
 			// Deploy chain
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSel,
+				// ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 				},
@@ -252,7 +252,7 @@ func TestDeployTokenPool(t *testing.T) {
 				burn_mint_erc20_with_drip.Deploy,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-					ChainSelector:  chainSel,
+					// ChainSelector:  chainSel,
 					TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
 					Args: burn_mint_erc20_with_drip.ConstructorArgs{
 						Name:   "Test Token",
@@ -279,7 +279,7 @@ func TestDeployTokenPool(t *testing.T) {
 			require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output")
 
 			poolAddress := poolReport.Output.Addresses[0].Address
-			hooksAddress := poolReport.Output.Addresses[1].Address
+			// hooksAddress := poolReport.Output.Addresses[1].Address
 
 			// Check token
 			getTokenReport, err := operations.ExecuteOperation(
@@ -287,8 +287,9 @@ func TestDeployTokenPool(t *testing.T) {
 				token_pool.GetToken,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolAddress),
+					// ChainSelector: chainSel,
+					// Address:       common.HexToAddress(poolAddress),
+					Args: struct {}{},
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -300,8 +301,9 @@ func TestDeployTokenPool(t *testing.T) {
 				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolAddress),
+					// ChainSelector: chainSel,
+					// Address:       common.HexToAddress(poolAddress),
+					Args: struct{}{},
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -314,8 +316,9 @@ func TestDeployTokenPool(t *testing.T) {
 				token_pool.GetRmnProxy,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolAddress),
+					// ChainSelector: chainSel,
+					// Address:       common.HexToAddress(poolAddress),
+					Args: struct{}{},
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -327,8 +330,9 @@ func TestDeployTokenPool(t *testing.T) {
 				advanced_pool_hooks.GetThresholdAmount,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
+					// ChainSelector: chainSel,
+					// Address:       common.HexToAddress(hooksAddress),
+					Args: struct{}{},
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -341,8 +345,9 @@ func TestDeployTokenPool(t *testing.T) {
 					advanced_pool_hooks.GetPolicyEngine,
 					e.BlockChains.EVMChains()[chainSel],
 					contract.FunctionInput[struct{}]{
-						ChainSelector: chainSel,
-						Address:       common.HexToAddress(hooksAddress),
+						// ChainSelector: chainSel,
+						// Address:       common.HexToAddress(hooksAddress),
+						Args: struct{}{},
 					},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
@@ -355,8 +360,9 @@ func TestDeployTokenPool(t *testing.T) {
 				advanced_pool_hooks.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
+					// ChainSelector: chainSel,
+					// Address:       common.HexToAddress(hooksAddress),
+					Args: struct{}{},
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")

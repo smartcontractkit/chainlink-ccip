@@ -97,7 +97,7 @@ var GetLockBox = contract.NewRead(contract.ReadParams[struct{}, common.Address, 
 	Version:      Version,
 	Description:  "Calls getLockBox on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLockReleaseTokenPoolContract,
+	//NewContract:  NewLockReleaseTokenPoolContract,
 	CallContract: func(c *LockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetLockBox(opts)
 	},

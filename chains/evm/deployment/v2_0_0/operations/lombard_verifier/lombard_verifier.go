@@ -319,7 +319,7 @@ var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Rem
 	Description:     "Calls applyRemoteChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, []RemoteChainConfigArgs],
 	Validate:        func([]RemoteChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -337,7 +337,7 @@ var SetPath = contract.NewWrite(contract.WriteParams[SetPathArgs, *LombardVerifi
 	Description:     "Calls setPath on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, SetPathArgs],
 	Validate:        func(SetPathArgs) error { return nil },
 	CallContract: func(
@@ -355,7 +355,7 @@ var UpdateSupportedTokens = contract.NewWrite(contract.WriteParams[UpdateSupport
 	Description:     "Calls updateSupportedTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, UpdateSupportedTokensArgs],
 	Validate:        func(UpdateSupportedTokensArgs) error { return nil },
 	CallContract: func(
@@ -373,7 +373,7 @@ var SetRemoteAdapters = contract.NewWrite(contract.WriteParams[[]RemoteAdapterAr
 	Description:     "Calls setRemoteAdapters on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, []RemoteAdapterArgs],
 	Validate:        func([]RemoteAdapterArgs) error { return nil },
 	CallContract: func(
@@ -391,7 +391,7 @@ var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *
 	Description:     "Calls setAllowedFinalityConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, [4]byte],
 	Validate:        func([4]byte) error { return nil },
 	CallContract: func(
@@ -409,7 +409,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *Lo
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
 	CallContract: func(
@@ -427,7 +427,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistCo
 	Description:     "Calls applyAllowlistUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, []AllowlistConfigArgs],
 	Validate:        func([]AllowlistConfigArgs) error { return nil },
 	CallContract: func(
@@ -445,7 +445,7 @@ var RemovePaths = contract.NewWrite(contract.WriteParams[[]uint64, *LombardVerif
 	Description:     "Calls removePaths on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, []uint64],
 	Validate:        func([]uint64) error { return nil },
 	CallContract: func(
@@ -463,7 +463,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address,
 	Description:     "Calls withdrawFeeTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardVerifierABI,
-	NewContract:     NewLombardVerifierContract,
+	//NewContract:     NewLombardVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardVerifierContract, []common.Address],
 	Validate:        func([]common.Address) error { return nil },
 	CallContract: func(
@@ -480,7 +480,7 @@ var VersionTag = contract.NewRead(contract.ReadParams[struct{}, [4]byte, *Lombar
 	Version:      Version,
 	Description:  "Calls versionTag on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.VersionTag(opts)
 	},
@@ -491,7 +491,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -502,7 +502,7 @@ var GetPath = contract.NewRead(contract.ReadParams[uint64, Path, *LombardVerifie
 	Version:      Version,
 	Description:  "Calls getPath on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args uint64) (Path, error) {
 		return c.GetPath(opts, args)
 	},
@@ -513,7 +513,7 @@ var GetRemoteAdapter = contract.NewRead(contract.ReadParams[GetRemoteAdapterArgs
 	Version:      Version,
 	Description:  "Calls getRemoteAdapter on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args GetRemoteAdapterArgs) ([32]byte, error) {
 		return c.GetRemoteAdapter(opts, args.RemoteChainSelector, args.Token)
 	},
@@ -524,7 +524,7 @@ var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, GetRemot
 	Version:      Version,
 	Description:  "Calls getRemoteChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
 		return c.GetRemoteChainConfig(opts, args)
 	},
@@ -535,7 +535,7 @@ var GetStorageLocations = contract.NewRead(contract.ReadParams[struct{}, []strin
 	Version:      Version,
 	Description:  "Calls getStorageLocations on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args struct{}) ([]string, error) {
 		return c.GetStorageLocations(opts)
 	},
@@ -546,7 +546,7 @@ var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64
 	Version:      Version,
 	Description:  "Calls getSupportedChains on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
 		return c.GetSupportedChains(opts)
 	},
@@ -557,7 +557,7 @@ var GetSupportedTokens = contract.NewRead(contract.ReadParams[struct{}, []common
 	Version:      Version,
 	Description:  "Calls getSupportedTokens on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetSupportedTokens(opts)
 	},
@@ -568,7 +568,7 @@ var IsSupportedToken = contract.NewRead(contract.ReadParams[common.Address, bool
 	Version:      Version,
 	Description:  "Calls isSupportedToken on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args common.Address) (bool, error) {
 		return c.IsSupportedToken(opts, args)
 	},
@@ -579,7 +579,7 @@ var GetFee = contract.NewRead(contract.ReadParams[GetFeeArgs, GetFeeResult, *Lom
 	Version:      Version,
 	Description:  "Calls getFee on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardVerifierContract,
+	//NewContract:  NewLombardVerifierContract,
 	CallContract: func(c *LombardVerifierContract, opts *bind.CallOpts, args GetFeeArgs) (GetFeeResult, error) {
 		return c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
 	},

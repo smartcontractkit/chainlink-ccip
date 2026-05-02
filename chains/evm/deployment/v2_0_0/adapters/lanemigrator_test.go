@@ -53,7 +53,7 @@ func TestLaneMigrator(t *testing.T) {
 			for _, chainSel := range []uint64{chainA, chainB} {
 				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-					ChainSelector:  chainSel,
+					// ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 					},
@@ -136,16 +136,16 @@ func TestLaneMigrator(t *testing.T) {
 				SourceChainSelector: chainB,
 				OffRamp:             offRampAddr,
 			})
-			feeQuoterAddr, err := datastore_utils.FindAndFormatRef(
-				e.DataStore,
-				datastore.AddressRef{
-					Type:    datastore.ContractType(fee_quoter.ContractType),
-					Version: fee_quoter.Version,
-				}, chainA, evm_datastore_utils.ToEVMAddress)
-			require.NoError(t, err)
+			// feeQuoterAddr, err := datastore_utils.FindAndFormatRef(
+			// 	e.DataStore,
+			// 	datastore.AddressRef{
+			// 		Type:    datastore.ContractType(fee_quoter.ContractType),
+			// 		Version: fee_quoter.Version,
+			// 	}, chainA, evm_datastore_utils.ToEVMAddress)
+			// require.NoError(t, err)
 			opOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fee_quoter.GetDestChainConfig, evmChain1, contract_utils.FunctionInput[uint64]{
-				ChainSelector: chainA,
-				Address:       feeQuoterAddr,
+				// ChainSelector: chainA,
+				// Address:       feeQuoterAddr,
 				Args:          chainB,
 			})
 			require.NoError(t, err)

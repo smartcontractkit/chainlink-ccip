@@ -76,8 +76,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		if !input.AllowOnrampOverride {
 			for remoteSelector := range input.RemoteChains {
 				existing, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       routerAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       routerAddr,
 					Args:          remoteSelector,
 				})
 				if err != nil {
@@ -128,8 +128,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 			if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas != nil {
 				gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       feeQuoterAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       feeQuoterAddr,
 					Args:          remoteSelector,
 				})
 				if err != nil {
@@ -146,8 +146,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// Router OnRamp: only add if the router doesn't already point to our OnRamp
 			// for this destination.
 			onRampAddrReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       routerAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       routerAddr,
 				Args:          remoteSelector,
 			})
 			if err != nil {
@@ -172,8 +172,9 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// proxies may point to the same implementation.
 			defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
 			getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       defaultExecutor,
+				// ChainSelector: chain.Selector,
+				// Address:       defaultExecutor,
+				Args:          struct{}{},
 			})
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
@@ -222,8 +223,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// Each block only emits a write when there are actual changes to apply.
 		if len(offRampArgs) > 0 {
 			offRampReport, err := cldf_ops.ExecuteOperation(b, offramp.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       offRampAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       offRampAddr,
 				Args:          offRampArgs,
 			})
 			if err != nil {
@@ -234,8 +235,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		if len(onRampArgs) > 0 {
 			onRampReport, err := cldf_ops.ExecuteOperation(b, onramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       onRampAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       onRampAddr,
 				Args:          onRampArgs,
 			})
 			if err != nil {
@@ -249,8 +250,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				continue
 			}
 			executorReport, err := cldf_ops.ExecuteOperation(b, ExecutorApplyDestChainUpdates, chain, contract.FunctionInput[ExecutorApplyDestChainUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       executorAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       executorAddr,
 				Args: ExecutorApplyDestChainUpdatesArgs{
 					DestChainSelectorsToAdd: toAdd,
 				},
@@ -263,8 +264,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		if len(feeQuoterArgs) > 0 {
 			feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       feeQuoterAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       feeQuoterAddr,
 				Args:          feeQuoterArgs,
 			})
 			if err != nil {
@@ -277,8 +278,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// so they must be applied via FeeQuoter.UpdatePrices.
 		if len(gasPriceUpdates) > 0 {
 			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       feeQuoterAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       feeQuoterAddr,
 				Args: fee_quoter.PriceUpdates{
 					GasPriceUpdates: gasPriceUpdates,
 				},
@@ -319,8 +320,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		if len(onRampAdds) > 0 || len(offRampAdds) > 0 {
 			routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       routerAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       routerAddr,
 				Args: router.ApplyRampsUpdatesArgs{
 					OnRampUpdates:  onRampAdds,
 					OffRampRemoves: []router.OffRamp{},
@@ -367,8 +368,8 @@ func maybeAddSourceChainConfigArgOnLocalChain(
 
 	offRampAddr := common.BytesToAddress(input.OffRamp)
 	currentReport, err := cldf_ops.ExecuteOperation(b, offramp.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       offRampAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       offRampAddr,
 		Args:          remoteSelector,
 	})
 	if err != nil {
@@ -443,8 +444,8 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 		OffRamp:                   remoteConfig.OffRamp,
 	}
 	currentReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       onRampAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       onRampAddr,
 		Args:          remoteSelector,
 	})
 	if err != nil {
@@ -590,7 +591,7 @@ func configureCommitteeVerifierAsSource(
 	chainSelector uint64,
 	cv changesetadapters.CommitteeVerifierConfig[datastore.AddressRef],
 ) ([]contract.WriteOutput, error) {
-	cvAddr, resolverAddr, err := extractCommitteeVerifierAddresses(cv.CommitteeVerifier, chainSelector)
+	cvAddr, _, err := extractCommitteeVerifierAddresses(cv.CommitteeVerifier, chainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -608,8 +609,8 @@ func configureCommitteeVerifierAsSource(
 			PayloadSizeBytes:    remoteConfig.PayloadSizeBytes,
 		}
 		currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(cvAddr),
 			Args:          remoteSelector,
 		})
 		if err != nil {
@@ -621,8 +622,8 @@ func configureCommitteeVerifierAsSource(
 			remoteChainConfigArgs = append(remoteChainConfigArgs, desired)
 		} else {
 			getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(cvAddr),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(cvAddr),
 				Args: committee_verifier.GetFeeArgs{
 					DestChainSelector: remoteSelector,
 				},
@@ -653,8 +654,9 @@ func configureCommitteeVerifierAsSource(
 	}
 
 	currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(resolverAddr),
+		// ChainSelector: chain.Selector,
+		// Address:       common.HexToAddress(resolverAddr),
+		Args:          struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get outbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
@@ -678,8 +680,8 @@ func configureCommitteeVerifierAsSource(
 
 	if len(remoteChainConfigArgs) > 0 {
 		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(cvAddr),
 			Args:          remoteChainConfigArgs,
 		})
 		if err != nil {
@@ -690,8 +692,8 @@ func configureCommitteeVerifierAsSource(
 
 	if len(allowlistArgs) > 0 {
 		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(cvAddr),
 			Args:          allowlistArgs,
 		})
 		if err != nil {
@@ -702,8 +704,8 @@ func configureCommitteeVerifierAsSource(
 
 	if len(outboundArgs) > 0 {
 		report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(resolverAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(resolverAddr),
 			Args:          outboundArgs,
 		})
 		if err != nil {
@@ -715,16 +717,17 @@ func configureCommitteeVerifierAsSource(
 	if !cv.AllowedFinalityConfig.IsZero() {
 		desiredFinality := cv.AllowedFinalityConfig.Raw()
 		currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(cvAddr),
+			Args:          struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
 		}
 		if currentFinalityReport.Output != desiredFinality {
 			setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(cvAddr),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(cvAddr),
 				Args:          desiredFinality,
 			})
 			if err != nil {
@@ -749,7 +752,7 @@ func configureCommitteeVerifierAsDest(
 	chainSelector uint64,
 	cv changesetadapters.CommitteeVerifierConfig[datastore.AddressRef],
 ) ([]contract.WriteOutput, error) {
-	cvAddr, resolverAddr, err := extractCommitteeVerifierAddresses(cv.CommitteeVerifier, chainSelector)
+	cvAddr, _, err := extractCommitteeVerifierAddresses(cv.CommitteeVerifier, chainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -766,8 +769,8 @@ func configureCommitteeVerifierAsDest(
 			Signers:             signers,
 		}
 		currentSigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetSignatureConfig, chain, contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(cvAddr),
 			Args:          remoteSelector,
 		})
 		if err != nil {
@@ -783,8 +786,8 @@ func configureCommitteeVerifierAsDest(
 
 	if len(signatureConfigs) > 0 {
 		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.ApplySignatureConfigsArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(cvAddr),
 			Args: committee_verifier.ApplySignatureConfigsArgs{
 				SignatureConfigs: signatureConfigs,
 			},
@@ -796,8 +799,9 @@ func configureCommitteeVerifierAsDest(
 	}
 
 	versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.VersionTag, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(cvAddr),
+		// ChainSelector: chain.Selector,
+		// Address:       common.HexToAddress(cvAddr),
+		Args:          struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
@@ -807,8 +811,9 @@ func configureCommitteeVerifierAsDest(
 		Verifier: common.HexToAddress(cvAddr),
 	}
 	currentInboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllInboundImplementations, chain, contract.FunctionInput[any]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(resolverAddr),
+		// ChainSelector: chain.Selector,
+		// Address:       common.HexToAddress(resolverAddr),
+		Args:          struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
@@ -822,8 +827,8 @@ func configureCommitteeVerifierAsDest(
 	}
 	if !inboundAlreadySet {
 		report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(resolverAddr),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(resolverAddr),
 			Args:          []versioned_verifier_resolver.InboundImplementationArgs{desiredInbound},
 		})
 		if err != nil {

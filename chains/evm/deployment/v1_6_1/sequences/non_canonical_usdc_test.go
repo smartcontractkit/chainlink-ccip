@@ -49,7 +49,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	// Deploy RMN Proxy (use deployer as RMN for test)
 	rmnProxyRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: chain.DeployerKey.From},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy RMN proxy")
@@ -58,7 +58,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	// Deploy Router (WrappedNative = zero for test)
 	routerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args: router.ConstructorArgs{
 			WrappedNative: common.Address{},
 			RMNProxy:      rmnAddr,
@@ -70,7 +70,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	// Deploy TokenAdminRegistry
 	tarRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, tar_ops.Deploy, chain, contract_utils.DeployInput[tar_ops.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(tar_ops.ContractType, *tar_ops.Version),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args:           tar_ops.ConstructorArgs{},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy TokenAdminRegistry")

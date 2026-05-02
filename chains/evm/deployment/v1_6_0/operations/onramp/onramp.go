@@ -187,7 +187,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	Description:     "Calls applyDestChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OnRampABI,
-	NewContract:     NewOnRampContract,
+	// NewContract:     NewOnRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -205,7 +205,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistCo
 	Description:     "Calls applyAllowlistUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OnRampABI,
-	NewContract:     NewOnRampContract,
+	// NewContract:     NewOnRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, []AllowlistConfigArgs],
 	Validate:        func([]AllowlistConfigArgs) error { return nil },
 	CallContract: func(
@@ -222,7 +222,7 @@ var GetAllowedSendersList = contract.NewRead(contract.ReadParams[uint64, GetAllo
 	Version:      Version,
 	Description:  "Calls getAllowedSendersList on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOnRampContract,
+	// NewContract:  NewOnRampContract,
 	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (GetAllowedSendersListResult, error) {
 		return c.GetAllowedSendersList(opts, args)
 	},
@@ -233,7 +233,7 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, GetDestCha
 	Version:      Version,
 	Description:  "Calls getDestChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOnRampContract,
+	// NewContract:  NewOnRampContract,
 	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (GetDestChainConfigResult, error) {
 		return c.GetDestChainConfig(opts, args)
 	},
@@ -244,7 +244,7 @@ var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfi
 	Version:      Version,
 	Description:  "Calls getStaticConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOnRampContract,
+	// NewContract:  NewOnRampContract,
 	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
 		return c.GetStaticConfig(opts)
 	},
@@ -255,7 +255,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOnRampContract,
+	// NewContract:  NewOnRampContract,
 	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -267,7 +267,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *On
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OnRampABI,
-	NewContract:     NewOnRampContract,
+	// NewContract:     NewOnRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
 	CallContract: func(

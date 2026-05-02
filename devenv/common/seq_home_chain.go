@@ -73,8 +73,8 @@ var AddDONAndSetCandidateSequence = operations.NewSequence(
 				cciphomeops.AddDON,
 				deps.HomeChain,
 				contract.FunctionInput[cciphomeops.AddDONOpInput]{
-					ChainSelector: deps.HomeChain.Selector,
-					Address:       input.CapabilitiesRegistry,
+					// ChainSelector: deps.HomeChain.Selector,
+					// Address:       input.CapabilitiesRegistry,
 					Args: cciphomeops.AddDONOpInput{
 						Nodes: don.PeerIDs,
 						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
@@ -139,8 +139,8 @@ var SetCandidateSequence = operations.NewSequence(
 				cciphomeops.UpdateDON,
 				deps.HomeChain,
 				contract.FunctionInput[cciphomeops.UpdateDONOpInput]{
-					Address:       input.CapabilitiesRegistry,
-					ChainSelector: deps.HomeChain.Selector,
+					// Address:       input.CapabilitiesRegistry,
+					// ChainSelector: deps.HomeChain.Selector,
 					Args: cciphomeops.UpdateDONOpInput{
 						ID:    don.ID,
 						Nodes: don.PeerIDs,
@@ -208,8 +208,8 @@ var PromoteCandidateSequence = operations.NewSequence(
 				cciphomeops.UpdateDON,
 				deps.HomeChain,
 				contract.FunctionInput[cciphomeops.UpdateDONOpInput]{
-					Address:       input.CapabilitiesRegistry,
-					ChainSelector: deps.HomeChain.Selector,
+					// Address:       input.CapabilitiesRegistry,
+					// ChainSelector: deps.HomeChain.Selector,
 					Args: cciphomeops.UpdateDONOpInput{
 						ID:    don.ID,
 						Nodes: don.PeerIDs,
@@ -296,8 +296,8 @@ var ApplyChainConfigUpdatesSequence = operations.NewSequence(
 				cciphomeops.ApplyChainConfigUpdates,
 				deps.HomeChain,
 				contract.FunctionInput[cciphomeops.ApplyChainConfigUpdatesOpInput]{
-					Address:       input.CCIPHome,
-					ChainSelector: deps.HomeChain.Selector,
+					// Address:       input.CCIPHome,
+					// ChainSelector: deps.HomeChain.Selector,
 					Args:          batch,
 				},
 			)
@@ -377,8 +377,8 @@ var SeqAddCapabilityToCapReg = operations.NewSequence(
 				cciphomeops.AddCapabilities,
 				deps.HomeChain,
 				contract.FunctionInput[cciphomeops.AddCapabilitiesOpInput]{
-					ChainSelector: chain.Selector,
-					Address:       input.CapReg,
+					// ChainSelector: chain.Selector,
+					// Address:       input.CapReg,
 					Args: cciphomeops.AddCapabilitiesOpInput{
 						Capabilities: []capabilities_registry.CapabilitiesRegistryCapability{
 							capabilityToAdd,
@@ -444,8 +444,8 @@ var SeqAddNodeOperatorsToCapReg = operations.NewSequence(
 				cciphomeops.AddNodeOperators,
 				chain,
 				contract.FunctionInput[cciphomeops.AddNodesOperatorsOpInput]{
-					ChainSelector: chain.Selector,
-					Address:       input.CapReg,
+					// ChainSelector: chain.Selector,
+					// Address:       input.CapReg,
 					Args: cciphomeops.AddNodesOperatorsOpInput{
 						Nodes: nodeOpsToAdd,
 					},
@@ -518,8 +518,8 @@ var SeqAddNodesToCapReg = operations.NewSequence(
 			cciphomeops.AddNodes,
 			chain,
 			contract.FunctionInput[cciphomeops.AddNodesOpInput]{
-				ChainSelector: chain.Selector,
-				Address:       input.CapReg,
+				// ChainSelector: chain.Selector,
+				// Address:       input.CapReg,
 				Args: cciphomeops.AddNodesOpInput{
 					Nodes: nodeParams,
 				},

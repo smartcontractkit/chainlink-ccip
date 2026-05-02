@@ -86,7 +86,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	// Deploy chain contracts
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
 		},
@@ -204,7 +204,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 				cctp_message_transmitter_proxy_v1_6_2.ContractType,
 				*cctp_message_transmitter_proxy_v1_6_2.Version,
 			),
-			ChainSelector: chainSelector,
+			// ChainSelector: chainSelector,
 			Args: cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs{
 				TokenMessenger: tokenMessengerV1Addr,
 			},
@@ -243,7 +243,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 
 	rmnProxyRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: chain.DeployerKey.From},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy RMN proxy")
@@ -251,7 +251,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 
 	routerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args: router.ConstructorArgs{
 			WrappedNative: common.Address{},
 			RMNProxy:      rmnAddr,
@@ -262,7 +262,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 
 	tarRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args:           token_admin_registry.ConstructorArgs{},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy TokenAdminRegistry")
@@ -381,7 +381,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// Get CREATE2Factory addresses for both chains
 	homeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, homeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  homeChainSelector,
+		// ChainSelector:  homeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{homeChain.DeployerKey.From},
 		},
@@ -390,7 +390,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 
 	nonHomeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, nonHomeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  nonHomeChainSelector,
+		// ChainSelector:  nonHomeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{nonHomeChain.DeployerKey.From},
 		},
@@ -538,8 +538,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 		token_admin_registry.GetTokenConfig,
 		homeChain,
 		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: homeChainSelector,
-			Address:       homeSetup.TokenAdminRegistry,
+			// ChainSelector: homeChainSelector,
+			// Address:       homeSetup.TokenAdminRegistry,
 			Args:          homeSetup.USDCToken,
 		},
 	)
@@ -714,8 +714,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 		token_admin_registry.GetTokenConfig,
 		nonHomeChain,
 		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: nonHomeChainSelector,
-			Address:       nonHomeSetup.TokenAdminRegistry,
+			// ChainSelector: nonHomeChainSelector,
+			// Address:       nonHomeSetup.TokenAdminRegistry,
 			Args:          nonHomeSetup.USDCToken,
 		},
 	)
@@ -978,8 +978,8 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 		token_admin_registry.GetTokenConfig,
 		canonicalChain,
 		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: canonicalChainSelector,
-			Address:       canonicalSetup.TokenAdminRegistry,
+			// ChainSelector: canonicalChainSelector,
+			// Address:       canonicalSetup.TokenAdminRegistry,
 			Args:          canonicalSetup.USDCToken,
 		},
 	)
@@ -1000,8 +1000,8 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 		token_admin_registry.GetTokenConfig,
 		nonCanonicalChain,
 		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: nonCanonicalChainSelector,
-			Address:       nonCanonicalSetup.TokenAdminRegistry,
+			// ChainSelector: nonCanonicalChainSelector,
+			// Address:       nonCanonicalSetup.TokenAdminRegistry,
 			Args:          nonCanonicalSetup.USDCToken,
 		},
 	)

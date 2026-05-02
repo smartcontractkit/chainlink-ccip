@@ -104,7 +104,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPMessageTransmitterProxyABI,
-	NewContract:     NewCCTPMessageTransmitterProxyContract,
+	// NewContract:     NewCCTPMessageTransmitterProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPMessageTransmitterProxyContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(
@@ -121,7 +121,7 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	Version:      Version,
 	Description:  "Calls getAllAuthorizedCallers on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPMessageTransmitterProxyContract,
+	// NewContract:  NewCCTPMessageTransmitterProxyContract,
 	CallContract: func(c *CCTPMessageTransmitterProxyContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
 	},

@@ -95,7 +95,7 @@ var Approve = contract.NewWrite(contract.WriteParams[ApproveArgs, *CrossChainTok
 	Description:     "Calls approve on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CrossChainTokenABI,
-	NewContract:     NewCrossChainTokenContract,
+	//NewContract:     NewCrossChainTokenContract,
 	IsAllowedCaller: contract.AllCallersAllowed[*CrossChainTokenContract, ApproveArgs],
 	Validate:        func(ApproveArgs) error { return nil },
 	CallContract: func(
@@ -112,7 +112,7 @@ var BalanceOf = contract.NewRead(contract.ReadParams[common.Address, *big.Int, *
 	Version:      Version,
 	Description:  "Calls balanceOf on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCrossChainTokenContract,
+	//NewContract:  NewCrossChainTokenContract,
 	CallContract: func(c *CrossChainTokenContract, opts *bind.CallOpts, args common.Address) (*big.Int, error) {
 		return c.BalanceOf(opts, args)
 	},

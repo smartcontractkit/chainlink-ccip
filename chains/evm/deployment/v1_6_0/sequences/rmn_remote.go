@@ -28,8 +28,8 @@ var SeqCurse = cldf_ops.NewSequence(
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
 		// Use Curse0 which takes an array of subjects
 		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Curse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
+			// Address:       in.Addr,
+			// ChainSelector: chain.Selector,
 			Args:          in.Subjects,
 		})
 		if err != nil {
@@ -52,8 +52,8 @@ var SeqUncurse = cldf_ops.NewSequence(
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
 		// Use Uncurse0 which takes an array of subjects
 		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Uncurse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
+			// Address:       in.Addr,
+			// ChainSelector: chain.Selector,
 			Args:          in.Subjects,
 		})
 		if err != nil {

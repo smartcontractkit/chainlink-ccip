@@ -44,8 +44,8 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 			report, err := operations.ExecuteOperation(
 				b, token_pool.SetAllowedFinalityConfig, chain,
 				contract.FunctionInput[[4]byte]{
-					ChainSelector: src,
-					Address:       addr,
+					// ChainSelector: src,
+					// Address:       addr,
 					Args:          finalityConfig.Raw(),
 				},
 			)

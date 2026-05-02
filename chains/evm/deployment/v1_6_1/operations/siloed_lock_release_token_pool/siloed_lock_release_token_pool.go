@@ -186,7 +186,7 @@ var GetRebalancer = contract.NewRead(contract.ReadParams[struct{}, common.Addres
 	Version:      Version,
 	Description:  "Calls getRebalancer on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetRebalancer(opts)
 	},
@@ -197,7 +197,7 @@ var GetChainRebalancer = contract.NewRead(contract.ReadParams[uint64, common.Add
 	Version:      Version,
 	Description:  "Calls getChainRebalancer on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (common.Address, error) {
 		return c.GetChainRebalancer(opts, args)
 	},
@@ -208,7 +208,7 @@ var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64
 	Version:      Version,
 	Description:  "Calls getSupportedChains on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
 		return c.GetSupportedChains(opts)
 	},
@@ -219,7 +219,7 @@ var IsSiloed = contract.NewRead(contract.ReadParams[uint64, bool, *SiloedLockRel
 	Version:      Version,
 	Description:  "Calls isSiloed on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (bool, error) {
 		return c.IsSiloed(opts, args)
 	},
@@ -230,7 +230,7 @@ var GetAvailableTokens = contract.NewRead(contract.ReadParams[uint64, *big.Int, 
 	Version:      Version,
 	Description:  "Calls getAvailableTokens on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args uint64) (*big.Int, error) {
 		return c.GetAvailableTokens(opts, args)
 	},
@@ -241,7 +241,7 @@ var GetUnsiloedLiquidity = contract.NewRead(contract.ReadParams[struct{}, *big.I
 	Version:      Version,
 	Description:  "Calls getUnsiloedLiquidity on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (*big.Int, error) {
 		return c.GetUnsiloedLiquidity(opts)
 	},
@@ -253,7 +253,7 @@ var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *Silo
 	Description:     "Calls setRebalancer on the contract",
 	ContractType:    ContractType,
 	ContractABI:     SiloedLockReleaseTokenPoolABI,
-	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:     NewSiloedLockReleaseTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -271,7 +271,7 @@ var SetSiloRebalancer = contract.NewWrite(contract.WriteParams[SetSiloRebalancer
 	Description:     "Calls setSiloRebalancer on the contract",
 	ContractType:    ContractType,
 	ContractABI:     SiloedLockReleaseTokenPoolABI,
-	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:     NewSiloedLockReleaseTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, SetSiloRebalancerArgs],
 	Validate:        func(SetSiloRebalancerArgs) error { return nil },
 	CallContract: func(
@@ -289,7 +289,7 @@ var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *Siloed
 	Description:     "Calls withdrawLiquidity on the contract",
 	ContractType:    ContractType,
 	ContractABI:     SiloedLockReleaseTokenPoolABI,
-	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:     NewSiloedLockReleaseTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, *big.Int],
 	Validate:        func(*big.Int) error { return nil },
 	CallContract: func(
@@ -307,7 +307,7 @@ var WithdrawSiloedLiquidity = contract.NewWrite(contract.WriteParams[WithdrawSil
 	Description:     "Calls withdrawSiloedLiquidity on the contract",
 	ContractType:    ContractType,
 	ContractABI:     SiloedLockReleaseTokenPoolABI,
-	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:     NewSiloedLockReleaseTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, WithdrawSiloedLiquidityArgs],
 	Validate:        func(WithdrawSiloedLiquidityArgs) error { return nil },
 	CallContract: func(
@@ -324,7 +324,7 @@ var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *S
 	Version:      Version,
 	Description:  "Calls getToken on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedLockReleaseTokenPoolContract,
+	// NewContract:  NewSiloedLockReleaseTokenPoolContract,
 	CallContract: func(c *SiloedLockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetToken(opts)
 	},

@@ -94,7 +94,7 @@ var ConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCa
 	Description:     "Calls configureAllowedCallers on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPMessageTransmitterProxyABI,
-	NewContract:     NewCCTPMessageTransmitterProxyContract,
+	// NewContract:     NewCCTPMessageTransmitterProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPMessageTransmitterProxyContract, []AllowedCallerConfigArgs],
 	Validate:        func([]AllowedCallerConfigArgs) error { return nil },
 	CallContract: func(

@@ -135,7 +135,7 @@ var (
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
-					ChainSelector:  chain.Selector,
+					// ChainSelector:  chain.Selector,
 					Args:           input.ConstructorArgs,
 				}, input.ExistingAddresses)
 			if err != nil {
@@ -153,8 +153,8 @@ var (
 				feeQuoterReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyDestChainConfigUpdates, chain,
 					contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+						// ChainSelector: chain.Selector,
+						// Address:       fqAddr,
 						Args:          batch,
 					})
 				if err != nil {
@@ -183,8 +183,8 @@ var (
 				}
 				feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+						// ChainSelector: chain.Selector,
+						// Address:       fqAddr,
 						Args: fqops.PriceUpdates{
 							GasPriceUpdates:   gasBatch,
 							TokenPriceUpdates: tokenBatch,
@@ -209,8 +209,8 @@ var (
 				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
 					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+						// ChainSelector: chain.Selector,
+						// Address:       fqAddr,
 						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 							TokenTransferFeeConfigArgs:   batch,
 							TokensToUseDefaultFeeConfigs: defaultFeeConfig,
@@ -228,8 +228,8 @@ var (
 				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
 					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+						// ChainSelector: chain.Selector,
+						// Address:       fqAddr,
 						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 							TokensToUseDefaultFeeConfigs: input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
 						},
@@ -246,8 +246,8 @@ var (
 				feeQuoterAuthorizedCallerReport, err := cldf_ops.ExecuteOperation(
 					b, fqops.ApplyAuthorizedCallerUpdates, chain,
 					contract.FunctionInput[fqops.AuthorizedCallerArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+						// ChainSelector: chain.Selector,
+						// Address:       fqAddr,
 						Args:          input.AuthorizedCallerUpdates,
 					})
 				if err != nil {

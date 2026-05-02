@@ -46,7 +46,7 @@ var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_contract.RMNC
 	Description:     "Applies a curse to an RMN contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_contract.RMNContractABI,
-	NewContract:     rmn_contract.NewRMNContract,
+	// NewContract:     rmn_contract.NewRMNContract,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_contract.RMNContract, CurseArgs],
 	Validate:        func(CurseArgs) error { return nil },
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
@@ -60,7 +60,7 @@ var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_contract.
 	Description:     "Uncurses an existing curse on an RMN contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_contract.RMNContractABI,
-	NewContract:     rmn_contract.NewRMNContract,
+	// NewContract:     rmn_contract.NewRMNContract,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_contract.RMNContract, UncurseArgs],
 	Validate:        func(UncurseArgs) error { return nil },
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.TransactOpts, args UncurseArgs) (*types.Transaction, error) {
@@ -73,7 +73,7 @@ var IsCursed = contract.NewRead(contract.ReadParams[fastcurse.Subject, bool, *rm
 	Version:      semver.MustParse("1.5.0"),
 	Description:  "Checks if a subject is cursed on an RMN contract",
 	ContractType: ContractType,
-	NewContract:  rmn_contract.NewRMNContract,
+	// NewContract:  rmn_contract.NewRMNContract,
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.CallOpts, args fastcurse.Subject) (bool, error) {
 		return rmn.IsCursed(opts, args)
 	},
@@ -84,7 +84,7 @@ var GetCurseProgress = contract.NewRead(contract.ReadParams[fastcurse.Subject, r
 	Version:      semver.MustParse("1.5.0"),
 	Description:  "Gets the curse progress for a given subject on an RMN contract",
 	ContractType: ContractType,
-	NewContract:  rmn_contract.NewRMNContract,
+	// NewContract:  rmn_contract.NewRMNContract,
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.CallOpts, args fastcurse.Subject) (rmn_contract.GetCurseProgress, error) {
 		return rmn.GetCurseProgress(opts, args)
 	},
@@ -95,7 +95,7 @@ var GetConfigDetails = contract.NewRead(contract.ReadParams[any, rmn_contract.Ge
 	Version:      semver.MustParse("1.5.0"),
 	Description:  "Gets the configuration details of the RMN contract",
 	ContractType: ContractType,
-	NewContract:  rmn_contract.NewRMNContract,
+	// NewContract:  rmn_contract.NewRMNContract,
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.CallOpts, _ any) (rmn_contract.GetConfigDetails, error) {
 		return rmn.GetConfigDetails(opts)
 	},

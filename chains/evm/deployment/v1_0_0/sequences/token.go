@@ -99,7 +99,7 @@ var DeployToken = cldf_ops.NewSequence(
 		case erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, erc20.Deploy, chain, contract.DeployInput[erc20.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: erc20.ConstructorArgs{
 					Name:   input.Name,
 					Symbol: input.Symbol,
@@ -113,7 +113,7 @@ var DeployToken = cldf_ops.NewSequence(
 		case burn_mint_erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain, contract.DeployInput[burn_mint_erc20.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: burn_mint_erc20.ConstructorArgs{
 					Name:      input.Name,
 					Symbol:    input.Symbol,
@@ -130,7 +130,7 @@ var DeployToken = cldf_ops.NewSequence(
 		case burn_mint_erc20_with_drip.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: burn_mint_erc20_with_drip.ConstructorArgs{
 					Name:      input.Name,
 					Symbol:    input.Symbol,
@@ -147,7 +147,7 @@ var DeployToken = cldf_ops.NewSequence(
 		case drip_v150.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, drip_v150.Deploy, chain, contract.DeployInput[drip_v150.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(drip_v150.ContractType, *drip_v150.Version),
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: drip_v150.ConstructorArgs{
 					Name:   input.Name,
 					Symbol: input.Symbol,
@@ -197,8 +197,8 @@ var DeployToken = cldf_ops.NewSequence(
 				b.Logger.Warnf("Multiple senders provided but only the first one (%s) will receive the pre-minted tokens", tokReceiver.Hex())
 			}
 			transferReport, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
-				ChainSelector: chain.Selector,
-				Address:       tokenAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       tokenAddr,
 				Args: erc20.TransferArgs{
 					Receiver: tokReceiver,
 					Amount:   preMint,
@@ -212,8 +212,8 @@ var DeployToken = cldf_ops.NewSequence(
 
 		if input.CCIPAdmin != "" && tokenSupportsCCIPAdmin(input.Type) {
 			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
-				ChainSelector: chain.Selector,
-				Address:       tokenAddr,
+				// ChainSelector: chain.Selector,
+				// Address:       tokenAddr,
 				Args:          ccipAdmin.Hex(),
 			})
 			if err != nil {
@@ -235,8 +235,8 @@ var DeployToken = cldf_ops.NewSequence(
 				}
 
 				grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tokenAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tokenAddr,
 					Args: burn_mint_erc20.RoleAssignment{
 						Role: role,
 						To:   externalAdmin,
@@ -249,8 +249,8 @@ var DeployToken = cldf_ops.NewSequence(
 
 			case tip20.ContractType:
 				grantReport, err := cldf_ops.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tokenAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tokenAddr,
 					Args:          externalAdmin,
 				})
 				if err != nil {

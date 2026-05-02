@@ -41,8 +41,8 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// best-effort and skip validation when the call fails.
 		if input.RegistryAddress != (common.Address{}) && input.TokenAddress != (common.Address{}) {
 			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.RegistryAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.RegistryAddress,
 				Args:          input.TokenAddress,
 			})
 			if err != nil {
@@ -51,8 +51,9 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			activePool := tokenConfigReport.Output.TokenPool
 			if activePool != (common.Address{}) {
 				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       activePool,
+					// ChainSelector: input.ChainSelector,
+					// Address:       activePool,
+					Args:          struct{}{},
 				})
 				if err == nil {
 					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
@@ -70,8 +71,9 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		}
 		ops := make([]mcms_types.BatchOperation, 0)
 		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       input.TokenPoolAddress,
+			Args:          struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from pool: %w", err)

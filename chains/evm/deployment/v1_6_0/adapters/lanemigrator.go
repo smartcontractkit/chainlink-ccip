@@ -19,7 +19,7 @@ import (
 
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	// datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -52,34 +52,34 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 					return sequences.OnChainOutput{}, fmt.Errorf("error adding address ref to temp datastore: %w", err)
 				}
 			}
-			tempDS := ds.Seal()
+			// tempDS := ds.Seal()
 			// fetch onRamp and offRamp from the existing addresses
-			onRampAddr, err := datastore_utils.FindAndFormatRef(
-				tempDS,
-				datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Type:          datastore.ContractType(onrampops.ContractType),
-					Version:       onrampops.Version,
-				},
-				input.ChainSelector,
-				evm_datastore_utils.ToEVMAddress,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("error finding onRamp address ref: %w", err)
-			}
-			offRampAddr, err := datastore_utils.FindAndFormatRef(
-				tempDS,
-				datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Type:          datastore.ContractType(offrampops.ContractType),
-					Version:       offrampops.Version,
-				},
-				input.ChainSelector,
-				evm_datastore_utils.ToEVMAddress,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("error finding offRamp address ref: %w", err)
-			}
+			// onRampAddr, err := datastore_utils.FindAndFormatRef(
+			// 	tempDS,
+			// 	datastore.AddressRef{
+			// 		ChainSelector: input.ChainSelector,
+			// 		Type:          datastore.ContractType(onrampops.ContractType),
+			// 		Version:       onrampops.Version,
+			// 	},
+			// 	input.ChainSelector,
+			// 	evm_datastore_utils.ToEVMAddress,
+			// )
+			// if err != nil {
+			// 	return sequences.OnChainOutput{}, fmt.Errorf("error finding onRamp address ref: %w", err)
+			// }
+			// offRampAddr, err := datastore_utils.FindAndFormatRef(
+			// 	tempDS,
+			// 	datastore.AddressRef{
+			// 		ChainSelector: input.ChainSelector,
+			// 		Type:          datastore.ContractType(offrampops.ContractType),
+			// 		Version:       offrampops.Version,
+			// 	},
+			// 	input.ChainSelector,
+			// 	evm_datastore_utils.ToEVMAddress,
+			// )
+			// if err != nil {
+			// 	return sequences.OnChainOutput{}, fmt.Errorf("error finding offRamp address ref: %w", err)
+			// }
 
 			routerRef := input.RouterAddr
 			routerAddr, err := evm_datastore_utils.ToEVMAddress(routerRef)
@@ -91,8 +91,8 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			for _, remoteChainSelector := range input.RemoteChainSelectors {
 				// get existing destChainConfig for the onRamp
 				existingDestChainCfgOut, err := cldf_ops.ExecuteOperation(b, onrampops.GetDestChainConfig, c, contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       onRampAddr,
+					// ChainSelector: input.ChainSelector,
+					// Address:       onRampAddr,
 					Args:          remoteChainSelector,
 				})
 				if err != nil {
@@ -108,8 +108,8 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 
 				// get the sourceChainConfig for the offRamp
 				srcChainCfgOut, err := cldf_ops.ExecuteOperation(b, offrampops.GetSourceChainConfig, c, contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
+					// ChainSelector: input.ChainSelector,
+					// Address:       offRampAddr,
 					Args:          remoteChainSelector,
 				})
 				if err != nil {
@@ -138,8 +138,8 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			}
 			//  set the destChainConfig with the updated router
 			writeOutputOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, c, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       onRampAddr,
+				// ChainSelector: input.ChainSelector,
+				// Address:       onRampAddr,
 				Args:          onRampArgs,
 			})
 			if err != nil {
@@ -150,8 +150,8 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			writeOutputOffRamp, err := cldf_ops.ExecuteOperation(
 				b, offrampops.ApplySourceChainConfigUpdates, c,
 				contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
+					// ChainSelector: input.ChainSelector,
+					// Address:       offRampAddr,
 					Args:          offRampArgs,
 				})
 			if err != nil {

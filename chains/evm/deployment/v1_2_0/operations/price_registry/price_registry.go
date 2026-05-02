@@ -21,7 +21,7 @@ var PriceRegistryGetFeeToken = contract.NewRead(contract.ReadParams[any, []commo
 	Version:      Version,
 	Description:  "gets fee token from price registry 1.2",
 	ContractType: ContractType,
-	NewContract:  price_registry.NewPriceRegistry,
+	// NewContract:  price_registry.NewPriceRegistry,
 	CallContract: func(pr *price_registry.PriceRegistry, opts *bind.CallOpts, args any) ([]common.Address, error) {
 		return pr.GetFeeTokens(opts)
 	},
@@ -32,7 +32,7 @@ var PriceRegistryGetTokenPrices = contract.NewRead(contract.ReadParams[[]common.
 	Version:      Version,
 	Description:  "Calls getTokenPrices on the contract",
 	ContractType: ContractType,
-	NewContract:  price_registry.NewPriceRegistry,
+	// NewContract:  price_registry.NewPriceRegistry,
 	CallContract: func(pr *price_registry.PriceRegistry, opts *bind.CallOpts, args []common.Address) ([]price_registry.InternalTimestampedPackedUint224, error) {
 		return pr.GetTokenPrices(opts, args)
 	},
@@ -43,7 +43,7 @@ var PriceRegistryGetDestinationChainGasPrice = contract.NewRead(contract.ReadPar
 	Version:      Version,
 	Description:  "Calls getDestinationChainGasPrice on the contract",
 	ContractType: ContractType,
-	NewContract:  price_registry.NewPriceRegistry,
+	// NewContract:  price_registry.NewPriceRegistry,
 	CallContract: func(pr *price_registry.PriceRegistry, opts *bind.CallOpts, args uint64) (price_registry.InternalTimestampedPackedUint224, error) {
 		return pr.GetDestinationChainGasPrice(opts, args)
 	},

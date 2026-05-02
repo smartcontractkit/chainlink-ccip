@@ -118,7 +118,7 @@ var GetRebalancer = contract.NewRead(contract.ReadParams[struct{}, common.Addres
 	Version:      Version,
 	Description:  "Calls getRebalancer on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLockReleaseTokenPoolContract,
+	// NewContract:  NewLockReleaseTokenPoolContract,
 	CallContract: func(c *LockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetRebalancer(opts)
 	},
@@ -130,7 +130,7 @@ var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *Lock
 	Description:     "Calls setRebalancer on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LockReleaseTokenPoolABI,
-	NewContract:     NewLockReleaseTokenPoolContract,
+	// NewContract:     NewLockReleaseTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*LockReleaseTokenPoolContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -148,7 +148,7 @@ var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *LockRe
 	Description:     "Calls withdrawLiquidity on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LockReleaseTokenPoolABI,
-	NewContract:     NewLockReleaseTokenPoolContract,
+	// NewContract:     NewLockReleaseTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*LockReleaseTokenPoolContract, *big.Int],
 	Validate:        func(*big.Int) error { return nil },
 	CallContract: func(
@@ -165,7 +165,7 @@ var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *L
 	Version:      Version,
 	Description:  "Calls getToken on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLockReleaseTokenPoolContract,
+	// NewContract:  NewLockReleaseTokenPoolContract,
 	CallContract: func(c *LockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetToken(opts)
 	},

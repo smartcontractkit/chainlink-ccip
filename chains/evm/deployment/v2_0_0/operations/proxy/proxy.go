@@ -118,7 +118,7 @@ var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *ProxyCon
 	Description:     "Calls setTarget on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ProxyABI,
-	NewContract:     NewProxyContract,
+	//NewContract:     NewProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*ProxyContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -136,7 +136,7 @@ var SetFeeAggregator = contract.NewWrite(contract.WriteParams[common.Address, *P
 	Description:     "Calls setFeeAggregator on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ProxyABI,
-	NewContract:     NewProxyContract,
+	//NewContract:     NewProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*ProxyContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -154,7 +154,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address,
 	Description:     "Calls withdrawFeeTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     ProxyABI,
-	NewContract:     NewProxyContract,
+	//NewContract:     NewProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*ProxyContract, []common.Address],
 	Validate:        func([]common.Address) error { return nil },
 	CallContract: func(
@@ -171,7 +171,7 @@ var GetTarget = contract.NewRead(contract.ReadParams[struct{}, common.Address, *
 	Version:      Version,
 	Description:  "Calls getTarget on the contract",
 	ContractType: ContractType,
-	NewContract:  NewProxyContract,
+	//NewContract:  NewProxyContract,
 	CallContract: func(c *ProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetTarget(opts)
 	},
@@ -182,7 +182,7 @@ var GetFeeAggregator = contract.NewRead(contract.ReadParams[struct{}, common.Add
 	Version:      Version,
 	Description:  "Calls getFeeAggregator on the contract",
 	ContractType: ContractType,
-	NewContract:  NewProxyContract,
+	//NewContract:  NewProxyContract,
 	CallContract: func(c *ProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetFeeAggregator(opts)
 	},

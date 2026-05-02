@@ -67,7 +67,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		committeeVerifier, committeeVerifierResolver, err := extractCommitteeVerifierAddresses(input.CommitteeVerifier, input.ChainSelector)
+		committeeVerifier, _, err := extractCommitteeVerifierAddresses(input.CommitteeVerifier, input.ChainSelector)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -86,8 +86,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				PayloadSizeBytes: remoteConfig.PayloadSizeBytes,
 			}
 			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifier),
 				Args:          remoteSelector,
 			})
 			if err != nil {
@@ -100,8 +100,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
 				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(committeeVerifier),
+					// ChainSelector: chain.Selector,
+					// Address:       common.HexToAddress(committeeVerifier),
 					Args: committee_verifier.GetFeeArgs{
 						DestChainSelector: remoteSelector,
 					},
@@ -134,8 +134,9 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		// Build outbound implementation args only for remotes where on-chain verifier differs (idempotent).
 		currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(committeeVerifierResolver),
+			Args:          struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get outbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
@@ -157,8 +158,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		if len(remoteChainConfigArgs) > 0 {
 			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifier),
 				Args:          remoteChainConfigArgs,
 			})
 			if err != nil {
@@ -169,8 +170,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		if len(allowlistArgs) > 0 {
 			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifier),
 				Args:          allowlistArgs,
 			})
 			if err != nil {
@@ -181,8 +182,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		if len(outboundImplementationArgs) > 0 {
 			outboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierResolver),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifierResolver),
 				Args:          outboundImplementationArgs,
 			})
 			if err != nil {
@@ -194,16 +195,17 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 		if !input.AllowedFinalityConfig.IsZero() {
 			desiredFinality := input.AllowedFinalityConfig.Raw()
 			currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifier),
+				Args:          struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
 			}
 			if currentFinalityReport.Output != desiredFinality {
 				setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(committeeVerifier),
+					// ChainSelector: chain.Selector,
+					// Address:       common.HexToAddress(committeeVerifier),
 					Args:          desiredFinality,
 				})
 				if err != nil {
@@ -237,7 +239,7 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		committeeVerifier, committeeVerifierResolver, err := extractCommitteeVerifierAddresses(input.CommitteeVerifier, input.ChainSelector)
+		committeeVerifier, _, err := extractCommitteeVerifierAddresses(input.CommitteeVerifier, input.ChainSelector)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -255,8 +257,8 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 				Signers:             signers,
 			}
 			currentSigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetSignatureConfig, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifier),
 				Args:          remoteSelector,
 			})
 			if err != nil {
@@ -270,8 +272,8 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 
 		if len(signatureConfigs) > 0 {
 			signatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.ApplySignatureConfigsArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifier),
 				Args: committee_verifier.ApplySignatureConfigsArgs{
 					SignatureConfigs: signatureConfigs,
 				},
@@ -284,8 +286,9 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 
 		// Apply inbound implementation updates on CommitteeVerifierResolver only when not already set (idempotent).
 		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.VersionTag, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(committeeVerifier),
+			Args:          struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
@@ -295,8 +298,9 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 			Verifier: common.HexToAddress(committeeVerifier),
 		}
 		currentInboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllInboundImplementations, chain, contract.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
+			// ChainSelector: chain.Selector,
+			// Address:       common.HexToAddress(committeeVerifierResolver),
+			Args:          struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
@@ -310,8 +314,8 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 		}
 		if !inboundAlreadySet {
 			inboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierResolver),
+				// ChainSelector: chain.Selector,
+				// Address:       common.HexToAddress(committeeVerifierResolver),
 				Args:          []versioned_verifier_resolver.InboundImplementationArgs{desiredInbound},
 			})
 			if err != nil {

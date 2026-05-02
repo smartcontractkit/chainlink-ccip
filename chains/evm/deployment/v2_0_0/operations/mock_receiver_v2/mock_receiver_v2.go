@@ -118,7 +118,7 @@ var GetCCVsAndFinalityConfig = contract.NewRead(contract.ReadParams[GetCCVsAndFi
 	Version:      Version,
 	Description:  "Calls getCCVsAndFinalityConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewMockReceiverV2Contract,
+	//NewContract:  NewMockReceiverV2Contract,
 	CallContract: func(c *MockReceiverV2Contract, opts *bind.CallOpts, args GetCCVsAndFinalityConfigArgs) (GetCCVsAndFinalityConfigResult, error) {
 		return c.GetCCVsAndFinalityConfig(opts, args.Arg0, args.Arg1)
 	},
@@ -130,7 +130,7 @@ var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *
 	Description:     "Calls setAllowedFinalityConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     MockReceiverV2ABI,
-	NewContract:     NewMockReceiverV2Contract,
+	//NewContract:     NewMockReceiverV2Contract,
 	IsAllowedCaller: contract.AllCallersAllowed[*MockReceiverV2Contract, [4]byte],
 	Validate:        func([4]byte) error { return nil },
 	CallContract: func(

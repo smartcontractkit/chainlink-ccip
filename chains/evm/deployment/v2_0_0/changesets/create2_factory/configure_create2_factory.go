@@ -59,8 +59,8 @@ var configureCREATE2Factory = cldf_ops.NewSequence(
 	func(b operations.Bundle, chain evm.Chain, input ConfigureCREATE2FactoryInput[common.Address]) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)
 		configureReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ApplyAllowListUpdates, chain, contract.FunctionInput[create2_factory.ApplyAllowListUpdatesArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CREATE2Factory,
+			// ChainSelector: chain.Selector,
+			// Address:       input.CREATE2Factory,
 			Args: create2_factory.ApplyAllowListUpdatesArgs{
 				Adds:    input.AllowListAdds,
 				Removes: input.AllowListRemoves,
