@@ -362,7 +362,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					}
 					writes = append(writes, report.Output)
 
-				case "BurnMintToken", cciputils.ERC677TokenHelper.String():
+				case cciputils.BurnMintToken.String(), cciputils.ERC677TokenHelper.String():
 					grantWrites, execErr := bnmERC677ops.PrepareGrantMintAndBurnRoles(b, chain,
 						evm_contract.FunctionInput[common.Address]{
 							ChainSelector: input.ChainSelector,

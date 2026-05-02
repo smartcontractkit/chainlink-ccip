@@ -517,6 +517,6 @@ func isBurnMintTokenType(typ datastore.ContractType) bool {
 }
 
 func isBurnMintERC677TokenType(typ datastore.ContractType) bool {
-	return typ.String() == "BurnMintToken" ||
+	return typ.String() == cciputils.BurnMintToken.String() ||
 		typ.String() == cciputils.ERC677TokenHelper.String()
 }
