@@ -606,7 +606,7 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 			poolContractType: string(burn_mint_token_pool.ContractType),
 			poolVersion:      burn_mint_token_pool.Version,
 			tokenSymbol:      "V2BMT",
-			tokenRefType:     datastore.ContractType(cciputils.BurnMintToken),
+			tokenRefType:     datastore.ContractType("BurnMintToken"),
 			tokenRefVersion:  cciputils.Version_1_0_0,
 			erc677Token:      true,
 		},
@@ -616,10 +616,14 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 			poolContractType: string(burn_mint_token_pool_v1_6_1.ContractType),
 			poolVersion:      burn_mint_token_pool_v1_6_1.Version,
 			tokenSymbol:      "V16BMT",
-			tokenRefType:     datastore.ContractType(cciputils.BurnMintToken),
+			tokenRefType:     datastore.ContractType("BurnMintToken"),
 			tokenRefVersion:  cciputils.Version_1_0_0,
 			erc677Token:      true,
 		},
+		// Some existing CCIP-BnM address refs recorded the BurnMintERC677 token
+		// under ERC677TokenHelper. Keep explicit legacy cases so token expansion
+		// can repair those datastores without pretending the helper type is the
+		// canonical type for new refs.
 		{
 			chainSel:         chainA,
 			adapterVersion:   semver.MustParse("2.0.0"),

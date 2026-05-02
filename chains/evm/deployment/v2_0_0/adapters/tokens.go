@@ -122,11 +122,11 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 					return nil, nil
 				}
 
-				toknRef, lookupErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				tokenRef, lookupErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 					ChainSelector: input.ChainSelector,
 					Address:       tokenAddr,
 				}, input.ChainSelector, datastore_utils.FullRef)
-				if lookupErr != nil || !isBurnMintTokenType(toknRef.Type) {
+				if lookupErr != nil || !isBurnMintTokenType(tokenRef.Type) {
 					return nil, nil
 				}
 
@@ -140,20 +140,28 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 					Address:       common.HexToAddress(tokenAddr),
 					Args:          poolAddr,
 				}
-				var grantReport cldf_ops.Report[contract.FunctionInput[common.Address], contract.WriteOutput]
-				var grantErr error
-				if isBurnMintERC677TokenType(toknRef.Type) {
-					grantReport, grantErr = cldf_ops.ExecuteOperation(b,
-						bnmERC677Ops.GrantMintAndBurnRoles, evmChain, grantInput)
+				var writes []contract.WriteOutput
+				if isBurnMintERC677TokenType(tokenRef.Type) {
+					var grantErr error
+					writes, grantErr = bnmERC677Ops.PrepareGrantMintAndBurnRoles(
+						b,
+						evmChain,
+						grantInput,
+						common.HexToAddress(input.TimelockAddress),
+					)
+					if grantErr != nil {
+						return nil, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
+					}
 				} else {
-					grantReport, grantErr = cldf_ops.ExecuteOperation(b,
+					grantReport, grantErr := cldf_ops.ExecuteOperation(b,
 						bnmOps.GrantMintAndBurnRoles, evmChain, grantInput)
-				}
-				if grantErr != nil {
-					return nil, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
+					if grantErr != nil {
+						return nil, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
+					}
+					writes = append(writes, grantReport.Output)
 				}
 
-				batchOp, bErr := contract.NewBatchOperationFromWrites([]contract.WriteOutput{grantReport.Output})
+				batchOp, bErr := contract.NewBatchOperationFromWrites(writes)
 				if bErr != nil {
 					return nil, fmt.Errorf("failed to create batch operation for role grants: %w", bErr)
 				}
@@ -172,6 +180,10 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			}
 			if len(matches) == 1 {
 				b.Logger.Info("Token pool already deployed at address:", matches[0].Address)
+				// A previous partial run can leave the pool in datastore before
+				// the token grants it burn/mint rights. Keep DeployTokenPoolForToken
+				// declarative: after it runs, the token/pool authority relationship
+				// should be correct whether the pool was just deployed or reused.
 				batchOp, err := grantMintBurnRoles(matches[0])
 				if err != nil {
 					return sequences.OnChainOutput{}, err
@@ -505,6 +517,6 @@ func isBurnMintTokenType(typ datastore.ContractType) bool {
 }
 
 func isBurnMintERC677TokenType(typ datastore.ContractType) bool {
-	return typ.String() == cciputils.BurnMintToken.String() ||
+	return typ.String() == "BurnMintToken" ||
 		typ.String() == cciputils.ERC677TokenHelper.String()
 }

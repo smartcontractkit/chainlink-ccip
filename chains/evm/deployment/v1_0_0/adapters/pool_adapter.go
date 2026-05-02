@@ -362,19 +362,19 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					}
 					writes = append(writes, report.Output)
 
-				case cciputils.BurnMintToken.String(), cciputils.ERC677TokenHelper.String():
-					report, execErr := cldf_ops.ExecuteOperation(b,
-						bnmERC677ops.GrantMintAndBurnRoles, chain,
+				case "BurnMintToken", cciputils.ERC677TokenHelper.String():
+					grantWrites, execErr := bnmERC677ops.PrepareGrantMintAndBurnRoles(b, chain,
 						evm_contract.FunctionInput[common.Address]{
 							ChainSelector: input.ChainSelector,
 							Address:       toknAddr,
 							Args:          poolAddr,
 						},
+						common.HexToAddress(input.TimelockAddress),
 					)
 					if execErr != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
 					}
-					writes = append(writes, report.Output)
+					writes = append(writes, grantWrites...)
 
 				case tip20ops.ContractType.String():
 					report, execErr := cldf_ops.ExecuteOperation(b,
