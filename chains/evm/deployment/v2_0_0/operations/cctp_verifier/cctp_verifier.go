@@ -297,7 +297,7 @@ var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Rem
 	Description:     "Calls applyRemoteChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, []RemoteChainConfigArgs],
 	Validate:        func([]RemoteChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -315,7 +315,7 @@ var SetDomains = contract.NewWrite(contract.WriteParams[[]SetDomainArgs, *CCTPVe
 	Description:     "Calls setDomains on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, []SetDomainArgs],
 	Validate:        func([]SetDomainArgs) error { return nil },
 	CallContract: func(
@@ -333,7 +333,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *CC
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
 	CallContract: func(
@@ -351,7 +351,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistCo
 	Description:     "Calls applyAllowlistUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, []AllowlistConfigArgs],
 	Validate:        func([]AllowlistConfigArgs) error { return nil },
 	CallContract: func(
@@ -369,7 +369,7 @@ var UpdateStorageLocations = contract.NewWrite(contract.WriteParams[[]string, *C
 	Description:     "Calls updateStorageLocations on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, []string],
 	Validate:        func([]string) error { return nil },
 	CallContract: func(
@@ -387,7 +387,7 @@ var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *
 	Description:     "Calls setAllowedFinalityConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, [4]byte],
 	Validate:        func([4]byte) error { return nil },
 	CallContract: func(
@@ -405,7 +405,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address,
 	Description:     "Calls withdrawFeeTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPVerifierABI,
-	NewContract:     NewCCTPVerifierContract,
+	// NewContract:     NewCCTPVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPVerifierContract, []common.Address],
 	Validate:        func([]common.Address) error { return nil },
 	CallContract: func(
@@ -422,7 +422,7 @@ var VersionTag = contract.NewRead(contract.ReadParams[struct{}, [4]byte, *CCTPVe
 	Version:      Version,
 	Description:  "Calls versionTag on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.VersionTag(opts)
 	},
@@ -433,7 +433,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -444,7 +444,7 @@ var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, GetRemot
 	Version:      Version,
 	Description:  "Calls getRemoteChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
 		return c.GetRemoteChainConfig(opts, args)
 	},
@@ -455,7 +455,7 @@ var GetDomain = contract.NewRead(contract.ReadParams[uint64, Domain, *CCTPVerifi
 	Version:      Version,
 	Description:  "Calls getDomain on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args uint64) (Domain, error) {
 		return c.GetDomain(opts, args)
 	},
@@ -466,7 +466,7 @@ var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, GetStaticCo
 	Version:      Version,
 	Description:  "Calls getStaticConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) (GetStaticConfigResult, error) {
 		return c.GetStaticConfig(opts)
 	},
@@ -477,7 +477,7 @@ var GetStorageLocations = contract.NewRead(contract.ReadParams[struct{}, []strin
 	Version:      Version,
 	Description:  "Calls getStorageLocations on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) ([]string, error) {
 		return c.GetStorageLocations(opts)
 	},
@@ -488,7 +488,7 @@ var GetAllowedFinalityConfig = contract.NewRead(contract.ReadParams[struct{}, [4
 	Version:      Version,
 	Description:  "Calls getAllowedFinalityConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.GetAllowedFinalityConfig(opts)
 	},
@@ -499,7 +499,7 @@ var GetFee = contract.NewRead(contract.ReadParams[GetFeeArgs, GetFeeResult, *CCT
 	Version:      Version,
 	Description:  "Calls getFee on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCCTPVerifierContract,
+	// NewContract:  NewCCTPVerifierContract,
 	CallContract: func(c *CCTPVerifierContract, opts *bind.CallOpts, args GetFeeArgs) (GetFeeResult, error) {
 		return c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
 	},

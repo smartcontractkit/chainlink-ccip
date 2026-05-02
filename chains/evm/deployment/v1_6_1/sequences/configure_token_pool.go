@@ -41,8 +41,9 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		// First, check if the allow-list is enabled
 		if len(input.AllowList) != 0 {
 			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowListEnabled, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -50,8 +51,9 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			if allowListEnabledReport.Output {
 				// Allow-list is enabled, so we first check the current allow-list
 				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowList, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.TokenPoolAddress,
+					Args: struct{}{},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -61,8 +63,8 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				// Apply any updates to the allow-list if they exist
 				if len(adds) != 0 || len(removes) != 0 {
 					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyAllowListUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyAllowListUpdatesArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
+						// ChainSelector: input.ChainSelector,
+						// Address:       input.TokenPoolAddress,
 						Args: token_pool.ApplyAllowListUpdatesArgs{
 							Adds:    adds,
 							Removes: removes,
@@ -79,16 +81,17 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		// Set router if necessary
 		if input.RouterAddress != (common.Address{}) {
 			currentRouterReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRouter, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current router from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
 			if currentRouterReport.Output != input.RouterAddress {
 				setRouterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRouter, chain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.TokenPoolAddress,
 					Args:          input.RouterAddress,
 				})
 				if err != nil {
@@ -101,16 +104,17 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		// Set rate limit admin if necessary
 		if input.RateLimitAdmin != (common.Address{}) {
 			currentRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRateLimitAdmin, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current rate limit admin from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
 			if currentRateLimitAdminReport.Output != input.RateLimitAdmin {
 				setRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitAdmin, chain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.TokenPoolAddress,
 					Args:          input.RateLimitAdmin,
 				})
 				if err != nil {

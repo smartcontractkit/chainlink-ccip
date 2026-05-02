@@ -18,7 +18,7 @@ var (
 		Version:      Version,
 		Description:  "Reads the static config from the OffRamp 1.5.0 contract",
 		ContractType: ContractType,
-		NewContract:  evm_2_evm_offramp.NewEVM2EVMOffRamp,
+		// NewContract:  evm_2_evm_offramp.NewEVM2EVMOffRamp,
 		CallContract: func(offRamp *evm_2_evm_offramp.EVM2EVMOffRamp, opts *bind.CallOpts, args any) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
 			return offRamp.GetStaticConfig(opts)
 		},
@@ -29,7 +29,7 @@ var (
 		Version:      Version,
 		Description:  "Reads the dynamic config from the OffRamp 1.5.0 contract",
 		ContractType: ContractType,
-		NewContract:  evm_2_evm_offramp.NewEVM2EVMOffRamp,
+		// NewContract:  evm_2_evm_offramp.NewEVM2EVMOffRamp,
 		CallContract: func(offRamp *evm_2_evm_offramp.EVM2EVMOffRamp, opts *bind.CallOpts, args any) (evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig, error) {
 			return offRamp.GetDynamicConfig(opts)
 		},

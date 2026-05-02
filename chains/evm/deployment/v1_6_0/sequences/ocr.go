@@ -29,35 +29,35 @@ var SetOCR3Config = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 		}
-		e := &EVMAdapter{}
-		offRampAddr, err := e.GetOffRampAddress(input.Datastore, input.ChainSelector)
-	if err != nil {
-		return sequences.OnChainOutput{}, err
-	}
-	update := make([]offrampops.OCRConfigArgs, 0)
-	for _, cfg := range input.Configs {
-		var signerAddresses []common.Address
-		var transmitterAddresses []common.Address
-		for _, s := range cfg.Signers {
-			signerAddresses = append(signerAddresses, common.BytesToAddress(s))
+		// e := &EVMAdapter{}
+		// offRampAddr, err := e.GetOffRampAddress(input.Datastore, input.ChainSelector)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
 		}
-		for _, t := range cfg.Transmitters {
-			transmitterAddresses = append(transmitterAddresses, common.BytesToAddress(t))
+		update := make([]offrampops.OCRConfigArgs, 0)
+		for _, cfg := range input.Configs {
+			var signerAddresses []common.Address
+			var transmitterAddresses []common.Address
+			for _, s := range cfg.Signers {
+				signerAddresses = append(signerAddresses, common.BytesToAddress(s))
+			}
+			for _, t := range cfg.Transmitters {
+				transmitterAddresses = append(transmitterAddresses, common.BytesToAddress(t))
+			}
+			update = append(update, offrampops.OCRConfigArgs{
+				ConfigDigest:                   cfg.ConfigDigest,
+				OcrPluginType:                  uint8(cfg.PluginType),
+				F:                              cfg.F,
+				IsSignatureVerificationEnabled: cfg.IsSignatureVerificationEnabled,
+				Signers:                        signerAddresses,
+				Transmitters:                   transmitterAddresses,
+			})
 		}
-		update = append(update, offrampops.OCRConfigArgs{
-			ConfigDigest:                   cfg.ConfigDigest,
-			OcrPluginType:                  uint8(cfg.PluginType),
-			F:                              cfg.F,
-			IsSignatureVerificationEnabled: cfg.IsSignatureVerificationEnabled,
-			Signers:                        signerAddresses,
-			Transmitters:                   transmitterAddresses,
+		report, err := operations.ExecuteOperation(b, offrampops.SetOCR3Configs, chain, contract.FunctionInput[[]offrampops.OCRConfigArgs]{
+			// ChainSelector: chain.Selector,
+			// Address:       common.BytesToAddress(offRampAddr),
+			Args: update,
 		})
-	}
-	report, err := operations.ExecuteOperation(b, offrampops.SetOCR3Configs, chain, contract.FunctionInput[[]offrampops.OCRConfigArgs]{
-		ChainSelector: chain.Selector,
-		Address:       common.BytesToAddress(offRampAddr),
-		Args:          update,
-	})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OffRampSetOcr3 on %s: %w", chain, err)
 		}

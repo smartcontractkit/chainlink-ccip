@@ -29,7 +29,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		}
 
 		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+			// ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
@@ -65,7 +65,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		switch deployment.ContractType(input.TokenPoolType) {
 		case burn_mint_token_pool.ContractType:
 			report, deployErr := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
+				// ChainSelector:  input.ChainSel,
 				TypeAndVersion: typeAndVersion,
 				Args: burn_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -79,7 +79,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			tpDeployReport, err = &report.Output, deployErr
 		case burn_from_mint_token_pool.ContractType:
 			report, deployErr := cldf_ops.ExecuteOperation(b, burn_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_from_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
+				// ChainSelector:  input.ChainSel,
 				TypeAndVersion: typeAndVersion,
 				Args: burn_from_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -93,7 +93,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			tpDeployReport, err = &report.Output, deployErr
 		case burn_with_from_mint_token_pool.ContractType:
 			report, deployErr := cldf_ops.ExecuteOperation(b, burn_with_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_with_from_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
+				// ChainSelector:  input.ChainSel,
 				TypeAndVersion: typeAndVersion,
 				Args: burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -131,8 +131,9 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
 			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSel,
-				Address:       hooksAddr,
+				// ChainSelector: input.ChainSel,
+				// Address:       hooksAddr,
+				Args:          struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
@@ -140,8 +141,8 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 
 			if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
 				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
-					ChainSelector: input.ChainSel,
-					Address:       hooksAddr,
+					// ChainSelector: input.ChainSel,
+					// Address:       hooksAddr,
 					Args: advanced_pool_hooks.AuthorizedCallerArgs{
 						AddedCallers: []common.Address{poolAddr},
 					},

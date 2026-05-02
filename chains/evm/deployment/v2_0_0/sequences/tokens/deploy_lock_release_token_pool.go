@@ -30,7 +30,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 		}
 
 		lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+			// ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args: erc20_lock_box.ConstructorArgs{
 				Token: input.ConstructorArgs.Token,
@@ -42,7 +42,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 		}
 
 		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+			// ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
@@ -61,7 +61,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			*input.TokenPoolVersion,
 		)
 		tpDeployReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+			// ChainSelector:  input.ChainSel,
 			TypeAndVersion: typeAndVersion,
 			Args: lock_release_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
@@ -95,8 +95,9 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
 			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSel,
-				Address:       hooksAddr,
+				// ChainSelector: input.ChainSel,
+				// Address:       hooksAddr,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
@@ -104,8 +105,8 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 
 			if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
 				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
-					ChainSelector: input.ChainSel,
-					Address:       hooksAddr,
+					// ChainSelector: input.ChainSel,
+					// Address:       hooksAddr,
 					Args: advanced_pool_hooks.AuthorizedCallerArgs{
 						AddedCallers: []common.Address{poolAddr},
 					},
@@ -124,8 +125,8 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 
 		// Add lock release token pool to the authorized callers of the lock box.
 		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-			ChainSelector: input.ChainSel,
-			Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
+			// ChainSelector: input.ChainSel,
+			// Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
 			Args: erc20_lock_box.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{
 					common.HexToAddress(tpDeployReport.Output.Address),

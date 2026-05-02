@@ -98,7 +98,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	}
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-		ChainSelector:  5009297550715157269,
+		// ChainSelector:  5009297550715157269,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
 		},

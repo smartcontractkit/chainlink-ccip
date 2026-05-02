@@ -56,7 +56,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
+				// ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
@@ -104,7 +104,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  remoteChainSelector,
+				// ChainSelector:  remoteChainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain2.DeployerKey.From},
 				},
@@ -255,8 +255,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check onRamps on router
 			onRampOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(routerAddress),
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -264,8 +264,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check offRamps on router
 			offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(routerAddress),
 				Args:          nil,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -274,8 +274,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check sourceChainConfig on OffRamp
 			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(offRampAddr),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(offRampAddr),
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -287,8 +287,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check destChainConfig on OnRamp
 			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(onRampAddr),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(onRampAddr),
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -300,8 +300,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check destChainConfig on CommitteeVerifier
 			committeeVerifierRemoteChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(committeeVerifierAddr),
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -310,8 +310,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check signature quorum on CommitteeVerifier
 			signatureQuorumReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(committeeVerifierAddr),
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -327,8 +327,9 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check inbound implementation on CommitteeVerifierResolver
 			versionTagReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.VersionTag, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(committeeVerifierAddr),
+				Args:          struct{}{},
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			inboundImpl, err := boundResolver.GetInboundImplementation(&bind.CallOpts{Context: t.Context()}, versionTagReport.Output[:])
@@ -337,8 +338,9 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 
 			// Check dest chains on Executor
 			executorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(executorAddr),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(executorAddr),
+				Args:          struct{}{},
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, executorDestChains.Output, 1, "There should be one dest chain on Executor")
@@ -383,16 +385,16 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			}
 
 			fee, err := operations.ExecuteOperation(e.OperationsBundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(routerAddress),
 				Args:          ccipSendArgs,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 
 			ccipSendArgs.Value = fee.Output
 			_, err = operations.ExecuteOperation(e.OperationsBundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
+				// ChainSelector: evmChain.Selector,
+				// Address:       common.HexToAddress(routerAddress),
 				Args:          ccipSendArgs,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -414,7 +416,7 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{evmChain.DeployerKey.From},
 		},
@@ -459,7 +461,7 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 
 	create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  remoteChainSelector,
+		// ChainSelector:  remoteChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{evmChain2.DeployerKey.From},
 		},
@@ -588,7 +590,7 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		// add an onramp with version 1.6.0
 		// deploy onramp 1.6.0
 		out, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), onramp2.Deploy, evmChain, contract_utils.DeployInput[onramp2.ConstructorArgs]{
-			ChainSelector:  chainSelector,
+			// ChainSelector:  chainSelector,
 			TypeAndVersion: onramp2.TypeAndVersion,
 			Args: onramp2.ConstructorArgs{
 				StaticConfig: onramp2.StaticConfig{
@@ -607,8 +609,8 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		deployedOnRampAddr := common.HexToAddress(out.Output.Address)
 		// add this onramp to the router
 		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(routerAddress),
+			// ChainSelector: chainSelector,
+			// Address:       common.HexToAddress(routerAddress),
 			Args: router.ApplyRampsUpdatesArgs{
 				OnRampUpdates: []router.OnRamp{
 					{
@@ -628,8 +630,8 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
 
 		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(testRouterAddress),
+			// ChainSelector: chainSelector,
+			// Address:       common.HexToAddress(testRouterAddress),
 			Args: router.ApplyRampsUpdatesArgs{
 				OnRampUpdates: []router.OnRamp{
 					{

@@ -180,8 +180,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If either rate limiter config is different, then update it
 				if !isOutboundEqual || !isInboundEqual {
 					report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
-						ChainSelector: chain.Selector,
-						Address:       input.TokenPoolAddress,
+						// ChainSelector: chain.Selector,
+						// Address:       input.TokenPoolAddress,
 						Args: tpops.SetChainRateLimiterConfigArgs{
 							OutboundConfig:      tpops.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
 							InboundConfig:       tpops.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
@@ -197,8 +197,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the remote token pool is not registered, then add it
 				if !hasRemoteTP {
 					report, err := cldf_ops.ExecuteOperation(b, tpops.AddRemotePool, chain, contract.FunctionInput[tpops.AddRemotePoolArgs]{
-						ChainSelector: chain.Selector,
-						Address:       input.TokenPoolAddress,
+						// ChainSelector: chain.Selector,
+						// Address:       input.TokenPoolAddress,
 						Args: tpops.AddRemotePoolArgs{
 							RemoteChainSelector: remoteCS,
 							RemotePoolAddress:   remoteTP,
@@ -228,8 +228,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
 			applyChainUpdatesInput := contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: chain.Selector,
+				// Address:       input.TokenPoolAddress,
 				Args: tpops.ApplyChainUpdatesArgs{
 					RemoteChainSelectorsToRemove: remotesToDel,
 					ChainsToAdd: []tpops.ChainUpdate{

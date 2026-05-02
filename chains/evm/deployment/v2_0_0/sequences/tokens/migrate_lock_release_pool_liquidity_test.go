@@ -175,7 +175,7 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 
 	create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, evm_contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
+		// ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{deployer},
 		},
@@ -210,7 +210,7 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		burn_mint_erc20_with_drip.Deploy,
 		chain,
 		evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
 			Args: burn_mint_erc20_with_drip.ConstructorArgs{
 				Name:   "Test Token",
@@ -226,7 +226,7 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		old_lrtp.Deploy,
 		chain,
 		evm_contract.DeployInput[old_lrtp.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(old_lrtp.ContractType, *old_lrtp.Version),
 			Args: old_lrtp.ConstructorArgs{
 				Token:              tokenAddr,
@@ -268,9 +268,9 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		burn_mint_erc20_with_drip.GrantMintAndBurnRoles,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       tokenAddr,
-			Args:          deployer,
+			// ChainSelector: chainSel,
+			// Address:       tokenAddr,
+			Args: deployer,
 		},
 	)
 	require.NoError(t, err)
@@ -280,8 +280,8 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		burn_mint_erc20_with_drip.Mint,
 		chain,
 		evm_contract.FunctionInput[burn_mint_erc20_with_drip.MintArgs]{
-			ChainSelector: chainSel,
-			Address:       tokenAddr,
+			// ChainSelector: chainSel,
+			// Address:       tokenAddr,
 			Args: burn_mint_erc20_with_drip.MintArgs{
 				Account: oldPoolAddr,
 				Amount:  liquidityAmount,
@@ -296,9 +296,9 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       tokenAddr,
-			Args:          oldPoolAddr,
+			// ChainSelector: chainSel,
+			// Address:       tokenAddr,
+			Args: oldPoolAddr,
 		},
 	)
 	require.NoError(t, err)
@@ -347,9 +347,9 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.tokenAddr,
-			Args:          s.oldPoolAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.tokenAddr,
+			Args: s.oldPoolAddr,
 		},
 	)
 	require.NoError(t, err)
@@ -360,9 +360,9 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.tokenAddr,
-			Args:          s.lockBoxAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.tokenAddr,
+			Args: s.lockBoxAddr,
 		},
 	)
 	require.NoError(t, err)
@@ -374,8 +374,9 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 		old_lrtp.GetRebalancer,
 		chain,
 		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       s.oldPoolAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.oldPoolAddr,
+			Args: struct{}{},
 		},
 	)
 	require.NoError(t, err)
@@ -388,8 +389,9 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 		erc20_lock_box.GetAllAuthorizedCallers,
 		chain,
 		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       s.lockBoxAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.lockBoxAddr,
+			Args: struct{}{},
 		},
 	)
 	require.NoError(t, err)
@@ -423,8 +425,8 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.tokenAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.tokenAddr,
 			Args:          s.oldPoolAddr,
 		},
 	)
@@ -436,8 +438,8 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.tokenAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.tokenAddr,
 			Args:          s.lockBoxAddr,
 		},
 	)
@@ -473,8 +475,8 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.tokenAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.tokenAddr,
 			Args:          s.oldPoolAddr,
 		},
 	)
@@ -486,8 +488,8 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 		erc20.BalanceOf,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.tokenAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.tokenAddr,
 			Args:          s.lockBoxAddr,
 		},
 	)
@@ -508,8 +510,8 @@ func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
 		old_lrtp.SetRebalancer,
 		chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel,
-			Address:       s.oldPoolAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.oldPoolAddr,
 			Args:          originalRebalancer,
 		},
 	)
@@ -538,8 +540,9 @@ func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
 		old_lrtp.GetRebalancer,
 		chain,
 		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       s.oldPoolAddr,
+			// ChainSelector: chainSel,
+			// Address:       s.oldPoolAddr,
+			Args: struct{}{},
 		},
 	)
 	require.NoError(t, err)
@@ -603,7 +606,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 
 	create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, evm_contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
+		// ChainSelector:  chainSel,
 		Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
 	}, nil)
 	require.NoError(t, err)
@@ -632,7 +635,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	tokenReport, err := operations.ExecuteOperation(
 		e.OperationsBundle, burn_mint_erc20_with_drip.Deploy, chain,
 		evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
 			Args:           burn_mint_erc20_with_drip.ConstructorArgs{Name: "Test Token", Symbol: "TEST"},
 		},
@@ -644,7 +647,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	oldPoolReport, err := operations.ExecuteOperation(
 		e.OperationsBundle, old_siloed.Deploy, chain,
 		evm_contract.DeployInput[old_siloed.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(old_siloed.ContractType, *old_siloed.Version),
 			Args: old_siloed.ConstructorArgs{
 				Token: tokenAddr, LocalTokenDecimals: 18,
@@ -699,24 +702,24 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 
 	// Set deployer as the unsiloed rebalancer (for provideLiquidity)
 	_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.SetRebalancer, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: oldPoolAddr, Args: deployer})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: oldPoolAddr,*/ Args: deployer})
 	require.NoError(t, err)
 
 	// Mint tokens to deployer, approve old pool, then provide siloed + unsiloed liquidity
 	_, err = operations.ExecuteOperation(e.OperationsBundle, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: tokenAddr, Args: deployer})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: tokenAddr,*/ Args: deployer})
 	require.NoError(t, err)
 
 	_, err = operations.ExecuteOperation(e.OperationsBundle, burn_mint_erc20_with_drip.Mint, chain,
 		evm_contract.FunctionInput[burn_mint_erc20_with_drip.MintArgs]{
-			ChainSelector: chainSel, Address: tokenAddr,
+			// ChainSelector: chainSel, Address: tokenAddr,
 			Args: burn_mint_erc20_with_drip.MintArgs{Account: deployer, Amount: totalMint},
 		})
 	require.NoError(t, err)
 
 	_, err = operations.ExecuteOperation(e.OperationsBundle, erc20.Approve, chain,
 		evm_contract.FunctionInput[erc20.ApproveArgs]{
-			ChainSelector: chainSel, Address: tokenAddr,
+			// ChainSelector: chainSel, Address: tokenAddr,
 			Args: erc20.ApproveArgs{Spender: oldPoolAddr, Value: totalMint},
 		})
 	require.NoError(t, err)
@@ -769,7 +772,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	// Deploy per-chain lockboxes
 	lockbox1Report, err := operations.ExecuteOperation(e.OperationsBundle, erc20_lock_box.Deploy, chain,
 		evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args:           erc20_lock_box.ConstructorArgs{Token: tokenAddr},
 			Qualifier:      strPtr("chain1"),
@@ -779,7 +782,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 
 	lockbox2Report, err := operations.ExecuteOperation(e.OperationsBundle, erc20_lock_box.Deploy, chain,
 		evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args:           erc20_lock_box.ConstructorArgs{Token: tokenAddr},
 			Qualifier:      strPtr("chain2"),
@@ -816,21 +819,21 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	// Verify old pool is drained
 	oldPoolBal, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: tokenAddr, Args: oldPoolAddr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: tokenAddr,*/ Args: oldPoolAddr})
 	require.NoError(t, err)
 	require.Equal(t, 0, big.NewInt(0).Cmp(oldPoolBal.Output), "Old siloed pool should be fully drained")
 
 	// Verify lockbox1 received silo1 amount
 	lb1Bal, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: tokenAddr, Args: lockbox1Addr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: tokenAddr,*/ Args: lockbox1Addr})
 	require.NoError(t, err)
 	require.True(t, lb1Bal.Output.Sign() > 0, "Lockbox 1 should have received tokens")
 
 	// Verify lockbox2 received silo2 amount
 	lb2Bal, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: tokenAddr, Args: lockbox2Addr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: tokenAddr,*/ Args: lockbox2Addr})
 	require.NoError(t, err)
 	require.True(t, lb2Bal.Output.Sign() > 0, "Lockbox 2 should have received tokens")
 
@@ -850,7 +853,7 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	tarReport, err := operations.ExecuteOperation(
 		s.env.OperationsBundle, tar.Deploy, chain,
 		evm_contract.DeployInput[tar.ConstructorArgs]{
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(tar.ContractType, *tar.Version),
 			Args:           tar.ConstructorArgs{},
 		})
@@ -861,7 +864,7 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	_, err = operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), tar.ProposeAdministrator, chain,
 		evm_contract.FunctionInput[tar.ProposeAdministratorArgs]{
-			ChainSelector: chainSel, Address: tarAddr,
+			// ChainSelector: chainSel, Address: tarAddr,
 			Args: tar.ProposeAdministratorArgs{TokenAddress: s.tokenAddr, Administrator: s.deployer},
 		})
 	require.NoError(t, err)
@@ -869,7 +872,7 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	_, err = operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), tar.AcceptAdminRole, chain,
 		evm_contract.FunctionInput[tar.AcceptAdminRoleArgs]{
-			ChainSelector: chainSel, Address: tarAddr,
+			// ChainSelector: chainSel, Address: tarAddr,
 			Args: tar.AcceptAdminRoleArgs{TokenAddress: s.tokenAddr},
 		})
 	require.NoError(t, err)
@@ -898,7 +901,8 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	tokenConfig, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), tar.GetTokenConfig, chain,
 		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chainSel, Address: tarAddr, Args: s.tokenAddr,
+			// ChainSelector: chainSel, Address: tarAddr,
+			Args: s.tokenAddr,
 		})
 	require.NoError(t, err)
 	require.Equal(t, s.newPoolAddr, tokenConfig.Output.TokenPool,
@@ -907,7 +911,7 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	// Verify liquidity was also migrated
 	lockboxBal, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: s.tokenAddr, Args: s.lockBoxAddr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: s.tokenAddr,*/ Args: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal.Output), "Lockbox should hold all liquidity")
 }
@@ -923,7 +927,7 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	_, err := operations.ExecuteOperation(
 		s.env.OperationsBundle, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain,
 		evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-			ChainSelector: chainSel, Address: s.lockBoxAddr,
+			// ChainSelector: chainSel, Address: s.lockBoxAddr,
 			Args: erc20_lock_box.AuthorizedCallerArgs{
 				AddedCallers:   []common.Address{preExistingCaller},
 				RemovedCallers: []common.Address{},
@@ -934,7 +938,10 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	// Verify pre-existing caller is present before migration
 	preCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20_lock_box.GetAllAuthorizedCallers, chain,
-		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.lockBoxAddr})
+		evm_contract.FunctionInput[struct{}]{
+			/*ChainSelector: chainSel, Address: s.lockBoxAddr,*/ 
+			Args: struct{}{},
+		})
 	require.NoError(t, err)
 	require.Contains(t, preCallersReport.Output, preExistingCaller,
 		"Pre-existing caller should be present before migration")
@@ -958,7 +965,10 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	// Verify pre-existing caller is still present after migration
 	postCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20_lock_box.GetAllAuthorizedCallers, chain,
-		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.lockBoxAddr})
+		evm_contract.FunctionInput[struct{}]{
+			// ChainSelector: chainSel, Address: s.lockBoxAddr
+			Args: struct{}{},
+		})
 	require.NoError(t, err)
 	require.Contains(t, postCallersReport.Output, preExistingCaller,
 		"Pre-existing authorized caller should be preserved after migration")
@@ -993,13 +1003,13 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 	// Verify 50% migrated
 	oldPoolBal1, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: s.tokenAddr, Args: s.oldPoolAddr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: s.tokenAddr,*/ Args: s.oldPoolAddr})
 	require.NoError(t, err)
 	require.Equal(t, 0, big.NewInt(5000).Cmp(oldPoolBal1.Output), "Old pool should retain 50%% after first migration")
 
 	lockboxBal1, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: s.tokenAddr, Args: s.lockBoxAddr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: s.tokenAddr,*/ Args: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Equal(t, 0, big.NewInt(5000).Cmp(lockboxBal1.Output), "Lockbox should hold 50%% after first migration")
 
@@ -1022,20 +1032,23 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 	// Verify all liquidity migrated
 	oldPoolBal2, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: s.tokenAddr, Args: s.oldPoolAddr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: s.tokenAddr,*/ Args: s.oldPoolAddr})
 	require.NoError(t, err)
 	require.Equal(t, 0, big.NewInt(0).Cmp(oldPoolBal2.Output), "Old pool should be fully drained after second migration")
 
 	lockboxBal2, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20.BalanceOf, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: s.tokenAddr, Args: s.lockBoxAddr})
+		evm_contract.FunctionInput[common.Address]{/*ChainSelector: chainSel, Address: s.tokenAddr,*/ Args: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal2.Output), "Lockbox should hold all liquidity after second migration")
 
 	// Verify rebalancer is restored (should be zero address since none was set)
 	rebalancerReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), old_lrtp.GetRebalancer, chain,
-		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.oldPoolAddr})
+		evm_contract.FunctionInput[struct{}]{
+			//ChainSelector: chainSel, Address: s.oldPoolAddr,
+			Args: struct{}{},
+		})
 	require.NoError(t, err)
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored after both migrations")

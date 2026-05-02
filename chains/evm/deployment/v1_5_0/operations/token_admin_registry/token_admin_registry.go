@@ -59,7 +59,7 @@ var ProposeAdministrator = contract.NewWrite(contract.WriteParams[ProposeAdminis
 	Description:  "Proposes an administrator for a token on the TokenAdminRegistry contract",
 	ContractType: ContractType,
 	ContractABI:  token_admin_registry.TokenAdminRegistryABI,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	IsAllowedCaller: func(contract *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, caller common.Address, input ProposeAdministratorArgs) (bool, error) {
 		owner, err := contract.Owner(opts)
 		if err != nil {
@@ -83,7 +83,7 @@ var TransferAdminRole = contract.NewWrite(contract.WriteParams[TransferAdminRole
 	Description:  "Transfers the admin role for a token on the TokenAdminRegistry contract",
 	ContractType: ContractType,
 	ContractABI:  token_admin_registry.TokenAdminRegistryABI,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	IsAllowedCaller: func(contract *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, caller common.Address, input TransferAdminRoleArgs) (bool, error) {
 		tokenConfig, err := contract.GetTokenConfig(opts, input.TokenAddress)
 		if err != nil {
@@ -103,7 +103,7 @@ var AcceptAdminRole = contract.NewWrite(contract.WriteParams[AcceptAdminRoleArgs
 	Description:  "Accepts the admin role for a token on the TokenAdminRegistry contract",
 	ContractType: ContractType,
 	ContractABI:  token_admin_registry.TokenAdminRegistryABI,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	IsAllowedCaller: func(contract *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, caller common.Address, args AcceptAdminRoleArgs) (bool, error) {
 		tokenConfig, err := contract.GetTokenConfig(opts, args.TokenAddress)
 		if err != nil {
@@ -123,7 +123,7 @@ var SetPool = contract.NewWrite(contract.WriteParams[SetPoolArgs, *token_admin_r
 	Description:  "Sets the token pool for a token on the TokenAdminRegistry contract",
 	ContractType: ContractType,
 	ContractABI:  token_admin_registry.TokenAdminRegistryABI,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	IsAllowedCaller: func(contract *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, caller common.Address, input SetPoolArgs) (bool, error) {
 		tokenConfig, err := contract.GetTokenConfig(opts, input.TokenAddress)
 		if err != nil {
@@ -143,7 +143,7 @@ var AddRegistryModule = contract.NewWrite(contract.WriteParams[common.Address, *
 	Description:     "Adds a registry module to the TokenAdminRegistry contract",
 	ContractType:    ContractType,
 	ContractABI:     token_admin_registry.TokenAdminRegistryABI,
-	NewContract:     token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:     token_admin_registry.NewTokenAdminRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*token_admin_registry.TokenAdminRegistry, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
@@ -156,7 +156,7 @@ var IsRegistryModule = contract.NewRead(contract.ReadParams[common.Address, bool
 	Version:      Version,
 	Description:  "Checks if an address is a registry module in the TokenAdminRegistry contract",
 	ContractType: ContractType,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args common.Address) (bool, error) {
 		return tokenAdminRegistry.IsRegistryModule(opts, args)
 	},
@@ -167,7 +167,7 @@ var Owner = contract.NewRead(contract.ReadParams[any, common.Address, *token_adm
 	Version:      Version,
 	Description:  "Gets the owner of the TokenAdminRegistry contract",
 	ContractType: ContractType,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args any) (common.Address, error) {
 		return tokenAdminRegistry.Owner(opts)
 	},
@@ -178,7 +178,7 @@ var GetTokenConfig = contract.NewRead(contract.ReadParams[common.Address, TokenC
 	Version:      Version,
 	Description:  "Gets the token configuration for a given token address from the TokenAdminRegistry contract",
 	ContractType: ContractType,
-	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	// NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args common.Address) (TokenConfig, error) {
 		return tokenAdminRegistry.GetTokenConfig(opts, args)
 	},

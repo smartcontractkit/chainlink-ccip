@@ -46,7 +46,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		// Deploy chain contracts
 		create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], evm_contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
@@ -150,8 +150,8 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			token_admin_registry.GetTokenConfig,
 			e.BlockChains.EVMChains()[chainSel],
 			evm_contract.FunctionInput[common.Address]{
-				ChainSelector: chainSel,
-				Address:       common.HexToAddress(tokenAdminRegistryAddress),
+				// ChainSelector: chainSel,
+				// Address:       common.HexToAddress(tokenAdminRegistryAddress),
 				Args:          common.HexToAddress(tokenAddress),
 			},
 		)
@@ -168,8 +168,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			token_pool.GetToken,
 			e.BlockChains.EVMChains()[chainSel],
 			evm_contract.FunctionInput[struct{}]{
-				ChainSelector: chainSel,
-				Address:       common.HexToAddress(tokenPoolAddress),
+				// ChainSelector: chainSel,
+				// Address:       common.HexToAddress(tokenPoolAddress),
+				Args:          struct{}{},
 			},
 		)
 		require.NoError(t, err, "ExecuteOperation should not error")
@@ -188,7 +189,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], evm_contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
+			// ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},

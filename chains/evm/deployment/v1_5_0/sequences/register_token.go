@@ -49,8 +49,9 @@ var RegisterToken = cldf_ops.NewSequence(
 		tokenAddress := input.TokenAddress
 		if tokenAddress == (common.Address{}) {
 			getTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
+				Args: nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address: %w", err)
@@ -60,8 +61,8 @@ var RegisterToken = cldf_ops.NewSequence(
 
 		// Get the current token config from the token admin registry.
 		tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenAdminRegistryAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       input.TokenAdminRegistryAddress,
 			Args:          tokenAddress,
 		})
 		if err != nil {
@@ -73,8 +74,9 @@ var RegisterToken = cldf_ops.NewSequence(
 
 		// Get the owner of the token admin registry.
 		ownerReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.Owner, chain, evm_contract.FunctionInput[any]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenAdminRegistryAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       input.TokenAdminRegistryAddress,
+			Args: nil,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get owner of token admin registry: %w", err)
@@ -89,8 +91,8 @@ var RegisterToken = cldf_ops.NewSequence(
 				desiredAdmin = registryOwner
 			}
 			proposeAdminReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, chain, evm_contract.FunctionInput[token_admin_registry.ProposeAdministratorArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenAdminRegistryAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenAdminRegistryAddress,
 				Args: token_admin_registry.ProposeAdministratorArgs{
 					TokenAddress:  tokenAddress,
 					Administrator: desiredAdmin,
@@ -106,8 +108,8 @@ var RegisterToken = cldf_ops.NewSequence(
 		// Accept the admin role if the registry owner is the pending admin.
 		if pendingAdmin == registryOwner {
 			acceptAdminReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, chain, evm_contract.FunctionInput[token_admin_registry.AcceptAdminRoleArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenAdminRegistryAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenAdminRegistryAddress,
 				Args: token_admin_registry.AcceptAdminRoleArgs{
 					TokenAddress: tokenAddress,
 				},
@@ -122,8 +124,8 @@ var RegisterToken = cldf_ops.NewSequence(
 		// Set the token pool on the token admin registry if the registry owner is the admin and the pool is not set.
 		if admin == registryOwner && tokenPoolSet != input.TokenPoolAddress {
 			setPoolReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.SetPool, chain, evm_contract.FunctionInput[token_admin_registry.SetPoolArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenAdminRegistryAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenAdminRegistryAddress,
 				Args: token_admin_registry.SetPoolArgs{
 					TokenAddress:     tokenAddress,
 					TokenPoolAddress: input.TokenPoolAddress,

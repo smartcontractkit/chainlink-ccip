@@ -68,8 +68,8 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 				report, err := operations.ExecuteOperation(
 					b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain,
 					contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: src,
-						Address:       addr,
+						// ChainSelector: src,
+						// Address:       addr,
 						Args:          args,
 					},
 				)

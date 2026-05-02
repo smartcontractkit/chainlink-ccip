@@ -895,7 +895,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	for _, chainSelector := range chainSelectorList {
 		chain := e.BlockChains.EVMChains()[chainSelector]
 		dRep, err2 := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.Deploy, chain, contract.DeployInput[routerops.ConstructorArgs]{
-			ChainSelector:  chainSelector,
+			// ChainSelector:  chainSelector,
 			TypeAndVersion: cldf.NewTypeAndVersion(routerops.ContractType, *routerops.Version),
 			Args: routerops.ConstructorArgs{
 				WrappedNative: utils2.RandomAddress(), // not relevant to this test, just needs to be populated with a valid address
@@ -1251,7 +1251,7 @@ func deployOnRamps(t *testing.T, e *cldf.Environment, chainSelector uint64, remo
 		switch version.String() {
 		case "1.5.0":
 			out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampv1_5ops.DeployOnRamp, chain, contract.DeployInput[onrampv1_5ops.ConstructorArgs]{
-				ChainSelector:  chainSelector,
+				// ChainSelector:  chainSelector,
 				TypeAndVersion: cldf.NewTypeAndVersion(onrampv1_5ops.ContractType, *onrampv1_5ops.Version),
 				Args: onrampv1_5ops.ConstructorArgs{
 					StaticConfig: evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampStaticConfig{
@@ -1293,7 +1293,7 @@ func deployOnRamps(t *testing.T, e *cldf.Environment, chainSelector uint64, remo
 			rampAddr = out.Output
 		case "1.6.0":
 			out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampv1_6ops.Deploy, chain, contract.DeployInput[onrampv1_6ops.ConstructorArgs]{
-				ChainSelector:  chainSelector,
+				// ChainSelector:  chainSelector,
 				TypeAndVersion: cldf.NewTypeAndVersion(onrampv1_6ops.ContractType, *onrampv1_6ops.Version),
 				Args: onrampv1_6ops.ConstructorArgs{
 					StaticConfig: onrampv1_6ops.StaticConfig{
@@ -1328,8 +1328,8 @@ func deployOnRamps(t *testing.T, e *cldf.Environment, chainSelector uint64, remo
 	}
 
 	_, err := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.ApplyRampUpdates, chain, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
-		ChainSelector: chainSelector,
-		Address:       routerAddr,
+		// ChainSelector: chainSelector,
+		// Address:       routerAddr,
 		Args: routerops.ApplyRampsUpdatesArgs{
 			OnRampUpdates:  routerOnRamps,
 			OffRampAdds:    []router.RouterOffRamp{},

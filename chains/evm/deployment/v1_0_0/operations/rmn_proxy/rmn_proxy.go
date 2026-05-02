@@ -42,7 +42,7 @@ var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contr
 	Description:     "Sets the RMN address on the RMNProxy",
 	ContractType:    ContractType,
 	ContractABI:     rmn_proxy_contract.RMNProxyABI,
-	NewContract:     rmn_proxy_contract.NewRMNProxy,
+	// NewContract:     rmn_proxy_contract.NewRMNProxy,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_proxy_contract.RMNProxy, SetRMNArgs],
 	Validate:        func(SetRMNArgs) error { return nil },
 	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
@@ -55,7 +55,7 @@ var GetRMN = contract.NewRead(contract.ReadParams[struct{}, common.Address, *rmn
 	Version:      semver.MustParse("1.0.0"),
 	Description:  "Gets the RMN address set on the RMNProxy",
 	ContractType: ContractType,
-	NewContract:  rmn_proxy_contract.NewRMNProxy,
+	// NewContract:  rmn_proxy_contract.NewRMNProxy,
 	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return rmnProxy.GetARM(opts)
 	},

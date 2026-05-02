@@ -53,8 +53,8 @@ var ManualRegistrationSequence = operations.NewSequence(
 				tarops.ProposeAdministrator,
 				chain,
 				contract.FunctionInput[tarops.ProposeAdministratorArgs]{
-					Address:       input.Address,
-					ChainSelector: input.ChainSelector,
+					// Address:       input.Address,
+					// ChainSelector: input.ChainSelector,
 					Args: tarops.ProposeAdministratorArgs{
 						Administrator: input.AdminAddress,
 						TokenAddress:  input.TokenAddress,
@@ -70,8 +70,8 @@ var ManualRegistrationSequence = operations.NewSequence(
 				tarops.TransferAdminRole,
 				chain,
 				contract.FunctionInput[tarops.TransferAdminRoleArgs]{
-					Address:       input.Address,
-					ChainSelector: input.ChainSelector,
+					// Address:       input.Address,
+					// ChainSelector: input.ChainSelector,
 					Args: tarops.TransferAdminRoleArgs{
 						Administrator: input.AdminAddress,
 						TokenAddress:  input.TokenAddress,

@@ -228,7 +228,7 @@ var ApplyCCVConfigUpdates = contract.NewWrite(contract.WriteParams[[]CCVConfigAr
 	Description:     "Calls applyCCVConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     AdvancedPoolHooksABI,
-	NewContract:     NewAdvancedPoolHooksContract,
+	// NewContract:     NewAdvancedPoolHooksContract,
 	IsAllowedCaller: contract.OnlyOwner[*AdvancedPoolHooksContract, []CCVConfigArg],
 	Validate:        func([]CCVConfigArg) error { return nil },
 	CallContract: func(
@@ -246,7 +246,7 @@ var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowLis
 	Description:     "Calls applyAllowListUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     AdvancedPoolHooksABI,
-	NewContract:     NewAdvancedPoolHooksContract,
+	// NewContract:     NewAdvancedPoolHooksContract,
 	IsAllowedCaller: contract.OnlyOwner[*AdvancedPoolHooksContract, ApplyAllowListUpdatesArgs],
 	Validate:        func(ApplyAllowListUpdatesArgs) error { return nil },
 	CallContract: func(
@@ -264,7 +264,7 @@ var SetThresholdAmount = contract.NewWrite(contract.WriteParams[*big.Int, *Advan
 	Description:     "Calls setThresholdAmount on the contract",
 	ContractType:    ContractType,
 	ContractABI:     AdvancedPoolHooksABI,
-	NewContract:     NewAdvancedPoolHooksContract,
+	// NewContract:     NewAdvancedPoolHooksContract,
 	IsAllowedCaller: contract.OnlyOwner[*AdvancedPoolHooksContract, *big.Int],
 	Validate:        func(*big.Int) error { return nil },
 	CallContract: func(
@@ -282,7 +282,7 @@ var SetPolicyEngine = contract.NewWrite(contract.WriteParams[common.Address, *Ad
 	Description:     "Calls setPolicyEngine on the contract",
 	ContractType:    ContractType,
 	ContractABI:     AdvancedPoolHooksABI,
-	NewContract:     NewAdvancedPoolHooksContract,
+	// NewContract:     NewAdvancedPoolHooksContract,
 	IsAllowedCaller: contract.OnlyOwner[*AdvancedPoolHooksContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -300,7 +300,7 @@ var SetPolicyEngineAllowFailedDetach = contract.NewWrite(contract.WriteParams[co
 	Description:     "Calls setPolicyEngineAllowFailedDetach on the contract",
 	ContractType:    ContractType,
 	ContractABI:     AdvancedPoolHooksABI,
-	NewContract:     NewAdvancedPoolHooksContract,
+	// NewContract:     NewAdvancedPoolHooksContract,
 	IsAllowedCaller: contract.OnlyOwner[*AdvancedPoolHooksContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -318,7 +318,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     AdvancedPoolHooksABI,
-	NewContract:     NewAdvancedPoolHooksContract,
+	// NewContract:     NewAdvancedPoolHooksContract,
 	IsAllowedCaller: contract.OnlyOwner[*AdvancedPoolHooksContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(
@@ -335,7 +335,7 @@ var GetAllowListEnabled = contract.NewRead(contract.ReadParams[struct{}, bool, *
 	Version:      Version,
 	Description:  "Calls getAllowListEnabled on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args struct{}) (bool, error) {
 		return c.GetAllowListEnabled(opts)
 	},
@@ -346,7 +346,7 @@ var GetAllowList = contract.NewRead(contract.ReadParams[struct{}, []common.Addre
 	Version:      Version,
 	Description:  "Calls getAllowList on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllowList(opts)
 	},
@@ -357,7 +357,7 @@ var GetThresholdAmount = contract.NewRead(contract.ReadParams[struct{}, *big.Int
 	Version:      Version,
 	Description:  "Calls getThresholdAmount on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args struct{}) (*big.Int, error) {
 		return c.GetThresholdAmount(opts)
 	},
@@ -368,7 +368,7 @@ var GetPolicyEngine = contract.NewRead(contract.ReadParams[struct{}, common.Addr
 	Version:      Version,
 	Description:  "Calls getPolicyEngine on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetPolicyEngine(opts)
 	},
@@ -379,7 +379,7 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	Version:      Version,
 	Description:  "Calls getAllAuthorizedCallers on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
 	},
@@ -390,7 +390,7 @@ var GetAllCCVConfigs = contract.NewRead(contract.ReadParams[struct{}, []CCVConfi
 	Version:      Version,
 	Description:  "Calls getAllCCVConfigs on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args struct{}) ([]CCVConfigArg, error) {
 		return c.GetAllCCVConfigs(opts)
 	},
@@ -401,7 +401,7 @@ var GetCCVConfig = contract.NewRead(contract.ReadParams[uint64, CCVConfig, *Adva
 	Version:      Version,
 	Description:  "Calls getCCVConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args uint64) (CCVConfig, error) {
 		return c.GetCCVConfig(opts, args)
 	},
@@ -412,7 +412,7 @@ var GetRequiredCCVs = contract.NewRead(contract.ReadParams[GetRequiredCCVsArgs, 
 	Version:      Version,
 	Description:  "Calls getRequiredCCVs on the contract",
 	ContractType: ContractType,
-	NewContract:  NewAdvancedPoolHooksContract,
+	// NewContract:  NewAdvancedPoolHooksContract,
 	CallContract: func(c *AdvancedPoolHooksContract, opts *bind.CallOpts, args GetRequiredCCVsArgs) ([]common.Address, error) {
 		return c.GetRequiredCCVs(opts, args.Arg0, args.RemoteChainSelector, args.Amount, args.Arg3, args.Arg4, args.Direction)
 	},

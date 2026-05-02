@@ -47,8 +47,8 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 		gasPrices := make(map[uint64]*big.Int)
 		for _, remoteChainSelector := range input.RemoteChains {
 			gasPricesOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       input.PriceRegistry,
+				// ChainSelector: chain.Selector,
+				// Address:       input.PriceRegistry,
 				Args:          remoteChainSelector,
 			})
 			if err != nil {
@@ -59,8 +59,8 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 		}
 		// get fee tokens
 		feetokensRep, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       input.PriceRegistry,
+			// ChainSelector: chain.Selector,
+			// Address:       input.PriceRegistry,
 			Args:          nil,
 		})
 		if err != nil {
@@ -80,8 +80,8 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 		}
 		tokenPrices := make(map[common.Address]*big.Int)
 		tokenPriceOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetTokenPrices, chain, contract.FunctionInput[[]common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       input.PriceRegistry,
+			// ChainSelector: chain.Selector,
+			// Address:       input.PriceRegistry,
 			Args:          allTokens,
 		})
 		if err != nil {

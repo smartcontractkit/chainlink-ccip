@@ -65,7 +65,7 @@ func TestRegisterToken(t *testing.T) {
 				token_admin_registry.Deploy,
 				e.BlockChains.EVMChains()[chainSel],
 				evmcontract.DeployInput[token_admin_registry.ConstructorArgs]{
-					ChainSelector:  chainSel,
+					// ChainSelector:  chainSel,
 					TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 				},
 			)
@@ -127,8 +127,8 @@ func TestRegisterToken(t *testing.T) {
 				token_admin_registry.GetTokenConfig,
 				e.BlockChains.EVMChains()[chainSel],
 				evmcontract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       tokenAdminRegistryAddress,
+					// ChainSelector: chainSel,
+					// Address:       tokenAdminRegistryAddress,
 					Args:          tokenAddress,
 				},
 			)

@@ -153,7 +153,7 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 	Description:     "Calls applySourceChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OffRampABI,
-	NewContract:     NewOffRampContract,
+	//NewContract:     NewOffRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, []SourceChainConfigArgs],
 	Validate:        func([]SourceChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -170,7 +170,7 @@ var GetSourceChainConfig = contract.NewRead(contract.ReadParams[uint64, SourceCh
 	Version:      Version,
 	Description:  "Calls getSourceChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOffRampContract,
+	//NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args uint64) (SourceChainConfig, error) {
 		return c.GetSourceChainConfig(opts, args)
 	},
@@ -181,7 +181,7 @@ var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfi
 	Version:      Version,
 	Description:  "Calls getStaticConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOffRampContract,
+	//NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
 		return c.GetStaticConfig(opts)
 	},
@@ -192,7 +192,7 @@ var GetAllSourceChainConfigs = contract.NewRead(contract.ReadParams[struct{}, Ge
 	Version:      Version,
 	Description:  "Calls getAllSourceChainConfigs on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOffRampContract,
+	//NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args struct{}) (GetAllSourceChainConfigsResult, error) {
 		return c.GetAllSourceChainConfigs(opts)
 	},

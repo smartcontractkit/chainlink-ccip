@@ -30,7 +30,7 @@ var ExecutorApplyDestChainUpdates = contract_utils.NewWrite(contract_utils.Write
 	Description:     "Applies updates to supported destination chains on the Executor",
 	ContractType:    executor.ContractType,
 	ContractABI:     executor.ExecutorABI,
-	NewContract:     executor_bindings.NewExecutor,
+	//NewContract:     executor_bindings.NewExecutor,
 	IsAllowedCaller: contract_utils.OnlyOwner[*executor_bindings.Executor, ExecutorApplyDestChainUpdatesArgs],
 	Validate:        func(ExecutorApplyDestChainUpdatesArgs) error { return nil },
 	CallContract: func(e *executor_bindings.Executor, opts *bind.TransactOpts, args ExecutorApplyDestChainUpdatesArgs) (*types.Transaction, error) {

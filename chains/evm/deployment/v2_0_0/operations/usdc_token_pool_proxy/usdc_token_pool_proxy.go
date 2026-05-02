@@ -121,7 +121,7 @@ var GetPools = contract.NewRead(contract.ReadParams[struct{}, PoolAddresses, *US
 	Version:      Version,
 	Description:  "Calls getPools on the contract",
 	ContractType: ContractType,
-	NewContract:  NewUSDCTokenPoolProxyContract,
+	//NewContract:  NewUSDCTokenPoolProxyContract,
 	CallContract: func(c *USDCTokenPoolProxyContract, opts *bind.CallOpts, args struct{}) (PoolAddresses, error) {
 		return c.GetPools(opts)
 	},
@@ -133,7 +133,7 @@ var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLo
 	Description:     "Calls updateLockOrBurnMechanisms on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolProxyABI,
-	NewContract:     NewUSDCTokenPoolProxyContract,
+	//NewContract:     NewUSDCTokenPoolProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolProxyContract, UpdateLockOrBurnMechanismsArgs],
 	Validate:        func(UpdateLockOrBurnMechanismsArgs) error { return nil },
 	CallContract: func(
@@ -151,7 +151,7 @@ var UpdatePoolAddresses = contract.NewWrite(contract.WriteParams[PoolAddresses, 
 	Description:     "Calls updatePoolAddresses on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolProxyABI,
-	NewContract:     NewUSDCTokenPoolProxyContract,
+	//NewContract:     NewUSDCTokenPoolProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolProxyContract, PoolAddresses],
 	Validate:        func(PoolAddresses) error { return nil },
 	CallContract: func(
@@ -169,7 +169,7 @@ var SetFeeAggregator = contract.NewWrite(contract.WriteParams[common.Address, *U
 	Description:     "Calls setFeeAggregator on the contract",
 	ContractType:    ContractType,
 	ContractABI:     USDCTokenPoolProxyABI,
-	NewContract:     NewUSDCTokenPoolProxyContract,
+	//NewContract:     NewUSDCTokenPoolProxyContract,
 	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolProxyContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(

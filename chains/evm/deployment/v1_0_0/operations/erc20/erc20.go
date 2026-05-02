@@ -45,7 +45,7 @@ var Transfer = contract.NewWrite(contract.WriteParams[TransferArgs, *erc20.ERC20
 	Description:     "Transfer ERC20 tokens to a specified address",
 	ContractType:    ContractType,
 	ContractABI:     erc20.ERC20ABI,
-	NewContract:     erc20.NewERC20,
+	// Contract:        erc20.NewERC20,
 	IsAllowedCaller: contract.AllCallersAllowed[*erc20.ERC20, TransferArgs],
 	Validate: func(args TransferArgs) error {
 		if args.Amount == nil || args.Amount.Cmp(big.NewInt(0)) <= 0 {

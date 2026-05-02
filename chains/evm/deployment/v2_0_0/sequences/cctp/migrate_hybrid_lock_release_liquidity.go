@@ -75,8 +75,8 @@ func migrateHybridLockReleaseLiquidity(
 	lockBoxes := make(map[uint64]common.Address, len(selectors))
 	for _, sel := range selectors {
 		shouldUseReport, err := cldf_ops.ExecuteOperation(b, hybrid_lock_release_usdc_token_pool.ShouldUseLockRelease, chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: input.ChainSelector,
-			Address:       hybridPoolAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       hybridPoolAddr,
 			Args:          sel,
 		})
 		if err != nil {
@@ -93,8 +93,8 @@ func migrateHybridLockReleaseLiquidity(
 		lockBoxes[sel] = lockBoxAddr
 
 		lockedReport, err := cldf_ops.ExecuteOperation(b, hybrid_lock_release_usdc_token_pool.GetLockedTokensForChain, chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: input.ChainSelector,
-			Address:       hybridPoolAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       hybridPoolAddr,
 			Args:          sel,
 		})
 		if err != nil {
@@ -183,8 +183,8 @@ func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput
 		lockBoxAddr := ctx.lockBoxes[sel]
 
 		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.GetLiquidityProvider, ctx.chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       ctx.hybridPoolAddr,
 			Args:          sel,
 		})
 		if err != nil {
@@ -193,8 +193,8 @@ func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput
 		lp := lpReport.Output
 
 		callersReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.GetAllAuthorizedCallers, ctx.chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       lockBoxAddr,
 			Args:          struct{}{},
 		})
 		if err != nil {
@@ -218,8 +218,8 @@ func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput
 
 		if len(callersToAdd) > 0 {
 			authReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.ApplyAuthorizedCallerUpdates, ctx.chain, contract_utils.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-				ChainSelector: ctx.input.ChainSelector,
-				Address:       lockBoxAddr,
+				// ChainSelector: ctx.input.ChainSelector,
+				// Address:       lockBoxAddr,
 				Args: erc20_lock_box.AuthorizedCallerArgs{
 					AddedCallers: callersToAdd,
 				},
@@ -246,8 +246,8 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		withdrawAmount := new(big.Int).SetUint64(ctx.input.WithdrawAmounts[sel])
 
 		withdrawReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.WithdrawLiquidity, ctx.chain, contract_utils.FunctionInput[hybrid_lock_release_usdc_token_pool.WithdrawLiquidityArgs]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       ctx.hybridPoolAddr,
 			Args: hybrid_lock_release_usdc_token_pool.WithdrawLiquidityArgs{
 				RemoteChainSelector: sel,
 				Amount:              withdrawAmount,
@@ -259,8 +259,8 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		writes = append(writes, withdrawReport.Output)
 
 		approveReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20.ApproveProposalOnly, ctx.chain, contract_utils.FunctionInput[erc20.ApproveArgs]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.tokenAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       ctx.tokenAddr,
 			Args: erc20.ApproveArgs{
 				Spender: lockBoxAddr,
 				Value:   withdrawAmount,
@@ -272,8 +272,8 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		writes = append(writes, approveReport.Output)
 
 		depositReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Deposit, ctx.chain, contract_utils.FunctionInput[erc20_lock_box.DepositArgs]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       lockBoxAddr,
 			Args: erc20_lock_box.DepositArgs{
 				Token:               ctx.tokenAddr,
 				RemoteChainSelector: sel,
@@ -299,8 +299,8 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 		lockBoxAddr := ctx.lockBoxes[sel]
 
 		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.GetLiquidityProvider, ctx.chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       ctx.hybridPoolAddr,
 			Args:          sel,
 		})
 		if err != nil {
@@ -313,8 +313,8 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 		}
 
 		ownerReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Owner, ctx.chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       lockBoxAddr,
 			Args:          struct{}{},
 		})
 		if err != nil {
@@ -325,8 +325,8 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 		}
 
 		transferReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.TransferOwnership, ctx.chain, contract_utils.FunctionInput[common.Address]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
+			// ChainSelector: ctx.input.ChainSelector,
+			// Address:       lockBoxAddr,
 			Args:          lp,
 		})
 		if err != nil {
@@ -362,8 +362,8 @@ func parseHexAddress(name, address string) (common.Address, error) {
 
 func fetchLockBoxesFromSiloedPool(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, poolAddress common.Address) (map[uint64]common.Address, error) {
 	lockBoxReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllLockBoxConfigs, chain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       poolAddress,
+		// ChainSelector: chainSelector,
+		// Address:       poolAddress,
 		Args:          struct{}{},
 	})
 	if err != nil {

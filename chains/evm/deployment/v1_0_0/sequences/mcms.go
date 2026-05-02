@@ -58,7 +58,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		switch in.ContractType {
 		case utils.ProposerManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployProposerMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  in.ChainSelector,
+				// ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.ProposerManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -67,7 +67,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 			}
 		case utils.BypasserManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployBypasserMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  in.ChainSelector,
+				// ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.BypasserManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -76,7 +76,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 			}
 		case utils.CancellerManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployCancellerMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  in.ChainSelector,
+				// ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.CancellerManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -94,8 +94,8 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		}
 		_, err = cldf_ops.ExecuteOperation(b, ops.OpEVMSetConfigMCM, chain,
 			contract.FunctionInput[ops.OpSetConfigMCMInput]{
-				ChainSelector: in.ChainSelector,
-				Address:       common.HexToAddress(mcmAddr.Address),
+				// ChainSelector: in.ChainSelector,
+				// Address:       common.HexToAddress(mcmAddr.Address),
 				Args: ops.OpSetConfigMCMInput{
 					SignerAddresses: signerAddresses,
 					SignerGroups:    signerGroups,
@@ -128,8 +128,8 @@ var SeqSetMCMSConfigs = cldf_ops.NewSequence(
 			}
 			report, err := cldf_ops.ExecuteOperation(b, ops.OpEVMSetConfigMCM, chain,
 				contract.FunctionInput[ops.OpSetConfigMCMInput]{
-					ChainSelector: in.ChainSelector,
-					Address:       common.HexToAddress(mcmContract.Address),
+					// ChainSelector: in.ChainSelector,
+					// Address:       common.HexToAddress(mcmContract.Address),
 					Args: ops.OpSetConfigMCMInput{
 						SignerAddresses: signerAddresses,
 						SignerGroups:    signerGroups,
@@ -184,8 +184,8 @@ var SeqGrantAdminRoleOfTimelockToTimelock = cldf_ops.NewSequence(
 		// Grant admin role to new admin Timelock
 		if !newAdminTimelockHasRole {
 			_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, chain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
-				ChainSelector: in.ChainSelector,
-				Address:       in.TimelockAddress,
+				// ChainSelector: in.ChainSelector,
+				// Address:       in.TimelockAddress,
 				Args: ops.OpGrantRoleTimelockInput{
 					RoleID:  ops.ADMIN_ROLE.ID,
 					Account: in.NewAdminTimelockAddress,
@@ -201,8 +201,8 @@ var SeqGrantAdminRoleOfTimelockToTimelock = cldf_ops.NewSequence(
 
 		// Renounce admin role from Deployer EOA
 		_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, chain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
-			ChainSelector: in.ChainSelector,
-			Address:       in.TimelockAddress,
+			// ChainSelector: in.ChainSelector,
+			// Address:       in.TimelockAddress,
 			Args: ops.OpRenounceRoleTimelockInput{
 				RoleID: ops.ADMIN_ROLE.ID,
 			},

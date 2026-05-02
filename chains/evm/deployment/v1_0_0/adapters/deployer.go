@@ -151,7 +151,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			cancellerAddr := report.Output.Addresses[0]
 			// deploy timelock
 			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
-				ChainSelector:  in.ChainSelector,
+				// ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.RBACTimelock, *ops.MCMSVersion),
 				Args: ops.OpDeployTimelockInput{
@@ -170,7 +170,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			b.Logger.Infof("Deployed Timelock at address %s on chain %s", timelockAddr, evmChain.Name)
 			// deploy call proxy with timelock
 			callProxyAddr, err := contract.MaybeDeployContract(b, ops.OpDeployCallProxy, evmChain, contract.DeployInput[ops.OpDeployCallProxyInput]{
-				ChainSelector:  in.ChainSelector,
+				// ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.CallProxy, *ops.MCMSVersion),
 				Args: ops.OpDeployCallProxyInput{
@@ -185,8 +185,8 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 
 			// now that call proxy is deployed, we can add it as executor to the timelock
 			_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, evmChain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
-				ChainSelector: in.ChainSelector,
-				Address:       common.HexToAddress(timelockAddr.Address),
+				// ChainSelector: in.ChainSelector,
+				// Address:       common.HexToAddress(timelockAddr.Address),
 				Args: ops.OpGrantRoleTimelockInput{
 					RoleID:  ops.EXECUTOR_ROLE.ID,
 					Account: common.HexToAddress(callProxyAddr.Address),

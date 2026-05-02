@@ -40,7 +40,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	// Deploy chain contracts
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
+		// ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
 		},

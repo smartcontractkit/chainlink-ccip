@@ -35,7 +35,7 @@ var AddDON = contract.NewWrite(contract.WriteParams[AddDONOpInput, *capabilities
 	Description:     "Adds a new DON to the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
-	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	// NewContract:     capabilities_registry.NewCapabilitiesRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddDONOpInput],
 	Validate:        func(AddDONOpInput) error { return nil },
 	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddDONOpInput) (*types.Transaction, error) {
@@ -57,7 +57,7 @@ var UpdateDON = contract.NewWrite(contract.WriteParams[UpdateDONOpInput, *capabi
 	Description:     "Updates an existing DON in the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
-	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	// NewContract:     capabilities_registry.NewCapabilitiesRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, UpdateDONOpInput],
 	Validate:        func(UpdateDONOpInput) error { return nil },
 	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input UpdateDONOpInput) (*types.Transaction, error) {
@@ -75,7 +75,7 @@ var AddNodes = contract.NewWrite(contract.WriteParams[AddNodesOpInput, *capabili
 	Description:     "Adds nodes to an existing node operator in the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
-	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	// NewContract:     capabilities_registry.NewCapabilitiesRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddNodesOpInput],
 	Validate:        func(AddNodesOpInput) error { return nil },
 	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddNodesOpInput) (*types.Transaction, error) {
@@ -93,7 +93,7 @@ var AddNodeOperators = contract.NewWrite(contract.WriteParams[AddNodesOperatorsO
 	Description:     "Adds new node operators to the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
-	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	// NewContract:     capabilities_registry.NewCapabilitiesRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddNodesOperatorsOpInput],
 	Validate:        func(AddNodesOperatorsOpInput) error { return nil },
 	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddNodesOperatorsOpInput) (*types.Transaction, error) {
@@ -111,7 +111,7 @@ var AddCapabilities = contract.NewWrite(contract.WriteParams[AddCapabilitiesOpIn
 	Description:     "Adds a new capability to the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
-	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	// NewContract:     capabilities_registry.NewCapabilitiesRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddCapabilitiesOpInput],
 	Validate:        func(AddCapabilitiesOpInput) error { return nil },
 	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddCapabilitiesOpInput) (*types.Transaction, error) {
@@ -130,7 +130,7 @@ var ApplyChainConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyChainC
 	Description:     "Applies chain config updates to the CCIPHome contract",
 	ContractType:    utils.CCIPHome,
 	ContractABI:     ccip_home.CCIPHomeABI,
-	NewContract:     ccip_home.NewCCIPHome,
+	// NewContract:     ccip_home.NewCCIPHome,
 	IsAllowedCaller: contract.OnlyOwner[*ccip_home.CCIPHome, ApplyChainConfigUpdatesOpInput],
 	Validate:        func(ApplyChainConfigUpdatesOpInput) error { return nil },
 	CallContract: func(ccipHome *ccip_home.CCIPHome, opts *bind.TransactOpts, input ApplyChainConfigUpdatesOpInput) (*types.Transaction, error) {

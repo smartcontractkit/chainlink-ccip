@@ -40,7 +40,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Applies updates to the list of authorized callers on the NonceManager",
 	ContractType:    ContractType,
 	ContractABI:     nonce_manager.NonceManagerABI,
-	NewContract:     nonce_manager.NewNonceManager,
+	// NewContract:     nonce_manager.NewNonceManager,
 	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
@@ -54,7 +54,7 @@ var ApplyPreviousRampUpdates = contract.NewWrite(contract.WriteParams[[]Previous
 	Description:     "Applies updates to the list of previous ramps on the NonceManager",
 	ContractType:    ContractType,
 	ContractABI:     nonce_manager.NonceManagerABI,
-	NewContract:     nonce_manager.NewNonceManager,
+	// NewContract:     nonce_manager.NewNonceManager,
 	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, []PreviousRampsArgs],
 	Validate:        func([]PreviousRampsArgs) error { return nil },
 	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {

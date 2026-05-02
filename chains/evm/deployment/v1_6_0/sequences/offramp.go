@@ -47,9 +47,9 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: input.UpdatesByChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OffRampApplySourceChainConfigUpdatesOp on %s: %w", chain, err)
@@ -77,16 +77,18 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, offrampops.GetStaticConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetStaticConfig on %s: %w", chain, err)
 			}
 			output.StaticConfig = report.Output
 			out, err := operations.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetDynamicConfig on %s: %w", chain, err)
@@ -94,8 +96,8 @@ var (
 			output.DynamicConfig = out.Output
 			for _, remoteChain := range input.RemoteChains {
 				report, err := operations.ExecuteOperation(b, offrampops.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
+					// ChainSelector: chain.Selector,
+					// Address:       input.Address,
 					Args:          remoteChain,
 				})
 				if err != nil {

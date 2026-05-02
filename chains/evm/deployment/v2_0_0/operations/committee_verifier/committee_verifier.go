@@ -255,7 +255,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *Co
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CommitteeVerifierABI,
-	NewContract:     NewCommitteeVerifierContract,
+	// NewContract:     NewCommitteeVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CommitteeVerifierContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
 	CallContract: func(
@@ -273,7 +273,7 @@ var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Rem
 	Description:     "Calls applyRemoteChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CommitteeVerifierABI,
-	NewContract:     NewCommitteeVerifierContract,
+	// NewContract:     NewCommitteeVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CommitteeVerifierContract, []RemoteChainConfigArgs],
 	Validate:        func([]RemoteChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -291,7 +291,7 @@ var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *
 	Description:     "Calls setAllowedFinalityConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CommitteeVerifierABI,
-	NewContract:     NewCommitteeVerifierContract,
+	// NewContract:     NewCommitteeVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CommitteeVerifierContract, [4]byte],
 	Validate:        func([4]byte) error { return nil },
 	CallContract: func(
@@ -309,7 +309,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistCo
 	Description:     "Calls applyAllowlistUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CommitteeVerifierABI,
-	NewContract:     NewCommitteeVerifierContract,
+	// NewContract:     NewCommitteeVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CommitteeVerifierContract, []AllowlistConfigArgs],
 	Validate:        func([]AllowlistConfigArgs) error { return nil },
 	CallContract: func(
@@ -327,7 +327,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address,
 	Description:     "Calls withdrawFeeTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CommitteeVerifierABI,
-	NewContract:     NewCommitteeVerifierContract,
+	// NewContract:     NewCommitteeVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CommitteeVerifierContract, []common.Address],
 	Validate:        func([]common.Address) error { return nil },
 	CallContract: func(
@@ -345,7 +345,7 @@ var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[ApplySignatur
 	Description:     "Calls applySignatureConfigs on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CommitteeVerifierABI,
-	NewContract:     NewCommitteeVerifierContract,
+	// NewContract:     NewCommitteeVerifierContract,
 	IsAllowedCaller: contract.OnlyOwner[*CommitteeVerifierContract, ApplySignatureConfigsArgs],
 	Validate:        func(ApplySignatureConfigsArgs) error { return nil },
 	CallContract: func(
@@ -362,7 +362,7 @@ var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, GetRemot
 	Version:      Version,
 	Description:  "Calls getRemoteChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCommitteeVerifierContract,
+	// NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
 		return c.GetRemoteChainConfig(opts, args)
 	},
@@ -373,7 +373,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCommitteeVerifierContract,
+	// NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -384,7 +384,7 @@ var GetSignatureConfig = contract.NewRead(contract.ReadParams[uint64, GetSignatu
 	Version:      Version,
 	Description:  "Calls getSignatureConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCommitteeVerifierContract,
+	// NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args uint64) (GetSignatureConfigResult, error) {
 		return c.GetSignatureConfig(opts, args)
 	},
@@ -395,7 +395,7 @@ var GetAllowedFinalityConfig = contract.NewRead(contract.ReadParams[struct{}, [4
 	Version:      Version,
 	Description:  "Calls getAllowedFinalityConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCommitteeVerifierContract,
+	// NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.GetAllowedFinalityConfig(opts)
 	},
@@ -406,7 +406,7 @@ var GetFee = contract.NewRead(contract.ReadParams[GetFeeArgs, GetFeeResult, *Com
 	Version:      Version,
 	Description:  "Calls getFee on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCommitteeVerifierContract,
+	// NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args GetFeeArgs) (GetFeeResult, error) {
 		return c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
 	},
@@ -417,7 +417,7 @@ var VersionTag = contract.NewRead(contract.ReadParams[struct{}, [4]byte, *Commit
 	Version:      Version,
 	Description:  "Calls versionTag on the contract",
 	ContractType: ContractType,
-	NewContract:  NewCommitteeVerifierContract,
+	// NewContract:  NewCommitteeVerifierContract,
 	CallContract: func(c *CommitteeVerifierContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.VersionTag(opts)
 	},

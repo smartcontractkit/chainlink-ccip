@@ -90,7 +90,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy/resolve CCTPMessageTransmitterProxy (v2.0.0 op) for CCTPVerifier + CCTP V2 pool wiring.
 		cctpV2MessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
-			ChainSelector:  chain.Selector,
+			// ChainSelector:  chain.Selector,
 			Args: cctp_message_transmitter_proxy.ConstructorArgs{
 				TokenMessenger: tokenMessengerV2Address,
 			},
@@ -104,7 +104,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy CCTPVerifier if needed
 		cctpVerifierRef, err := contract_utils.MaybeDeployContract(b, cctp_verifier.Deploy, chain, contract_utils.DeployInput[cctp_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ContractType, *cctp_verifier.Version),
-			ChainSelector:  chain.Selector,
+			// ChainSelector:  chain.Selector,
 			Args: cctp_verifier.ConstructorArgs{
 				TokenMessenger:          tokenMessengerV2Address,
 				MessageTransmitterProxy: cctpV2MessageTransmitterProxyAddress,
@@ -135,7 +135,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy token pools
 		// Deploy CCTPThroughCCVTokenPool if needed
 		cctpV2WithCCVsTokenPoolRef, err := contract_utils.MaybeDeployContract(b, cctp_through_ccv_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_through_ccv_token_pool.ConstructorArgs]{
-			ChainSelector:  chain.Selector,
+			// ChainSelector:  chain.Selector,
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_through_ccv_token_pool.ContractType, *cctp_through_ccv_token_pool.Version),
 			Args: cctp_through_ccv_token_pool.ConstructorArgs{
 				Token:              usdcTokenAddress,
@@ -178,7 +178,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		if enableCCTPV1 {
 			tokenMessengerV1Address := common.HexToAddress(input.TokenMessengerV1)
 			cctpV1PoolAddressRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool.Deploy, chain, contract_utils.DeployInput[usdc_token_pool.ConstructorArgs]{
-				ChainSelector: input.ChainSelector,
+				// ChainSelector: input.ChainSelector,
 				TypeAndVersion: deployment.NewTypeAndVersion(
 					usdc_token_pool.ContractType,
 					*usdc_token_pool.Version,
@@ -202,7 +202,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 		// Deploy USDCTokenPoolCCTPV2 (CCTP V2 pool)
 		cctpV2TokenPoolAddressRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool_cctp_v2.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_cctp_v2.ConstructorArgs]{
-			ChainSelector: input.ChainSelector,
+			// ChainSelector: input.ChainSelector,
 			TypeAndVersion: deployment.NewTypeAndVersion(
 				usdc_token_pool_cctp_v2.ContractType,
 				*usdc_token_pool_cctp_v2.Version,
@@ -225,7 +225,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy USDCTokenPoolProxy
 		usdcTokenPoolProxyRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version),
-			ChainSelector:  chain.Selector,
+			// ChainSelector:  chain.Selector,
 			Args: usdc_token_pool_proxy.ConstructorArgs{
 				Token: usdcTokenAddress,
 				Pools: usdc_token_pool_proxy.PoolAddresses{
@@ -255,8 +255,8 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 		// Set the fee aggregator on the USDCTokenPoolProxy
 		setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       usdcTokenPoolProxyAddress,
+			// ChainSelector: chain.Selector,
+			// Address:       usdcTokenPoolProxyAddress,
 			Args:          feeAggregatorAddress,
 		})
 		if err != nil {
@@ -312,8 +312,9 @@ func configureSiloedPoolProxyWiring(
 	writes := make([]contract_utils.WriteOutput, 0)
 	// Get authorized callers on siloed pool.
 	callersReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       siloedPoolAddr,
+		// ChainSelector: chainSelector,
+		// Address:       siloedPoolAddr,
+		Args:          struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authorized callers from siloed pool: %w", err)
@@ -321,8 +322,8 @@ func configureSiloedPoolProxyWiring(
 	// Authorize proxy if not already authorized.
 	if !slices.Contains(callersReport.Output, proxyAddr) {
 		poolAuthReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[siloed_usdc_token_pool.AuthorizedCallerArgs]{
-			ChainSelector: chainSelector,
-			Address:       siloedPoolAddr,
+			// ChainSelector: chainSelector,
+			// Address:       siloedPoolAddr,
 			Args: siloed_usdc_token_pool.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{proxyAddr},
 			},
@@ -334,8 +335,9 @@ func configureSiloedPoolProxyWiring(
 	}
 	// Get current pools from proxy.
 	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       proxyAddr,
+		// ChainSelector: chainSelector,
+		// Address:       proxyAddr,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get existing proxy pools: %w", err)
@@ -344,8 +346,8 @@ func configureSiloedPoolProxyWiring(
 	// If siloed pool address is not set correctly, update it.
 	if currentPools.SiloedLockReleasePool != siloedPoolAddr {
 		updatePoolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdatePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.PoolAddresses]{
-			ChainSelector: chainSelector,
-			Address:       proxyAddr,
+			// ChainSelector: chainSelector,
+			// Address:       proxyAddr,
 			Args: usdc_token_pool_proxy.PoolAddresses{
 				CctpV1Pool:            currentPools.CctpV1Pool,
 				CctpV2Pool:            currentPools.CctpV2Pool,
@@ -458,8 +460,8 @@ func applyCCTPAuthorizedCallerWrites(
 	writes := make([]contract_utils.WriteOutput, 0)
 	if enableCCTPV1 {
 		v1MsgTxReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy_v1_6_2.ConfigureAllowedCallers, chain, contract_utils.FunctionInput[[]cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       cctpV1MessageTransmitterProxyAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       cctpV1MessageTransmitterProxyAddr,
 			Args: []cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs{
 				{Caller: cctpVerifierAddr, Allowed: true},
 				{Caller: cctpV1PoolAddr, Allowed: true},
@@ -472,8 +474,8 @@ func applyCCTPAuthorizedCallerWrites(
 	}
 
 	v2MsgTxReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_message_transmitter_proxy.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       cctpV2MessageTransmitterProxyAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       cctpV2MessageTransmitterProxyAddr,
 		Args: cctp_message_transmitter_proxy.AuthorizedCallerArgs{
 			AddedCallers: []common.Address{cctpVerifierAddr, cctpV2PoolAddr},
 		},
@@ -485,8 +487,8 @@ func applyCCTPAuthorizedCallerWrites(
 
 	if enableCCTPV1 {
 		cctpV1TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool.AuthorizedCallerArgs]{
-			ChainSelector: chain.Selector,
-			Address:       cctpV1PoolAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       cctpV1PoolAddr,
 			Args: usdc_token_pool.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{proxyAddr},
 			},
@@ -498,8 +500,8 @@ func applyCCTPAuthorizedCallerWrites(
 	}
 
 	cctpV2ThroughCCVTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_through_ccv_token_pool.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       cctpV2WithCCVsPoolAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       cctpV2WithCCVsPoolAddr,
 		Args: cctp_through_ccv_token_pool.AuthorizedCallerArgs{
 			AddedCallers: []common.Address{proxyAddr},
 		},
@@ -510,8 +512,8 @@ func applyCCTPAuthorizedCallerWrites(
 	writes = append(writes, cctpV2ThroughCCVTokenPoolReport.Output)
 
 	cctpV2TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       cctpV2PoolAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       cctpV2PoolAddr,
 		Args: usdc_token_pool_cctp_v2.AuthorizedCallerArgs{
 			AddedCallers: []common.Address{proxyAddr},
 		},
@@ -530,15 +532,16 @@ func setCCTPVerifierResolverInbound(
 	cctpVerifierAddr, resolverAddr common.Address,
 ) ([]contract_utils.WriteOutput, error) {
 	versionTagReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.VersionTag, chain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       cctpVerifierAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       cctpVerifierAddr,
+		Args:          struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get version tag from CCTPVerifier: %w", err)
 	}
 	report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
-		ChainSelector: chain.Selector,
-		Address:       resolverAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       resolverAddr,
 		Args: []versioned_verifier_resolver.InboundImplementationArgs{
 			{Version: versionTagReport.Output, Verifier: cctpVerifierAddr},
 		},

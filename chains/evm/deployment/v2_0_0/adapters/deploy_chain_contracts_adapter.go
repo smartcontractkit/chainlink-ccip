@@ -181,8 +181,8 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 	}
 	// directly fetch offRamp static config
 	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, upstream.FunctionInput[struct{}]{
-		ChainSelector: input.ChainSelector,
-		Address:       common.HexToAddress(offRampAddr.Address),
+		// ChainSelector: input.ChainSelector,
+		// Address:       common.HexToAddress(offRampAddr.Address),
 		Args:          struct{}{},
 	})
 	if err != nil {

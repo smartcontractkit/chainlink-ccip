@@ -527,9 +527,9 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 // applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver.
 func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, resolverAddress common.Address, args []versioned_verifier_resolver.OutboundImplementationArgs) ([]contract_utils.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
-		ChainSelector: chain.Selector,
-		Address:       resolverAddress,
-		Args:          args,
+		// ChainSelector: chain.Selector,
+		// Address:       resolverAddress,
+		Args: args,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set outbound implementation on CCTPVerifierResolver: %w", err)
@@ -540,8 +540,8 @@ func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, res
 // applyUSDCTokenPoolProxyMechanismWrites updates lock/burn mechanisms on the USDCTokenPoolProxy.
 func applyUSDCTokenPoolProxyMechanismWrites(b cldf_ops.Bundle, chain evm.Chain, proxyAddress common.Address, remoteChainSelectors []uint64, mechanisms []uint8) ([]contract_utils.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
-		ChainSelector: chain.Selector,
-		Address:       proxyAddress,
+		// ChainSelector: chain.Selector,
+		// Address:       proxyAddress,
 		Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
 			RemoteChainSelectors: remoteChainSelectors,
 			Mechanisms:           mechanisms,
@@ -557,18 +557,18 @@ func applyUSDCTokenPoolProxyMechanismWrites(b cldf_ops.Bundle, chain evm.Chain, 
 func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress common.Address, setDomainArgs []cctp_verifier.SetDomainArgs, remoteChainConfigArgs []cctp_verifier.RemoteChainConfigArgs) ([]contract_utils.WriteOutput, error) {
 	writes := make([]contract_utils.WriteOutput, 0)
 	remoteConfigReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.ApplyRemoteChainConfigUpdates, chain, contract_utils.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
-		ChainSelector: chain.Selector,
-		Address:       verifierAddress,
-		Args:          remoteChainConfigArgs,
+		// ChainSelector: chain.Selector,
+		// Address:       verifierAddress,
+		Args: remoteChainConfigArgs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply remote chain config updates on CCTPVerifier: %w", err)
 	}
 	writes = append(writes, remoteConfigReport.Output)
 	domainsReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetDomains, chain, contract_utils.FunctionInput[[]cctp_verifier.SetDomainArgs]{
-		ChainSelector: chain.Selector,
-		Address:       verifierAddress,
-		Args:          setDomainArgs,
+		// ChainSelector: chain.Selector,
+		// Address:       verifierAddress,
+		Args: setDomainArgs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set domains on CCTPVerifier: %w", err)
@@ -577,16 +577,17 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 
 	desiredFinality := finality.Config{BlockDepth: 1}.Raw()
 	currentFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetAllowedFinalityConfig, chain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       verifierAddress,
+		// ChainSelector: chain.Selector,
+		// Address:       verifierAddress,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allowed finality config from CCTPVerifier: %w", err)
 	}
 	if currentFinalityReport.Output != desiredFinality {
 		setFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
-			ChainSelector: chain.Selector,
-			Address:       verifierAddress,
+			// ChainSelector: chain.Selector,
+			// Address:       verifierAddress,
 			Args:          desiredFinality,
 		})
 		if err != nil {
@@ -601,8 +602,8 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 // applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool.
 func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool_cctp_v2.DomainUpdate) ([]contract_utils.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool_cctp_v2.DomainUpdate]{
-		ChainSelector: chain.Selector,
-		Address:       poolAddress,
+		// ChainSelector: chain.Selector,
+		// Address:       poolAddress,
 		Args:          domainUpdates,
 	})
 	if err != nil {
@@ -614,8 +615,8 @@ func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 // applyCCTPV1PoolSetDomainsWrites sets domains on the CCTP V1 token pool.
 func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool.DomainUpdate) ([]contract_utils.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool.DomainUpdate]{
-		ChainSelector: chain.Selector,
-		Address:       poolAddress,
+		// ChainSelector: chain.Selector,
+		// Address:       poolAddress,
 		Args:          domainUpdates,
 	})
 	if err != nil {

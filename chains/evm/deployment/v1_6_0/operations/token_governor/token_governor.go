@@ -50,7 +50,7 @@ var GrantRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *token_go
 	Description:  "Grant access to given roles on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input RoleAssignment) (bool, error) {
 		defaultAdmin, err := tg.DefaultAdmin(opts)
 		if err != nil {
@@ -75,7 +75,7 @@ var RenounceRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *token
 	Description:  "Renounce access to given roles on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input RoleAssignment) (bool, error) {
 		defaultAdmin, err := tg.DefaultAdmin(opts)
 		if err != nil {
@@ -100,7 +100,7 @@ var RevokeRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *token_g
 	Description:  "Revoke access to given roles on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input RoleAssignment) (bool, error) {
 		defaultAdmin, err := tg.DefaultAdmin(opts)
 		if err != nil {
@@ -125,7 +125,7 @@ var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *
 	Description:  "TransferOwnership to given account on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		owner, err := tg.Owner(opts)
 		if err != nil {
@@ -147,7 +147,7 @@ var AcceptOwnership = contract.NewWrite(contract.WriteParams[common.Address, *to
 	Description:  "AcceptOwnership on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		owner, err := tg.Owner(opts)
 		if err != nil {
@@ -169,7 +169,7 @@ var BeginDefaultAdminTransfer = contract.NewWrite(contract.WriteParams[common.Ad
 	Description:  "BeginDefaultAdminTransfer on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		owner, err := tg.Owner(opts)
 		if err != nil {
@@ -191,7 +191,7 @@ var AcceptDefaultAdminTransfer = contract.NewWrite(contract.WriteParams[common.A
 	Description:  "AcceptDefaultAdminTransfer on TokenGovernor contract",
 	ContractType: ContractType,
 	ContractABI:  token_governor.TokenGovernorABI,
-	NewContract:  token_governor.NewTokenGovernor,
+	// NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		owner, err := tg.Owner(opts)
 		if err != nil {

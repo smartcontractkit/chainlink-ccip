@@ -168,7 +168,7 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 	Description:     "Calls applySourceChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OffRampABI,
-	NewContract:     NewOffRampContract,
+	// NewContract:     NewOffRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, []SourceChainConfigArgs],
 	Validate:        func([]SourceChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -186,7 +186,7 @@ var SetOCR3Configs = contract.NewWrite(contract.WriteParams[[]OCRConfigArgs, *Of
 	Description:     "Calls setOCR3Configs on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OffRampABI,
-	NewContract:     NewOffRampContract,
+	// NewContract:     NewOffRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, []OCRConfigArgs],
 	Validate:        func([]OCRConfigArgs) error { return nil },
 	CallContract: func(
@@ -203,7 +203,7 @@ var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfi
 	Version:      Version,
 	Description:  "Calls getStaticConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOffRampContract,
+	// NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
 		return c.GetStaticConfig(opts)
 	},
@@ -214,7 +214,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOffRampContract,
+	// NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -225,7 +225,7 @@ var GetSourceChainConfig = contract.NewRead(contract.ReadParams[uint64, SourceCh
 	Version:      Version,
 	Description:  "Calls getSourceChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewOffRampContract,
+	// NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args uint64) (SourceChainConfig, error) {
 		return c.GetSourceChainConfig(opts, args)
 	},
@@ -237,7 +237,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *Of
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     OffRampABI,
-	NewContract:     NewOffRampContract,
+	// NewContract:     NewOffRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
 	CallContract: func(

@@ -58,7 +58,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		if siloedPoolAddr == "" {
 			poolReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.Deploy, chain, contract_utils.DeployInput[siloed_usdc_token_pool.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version),
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: siloed_usdc_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
 					LocalTokenDecimals: input.TokenDecimals,
@@ -83,7 +83,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 				qualifier := fmt.Sprintf("remoteChainSelector(%d)", sel)
 				lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
-					ChainSelector:  chain.Selector,
+					// ChainSelector:  chain.Selector,
 					Qualifier:      &qualifier,
 					Args: erc20_lock_box.ConstructorArgs{
 						Token: common.HexToAddress(input.USDCToken),
@@ -101,8 +101,8 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			}
 
 			cfgReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ConfigureLockBoxes, chain, contract_utils.FunctionInput[[]siloed_usdc_token_pool.LockBoxConfig]{
-				ChainSelector: input.ChainSelector,
-				Address:       siloedPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       siloedPoolAddress,
 				Args:          configs,
 			})
 			if err != nil {
@@ -114,11 +114,12 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		// Authorize siloed pool on each lockbox
 		for sel := range lockBoxes {
 			lbAddr := lockBoxes[sel]
-			lockBoxAddress := common.HexToAddress(lbAddr)
+			// lockBoxAddress := common.HexToAddress(lbAddr)
 			// Check if already authorized
 			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       lockBoxAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       lockBoxAddress,
+				Args:          struct{}{},
 			})
 			if err != nil {
 				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to get authorized callers on lockbox %s (chain %d): %w", lbAddr, sel, err)
@@ -126,8 +127,8 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			// If not authorized, authorize it
 			if !slices.Contains(callersReport.Output, siloedPoolAddress) {
 				authReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       lockBoxAddress,
+					// ChainSelector: input.ChainSelector,
+					// Address:       lockBoxAddress,
 					Args: erc20_lock_box.AuthorizedCallerArgs{
 						AddedCallers: []common.Address{siloedPoolAddress},
 					},

@@ -42,7 +42,7 @@ var GrantMintRole = contract.NewWrite(contract.WriteParams[GrantMintRoleArgs, *l
 	Description:     "Grants minting permission to an address",
 	ContractType:    ContractType,
 	ContractABI:     link_token.LinkTokenABI,
-	NewContract:     link_token.NewLinkToken,
+	// NewContract:     link_token.NewLinkToken,
 	IsAllowedCaller: contract.OnlyOwner[*link_token.LinkToken, GrantMintRoleArgs],
 	Validate:        func(GrantMintRoleArgs) error { return nil },
 	CallContract: func(linkToken *link_token.LinkToken, opts *bind.TransactOpts, args GrantMintRoleArgs) (*types.Transaction, error) {
@@ -62,7 +62,7 @@ var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *link_token.LinkToke
 	Description:     "Mints LINK tokens to the specified address",
 	ContractType:    ContractType,
 	ContractABI:     link_token.LinkTokenABI,
-	NewContract:     link_token.NewLinkToken,
+	// NewContract:     link_token.NewLinkToken,
 	IsAllowedCaller: contract.AllCallersAllowed[*link_token.LinkToken, MintArgs], // Minter check is done on-chain
 	Validate:        func(MintArgs) error { return nil },
 	CallContract: func(linkToken *link_token.LinkToken, opts *bind.TransactOpts, args MintArgs) (*types.Transaction, error) {

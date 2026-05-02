@@ -95,8 +95,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 
 		localDecimalsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenDecimals, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       input.TokenPoolAddress,
+			Args: struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
@@ -120,9 +121,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 		// Read allowedFinalityConfig to determine whether to use fast finality (custom) or default finality
 		finalityConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args:          struct{}{},
+			// ChainSelector: input.ChainSelector,
+			// Address:       input.TokenPoolAddress,
+			Args: struct{}{},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config: %w", err)
@@ -142,9 +143,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			}
 			if needCCVUpdate && ccvArg != nil {
 				setCCVsReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.AdvancedPoolHooks,
-					Args:          []advanced_pool_hooks.CCVConfigArg{*ccvArg},
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.AdvancedPoolHooks,
+					Args: []advanced_pool_hooks.CCVConfigArg{*ccvArg},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCVs: %w", err)
@@ -161,9 +162,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if input.RemoteChainAlreadySupported {
 			// Check existing remote token
 			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, chain, evm_contract.FunctionInput[uint64]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-				Args:          input.RemoteChainSelector,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
+				Args: input.RemoteChainSelector,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
@@ -194,9 +195,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 				// Check existing remote pools and add any missing (active pool's remote pools first for upgrade, then requested pool)
 				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args:          input.RemoteChainSelector,
+					// ChainSelector: input.ChainSelector,
+					// Address:       input.TokenPoolAddress,
+					Args: input.RemoteChainSelector,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pools: %w", err)
@@ -210,8 +211,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					padded := common.LeftPadBytes(activePoolAddr, 32)
 					if !containsPool(padded) {
 						addReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
-							ChainSelector: input.ChainSelector,
-							Address:       input.TokenPoolAddress,
+							// ChainSelector: input.ChainSelector,
+							// Address:       input.TokenPoolAddress,
 							Args: token_pool.AddRemotePoolArgs{
 								RemoteChainSelector: input.RemoteChainSelector,
 								RemotePoolAddress:   padded,
@@ -226,8 +227,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				}
 				if !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
 					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
+						// ChainSelector: input.ChainSelector,
+						// Address:       input.TokenPoolAddress,
 						Args: token_pool.AddRemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
@@ -267,8 +268,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			remotePoolAddresses = append(remotePoolAddresses, inputPoolPadded)
 		}
 		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       input.TokenPoolAddress,
 			Args: token_pool.ApplyChainUpdatesArgs{
 				RemoteChainSelectorsToRemove: removes,
 				ChainsToAdd: []token_pool.ChainUpdate{
@@ -319,8 +320,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		if len(tokenTransferFeeConfigUpdates) > 0 {
 			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				// ChainSelector: input.ChainSelector,
+				// Address:       input.TokenPoolAddress,
 				Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigUpdates,
 				},
@@ -355,9 +356,9 @@ func importConfigFromActivePool(
 		return nil, nil
 	}
 	tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSelector,
-		Address:       registryAddress,
-		Args:          tokenAddress,
+		// ChainSelector: chainSelector,
+		// Address:       registryAddress,
+		Args: tokenAddress,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token config from registry: %w", err)
@@ -367,9 +368,9 @@ func importConfigFromActivePool(
 		return nil, nil
 	}
 	typeAndVersionReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       activePool,
-		Args:          struct{}{},
+		// ChainSelector: chainSelector,
+		// Address:       activePool,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
@@ -401,9 +402,9 @@ func importConfigFromActivePoolV150(
 	poolForRateLimits := activePool
 	if strings.Contains(typeStr, "Proxy") {
 		prevReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetPreviousPool, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       activePool,
-			Args:          struct{}{},
+			// ChainSelector: chainSelector,
+			// Address:       activePool,
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get previous pool from proxy: %w", err)
@@ -411,9 +412,9 @@ func importConfigFromActivePoolV150(
 		previousPool := prevReport.Output
 		if previousPool != (common.Address{}) {
 			prevTVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: chainSelector,
-				Address:       previousPool,
-				Args:          struct{}{},
+				// ChainSelector: chainSelector,
+				// Address:       previousPool,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to get previous pool type and version: %w", err)
@@ -443,25 +444,25 @@ func fetchRateLimitsAndRemotePoolV150(
 	remoteChainSelector uint64,
 ) (*activePoolImportedConfig, error) {
 	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       poolForRateLimits,
-		Args:          remoteChainSelector,
+		// ChainSelector: chainSelector,
+		// Address:       poolForRateLimits,
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inbound rate limiter state: %w", err)
 	}
 	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       poolForRateLimits,
-		Args:          remoteChainSelector,
+		// ChainSelector: chainSelector,
+		// Address:       poolForRateLimits,
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get outbound rate limiter state: %w", err)
 	}
 	remotePoolReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetRemotePool, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       poolForRemotePool,
-		Args:          remoteChainSelector,
+		// ChainSelector: chainSelector,
+		// Address:       poolForRemotePool,
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote pool: %w", err)
@@ -486,25 +487,25 @@ func importConfigFromActivePoolV161(
 	remoteChainSelector uint64,
 ) (*activePoolImportedConfig, error) {
 	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       activePool,
-		Args:          remoteChainSelector,
+		// ChainSelector: chainSelector,
+		// Address:       activePool,
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active pool inbound rate limiter state: %w", err)
 	}
 	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       activePool,
-		Args:          remoteChainSelector,
+		// ChainSelector: chainSelector,
+		// Address:       activePool,
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active pool outbound rate limiter state: %w", err)
 	}
 	remotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       activePool,
-		Args:          remoteChainSelector,
+		// ChainSelector: chainSelector,
+		// Address:       activePool,
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active pool remote pools: %w", err)
@@ -548,8 +549,8 @@ func maybeUpdateRateLimiters(
 ) (*evm_contract.WriteOutput, error) {
 	// Check existing rate limiters
 	rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
-		ChainSelector: chainSelector,
-		Address:       tokenPoolAddress,
+		// ChainSelector: chainSelector,
+		// Address:       tokenPoolAddress,
 		Args: token_pool.GetCurrentRateLimiterStateArgs{
 			RemoteChainSelector: remoteChainSelector,
 			FastFinality:        fastFinality,
@@ -567,8 +568,8 @@ func maybeUpdateRateLimiters(
 	if (!rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) && desiredInboundRateLimiterConfig.IsEnabled) ||
 		(!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) && desiredOutboundRateLimiterConfig.IsEnabled) {
 		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
-			ChainSelector: chainSelector,
-			Address:       tokenPoolAddress,
+			// ChainSelector: chainSelector,
+			// Address:       tokenPoolAddress,
 			Args: []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector:       remoteChainSelector,
@@ -612,8 +613,8 @@ func applyTokenTransferFeeConfigIfNeeded(b cldf_ops.Bundle, chain evm.Chain, inp
 		return nil, nil
 	}
 	report, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
-		ChainSelector: input.ChainSelector,
-		Address:       input.TokenPoolAddress,
+		// ChainSelector: input.ChainSelector,
+		// Address:       input.TokenPoolAddress,
 		Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
 			TokenTransferFeeConfigArgs:     tokenTransferFeeConfigUpdates,
 			DisableTokenTransferFeeConfigs: nil,
@@ -673,9 +674,9 @@ func importTokenTransferFeeConfigFromFeeQuoter(
 	remoteChainSelector uint64,
 ) (*tokens.TokenTransferFeeConfig, error) {
 	feeQuoterTAVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       feeQuoterAddr,
-		Args:          struct{}{},
+		// ChainSelector: chainSelector,
+		// Address:       feeQuoterAddr,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get type and version of fee quoter %s on chain %s: %w", feeQuoterAddr.Hex(), chain.String(), err)
@@ -685,8 +686,8 @@ func importTokenTransferFeeConfigFromFeeQuoter(
 	switch {
 	case feeQuoterVersion.Major() == 1 && feeQuoterVersion.Minor() == 6:
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: chainSelector,
-			Address:       feeQuoterAddr,
+			// ChainSelector: chainSelector,
+			// Address:       feeQuoterAddr,
 			Args: fqops_v163.GetTokenTransferFeeConfigArgs{
 				Token:             tokenAddress,
 				DestChainSelector: remoteChainSelector,
@@ -699,8 +700,8 @@ func importTokenTransferFeeConfigFromFeeQuoter(
 		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
 	case feeQuoterVersion.String() == fqops.Version.String():
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: chainSelector,
-			Address:       feeQuoterAddr,
+			// ChainSelector: chainSelector,
+			// Address:       feeQuoterAddr,
 			Args: fqops.GetTokenTransferFeeConfigArgs{
 				Token:             tokenAddress,
 				DestChainSelector: remoteChainSelector,
@@ -720,8 +721,9 @@ func importTokenTransferFeeConfigFromFeeQuoter(
 func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (*tokens.TokenTransferFeeConfig, error) {
 	// get router from token
 	dCfgReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: input.ChainSelector,
-		Address:       input.TokenPoolAddress,
+		// ChainSelector: input.ChainSelector,
+		// Address:       input.TokenPoolAddress,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token dynamic config for pool %s on chain %s: %w", input.TokenPoolAddress.Hex(), chain.String(), err)
@@ -733,9 +735,9 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 	}
 	// get onRamp from router for the destination chain
 	onRampOnRouterReport, err := cldf_ops.ExecuteOperation(b, routerops.GetOnRamp, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: input.ChainSelector,
-		Address:       routerAddr,
-		Args:          input.RemoteChainSelector,
+		// ChainSelector: input.ChainSelector,
+		// Address:       routerAddr,
+		Args: input.RemoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get onRamp from router %s for "+
@@ -748,9 +750,9 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 	onRampAddr := onRampOnRouterReport.Output
 	// check the version of the onRamp contract
 	onRampTAVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: input.ChainSelector,
-		Address:       onRampAddr,
-		Args:          struct{}{},
+		// ChainSelector: input.ChainSelector,
+		// Address:       onRampAddr,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get type and version of onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
@@ -760,9 +762,9 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 	case semver.MustParse("1.5.0").String():
 		// for onRamp version 1.5.0, import tokenTransferFeeConfig from onRamp 1.5.0
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, onrampops_v150.OnRampGetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       onRampAddr,
-			Args:          input.TokenAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       onRampAddr,
+			Args: input.TokenAddress,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token transfer fee config from onRamp %s for token %s on chain %s: %w",
@@ -772,9 +774,9 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 	case semver.MustParse("1.6.0").String(): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops_v160.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       onRampAddr,
-			Args:          struct{}{},
+			// ChainSelector: input.ChainSelector,
+			// Address:       onRampAddr,
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dynamic config from onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
@@ -787,9 +789,9 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       onRampAddr,
-			Args:          struct{}{},
+			// ChainSelector: input.ChainSelector,
+			// Address:       onRampAddr,
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dynamic config from onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
@@ -846,8 +848,8 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		return nil, nil
 	}
 	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-		ChainSelector: input.ChainSelector,
-		Address:       input.TokenPoolAddress,
+		// ChainSelector: input.ChainSelector,
+		// Address:       input.TokenPoolAddress,
 		Args: token_pool.GetTokenTransferFeeConfigArgs{
 			Arg0:              common.Address{},
 			DestChainSelector: remoteChainSelector,
@@ -915,8 +917,9 @@ func makeCCVUpdates(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, ad
 	const directionOutbound uint8 = 0
 
 	thresholdReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       advancedPoolHooksAddr,
+		// ChainSelector: chainSelector,
+		// Address:       advancedPoolHooksAddr,
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("get threshold amount: %w", err)
@@ -926,8 +929,8 @@ func makeCCVUpdates(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, ad
 
 	getRequiredCCVs := func(amount *big.Int, direction uint8) ([]common.Address, error) {
 		report, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetRequiredCCVs, chain, evm_contract.FunctionInput[advanced_pool_hooks.GetRequiredCCVsArgs]{
-			ChainSelector: chainSelector,
-			Address:       advancedPoolHooksAddr,
+			// ChainSelector: chainSelector,
+			// Address:       advancedPoolHooksAddr,
 			Args: advanced_pool_hooks.GetRequiredCCVsArgs{
 				RemoteChainSelector: remoteChainSelector,
 				Amount:              amount,

@@ -54,7 +54,7 @@ func TestConfigurePool(t *testing.T) {
 			// Deploy chain
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSel,
+				// ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 				},
@@ -101,8 +101,9 @@ func TestConfigurePool(t *testing.T) {
 				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       input.TokenPoolAddress,
+					// ChainSelector: chainSel,
+					// Address:       input.TokenPoolAddress,
+					Args: struct{}{},
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")

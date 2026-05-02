@@ -83,7 +83,7 @@ var CreateToken = contract.NewWrite(contract.WriteParams[CreateTokenArgs, *TIP20
 	Description:     "Creates a TIP-20 token via the Tempo TIP-20 factory precompile",
 	ContractType:    FactoryContractType,
 	ContractABI:     TIP20FactoryABI,
-	NewContract:     NewTIP20Factory,
+	// NewContract:     NewTIP20Factory,
 	IsAllowedCaller: contract.AllCallersAllowed[*TIP20Factory, CreateTokenArgs],
 	Validate: func(args CreateTokenArgs) error {
 		if args.Name == "" {
@@ -107,7 +107,7 @@ var GetTokenAddress = contract.NewRead(contract.ReadParams[GetTokenAddressArgs, 
 	Version:      Version,
 	Description:  "Predicts the TIP-20 token address for a sender and salt",
 	ContractType: FactoryContractType,
-	NewContract:  NewTIP20Factory,
+	// NewContract:  NewTIP20Factory,
 	CallContract: func(f *TIP20Factory, opts *bind.CallOpts, args GetTokenAddressArgs) (common.Address, error) {
 		return f.GetTokenAddress(opts, args.Sender, args.Salt)
 	},
@@ -118,7 +118,7 @@ var IsTIP20 = contract.NewRead(contract.ReadParams[common.Address, bool, *TIP20F
 	Version:      Version,
 	Description:  "Returns whether an address is a valid TIP-20 token",
 	ContractType: FactoryContractType,
-	NewContract:  NewTIP20Factory,
+	// NewContract:  NewTIP20Factory,
 	CallContract: func(f *TIP20Factory, opts *bind.CallOpts, token common.Address) (bool, error) {
 		return f.IsTIP20(opts, token)
 	},

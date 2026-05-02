@@ -54,8 +54,8 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, onramp.OnRampSetTokenTransferFeeConfig, chain, contract.FunctionInput[onramp.SetTokenTransferFeeConfigInput]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
 				Args:          input.UpdatesByChain,
 			})
 			if err != nil {
@@ -85,8 +85,9 @@ var (
 			outerGrp, _ := errgroup.WithContext(b.GetContext())
 			outerGrp.SetLimit(10) // limit concurrency across remote chains
 			feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       input.PriceRegistry,
+				// ChainSelector: chain.Selector,
+				// Address:       input.PriceRegistry,
+				Args: nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
@@ -98,16 +99,18 @@ var (
 				onRampAddress := onRampAddress
 				outerGrp.Go(func() error {
 					sCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampStaticConfig, chain, contract.FunctionInput[any]{
-						ChainSelector: chain.Selector,
-						Address:       onRampAddress,
+						// ChainSelector: chain.Selector,
+						// Address:       onRampAddress,
+						Args: nil,
 					})
 					if err != nil {
 						return fmt.Errorf("failed to execute OnRampStaticConfigOp "+
 							"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
 					}
 					dCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampDynamicConfig, chain, contract.FunctionInput[any]{
-						ChainSelector: chain.Selector,
-						Address:       onRampAddress,
+						// ChainSelector: chain.Selector,
+						// Address:       onRampAddress,
+						Args: nil,
 					})
 					if err != nil {
 						return fmt.Errorf("failed to execute OnRampDynamicConfigOp "+
@@ -117,8 +120,8 @@ var (
 					feeTokenConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig)
 					for _, token := range feeTokens {
 						feeTokenConfigOut, err := operations.ExecuteOperation(b, onramp.OnRampFeeTokenConfig, chain, contract.FunctionInput[common.Address]{
-							ChainSelector: chain.Selector,
-							Address:       onRampAddress,
+							// ChainSelector: chain.Selector,
+							// Address:       onRampAddress,
 							Args:          token,
 						})
 						if err != nil {
@@ -139,8 +142,8 @@ var (
 						tokenGrp.Go(func() error {
 							ttfcOut, err := operations.ExecuteOperation(
 								b, onramp.OnRampGetTokenTransferFeeConfig, chain, contract.FunctionInput[common.Address]{
-									ChainSelector: chain.Selector,
-									Address:       onRampAddress,
+									// ChainSelector: chain.Selector,
+									// Address:       onRampAddress,
 									Args:          token,
 								})
 							if err != nil {

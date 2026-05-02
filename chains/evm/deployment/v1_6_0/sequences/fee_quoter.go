@@ -70,9 +70,9 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: input.UpdatesByChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyDestChainConfigUpdatesOp on %s: %w", chain, err)
@@ -98,9 +98,9 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: input.UpdatesByChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterUpdatePricesOp on %s: %w", chain, err)
@@ -126,9 +126,9 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			report, err := operations.ExecuteOperation(b, fqops.ApplyTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
+				// ChainSelector: chain.Selector,
+				// Address:       input.Address,
+				Args: input.UpdatesByChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdatesOp on %s: %w", chain, err)
@@ -165,9 +165,9 @@ var (
 			gasPriceMu := sync.Mutex{}
 			// fetch fee tokens
 			feeTokensRep, err := operations.ExecuteOperation(b, fqops.GetFeeTokens, evmChain, contract.FunctionInput[struct{}]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
-				Args:          struct{}{},
+				// Address:       fqAddress,
+				// ChainSelector: chainSelector,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee tokens from feequoter %s on chain %s: %w",
@@ -177,9 +177,9 @@ var (
 				remoteChain := remoteChain
 				destGrp.Go(func() error {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-						Address:       fqAddress,
-						ChainSelector: chainSelector,
-						Args:          remoteChain,
+						// Address:       fqAddress,
+						// ChainSelector: chainSelector,
+						Args: remoteChain,
 					})
 					if err != nil {
 						return fmt.Errorf("failed to get dest chain config for "+
@@ -193,9 +193,9 @@ var (
 					destChainConfigs[remoteChain] = opsOutput.Output
 					destChainMu.Unlock()
 					gasPriceOutput, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
-						Address:       fqAddress,
-						ChainSelector: chainSelector,
-						Args:          remoteChain,
+						// Address:       fqAddress,
+						// ChainSelector: chainSelector,
+						Args: remoteChain,
 					})
 					if err != nil {
 						return fmt.Errorf("failed to get destination chain gas price for "+
@@ -249,8 +249,8 @@ var (
 						innerTokenGrp.Go(func() error {
 							opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
 								contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
-									Address:       fqAddress,
-									ChainSelector: chainSelector,
+									// Address:       fqAddress,
+									// ChainSelector: chainSelector,
 									Args: fqops.GetTokenTransferFeeConfigArgs{
 										Token:             token,
 										DestChainSelector: remoteChain,
@@ -292,16 +292,18 @@ var (
 				}
 			}
 			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[struct{}]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
+				// Address:       fqAddress,
+				// ChainSelector: chainSelector,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
 			priceUpdaters, err := operations.ExecuteOperation(b, fqops.GetAllAuthorizedCallers, evmChain, contract.FunctionInput[struct{}]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
+				// Address:       fqAddress,
+				// ChainSelector: chainSelector,
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get all authorized callers from feequoter %s on chain %d: %w",
@@ -318,8 +320,8 @@ var (
 			tokenSlice := maps.Keys(allTokens)
 			// add fee tokens
 			tokenPrices, err := operations.ExecuteOperation(b, fqops.GetTokenPrices, evmChain, contract.FunctionInput[[]common.Address]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
+				// Address:       fqAddress,
+				// ChainSelector: chainSelector,
 				Args:          tokenSlice,
 			})
 			if err != nil {

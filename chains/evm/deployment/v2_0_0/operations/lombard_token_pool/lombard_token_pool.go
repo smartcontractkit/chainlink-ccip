@@ -119,7 +119,7 @@ var SetPath = contract.NewWrite(contract.WriteParams[SetPathArgs, *LombardTokenP
 	Description:     "Calls setPath on the contract",
 	ContractType:    ContractType,
 	ContractABI:     LombardTokenPoolABI,
-	NewContract:     NewLombardTokenPoolContract,
+	//NewContract:     NewLombardTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*LombardTokenPoolContract, SetPathArgs],
 	Validate:        func(SetPathArgs) error { return nil },
 	CallContract: func(
@@ -136,7 +136,7 @@ var GetPath = contract.NewRead(contract.ReadParams[uint64, Path, *LombardTokenPo
 	Version:      Version,
 	Description:  "Calls getPath on the contract",
 	ContractType: ContractType,
-	NewContract:  NewLombardTokenPoolContract,
+	//NewContract:  NewLombardTokenPoolContract,
 	CallContract: func(c *LombardTokenPoolContract, opts *bind.CallOpts, args uint64) (Path, error) {
 		return c.GetPath(opts, args)
 	},

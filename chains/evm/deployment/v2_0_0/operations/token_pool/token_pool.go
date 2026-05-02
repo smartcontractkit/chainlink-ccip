@@ -329,7 +329,7 @@ var SetAllowedFinalityConfig = contract.NewWrite(contract.WriteParams[[4]byte, *
 	Description:     "Calls setAllowedFinalityConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, [4]byte],
 	Validate:        func([4]byte) error { return nil },
 	CallContract: func(
@@ -347,7 +347,7 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *T
 	Description:     "Calls addRemotePool on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, AddRemotePoolArgs],
 	Validate:        func(AddRemotePoolArgs) error { return nil },
 	CallContract: func(
@@ -365,7 +365,7 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolAr
 	Description:     "Calls removeRemotePool on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, RemoveRemotePoolArgs],
 	Validate:        func(RemoveRemotePoolArgs) error { return nil },
 	CallContract: func(
@@ -383,7 +383,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, SetDynamicConfigArgs],
 	Validate:        func(SetDynamicConfigArgs) error { return nil },
 	CallContract: func(
@@ -401,7 +401,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	Description:     "Calls withdrawFeeTokens on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, WithdrawFeeTokensArgs],
 	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
 	CallContract: func(
@@ -419,7 +419,7 @@ var UpdateAdvancedPoolHooks = contract.NewWrite(contract.WriteParams[common.Addr
 	Description:     "Calls updateAdvancedPoolHooks on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(
@@ -437,7 +437,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	Description:     "Calls applyChainUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, ApplyChainUpdatesArgs],
 	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
 	CallContract: func(
@@ -455,7 +455,7 @@ var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]RateLimitConfi
 	Description:     "Calls setRateLimitConfig on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, []RateLimitConfigArgs],
 	Validate:        func([]RateLimitConfigArgs) error { return nil },
 	CallContract: func(
@@ -473,7 +473,7 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	Description:     "Calls applyTokenTransferFeeConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     TokenPoolABI,
-	NewContract:     NewTokenPoolContract,
+	//NewContract:     NewTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, ApplyTokenTransferFeeConfigUpdatesArgs],
 	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
 	CallContract: func(
@@ -490,7 +490,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, GetDynamic
 	Version:      Version,
 	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (GetDynamicConfigResult, error) {
 		return c.GetDynamicConfig(opts)
 	},
@@ -501,7 +501,7 @@ var GetRmnProxy = contract.NewRead(contract.ReadParams[struct{}, common.Address,
 	Version:      Version,
 	Description:  "Calls getRmnProxy on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetRmnProxy(opts)
 	},
@@ -512,7 +512,7 @@ var GetCurrentRateLimiterState = contract.NewRead(contract.ReadParams[GetCurrent
 	Version:      Version,
 	Description:  "Calls getCurrentRateLimiterState on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args GetCurrentRateLimiterStateArgs) (GetCurrentRateLimiterStateResult, error) {
 		return c.GetCurrentRateLimiterState(opts, args.RemoteChainSelector, args.FastFinality)
 	},
@@ -523,7 +523,7 @@ var GetAllowedFinalityConfig = contract.NewRead(contract.ReadParams[struct{}, [4
 	Version:      Version,
 	Description:  "Calls getAllowedFinalityConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) ([4]byte, error) {
 		return c.GetAllowedFinalityConfig(opts)
 	},
@@ -534,7 +534,7 @@ var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64
 	Version:      Version,
 	Description:  "Calls getSupportedChains on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
 		return c.GetSupportedChains(opts)
 	},
@@ -545,7 +545,7 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *Tok
 	Version:      Version,
 	Description:  "Calls getRemotePools on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args uint64) ([][]byte, error) {
 		return c.GetRemotePools(opts, args)
 	},
@@ -556,7 +556,7 @@ var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *Token
 	Version:      Version,
 	Description:  "Calls getRemoteToken on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args uint64) ([]byte, error) {
 		return c.GetRemoteToken(opts, args)
 	},
@@ -567,7 +567,7 @@ var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *T
 	Version:      Version,
 	Description:  "Calls getToken on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetToken(opts)
 	},
@@ -578,7 +578,7 @@ var GetTokenDecimals = contract.NewRead(contract.ReadParams[struct{}, uint8, *To
 	Version:      Version,
 	Description:  "Calls getTokenDecimals on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (uint8, error) {
 		return c.GetTokenDecimals(opts)
 	},
@@ -589,7 +589,7 @@ var IsSupportedToken = contract.NewRead(contract.ReadParams[common.Address, bool
 	Version:      Version,
 	Description:  "Calls isSupportedToken on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args common.Address) (bool, error) {
 		return c.IsSupportedToken(opts, args)
 	},
@@ -600,7 +600,7 @@ var GetAdvancedPoolHooks = contract.NewRead(contract.ReadParams[struct{}, common
 	Version:      Version,
 	Description:  "Calls getAdvancedPoolHooks on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetAdvancedPoolHooks(opts)
 	},
@@ -611,7 +611,7 @@ var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTra
 	Version:      Version,
 	Description:  "Calls getTokenTransferFeeConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewTokenPoolContract,
+	//NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args GetTokenTransferFeeConfigArgs) (TokenTransferFeeConfig, error) {
 		return c.GetTokenTransferFeeConfig(opts, args.Arg0, args.DestChainSelector, args.Arg2, args.Arg3)
 	},

@@ -185,7 +185,7 @@ var DeployTokenGovernor = cldf_ops.NewSequence(
 		}
 		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
 			TypeAndVersion: token_governor.TypeAndVersion,
-			ChainSelector:  chain.Selector,
+			// ChainSelector:  chain.Selector,
 			Args: token_governor.ConstructorArgs{
 				Token:               common.HexToAddress(input.Token),
 				InitialDelay:        input.InitialDelay,
@@ -247,8 +247,8 @@ var GrantRole = cldf_ops.NewSequence(
 				}
 				// execute GrantRole operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.GrantRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args: token_governor.RoleAssignment{
 						Role: role,
 						To:   tokenGovernorRole.Account,
@@ -307,8 +307,8 @@ var RevokeRole = cldf_ops.NewSequence(
 				}
 				// execute RevokeRole operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.RevokeRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args: token_governor.RoleAssignment{
 						Role: role,
 						To:   tokenGovernorRole.Account,
@@ -367,8 +367,8 @@ var RenounceRole = cldf_ops.NewSequence(
 				}
 				// execute RenounceRole operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.RenounceRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args: token_governor.RoleAssignment{
 						Role: role,
 						To:   tokenGovernorRole.Account,
@@ -440,8 +440,8 @@ var TransferOwnership = cldf_ops.NewSequence(
 
 				// execute TransferOwnership operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.TransferOwnership, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args:          newOwner,
 				})
 				if err != nil {
@@ -475,15 +475,15 @@ var AcceptOwnership = cldf_ops.NewSequence(
 
 			for tokenSymbol, newOwner := range tokenMap {
 				// get token governor address from datastore
-				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
-				}
+				// tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				// if err != nil {
+					// return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				// }
 
 				// execute AcceptOwnership operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptOwnership, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args:          newOwner,
 				})
 				if err != nil {
@@ -539,8 +539,8 @@ var BeginDefaultAdminTransfer = cldf_ops.NewSequence(
 
 				// execute BeginDefaultAdminTransfer operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.BeginDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args:          newAdmin,
 				})
 				if err != nil {
@@ -574,15 +574,15 @@ var AcceptDefaultAdminTransfer = cldf_ops.NewSequence(
 
 			for tokenSymbol, admin := range tokenMap {
 				// get token governor address from datastore
-				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
-				}
+				// tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				// if err != nil {
+					// return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				// }
 
 				// execute AcceptDefaultAdminTransfer operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
+					// ChainSelector: chain.Selector,
+					// Address:       tgAddr,
 					Args:          admin,
 				})
 				if err != nil {

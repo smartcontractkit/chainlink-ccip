@@ -60,7 +60,7 @@ var CreateAndTransferOwnership = contract.NewWrite(contract.WriteParams[CreateAn
 	Description:  "Deploys a contract with the given creation code + salt and transfers ownership to the given address",
 	ContractType: ContractType,
 	ContractABI:  create2_factory.CREATE2FactoryABI,
-	NewContract:  create2_factory.NewCREATE2Factory,
+	// NewContract:  create2_factory.NewCREATE2Factory,
 	IsAllowedCaller: func(contract *create2_factory.CREATE2Factory, opts *bind.CallOpts, caller common.Address, input CreateAndTransferOwnershipArgs) (bool, error) {
 		allowList, err := contract.GetAllowList(opts)
 		if err != nil {
@@ -83,7 +83,7 @@ var ComputeAddress = contract.NewRead(contract.ReadParams[ComputeAddressArgs, co
 	Version:      Version,
 	Description:  "Computes the address of a contract that will be deployed with the given creation code and salt",
 	ContractType: ContractType,
-	NewContract:  create2_factory.NewCREATE2Factory,
+	// NewContract:  create2_factory.NewCREATE2Factory,
 	CallContract: func(contract *create2_factory.CREATE2Factory, opts *bind.CallOpts, input ComputeAddressArgs) (common.Address, error) {
 		creationCode, err := makeCreationCode(input.ABI, input.Bin, input.ConstructorArgs...)
 		if err != nil {
@@ -99,7 +99,7 @@ var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowLis
 	Description:     "Applies the allow list updates to the CREATE2Factory contract",
 	ContractType:    ContractType,
 	ContractABI:     create2_factory.CREATE2FactoryABI,
-	NewContract:     create2_factory.NewCREATE2Factory,
+	// NewContract:     create2_factory.NewCREATE2Factory,
 	IsAllowedCaller: contract.OnlyOwner[*create2_factory.CREATE2Factory, ApplyAllowListUpdatesArgs],
 	Validate:        func(ApplyAllowListUpdatesArgs) error { return nil },
 	CallContract: func(contract *create2_factory.CREATE2Factory, opts *bind.TransactOpts, input ApplyAllowListUpdatesArgs) (*types.Transaction, error) {

@@ -218,8 +218,8 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 					grantReport, grantErr := cldf_ops.ExecuteOperation(b,
 						bnmOps.GrantMintAndBurnRoles, evmChain,
 						contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       common.HexToAddress(tokenAddr),
+							// ChainSelector: input.ChainSelector,
+							// Address:       common.HexToAddress(tokenAddr),
 							Args:          poolAddr,
 						},
 					)
@@ -248,8 +248,9 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
 	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       common.HexToAddress(poolRef.Address),
+		// ChainSelector: chainSelector,
+		// Address:       common.HexToAddress(poolRef.Address),
+		Args: struct{}{},
 	})
 	if err == nil {
 		return getTokenDecimalsReport.Output, nil
@@ -259,8 +260,9 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 	tokenAddr := common.BytesToAddress(tokenBytes)
 	if tokenAddr.Cmp(common.Address{}) == 0 {
 		getTokenReport, getTokErr := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(poolRef.Address),
+			// ChainSelector: chainSelector,
+			// Address:       common.HexToAddress(poolRef.Address),
+			Args: struct{}{},
 		})
 		if getTokErr != nil {
 			return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w", poolRef.Address, evmChain, poolErr)
@@ -302,8 +304,8 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 			}
 
 			currentFinalityConfig, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       tokenPoolAddr,
+				// ChainSelector: input.ChainSelector,
+				// Address:       tokenPoolAddr,
 				Args:          struct{}{},
 			})
 			if err != nil {
@@ -315,8 +317,8 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				requestedFinalityConfig := input.AllowedFinalityConfig.Raw()
 				if requestedFinalityConfig != currentFinalityConfig.Output {
 					_, err = cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, contract.FunctionInput[[4]byte]{
-						ChainSelector: input.ChainSelector,
-						Address:       tokenPoolAddr,
+						// ChainSelector: input.ChainSelector,
+						// Address:       tokenPoolAddr,
 						Args:          requestedFinalityConfig,
 					})
 					if err != nil {
@@ -344,8 +346,8 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 			}
 
 			report, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, evmChain, contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       tokenPoolAddr,
+				// ChainSelector: input.ChainSelector,
+				// Address:       tokenPoolAddr,
 				Args:          args,
 			})
 			if err != nil {
@@ -397,8 +399,8 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 		token_pool.GetTokenTransferFeeConfig,
 		chain,
 		contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: src,
-			Address:       addr,
+			// ChainSelector: src,
+			// Address:       addr,
 			Args:          args,
 		},
 	)
@@ -427,8 +429,9 @@ func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.
 	res, err := cldf_ops.ExecuteOperation(b,
 		token_pool.GetToken, ch,
 		contract.FunctionInput[struct{}]{
-			ChainSelector: ch.Selector,
-			Address:       poolAddr,
+			// ChainSelector: ch.Selector,
+			// Address:       poolAddr,
+			Args: struct{}{},
 		},
 	)
 	if err != nil {

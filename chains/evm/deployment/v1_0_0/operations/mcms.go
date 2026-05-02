@@ -169,7 +169,7 @@ var OpEVMSetConfigMCM = contract.NewWrite(contract.WriteParams[OpSetConfigMCMInp
 	Description:     "Sets Config on the deployed MCM contract",
 	ContractABI:     bindings.ManyChainMultiSigABI,
 	ContractType:    "ManyChainMultiSig",
-	NewContract:     bindings.NewManyChainMultiSig,
+	// NewContract:     bindings.NewManyChainMultiSig,
 	IsAllowedCaller: contract.OnlyOwner[*bindings.ManyChainMultiSig, OpSetConfigMCMInput],
 	Validate:        func(input OpSetConfigMCMInput) error { return nil },
 	CallContract: func(mcm *bindings.ManyChainMultiSig, opts *bind.TransactOpts, input OpSetConfigMCMInput) (*types.Transaction, error) {
@@ -190,7 +190,7 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 	Description:  "Grants role on the deployed Timelock contract",
 	ContractABI:  bindings.RBACTimelockABI,
 	ContractType: "RBACTimelock",
-	NewContract:  bindings.NewRBACTimelock,
+	// NewContract:  bindings.NewRBACTimelock,
 	IsAllowedCaller: func(contract *bindings.RBACTimelock, opts *bind.CallOpts, caller common.Address, input OpGrantRoleTimelockInput) (bool, error) {
 		roleAdmin, err := contract.GetRoleAdmin(opts, input.RoleID)
 		if err != nil {
@@ -219,7 +219,7 @@ var OpRenounceRoleTimelock = contract.NewWrite(contract.WriteParams[OpRenounceRo
 	Description:  "Renounces role of the caller key on the deployed Timelock contract",
 	ContractABI:  bindings.RBACTimelockABI,
 	ContractType: "RBACTimelock",
-	NewContract:  bindings.NewRBACTimelock,
+	// NewContract:  bindings.NewRBACTimelock,
 	IsAllowedCaller: func(contract *bindings.RBACTimelock, opts *bind.CallOpts, caller common.Address, input OpRenounceRoleTimelockInput) (bool, error) {
 		roleAdmin, err := contract.GetRoleAdmin(opts, input.RoleID)
 		if err != nil {

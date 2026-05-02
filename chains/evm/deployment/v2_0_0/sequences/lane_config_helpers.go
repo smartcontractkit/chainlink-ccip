@@ -23,8 +23,9 @@ func FilterOffRampAdds(
 	offRampAdds []router.OffRamp,
 ) ([]router.OffRamp, error) {
 	currentReport, err := cldf_ops.ExecuteOperation(b, router.GetOffRamps, chain, contract.FunctionInput[any]{
-		ChainSelector: chain.Selector,
-		Address:       routerAddr,
+		// ChainSelector: chain.Selector,
+		// Address:       routerAddr,
+		Args: nil,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramps from Router(%s) on chain %v: %w", routerAddr, chain, err)
@@ -53,8 +54,9 @@ func FilterExecutorDestChains(
 	out := make(map[common.Address][]ExecutorRemoteChainConfigArgs, len(destChainSelectorsPerExecutor))
 	for executorAddr, toAdd := range destChainSelectorsPerExecutor {
 		currentReport, err := cldf_ops.ExecuteOperation(b, executor.GetDestChains, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       executorAddr,
+			// ChainSelector: chain.Selector,
+			// Address:       executorAddr,
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dest chains from Executor(%s) on chain %v: %w", executorAddr, chain, err)

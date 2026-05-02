@@ -47,7 +47,7 @@ var SetCCIPAdmin = contract.NewWrite(contract.WriteParams[string, *burn_mint_erc
 	Description:  "Set CCIP Admin on BurnMintERC20 token contract",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20.BurnMintERC20ABI,
-	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	// NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	IsAllowedCaller: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, caller common.Address, input string) (bool, error) {
 		// SetCCIPAdmin can only be called by the current CCIP admin
 		currentAdmin, err := token.GetCCIPAdmin(opts)
@@ -68,7 +68,7 @@ var GrantAdminRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *bur
 	Description:  "Grant admin role on BurnMintERC20 token contract",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20.BurnMintERC20ABI,
-	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	// NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	IsAllowedCaller: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, caller common.Address, input RoleAssignment) (bool, error) {
 		// Check if caller has the admin role for the role being granted
 		roleAdmin, err := token.GetRoleAdmin(opts, input.Role)
@@ -89,7 +89,7 @@ var RevokeAdminRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *bu
 	Description:  "Revoke admin role on BurnMintERC20 token contract",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20.BurnMintERC20ABI,
-	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	// NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	IsAllowedCaller: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, caller common.Address, input RoleAssignment) (bool, error) {
 		// Check if caller has the admin role for the role being revoked
 		roleAdmin, err := token.GetRoleAdmin(opts, input.Role)
@@ -109,7 +109,7 @@ var GetDefaultAdminRole = contract.NewRead(contract.ReadParams[struct{}, [32]byt
 	Version:      utils.Version_1_0_0,
 	Description:  "Gets the default admin role on BurnMintERC20 token contract",
 	ContractType: ContractType,
-	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	// NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	CallContract: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, input struct{}) ([32]byte, error) {
 		return token.DEFAULTADMINROLE(opts)
 	},
@@ -121,7 +121,7 @@ var RenounceAdminRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *
 	Description:  "Renounce admin role on BurnMintERC20 token contract",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20.BurnMintERC20ABI,
-	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	// NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	IsAllowedCaller: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, caller common.Address, input RoleAssignment) (bool, error) {
 		// For renounce, the caller must be the one renouncing their own role
 		// The caller can only renounce for themselves
@@ -139,7 +139,7 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 	Description:  "Grant mint and burn role on BurnMintERC20 token contract",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20.BurnMintERC20ABI,
-	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	// NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	IsAllowedCaller: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		// Check if caller has the admin role for the role being revoked
 		roleAdmin, err := token.DEFAULTADMINROLE(opts)

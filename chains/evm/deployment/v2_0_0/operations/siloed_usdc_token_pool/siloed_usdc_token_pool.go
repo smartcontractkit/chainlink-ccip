@@ -127,7 +127,7 @@ var ConfigureLockBoxes = contract.NewWrite(contract.WriteParams[[]LockBoxConfig,
 	Description:     "Calls configureLockBoxes on the contract",
 	ContractType:    ContractType,
 	ContractABI:     SiloedUSDCTokenPoolABI,
-	NewContract:     NewSiloedUSDCTokenPoolContract,
+	//NewContract:     NewSiloedUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*SiloedUSDCTokenPoolContract, []LockBoxConfig],
 	Validate:        func([]LockBoxConfig) error { return nil },
 	CallContract: func(
@@ -145,7 +145,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     SiloedUSDCTokenPoolABI,
-	NewContract:     NewSiloedUSDCTokenPoolContract,
+	//NewContract:     NewSiloedUSDCTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*SiloedUSDCTokenPoolContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(
@@ -162,7 +162,7 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	Version:      Version,
 	Description:  "Calls getAllAuthorizedCallers on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedUSDCTokenPoolContract,
+	//NewContract:  NewSiloedUSDCTokenPoolContract,
 	CallContract: func(c *SiloedUSDCTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
 	},
@@ -173,7 +173,7 @@ var GetAllLockBoxConfigs = contract.NewRead(contract.ReadParams[struct{}, []Lock
 	Version:      Version,
 	Description:  "Calls getAllLockBoxConfigs on the contract",
 	ContractType: ContractType,
-	NewContract:  NewSiloedUSDCTokenPoolContract,
+	//NewContract:  NewSiloedUSDCTokenPoolContract,
 	CallContract: func(c *SiloedUSDCTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]LockBoxConfig, error) {
 		return c.GetAllLockBoxConfigs(opts)
 	},

@@ -99,7 +99,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     CCTPThroughCCVTokenPoolABI,
-	NewContract:     NewCCTPThroughCCVTokenPoolContract,
+	// NewContract:     NewCCTPThroughCCVTokenPoolContract,
 	IsAllowedCaller: contract.OnlyOwner[*CCTPThroughCCVTokenPoolContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(

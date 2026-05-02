@@ -122,7 +122,7 @@ var Curse = contract.NewWrite(contract.WriteParams[[16]byte, *RMNRemoteContract]
 	Description:     "Calls curse on the contract",
 	ContractType:    ContractType,
 	ContractABI:     RMNRemoteABI,
-	NewContract:     NewRMNRemoteContract,
+	// NewContract:     NewRMNRemoteContract,
 	IsAllowedCaller: contract.OnlyOwner[*RMNRemoteContract, [16]byte],
 	Validate:        func([16]byte) error { return nil },
 	CallContract: func(
@@ -140,7 +140,7 @@ var Curse0 = contract.NewWrite(contract.WriteParams[[][16]byte, *RMNRemoteContra
 	Description:     "Calls curse0 on the contract",
 	ContractType:    ContractType,
 	ContractABI:     RMNRemoteABI,
-	NewContract:     NewRMNRemoteContract,
+	// NewContract:     NewRMNRemoteContract,
 	IsAllowedCaller: contract.OnlyOwner[*RMNRemoteContract, [][16]byte],
 	Validate:        func([][16]byte) error { return nil },
 	CallContract: func(
@@ -158,7 +158,7 @@ var Uncurse = contract.NewWrite(contract.WriteParams[[16]byte, *RMNRemoteContrac
 	Description:     "Calls uncurse on the contract",
 	ContractType:    ContractType,
 	ContractABI:     RMNRemoteABI,
-	NewContract:     NewRMNRemoteContract,
+	// NewContract:     NewRMNRemoteContract,
 	IsAllowedCaller: contract.OnlyOwner[*RMNRemoteContract, [16]byte],
 	Validate:        func([16]byte) error { return nil },
 	CallContract: func(
@@ -176,7 +176,7 @@ var Uncurse0 = contract.NewWrite(contract.WriteParams[[][16]byte, *RMNRemoteCont
 	Description:     "Calls uncurse0 on the contract",
 	ContractType:    ContractType,
 	ContractABI:     RMNRemoteABI,
-	NewContract:     NewRMNRemoteContract,
+	// NewContract:     NewRMNRemoteContract,
 	IsAllowedCaller: contract.OnlyOwner[*RMNRemoteContract, [][16]byte],
 	Validate:        func([][16]byte) error { return nil },
 	CallContract: func(
@@ -193,7 +193,7 @@ var IsCursed = contract.NewRead(contract.ReadParams[[16]byte, bool, *RMNRemoteCo
 	Version:      Version,
 	Description:  "Calls isCursed on the contract",
 	ContractType: ContractType,
-	NewContract:  NewRMNRemoteContract,
+	// NewContract:  NewRMNRemoteContract,
 	CallContract: func(c *RMNRemoteContract, opts *bind.CallOpts, args [16]byte) (bool, error) {
 		return c.IsCursed(opts, args)
 	},
@@ -204,7 +204,7 @@ var IsCursed0 = contract.NewRead(contract.ReadParams[struct{}, bool, *RMNRemoteC
 	Version:      Version,
 	Description:  "Calls isCursed0 on the contract",
 	ContractType: ContractType,
-	NewContract:  NewRMNRemoteContract,
+	// NewContract:  NewRMNRemoteContract,
 	CallContract: func(c *RMNRemoteContract, opts *bind.CallOpts, args struct{}) (bool, error) {
 		return c.IsCursed0(opts)
 	},

@@ -66,7 +66,7 @@ var DeployNonCanonicalUSDC = cldf_ops.NewSequence(
 		} else {
 			burnMintWithLockReleaseFlagTokenPoolReport, err := cldf_ops.ExecuteOperation(b, burn_mint_with_lock_release_flag_token_pool.Deploy, chain, contract_utils.DeployInput[burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_with_lock_release_flag_token_pool.ContractType, *burn_mint_with_lock_release_flag_token_pool.Version),
-				ChainSelector:  chain.Selector,
+				// ChainSelector:  chain.Selector,
 				Args: burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
 					Token:              usdcTokenAddress,
 					LocalTokenDecimals: input.TokenDecimals,

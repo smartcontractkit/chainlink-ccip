@@ -26,7 +26,7 @@ type WriteParams[ARGS any, C any] = upstream.WriteParams[ARGS, C]
 // NewWrite creates a new write operation.
 //
 // Deprecated: Import github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract directly.
-func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operation[FunctionInput[ARGS], WriteOutput, cldf_evm.Chain] {
+func NewWrite[ARGS any, C interface{ Address() common.Address}](params WriteParams[ARGS, C]) *operations.Operation[FunctionInput[ARGS], WriteOutput, cldf_evm.Chain] {
 	return upstream.NewWrite(params)
 }
 

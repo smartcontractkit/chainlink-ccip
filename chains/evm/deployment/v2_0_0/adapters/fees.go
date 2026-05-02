@@ -228,11 +228,11 @@ func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operation
 				return result, fmt.Errorf("chain with selector %d not defined", input.Selector)
 			}
 
-			fqRef, err := a.GetFeeContractRef(e, input.Selector, 0)
-			if err != nil {
-				return result, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", input.Selector, err)
-			}
-			fqAddr := common.HexToAddress(fqRef.Address)
+			// fqRef, err := a.GetFeeContractRef(e, input.Selector, 0)
+			// if err != nil {
+			// 	return result, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", input.Selector, err)
+			// }
+			// fqAddr := common.HexToAddress(fqRef.Address)
 
 			args := make([]fqops.DestChainConfigArgs, 0, len(input.Settings))
 			for dst, cfg := range input.Settings {
@@ -245,8 +245,8 @@ func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment) *operation
 			report, err := operations.ExecuteOperation(
 				b, fqops.ApplyDestChainConfigUpdates, evmChain,
 				contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-					ChainSelector: evmChain.Selector,
-					Address:       fqAddr,
+					// ChainSelector: evmChain.Selector,
+					// Address:       fqAddr,
 					Args:          args,
 				},
 			)

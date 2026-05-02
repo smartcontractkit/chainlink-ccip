@@ -31,8 +31,9 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			tokenAddress = common.HexToAddress(input.TokenAddress)
 		} else {
 			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.TokenPoolAddress),
+				// ChainSelector: input.ChainSelector,
+				// Address:       common.HexToAddress(input.TokenPoolAddress),
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -47,9 +48,9 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 
 		// Validate the pool supports the token
 		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenPoolAddress,
-			Args:          tokenAddress,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenPoolAddress,
+			Args: tokenAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if token %s is supported by token pool %s on %s: %w", tokenAddress, tokenPoolAddress, chain, err)

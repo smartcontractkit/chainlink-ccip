@@ -38,16 +38,18 @@ var OffRampImportConfigSequence = operations.NewSequence(
 		contractMeta := make([]datastore.ContractMetadata, 0)
 		for remoteChain, offRampAddress := range input.OffRampsPerRemoteChain {
 			sCfg, err := operations.ExecuteOperation(b, offrampops.OffRampStaticConfig, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       offRampAddress,
+				// ChainSelector: chain.Selector,
+				// Address:       offRampAddress,
+				Args: nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from OffRamp %s on chain %s "+
 					"for remote chain %d: %w", offRampAddress.Hex(), chain.String(), remoteChain, err)
 			}
 			dCfg, err := operations.ExecuteOperation(b, offrampops.OffRampDynamicConfig, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       offRampAddress,
+				// ChainSelector: chain.Selector,
+				// Address:       offRampAddress,
+				Args: nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config from OffRamp %s "+

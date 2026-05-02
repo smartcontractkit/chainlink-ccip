@@ -167,8 +167,9 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 				return result, fmt.Errorf("chain with selector %d not defined", input.Dest.Selector)
 			}
 			rep, err := operations.ExecuteOperation(b, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
-				ChainSelector: input.Dest.Selector,
-				Address:       common.BytesToAddress(input.Dest.Router),
+				// ChainSelector: input.Dest.Selector,
+				// Address:       common.BytesToAddress(input.Dest.Router),
+				Args: nil,
 			})
 			if err != nil {
 				return result, fmt.Errorf("read offRamps from router: %w", err)
@@ -210,9 +211,9 @@ func feeQuoterPricesAlreadySeeded(
 	destChainSelector uint64,
 ) (bool, error) {
 	rep, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-		ChainSelector: sourceChainSelector,
-		Address:       feeQuoter,
-		Args:          destChainSelector,
+		// ChainSelector: sourceChainSelector,
+		// Address:       feeQuoter,
+		Args: destChainSelector,
 	})
 	if err != nil {
 		return false, fmt.Errorf("read destination gas price from fee quoter: %w", err)
@@ -229,8 +230,8 @@ func feeQuoterV2PricesAlreadySeeded(
 	destChainSelector uint64,
 ) (bool, error) {
 	rep, err := operations.ExecuteOperation(b, fqops2.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-		ChainSelector: sourceChainSelector,
-		Address:       feeQuoter,
+		// ChainSelector: sourceChainSelector,
+		// Address:       feeQuoter,
 		Args:          destChainSelector,
 	})
 	if err != nil {
@@ -254,10 +255,10 @@ func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes
 		return errors.New("OnRamp allowlist: cannot specify AllowList addresses when AllowListEnabled is false")
 	}
 
-	onRampAddr := common.BytesToAddress(input.Source.OnRamp)
+	// onRampAddr := common.BytesToAddress(input.Source.OnRamp)
 	currentRep, err := operations.ExecuteOperation(b, onrampops.GetAllowedSendersList, chain, contract.FunctionInput[uint64]{
-		ChainSelector: input.Source.Selector,
-		Address:       onRampAddr,
+		// ChainSelector: input.Source.Selector,
+		// Address:       onRampAddr,
 		Args:          input.Dest.Selector,
 	})
 	if err != nil {
@@ -280,8 +281,8 @@ func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes
 	}
 
 	writeRep, err := operations.ExecuteOperation(b, onrampops.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]onrampops.AllowlistConfigArgs]{
-		ChainSelector: input.Source.Selector,
-		Address:       onRampAddr,
+		// ChainSelector: input.Source.Selector,
+		// Address:       onRampAddr,
 		Args: []onrampops.AllowlistConfigArgs{{
 			DestChainSelector:         input.Dest.Selector,
 			AllowlistEnabled:          input.Source.AllowListEnabled,
@@ -460,8 +461,8 @@ func configureFeeQuoterV2(b operations.Bundle, input lanes.UpdateLanesInput, fqA
 	destChainCfgReport, err := operations.ExecuteOperation(
 		b, fqops2.ApplyDestChainConfigUpdates, evmChain,
 		contract.FunctionInput[[]fqops2.DestChainConfigArgs]{
-			ChainSelector: evmChain.Selector,
-			Address:       fqAddr,
+			// ChainSelector: evmChain.Selector,
+			// Address:       fqAddr,
 			Args: []fqops2.DestChainConfigArgs{
 				{
 					DestChainSelector: input.Dest.Selector,
@@ -489,8 +490,8 @@ func configureFeeQuoterV2(b operations.Bundle, input lanes.UpdateLanesInput, fqA
 			b.Logger.Info("Skipping FeeQuoter v2 price updates: prices already seeded for dest chain")
 		} else {
 			priceReport, err := operations.ExecuteOperation(b, fqops2.UpdatePrices, evmChain, contract.FunctionInput[fqops2.PriceUpdates]{
-				ChainSelector: evmChain.Selector,
-				Address:       fqAddr,
+				// ChainSelector: evmChain.Selector,
+				// Address:       fqAddr,
 				Args: fqops2.PriceUpdates{
 					TokenPriceUpdates: TranslateTokenPricesV2(input.Source.TokenPrices),
 					GasPriceUpdates: []fqops2.GasPriceUpdate{

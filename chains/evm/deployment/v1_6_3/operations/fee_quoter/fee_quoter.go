@@ -287,7 +287,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	Description:     "Calls applyDestChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     FeeQuoterABI,
-	NewContract:     NewFeeQuoterContract,
+	// NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(
@@ -305,7 +305,7 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *FeeQuot
 	Description:     "Calls updatePrices on the contract",
 	ContractType:    ContractType,
 	ContractABI:     FeeQuoterABI,
-	NewContract:     NewFeeQuoterContract,
+	// NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, PriceUpdates],
 	Validate:        func(PriceUpdates) error { return nil },
 	CallContract: func(
@@ -323,7 +323,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     FeeQuoterABI,
-	NewContract:     NewFeeQuoterContract,
+	// NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(
@@ -341,7 +341,7 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	Description:     "Calls applyTokenTransferFeeConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     FeeQuoterABI,
-	NewContract:     NewFeeQuoterContract,
+	// NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, ApplyTokenTransferFeeConfigUpdatesArgs],
 	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
 	CallContract: func(
@@ -358,7 +358,7 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainC
 	Version:      Version,
 	Description:  "Calls getDestChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
 		return c.GetDestChainConfig(opts, args)
 	},
@@ -369,7 +369,7 @@ var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTra
 	Version:      Version,
 	Description:  "Calls getTokenTransferFeeConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args GetTokenTransferFeeConfigArgs) (TokenTransferFeeConfig, error) {
 		return c.GetTokenTransferFeeConfig(opts, args.DestChainSelector, args.Token)
 	},
@@ -380,7 +380,7 @@ var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfi
 	Version:      Version,
 	Description:  "Calls getStaticConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
 		return c.GetStaticConfig(opts)
 	},
@@ -391,7 +391,7 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	Version:      Version,
 	Description:  "Calls getAllAuthorizedCallers on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
 	},
@@ -402,7 +402,7 @@ var GetTokenPrices = contract.NewRead(contract.ReadParams[[]common.Address, []Ti
 	Version:      Version,
 	Description:  "Calls getTokenPrices on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args []common.Address) ([]TimestampedPackedUint224, error) {
 		return c.GetTokenPrices(opts, args)
 	},
@@ -413,7 +413,7 @@ var GetDestinationChainGasPrice = contract.NewRead(contract.ReadParams[uint64, T
 	Version:      Version,
 	Description:  "Calls getDestinationChainGasPrice on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args uint64) (TimestampedPackedUint224, error) {
 		return c.GetDestinationChainGasPrice(opts, args)
 	},
@@ -424,7 +424,7 @@ var GetFeeTokens = contract.NewRead(contract.ReadParams[struct{}, []common.Addre
 	Version:      Version,
 	Description:  "Calls getFeeTokens on the contract",
 	ContractType: ContractType,
-	NewContract:  NewFeeQuoterContract,
+	// NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetFeeTokens(opts)
 	},

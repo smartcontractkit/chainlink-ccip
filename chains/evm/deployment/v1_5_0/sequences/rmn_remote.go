@@ -33,8 +33,8 @@ var SeqCurse = cldf_ops.NewSequence(
 	"Cursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
 		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Curse, chain, contract.FunctionInput[ops.CurseArgs]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
+			// Address:       in.Addr,
+			// ChainSelector: chain.Selector,
 			Args: ops.CurseArgs{
 				Subject: in.Subjects,
 				CurseID: in.CurseID,
@@ -58,8 +58,8 @@ var SeqUncurse = cldf_ops.NewSequence(
 	"Uncursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqUncurseInput) (output sequences.OnChainOutput, err error) {
 		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Uncurse, chain, contract.FunctionInput[ops.UncurseArgs]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
+			// Address:       in.Addr,
+			// ChainSelector: chain.Selector,
 			Args: ops.UncurseArgs{
 				Requests: in.Requests,
 			},

@@ -26,7 +26,7 @@ var Owner = contract.NewRead(contract.ReadParams[struct{}, common.Address, *ERC2
 	Version:      Version,
 	Description:  "Calls owner on the contract",
 	ContractType: ContractType,
-	NewContract:  NewERC20LockBoxContract,
+	//NewContract:  NewERC20LockBoxContract,
 	CallContract: func(c *ERC20LockBoxContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.Owner(opts)
 	},
@@ -38,7 +38,7 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 	Description:  "Deposits tokens into the ERC20LockBox",
 	ContractType: ContractType,
 	ContractABI:  ERC20LockBoxABI,
-	NewContract:  NewERC20LockBoxContract,
+	//NewContract:  NewERC20LockBoxContract,
 	IsAllowedCaller: func(erc20LockBox *ERC20LockBoxContract, opts *bind.CallOpts, caller common.Address, args DepositArgs) (bool, error) {
 		callers, err := erc20LockBox.GetAllAuthorizedCallers(opts)
 		if err != nil {

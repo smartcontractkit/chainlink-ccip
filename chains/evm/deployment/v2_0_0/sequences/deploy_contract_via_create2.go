@@ -48,8 +48,8 @@ var DeployContractViaCREATE2 = cldf_ops.NewSequence(
 		}
 
 		expectedAddressReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract_utils.FunctionInput[create2_factory.ComputeAddressArgs]{
-			Address:       input.CREATE2Factory,
-			ChainSelector: chain.Selector,
+			// Address:       input.CREATE2Factory,
+			// ChainSelector: chain.Selector,
 			Args:          computeArgs,
 		})
 		if err != nil {
@@ -64,8 +64,8 @@ var DeployContractViaCREATE2 = cldf_ops.NewSequence(
 		})
 
 		deployReport, err := cldf_ops.ExecuteOperation(b, create2_factory.CreateAndTransferOwnership, chain, contract_utils.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CREATE2Factory,
+			// ChainSelector: chain.Selector,
+			// Address:       input.CREATE2Factory,
 			Args: create2_factory.CreateAndTransferOwnershipArgs{
 				ComputeAddressArgs: computeArgs,
 				To:                 chain.DeployerKey.From,

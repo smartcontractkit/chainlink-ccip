@@ -351,8 +351,8 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					report, execErr := cldf_ops.ExecuteOperation(b,
 						bnmERC20ops.GrantMintAndBurnRoles, chain,
 						evm_contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       toknAddr,
+							// ChainSelector: input.ChainSelector,
+							// Address:       toknAddr,
 							Args:          poolAddr,
 						},
 					)
@@ -365,8 +365,8 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					report, execErr := cldf_ops.ExecuteOperation(b,
 						tip20ops.GrantIssuerRole, chain,
 						evm_contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       toknAddr,
+							// ChainSelector: input.ChainSelector,
+							// Address:       toknAddr,
 							Args:          poolAddr,
 						},
 					)
@@ -450,16 +450,16 @@ func tidyTokenRoles(
 	// BnM ERC-20
 	case bnmDripERC20ops.ContractType.String(), bnmERC20ops.ContractType.String(), bnmDripOps150.ContractType.String():
 		defaultAdminRole, err := cldf_ops.ExecuteOperation(b, bnmERC20ops.GetDefaultAdminRole, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenAddr,
 			Args:          struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get default admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
 		}
 		grantReport, err := cldf_ops.ExecuteOperation(b, bnmERC20ops.GrantAdminRole, chain, evm_contract.FunctionInput[bnmERC20ops.RoleAssignment]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenAddr,
 			Args: bnmERC20ops.RoleAssignment{
 				Role: defaultAdminRole.Output,
 				To:   timelockAddr,
@@ -469,8 +469,8 @@ func tidyTokenRoles(
 			return nil, fmt.Errorf("failed to grant default admin role to timelock %q for token %q on chain %d: %w", timelockAddr.Hex(), tokenAddr.Hex(), input.ChainSelector, err)
 		}
 		revokeReport, err := cldf_ops.ExecuteOperation(b, bnmERC20ops.RevokeAdminRole, chain, evm_contract.FunctionInput[bnmERC20ops.RoleAssignment]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenAddr,
 			Args: bnmERC20ops.RoleAssignment{
 				Role: defaultAdminRole.Output,
 				To:   chain.DeployerKey.From,
@@ -484,16 +484,16 @@ func tidyTokenRoles(
 	// TIP-20
 	case tip20ops.ContractType.String():
 		grantReport, err := cldf_ops.ExecuteOperation(b, tip20ops.GrantAdminRole, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenAddr,
 			Args:          timelockAddr,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to grant TIP-20 default admin role to timelock %q for token %q on chain %d: %w", timelockAddr.Hex(), tokenAddr.Hex(), input.ChainSelector, err)
 		}
 		revokeReport, err := cldf_ops.ExecuteOperation(b, tip20ops.RevokeAdminRole, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenAddr,
+			// ChainSelector: input.ChainSelector,
+			// Address:       tokenAddr,
 			Args:          chain.DeployerKey.From,
 		})
 		if err != nil {

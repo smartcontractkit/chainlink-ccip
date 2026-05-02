@@ -59,14 +59,15 @@ func (c *LombardChainAdapter) TokenPool(ds datastore.DataStore, selector uint64,
 }
 
 func (c *LombardChainAdapter) RemoteTokenAddress(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error) {
-	tokenPool, err := c.TokenPool(ds, selector, tokenQualifier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token pool: %w", err)
-	}
+	// tokenPool, err := c.TokenPool(ds, selector, tokenQualifier)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get token pool: %w", err)
+	// }
 
 	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.GetToken, chains.EVMChains()[selector], evm_contract.FunctionInput[struct{}]{
-		ChainSelector: selector,
-		Address:       common.HexToAddress(tokenPool.Address),
+		// ChainSelector: selector,
+		// Address:       common.HexToAddress(tokenPool.Address),
+		Args: struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute get token operation: %w", err)
