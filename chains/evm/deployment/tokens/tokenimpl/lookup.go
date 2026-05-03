@@ -21,8 +21,7 @@ func Get(ct deployment.ContractType) (Token, bool) {
 	return s, ok
 }
 
-// Capabilities returns the Capabilities for an EVM token contract type, or the
-// zero value if no strategy exists.
+// Capabilities returns the capability set for an EVM token contract type, or the zero value if the token implementation does not exist.
 func Capabilities(ct deployment.ContractType) CapabilitySet {
 	if s, ok := Get(ct); ok {
 		return s.Capabilities()

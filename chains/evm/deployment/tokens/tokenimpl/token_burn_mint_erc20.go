@@ -32,19 +32,19 @@ func (tokenBurnMintERC20) Capabilities() CapabilitySet {
 }
 
 func (tokenBurnMintERC20) RevokeAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
-	return revokeBnMDefaultAdminRole(b, chain, token, user)
+	return revokeDefaultAdminRoleBurnMintERC20(b, chain, token, user)
 }
 
 func (tokenBurnMintERC20) GrantAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
-	return grantBnMDefaultAdminRole(b, chain, token, externalAdmin)
+	return grantDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }
 
 func (tokenBurnMintERC20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
-	return grantBnMMintAndBurnRoles(b, chain, token, pool)
+	return grantMintAndBurnRolesBurnMintERC20(b, chain, token, pool)
 }
 
 func (tokenBurnMintERC20) SetCCIPAdmin(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
-	return setBnMCCIPAdmin(b, chain, token, ccipAdmin)
+	return setCCIPAdminBurnMintERC20(b, chain, token, ccipAdmin)
 }
 
 func (tokenBurnMintERC20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {

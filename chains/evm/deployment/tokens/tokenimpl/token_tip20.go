@@ -16,12 +16,11 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-// tokenTIP20 is the Tempo-only TIP-20 token strategy. Deployed via a
-// factory sequence rather than MaybeDeployContract; CCIPAdmin and pre-mint
-// do not apply.
 type tokenTIP20 struct{}
 
-func (tokenTIP20) ContractType() deployment.ContractType { return tip20.ContractType }
+func (tokenTIP20) ContractType() deployment.ContractType {
+	return tip20.ContractType
+}
 
 func (tokenTIP20) Capabilities() CapabilitySet {
 	return CapabilitySet{
@@ -69,7 +68,7 @@ func (tokenTIP20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool
 }
 
 func (tokenTIP20) SetCCIPAdmin(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("CCIP admin role not supported for TIP-20 strategy")
+	return nil, fmt.Errorf("CCIP admin role not supported for TIP-20 tokens")
 }
 
 func (tokenTIP20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
@@ -89,9 +88,6 @@ func (tokenTIP20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.
 }
 
 func (tokenTIP20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
-	// Initial admin must be the deployer so subsequent ops (e.g. GrantIssuerRole)
-	// pass IsAllowedCaller; ExternalAdmin receives DEFAULT_ADMIN_ROLE in a
-	// follow-up grant performed by the orchestrating sequence.
 	report, err := cldf_ops.ExecuteSequence(b, tip20.Deploy, chain, tip20.FactoryDeployArgs{
 		QuoteToken: common.Address{},
 		Currency:   in.Currency,
@@ -106,5 +102,6 @@ func (tokenTIP20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.Deploy
 	if len(report.Output.Addresses) == 0 {
 		return datastore.AddressRef{}, nil, errors.New("no address returned from TIP20 factory deployment")
 	}
+
 	return report.Output.Addresses[0], nil, nil
 }

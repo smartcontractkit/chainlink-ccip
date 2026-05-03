@@ -1,13 +1,3 @@
-// Package tokenimpl provides per-token-contract-type behaviors for EVM
-// token deployment and pool wiring. A token implementation encapsulates everything
-// specific to one token contract type (e.g. BurnMintERC20, TIP-20):
-// how to deploy the token, how to grant pool roles after a pool is
-// deployed, how to grant an external admin role, and which capabilities
-// the token contract supports.
-//
-// Token implementations are looked up by ContractType through the EVM tokenimpl package
-// and are independent of pool version, so adding a new token type makes it
-// available to every pool-version adapter that consults the token implementation lookup.
 package tokenimpl
 
 import (
@@ -26,11 +16,6 @@ import (
 // CapabilitySet reports the optional flow steps a token contract type
 // participates in. The orchestrating sequence reads these flags to
 // decide whether to invoke the corresponding step.
-//
-// ParticipatesInPoolRoleGrant is declared explicitly rather than inferred
-// from a no-op GrantPoolRoles return so that intentional non-participation
-// (e.g. plain ERC20) is distinguishable from a strategy bug that returned
-// no writes by accident.
 type CapabilitySet struct {
 	// ParticipatesInPoolRoleGrant is true when the token requires token-side
 	// role grants for the pool to operate; GrantPoolRoles must emit those writes.

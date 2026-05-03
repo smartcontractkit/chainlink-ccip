@@ -193,8 +193,8 @@ func TestEVMTokenDeployments(t *testing.T) {
 						}
 					}
 
-					tokenSupportsAdmin := tokenimpl.Capabilities(tc.tokenType).SupportsAdminRole
-					if tokenSupportsAdmin {
+					caps := tokenimpl.Capabilities(tc.tokenType)
+					if caps.SupportsAdminRole {
 						// Verify CCIP Admin was set correctly
 						t.Log("  Verifying CCIP Admin...")
 						onChainCCIPAdmin, err := tokenContract.GetCCIPAdmin(&bind.CallOpts{})

@@ -16,10 +16,11 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-// tokenERC20 is the plain (non-CCIP-aware) ERC20 strategy.
 type tokenERC20 struct{}
 
-func (tokenERC20) ContractType() deployment.ContractType { return erc20.ContractType }
+func (tokenERC20) ContractType() deployment.ContractType {
+	return erc20.ContractType
+}
 
 func (tokenERC20) Capabilities() CapabilitySet {
 	return CapabilitySet{
@@ -35,15 +36,15 @@ func (tokenERC20) RevokeAdminRole(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Ad
 }
 
 func (tokenERC20) GrantAdminRole(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("admin role granting not supported for plain ERC20 strategy")
+	return nil, fmt.Errorf("admin role granting not supported for plain ERC20 token")
 }
 
 func (tokenERC20) GrantPoolRoles(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("pool role granting not supported for plain ERC20 strategy")
+	return nil, fmt.Errorf("pool role granting not supported for plain ERC20 token")
 }
 
 func (tokenERC20) SetCCIPAdmin(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("CCIP admin role not supported for plain ERC20 strategy")
+	return nil, fmt.Errorf("CCIP admin role not supported for plain ERC20 token")
 }
 
 func (tokenERC20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
@@ -66,5 +67,6 @@ func (tokenERC20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.Deploy
 	if err != nil {
 		return datastore.AddressRef{}, nil, fmt.Errorf("failed to deploy ERC20 token: %w", err)
 	}
+
 	return ref, nil, nil
 }

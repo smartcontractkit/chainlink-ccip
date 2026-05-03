@@ -15,7 +15,7 @@ import (
 	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
-func revokeBnMDefaultAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
+func revokeDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
 	tokenContract, err := bnm_erc20_bindings.NewBurnMintERC20(token, chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
@@ -38,7 +38,7 @@ func revokeBnMDefaultAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user c
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func grantBnMDefaultAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
+func grantDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
 	tokenContract, err := bnm_erc20_bindings.NewBurnMintERC20(token, chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
@@ -61,7 +61,7 @@ func grantBnMDefaultAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user co
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func grantBnMMintAndBurnRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
+func grantMintAndBurnRolesBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantMintAndBurnRoles, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,
 		Address:       token,
@@ -69,6 +69,18 @@ func grantBnMMintAndBurnRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool co
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant mint and burn roles: %w", err)
+	}
+	return []contract.WriteOutput{report.Output}, nil
+}
+
+func setCCIPAdminBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
+	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
+		ChainSelector: chain.Selector,
+		Address:       token,
+		Args:          ccipAdmin.Hex(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set CCIP admin: %w", err)
 	}
 	return []contract.WriteOutput{report.Output}, nil
 }
@@ -84,19 +96,6 @@ func transferTokensERC20(b cldf_ops.Bundle, chain evm.Chain, token, to common.Ad
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to transfer ERC20 tokens: %w", err)
-	}
-
-	return []contract.WriteOutput{report.Output}, nil
-}
-
-func setBnMCCIPAdmin(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args:          ccipAdmin.Hex(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set CCIP admin: %w", err)
 	}
 	return []contract.WriteOutput{report.Output}, nil
 }
