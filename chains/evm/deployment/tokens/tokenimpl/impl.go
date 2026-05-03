@@ -69,8 +69,8 @@ type Token interface {
 
 	// Deploy performs the token contract deployment, returning the
 	// resulting datastore reference and any token-side write outputs
-	// produced during deployment. Implementations wrap either an
-	// Operation (via contract.MaybeDeployContract) or a Sequence
-	// (via cldf_ops.ExecuteSequence) as appropriate for the token type.
+	// produced during deployment. Implementations may call lower-level
+	// deployment operations or helpers, but batching is handled by the
+	// outer token deployment sequence.
 	Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error)
 }
