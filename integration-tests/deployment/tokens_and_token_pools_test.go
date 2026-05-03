@@ -365,11 +365,18 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Name, name)
 
 				// Verify that timelock got the default role
-				admRole, err := tokn.DEFAULTADMINROLE(&bind.CallOpts{Context: t.Context()})
+				defaultAdminRole, err := tokn.DEFAULTADMINROLE(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
-				hasRole, err := tokn.HasRole(&bind.CallOpts{Context: t.Context()}, admRole, common.HexToAddress(timelockRef.Address))
+
+				// Timelock should have DEFAULT_ADMIN_ROLE (this is a security feature of the changeset)
+				timelockHasDefaultAdminRole, err := tokn.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, common.HexToAddress(timelockRef.Address))
 				require.NoError(t, err)
-				require.True(t, hasRole, fmt.Sprintf("expected timelock %q to have default admin role on token", timelockRef.Address))
+				require.True(t, timelockHasDefaultAdminRole, fmt.Sprintf("expected timelock %q to have default admin role on token", timelockRef.Address))
+
+				// Deployer EOA shouldn't have DEFAULT_ADMIN_ROLE since timelock is a more secure choice
+				deployerHasDefaultAdminRole, err := tokn.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, data.Deployer)
+				require.NoError(t, err)
+				require.False(t, deployerHasDefaultAdminRole, fmt.Sprintf("expected deployer %q to no longer have default admin role on token", data.Deployer.Hex()))
 
 				// Verify max supply and pre-mint
 				require.Equal(t, 0, maxSupply.Cmp(supply), fmt.Sprintf("expected max supply %q to match actual max supply %q", maxSupply.String(), supply.String()))

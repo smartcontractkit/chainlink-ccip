@@ -194,6 +194,17 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 					fmt.Errorf("failed to deploy chain contracts on chain %d: %w", sel, err)
 			}
 
+			// if the deployed contracts are not to be owned by the deployer key, transfer ownership to the timelock via MCMS and, if needed, execute the accept ownership sequence
+			if !input.DeployerKeyOwned {
+				ownershipBatchOps, ownershipReports, err := deploy.TransferToTimelock(sel, e, cfg.MCMS, report.Output.RefsToTransferOwnership)
+				if err != nil {
+					return deployment.ChangesetOutput{Reports: allReports},
+						fmt.Errorf("failed to transfer to timelock for chain %d: %w", sel, err)
+				}
+				allReports = append(allReports, ownershipReports...)
+				allBatchOps = append(allBatchOps, ownershipBatchOps...)
+			}
+
 			for _, ref := range report.Output.Addresses {
 				if addErr := ds.Addresses().Add(ref); addErr != nil {
 					return deployment.ChangesetOutput{Reports: allReports},

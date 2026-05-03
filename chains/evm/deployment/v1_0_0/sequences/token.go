@@ -163,7 +163,7 @@ var DeployToken = cldf_ops.NewSequence(
 			// identity pass IsAllowedCaller; ExternalAdmin receives DEFAULT_ADMIN_ROLE in a follow-up grant.
 			report, err := cldf_ops.ExecuteSequence(b, tip20.Deploy, chain, tip20.FactoryDeployArgs{
 				QuoteToken: common.Address{}, // defaults to sensible value
-				Currency:   "",               // defaults to sensible value
+				Currency:   input.Currency,   // defaults to sensible value if empty
 				Salt:       [32]byte{},       // defaults to random salt
 				Symbol:     input.Symbol,
 				Admin:      chain.DeployerKey.From,
