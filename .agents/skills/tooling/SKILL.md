@@ -1,11 +1,13 @@
 ---
-name: tooling
-description: Use when writing or reviewing Chainlink CCIP deployment tooling, changesets, adapters, registries, integration tests, or operator-facing automation. Guides agents to follow local patterns, infer system state where possible, preserve compatibility, and avoid over-broad abstractions.
+name: ccip-tooling
+description: Use when writing or reviewing Chainlink CCIP deployment tooling, changesets, adapters, registries, datastore flows, integration tests, or operator-facing automation. Guides agents to follow local patterns, infer system state where possible, preserve compatibility, and avoid over-broad abstractions.
 ---
 
 # CCIP Tooling Code
 
 Use this skill when implementing or reviewing deployment/tooling code in this repo, especially changesets, adapters, registries, datastore flows, and integration tests.
+
+Use skills for repeatable tooling tasks that require reasoning and guidance. Use scripts, make targets, or config for deterministic checks, formatters, and validators.
 
 Before coding, read the relevant local code and docs:
 
@@ -116,4 +118,3 @@ Confirm:
 - stale reads and stale datastore merges are avoided,
 - compatibility behavior is documented,
 - tests cover the operator-facing path and meaningful edge cases.
-
