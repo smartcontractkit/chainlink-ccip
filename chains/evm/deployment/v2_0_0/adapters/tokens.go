@@ -11,16 +11,17 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/strategy"
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
+	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -129,29 +130,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, nil
 			}
 
-			// Defensive: TIP-20 tokens are v1.6-only by product decision; reject before pool deploy
-			// even when the pool-type gate would otherwise allow it. Resolve the token type via the
-			// caller-supplied input first, then fall back to a datastore probe by address. If neither
-			// resolves, log a warning so a potential bypass is visible rather than silent.
-			guardType := datastore.ContractType("")
-			if input.TokenRef != nil {
-				guardType = input.TokenRef.Type
-			}
-			if guardType == "" {
-				if typeProbe, probeErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Address:       tokenAddr,
-				}, input.ChainSelector, datastore_utils.FullRef); probeErr == nil {
-					guardType = typeProbe.Type
-				} else {
-					b.Logger.Warnf("TIP-20 v2.0 guard could not resolve token type for address %s on chain %d (probe: %v); skipping guard",
-						tokenAddr, input.ChainSelector, probeErr)
-				}
-			}
-			if guardType.String() == tip20ops.ContractType.String() {
-				return sequences.OnChainOutput{}, fmt.Errorf("TIP-20 tokens are not supported on CCIP v2.0 (v1.6-only by product decision)")
-			}
-
 			tokenContract, err := erc20.NewERC20(common.HexToAddress(tokenAddr), evmChain.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind ERC20 at %s: %w", tokenAddr, err)
@@ -230,28 +208,30 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 					ChainSelector: input.ChainSelector,
 					Address:       tokenAddr,
 				}, input.ChainSelector, datastore_utils.FullRef)
-				if lookupErr == nil {
-					strat, ok := strategy.GetRegistry().GetEVM(deployment.ContractType(toknRef.Type))
-					if ok && strat.Capabilities().ParticipatesInPoolRoleGrant {
-						poolRef := deployOutput.Addresses[0]
-						poolAddr := common.HexToAddress(poolRef.Address)
-						if poolAddr == (common.Address{}) {
-							return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero")
-						}
-
-						grantWrites, grantErr := strat.GrantPoolRoles(b, evmChain, common.HexToAddress(tokenAddr), poolAddr, input.ChainSelector)
-						if grantErr != nil {
-							return sequences.OnChainOutput{}, fmt.Errorf("failed to grant pool roles for token type %q (token %s, pool %s) on chain %d: %w", toknRef.Type, tokenAddr, poolAddr, input.ChainSelector, grantErr)
-						}
-
-						if len(grantWrites) > 0 {
-							batchOp, bErr := contract.NewBatchOperationFromWrites(grantWrites)
-							if bErr != nil {
-								return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for role grants: %w", bErr)
-							}
-							result.BatchOps = append(result.BatchOps, batchOp)
-						}
+				if lookupErr == nil && isBurnMintTokenType(toknRef.Type) {
+					poolRef := deployOutput.Addresses[0]
+					poolAddr := common.HexToAddress(poolRef.Address)
+					if poolAddr == (common.Address{}) {
+						return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero")
 					}
+
+					grantReport, grantErr := cldf_ops.ExecuteOperation(b,
+						bnmOps.GrantMintAndBurnRoles, evmChain,
+						contract.FunctionInput[common.Address]{
+							ChainSelector: input.ChainSelector,
+							Address:       common.HexToAddress(tokenAddr),
+							Args:          poolAddr,
+						},
+					)
+					if grantErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
+					}
+
+					batchOp, bErr := contract.NewBatchOperationFromWrites([]contract.WriteOutput{grantReport.Output})
+					if bErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for role grants: %w", bErr)
+					}
+					result.BatchOps = append(result.BatchOps, batchOp)
 				}
 			}
 
@@ -486,4 +466,10 @@ func isBurnMintPoolType(poolType deployment.ContractType) bool {
 func isLockReleasePoolType(poolType deployment.ContractType) bool {
 	return poolType == cciputils.LockReleaseTokenPool ||
 		poolType == siloed_lock_release_token_pool.ContractType
+}
+
+func isBurnMintTokenType(typ datastore.ContractType) bool {
+	return typ.String() == bnmOps.ContractType.String() ||
+		typ.String() == bnmDripOps.ContractType.String() ||
+		typ.String() == bnmDripOps150.ContractType.String()
 }
