@@ -14,11 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/strategy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -72,16 +72,12 @@ func TestEVMTokenDeployments(t *testing.T) {
 			requiresSupply: true,
 		},
 		{
-			name:           "BurnMintERC20WithDripToken",
-			tokenType:      burn_mint_erc20_with_drip.ContractType,
-			tokenName:      "Test BurnMint ERC20 With Drip",
-			tokenSymbol:    "TBMDRIP",
-			decimals:       18,
-			ccipAdmin:      "0x1111111111111111111111111111111111111111",
-			sender:         "",
-			supply:         &maxSupply,
-			preMint:        &preMint,
-			requiresSupply: true,
+			name:        "BurnMintERC20WithDrip",
+			tokenType:   burn_mint_erc20_with_drip.ContractType,
+			tokenName:   "Test BurnMint ERC20 With Drip",
+			tokenSymbol: "TBMDRIP",
+			decimals:    18,
+			ccipAdmin:   "0x1111111111111111111111111111111111111111",
 		},
 	}
 
@@ -197,7 +193,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 						}
 					}
 
-					tokenSupportsAdmin := strategy.GetRegistry().CapabilitiesEVM(tc.tokenType).SupportsAdminRole
+					tokenSupportsAdmin := tokenimpl.Capabilities(tc.tokenType).SupportsAdminRole
 					if tokenSupportsAdmin {
 						// Verify CCIP Admin was set correctly
 						t.Log("  Verifying CCIP Admin...")
@@ -236,11 +232,14 @@ func TestEVMTokenDeployments(t *testing.T) {
 func TestTokenSupportsAdminRole(t *testing.T) {
 	t.Parallel()
 
-	caps := func(ct cldf.ContractType) bool {
-		return strategy.GetRegistry().CapabilitiesEVM(ct).SupportsAdminRole
+	tokenTypes := map[cldf.ContractType]bool{
+		burn_mint_erc20_with_drip.ContractType: true,
+		burn_mint_erc20.ContractType:           true,
+		tip20.ContractType:                     true,
+		erc20.ContractType:                     false,
 	}
-	require.True(t, caps(burn_mint_erc20.ContractType))
-	require.True(t, caps(burn_mint_erc20_with_drip.ContractType))
-	require.True(t, caps(tip20.ContractType))
-	require.False(t, caps(erc20.ContractType))
+
+	for tt, supportsAdmin := range tokenTypes {
+		require.Equal(t, supportsAdmin, tokenimpl.Capabilities(tt).SupportsAdminRole, "Token type %s admin role support mismatch", tt)
+	}
 }

@@ -3,6 +3,7 @@ package tip20
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -49,6 +50,11 @@ type FactoryDeployArgs struct {
 	QuoteToken common.Address // Address of a pre-existing TIP20 token to use as the quote token. Defaults to PathUSD if not provided.
 	Admin      common.Address // The token admin. Defaults to the deployer address if not provided.
 	Salt       [32]byte       // Optional salt for deterministic deployment. Defaults to a random salt if not provided.
+}
+
+type TransferArgs struct {
+	Receiver common.Address
+	Amount   *big.Int
 }
 
 // Deploy deploys the TIP20 token contract with the provided deploy arguments. The TIP20 token is ERC20 compliant and includes additional
@@ -161,6 +167,28 @@ var Deploy = operations.NewSequence(
 		}, nil
 	},
 )
+
+var Transfer = contract.NewWrite(contract.WriteParams[TransferArgs, *TIP20Token]{
+	Name:            "tip20:transfer",
+	Version:         Version,
+	Description:     "Transfer TIP-20 tokens to a specified address",
+	ContractType:    ContractType,
+	ContractABI:     TIP20TokenABI,
+	NewContract:     NewTIP20Token,
+	IsAllowedCaller: contract.AllCallersAllowed[*TIP20Token, TransferArgs],
+	Validate: func(args TransferArgs) error {
+		if args.Amount == nil || args.Amount.Cmp(big.NewInt(0)) <= 0 {
+			return errors.New("amount must be greater than 0")
+		}
+		if args.Receiver == (common.Address{}) {
+			return errors.New("receiver address is required")
+		}
+		return nil
+	},
+	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, args TransferArgs) (*types.Transaction, error) {
+		return token.Transfer(opts, args.Receiver, args.Amount)
+	},
+})
 
 var GrantIssuerRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
 	Name:         "tip20:grant-issuer-role",

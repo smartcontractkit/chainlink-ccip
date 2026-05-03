@@ -1,7 +1,6 @@
 package sequences
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -9,13 +8,8 @@ import (
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/strategy"
-	// Defensive blank import: ensures all known EVM token strategies are
-	// registered when this package is imported directly (e.g. by tests)
-	// rather than transitively via an adapter package.
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/strategy/registrations"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -30,7 +24,10 @@ var DeployToken = cldf_ops.NewSequence(
 	common_utils.Version_1_0_0,
 	"Deploy given type of token contracts",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenInput) (sequences.OnChainOutput, error) {
-		chain := chains.EVMChains()[input.ChainSelector]
+		chain, ok := chains.EVMChains()[input.ChainSelector]
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found among provided chains", input.ChainSelector)
+		}
 
 		preMint := big.NewInt(0)
 		if input.PreMint != nil {
@@ -51,63 +48,54 @@ var DeployToken = cldf_ops.NewSequence(
 			ccipAdmin = common.HexToAddress(input.CCIPAdmin)
 		}
 
-		strat, ok := strategy.GetRegistry().GetEVM(input.Type)
+		tokenImpl, ok := tokenimpl.Get(input.Type)
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type: %s", input.Type)
 		}
-		caps := strat.Capabilities()
-
-		tokenRef, deployWrites, err := strat.Deploy(b, chain, input)
+		tokenRefr, deployWrites, err := tokenImpl.Deploy(b, chain, input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-
-		addresses := []datastore.AddressRef{tokenRef}
-		writes := append([]contract.WriteOutput(nil), deployWrites...)
-		tokenAddr := common.HexToAddress(tokenRef.Address)
-
-		if caps.SupportsPreMint && preMint.Cmp(big.NewInt(0)) > 0 && len(input.Senders) > 0 {
-			firstSender := input.Senders[0]
-			if !common.IsHexAddress(firstSender) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid sender address: %s", firstSender)
-			}
-			tokReceiver := common.HexToAddress(firstSender)
-			if tokReceiver == (common.Address{}) {
-				return sequences.OnChainOutput{}, errors.New("refusing to transfer pre-minted tokens to the zero address")
-			}
-			if len(input.Senders) > 1 {
-				b.Logger.Warnf("Multiple senders provided but only the first one (%s) will receive the pre-minted tokens", tokReceiver.Hex())
-			}
-			transferReport, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
-				ChainSelector: chain.Selector,
-				Address:       tokenAddr,
-				Args: erc20.TransferArgs{
-					Receiver: tokReceiver,
-					Amount:   preMint,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer pre-minted tokens to sender %s: %w", tokReceiver.Hex(), err)
-			}
-			writes = append(writes, transferReport.Output)
+		tokenAddr, err := datastore_utils_evm.ToEVMAddress(tokenRefr)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid token address reference: %w", err)
 		}
 
-		if input.CCIPAdmin != "" && caps.SupportsCCIPAdmin {
-			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
-				ChainSelector: chain.Selector,
-				Address:       tokenAddr,
-				Args:          ccipAdmin.Hex(),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCIP admin: %w", err)
+		caps := tokenImpl.Capabilities()
+		recv := common.Address{}
+		if len(input.Senders) >= 1 && preMint.Cmp(big.NewInt(0)) > 0 && caps.SupportsPreMint {
+			address := input.Senders[0]
+			if !common.IsHexAddress(address) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pre-mint recipient address: %s", address)
 			}
-			writes = append(writes, setCCIPAdminReport.Output)
+			recv = common.HexToAddress(address)
+			if recv == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("pre-mint recipient address cannot be the zero address")
+			}
+			if len(input.Senders) != 1 {
+				b.Logger.Warnf("Multiple sender addresses provided, but adapter only supports one. Only the first address will receive the tokens: %s", address)
+			}
 		}
 
+		writes := append([]contract.WriteOutput{}, deployWrites...)
+		if recv != (common.Address{}) && caps.SupportsPreMint {
+			transferWrites, err := tokenImpl.Transfer(b, chain, tokenAddr, recv, preMint)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint pre-mint tokens: %w", err)
+			}
+			writes = append(writes, transferWrites...)
+		}
 		if input.ExternalAdmin != "" && caps.SupportsAdminRole {
-			adminWrites, err := strat.GrantExternalAdmin(b, chain, tokenAddr, externalAdmin, chain.Selector)
+			grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, externalAdmin)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
+			}
+			writes = append(writes, grantWrites...)
+		}
+		if input.CCIPAdmin != "" && caps.SupportsCCIPAdmin {
+			adminWrites, err := tokenImpl.SetCCIPAdmin(b, chain, tokenAddr, ccipAdmin)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCIP admin: %w", err)
 			}
 			writes = append(writes, adminWrites...)
 		}
@@ -118,7 +106,7 @@ var DeployToken = cldf_ops.NewSequence(
 		}
 
 		return sequences.OnChainOutput{
-			Addresses: addresses,
+			Addresses: []datastore.AddressRef{tokenRefr},
 			BatchOps:  []mcms_types.BatchOperation{batchOp},
 		}, nil
 	},
