@@ -62,5 +62,4 @@ devenv/env-out.toml
 .cursorrules
 .claude/
 operations-gen
-.agents/
 AGENTS.md
