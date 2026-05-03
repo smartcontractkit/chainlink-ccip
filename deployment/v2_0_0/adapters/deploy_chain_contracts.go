@@ -115,12 +115,17 @@ type DeployChainConfigCreatorInput struct {
 	UserProvidedConfig DeployContractParams
 }
 
+type DeployChainContractsOutput struct {
+	sequences.OnChainOutput
+	RefsToTransferOwnership []datastore.AddressRef
+}
+
 type DeployChainContractsAdapter interface {
 	// SetContractParamsFromImportedConfig is used when ImportConfig is true in DeployChainContractsInput.
 	// It should read the necessary contract parameters from the datastore contract metadata based on the chain selector and
 	// return them in the same format as DeployContractParams for use in the deployment sequence.
 	SetContractParamsFromImportedConfig() *cldf_ops.Sequence[DeployChainConfigCreatorInput, DeployContractParams, cldf_chain.BlockChains]
-	DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, DeployChainContractsOutput, cldf_chain.BlockChains]
 }
 
 type DeployChainContractsRegistry struct {
