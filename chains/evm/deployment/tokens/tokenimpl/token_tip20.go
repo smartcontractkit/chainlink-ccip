@@ -1,7 +1,6 @@
 package tokenimpl
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -88,7 +87,7 @@ func (tokenTIP20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.
 }
 
 func (tokenTIP20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteSequence(b, tip20.Deploy, chain, tip20.FactoryDeployArgs{
+	tokenRef, writes, err := tip20.DeployTokenViaFactory(b, chain, tip20.FactoryDeployArgs{
 		QuoteToken: common.Address{},
 		Currency:   in.Currency,
 		Salt:       [32]byte{},
@@ -97,11 +96,8 @@ func (tokenTIP20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.Deploy
 		Name:       in.Name,
 	})
 	if err != nil {
-		return datastore.AddressRef{}, nil, fmt.Errorf("failed to deploy TIP20 token via factory: %w", err)
-	}
-	if len(report.Output.Addresses) == 0 {
-		return datastore.AddressRef{}, nil, errors.New("no address returned from TIP20 factory deployment")
+		return datastore.AddressRef{}, nil, fmt.Errorf("failed to deploy TIP-20 token via factory: %w", err)
 	}
 
-	return report.Output.Addresses[0], nil, nil
+	return tokenRef, writes, nil
 }
