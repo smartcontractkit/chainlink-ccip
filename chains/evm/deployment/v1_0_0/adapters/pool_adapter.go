@@ -374,7 +374,7 @@ func tidyTokenPoolRoles(
 		tokenImpl, ok := tokenimpl.Get(deployment.ContractType(tokenRef.Type))
 		if !ok {
 			b.Logger.Warnf(
-				"unsupported token type %q for token at ref (%s); skipping admin role tidy for this token on chain %d",
+				"unsupported token type %q for token at ref (%s); skipping pool role grants for this token on chain %d",
 				tokenRef.Type.String(), datastore_utils.SprintRef(tokenRef), input.ChainSelector,
 			)
 			return nil, nil
@@ -455,7 +455,7 @@ func tidyTokenRoles(
 	}
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to grant deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
 	}
 	revokeWrites, err := tokenImpl.RevokeAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
 	if err != nil {

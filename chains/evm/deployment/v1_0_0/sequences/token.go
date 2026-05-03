@@ -81,7 +81,7 @@ var DeployToken = cldf_ops.NewSequence(
 		if recv != (common.Address{}) && caps.SupportsPreMint {
 			transferWrites, err := tokenImpl.Transfer(b, chain, tokenAddr, recv, preMint)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint pre-mint tokens: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer pre-minted tokens: %w", err)
 			}
 			writes = append(writes, transferWrites...)
 		}

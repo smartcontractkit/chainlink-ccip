@@ -32,7 +32,7 @@ func (tokenERC20) Capabilities() CapabilitySet {
 }
 
 func (tokenERC20) RevokeAdminRole(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("admin role not supported for plain ERC20 strategy")
+	return nil, fmt.Errorf("admin role not supported for plain ERC20 token")
 }
 
 func (tokenERC20) GrantAdminRole(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {

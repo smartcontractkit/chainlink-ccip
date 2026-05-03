@@ -47,7 +47,7 @@ func (tokenBurnMintERC20WithDrip) SetCCIPAdmin(b cldf_ops.Bundle, chain evm.Chai
 }
 
 func (tokenBurnMintERC20WithDrip) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
-	// NOTE: BnM ERC20 drip tokens inherit from a standard ERC20 implementation, so we can use the same transfer helper function as the plain ERC20 strategy.
+	// NOTE: BnM ERC20 drip tokens inherit from a standard ERC20 implementation, so we can use the same transfer helper function as the plain ERC20 token.
 	return transferTokensERC20(b, chain, token, to, scaledAmount)
 }
 
