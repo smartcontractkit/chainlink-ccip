@@ -1,23 +1,24 @@
 package adapters
 
 import (
-	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 func init() {
+	v := utils.Version_1_5_0
+
 	curseRegistry := fastcurse.GetCurseRegistry()
 	curseRegistry.RegisterNewCurse(fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      semver.MustParse("1.5.0"),
+		CursingVersion:      v,
 		CurseAdapter:        NewCurseAdapter(),
 		CurseSubjectAdapter: NewCurseAdapter(),
 	})
 
-	defaultConcurrency := 10
 	feeReg := fees.GetRegistry()
-	feeReg.RegisterFeeAdapter(chainsel.FamilyEVM, semver.MustParse("1.5.0"), NewFeesAdapter(&defaultConcurrency))
+	feeReg.RegisterFeeAdapter(chainsel.FamilyEVM, v, NewFeesAdapter())
 }
