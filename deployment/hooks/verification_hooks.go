@@ -23,6 +23,9 @@ const (
 	DefaultVerifyPollInterval           = 1 * time.Second
 	concurrentNetworksLimit             = 5
 	concurrentVerificationsLimit        = 5
+	// verificationExplorerStepCooldown spaces explorer API usage after each verification step.
+	// Block explorer tiers often enforce ~3 calls/sec; ~400ms between steps stays under that when work is serialized.
+	verificationExplorerStepCooldown = 400 * time.Millisecond
 )
 
 // Hook name constants for changeset wiring and chain-specific tests.
@@ -341,6 +344,7 @@ func IterateVerifiers(
 ) error {
 	var errs []error
 	var errsMu sync.Mutex
+	var verificationStepCooldownMu sync.Mutex
 	networkGrp, ctx := errgroup.WithContext(ctx)
 	networkGrp.SetLimit(concurrentNetworksLimit)
 	for _, network := range networkCfg.Networks() {
@@ -381,11 +385,17 @@ func IterateVerifiers(
 						errsMu.Unlock()
 						return nil
 					}
+					verificationStepCooldownMu.Lock()
+					defer verificationStepCooldownMu.Unlock()
 					if err := step(ctx, v, ref, network.ChainSelector); err != nil {
 						errsMu.Lock()
 						errs = append(errs, fmt.Errorf("%s: step for %s %s (%s on %d): %w", logPrefix, ref.Type, ref.Version, ref.Address, network.ChainSelector, err))
 						errsMu.Unlock()
-						return nil
+					}
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-time.After(verificationExplorerStepCooldown):
 					}
 					return nil
 				})

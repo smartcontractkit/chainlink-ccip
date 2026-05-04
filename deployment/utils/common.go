@@ -37,6 +37,7 @@ const (
 	// Pools
 	TokenPoolFactory                    cldf.ContractType = "TokenPoolFactory"
 	LinkToken                           cldf.ContractType = "LinkToken"
+	BurnMintToken                       cldf.ContractType = "BurnMintToken"
 	FactoryBurnMintERC20Token           cldf.ContractType = "FactoryBurnMintERC20Token"
 	ERC677TokenHelper                   cldf.ContractType = "ERC677TokenHelper"
 	USDCTokenPool                       cldf.ContractType = "USDCTokenPool"
@@ -118,10 +119,12 @@ var (
 
 var (
 	Version_1_0_0 = semver.MustParse("1.0.0")
+	Version_1_2_0 = semver.MustParse("1.2.0")
 	Version_1_5_0 = semver.MustParse("1.5.0")
 	Version_1_5_1 = semver.MustParse("1.5.1")
 	Version_1_6_0 = semver.MustParse("1.6.0")
 	Version_1_6_1 = semver.MustParse("1.6.1")
+	Version_1_6_3 = semver.MustParse("1.6.3")
 	Version_2_0_0 = semver.MustParse("2.0.0")
 )
 

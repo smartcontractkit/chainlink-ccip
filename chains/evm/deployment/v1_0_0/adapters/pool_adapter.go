@@ -11,6 +11,7 @@ import (
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	bnmERC677ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	tip20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -360,6 +361,20 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
 					}
 					writes = append(writes, report.Output)
+
+				case cciputils.BurnMintToken.String(), cciputils.ERC677TokenHelper.String():
+					grantWrites, execErr := bnmERC677ops.PrepareGrantMintAndBurnRoles(b, chain,
+						evm_contract.FunctionInput[common.Address]{
+							ChainSelector: input.ChainSelector,
+							Address:       toknAddr,
+							Args:          poolAddr,
+						},
+						common.HexToAddress(input.TimelockAddress),
+					)
+					if execErr != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, execErr)
+					}
+					writes = append(writes, grantWrites...)
 
 				case tip20ops.ContractType.String():
 					report, execErr := cldf_ops.ExecuteOperation(b,
