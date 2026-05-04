@@ -32,7 +32,13 @@ type DestChainConfigForSrc struct {
 
 // UpdateFeeQuoterDestsInput is the top-level input for the UpdateFeeQuoterDests changeset.
 type UpdateFeeQuoterDestsInput struct {
-	// Version is the lane version used for initial adapter lookup.
+	// Version represents the chain adapter version to use. Historically this was
+	// equal to the version of the currently configured OnRamp, but we have since
+	// modified this adapter such that it is now capable of inferring the correct
+	// contract version purely from onchain data. Thus, specifying this field has
+	// no effect, but we have left it here for backwards compatibility - or if we
+	// want to implement a later feature that allows the user to override version
+	// inference.
 	Version *semver.Version         `json:"version" yaml:"version"`
 	Args    []DestChainConfigForSrc `json:"args" yaml:"args"`
 	MCMS    mcms.Input              `json:"mcms" yaml:"mcms"`

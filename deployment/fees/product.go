@@ -18,25 +18,41 @@ var (
 	once              sync.Once
 )
 
+// feeResolverID is a unique identifier for a fee resolver based on chain family.
+type feeResolverID string
+
 // feeAdapterID is a unique identifier for a fee adapter based on chain family and version.
 type feeAdapterID string
 
+// FeeResolver defines the interface for fee resolvers that can infer the appropriate fee adapter version based on the chain family.
+type FeeResolver interface {
+	GetOnRampRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error)
+}
+
 // FeeAdapter defines the interface for fee adapters.
 type FeeAdapter interface {
-	SetTokenTransferFee(e cldf.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
-	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
-	GetFeeContractRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error)
+	GetFeeContractRef(e cldf.Environment, onRamp datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error)
 
-	ApplyDestChainConfigUpdates(e cldf.Environment) *cldf_ops.Sequence[ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetTokenTransferFee(e cldf.Environment, fq datastore.AddressRef) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetOnchainTokenTransferFeeConfig(e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
+	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
+
+	ApplyDestChainConfigUpdates(e cldf.Environment, fq datastore.AddressRef) *cldf_ops.Sequence[ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetOnchainDestChainConfig(e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error)
 	GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig
-	GetOnchainDestChainConfig(e cldf.Environment, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error)
 }
 
 // FeeAdapterRegistry maintains a registry of FeeAdapters for different chain families and versions.
 type FeeAdapterRegistry struct {
-	mu sync.Mutex
-	m  map[feeAdapterID]FeeAdapter
+	muResolvers sync.Mutex
+	muAdapters  sync.Mutex
+	resolvers   map[feeResolverID]FeeResolver
+	adapters    map[feeAdapterID]FeeAdapter
+}
+
+// newFeeResolverID constructs a unique identifier for a fee resolver based on chain family.
+func newFeeResolverID(chainFamily string) feeResolverID {
+	return feeResolverID(chainFamily)
 }
 
 // newFeeAdapterID constructs a unique identifier for a fee adapter based on chain family and version.
@@ -47,7 +63,20 @@ func newFeeAdapterID(chainFamily string, version *semver.Version) feeAdapterID {
 // newFeeAdapterRegistry creates a fresh registry.
 func newFeeAdapterRegistry() *FeeAdapterRegistry {
 	return &FeeAdapterRegistry{
-		m: make(map[feeAdapterID]FeeAdapter),
+		resolvers: make(map[feeResolverID]FeeResolver),
+		adapters:  make(map[feeAdapterID]FeeAdapter),
+	}
+}
+
+// RegisterFeeResolver registers a new resolver.
+func (r *FeeAdapterRegistry) RegisterFeeResolver(chainFamily string, resolver FeeResolver) {
+	id := newFeeResolverID(chainFamily)
+
+	r.muResolvers.Lock()
+	defer r.muResolvers.Unlock()
+
+	if _, exists := r.resolvers[id]; !exists {
+		r.resolvers[id] = resolver
 	}
 }
 
@@ -55,22 +84,33 @@ func newFeeAdapterRegistry() *FeeAdapterRegistry {
 func (r *FeeAdapterRegistry) RegisterFeeAdapter(chainFamily string, version *semver.Version, adapter FeeAdapter) {
 	id := newFeeAdapterID(chainFamily, version)
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.muAdapters.Lock()
+	defer r.muAdapters.Unlock()
 
-	if _, exists := r.m[id]; !exists {
-		r.m[id] = adapter
+	if _, exists := r.adapters[id]; !exists {
+		r.adapters[id] = adapter
 	}
+}
+
+// GetFeeResolver looks up a fee resolver; the second return value tells you if it was found.
+func (r *FeeAdapterRegistry) GetFeeResolver(chainFamily string) (FeeResolver, bool) {
+	id := newFeeResolverID(chainFamily)
+
+	r.muResolvers.Lock()
+	defer r.muResolvers.Unlock()
+
+	adapter, ok := r.resolvers[id]
+	return adapter, ok
 }
 
 // GetFeeAdapter looks up an adapter; the second return value tells you if it was found.
 func (r *FeeAdapterRegistry) GetFeeAdapter(chainFamily string, version *semver.Version) (FeeAdapter, bool) {
 	id := newFeeAdapterID(chainFamily, version)
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.muAdapters.Lock()
+	defer r.muAdapters.Unlock()
 
-	adapter, ok := r.m[id]
+	adapter, ok := r.adapters[id]
 	return adapter, ok
 }
 
