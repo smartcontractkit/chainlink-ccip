@@ -324,6 +324,9 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 					}
+					if poolAddr == (common.Address{}) {
+						return sequences.OnChainOutput{}, errors.New("deployed token pool address cannot be the zero address")
+					}
 					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, rlAdminAddr)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
@@ -395,11 +398,6 @@ func tidyTokenPoolRoles(
 			return grantWrites, nil
 		}
 	}
-
-	b.Logger.Warnf(
-		"pool with ref (%s) was not configured with any roles",
-		datastore_utils.SprintRef(poolRef),
-	)
 
 	return nil, nil
 }

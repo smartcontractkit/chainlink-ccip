@@ -47,9 +47,9 @@ type Token interface {
 	RevokeAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error)
 
 	// GrantAdminRole grants the default-admin or contract-specific
-	// admin role to user. Implementations return (nil, nil) for any
-	// token types whose Capabilities.SupportsAdminRole is false;
-	// callers should consult that flag first.
+	// admin role to user. Returns an error for token types whose
+	// Capabilities.SupportsAdminRole is false; callers should consult
+	// that flag first.
 	GrantAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error)
 
 	// GrantPoolRoles emits the writes that authorize a freshly-deployed pool
