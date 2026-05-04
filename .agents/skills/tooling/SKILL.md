@@ -30,6 +30,10 @@ Good tooling code usually fits into the repo's current seams:
 
 Add a new abstraction only when more than one concrete caller needs it or when it clearly removes duplicated complexity.
 
+For a fixed set of implementations, prefer explicit maps and lookup functions over global registries, `init()` registration, blank imports, or side-effect packages. Use a registry only when runtime extension is a real requirement, and make the registration path visible at normal call sites.
+
+Name abstractions after the domain concept they model. Avoid generic names like "strategy" when a narrower local term such as adapter, token implementation, resolver, or helper makes ownership clearer.
+
 ### Make Operators Provide Intent, Not Fragile State
 
 If the system can derive a value from on-chain state, datastore refs, registry state, or standard conventions, infer it inside the tooling. Do not make users provide values they are unlikely to know or easy to get wrong.
@@ -56,6 +60,10 @@ Examples:
 
 If version, family, or type is not enough to uniquely identify the target, do not use it as the grouping key.
 
+Preserve the owner of batching and proposal assembly. If an outer sequence or changeset already owns MCMS output construction, lower-level helpers should return write outputs rather than constructing their own batches. Do not hide writes inside nested orchestration if the caller must include them in the final proposal.
+
+Separate reads from writes when refactoring deployment flows. Read operations can validate inputs or resolve addresses, but only write operations should be returned as `WriteOutput`s or added to MCMS batches.
+
 ### Keep Apply Paths Retry-Safe
 
 Apply paths should be safe to retry after partial success. Read current state, skip no-op updates, and preserve idempotent behavior where the domain supports it.
@@ -76,6 +84,10 @@ Prefer checks like:
 
 Avoid requiring user inputs that are no longer used by the apply path.
 
+When behavior is gated by capability flags, use the exact flag for the action being performed or tested. Do not substitute a nearby broader capability just because it happens to pass the current cases.
+
+Before restoring support that appears to have been dropped, check whether the exclusion is intentional. Some legacy contract types, versions, or paths may be deliberately unsupported because they are broken, obsolete, or outside the product scope.
+
 ### Test Behavior, Not Just Mechanics
 
 Write tests that prove the operator-facing workflow works. Avoid tests that only exercise a newly invented registry or abstraction unless that abstraction is itself the durable API.
@@ -88,15 +100,21 @@ Good tooling tests usually verify:
 - mixed-family or mixed-version paths use the correct adapter,
 - datastore and operation-cache state is fresh after each step.
 
+When refactoring orchestration, add or update tests that prove write outputs still reach the final sequence or changeset output. A test that only verifies returned addresses can miss a dropped deployment or configuration transaction.
+
 ## AI Pitfalls To Avoid
 
 - Do not add a registry/interface layer just because code varies by version or chain family; first look for the repo's existing version/family adapter seam.
+- Do not use `init()` registration, blank imports, or side-effect packages to connect static implementations when an explicit map or constructor is enough.
 - Do not make users pass contract versions, addresses, or refs that the system can discover from canonical state.
 - Do not group by version when the write target is a concrete address/ref/resource.
+- Do not force orchestration over several reads/writes into an operation just to make it reusable; use a helper when the caller owns sequencing and batching.
+- Do not add design docs, `.gitignore` changes, product guards, or unrelated compatibility behavior unless the task or local code requires them.
 - Do not remove public fields or change input shapes casually; preserve compatibility unless the user explicitly asks for a breaking change.
 - Do not write tests that pass because they mirror your abstraction; test the workflow an operator runs.
 - Do not duplicate helper logic for datastore refs, address conversion, MCMS lookup, or defaults without first searching for an existing helper.
 - Do not treat "no error" as proof that a returned ref or datastore output is populated and current.
+- Do not let comments, log messages, or errors drift from the operation actually being performed; operator-facing wording is part of tooling usability.
 
 ## Before Implementing
 
@@ -104,7 +122,8 @@ Good tooling tests usually verify:
 2. Identify the source of truth for every value: user intent, datastore, on-chain state, registry, or convention.
 3. Decide where behavior belongs: shared changeset, chain adapter, sequence, helper, or test.
 4. Check the deployment style guide for applicable changeset rules.
-5. Keep the smallest abstraction that makes the behavior clear.
+5. Trace every write operation to the final batch/proposal owner.
+6. Keep the smallest abstraction that makes the behavior clear.
 
 ## Before Finishing
 
@@ -115,6 +134,9 @@ Confirm:
 - partial refs are resolved before use,
 - inferred/defaulted values reduce operator burden without hiding necessary overrides,
 - grouping keys match the actual write target,
+- read outputs are not accidentally treated as proposal writes,
+- write outputs from helper/orchestration flows reach the final batch/proposal,
 - stale reads and stale datastore merges are avoided,
 - compatibility behavior is documented,
+- capability checks use the exact capability for the behavior,
 - tests cover the operator-facing path and meaningful edge cases.
