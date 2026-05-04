@@ -58,7 +58,6 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		if siloedPoolAddr == "" {
 			poolReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.Deploy, chain, contract_utils.DeployInput[siloed_usdc_token_pool.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version),
-				ChainSelector:  chain.Selector,
 				Args: siloed_usdc_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
 					LocalTokenDecimals: input.TokenDecimals,
@@ -83,7 +82,6 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 				qualifier := fmt.Sprintf("remoteChainSelector(%d)", sel)
 				lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
-					ChainSelector:  chain.Selector,
 					Qualifier:      &qualifier,
 					Args: erc20_lock_box.ConstructorArgs{
 						Token: common.HexToAddress(input.USDCToken),

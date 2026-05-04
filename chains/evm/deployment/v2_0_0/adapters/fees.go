@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	evmseq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	fq_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -76,7 +77,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 	}
 
 	fqAddr := common.HexToAddress(fqRef.Address)
-	fq, err := fqops.NewFeeQuoterContract(fqAddr, chain.Client)
+	fq, err := fq_bindings.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -202,7 +203,7 @@ func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, src uint64, 
 	}
 
 	fqAddr := common.HexToAddress(fqRef.Address)
-	fq, err := fqops.NewFeeQuoterContract(fqAddr, chain.Client)
+	fq, err := fq_bindings.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to instantiate FeeQuoter 2.0 contract at %s on chain %d: %w", fqAddr.Hex(), src, err)
 	}

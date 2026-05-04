@@ -5,7 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	upstream "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 
@@ -180,7 +180,7 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 		}
 	}
 	// directly fetch offRamp static config
-	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, upstream.FunctionInput[struct{}]{
+	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, contract.FunctionInput[struct{}]{
 		ChainSelector: input.ChainSelector,
 		Address:       common.HexToAddress(offRampAddr.Address),
 		Args:          struct{}{},

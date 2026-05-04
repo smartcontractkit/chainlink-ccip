@@ -1,7 +1,8 @@
-version: "1.0"
+version: "1.0.0"
+chain_family: evm
 
 input:
-  base_path: ".."  # Directory containing abi/ and bytecode/ folders
+  gobindings_package: "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 
 output:
   base_path: "." # Directory for generated operations/
@@ -62,8 +63,7 @@ contracts:
   # 1.6.1
   - contract_name: TokenPool
     version: "1.6.1"
-    abi_file: burn_mint_token_pool.json
-    no_deployment: true
+    omit_deploy: true
     functions:
       - name: applyChainUpdates
         access: owner
@@ -198,6 +198,7 @@ contracts:
 
   - contract_name: OnRamp
     version: "1.6.0"
+    package_name: onramp
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
@@ -256,8 +257,8 @@ contracts:
   - contract_name: CrossChainToken
     version: "2.0.0"
     package_name: erc20
-    abi_file: cross_chain_token.json
-    no_deployment: true
+    gobindings_package: "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cross_chain_token"
+    omit_deploy: true
     functions:
       - name: approve
         access: public
@@ -338,8 +339,7 @@ contracts:
 
   - contract_name: TokenPool
     version: "2.0.0"
-    abi_file: burn_mint_token_pool.json
-    no_deployment: true
+    omit_deploy: true
     functions:
       - name: setAllowedFinalityConfig
         access: owner
@@ -475,13 +475,13 @@ contracts:
         access: owner
       - name: getAllAuthorizedCallers
         access: public
-      - name : transferOwnership
+      - name: transferOwnership
         access: owner
 
   - contract_name: MockReceiverV2
     version: "2.0.0"
     package_name: mock_receiver
-    abi_file: mock_receiver_v2.json
+    gobindings_package: "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
     functions: []
 
   - contract_name: Executor
