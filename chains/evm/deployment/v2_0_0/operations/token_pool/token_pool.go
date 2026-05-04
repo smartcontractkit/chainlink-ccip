@@ -279,11 +279,11 @@ func NewReadGetDynamicConfig(c gobindings.TokenPoolInterface) *cld_ops.Operation
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.TokenPoolInterface, opts *bind.CallOpts, args struct{}) (GetDynamicConfigResult, error) {
-			res, err := c.GetDynamicConfig(opts)
+			r0, r1, r2, err := c.GetDynamicConfig(opts)
 			if err != nil {
 				return GetDynamicConfigResult{}, err
 			}
-			return GetDynamicConfigResult{Router: res.Router, RateLimitAdmin: res.RateLimitAdmin, FeeAdmin: res.FeeAdmin}, nil
+			return GetDynamicConfigResult{Router: r0, RateLimitAdmin: r1, FeeAdmin: r2}, nil
 		},
 	})
 }
@@ -309,11 +309,11 @@ func NewReadGetCurrentRateLimiterState(c gobindings.TokenPoolInterface) *cld_ops
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.TokenPoolInterface, opts *bind.CallOpts, args GetCurrentRateLimiterStateArgs) (GetCurrentRateLimiterStateResult, error) {
-			res, err := c.GetCurrentRateLimiterState(opts, args.RemoteChainSelector, args.FastFinality)
+			r0, r1, err := c.GetCurrentRateLimiterState(opts, args.RemoteChainSelector, args.FastFinality)
 			if err != nil {
 				return GetCurrentRateLimiterStateResult{}, err
 			}
-			return GetCurrentRateLimiterStateResult{OutboundRateLimiterState: res.OutboundRateLimiterState, InboundRateLimiterState: res.InboundRateLimiterState}, nil
+			return GetCurrentRateLimiterStateResult{OutboundRateLimiterState: r0, InboundRateLimiterState: r1}, nil
 		},
 	})
 }

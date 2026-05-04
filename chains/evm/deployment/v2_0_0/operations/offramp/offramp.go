@@ -97,11 +97,11 @@ func NewReadGetAllSourceChainConfigs(c gobindings.OffRampInterface) *cld_ops.Ope
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.OffRampInterface, opts *bind.CallOpts, args struct{}) (GetAllSourceChainConfigsResult, error) {
-			res, err := c.GetAllSourceChainConfigs(opts)
+			r0, r1, err := c.GetAllSourceChainConfigs(opts)
 			if err != nil {
 				return GetAllSourceChainConfigsResult{}, err
 			}
-			return GetAllSourceChainConfigsResult{SourceChainSelectors: res.SourceChainSelectors, SourceChainConfigs: res.SourceChainConfigs}, nil
+			return GetAllSourceChainConfigsResult{SourceChainSelectors: r0, SourceChainConfigs: r1}, nil
 		},
 	})
 }

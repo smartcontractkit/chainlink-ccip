@@ -35,7 +35,7 @@ type ConstructorArgs struct {
 	FeeTokens                      []common.Address                                 `json:"feeTokens"`
 	TokenPriceFeeds                []gobindings.FeeQuoterTokenPriceFeedUpdate       `json:"tokenPriceFeeds"`
 	TokenTransferFeeConfigArgs     []gobindings.FeeQuoterTokenTransferFeeConfigArgs `json:"tokenTransferFeeConfigArgs"`
-	PremiumMultiplierWeiPerEthArgs []gobindings.FeeQuoterPremiumMultiplierWeiPerEthArgs `json:"premiumMultiplierWeiPerEthArgs"`
+	PremiumMultiplierWeiPerEthArgs []gobindings.FeeQuoterFeeTokenArgs               `json:"premiumMultiplierWeiPerEthArgs"`
 	DestChainConfigArgs            []gobindings.FeeQuoterDestChainConfigArgs        `json:"destChainConfigArgs"`
 }
 

@@ -253,11 +253,11 @@ func NewReadGetRemoteChainConfig(c gobindings.CCTPVerifierInterface) *cld_ops.Op
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.CCTPVerifierInterface, opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
-			res, err := c.GetRemoteChainConfig(opts, args)
+			r0, r1, err := c.GetRemoteChainConfig(opts, args)
 			if err != nil {
 				return GetRemoteChainConfigResult{}, err
 			}
-			return GetRemoteChainConfigResult{RemoteChainConfig: res.RemoteChainConfig, AllowedSendersList: res.AllowedSendersList}, nil
+			return GetRemoteChainConfigResult{RemoteChainConfig: r0, AllowedSendersList: r1}, nil
 		},
 	})
 }
@@ -283,16 +283,11 @@ func NewReadGetStaticConfig(c gobindings.CCTPVerifierInterface) *cld_ops.Operati
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.CCTPVerifierInterface, opts *bind.CallOpts, args struct{}) (GetStaticConfigResult, error) {
-			res, err := c.GetStaticConfig(opts)
+			r0, r1, r2, r3, err := c.GetStaticConfig(opts)
 			if err != nil {
 				return GetStaticConfigResult{}, err
 			}
-			return GetStaticConfigResult{
-				TokenMessenger:          res.TokenMessenger,
-				MessageTransmitterProxy: res.MessageTransmitterProxy,
-				UsdcToken:               res.UsdcToken,
-				LocalDomainIdentifier:   res.LocalDomainIdentifier,
-			}, nil
+			return GetStaticConfigResult{TokenMessenger: r0, MessageTransmitterProxy: r1, UsdcToken: r2, LocalDomainIdentifier: r3}, nil
 		},
 	})
 }
@@ -331,11 +326,11 @@ func NewReadGetFee(c gobindings.CCTPVerifierInterface) *cld_ops.Operation[contra
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.CCTPVerifierInterface, opts *bind.CallOpts, args GetFeeArgs) (GetFeeResult, error) {
-			res, err := c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
+			r0, r1, r2, err := c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
 			if err != nil {
 				return GetFeeResult{}, err
 			}
-			return GetFeeResult{FeeUSDCents: res.FeeUSDCents, GasForVerification: res.GasForVerification, PayloadSizeBytes: res.PayloadSizeBytes}, nil
+			return GetFeeResult{FeeUSDCents: r0, GasForVerification: r1, PayloadSizeBytes: r2}, nil
 		},
 	})
 }

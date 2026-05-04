@@ -101,11 +101,11 @@ func NewReadGetAllowedSendersList(c gobindings.OnRampInterface) *cld_ops.Operati
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.OnRampInterface, opts *bind.CallOpts, args uint64) (GetAllowedSendersListResult, error) {
-			res, err := c.GetAllowedSendersList(opts, args)
+			r0, r1, err := c.GetAllowedSendersList(opts, args)
 			if err != nil {
 				return GetAllowedSendersListResult{}, err
 			}
-			return GetAllowedSendersListResult{IsEnabled: res.IsEnabled, ConfiguredAddresses: res.ConfiguredAddresses}, nil
+			return GetAllowedSendersListResult{IsEnabled: r0, ConfiguredAddresses: r1}, nil
 		},
 	})
 }
@@ -118,11 +118,11 @@ func NewReadGetDestChainConfig(c gobindings.OnRampInterface) *cld_ops.Operation[
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.OnRampInterface, opts *bind.CallOpts, args uint64) (GetDestChainConfigResult, error) {
-			res, err := c.GetDestChainConfig(opts, args)
+			r0, r1, r2, err := c.GetDestChainConfig(opts, args)
 			if err != nil {
 				return GetDestChainConfigResult{}, err
 			}
-			return GetDestChainConfigResult{SequenceNumber: res.SequenceNumber, AllowlistEnabled: res.AllowlistEnabled, Router: res.Router}, nil
+			return GetDestChainConfigResult{SequenceNumber: r0, AllowlistEnabled: r1, Router: r2}, nil
 		},
 	})
 }

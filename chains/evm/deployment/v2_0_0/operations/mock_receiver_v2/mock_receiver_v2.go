@@ -58,16 +58,11 @@ func NewReadGetCCVsAndFinalityConfig(c gobindings.MockReceiverV2Interface) *cld_
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.MockReceiverV2Interface, opts *bind.CallOpts, args GetCCVsAndFinalityConfigArgs) (GetCCVsAndFinalityConfigResult, error) {
-			res, err := c.GetCCVsAndFinalityConfig(opts, args.Arg0, args.Arg1)
+			r0, r1, r2, r3, err := c.GetCCVsAndFinalityConfig(opts, args.Arg0, args.Arg1)
 			if err != nil {
 				return GetCCVsAndFinalityConfigResult{}, err
 			}
-			return GetCCVsAndFinalityConfigResult{
-				RequiredVerifier:      res.RequiredVerifier,
-				OptionalVerifiers:     res.OptionalVerifiers,
-				Threshold:             res.Threshold,
-				AllowedFinalityConfig: res.AllowedFinalityConfig,
-			}, nil
+			return GetCCVsAndFinalityConfigResult{RequiredVerifier: r0, OptionalVerifiers: r1, Threshold: r2, AllowedFinalityConfig: r3}, nil
 		},
 	})
 }

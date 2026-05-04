@@ -207,11 +207,11 @@ func NewReadGetRemoteChainConfig(c gobindings.CommitteeVerifierInterface) *cld_o
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.CommitteeVerifierInterface, opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
-			res, err := c.GetRemoteChainConfig(opts, args)
+			r0, r1, err := c.GetRemoteChainConfig(opts, args)
 			if err != nil {
 				return GetRemoteChainConfigResult{}, err
 			}
-			return GetRemoteChainConfigResult{RemoteChainConfig: res.RemoteChainConfig, AllowedSendersList: res.AllowedSendersList}, nil
+			return GetRemoteChainConfigResult{RemoteChainConfig: r0, AllowedSendersList: r1}, nil
 		},
 	})
 }
@@ -237,11 +237,11 @@ func NewReadGetSignatureConfig(c gobindings.CommitteeVerifierInterface) *cld_ops
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.CommitteeVerifierInterface, opts *bind.CallOpts, args uint64) (GetSignatureConfigResult, error) {
-			res, err := c.GetSignatureConfig(opts, args)
+			r0, r1, err := c.GetSignatureConfig(opts, args)
 			if err != nil {
 				return GetSignatureConfigResult{}, err
 			}
-			return GetSignatureConfigResult{Signers: res.Signers, Threshold: res.Threshold}, nil
+			return GetSignatureConfigResult{Signers: r0, Threshold: r1}, nil
 		},
 	})
 }
@@ -267,11 +267,11 @@ func NewReadGetFee(c gobindings.CommitteeVerifierInterface) *cld_ops.Operation[c
 		ContractType: ContractType,
 		Contract:     c,
 		CallContract: func(c gobindings.CommitteeVerifierInterface, opts *bind.CallOpts, args GetFeeArgs) (GetFeeResult, error) {
-			res, err := c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
+			r0, r1, r2, err := c.GetFee(opts, args.DestChainSelector, args.Arg1, args.Arg2, args.RequestedFinality)
 			if err != nil {
 				return GetFeeResult{}, err
 			}
-			return GetFeeResult{FeeUSDCents: res.FeeUSDCents, GasForVerification: res.GasForVerification, PayloadSizeBytes: res.PayloadSizeBytes}, nil
+			return GetFeeResult{FeeUSDCents: r0, GasForVerification: r1, PayloadSizeBytes: r2}, nil
 		},
 	})
 }
