@@ -30,7 +30,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260312233953-f588f8dc6d7c
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260430162852-e8daba118223
-	github.com/smartcontractkit/chainlink-deployments-framework v0.96.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.99.1-0.20260502081614-b3ef67cd40fd
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260410162948-2dca02f24e98
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/mcms v0.40.1
@@ -214,7 +214,7 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
-	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
@@ -274,7 +274,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.0.4 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.16 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.18 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260415120434-cecc380f8d87 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 // indirect
