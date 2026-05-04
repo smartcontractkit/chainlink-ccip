@@ -122,11 +122,18 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			// Pre-1.6.1 EVM pools stored inbound limits in source/remote decimals.
 			// New pools consume inbound limits in local/destination decimals, so rebase before applying.
 			if imported.LegacyPoolVersion != nil && imported.LegacyPoolVersion.LessThan(semver.MustParse("1.6.1")) {
-				inboundRateLimiterConfig = normalizeInboundRateLimiterConfig(
-					inboundRateLimiterConfig,
-					input.RemoteChainConfig.RemoteDecimals,
-					localDecimalsReport.Output,
-				)
+				if input.RemoteChainConfig.RemoteDecimals == 0 {
+					b.Logger.Warnf(
+						"remote decimals not set when importing inbound rate limits from pre-1.6.1 active pool for remote chain %d; preserving imported inbound limits without decimal normalization",
+						input.RemoteChainSelector,
+					)
+				} else {
+					inboundRateLimiterConfig = normalizeInboundRateLimiterConfig(
+						inboundRateLimiterConfig,
+						input.RemoteChainConfig.RemoteDecimals,
+						localDecimalsReport.Output,
+					)
+				}
 			}
 		}
 
