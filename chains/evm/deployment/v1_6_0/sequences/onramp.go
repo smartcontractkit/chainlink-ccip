@@ -13,13 +13,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	ongb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type OnRampApplyDestChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []onrampops.DestChainConfigArgs
+	UpdatesByChain []ongb.OnRampDestChainConfigArgs
 }
 
 type OnRampImportConfigSequenceInput struct {
@@ -30,8 +31,8 @@ type OnRampImportConfigSequenceInput struct {
 
 type OnRampImportConfigSequenceOutput struct {
 	DestChainCfgs map[uint64]onrampops.GetDestChainConfigResult
-	StaticConfig  onrampops.StaticConfig
-	DynamicConfig onrampops.DynamicConfig
+	StaticConfig  ongb.OnRampStaticConfig
+	DynamicConfig ongb.OnRampDynamicConfig
 }
 
 var (
@@ -45,7 +46,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
+			report, err := operations.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]ongb.OnRampDestChainConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
 				Args:          input.UpdatesByChain,

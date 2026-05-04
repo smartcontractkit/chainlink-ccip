@@ -25,7 +25,6 @@ var DeployAdvancedPoolHooksExtractor = cldf_ops.NewSequence(
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployAdvancedPoolHooksExtractorInput) (sequences.OnChainOutput, error) {
 		ref, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks_extractor.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks_extractor.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks_extractor.ContractType, *advanced_pool_hooks_extractor.Version),
-			ChainSelector:  chain.Selector,
 			Args:           advanced_pool_hooks_extractor.ConstructorArgs{},
 		}, input.ExistingAddresses)
 		if err != nil {

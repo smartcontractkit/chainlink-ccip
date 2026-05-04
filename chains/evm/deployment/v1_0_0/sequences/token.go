@@ -19,7 +19,8 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -65,7 +66,7 @@ var DeployToken = cldf_ops.NewSequence(
 	"Deploy given type of token contracts",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenInput) (sequences.OnChainOutput, error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]contract.WriteOutput, 0)
+		writes := make([]evm_contract.WriteOutput, 0)
 		chain := chains.EVMChains()[input.ChainSelector]
 		var err error
 		var tokenRef datastore.AddressRef
@@ -97,9 +98,8 @@ var DeployToken = cldf_ops.NewSequence(
 
 		switch input.Type {
 		case erc20.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, erc20.Deploy, chain, contract.DeployInput[erc20.ConstructorArgs]{
+			tokenRef, err = evm_contract.MaybeDeployContract(b, erc20.Deploy, chain, evm_contract.DeployInput[erc20.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
 				Args: erc20.ConstructorArgs{
 					Name:   input.Name,
 					Symbol: input.Symbol,
@@ -111,9 +111,8 @@ var DeployToken = cldf_ops.NewSequence(
 			}
 
 		case burn_mint_erc20.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain, contract.DeployInput[burn_mint_erc20.ConstructorArgs]{
+			tokenRef, err = evm_contract.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain, evm_contract.DeployInput[burn_mint_erc20.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
 				Args: burn_mint_erc20.ConstructorArgs{
 					Name:      input.Name,
 					Symbol:    input.Symbol,
@@ -128,9 +127,8 @@ var DeployToken = cldf_ops.NewSequence(
 			}
 
 		case burn_mint_erc20_with_drip.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+			tokenRef, err = evm_contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
 				Args: burn_mint_erc20_with_drip.ConstructorArgs{
 					Name:      input.Name,
 					Symbol:    input.Symbol,
@@ -145,9 +143,8 @@ var DeployToken = cldf_ops.NewSequence(
 			}
 
 		case drip_v150.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, drip_v150.Deploy, chain, contract.DeployInput[drip_v150.ConstructorArgs]{
+			tokenRef, err = evm_contract.MaybeDeployContract(b, drip_v150.Deploy, chain, evm_contract.DeployInput[drip_v150.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(drip_v150.ContractType, *drip_v150.Version),
-				ChainSelector:  chain.Selector,
 				Args: drip_v150.ConstructorArgs{
 					Name:   input.Name,
 					Symbol: input.Symbol,
@@ -196,7 +193,7 @@ var DeployToken = cldf_ops.NewSequence(
 			if len(input.Senders) > 1 {
 				b.Logger.Warnf("Multiple senders provided but only the first one (%s) will receive the pre-minted tokens", tokReceiver.Hex())
 			}
-			transferReport, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
+			transferReport, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, evm_contract.FunctionInput[erc20.TransferArgs]{
 				ChainSelector: chain.Selector,
 				Address:       tokenAddr,
 				Args: erc20.TransferArgs{
@@ -211,7 +208,7 @@ var DeployToken = cldf_ops.NewSequence(
 		}
 
 		if input.CCIPAdmin != "" && tokenSupportsCCIPAdmin(input.Type) {
-			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
+			setCCIPAdminReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, evm_contract.FunctionInput[string]{
 				ChainSelector: chain.Selector,
 				Address:       tokenAddr,
 				Args:          ccipAdmin.Hex(),
@@ -234,7 +231,7 @@ var DeployToken = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role constant: %w", err)
 				}
 
-				grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
+				grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, evm_contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
 					ChainSelector: chain.Selector,
 					Address:       tokenAddr,
 					Args: burn_mint_erc20.RoleAssignment{
@@ -248,7 +245,7 @@ var DeployToken = cldf_ops.NewSequence(
 				writes = append(writes, grantReport.Output)
 
 			case tip20.ContractType:
-				grantReport, err := cldf_ops.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
+				grantReport, err := cldf_ops.ExecuteOperation(b, tip20.GrantAdminRole, chain, evm_contract.FunctionInput[common.Address]{
 					ChainSelector: chain.Selector,
 					Address:       tokenAddr,
 					Args:          externalAdmin,
@@ -263,7 +260,7 @@ var DeployToken = cldf_ops.NewSequence(
 			}
 		}
 
-		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

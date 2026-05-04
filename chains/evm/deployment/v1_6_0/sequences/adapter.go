@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	ongb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -284,7 +285,7 @@ func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelect
 		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
 	}
 
-	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	onrampContract, err := ongb.NewOnRamp(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
 	}

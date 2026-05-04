@@ -13,6 +13,7 @@ import (
 
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -61,7 +62,7 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	}
 
 	onRampAddr := common.HexToAddress(onRampRef.Address)
-	onRamp, err := onrampops.NewOnRampContract(onRampAddr, chain.Client)
+	onRamp, err := onramp_bindings.NewOnRamp(onRampAddr, chain.Client)
 	if err != nil {
 		return "", fmt.Errorf("failed to instantiate OnRamp at %s on chain %d: %w", onRampAddr.Hex(), chainSelector, err)
 	}

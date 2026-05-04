@@ -29,7 +29,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		}
 
 		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
@@ -65,7 +64,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		switch deployment.ContractType(input.TokenPoolType) {
 		case burn_mint_token_pool.ContractType:
 			report, deployErr := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
 				TypeAndVersion: typeAndVersion,
 				Args: burn_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -79,7 +77,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			tpDeployReport, err = &report.Output, deployErr
 		case burn_from_mint_token_pool.ContractType:
 			report, deployErr := cldf_ops.ExecuteOperation(b, burn_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_from_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
 				TypeAndVersion: typeAndVersion,
 				Args: burn_from_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -93,7 +90,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			tpDeployReport, err = &report.Output, deployErr
 		case burn_with_from_mint_token_pool.ContractType:
 			report, deployErr := cldf_ops.ExecuteOperation(b, burn_with_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_with_from_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
 				TypeAndVersion: typeAndVersion,
 				Args: burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,

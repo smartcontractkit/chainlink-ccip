@@ -84,7 +84,6 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		// Deploy LombardVerifier if needed
 		lombardVerifierRef, err := contract_utils.MaybeDeployContract(b, lombard_verifier.Deploy, chain, contract_utils.DeployInput[lombard_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_verifier.ContractType, *lombard_verifier.Version),
-			ChainSelector:  input.ChainSelector,
 			Qualifier:      &ContractQualifier,
 			Args: lombard_verifier.ConstructorArgs{
 				Bridge:          lombardBridgeAddress,
@@ -177,7 +176,6 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		// There can be multiple pools / tokens and advancedPoolHooks for Lombard
 		advancedPoolHooksRef, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
-			ChainSelector:  input.ChainSelector,
 			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        []common.Address{}, // Empty allowlist
@@ -193,7 +191,6 @@ var DeployLombardChain = cldf_ops.NewSequence(
 
 		lombardTokenPoolRef, err := contract_utils.MaybeDeployContract(b, lombard_token_pool.Deploy, chain, contract_utils.DeployInput[lombard_token_pool.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_token_pool.ContractType, *lombard_token_pool.Version),
-			ChainSelector:  input.ChainSelector,
 			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
 			Args: lombard_token_pool.ConstructorArgs{
 				Token:             tokenAddress,

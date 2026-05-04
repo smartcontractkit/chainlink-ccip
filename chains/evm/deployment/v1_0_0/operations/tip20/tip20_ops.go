@@ -11,9 +11,9 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -64,7 +64,7 @@ var Deploy = operations.NewSequence(
 	"tip20:deploy",
 	Version,
 	"Deploys a TIP20 token via the TIP20 factory. Only applicable for Tempo testnet / mainnet.",
-	func(b operations.Bundle, chain evm.Chain, input FactoryDeployArgs) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chain cldf_evm.Chain, input FactoryDeployArgs) (sequences.OnChainOutput, error) {
 		isTempoTestnet := chainsel.TEMPO_TESTNET_MODERATO.Selector == chain.Selector || chainsel.TEMPO_TESTNET.Selector == chain.Selector
 		isTempoMainnet := chainsel.TEMPO_MAINNET.Selector == chain.Selector
 		if !isTempoTestnet && !isTempoMainnet {

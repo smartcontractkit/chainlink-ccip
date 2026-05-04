@@ -15,8 +15,10 @@ import (
 
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
+	gbtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	cldf_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -46,21 +48,19 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
+		bound, err := gbtp.NewTokenPool(input.TokenPoolAddress, chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("bind token pool: %w", err)
+		}
 		writes := make([]evm_contract.WriteOutput, 0)
 
 		// Get remote chains that are currently supported by the token pools
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-		})
+		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetSupportedChains(bound), chain, cldf_contract.FunctionInput[struct{}]{Args: struct{}{}})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains: %w", err)
 		}
 
-		localDecimalsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenDecimals, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-		})
+		localDecimalsReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetTokenDecimals(bound), chain, cldf_contract.FunctionInput[struct{}]{Args: struct{}{}})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
@@ -81,10 +81,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		removes := make([]uint64, 0, 1) // Cap == 1 because we may need to remove the chain if the remote token is different
 		if slices.Contains(supportedChainsReport.Output, input.RemoteChainSelector) {
 			// Check existing remote token
-			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, chain, evm_contract.FunctionInput[uint64]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-				Args:          input.RemoteChainSelector,
+			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetRemoteToken(bound), chain, cldf_contract.FunctionInput[uint64]{
+				Args: input.RemoteChainSelector,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
@@ -96,7 +94,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			// Only proceed further if we do NOT need to remove and re-add the chain
 			if len(removes) == 0 {
 				// Check and update rate limiters
-				rateLimitersReport, err := maybeUpdateRateLimiters(b, chain, input.ChainSelector, input.TokenPoolAddress, input.RemoteChainSelector, inboundConfig, outboundConfig)
+				rateLimitersReport, err := maybeUpdateRateLimiters(b, chain, bound, input.RemoteChainSelector, inboundConfig, outboundConfig)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
@@ -106,10 +104,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				}
 
 				// Check existing remote pools
-				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args:          input.RemoteChainSelector,
+				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetRemotePools(bound), chain, cldf_contract.FunctionInput[uint64]{
+					Args: input.RemoteChainSelector,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pools: %w", err)
@@ -118,9 +114,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					return bytes.Equal(addr, input.RemoteChainConfig.RemotePool)
 				}) {
 					// Add the requested remote pool
-					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
+					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewWriteAddRemotePool(bound), chain, cldf_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 						Args: token_pool.AddRemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
@@ -143,24 +137,22 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 
 		// If the chain is not supported, apply the config for the remote chain
-		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
+		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewWriteApplyChainUpdates(bound), chain, cldf_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
 			Args: token_pool.ApplyChainUpdatesArgs{
 				RemoteChainSelectorsToRemove: removes,
-				ChainsToAdd: []token_pool.ChainUpdate{
+				ChainsToAdd: []gbtp.TokenPoolChainUpdate{
 					{
 						RemoteChainSelector: input.RemoteChainSelector,
 						RemotePoolAddresses: [][]byte{
 							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
 						RemoteTokenAddress: common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
-						OutboundRateLimiterConfig: token_pool.Config{
+						OutboundRateLimiterConfig: gbtp.RateLimiterConfig{
 							IsEnabled: outboundConfig.IsEnabled,
 							Capacity:  outboundConfig.Capacity,
 							Rate:      outboundConfig.Rate,
 						},
-						InboundRateLimiterConfig: token_pool.Config{
+						InboundRateLimiterConfig: gbtp.RateLimiterConfig{
 							IsEnabled: inboundConfig.IsEnabled,
 							Capacity:  inboundConfig.Capacity,
 							Rate:      inboundConfig.Rate,
@@ -187,26 +179,21 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 func maybeUpdateRateLimiters(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
-	chainSelector uint64,
-	tokenPoolAddress common.Address,
+	bound gbtp.TokenPoolInterface,
 	remoteChainSelector uint64,
 	inboundConfig tokens.RateLimiterConfig,
 	outboundConfig tokens.RateLimiterConfig,
 ) (output evm_contract.WriteOutput, err error) {
-	inboundRateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       tokenPoolAddress,
-		Args:          remoteChainSelector,
+	inboundRateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetCurrentInboundRateLimiterState(bound), chain, cldf_contract.FunctionInput[uint64]{
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return evm_contract.WriteOutput{}, fmt.Errorf("failed to get inbound rate limiter state: %w", err)
 	}
 	currentInboundRateLimiterState := inboundRateLimiterStateReport.Output
 
-	outboundRateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       tokenPoolAddress,
-		Args:          remoteChainSelector,
+	outboundRateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetCurrentOutboundRateLimiterState(bound), chain, cldf_contract.FunctionInput[uint64]{
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return evm_contract.WriteOutput{}, fmt.Errorf("failed to get outbound rate limiter state: %w", err)
@@ -216,17 +203,15 @@ func maybeUpdateRateLimiters(
 	// Update the rate limiters if they do not match the desired config
 	if !rateLimiterConfigsEqual(currentInboundRateLimiterState, inboundConfig) ||
 		!rateLimiterConfigsEqual(currentOutboundRateLimiterState, outboundConfig) {
-		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[token_pool.SetChainRateLimiterConfigArgs]{
-			ChainSelector: chainSelector,
-			Address:       tokenPoolAddress,
+		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewWriteSetChainRateLimiterConfig(bound), chain, cldf_contract.FunctionInput[token_pool.SetChainRateLimiterConfigArgs]{
 			Args: token_pool.SetChainRateLimiterConfigArgs{
 				RemoteChainSelector: remoteChainSelector,
-				InboundConfig: token_pool.Config{
+				InboundConfig: gbtp.RateLimiterConfig{
 					IsEnabled: inboundConfig.IsEnabled,
 					Capacity:  inboundConfig.Capacity,
 					Rate:      inboundConfig.Rate,
 				},
-				OutboundConfig: token_pool.Config{
+				OutboundConfig: gbtp.RateLimiterConfig{
 					IsEnabled: outboundConfig.IsEnabled,
 					Capacity:  outboundConfig.Capacity,
 					Rate:      outboundConfig.Rate,
@@ -243,7 +228,7 @@ func maybeUpdateRateLimiters(
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
-func rateLimiterConfigsEqual(current token_pool.TokenBucket, desired tokens.RateLimiterConfig) bool {
+func rateLimiterConfigsEqual(current gbtp.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity.Cmp(desired.Capacity) == 0 &&
 		current.Rate.Cmp(desired.Rate) == 0

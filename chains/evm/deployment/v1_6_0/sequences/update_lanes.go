@@ -15,10 +15,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	fqops2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	fq2gb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	fqgb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	ongb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	ofgb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -49,7 +52,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
 				Address:       fqAddr,
 				ChainSelector: input.Source.Selector,
-				UpdatesByChain: []fqops.DestChainConfigArgs{
+				UpdatesByChain: []fqgb.FeeQuoterDestChainConfigArgs{
 					{
 						DestChainSelector: input.Dest.Selector,
 						DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
@@ -72,7 +75,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 					result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
 						Address:       fqAddr,
 						ChainSelector: input.Source.Selector,
-						UpdatesByChain: fqops.PriceUpdates{
+						UpdatesByChain: fqgb.InternalPriceUpdates{
 							GasPriceUpdates:   translateGasPrice(input.Dest.Selector, input.Dest.GasPrice),
 							TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
 						},
@@ -88,7 +91,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
 			Address:       common.BytesToAddress(input.Source.OnRamp),
 			ChainSelector: input.Source.Selector,
-			UpdatesByChain: []onrampops.DestChainConfigArgs{
+			UpdatesByChain: []ongb.OnRampDestChainConfigArgs{
 				{
 					Router:            common.BytesToAddress(input.Source.Router),
 					DestChainSelector: input.Dest.Selector,
@@ -139,7 +142,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
 			Address:       common.BytesToAddress(input.Dest.OffRamp),
 			ChainSelector: input.Dest.Selector,
-			UpdatesByChain: []offrampops.SourceChainConfigArgs{
+			UpdatesByChain: []ofgb.OffRampSourceChainConfigArgs{
 				{
 					Router:              common.BytesToAddress(input.Dest.Router),
 					SourceChainSelector: input.Source.Selector,
@@ -239,11 +242,11 @@ func feeQuoterV2PricesAlreadySeeded(
 	return rep.Output.Timestamp > 0, nil
 }
 
-func translateGasPrice(destChainSelector uint64, gasPrice *big.Int) []fqops.GasPriceUpdate {
+func translateGasPrice(destChainSelector uint64, gasPrice *big.Int) []fqgb.InternalGasPriceUpdate {
 	if gasPrice == nil {
 		return nil
 	}
-	return []fqops.GasPriceUpdate{{DestChainSelector: destChainSelector, UsdPerUnitGas: gasPrice}}
+	return []fqgb.InternalGasPriceUpdate{{DestChainSelector: destChainSelector, UsdPerUnitGas: gasPrice}}
 }
 
 // applyOnRampAllowlist reconciles the on-chain allowlist with the desired state
@@ -279,10 +282,10 @@ func applyOnRampAllowlist(b operations.Bundle, chain cldf_evm.Chain, input lanes
 		return nil
 	}
 
-	writeRep, err := operations.ExecuteOperation(b, onrampops.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]onrampops.AllowlistConfigArgs]{
+	writeRep, err := operations.ExecuteOperation(b, onrampops.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]ongb.OnRampAllowlistConfigArgs]{
 		ChainSelector: input.Source.Selector,
 		Address:       onRampAddr,
-		Args: []onrampops.AllowlistConfigArgs{{
+		Args: []ongb.OnRampAllowlistConfigArgs{{
 			DestChainSelector:         input.Dest.Selector,
 			AllowlistEnabled:          input.Source.AllowListEnabled,
 			AddedAllowlistedSenders:   added,
@@ -338,12 +341,12 @@ func (a *EVMAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateL
 	return ConfigureLaneLegAsDest
 }
 
-func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
+func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqgb.FeeQuoterDestChainConfig {
 	var v1 lanes.FeeQuoterV1Params
 	if fqc.V1Params != nil {
 		v1 = *fqc.V1Params
 	}
-	return fqops.DestChainConfig{
+	return fqgb.FeeQuoterDestChainConfig{
 		IsEnabled:                         fqc.IsEnabled,
 		MaxNumberOfTokensPerMsg:           v1.MaxNumberOfTokensPerMsg,
 		MaxDataBytes:                      fqc.MaxDataBytes,
@@ -366,12 +369,12 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
 	}
 }
 
-func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fqops2.DestChainConfig {
+func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fq2gb.FeeQuoterDestChainConfig {
 	var v2 lanes.FeeQuoterV2Params
 	if fqc.V2Params != nil {
 		v2 = *fqc.V2Params
 	}
-	return fqops2.DestChainConfig{
+	return fq2gb.FeeQuoterDestChainConfig{
 		IsEnabled:                   fqc.IsEnabled,
 		MaxDataBytes:                fqc.MaxDataBytes,
 		MaxPerMsgGasLimit:           fqc.MaxPerMsgGasLimit,
@@ -388,7 +391,7 @@ func TranslateFQtoV2(fqc lanes.FeeQuoterDestChainConfig) fqops2.DestChainConfig 
 
 // ReverseTranslateFQ is the inverse of TranslateFQ: it maps the EVM v1.6 on-chain
 // DestChainConfig back to the product-level FeeQuoterDestChainConfig.
-func ReverseTranslateFQ(dc fqops.DestChainConfig) lanes.FeeQuoterDestChainConfig {
+func ReverseTranslateFQ(dc fqgb.FeeQuoterDestChainConfig) lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
 		IsEnabled:                   dc.IsEnabled,
 		MaxDataBytes:                dc.MaxDataBytes,
@@ -416,7 +419,7 @@ func ReverseTranslateFQ(dc fqops.DestChainConfig) lanes.FeeQuoterDestChainConfig
 
 // ReverseTranslateFQV2 is the inverse of TranslateFQtoV2: it maps the EVM v2.0 on-chain
 // DestChainConfig back to the product-level FeeQuoterDestChainConfig.
-func ReverseTranslateFQV2(dc fqops2.DestChainConfig) lanes.FeeQuoterDestChainConfig {
+func ReverseTranslateFQV2(dc fq2gb.FeeQuoterDestChainConfig) lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
 		IsEnabled:                   dc.IsEnabled,
 		MaxDataBytes:                dc.MaxDataBytes,
@@ -434,10 +437,10 @@ func ReverseTranslateFQV2(dc fqops2.DestChainConfig) lanes.FeeQuoterDestChainCon
 	}
 }
 
-func TranslateTokenPrices(prices map[string]*big.Int) []fqops.TokenPriceUpdate {
-	var result []fqops.TokenPriceUpdate
+func TranslateTokenPrices(prices map[string]*big.Int) []fqgb.InternalTokenPriceUpdate {
+	var result []fqgb.InternalTokenPriceUpdate
 	for k, v := range prices {
-		result = append(result, fqops.TokenPriceUpdate{
+		result = append(result, fqgb.InternalTokenPriceUpdate{
 			SourceToken: common.HexToAddress(k),
 			UsdPerToken: v,
 		})
@@ -445,10 +448,10 @@ func TranslateTokenPrices(prices map[string]*big.Int) []fqops.TokenPriceUpdate {
 	return result
 }
 
-func TranslateTokenPricesV2(prices map[string]*big.Int) []fqops2.TokenPriceUpdate {
-	var result []fqops2.TokenPriceUpdate
+func TranslateTokenPricesV2(prices map[string]*big.Int) []fq2gb.InternalTokenPriceUpdate {
+	var result []fq2gb.InternalTokenPriceUpdate
 	for k, v := range prices {
-		result = append(result, fqops2.TokenPriceUpdate{
+		result = append(result, fq2gb.InternalTokenPriceUpdate{
 			SourceToken: common.HexToAddress(k),
 			UsdPerToken: v,
 		})
@@ -459,10 +462,10 @@ func TranslateTokenPricesV2(prices map[string]*big.Int) []fqops2.TokenPriceUpdat
 func configureFeeQuoterV2(b operations.Bundle, input lanes.UpdateLanesInput, fqAddr common.Address, evmChain cldf_evm.Chain, result sequences.OnChainOutput) (sequences.OnChainOutput, error) {
 	destChainCfgReport, err := operations.ExecuteOperation(
 		b, fqops2.ApplyDestChainConfigUpdates, evmChain,
-		contract.FunctionInput[[]fqops2.DestChainConfigArgs]{
+		contract.FunctionInput[[]fq2gb.FeeQuoterDestChainConfigArgs]{
 			ChainSelector: evmChain.Selector,
 			Address:       fqAddr,
-			Args: []fqops2.DestChainConfigArgs{
+			Args: []fq2gb.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: input.Dest.Selector,
 					DestChainConfig:   TranslateFQtoV2(input.Dest.FeeQuoterDestChainConfig),
@@ -488,12 +491,12 @@ func configureFeeQuoterV2(b operations.Bundle, input lanes.UpdateLanesInput, fqA
 		if skip {
 			b.Logger.Info("Skipping FeeQuoter v2 price updates: prices already seeded for dest chain")
 		} else {
-			priceReport, err := operations.ExecuteOperation(b, fqops2.UpdatePrices, evmChain, contract.FunctionInput[fqops2.PriceUpdates]{
+			priceReport, err := operations.ExecuteOperation(b, fqops2.UpdatePrices, evmChain, contract.FunctionInput[fq2gb.InternalPriceUpdates]{
 				ChainSelector: evmChain.Selector,
 				Address:       fqAddr,
-				Args: fqops2.PriceUpdates{
+				Args: fq2gb.InternalPriceUpdates{
 					TokenPriceUpdates: TranslateTokenPricesV2(input.Source.TokenPrices),
-					GasPriceUpdates: []fqops2.GasPriceUpdate{
+					GasPriceUpdates: []fq2gb.InternalGasPriceUpdate{
 						{
 							DestChainSelector: input.Dest.Selector,
 							UsdPerUnitGas:     input.Dest.GasPrice,

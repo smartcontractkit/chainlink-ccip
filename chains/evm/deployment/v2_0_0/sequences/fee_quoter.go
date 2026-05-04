@@ -135,7 +135,6 @@ var (
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
-					ChainSelector:  chain.Selector,
 					Args:           input.ConstructorArgs,
 				}, input.ExistingAddresses)
 			if err != nil {

@@ -36,7 +36,6 @@ func applyDeployCREATE2Factory(e cldf_deployment.Environment, cfg DeployCREATE2F
 	}
 
 	deployReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
-		ChainSelector:  cfg.ChainSel,
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
 		Args: create2_factory.ConstructorArgs{
 			AllowList: cfg.AllowList,

@@ -165,7 +165,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy WETH
 		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *weth.Version),
-			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
@@ -175,7 +174,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy LINK
 		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract_utils.DeployInput[link.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *link.Version),
-			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
@@ -185,7 +183,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy RMNRemote
 		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract_utils.DeployInput[rmn_remote.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
-			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
 				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
@@ -200,7 +197,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy RMNProxy
 		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
 			},
@@ -238,7 +234,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy Router
 		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
 				RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
@@ -276,7 +271,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if input.DeployTestRouter {
 			testRouterRef, err := contract_utils.MaybeDeployContract(b, router.DeployTestRouter, chain, contract_utils.DeployInput[router.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(router.TestRouterContractType, *router.Version),
-				ChainSelector:  chain.Selector,
 				Args: router.ConstructorArgs{
 					WrappedNative: common.HexToAddress(wethRef.Address),
 					RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
@@ -313,7 +307,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
-			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
@@ -324,7 +317,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy RegistryModuleOwnerCustom
 		registryModuleOwnerCustomRef, err := contract_utils.MaybeDeployContract(b, registry_module_owner_custom.Deploy, chain, contract_utils.DeployInput[registry_module_owner_custom.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(registry_module_owner_custom.ContractType, *registry_module_owner_custom.Version),
-			ChainSelector:  chain.Selector,
 			Args: registry_module_owner_custom.ConstructorArgs{
 				TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
 			},
@@ -356,7 +348,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
-			ChainSelector:  chain.Selector,
 			Args: fee_quoter.ConstructorArgs{
 				StaticConfig: fee_quoter.StaticConfig{
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
@@ -405,7 +396,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy OffRamp
 		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(offramp.ContractType, *input.ContractParams.OffRamp.Version),
-			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
 				StaticConfig: offramp.StaticConfig{
 					LocalChainSelector:        chain.Selector,
@@ -425,7 +415,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy OnRamp
 		onRampRef, err := contract_utils.MaybeDeployContract(b, onramp.Deploy, chain, contract_utils.DeployInput[onramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(onramp.ContractType, *input.ContractParams.OnRamp.Version),
-			ChainSelector:  chain.Selector,
 			Args: onramp.ConstructorArgs{
 				StaticConfig: onramp.StaticConfig{
 					ChainSelector:         chain.Selector,
@@ -503,7 +492,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 			executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract_utils.DeployInput[executor.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *executorParam.Version),
-				ChainSelector:  chain.Selector,
 				Args: executor.ConstructorArgs{
 					MaxCCVsPerMsg: executorParam.MaxCCVsPerMsg,
 					DynamicConfig: executorParam.DynamicConfig,
@@ -661,7 +649,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
-				ChainSelector:  chain.Selector,
 				Args: mock_receiver.ConstructorArgs{
 					Required:  requiredVerifiers,
 					Optional:  optionalVerifiers,

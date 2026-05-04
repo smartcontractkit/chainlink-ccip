@@ -14,6 +14,9 @@ type DestChainConfigArgs = gobindings.OnRampDestChainConfigArgs
 // DynamicConfig is the OnRamp dynamic configuration for SetDynamicConfig.
 type DynamicConfig = gobindings.OnRampDynamicConfig
 
+// StaticConfig is the OnRamp static configuration for deploy/constructor.
+type StaticConfig = gobindings.OnRampStaticConfig
+
 var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]gobindings.OnRampDestChainConfigArgs, *gobindings.OnRamp]{
 	Name:            "onramp:apply-dest-chain-config-updates",
 	Version:         Version,

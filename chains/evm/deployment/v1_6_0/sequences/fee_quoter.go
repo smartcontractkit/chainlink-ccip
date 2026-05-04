@@ -17,19 +17,20 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	fqgb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type FeeQuoterApplyDestChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []fqops.DestChainConfigArgs
+	UpdatesByChain []fqgb.FeeQuoterDestChainConfigArgs
 }
 
 type FeeQuoterUpdatePricesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain fqops.PriceUpdates
+	UpdatesByChain fqgb.InternalPriceUpdates
 }
 
 type FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput struct {
@@ -48,13 +49,13 @@ type FeeQuoterImportConfigSequenceInput struct {
 type FeeQuoterImportConfigSequenceOutput struct {
 	RemoteChainCfgs map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain
 	PriceUpdaters   []common.Address
-	StaticCfg       fqops.StaticConfig
+	StaticCfg       fqgb.FeeQuoterStaticConfig
 	TokenPrices     map[common.Address]*big.Int
 }
 
 type FeeQuoterImportConfigSequenceOutputPerRemoteChain struct {
-	DestChainCfg         fqops.DestChainConfig
-	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
+	DestChainCfg         fqgb.FeeQuoterDestChainConfig
+	TokenTransferFeeCfgs map[common.Address]fqgb.FeeQuoterTokenTransferFeeConfig
 	GasPrice             *big.Int
 }
 
@@ -69,7 +70,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
+			report, err := operations.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fqgb.FeeQuoterDestChainConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
 				Args:          input.UpdatesByChain,
@@ -97,7 +98,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
+			report, err := operations.ExecuteOperation(b, fqops.UpdatePrices, chain, contract.FunctionInput[fqgb.InternalPriceUpdates]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
 				Args:          input.UpdatesByChain,
@@ -157,7 +158,7 @@ var (
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for FeeQuoter %s on chain %d (%s)", fqAddress.Hex(), chainSelector, evmChain.Name())
 			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain)
-			destChainConfigs := make(map[uint64]fqops.DestChainConfig)
+			destChainConfigs := make(map[uint64]fqgb.FeeQuoterDestChainConfig)
 			var destChainMu sync.Mutex
 			destGrp, _ := errgroup.WithContext(b.GetContext())
 			destGrp.SetLimit(10)
@@ -212,7 +213,7 @@ var (
 				return sequences.OnChainOutput{}, err
 			}
 
-			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
+			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqgb.FeeQuoterTokenTransferFeeConfig)
 			allTokens := make(map[common.Address]struct{})
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
@@ -237,7 +238,7 @@ var (
 						return nil // skip if dest chain config is not enabled
 					}
 
-					tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
+					tokenTransferFeeCfgs := make(map[common.Address]fqgb.FeeQuoterTokenTransferFeeConfig)
 					var tokenTransferFeeCfgsMu sync.Mutex
 					innerTokenGrp, _ := errgroup.WithContext(b.GetContext())
 					innerTokenGrp.SetLimit(10)

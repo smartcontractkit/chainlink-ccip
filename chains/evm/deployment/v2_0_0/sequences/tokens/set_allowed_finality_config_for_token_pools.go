@@ -5,8 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"

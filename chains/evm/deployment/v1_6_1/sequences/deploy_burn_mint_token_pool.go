@@ -28,7 +28,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			*input.TokenPoolVersion,
 		)
 		tpDeployReport, err := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
 			TypeAndVersion: typeAndVersion,
 			Args: burn_mint_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,

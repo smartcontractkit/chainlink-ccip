@@ -11,6 +11,9 @@ import (
 // SourceChainConfigArgs is the element type for ApplySourceChainConfigUpdates.
 type SourceChainConfigArgs = gobindings.OffRampSourceChainConfigArgs
 
+// StaticConfig is the OffRamp static configuration for deploy/constructor.
+type StaticConfig = gobindings.OffRampStaticConfig
+
 var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]gobindings.OffRampSourceChainConfigArgs, *gobindings.OffRamp]{
 	Name:            "offramp:apply-source-chain-config-updates",
 	Version:         Version,

@@ -185,7 +185,6 @@ var DeployTokenGovernor = cldf_ops.NewSequence(
 		}
 		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
 			TypeAndVersion: token_governor.TypeAndVersion,
-			ChainSelector:  chain.Selector,
 			Args: token_governor.ConstructorArgs{
 				Token:               common.HexToAddress(input.Token),
 				InitialDelay:        input.InitialDelay,

@@ -15,7 +15,7 @@ import (
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 

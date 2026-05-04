@@ -40,7 +40,6 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 
 		// Deploy burn mint token.
 		deployTokenReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.Deploy, chain, evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			ChainSelector:  input.DeployTokenPoolInput.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
 			Args: burn_mint_erc20_with_drip.ConstructorArgs{
 				Name:   input.DeployTokenPoolInput.TokenSymbol,

@@ -16,9 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ccip_evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -121,7 +121,7 @@ type poolOpsV151 struct{}
 func (p *poolOpsV151) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
 	res, err := cldf_ops.ExecuteOperation(b,
 		tpOps.GetToken, chain,
-		evm_contract.FunctionInput[struct{}]{
+		ccip_evm_contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 		},
@@ -156,10 +156,10 @@ func (p *poolOpsV151) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolA
 	return owner, rlAdmin, nil
 }
 
-func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error) {
+func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (ccip_evm_contract.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOps.SetChainRateLimiterConfig, chain,
-		evm_contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
+		ccip_evm_contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 			Args: tpOps.SetChainRateLimiterConfigArgs{
@@ -177,15 +177,15 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 			},
 		})
 	if err != nil {
-		return evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.5.1: %w", err)
+		return ccip_evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.5.1: %w", err)
 	}
 	return report.Output, nil
 }
 
-func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {
+func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (ccip_evm_contract.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOps.SetRateLimitAdmin, chain,
-		evm_contract.FunctionInput[tpOps.SetRateLimitAdminArgs]{
+		ccip_evm_contract.FunctionInput[tpOps.SetRateLimitAdminArgs]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 			Args: tpOps.SetRateLimitAdminArgs{
@@ -193,7 +193,7 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 			},
 		})
 	if err != nil {
-		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
+		return ccip_evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
 	}
 	return report.Output, nil
 }

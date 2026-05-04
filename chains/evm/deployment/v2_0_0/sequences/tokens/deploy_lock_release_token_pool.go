@@ -30,7 +30,6 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 		}
 
 		lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args: erc20_lock_box.ConstructorArgs{
 				Token: input.ConstructorArgs.Token,
@@ -42,7 +41,6 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 		}
 
 		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
@@ -61,7 +59,6 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			*input.TokenPoolVersion,
 		)
 		tpDeployReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
 			TypeAndVersion: typeAndVersion,
 			Args: lock_release_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,

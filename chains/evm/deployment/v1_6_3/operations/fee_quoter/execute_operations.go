@@ -12,6 +12,15 @@ import (
 // TokenTransferFeeConfig is the FeeQuoter GetTokenTransferFeeConfig return type (alias for call-site ergonomics).
 type TokenTransferFeeConfig = gobindings.FeeQuoterTokenTransferFeeConfig
 
+// Type aliases for adapter and sequence call sites.
+type (
+	DestChainConfig                       = gobindings.FeeQuoterDestChainConfig
+	DestChainConfigArgs                   = gobindings.FeeQuoterDestChainConfigArgs
+	TokenTransferFeeConfigRemoveArgs      = gobindings.FeeQuoterTokenTransferFeeConfigRemoveArgs
+	TokenTransferFeeConfigSingleTokenArgs = gobindings.FeeQuoterTokenTransferFeeConfigSingleTokenArgs
+	TokenTransferFeeConfigArgs            = gobindings.FeeQuoterTokenTransferFeeConfigArgs
+)
+
 var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]gobindings.FeeQuoterDestChainConfigArgs, *gobindings.FeeQuoter]{
 	Name:            "fee-quoter:apply-dest-chain-config-updates",
 	Version:         Version,

@@ -74,6 +74,8 @@ var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTra
 		return c.GetTokenTransferFeeConfig(opts, args.DestChainSelector, args.Token)
 	},
 })
+
+var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]gobindings.FeeQuoterDestChainConfigArgs, *gobindings.FeeQuoter]{
 	Name:            "fee-quoter:apply-dest-chain-config-updates",
 	Version:         Version,
 	Description:     "Calls applyDestChainConfigUpdates on the contract",

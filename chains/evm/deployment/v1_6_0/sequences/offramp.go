@@ -14,13 +14,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	ofgb "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type OffRampApplySourceChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []offrampops.SourceChainConfigArgs
+	UpdatesByChain []ofgb.OffRampSourceChainConfigArgs
 }
 
 type OffRampImportConfigSequenceInput struct {
@@ -30,9 +31,9 @@ type OffRampImportConfigSequenceInput struct {
 }
 
 type OffRampImportConfigSequenceOutput struct {
-	SourceChainCfgs map[uint64]offrampops.SourceChainConfig
-	StaticConfig    offrampops.StaticConfig
-	DynamicConfig   offrampops.DynamicConfig
+	SourceChainCfgs map[uint64]ofgb.OffRampSourceChainConfig
+	StaticConfig    ofgb.OffRampStaticConfig
+	DynamicConfig   ofgb.OffRampDynamicConfig
 }
 
 var (
@@ -46,7 +47,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
+			report, err := operations.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]ofgb.OffRampSourceChainConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
 				Args:          input.UpdatesByChain,
@@ -70,7 +71,7 @@ var (
 		"Imports OffRamp contract configuration from multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input OffRampImportConfigSequenceInput) (sequences.OnChainOutput, error) {
 			output := OffRampImportConfigSequenceOutput{
-				SourceChainCfgs: make(map[uint64]offrampops.SourceChainConfig),
+				SourceChainCfgs: make(map[uint64]ofgb.OffRampSourceChainConfig),
 			}
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {

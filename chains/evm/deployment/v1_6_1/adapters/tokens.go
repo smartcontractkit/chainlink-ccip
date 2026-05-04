@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 

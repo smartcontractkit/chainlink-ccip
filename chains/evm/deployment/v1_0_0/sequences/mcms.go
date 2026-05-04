@@ -58,7 +58,6 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		switch in.ContractType {
 		case utils.ProposerManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployProposerMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.ProposerManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -67,7 +66,6 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 			}
 		case utils.BypasserManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployBypasserMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.BypasserManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -76,7 +74,6 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 			}
 		case utils.CancellerManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployCancellerMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.CancellerManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)

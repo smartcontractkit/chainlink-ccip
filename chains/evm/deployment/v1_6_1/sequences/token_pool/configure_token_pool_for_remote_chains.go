@@ -12,12 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 
-	// NOTE: the token pool contracts for v1.6.1 are still children of the abstract v1.5.1
-	// TokenPool.sol contract so we can still use the 1.5.1 bindings to read onchain state
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	gbtp161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	cldf_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -48,7 +47,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// ConfigureTokensForTransfers) so we intentionally use the direct contract bindings
 		// over ExecuteOperation to avoid the possibility of reading stale onchain data from
 		// the operation reports cache.
-		tokenPool, err := token_pool.NewTokenPool(input.TokenPoolAddress, chain.Client)
+		tokenPool, err := gbtp161.NewTokenPool(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
 		}
@@ -101,7 +100,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// the operations reports cache if this sequence is called as part of a broader, and
 		// more complex changeset that repeatedly reads and writes to the same config during
 		// execution (e.g. ConfigureTokensForTransfers)
-		tp, err := token_pool.NewTokenPool(input.TokenPoolAddress, chain.Client)
+		tp, err := gbtp161.NewTokenPool(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
 		}
@@ -179,12 +178,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 				// If either rate limiter config is different, then update it
 				if !isOutboundEqual || !isInboundEqual {
-					report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
-						ChainSelector: chain.Selector,
-						Address:       input.TokenPoolAddress,
+					report, err := cldf_ops.ExecuteOperation(b, tpops.NewWriteSetChainRateLimiterConfig(tp), chain, cldf_contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
 						Args: tpops.SetChainRateLimiterConfigArgs{
-							OutboundConfig:      tpops.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
-							InboundConfig:       tpops.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
+							OutboundConfig: gbtp161.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
+							InboundConfig:  gbtp161.RateLimiterConfig{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
 							RemoteChainSelector: remoteCS,
 						},
 					})
@@ -196,9 +193,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 				// If the remote token pool is not registered, then add it
 				if !hasRemoteTP {
-					report, err := cldf_ops.ExecuteOperation(b, tpops.AddRemotePool, chain, contract.FunctionInput[tpops.AddRemotePoolArgs]{
-						ChainSelector: chain.Selector,
-						Address:       input.TokenPoolAddress,
+					report, err := cldf_ops.ExecuteOperation(b, tpops.NewWriteAddRemotePool(tp), chain, cldf_contract.FunctionInput[tpops.AddRemotePoolArgs]{
 						Args: tpops.AddRemotePoolArgs{
 							RemoteChainSelector: remoteCS,
 							RemotePoolAddress:   remoteTP,
@@ -227,22 +222,20 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		//
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
-			applyChainUpdatesInput := contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.TokenPoolAddress,
+			applyChainUpdatesInput := cldf_contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
 				Args: tpops.ApplyChainUpdatesArgs{
 					RemoteChainSelectorsToRemove: remotesToDel,
-					ChainsToAdd: []tpops.ChainUpdate{
+					ChainsToAdd: []gbtp161.TokenPoolChainUpdate{
 						{
 							RemotePoolAddresses: [][]byte{paddedRemoteTokenPoolAddress},
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
-							OutboundRateLimiterConfig: tpops.Config{
+							OutboundRateLimiterConfig: gbtp161.RateLimiterConfig{
 								IsEnabled: inputORL.IsEnabled,
 								Capacity:  inputORL.Capacity,
 								Rate:      inputORL.Rate,
 							},
-							InboundRateLimiterConfig: tpops.Config{
+							InboundRateLimiterConfig: gbtp161.RateLimiterConfig{
 								IsEnabled: inputIRL.IsEnabled,
 								Capacity:  inputIRL.Capacity,
 								Rate:      inputIRL.Rate,
@@ -252,7 +245,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				},
 			}
 
-			report, err := cldf_ops.ExecuteOperation(b, tpops.ApplyChainUpdates, chain, applyChainUpdatesInput)
+			report, err := cldf_ops.ExecuteOperation(b, tpops.NewWriteApplyChainUpdates(tp), chain, applyChainUpdatesInput)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply chain updates: %w", err)
 			}

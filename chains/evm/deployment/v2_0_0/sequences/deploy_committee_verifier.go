@@ -53,7 +53,6 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract_utils.DeployInput[committee_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
-			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
 					FeeAggregator:  input.Params.FeeAggregator,

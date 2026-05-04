@@ -61,3 +61,45 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *elboxg.ERC20L
 		return erc20LockBox.Deposit(opts, args.Token, args.RemoteChainSelector, args.Amount)
 	},
 })
+
+// AuthorizedCallerArgs matches applyAuthorizedCallerUpdates input.
+type AuthorizedCallerArgs = elboxg.AuthorizedCallersAuthorizedCallerArgs
+
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[elboxg.AuthorizedCallersAuthorizedCallerArgs, *elboxg.ERC20LockBox]{
+	Name:            "erc20-lock-box:apply-authorized-caller-updates",
+	Version:         Version,
+	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     elboxg.ERC20LockBoxMetaData.ABI,
+	NewContract:     elboxg.NewERC20LockBox,
+	IsAllowedCaller: contract.OnlyOwner[*elboxg.ERC20LockBox, elboxg.AuthorizedCallersAuthorizedCallerArgs],
+	Validate:        func(elboxg.AuthorizedCallersAuthorizedCallerArgs) error { return nil },
+	CallContract: func(c *elboxg.ERC20LockBox, opts *bind.TransactOpts, args elboxg.AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+		return c.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *elboxg.ERC20LockBox]{
+	Name:         "erc20-lock-box:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  elboxg.NewERC20LockBox,
+	CallContract: func(c *elboxg.ERC20LockBox, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
+	},
+})
+
+var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *elboxg.ERC20LockBox]{
+	Name:            "erc20-lock-box:transfer-ownership",
+	Version:         Version,
+	Description:     "Calls transferOwnership on the contract",
+	ContractType:    ContractType,
+	ContractABI:     elboxg.ERC20LockBoxMetaData.ABI,
+	NewContract:     elboxg.NewERC20LockBox,
+	IsAllowedCaller: contract.OnlyOwner[*elboxg.ERC20LockBox, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(c *elboxg.ERC20LockBox, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return c.TransferOwnership(opts, args)
+	},
+})

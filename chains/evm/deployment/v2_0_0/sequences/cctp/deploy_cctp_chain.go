@@ -90,7 +90,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy/resolve CCTPMessageTransmitterProxy (v2.0.0 op) for CCTPVerifier + CCTP V2 pool wiring.
 		cctpV2MessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
-			ChainSelector:  chain.Selector,
 			Args: cctp_message_transmitter_proxy.ConstructorArgs{
 				TokenMessenger: tokenMessengerV2Address,
 			},
@@ -104,7 +103,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy CCTPVerifier if needed
 		cctpVerifierRef, err := contract_utils.MaybeDeployContract(b, cctp_verifier.Deploy, chain, contract_utils.DeployInput[cctp_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ContractType, *cctp_verifier.Version),
-			ChainSelector:  chain.Selector,
 			Args: cctp_verifier.ConstructorArgs{
 				TokenMessenger:          tokenMessengerV2Address,
 				MessageTransmitterProxy: cctpV2MessageTransmitterProxyAddress,
@@ -135,7 +133,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy token pools
 		// Deploy CCTPThroughCCVTokenPool if needed
 		cctpV2WithCCVsTokenPoolRef, err := contract_utils.MaybeDeployContract(b, cctp_through_ccv_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_through_ccv_token_pool.ConstructorArgs]{
-			ChainSelector:  chain.Selector,
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_through_ccv_token_pool.ContractType, *cctp_through_ccv_token_pool.Version),
 			Args: cctp_through_ccv_token_pool.ConstructorArgs{
 				Token:              usdcTokenAddress,
@@ -178,7 +175,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		if enableCCTPV1 {
 			tokenMessengerV1Address := common.HexToAddress(input.TokenMessengerV1)
 			cctpV1PoolAddressRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool.Deploy, chain, contract_utils.DeployInput[usdc_token_pool.ConstructorArgs]{
-				ChainSelector: input.ChainSelector,
 				TypeAndVersion: deployment.NewTypeAndVersion(
 					usdc_token_pool.ContractType,
 					*usdc_token_pool.Version,
@@ -202,7 +198,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 		// Deploy USDCTokenPoolCCTPV2 (CCTP V2 pool)
 		cctpV2TokenPoolAddressRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool_cctp_v2.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_cctp_v2.ConstructorArgs]{
-			ChainSelector: input.ChainSelector,
 			TypeAndVersion: deployment.NewTypeAndVersion(
 				usdc_token_pool_cctp_v2.ContractType,
 				*usdc_token_pool_cctp_v2.Version,
@@ -225,7 +220,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy USDCTokenPoolProxy
 		usdcTokenPoolProxyRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version),
-			ChainSelector:  chain.Selector,
 			Args: usdc_token_pool_proxy.ConstructorArgs{
 				Token: usdcTokenAddress,
 				Pools: usdc_token_pool_proxy.PoolAddresses{
