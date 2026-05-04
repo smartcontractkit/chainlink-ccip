@@ -282,4 +282,4 @@ jobs:
     steps:
       - name: Fail the job if ccip tests in PR not successful
         if: always() && needs.integration-test-matrix.result == 'failure'
-        run: exit 0 # TODO: fix the ccip tests and remove this line to make the job fail when ccip tests fail
+        run: exit 1
