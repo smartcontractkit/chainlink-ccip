@@ -88,6 +88,10 @@ When behavior is gated by capability flags, use the exact flag for the action be
 
 Before restoring support that appears to have been dropped, check whether the exclusion is intentional. Some legacy contract types, versions, or paths may be deliberately unsupported because they are broken, obsolete, or outside the product scope.
 
+When replacing switches or hand-coded branches with registries, interfaces, or capability flags, enumerate the old cases and account for each one. Every old case should be preserved, intentionally migrated, or intentionally dropped. Treat legacy and deprecated cases as compatibility-sensitive until tests or product intent prove they are safe to remove.
+
+When simplifying a flow, compare removed guards against the old path. Helper conversion functions often validate shape or parsing only; do not assume they preserve semantic checks such as non-zero addresses, non-empty refs, active targets, or execution ownership.
+
 ### Test Behavior, Not Just Mechanics
 
 Write tests that prove the operator-facing workflow works. Avoid tests that only exercise a newly invented registry or abstraction unless that abstraction is itself the durable API.
@@ -115,6 +119,7 @@ When refactoring orchestration, add or update tests that prove write outputs sti
 - Do not duplicate helper logic for datastore refs, address conversion, MCMS lookup, or defaults without first searching for an existing helper.
 - Do not treat "no error" as proof that a returned ref or datastore output is populated and current.
 - Do not let comments, log messages, or errors drift from the operation actually being performed; operator-facing wording is part of tooling usability.
+- Do not preserve warnings for valid no-op paths. Before adding or keeping a warning, confirm the condition is actually suspicious for that pool/token/family/version flow.
 
 ## Before Implementing
 
@@ -139,4 +144,6 @@ Confirm:
 - stale reads and stale datastore merges are avoided,
 - compatibility behavior is documented,
 - capability checks use the exact capability for the behavior,
+- refactors account for old branch coverage and removed validation guards,
+- comments, logs, and errors match the behavior of unsupported or no-op paths,
 - tests cover the operator-facing path and meaningful edge cases.
