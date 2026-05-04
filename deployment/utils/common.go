@@ -37,6 +37,7 @@ const (
 	// Pools
 	TokenPoolFactory                    cldf.ContractType = "TokenPoolFactory"
 	LinkToken                           cldf.ContractType = "LinkToken"
+	BurnMintToken                       cldf.ContractType = "BurnMintToken"
 	FactoryBurnMintERC20Token           cldf.ContractType = "FactoryBurnMintERC20Token"
 	ERC677TokenHelper                   cldf.ContractType = "ERC677TokenHelper"
 	USDCTokenPool                       cldf.ContractType = "USDCTokenPool"
