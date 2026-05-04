@@ -10,12 +10,9 @@ import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -95,11 +92,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
-    address[] memory allowlist,
     address rmnProxy,
     address router,
     address previousPool
-  ) TokenPool(token, 6, allowlist, rmnProxy, router) {
+  ) TokenPool(token, 6, address(0), rmnProxy, router) {
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
@@ -111,7 +107,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
-    i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_token.forceApprove(address(i_tokenMessenger), type(uint256).max);
 
     // PreviousPool should not be current pool.
     if (previousPool == address(this)) {
@@ -135,7 +131,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
@@ -187,7 +183,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, WAIT_FOR_FINALITY);
     SourceTokenDataPayload memory sourceTokenDataPayload =
       abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
 

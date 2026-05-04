@@ -9,12 +9,9 @@ import {CCTPMessageTransmitterProxy} from "../USDC/CCTPMessageTransmitterProxy.s
 import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
 import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 // bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
 bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
@@ -51,12 +48,11 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
-    address[] memory allowlist,
     address rmnProxy,
     address router,
     address previousPool
   )
-    USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, previousPool)
+    USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, rmnProxy, router, previousPool)
     USDCBridgeMigrator(address(token))
   {}
 
@@ -87,7 +83,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function _lockReleaseOutgoingMessage(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) internal virtual returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
 
     // Increase internal accounting of locked tokens for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
@@ -127,7 +123,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function _lockReleaseIncomingMessage(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, WAIT_FOR_FINALITY);
 
     // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
     // This prevents new incoming messages once the migration has begun to ensure any the procedure runs as expected
