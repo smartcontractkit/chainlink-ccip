@@ -41,11 +41,7 @@ func (tokenBurnMintERC677) GrantAdminRole(_ operations.Bundle, _ evm.Chain, _, _
 	return nil, fmt.Errorf("admin role grant not supported for BurnMintERC677 token type")
 }
 
-func (tokenBurnMintERC677) GrantPoolRoles(
-	b operations.Bundle,
-	chain evm.Chain,
-	token, pool, proposalExecutor common.Address,
-) ([]contract.WriteOutput, error) {
+func (tokenBurnMintERC677) GrantPoolRoles(b operations.Bundle, chain evm.Chain, token, pool, proposalExecutor common.Address) ([]contract.WriteOutput, error) {
 	return burn_mint_erc677.PrepareGrantMintAndBurnRoles(
 		b,
 		chain,
@@ -66,6 +62,29 @@ func (tokenBurnMintERC677) Transfer(b operations.Bundle, chain evm.Chain, token,
 	return transferTokensERC20(b, chain, token, to, scaledAmount)
 }
 
-func (tokenBurnMintERC677) Deploy(_ operations.Bundle, _ evm.Chain, _ tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
-	return datastore.AddressRef{}, nil, fmt.Errorf("deploy BurnMintERC677 token is not implemented in tokenimpl; deploy out of band and record in datastore")
+func (tokenBurnMintERC677) Deploy(b operations.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
+	maxSupply := big.NewInt(0)
+	if in.Supply != nil {
+		maxSupply = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*in.Supply), in.Decimals)
+	}
+
+	ref, err := contract.MaybeDeployContract(b, burn_mint_erc677.Deploy, chain,
+		contract.DeployInput[burn_mint_erc677.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc677.ContractType, *utils.Version_1_0_0),
+			ChainSelector:  chain.Selector,
+			Qualifier:      &in.Symbol,
+			Args: burn_mint_erc677.ConstructorArgs{
+				Name:      in.Name,
+				Symbol:    in.Symbol,
+				Decimals:  in.Decimals,
+				MaxSupply: maxSupply,
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		return datastore.AddressRef{}, nil, fmt.Errorf("failed to deploy BurnMintERC677 token: %w", err)
+	}
+
+	return ref, nil, nil
 }
