@@ -392,7 +392,7 @@ func tidyTokenPoolRoles(
 			return nil, nil
 		}
 
-		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddress); grantErr != nil {
+		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddress, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
 			return nil, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", tokenRef.Type, input.TokenRef.Qualifier, poolAddress.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil

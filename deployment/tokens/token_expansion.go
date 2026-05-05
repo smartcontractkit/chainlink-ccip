@@ -117,6 +117,9 @@ type DeployTokenPoolInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
+	// TimelockAddress is always resolved from the MCMS config by TokenExpansion.
+	// Users should not set this field in durable pipeline inputs.
+	TimelockAddress string `yaml:"-" json:"-"`
 }
 
 type UpdateAuthoritiesInput struct {
@@ -260,6 +263,19 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenPoolInput.TokenPoolVersion = input.TokenPoolVersion
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector
+				if cfg.MCMS.TimelockAction != "" {
+					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
+					}
+					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
+					}
+					if !datastore_utils.IsAddressRefEmpty(timelockRef) {
+						deployTokenPoolInput.TimelockAddress = timelockRef.Address
+					}
+				}
 				deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)
