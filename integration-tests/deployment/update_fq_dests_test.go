@@ -6,18 +6,23 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	soladaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -65,7 +70,13 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 
 	evmFeesAdapter := evmadaptersV1_6_0.NewFeesAdapter(&evmseqV1_6_0.EVMAdapter{})
 
-	initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, src, dst)
+	srcOnRampRef := datastore.AddressRef{ChainSelector: src, Type: datastore.ContractType(onramp.ContractType), Version: utils.Version_1_6_0}
+	srcOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, srcOnRampRef, src, datastore_utils.FullRef)
+	require.NoError(t, err)
+	srcFQ, err := evmFeesAdapter.GetFeeContractRef(*e, srcOnRampRef, src, dst)
+	require.NoError(t, err)
+
+	initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, srcFQ, src, dst)
 	require.NoError(t, err)
 	require.True(t, initialCfg.IsEnabled)
 
@@ -97,7 +108,7 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, src, dst)
+	updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, srcFQ, src, dst)
 	require.NoError(t, err)
 	require.True(t, updatedCfg.IsEnabled)
 	require.Equal(t, newMaxDataBytes, updatedCfg.MaxDataBytes, "MaxDataBytes should be updated")
@@ -157,7 +168,13 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 
 	// Verify EVM src → Solana dst FQ dest update
 	t.Run("EVM src to Solana dst", func(t *testing.T) {
-		initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, evmSel, solSel)
+		evmOnRampRef := datastore.AddressRef{ChainSelector: evmSel, Type: datastore.ContractType(onramp.ContractType), Version: utils.Version_1_6_0}
+		evmOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, evmOnRampRef, evmSel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		evmFQ, err := evmFeesAdapter.GetFeeContractRef(*e, evmOnRampRef, evmSel, solSel)
+		require.NoError(t, err)
+
+		initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, evmFQ, evmSel, solSel)
 		require.NoError(t, err)
 		require.True(t, initialCfg.IsEnabled)
 
@@ -188,7 +205,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 			})
 		require.NoError(t, err)
 
-		updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, evmSel, solSel)
+		updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, evmFQ, evmSel, solSel)
 		require.NoError(t, err)
 		require.True(t, updatedCfg.IsEnabled)
 		require.Equal(t, newMaxDataBytes, updatedCfg.MaxDataBytes, "MaxDataBytes should be updated")
@@ -197,7 +214,13 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 
 	// Verify Solana src → EVM dst FQ dest update
 	t.Run("Solana src to EVM dst", func(t *testing.T) {
-		initialCfg, err := solFeesAdapter.GetOnchainDestChainConfig(*e, solSel, evmSel)
+		solOnRampRef := datastore.AddressRef{ChainSelector: solSel, Type: datastore.ContractType(router.ContractType), Version: utils.Version_1_6_0}
+		solOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, solOnRampRef, solSel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		solFQ, err := solFeesAdapter.GetFeeContractRef(*e, solOnRampRef, solSel, evmSel)
+		require.NoError(t, err)
+
+		initialCfg, err := solFeesAdapter.GetOnchainDestChainConfig(*e, solFQ, solSel, evmSel)
 		require.NoError(t, err)
 		require.True(t, initialCfg.IsEnabled)
 
@@ -228,7 +251,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 			})
 		require.NoError(t, err)
 
-		updatedCfg, err := solFeesAdapter.GetOnchainDestChainConfig(*e, solSel, evmSel)
+		updatedCfg, err := solFeesAdapter.GetOnchainDestChainConfig(*e, solFQ, solSel, evmSel)
 		require.NoError(t, err)
 		require.True(t, updatedCfg.IsEnabled)
 		require.Equal(t, newMaxDataBytes, updatedCfg.MaxDataBytes, "MaxDataBytes should be updated")
