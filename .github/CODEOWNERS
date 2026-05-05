@@ -15,5 +15,6 @@
 # Deployment tooling
 **/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-offchain
 /devenv @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-offchain
-/chains/evm/deployment @smartcontractkit/ccip-onchain
+/chains/evm/deployment @smartcontractkit/ccip-onchain @smartcontractkit/ccip-tooling
+/chains/evm/deployment/**/operations @smartcontractkit/ccip-onchain
 /chains/solana/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain-solana
