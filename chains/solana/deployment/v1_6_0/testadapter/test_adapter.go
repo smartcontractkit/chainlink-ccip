@@ -727,6 +727,9 @@ func SolEventEmitter[T any](ctx context.Context, client *solrpc.Client, address 
 					},
 				)
 				if err != nil {
+					if isTransientSolanaRPCError(err) {
+						continue
+					}
 					errorCh <- err
 					return
 				}
@@ -756,6 +759,13 @@ func SolEventEmitter[T any](ctx context.Context, client *solrpc.Client, address 
 						},
 					)
 					if err != nil {
+						// Skip transient Solana RPC errors (e.g. "Transaction not found",
+						// code -32020) which occur on devnet when the signature exists in
+						// the address history but the full transaction data is not yet
+						// available from this RPC node.
+						if isTransientSolanaRPCError(err) {
+							continue
+						}
 						errorCh <- err
 						return
 					}
@@ -965,4 +975,18 @@ func confirmExecWithSeqNrsSol(
 	}
 
 	return executionStates, nil
+}
+
+// isTransientSolanaRPCError returns true for RPC errors that are transient and
+// should be retried, such as "Transaction not found" (-32020) on Solana devnet.
+func isTransientSolanaRPCError(err error) bool {
+	var rpcErr *jsonrpc.RPCError
+	if errors.As(err, &rpcErr) && rpcErr.Code == -32020 {
+		return true
+	}
+	// Fallback: string match for cases where the error is wrapped differently
+	if strings.Contains(err.Error(), "not found") && strings.Contains(err.Error(), "Transaction") {
+		return true
+	}
+	return false
 }
