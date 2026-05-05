@@ -13,15 +13,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog"
-	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/stretchr/testify/require"
 	"github.com/xssnick/tonutils-go/tlb"
+
+	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
+	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -30,6 +33,7 @@ import (
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
@@ -164,9 +168,9 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get RMNRemote address: %w", err)
 	}
-	linkAddr, err := a.getAddress(datastore.ContractType("LINK"))
+	linkAddr, err := a.getAddress(datastore.ContractType(tokenops.LinkContractType))
 	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to get LINK address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get LinkToken address: %w", err)
 	}
 	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"), "CLLCCIP")
 	if err != nil {
