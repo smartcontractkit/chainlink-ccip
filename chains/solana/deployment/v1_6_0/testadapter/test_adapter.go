@@ -63,7 +63,7 @@ func init() {
 }
 
 type SVMAdapter struct {
-	state testadapters.StateProvider
+	state *testadapters.DataStoreStateProvider
 	cldf_solana.Chain
 }
 
@@ -131,8 +131,8 @@ func (a *SVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 	}, nil
 }
 
-func (a *SVMAdapter) getAddress(ty datastore.ContractType) (solana.PublicKey, error) {
-	addr, err := a.state.GetAddress(ty)
+func (a *SVMAdapter) getAddress(ty datastore.ContractType, qualifier ...string) (solana.PublicKey, error) {
+	addr, err := a.state.GetAddress(ty, qualifier...)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to get %v address: %w", ty, err)
 	}
@@ -168,7 +168,7 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get LINK address: %w", err)
 	}
-	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"))
+	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"), "CLLCCIP")
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
 	}

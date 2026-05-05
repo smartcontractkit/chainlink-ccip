@@ -259,7 +259,7 @@ func newTestAdapterID(chainFamily string, version *semver.Version) testAdapterID
 
 // TODO: remove once migration to DataStore is completed and stateview is obsolete
 type StateProvider interface {
-	GetAddress(datastore.ContractType) (string, error)
+	GetAddress(ty datastore.ContractType, qualifier ...string) (string, error)
 }
 
 type DataStoreStateProvider struct {
@@ -267,10 +267,15 @@ type DataStoreStateProvider struct {
 	DS       datastore.DataStore
 }
 
-func (p *DataStoreStateProvider) GetAddress(ty datastore.ContractType) (string, error) {
+func (p *DataStoreStateProvider) GetAddress(ty datastore.ContractType, qualifier ...string) (string, error) {
+	ql := ""
+	if len(qualifier) > 0 {
+		ql = qualifier[0]
+	}
 	addr, err := datastore_utils.FindAndFormatRef(p.DS, datastore.AddressRef{
 		ChainSelector: p.Selector,
 		Type:          ty,
+		Qualifier:     ql,
 		// TODO: version
 	}, p.Selector, datastore_utils.FullRef)
 	if err != nil {
