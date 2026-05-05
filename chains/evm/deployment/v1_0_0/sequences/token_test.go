@@ -22,6 +22,7 @@ import (
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 // TestEVMTokenDeployments tests various EVM token deployments using the DeployToken sequence directly.
@@ -235,6 +236,8 @@ func TestTokenSupportsAdminRole(t *testing.T) {
 	tokenTypes := map[cldf.ContractType]bool{
 		burn_mint_erc20_with_drip.ContractType: true,
 		burn_mint_erc20.ContractType:           true,
+		utils.ERC677TokenHelper:                false,
+		utils.BurnMintToken:                    false,
 		tip20.ContractType:                     true,
 		erc20.ContractType:                     false,
 	}

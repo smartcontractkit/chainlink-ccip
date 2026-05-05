@@ -39,7 +39,7 @@ func (tokenERC20) GrantAdminRole(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Add
 	return nil, fmt.Errorf("admin role granting not supported for plain ERC20 token")
 }
 
-func (tokenERC20) GrantPoolRoles(_ cldf_ops.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
+func (tokenERC20) GrantPoolRoles(_ cldf_ops.Bundle, _ evm.Chain, _, _, _ common.Address) ([]contract.WriteOutput, error) {
 	return nil, fmt.Errorf("pool role granting not supported for plain ERC20 token")
 }
 

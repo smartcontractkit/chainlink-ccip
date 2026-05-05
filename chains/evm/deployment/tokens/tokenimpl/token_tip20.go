@@ -54,7 +54,7 @@ func (tokenTIP20) GrantAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (tokenTIP20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
+func (tokenTIP20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b, tip20.GrantIssuerRole, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,
 		Address:       token,

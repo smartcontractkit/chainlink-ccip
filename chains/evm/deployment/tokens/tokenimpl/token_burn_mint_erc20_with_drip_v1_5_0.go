@@ -38,7 +38,7 @@ func (tokenBurnMintERC20WithDripV1_5_0) GrantAdminRole(b cldf_ops.Bundle, chain 
 	return grantDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }
 
-func (tokenBurnMintERC20WithDripV1_5_0) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
+func (tokenBurnMintERC20WithDripV1_5_0) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
 	return grantMintAndBurnRolesBurnMintERC20(b, chain, token, pool)
 }
 

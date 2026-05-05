@@ -54,10 +54,12 @@ type Token interface {
 
 	// GrantPoolRoles emits the writes that authorize a freshly-deployed pool
 	// to mint/burn (or its TIP-20 issuer-role equivalent) against this token.
+	// proposalExecutor is the MCMS timelock (or zero when unused); BurnMintERC677
+	// uses it for PrepareGrantMintAndBurnRoles. Other token types ignore it.
 	// Returns an error for token types that don't participate in pool role
 	// granting; ParticipatesInPoolRoleGrant is the authoritative flag, callers
 	// should consult it first.
-	GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error)
+	GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool, proposalExecutor common.Address) ([]contract.WriteOutput, error)
 
 	// SetCCIPAdmin sets the token-level CCIP admin where the token contract
 	// supports one. Callers should consult SupportsCCIPAdmin first.
