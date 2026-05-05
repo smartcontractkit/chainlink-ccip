@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type tokenTIP20 struct{}
@@ -30,8 +30,8 @@ func (tokenTIP20) Capabilities() CapabilitySet {
 	}
 }
 
-func (tokenTIP20) RevokeAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, tip20.RevokeAdminRole, chain, contract.FunctionInput[common.Address]{
+func (tokenTIP20) RevokeAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
+	report, err := operations.ExecuteOperation(b, tip20.RevokeAdminRole, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,
 		Address:       token,
 		Args:          user,
@@ -42,8 +42,8 @@ func (tokenTIP20) RevokeAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, use
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (tokenTIP20) GrantAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
+func (tokenTIP20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
+	report, err := operations.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,
 		Address:       token,
 		Args:          user,
@@ -54,8 +54,8 @@ func (tokenTIP20) GrantAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (tokenTIP20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, tip20.GrantIssuerRole, chain, contract.FunctionInput[common.Address]{
+func (tokenTIP20) GrantPoolRoles(b operations.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
+	report, err := operations.ExecuteOperation(b, tip20.GrantIssuerRole, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,
 		Address:       token,
 		Args:          pool,
@@ -66,12 +66,12 @@ func (tokenTIP20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (tokenTIP20) SetCCIPAdmin(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
+func (tokenTIP20) SetCCIPAdmin(b operations.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
 	return nil, fmt.Errorf("CCIP admin role not supported for TIP-20 tokens")
 }
 
-func (tokenTIP20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, tip20.Transfer, chain, contract.FunctionInput[tip20.TransferArgs]{
+func (tokenTIP20) Transfer(b operations.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
+	report, err := operations.ExecuteOperation(b, tip20.Transfer, chain, contract.FunctionInput[tip20.TransferArgs]{
 		ChainSelector: chain.Selector,
 		Address:       token,
 		Args: tip20.TransferArgs{
@@ -86,7 +86,7 @@ func (tokenTIP20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (tokenTIP20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
+func (tokenTIP20) Deploy(b operations.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
 	tokenRef, writes, err := tip20.DeployTokenViaFactory(b, chain, tip20.FactoryDeployArgs{
 		QuoteToken: common.Address{},
 		Currency:   in.Currency,
