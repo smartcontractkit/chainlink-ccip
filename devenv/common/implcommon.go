@@ -33,6 +33,7 @@ import (
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters" // register v1.5.1 token pool adapter
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters" // register v1.6.0/v1.6.1 token pool adapter
@@ -40,7 +41,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
@@ -444,9 +444,13 @@ func AddNodesToContracts(
 	}
 
 	for _, chain := range remoteSelectors {
+		family, _ := chainsel.GetSelectorFamily(chain)
 		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
 			if ocrParams.CommitOffChainConfig != nil {
 				ocrParams.CommitOffChainConfig.RMNEnabled = false
+			}
+			if family == chainsel.FamilyTon {
+				return withTONOCRConfigOverrides(ocrParams)
 			}
 			return ocrParams
 		}
