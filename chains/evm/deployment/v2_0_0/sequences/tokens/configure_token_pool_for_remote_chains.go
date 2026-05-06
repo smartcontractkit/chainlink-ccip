@@ -2,14 +2,13 @@ package tokens
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -60,8 +59,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 					for _, sel := range supportedChains {
 						if _, ok := input.RemoteChains[sel]; !ok {
 							slices.Sort(supportedChains)
-							return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
-								supportedChains, slices.Sorted(maps.Keys(input.RemoteChains)))
+							break
 						}
 					}
 				}
