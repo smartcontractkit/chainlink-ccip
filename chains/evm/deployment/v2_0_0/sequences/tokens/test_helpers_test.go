@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
-	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -37,6 +37,16 @@ func deployTokenAndPoolViaExpansion(
 	chainSel uint64,
 	chainReportAddresses []datastore.AddressRef,
 ) tokenExpansionResult {
+	return deployTokenAndPoolViaExpansionWithDecimals(t, e, chainSel, chainReportAddresses, 18)
+}
+
+func deployTokenAndPoolViaExpansionWithDecimals(
+	t *testing.T,
+	e *deployment.Environment,
+	chainSel uint64,
+	chainReportAddresses []datastore.AddressRef,
+	decimals uint8,
+) tokenExpansionResult {
 	t.Helper()
 
 	ds := datastore.NewMemoryDataStore()
@@ -58,7 +68,7 @@ func deployTokenAndPoolViaExpansion(
 				DeployTokenInput: &tokenscore.DeployTokenInput{
 					Name:          "TEST",
 					Symbol:        "TEST",
-					Decimals:      18,
+					Decimals:      decimals,
 					PreMint:       &preMint,
 					ExternalAdmin: deployer.Hex(),
 					CCIPAdmin:     deployer.Hex(),
