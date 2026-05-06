@@ -65,18 +65,20 @@ contract USDCForkTest is MCMSForkTest {
 
     uint256 adiTestnetLockedTokens = HybridLockReleaseUSDCTokenPool(s_usdc_token_pool_address_sepolia).getLockedTokensForChain(remoteChainSelectorADI);
     uint256 jovayTestnetLockedTokens = HybridLockReleaseUSDCTokenPool(s_usdc_token_pool_address_sepolia).getLockedTokensForChain(remoteChainSelectorJovay);
-    
-    uint256 timelockBalance = IERC20(s_usdc_token_address_sepolia).balanceOf(s_timelock_address_sepolia);
-    
-    uint256 adiTestnetLockBoxBalance = IERC20(s_usdc_token_address_sepolia).balanceOf(s_lockbox_address_adi_testnet);
-    uint256 jovayTestnetLockBoxBalance = IERC20(s_usdc_token_address_sepolia).balanceOf(s_lockbox_address_jovay_testnet);
 
     // Locked Tokens should be >= withdraw amounts
     assertEq(adiTestnetLockedTokens, s_adi_withdraw_amount, "ADI Testnet locked tokens should be >= withdraw amount");
     assertEq(jovayTestnetLockedTokens, s_jovay_withdraw_amount, "Jovay Testnet locked tokens should be >= withdraw amount");
 
     // Apply first payload (withdraw liquidity)
-    _applyPayload(s_timelock_address_sepolia, s_payloads[0]);
+    _applyPayload(s_timelock_address_sepolia, s_payloads[0]); // Chain 1
+    // Apply the fourth payload (withdraw liquidity)
+    _applyPayload(s_timelock_address_sepolia, s_payloads[3]); // Chain 2
+
+    // Check balances before deposit
+    uint256 timelockBalance = IERC20(s_usdc_token_address_sepolia).balanceOf(s_timelock_address_sepolia);
+    uint256 adiTestnetLockBoxBalance = IERC20(s_usdc_token_address_sepolia).balanceOf(s_lockbox_address_adi_testnet);
+    uint256 jovayTestnetLockBoxBalance = IERC20(s_usdc_token_address_sepolia).balanceOf(s_lockbox_address_jovay_testnet);
 
     // Timelock should have the withdraw amounts
     assertEq(timelockBalance, s_adi_withdraw_amount + s_jovay_withdraw_amount, "Timelock balance should be >= withdraw amounts");
@@ -85,11 +87,15 @@ contract USDCForkTest is MCMSForkTest {
     assertEq(adiTestnetLockBoxBalance, 0, "ADI Testnet lock box balance should be 0");
     assertEq(jovayTestnetLockBoxBalance, 0, "Jovay Testnet lock box balance should be 0");
 
-    //Apply the second payload (approve lockbox to spend timelock's USDC)
+    // Apply the second payload (approve lockbox to spend timelock's USDC) Chain 1
     _applyPayload(s_timelock_address_sepolia, s_payloads[1]);
+    // Apply the fifth payload (approve lockbox to spend timelock's USDC) Chain 2
+    _applyPayload(s_timelock_address_sepolia, s_payloads[4]);
 
-    // Apply the third payload (deposit USDC into the lockbox)
+    // Apply the third payload (deposit USDC into the lockbox) Chain 1
     _applyPayload(s_timelock_address_sepolia, s_payloads[2]);
+    // Apply the sixth payload (deposit USDC into the lockbox) Chain 2
+    _applyPayload(s_timelock_address_sepolia, s_payloads[5]);
 
     // Re-check Locked Tokens
     uint256 newadiTestnetLockedTokens = HybridLockReleaseUSDCTokenPool(s_usdc_token_pool_address_sepolia).getLockedTokensForChain(remoteChainSelectorADI);
