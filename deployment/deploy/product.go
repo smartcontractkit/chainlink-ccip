@@ -112,3 +112,61 @@ type LaneVersionResolver interface {
 	IsSupportedChain(e cldf.Environment, chainSel uint64) bool
 	DeriveLaneVersionsForChain(e cldf.Environment, chainSel uint64) (map[uint64]*semver.Version, []*semver.Version, error)
 }
+
+// AddressNormalizer canonicalizes VM-specific address strings so datastore lookups
+// and config parsing behave consistently across deployments (same role as versioning
+// of pool contracts is orthogonal).
+type AddressNormalizer interface {
+	NormalizeAddress(address string) (string, error)
+}
+
+type addressNormalizerID string
+
+func newAddressNormalizerID(chainFamily string) addressNormalizerID {
+	return addressNormalizerID(chainFamily)
+}
+
+// AddressNormalizerRegistry maps chain family strings to address normalizers.
+// It is analogous to FeeAdapterRegistry's family-keyed FeeResolver slot.
+type AddressNormalizerRegistry struct {
+	mu sync.Mutex
+	m  map[addressNormalizerID]AddressNormalizer
+}
+
+func newAddressNormalizerRegistry() *AddressNormalizerRegistry {
+	return &AddressNormalizerRegistry{
+		m: make(map[addressNormalizerID]AddressNormalizer),
+	}
+}
+
+var (
+	addressNormalizerSingleton *AddressNormalizerRegistry
+	addressNormalizerOnce      sync.Once
+)
+
+// GetAddressNormalizerRegistry returns the singleton address normalizer registry.
+func GetAddressNormalizerRegistry() *AddressNormalizerRegistry {
+	addressNormalizerOnce.Do(func() {
+		addressNormalizerSingleton = newAddressNormalizerRegistry()
+	})
+	return addressNormalizerSingleton
+}
+
+// RegisterAddressNormalizer registers normalizer for chainFamily if not already set.
+func (r *AddressNormalizerRegistry) RegisterAddressNormalizer(chainFamily string, n AddressNormalizer) {
+	id := newAddressNormalizerID(chainFamily)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.m[id]; !exists {
+		r.m[id] = n
+	}
+}
+
+// GetAddressNormalizer returns the AddressNormalizer registered for chainFamily.
+func (r *AddressNormalizerRegistry) GetAddressNormalizer(chainFamily string) (AddressNormalizer, bool) {
+	id := newAddressNormalizerID(chainFamily)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a, ok := r.m[id]
+	return a, ok
+}

@@ -167,6 +167,14 @@ func (a *MyChainAdapter) DeriveTokenPoolCounterpart(e Environment, chainSelector
 }
 ```
 
+#### AddressNormalizer (config and datastore addresses)
+
+Some changesets normalize user-supplied address strings before datastore lookups. That logic lives on **`deploy.AddressNormalizer`** in **`deployment/deploy`**, registered on **`deploy.GetAddressNormalizerRegistry()`** and keyed **only by chain family** (not by token adapter semver).
+
+- Implement the interface in **`chains/<family>/deployment/v1_0_0/adapters/address_normalizer.go`** (see EVM and Solana in this repo).
+- Register once from that package’s **`init()`** with **`RegisterAddressNormalizer(chain_selectors.Family..., &MyAddressNormalizer{})`** (first registration wins).
+- Optionally embed the normalizer on your **`TokenAdapter`** so the type still satisfies **`AddressNormalizer`** when useful; cross-package callers that only have a chain selector should use the family-keyed registry (as **`deployment/tokens`** does via **`chain_selectors.GetSelectorFamily`**).
+
 #### 4.4 FeeAdapter, MCMSReader, TransferOwnershipAdapter, CurseAdapter, CurseSubjectAdapter
 
 Follow the same pattern -- see [Interfaces Reference](interfaces.md) for the full method signatures.

@@ -95,7 +95,22 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 	reports := make([]cldf_ops.Report[any, any], 0)
 	ds := datastore.NewMemoryDataStore()
 
+	var err error
 	for selector, token := range cfg {
+		token.TokenPoolRef, err = TryNormalizeAddressRef(selector, token.TokenPoolRef)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to normalize token pool ref address for chain selector %d: %w", selector, err)
+		}
+		token.TokenRef, err = TryNormalizeAddressRef(selector, token.TokenRef)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to normalize token ref address for chain selector %d: %w", selector, err)
+		}
+		token.RegistryRef, err = TryNormalizeAddressRef(selector, token.RegistryRef)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to normalize registry ref address for chain selector %d: %w", selector, err)
+		}
+		cfg[selector] = token
+
 		tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, selector, datastore_utils.FullRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", selector, err)
@@ -201,7 +216,11 @@ func convertRemoteChainConfig(
 	}
 
 	if inCfg.RemotePool != nil {
-		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
+		remotePoolRef, err := TryNormalizeAddressRef(remoteChainSelector, *inCfg.RemotePool)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to normalize remote pool ref address for remote chain selector %d: %w", remoteChainSelector, err)
+		}
+		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, remotePoolRef, remoteChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
@@ -215,7 +234,11 @@ func convertRemoteChainConfig(
 		}
 		// Can either provide the token reference directly or derive it from the pool reference.
 		if inCfg.RemoteToken != nil {
-			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, remoteAdapter.AddressRefToBytes)
+			remoteTokenRef, normErr := TryNormalizeAddressRef(remoteChainSelector, *inCfg.RemoteToken)
+			if normErr != nil {
+				return outCfg, fmt.Errorf("failed to normalize remote token ref address for remote chain selector %d: %w", remoteChainSelector, normErr)
+			}
+			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, remoteTokenRef, remoteChainSelector, remoteAdapter.AddressRefToBytes)
 			if err != nil {
 				e.Logger.Warnf("failed to resolve remote token ref %s: %v. Will attempt to derive remote token address from pool reference", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
 				outCfg.RemoteToken, err = remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
@@ -240,30 +263,46 @@ func convertRemoteChainConfig(
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {
-		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve outbound CCV ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+			return outCfg, fmt.Errorf("failed to normalize outbound CCV ref address for chain selector %d: %w", chainSelector, err)
+		}
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve outbound CCV ref %s: %w", datastore_utils.SprintRef(ref), err)
 		}
 		outCfg.OutboundCCVs = append(outCfg.OutboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVs {
-		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve inbound CCV ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+			return outCfg, fmt.Errorf("failed to normalize inbound CCV ref address for chain selector %d: %w", chainSelector, err)
+		}
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve inbound CCV ref %s: %w", datastore_utils.SprintRef(ref), err)
 		}
 		outCfg.InboundCCVs = append(outCfg.InboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.OutboundCCVsToAddAboveThreshold {
-		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve outbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+			return outCfg, fmt.Errorf("failed to normalize outbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
+		}
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve outbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ref), err)
 		}
 		outCfg.OutboundCCVsToAddAboveThreshold = append(outCfg.OutboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVsToAddAboveThreshold {
-		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve inbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+			return outCfg, fmt.Errorf("failed to normalize inbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
+		}
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve inbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ref), err)
 		}
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
