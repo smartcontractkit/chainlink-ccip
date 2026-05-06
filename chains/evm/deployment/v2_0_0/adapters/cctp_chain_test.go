@@ -10,9 +10,6 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -22,6 +19,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
+	evm_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	burn_mint_with_lock_release_flag_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
@@ -816,10 +816,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 // Rate limiter Capacity/Rate must be non-nil for ABI packing in token pool configuration.
 func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
 	return adapters.RemoteCCTPChainConfig{
-		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 		TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
 			IsEnabled:                     true,
 			DestGasOverhead:               200_000,
@@ -919,10 +917,8 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 							DefaultFinalityTransferFeeBps: 100,
 							CustomFinalityTransferFeeBps:  100,
 						},
-						DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-						DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-						CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-						CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+						InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+						OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 					},
 				},
 			},

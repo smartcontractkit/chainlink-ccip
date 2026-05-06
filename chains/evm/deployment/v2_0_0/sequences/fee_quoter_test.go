@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -705,7 +706,7 @@ func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
 	t.Run("zero_token_price_does_not_err", func(t *testing.T) {
 		_, err := sequences.GetLastKnownPriceUpdates(
 			map[common.Address]*big.Int{link: big.NewInt(0)},
-			validGas,
+			validGas, nil,
 		)
 		require.NoError(t, err)
 	})
@@ -713,7 +714,7 @@ func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
 	t.Run("nil_token_price_does_not_error", func(t *testing.T) {
 		_, err := sequences.GetLastKnownPriceUpdates(
 			map[common.Address]*big.Int{link: nil},
-			validGas,
+			validGas, nil,
 		)
 		require.NoError(t, err)
 	})
@@ -721,17 +722,40 @@ func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
 	t.Run("zero_gas_price", func(t *testing.T) {
 		_, err := sequences.GetLastKnownPriceUpdates(
 			validToken,
-			map[uint64]*big.Int{42: big.NewInt(0)},
+			map[uint64]*big.Int{chain_selectors.AB_MAINNET.Selector: big.NewInt(0)}, nil,
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid gas price")
-		require.Contains(t, err.Error(), "42")
+	})
+
+	t.Run("zero_gas_price_with_input_gas", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{chain_selectors.AB_MAINNET.Selector: big.NewInt(0)}, map[uint64]string{chain_selectors.AB_MAINNET.Selector: "21000"},
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("zero_gas_price_aptos", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{chain_selectors.APTOS_MAINNET.Selector: big.NewInt(0)}, nil,
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("zero_gas_price_sui", func(t *testing.T) {
+		_, err := sequences.GetLastKnownPriceUpdates(
+			validToken,
+			map[uint64]*big.Int{chain_selectors.SUI_TESTNET.Selector: big.NewInt(0)}, nil,
+		)
+		require.NoError(t, err)
 	})
 
 	t.Run("negative_gas_price", func(t *testing.T) {
 		_, err := sequences.GetLastKnownPriceUpdates(
 			validToken,
-			map[uint64]*big.Int{99: big.NewInt(-100)},
+			map[uint64]*big.Int{chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector: big.NewInt(-100)}, nil,
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid gas price")
@@ -740,7 +764,7 @@ func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
 	t.Run("nil_gas_price", func(t *testing.T) {
 		_, err := sequences.GetLastKnownPriceUpdates(
 			validToken,
-			map[uint64]*big.Int{7: nil},
+			map[uint64]*big.Int{chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector: nil}, nil,
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid gas price")
@@ -748,7 +772,7 @@ func TestGetLastKnownPriceUpdates_RejectsInvalidPrices(t *testing.T) {
 	})
 
 	t.Run("valid_prices_succeed", func(t *testing.T) {
-		out, err := sequences.GetLastKnownPriceUpdates(validToken, validGas)
+		out, err := sequences.GetLastKnownPriceUpdates(validToken, validGas, nil)
 		require.NoError(t, err)
 		require.Len(t, out.TokenPriceUpdates, 1)
 		require.Len(t, out.GasPriceUpdates, 1)

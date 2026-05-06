@@ -40,3 +40,20 @@ func (a *EVMCommitteeVerifierContractAdapter) ResolveCommitteeVerifierContracts(
 
 	return []datastore.AddressRef{verifier, resolver}, nil
 }
+
+func (a *EVMCommitteeVerifierContractAdapter) GetCommitteeVerifierResolver(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	qualifier string,
+) ([]datastore.AddressRef, error) {
+	resolver, err := ds.Addresses().Get(datastore.NewAddressRefKey(
+		chainSelector,
+		datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+		versioned_verifier_resolver.Version,
+		qualifier,
+	))
+	if err != nil {
+		return nil, fmt.Errorf("committee verifier resolver not found for chain %d qualifier %q: %w", chainSelector, qualifier, err)
+	}
+	return []datastore.AddressRef{resolver}, nil
+}

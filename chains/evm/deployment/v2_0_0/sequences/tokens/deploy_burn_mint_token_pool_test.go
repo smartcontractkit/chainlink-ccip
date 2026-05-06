@@ -6,6 +6,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
@@ -13,12 +19,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -29,12 +31,12 @@ import (
 func TestDeployTokenPool(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput
+		makeInput   func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput
 		expectedErr string
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				var routerAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {
@@ -65,7 +67,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "happy path - hooks configured",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				var routerAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {
@@ -99,7 +101,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "incorrect chain selector",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel: 1,
 				}
@@ -108,7 +110,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token symbol not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel: chainReport.Input.ChainSelector,
 				}
@@ -117,7 +119,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token pool type not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:    chainReport.Input.ChainSelector,
 					TokenSymbol: tokenReport.Input.Args.Symbol,
@@ -127,7 +129,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token pool version not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:      chainReport.Input.ChainSelector,
 					TokenSymbol:   tokenReport.Input.Args.Symbol,
@@ -138,7 +140,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token address not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
@@ -150,7 +152,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "rmn proxy address not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
@@ -165,7 +167,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "router address not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {
 					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
@@ -187,7 +189,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "threshold amount for additional ccvs not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				var routerAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {

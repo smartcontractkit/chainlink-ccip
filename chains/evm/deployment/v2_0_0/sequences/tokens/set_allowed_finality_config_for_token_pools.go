@@ -5,11 +5,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -25,8 +25,12 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
 		}
 
-		writes := make([]contract.WriteOutput, 0)
-		for pool, minBlockConfirmations := range input.Settings {
+		writes := make([]contract.WriteOutput, 0, len(input.Settings))
+		for pool, finalityConfig := range input.Settings {
+			if err := finalityConfig.Validate(); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid finality config for pool %s on src %d: %w", pool, chain.Selector, err)
+			}
+
 			src := chain.Selector
 			if !common.IsHexAddress(pool) {
 				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for src %d: %s", src, pool)
@@ -42,7 +46,7 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 				contract.FunctionInput[[4]byte]{
 					ChainSelector: src,
 					Address:       addr,
-					Args:          minBlockConfirmations,
+					Args:          finalityConfig.Raw(),
 				},
 			)
 			if err != nil {

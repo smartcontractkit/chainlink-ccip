@@ -48,8 +48,10 @@ type DeployTokenInput struct {
 	// Customer admin who will be granted admin rights on the token
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
 	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`
-	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
+	// CCIPAdmin is the address to be set as the CCIP admin on the token contract, defaults to the timelock address. Only applicable for EVM BnM ERC20 tokens.
 	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
+	// Currency is the TIP20 token currency. This field is only applicable for TIP20 tokens on Tempo. If this field is empty, then a sensible default will be chosen.
+	Currency string `yaml:"currency" json:"currency"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
@@ -95,6 +97,9 @@ type DeployTokenPoolInput struct {
 	PoolType           string                `yaml:"poolType" json:"poolType"`
 	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
+	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
+	// If empty, then this remains unconfigured on the token pool (i.e. the zero address).
+	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
 	AcceptLiquidity *bool `yaml:"acceptLiquidity" json:"acceptLiquidity"`
@@ -112,6 +117,9 @@ type DeployTokenPoolInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
+	// TimelockAddress is always resolved from the MCMS config by TokenExpansion.
+	// Users should not set this field in durable pipeline inputs.
+	TimelockAddress string `yaml:"-" json:"-"`
 }
 
 type UpdateAuthoritiesInput struct {
@@ -255,6 +263,19 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenPoolInput.TokenPoolVersion = input.TokenPoolVersion
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector
+				if cfg.MCMS.TimelockAction != "" {
+					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
+					}
+					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
+					}
+					if !datastore_utils.IsAddressRefEmpty(timelockRef) {
+						deployTokenPoolInput.TimelockAddress = timelockRef.Address
+					}
+				}
 				deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)

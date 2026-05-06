@@ -42,6 +42,28 @@ type ExecutorDestChainConfig struct {
 	Enabled     bool
 }
 
+// CommitteeVerifierRemoteChainDefaults provides sensible defaults for CommitteeVerifier
+// remote chain configuration fields. Each ChainFamily adapter returns its own defaults;
+// callers override individual fields as needed via pointer overrides.
+type CommitteeVerifierRemoteChainDefaults struct {
+	AllowlistEnabled   bool
+	FeeUSDCents        uint16
+	GasForVerification uint32
+	PayloadSizeBytes   uint16
+}
+
+// RemoteChainDefaults provides sensible defaults for remote chain configuration
+// fields that are chain-family-specific. Each ChainFamily adapter returns its own
+// defaults; callers override individual fields as needed for lane-pair-specific values.
+type RemoteChainDefaults struct {
+	AllowTrafficFrom          bool
+	ExecutorDestChainConfig   ExecutorDestChainConfig
+	BaseExecutionGasCost      uint32
+	TokenReceiverAllowed      bool
+	MessageNetworkFeeUSDCents uint16
+	TokenNetworkFeeUSDCents   uint16
+}
+
 // FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
 type FeeQuoterDestChainConfig struct {
 	OverrideExistingConfig      bool
@@ -82,11 +104,11 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 type ConfigureChainForLanesInput struct {
 	ChainSelector       uint64
 	AllowOnrampOverride bool
-	Router              string
-	OnRamp              string
+	Router              []byte
+	OnRamp              []byte
 	CommitteeVerifiers  []CommitteeVerifierConfig[datastore.AddressRef]
-	FeeQuoter           string
-	OffRamp             string
+	FeeQuoter           []byte
+	OffRamp             []byte
 	RemoteChains        map[uint64]RemoteChainConfig[[]byte, string]
 	// FamilyExtras holds chain-family-specific configuration passed through
 	// from the changeset. Each family adapter's sequence is responsible for
@@ -107,6 +129,12 @@ type ChainFamily interface {
 	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error)
+	GetAddressBytesLength() uint8
+	GetChainFamilySelector() [4]byte
+	GetDefaultFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
+	GetDefaultRemoteChainConfig() RemoteChainDefaults
+	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
+	GetDefaultFinalityConfig() finality.Config
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.

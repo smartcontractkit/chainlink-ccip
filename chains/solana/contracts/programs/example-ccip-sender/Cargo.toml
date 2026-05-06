@@ -13,8 +13,7 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
-default = ["custom-heap"]
-custom-heap = []
+default = []
 
 [dependencies]
 solana-program = "1.17.25" # pin solana to 1.17
@@ -23,7 +22,6 @@ anchor-spl = "0.29.0"
 ccip_router = { version = "1.6.1", path = "../ccip-router", features = [
     "no-entrypoint",
 ] }
-smalloc = "0.1.2"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

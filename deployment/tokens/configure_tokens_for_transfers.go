@@ -36,8 +36,11 @@ type TokenTransferConfig struct {
 	// Populate the reference as needed to match the desired registry.
 	RegistryRef datastore.AddressRef `yaml:"registryRef" json:"registryRef"`
 	// RemoteChains specifies the remote chains to configure on the token pool.
-	RemoteChains          map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] `yaml:"remoteChains" json:"remoteChains"`
-	AllowedFinalityConfig finality.Config                                                           `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
+	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] `yaml:"remoteChains" json:"remoteChains"`
+	// AllowedFinalityConfig, if set, specifies the allowed finality configurations to set on the token pool. If this is unspecified, then one of
+	// two things will happen. If this is a new pool, then the onchain code will use a sensible default (e.g. WAIT_FOR_FINALITY). Otherwise, this
+	// config will be left as-is, meaning that the existing allowed finality config on the pool remains in place.
+	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
 	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
 	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
@@ -130,8 +133,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 				tokenRegistry,
 				remoteChainSelector,
 				inCfg,
-				counterpartRemoteChainCfg.DefaultFinalityOutboundRateLimiterConfig,
-				counterpartRemoteChainCfg.CustomFinalityOutboundRateLimiterConfig,
+				counterpartRemoteChainCfg.OutboundRateLimiterConfig,
 			)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
@@ -187,18 +189,15 @@ func convertRemoteChainConfig(
 	tokenAdapterRegistry *TokenAdapterRegistry,
 	remoteChainSelector uint64,
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
-	chainSelectorDefaultFinalityOutboundTprl RateLimiterConfigFloatInput,
-	chainSelectorCustomFinalityOutboundTprl RateLimiterConfigFloatInput,
+	chainSelectorOutboundTprl RateLimiterConfigFloatInput,
 ) (RemoteChainConfig[[]byte, string], error) {
 	// a chain's inbound rate limiter config should be based on the remote chain's outbound rate limiter config
 	// to ensure that the remote chain is configured to allow the desired traffic from this chain.
 	// The values here should NOT be passed in decimal adjusted but rather the adapters should be responsible for performing
 	// any necessary decimal adjustments based on the token decimals on each chain.
 	outCfg := RemoteChainConfig[[]byte, string]{
-		DefaultFinalityInboundRateLimiterConfig:  chainSelectorDefaultFinalityOutboundTprl,
-		CustomFinalityInboundRateLimiterConfig:   chainSelectorCustomFinalityOutboundTprl,
-		DefaultFinalityOutboundRateLimiterConfig: inCfg.DefaultFinalityOutboundRateLimiterConfig,
-		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
+		InboundRateLimiterConfig:  chainSelectorOutboundTprl,
+		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
 	}
 
 	if inCfg.RemotePool != nil {

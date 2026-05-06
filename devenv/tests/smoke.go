@@ -22,7 +22,7 @@ import (
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
-func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
+func buildImplsMap(t *testing.T, e *deployment.Environment, selectors []uint64) map[uint64]ccip.CCIP16ProductConfiguration {
 	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
 	for _, selector := range selectors {
 		family, err := chainsel.GetSelectorFamily(selector)
@@ -34,6 +34,11 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		i.SetCLDF(e)
 		selectorsToImpl[selector] = i
 	}
+	return selectorsToImpl
+}
+
+func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
+	selectorsToImpl := buildImplsMap(t, e, selectors)
 
 	if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
 		t.Parallel()

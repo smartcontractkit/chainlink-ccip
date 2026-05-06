@@ -285,6 +285,10 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 						configImporterVersions = append(configImporterVersions, version)
 					}
 				}
+				selectiveChainMap := make(map[uint64]struct{})
+				for _, selector := range perChainInput.RemoteChainSelectors {
+					selectiveChainMap[selector] = struct{}{}
+				}
 				for _, version := range configImporterVersions {
 					configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 					if !ok {
@@ -294,7 +298,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
 					}
-					supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
+					supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel, perChainInput.RemoteChainSelectors)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
 					}
@@ -302,9 +306,19 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get connected chains for chain %d: %w", chainSel, err)
 					}
+					var filteredChains []uint64
+					if len(perChainInput.RemoteChainSelectors) > 0 {
+						for _, selector := range connectedChains {
+							if _, ok := selectiveChainMap[selector]; ok {
+								filteredChains = append(filteredChains, selector)
+							}
+						}
+					} else {
+						filteredChains = connectedChains
+					}
 					populateConfigReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, configImporter.SequenceImportConfig(), e.BlockChains, ImportConfigPerChainInput{
 						ChainSelector:        chainSel,
-						RemoteChains:         connectedChains,
+						RemoteChains:         filteredChains,
 						TokensPerRemoteChain: supportedTokensPerRemoteChain,
 					})
 					if err != nil {
@@ -359,7 +373,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
 
 					if isNewFeeQuoterDeployment && timelockAddr != "" {
-						fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, &e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
+						fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
 						if err != nil {
 							return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
 						}
@@ -417,7 +431,7 @@ func PopulateMetaDataFromConfigImporter(e cldf.Environment, configImporter Confi
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
 	}
-	supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
+	supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel, nil)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
 	}

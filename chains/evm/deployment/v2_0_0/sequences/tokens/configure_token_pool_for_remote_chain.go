@@ -10,12 +10,12 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	onrampops_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -102,30 +102,32 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
-		defaultFinalityOutboundRateLimiterConfig, defaultFinalityInboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
-			input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
-			input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
+		outboundRateLimiterConfig, inboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
+			input.RemoteChainConfig.OutboundRateLimiterConfig,
+			input.RemoteChainConfig.InboundRateLimiterConfig,
 			localDecimalsReport.Output,
 			input.RemoteChainConfig.RemoteDecimals,
 			chain.Family(),
 			token_pool.Version,
 		)
-		// If input did not provide default finality rate limits, use imported from active pool when available.
-		if importedDefaultOutbound != nil && !input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled {
-			defaultFinalityOutboundRateLimiterConfig = *importedDefaultOutbound
+		// If input did not provide rate limits, use imported from active pool when available.
+		if importedDefaultOutbound != nil && !input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled {
+			outboundRateLimiterConfig = *importedDefaultOutbound
 		}
-		if importedDefaultInbound != nil && !input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled {
-			defaultFinalityInboundRateLimiterConfig = *importedDefaultInbound
+		if importedDefaultInbound != nil && !input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled {
+			inboundRateLimiterConfig = *importedDefaultInbound
 		}
 
-		customFinalityOutboundRateLimiterConfig, customFinalityInboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
-			input.RemoteChainConfig.CustomFinalityOutboundRateLimiterConfig,
-			input.RemoteChainConfig.CustomFinalityInboundRateLimiterConfig,
-			localDecimalsReport.Output,
-			input.RemoteChainConfig.RemoteDecimals,
-			chain.Family(),
-			token_pool.Version,
-		)
+		// Read allowedFinalityConfig to determine whether to use fast finality (custom) or default finality
+		finalityConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenPoolAddress,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config: %w", err)
+		}
+		fastFinality := finalityConfigReport.Output != finality.RawWaitForFinality
 
 		// Set CCVs for the remote chain (idempotent: only apply when on-chain differs from desired)
 		if input.AdvancedPoolHooks != (common.Address{}) {
@@ -172,44 +174,22 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 			// Only proceed further if we do NOT need to remove and re-add the chain
 			if len(removes) == 0 {
-				// Check and update default finality rate limiters
-				defaultFinalityRateLimitersReport, err := maybeUpdateRateLimiters(
+				// Check and update rate limiters based on the current finality config
+				rateLimitersReport, err := maybeUpdateRateLimiters(
 					b,
 					chain,
 					input.ChainSelector,
 					input.TokenPoolAddress,
 					input.RemoteChainSelector,
-					false,
-					customFinalityInboundRateLimiterConfig,
-					customFinalityOutboundRateLimiterConfig,
-					defaultFinalityInboundRateLimiterConfig,
-					defaultFinalityOutboundRateLimiterConfig,
+					fastFinality,
+					inboundRateLimiterConfig,
+					outboundRateLimiterConfig,
 				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
-				if defaultFinalityRateLimitersReport != nil {
-					writes = append(writes, *defaultFinalityRateLimitersReport)
-				}
-
-				// Check and update custom finality rate limiters
-				customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(
-					b,
-					chain,
-					input.ChainSelector,
-					input.TokenPoolAddress,
-					input.RemoteChainSelector,
-					true,
-					customFinalityInboundRateLimiterConfig,
-					customFinalityOutboundRateLimiterConfig,
-					defaultFinalityInboundRateLimiterConfig,
-					defaultFinalityOutboundRateLimiterConfig,
-				)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
-				}
-				if customFinalityRateLimitersReport != nil {
-					writes = append(writes, *customFinalityRateLimitersReport)
+				if rateLimitersReport != nil {
+					writes = append(writes, *rateLimitersReport)
 				}
 
 				// Check existing remote pools and add any missing (active pool's remote pools first for upgrade, then requested pool)
@@ -296,8 +276,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						RemoteChainSelector:       input.RemoteChainSelector,
 						RemotePoolAddresses:       remotePoolAddresses,
 						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
-						OutboundRateLimiterConfig: tokensRateLimiterToConfig(defaultFinalityOutboundRateLimiterConfig),
-						InboundRateLimiterConfig:  tokensRateLimiterToConfig(defaultFinalityInboundRateLimiterConfig),
+						OutboundRateLimiterConfig: tokensRateLimiterToConfig(outboundRateLimiterConfig),
+						InboundRateLimiterConfig:  tokensRateLimiterToConfig(inboundRateLimiterConfig),
 					},
 				},
 			},
@@ -314,24 +294,22 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, tokenTransferFeeWrites...)
 
-		// Check and update custom finality rate limiters
-		customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(
+		// Check and update rate limiters based on the current finality config
+		rateLimitersReport, err := maybeUpdateRateLimiters(
 			b,
 			chain,
 			input.ChainSelector,
 			input.TokenPoolAddress,
 			input.RemoteChainSelector,
-			true,
-			customFinalityInboundRateLimiterConfig,
-			customFinalityOutboundRateLimiterConfig,
-			defaultFinalityInboundRateLimiterConfig,
-			defaultFinalityOutboundRateLimiterConfig,
+			fastFinality,
+			inboundRateLimiterConfig,
+			outboundRateLimiterConfig,
 		)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 		}
-		if customFinalityRateLimitersReport != nil {
-			writes = append(writes, *customFinalityRateLimitersReport)
+		if rateLimitersReport != nil {
+			writes = append(writes, *rateLimitersReport)
 		}
 
 		// Update token transfer fee configuration (after applyChainUpdates so chain exists on pool).
@@ -564,26 +542,17 @@ func maybeUpdateRateLimiters(
 	chainSelector uint64,
 	tokenPoolAddress common.Address,
 	remoteChainSelector uint64,
-	customBlockConfirmation bool,
-	customFinalityInboundConfig tokens.RateLimiterConfig,
-	customFinalityOutboundConfig tokens.RateLimiterConfig,
-	defaultFinalityInboundConfig tokens.RateLimiterConfig,
-	defaultFinalityOutboundConfig tokens.RateLimiterConfig,
+	fastFinality bool,
+	desiredInboundRateLimiterConfig tokens.RateLimiterConfig,
+	desiredOutboundRateLimiterConfig tokens.RateLimiterConfig,
 ) (*evm_contract.WriteOutput, error) {
-	desiredInboundRateLimiterConfig := defaultFinalityInboundConfig
-	desiredOutboundRateLimiterConfig := defaultFinalityOutboundConfig
-	if customBlockConfirmation {
-		desiredInboundRateLimiterConfig = customFinalityInboundConfig
-		desiredOutboundRateLimiterConfig = customFinalityOutboundConfig
-	}
-
 	// Check existing rate limiters
 	rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
 		ChainSelector: chainSelector,
 		Address:       tokenPoolAddress,
 		Args: token_pool.GetCurrentRateLimiterStateArgs{
 			RemoteChainSelector: remoteChainSelector,
-			FastFinality:        customBlockConfirmation,
+			FastFinality:        fastFinality,
 		},
 	})
 	if err != nil {
@@ -603,7 +572,7 @@ func maybeUpdateRateLimiters(
 			Args: []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector:       remoteChainSelector,
-					FastFinality:              customBlockConfirmation,
+					FastFinality:              fastFinality,
 					InboundRateLimiterConfig:  tokensRateLimiterToConfig(desiredInboundRateLimiterConfig),
 					OutboundRateLimiterConfig: tokensRateLimiterToConfig(desiredOutboundRateLimiterConfig),
 				},
@@ -695,6 +664,59 @@ func v2FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig)
 	}
 }
 
+func importTokenTransferFeeConfigFromFeeQuoter(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	feeQuoterAddr common.Address,
+	tokenAddress common.Address,
+	remoteChainSelector uint64,
+) (*tokens.TokenTransferFeeConfig, error) {
+	feeQuoterTAVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       feeQuoterAddr,
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type and version of fee quoter %s on chain %s: %w", feeQuoterAddr.Hex(), chain.String(), err)
+	}
+
+	feeQuoterVersion := feeQuoterTAVReport.Output.Version
+	switch {
+	case feeQuoterVersion.Major() == 1 && feeQuoterVersion.Minor() == 6:
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: chainSelector,
+			Address:       feeQuoterAddr,
+			Args: fqops_v163.GetTokenTransferFeeConfigArgs{
+				Token:             tokenAddress,
+				DestChainSelector: remoteChainSelector,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
+				feeQuoterAddr.Hex(), tokenAddress.Hex(), remoteChainSelector, chain.String(), err)
+		}
+		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	case feeQuoterVersion.String() == fqops.Version.String():
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: chainSelector,
+			Address:       feeQuoterAddr,
+			Args: fqops.GetTokenTransferFeeConfigArgs{
+				Token:             tokenAddress,
+				DestChainSelector: remoteChainSelector,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
+				feeQuoterAddr.Hex(), tokenAddress.Hex(), remoteChainSelector, chain.String(), err)
+		}
+		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	default:
+		return nil, fmt.Errorf("unsupported fee quoter version %s for fee quoter %s on chain %s",
+			feeQuoterVersion.String(), feeQuoterAddr.Hex(), chain.String())
+	}
+}
+
 func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (*tokens.TokenTransferFeeConfig, error) {
 	// get router from token
 	dCfgReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
@@ -761,20 +783,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		if feeQuoterAddr == (common.Address{}) {
 			return nil, nil
 		}
-		// get token transfer fee config from fee quoter
-		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       feeQuoterAddr,
-			Args: fqops_v163.GetTokenTransferFeeConfigArgs{
-				Token:             input.TokenAddress,
-				DestChainSelector: input.RemoteChainSelector,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
-				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
-		}
-		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+		return importTokenTransferFeeConfigFromFeeQuoter(b, chain, input.ChainSelector, feeQuoterAddr, input.TokenAddress, input.RemoteChainSelector)
 	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
@@ -789,20 +798,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		if feeQuoterAddr == (common.Address{}) {
 			return nil, nil
 		}
-		// get token transfer fee config from fee quoter
-		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       feeQuoterAddr,
-			Args: fqops.GetTokenTransferFeeConfigArgs{
-				Token:             input.TokenAddress,
-				DestChainSelector: input.RemoteChainSelector,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
-				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
-		}
-		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+		return importTokenTransferFeeConfigFromFeeQuoter(b, chain, input.ChainSelector, feeQuoterAddr, input.TokenAddress, input.RemoteChainSelector)
 	default:
 		// Unsupported onRamp version, nothing to import.
 		return nil, nil

@@ -127,18 +127,12 @@ type RemoteChainConfig[R any, CCV any] struct {
 	RemoteToken R `yaml:"remoteToken" json:"remoteToken"`
 	// The token pool on the remote chain.
 	RemotePool R `yaml:"remotePool" json:"remotePool"`
-	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
+	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
 	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
 	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
-	DefaultFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"defaultFinalityInboundRateLimiterConfig" json:"defaultFinalityInboundRateLimiterConfig"`
-	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
-	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"defaultFinalityOutboundRateLimiterConfig" json:"defaultFinalityOutboundRateLimiterConfig"`
-	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
-	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
-	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
-	CustomFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"customFinalityInboundRateLimiterConfig" json:"customFinalityInboundRateLimiterConfig"`
-	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
-	CustomFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"customFinalityOutboundRateLimiterConfig" json:"customFinalityOutboundRateLimiterConfig"`
+	InboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"inboundRateLimiterConfig" json:"inboundRateLimiterConfig"`
+	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
+	OutboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"outboundRateLimiterConfig" json:"outboundRateLimiterConfig"`
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8 `yaml:"remoteDecimals,string" json:"remoteDecimals,string"`
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
@@ -193,8 +187,8 @@ type ConfigureTokenForTransfersInput struct {
 // SetAllowedFinalityConfigSequenceInput defines the input for setting the allowed finality config on a V2 token pool.
 type SetAllowedFinalityConfigSequenceInput struct {
 	// Settings are provided as a map of pool address to finality config.
-	Settings map[string][4]byte `json:"settings" yaml:"settings"`
-	// Selector is the chain selector for the chain on which to set the minimum block confirmations.
+	Settings map[string]finality.Config `json:"settings" yaml:"settings"`
+	// Selector is the chain selector for the chain on which to set the allowed finality configs.
 	Selector uint64 `json:"selector" yaml:"selector"`
 }
 

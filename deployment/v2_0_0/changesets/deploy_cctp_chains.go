@@ -200,8 +200,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				// Derive the inbound rate limiter configs from the counterpart's outbound rate limiter configs.
 				derived := remoteCfg
 				counterpartCfg := cfg.Chains[remoteChainSelector].RemoteChains[chainSel]
-				derived.DefaultFinalityInboundRateLimiterConfig = counterpartCfg.DefaultFinalityOutboundRateLimiterConfig
-				derived.CustomFinalityInboundRateLimiterConfig = counterpartCfg.CustomFinalityOutboundRateLimiterConfig
+				derived.InboundRateLimiterConfig = counterpartCfg.OutboundRateLimiterConfig
 				remoteChainConfigs[remoteChainSelector] = derived
 			}
 			dep := adapters.ConfigureCCTPChainForLanesDeps{

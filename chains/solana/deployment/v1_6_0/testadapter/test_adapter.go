@@ -48,8 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
-	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 )
 
 var (
@@ -60,6 +59,7 @@ var (
 
 func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMTestAdapterForFamily)
 }
 
 type SVMAdapter struct {
@@ -84,6 +84,12 @@ func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	return &SVMAdapter{
 		state: s,
 		Chain: c,
+	}
+}
+
+func NewSVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
+	return &SVMAdapter{
+		state: &testadapters.DataStoreStateProvider{Selector: selector, DS: ds},
 	}
 }
 
@@ -395,7 +401,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		extraArgs := msg_hasher163.ClientSVMExtraArgsV1{
+		extraArgs := extraargs.ClientSVMExtraArgsV1{
 			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts:                 accounts,
 			TokenReceiver:            receiverProgram,
@@ -420,7 +426,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 				// unsupported arg
 			}
 		}
-		return ccipcommon.SerializeClientSVMExtraArgsV1(extraArgs)
+		return extraargs.SerializeClientSVMExtraArgsV1(extraArgs)
 	case chain_selectors.FamilySolana:
 		panic("unimplemented GetExtraArgs(solana->solana)")
 	case chain_selectors.FamilyTon:

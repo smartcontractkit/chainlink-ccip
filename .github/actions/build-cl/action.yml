@@ -58,5 +58,6 @@ runs:
         fi
         if [ -n "${{ inputs.ccip_ref }}" ]; then
           go get github.com/smartcontractkit/chainlink-ccip@${{ inputs.ccip_ref }}
+          go get github.com/smartcontractkit/chainlink-ccip/chains/evm@${{ inputs.ccip_ref }}
         fi
         make gomodtidy

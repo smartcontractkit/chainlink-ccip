@@ -14,6 +14,12 @@ type CommitteeVerifierContractAdapter interface {
 		chainSelector uint64,
 		qualifier string,
 	) ([]datastore.AddressRef, error)
+
+	GetCommitteeVerifierResolver(
+		ds datastore.DataStore,
+		chainSelector uint64,
+		qualifier string,
+	) ([]datastore.AddressRef, error)
 }
 
 type CommitteeVerifierContractRegistry struct {

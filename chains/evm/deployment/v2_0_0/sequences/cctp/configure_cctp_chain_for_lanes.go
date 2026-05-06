@@ -231,10 +231,12 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, report.Output.BatchOps...)
 		}
 
-		// Configure token for transfers (CCTP-through-CCV pool; registration is done once)
+		// Proactively configure the CCTP-through-CCV pool for all CCTP-capable remotes.
+		// This excludes lock-release lanes, but includes V1/V2 remotes so the CCV pool
+		// is ready before proxy routing is switched to CCTP_V2_WITH_CCV.
 		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
-			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism != mechanismCCTPV2WithCCV {
+			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == mechanismLockRelease {
 				continue
 			}
 			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
@@ -360,13 +362,11 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 			return nil, fmt.Errorf("failed to get remote token address: %w", err)
 		}
 		configs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
-			RemotePool:                               common.LeftPadBytes(remotePoolAddress, 32),
-			RemoteToken:                              common.LeftPadBytes(remoteTokenAddress, 32),
-			TokenTransferFeeConfig:                   remoteChain.TokenTransferFeeConfig,
-			DefaultFinalityOutboundRateLimiterConfig: remoteChain.DefaultFinalityOutboundRateLimiterConfig,
-			CustomFinalityOutboundRateLimiterConfig:  remoteChain.CustomFinalityOutboundRateLimiterConfig,
-			DefaultFinalityInboundRateLimiterConfig:  remoteChain.DefaultFinalityInboundRateLimiterConfig,
-			CustomFinalityInboundRateLimiterConfig:   remoteChain.CustomFinalityInboundRateLimiterConfig,
+			RemotePool:                common.LeftPadBytes(remotePoolAddress, 32),
+			RemoteToken:               common.LeftPadBytes(remoteTokenAddress, 32),
+			TokenTransferFeeConfig:    remoteChain.TokenTransferFeeConfig,
+			OutboundRateLimiterConfig: remoteChain.OutboundRateLimiterConfig,
+			InboundRateLimiterConfig:  remoteChain.InboundRateLimiterConfig,
 		}
 	}
 	return configs, nil
