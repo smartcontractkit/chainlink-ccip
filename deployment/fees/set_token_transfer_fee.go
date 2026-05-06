@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -31,6 +32,13 @@ type TokenTransferFeeForSrc struct {
 }
 
 type SetTokenTransferFeeInput struct {
+	// Version represents the chain adapter version to use. Historically this was
+	// equal to the version of the currently configured OnRamp, but we have since
+	// modified this adapter such that it is now capable of inferring the correct
+	// contract version purely from onchain data. Thus, specifying this field has
+	// no effect, but we have left it here for backwards compatibility - or if we
+	// want to implement a later feature that allows the user to override version
+	// inference.
 	Version *semver.Version          `json:"version" yaml:"version"`
 	Args    []TokenTransferFeeForSrc `json:"args" yaml:"args"`
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
@@ -82,8 +90,9 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		type FeeGroup struct {
-			adapter  FeeAdapter
 			settings map[uint64]map[string]*TokenTransferFeeArgs
+			fqRefDS  datastore.AddressRef
+			adapter  FeeAdapter
 		}
 
 		for _, src := range cfg.Args {
@@ -91,56 +100,74 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
 			}
-
-			adapter, exists := feeRegistry.GetFeeAdapter(srcFamily, cfg.Version)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, cfg.Version.String())
+			srcResolver, ok := feeRegistry.GetFeeResolver(srcFamily)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no fee resolver found for chain family %s (src selector %d)", srcFamily, src.Selector)
 			}
 
-			// Build version-grouped settings: version -> settings map
-			versionGroups := map[string]FeeGroup{}
-
-			settings := map[uint64]map[string]*TokenTransferFeeArgs{}
+			// NOTE: we could have a pair A (src --> dst1) & a pair B (src --> dst2) where pair A has
+			// an FeeQ with version v1.6.0 and pair B has an FeeQ with version v2.0.0. In these cases
+			// we need to execute the fee update for pair A using the v1.6 adapter and the fee update
+			// for pair B using the v2.0 adapter as the logic differs between versions. The map below
+			// will be used to group updates by AddressRefKey so that we can execute them correctly.
+			feeGroups := map[datastore.AddressRefKey]FeeGroup{}
 			for _, dst := range src.Settings {
+				// Version inference part 1: we use the router contract to infer the currently configured on ramp
+				onRampRef, err := srcResolver.GetOnRampRef(e, src.Selector, dst.Selector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get OnRamp address ref from Router for src %d and dst %d: %w", src.Selector, dst.Selector, err)
+				}
+				onRampAdp, ok := feeRegistry.GetFeeAdapter(srcFamily, onRampRef.Version)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, onRampRef.Version.String())
+				}
 
-				feeContractRef, err := adapter.GetFeeContractRef(e, src.Selector, dst.Selector)
+				// Version inference part 2: we use the on ramp to get the currently configure fee contract (e.g. EVM2EVMOnRamp for v1.5.x and FeeQuoter for v1.6.x and v2.0.x)
+				feeQuoterRef, err := onRampAdp.GetFeeContractRef(e, onRampRef, src.Selector, dst.Selector)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
-
-				lookupVersion := utils.StripPatchVersion(feeContractRef.Version)
-
-				updater, exists := feeRegistry.GetFeeAdapter(srcFamily, lookupVersion)
-				if !exists {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, feeContractRef.Version.String())
+				feeQuoterAdp, ok := feeRegistry.GetFeeAdapter(srcFamily, feeQuoterRef.Version)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no fee adapter found for chain family %s and version %s", srcFamily, feeQuoterRef.Version.String())
 				}
 
-				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
+				// Version inference part 3: the fee quoter adapter is used to configure the fees
+				dstSettings := map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					if args, err := inferTokenTransferFeeArgs(updater, e, src.Selector, dst.Selector, feeCfg); err != nil {
+					args, shouldApply, err := inferTokenTransferFeeArgs(feeQuoterAdp, e, feeQuoterRef, src.Selector, dst.Selector, feeCfg)
+					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
-					} else {
-						settings[dst.Selector][feeCfg.Address] = args
 					}
+					if !shouldApply {
+						continue
+					}
+					dstSettings[feeCfg.Address] = args
+				}
+				if len(dstSettings) == 0 {
+					continue
 				}
 
-				versionKey := lookupVersion.String()
-				if _, exists := versionGroups[versionKey]; !exists {
-					versionGroups[versionKey] = FeeGroup{
-						adapter:  updater,
+				// Operations are grouped by fee contract to ensure the correct bindings are used
+				if _, exists := feeGroups[feeQuoterRef.Key()]; !exists {
+					feeGroups[feeQuoterRef.Key()] = FeeGroup{
 						settings: map[uint64]map[string]*TokenTransferFeeArgs{},
+						fqRefDS:  feeQuoterRef,
+						adapter:  feeQuoterAdp,
 					}
 				}
 
-				// Process settings for this dst with its version's adapter
-				versionGroups[versionKey].settings[dst.Selector] = settings[dst.Selector]
+				// Assign the settings for this dst to the appropriate group
+				feeGroups[feeQuoterRef.Key()].settings[dst.Selector] = dstSettings
 			}
 
-			// Execute updates grouped by adapter version
-			for _, group := range versionGroups {
+			for _, group := range feeGroups {
+				if len(group.settings) == 0 {
+					continue
+				}
 				report, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle,
-					group.adapter.SetTokenTransferFee(e),
+					group.adapter.SetTokenTransferFee(e, group.fqRefDS),
 					e.BlockChains,
 					SetTokenTransferFeeSequenceInput{
 						Selector: src.Selector,
@@ -150,11 +177,9 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to set token transfer fee config for selector %d: %w", src.Selector, err)
 				}
-
 				batchOps = append(batchOps, report.Output.BatchOps...)
 				reports = append(reports, report.ExecutionReports...)
 			}
-
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
@@ -164,16 +189,21 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 	}
 }
 
-func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, error) {
-	if cfg.IsReset {
-		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and token %s; skipping inference", src, dst, cfg.Address)
-		return nil, nil
+func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
+	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
+	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, fq, src, dst, cfg.Address)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
 	}
 
-	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
-	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, src, dst, cfg.Address)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
+	if cfg.IsReset {
+		if !onchainCfg.IsEnabled {
+			e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is already disabled on-chain; skipping reset", src, dst, cfg.Address)
+			return nil, false, nil
+		}
+
+		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
+		return nil, true, nil
 	}
 
 	var fallbacks TokenTransferFeeArgs
@@ -185,5 +215,11 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
-	return cfg.FeeArgs.Resolve(fallbacks), nil
+	resolved := cfg.FeeArgs.Resolve(fallbacks)
+	if *resolved == onchainCfg {
+		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s already matches on-chain config; skipping update", src, dst, cfg.Address)
+		return nil, false, nil
+	}
+
+	return resolved, true, nil
 }

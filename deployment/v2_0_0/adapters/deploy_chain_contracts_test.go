@@ -1,13 +1,21 @@
 package adapters
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldfevm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 func TestMergeIfNotEmpty(t *testing.T) {
@@ -273,4 +281,101 @@ func TestMergeIfNotEmpty(t *testing.T) {
 		assert.Equal(t, "importedExec", merged.Executors[0].Qualifier)
 		assert.Equal(t, importedFeeAggregator, merged.Executors[0].DynamicConfig.FeeAggregator)
 	})
+}
+
+type transferOwnershipAwareAdapter struct{}
+
+func (a *transferOwnershipAwareAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[DeployChainConfigCreatorInput, DeployContractParams, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"transfer-ownership-aware-set-contract-params",
+		semver.MustParse("2.0.0"),
+		"No-op sequence for tests",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ DeployChainConfigCreatorInput) (DeployContractParams, error) {
+			return DeployContractParams{}, nil
+		},
+	)
+}
+
+func (a *transferOwnershipAwareAdapter) DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, DeployChainContractsOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"transfer-ownership-aware-deploy",
+		semver.MustParse("2.0.0"),
+		"Returns ownership refs only when transfer is required",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input DeployChainContractsInput) (DeployChainContractsOutput, error) {
+			output := DeployChainContractsOutput{
+				OnChainOutput: sequences.OnChainOutput{
+					Addresses: []datastore.AddressRef{
+						{
+							ChainSelector: input.ChainSelector,
+							Type:          "Router",
+							Version:       semver.MustParse("2.0.0"),
+							Address:       "0x00000000000000000000000000000000000000AA",
+						},
+					},
+				},
+			}
+			if !input.DeployerKeyOwned {
+				output.RefsToTransferOwnership = []datastore.AddressRef{
+					{
+						ChainSelector: input.ChainSelector,
+						Type:          "OnRamp",
+						Version:       semver.MustParse("2.0.0"),
+						Address:       "0x00000000000000000000000000000000000000BB",
+					},
+					{
+						ChainSelector: input.ChainSelector,
+						Type:          "OffRamp",
+						Version:       semver.MustParse("2.0.0"),
+						Address:       "0x00000000000000000000000000000000000000CC",
+					},
+				}
+			}
+			return output, nil
+		},
+	)
+}
+
+func TestDeployChainContracts_TransferOwnershipRefsBehavior(t *testing.T) {
+	sel := chainsel.TEST_90000001.Selector
+	adapter := &transferOwnershipAwareAdapter{}
+	registry := NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, adapter)
+
+	resolved, err := registry.GetByChain(sel)
+	require.NoError(t, err)
+
+	deps := cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{
+		sel: cldfevm.Chain{Selector: sel},
+	})
+	bundle := cldf_ops.NewBundle(
+		func() context.Context { return context.Background() },
+		logger.Test(t),
+		cldf_ops.NewMemoryReporter(),
+	)
+
+	reportWithoutOwnership, err := cldf_ops.ExecuteSequence(
+		bundle,
+		resolved.DeployChainContracts(),
+		deps,
+		DeployChainContractsInput{
+			ChainSelector:    sel,
+			DeployerKeyOwned: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.Empty(t, reportWithoutOwnership.Output.RefsToTransferOwnership)
+
+	reportWithOwnership, err := cldf_ops.ExecuteSequence(
+		bundle,
+		resolved.DeployChainContracts(),
+		deps,
+		DeployChainContractsInput{
+			ChainSelector:    sel,
+			DeployerKeyOwned: false,
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, reportWithOwnership.Output.RefsToTransferOwnership, 2)
+	assert.Equal(t, "OnRamp", string(reportWithOwnership.Output.RefsToTransferOwnership[0].Type))
+	assert.Equal(t, "OffRamp", string(reportWithOwnership.Output.RefsToTransferOwnership[1].Type))
 }

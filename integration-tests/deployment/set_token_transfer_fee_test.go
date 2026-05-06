@@ -1,12 +1,8 @@
 package deployment
 
 import (
-	"context"
-	"math/big"
 	"testing"
-	"time"
 
-	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -16,13 +12,15 @@ import (
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
+	onrampV1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	evmadaptersV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	fqV2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
 	soladaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
-	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
@@ -54,6 +52,12 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.NoError(t, err)
 	env.DataStore = ds.Seal()
 
+	// Ensure chains exist
+	_, ok := env.BlockChains.SolanaChains()[src]
+	require.True(t, ok, "Source chain not found in environment")
+	_, ok = env.BlockChains.EVMChains()[dst]
+	require.True(t, ok, "Destination chain not found in environment")
+
 	// Initialize v1.6.0 adapters
 	solAdapter := solseqV1_6_0.SolanaAdapter{}
 	evmAdapter := evmseqV1_6_0.EVMAdapter{}
@@ -81,29 +85,39 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
 
-	// Get the address of the LINK token on the source chain
-	srcLinkRef, err := output.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(src,
-			datastore.ContractType(tokensops.LinkContractType),
-			semver.MustParse("1.6.0"), // version 1.6.0 for Solana LINK token
-			"",                        // no qualifier is needed for Solana LINK token
-		),
-	)
+	// Connect the chains so that srcRouter.getOnRamp(dst) works
+	output, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*env, lanes.ConnectChainsConfig{
+		Lanes: []lanes.LaneConfig{
+			{
+				Version: utils.Version_1_6_0,
+				ChainA:  lanes.ChainDefinition{Selector: src},
+				ChainB:  lanes.ChainDefinition{Selector: dst},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
+
+	// Any valid address can be used when setting token transfer fees. The
+	// contracts do *not* validate that the addresses are actually tokens.
+	srcTokenAddress := "GcqdKBdgcJNdBeC1TnZvJTaWuRXXg8WotC5qw1BNBSEp"
+	dstTokenAddress := "0x2222222222222222222222222222222222222222"
+
+	// Get the FQ on the source
+	srcOnRampRef := datastore.AddressRef{ChainSelector: src, Type: datastore.ContractType(router.ContractType), Version: utils.Version_1_6_0}
+	srcOnRampRef, err = datastore_utils.FindAndFormatRef(env.DataStore, srcOnRampRef, src, datastore_utils.FullRef)
+	require.NoError(t, err)
+	srcFQ, err := solFeesAdapter.GetFeeContractRef(*env, srcOnRampRef, src, dst)
 	require.NoError(t, err)
 
-	// Get the address of the LINK token on the destination chain
-	dstLinkRef, err := output.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(dst,
-			datastore.ContractType(link.ContractType),
-			link.Version,
-			"", // no qualifier is needed for EVM LINK token
-		),
-	)
+	// Get the FQ on the destination
+	dstOnRampRef := datastore.AddressRef{ChainSelector: dst, Type: datastore.ContractType(onrampV1_6.ContractType), Version: utils.Version_1_6_0}
+	dstOnRampRef, err = datastore_utils.FindAndFormatRef(env.DataStore, dstOnRampRef, dst, datastore_utils.FullRef)
 	require.NoError(t, err)
-
-	// Ensure environment has the updated datastore
-	env.DataStore = output.DataStore.Seal()
+	dstFQ, err := evmFeesAdapter.GetFeeContractRef(*env, dstOnRampRef, dst, src)
+	require.NoError(t, err)
 
 	// Set the token transfer fee config for LINK
 	_, err = fees.
@@ -119,7 +133,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 							Selector: dst,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: srcLinkRef.Address,
+									Address: srcTokenAddress,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
 										DestGasOverhead: utils.NewOptional(uint32(120_000)),
@@ -136,7 +150,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 							Selector: src,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: dstLinkRef.Address,
+									Address: dstTokenAddress,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
 										DestGasOverhead: utils.NewOptional(uint32(150_000)),
@@ -151,7 +165,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm that the config was correctly set on the source
-	srcCfg, err := solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, src, dst, srcLinkRef.Address)
+	srcCfg, err := solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	srcSensibleDefaults := solFeesAdapter.GetDefaultTokenTransferFeeConfig(src, dst)
 	require.Equal(t, srcCfg.DestBytesOverhead, srcSensibleDefaults.DestBytesOverhead)
@@ -162,7 +176,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.True(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was correctly set on the destination
-	dstCfg, err := evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dst, src, dstLinkRef.Address)
+	dstCfg, err := evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	dstSensibleDefaults := evmFeesAdapter.GetDefaultTokenTransferFeeConfig(dst, src)
 	require.Equal(t, dstCfg.DestBytesOverhead, dstSensibleDefaults.DestBytesOverhead)
@@ -186,7 +200,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 							Selector: dst,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: srcLinkRef.Address,
+									Address: srcTokenAddress,
 									IsReset: true,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
 								},
@@ -201,7 +215,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 							Selector: src,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: dstLinkRef.Address,
+									Address: dstTokenAddress,
 									IsReset: true,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
 								},
@@ -214,12 +228,12 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm that the config was disabled on the source
-	srcCfg, err = solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, src, dst, srcLinkRef.Address)
+	srcCfg, err = solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	require.False(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was disabled on the destination
-	dstCfg, err = evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dst, src, dstLinkRef.Address)
+	dstCfg, err = evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	require.False(t, dstCfg.IsEnabled)
 }
@@ -233,69 +247,50 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 		dst,
 	}
 
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, chains),
-	)
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, chains))
+	require.NoError(t, err)
 
-	require.NoError(t, err, "Failed to create test environment")
-	require.NotNil(t, e, "Environment should be created")
 	mcmsRegistry := changesets.GetRegistry()
-	dReg := deploy.GetRegistry()
+	dplyRegistry := deploy.GetRegistry()
+
 	chainInput := make(map[uint64]deploy.ContractDeploymentConfigPerChain)
 	fqInput := make(map[uint64]deploy.UpdateFeeQuoterInputPerChain)
-
 	for _, chainSel := range chains {
-		chainInput[chainSel] = deploy.ContractDeploymentConfigPerChain{
-			Version: utils.Version_1_6_0,
-			// FEE QUOTER CONFIG
-			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
-			LinkPremiumMultiplier:        9e17, // 0.9 ETH
-			NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
-			// OFFRAMP CONFIG
-			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
-			GasForCallExactCheck:                    uint16(5000),
-		}
+		chainInput[chainSel] = NewDefaultDeploymentConfigForEVM(utils.Version_1_6_0)
 		fqInput[chainSel] = deploy.UpdateFeeQuoterInputPerChain{
 			FeeQuoterVersion: utils.Version_2_0_0,
 			RampsVersion:     utils.Version_1_6_0,
 		}
 	}
-	out, err := deploy.DeployContracts(dReg).Apply(*e, deploy.ContractDeploymentConfig{
+
+	// Deploy FeeQuoter + other contracts
+	out, err := deploy.DeployContracts(dplyRegistry).Apply(*e, deploy.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 	MergeAddresses(t, e, out.DataStore)
 
-	chain1 := lanes.ChainDefinition{
-		Selector: src,
-		GasPrice: big.NewInt(1e9),
-	}
-	chain2 := lanes.ChainDefinition{
-		Selector: dst,
-		GasPrice: big.NewInt(1e9),
-	}
-	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+	// Connect the chains so that srcRouter.getOnRamp(dst) works
+	connectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: utils.Version_1_6_0,
-				ChainA:  chain1,
-				ChainB:  chain2,
+				ChainA:  lanes.ChainDefinition{Selector: src},
+				ChainB:  lanes.ChainDefinition{Selector: dst},
 			},
 		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	MergeAddresses(t, e, connectOut.DataStore)
+
 	// Deploy MCMS
 	DeployMCMS(t, e, src, []string{utils.CLLQualifier})
 	DeployMCMS(t, e, dst, []string{utils.CLLQualifier})
+
 	// Reset bundle so second ConnectChains runs without cached executions.
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
+
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deploy.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deploy.UpdateFeeQuoterInput{
@@ -305,40 +300,44 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 	require.Greater(t, len(out.Reports), 0)
 	require.Equal(t, 1, len(out.MCMSTimelockProposals))
-
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
-	// update datastore with changeset output
 	MergeAddresses(t, e, out.DataStore)
-
 	for _, chainSel := range chains {
 		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
 
-	evmAdapter := evmseqV1_6_0.EVMAdapter{}
-	evmFeesAdapterV2_0 := evmadaptersV2_0_0.NewFeesAdapter(&evmAdapter)
-
-	// Get the address of the LINK token on the source chain
-	srcLinkRef, err := out.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(src,
-			datastore.ContractType(link.ContractType),
-			semver.MustParse("1.0.0"),
-			"", // no qualifier is needed for EVM LINK token
-		),
+	// Ensure new FQ v2.0 contracts exist in datastore
+	refs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(fqV2_0.ContractType)),
+		datastore.AddressRefByVersion(utils.Version_2_0_0),
 	)
-	require.NoError(t, err)
+	require.Len(t, refs, len(chains))
 
-	// Get the address of the LINK token on the destination chain
-	dstLinkRef, err := out.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(dst,
-			datastore.ContractType(link.ContractType),
-			semver.MustParse("1.0.0"),
-			"", // no qualifier is needed for EVM LINK token
-		),
-	)
-	require.NoError(t, err)
+	// Any valid address can be used when setting token transfer fees. The
+	// contracts do *not* validate that the addresses are actually tokens.
+	evmFeesAdapterV2_0_0 := evmadaptersV2_0_0.NewFeesAdapter(&evmseqV1_6_0.EVMAdapter{})
+	evmFeesAdapterV1_6_0 := evmadaptersV1_6_0.NewFeesAdapter(&evmseqV1_6_0.EVMAdapter{})
+	srcTokenAddress := "0x1111111111111111111111111111111111111111"
+	dstTokenAddress := "0x2222222222222222222222222222222222222222"
 
-	// Ensure environment has the updated datastore
-	e.DataStore = out.DataStore.Seal()
+	// Reset bundle so second ConnectChains runs without cached executions.
+	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
+
+	// Get the FQ on the source
+	srcOnRampRef := datastore.AddressRef{ChainSelector: src, Type: datastore.ContractType(onrampV1_6.ContractType), Version: utils.Version_1_6_0}
+	srcOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, srcOnRampRef, src, datastore_utils.FullRef)
+	require.NoError(t, err)
+	srcFQ, err := evmFeesAdapterV1_6_0.GetFeeContractRef(*e, srcOnRampRef, src, dst)
+	require.NoError(t, err)
+	require.True(t, srcFQ.Version.Equal(utils.Version_2_0_0), "Expected v1.6 OnRamp to be connected to v2.0 FeeQuoter after upgrade, but got version %s", srcFQ.Version.String())
+
+	// Get the FQ on the destination
+	dstOnRampRef := datastore.AddressRef{ChainSelector: dst, Type: datastore.ContractType(onrampV1_6.ContractType), Version: utils.Version_1_6_0}
+	dstOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, dstOnRampRef, dst, datastore_utils.FullRef)
+	require.NoError(t, err)
+	dstFQ, err := evmFeesAdapterV1_6_0.GetFeeContractRef(*e, dstOnRampRef, dst, src)
+	require.NoError(t, err)
+	require.True(t, dstFQ.Version.Equal(utils.Version_2_0_0), "Expected v1.6 OnRamp to be connected to v2.0 FeeQuoter after upgrade, but got version %s", dstFQ.Version.String())
 
 	// Set the token transfer fee config for LINK
 	out, err = fees.
@@ -354,7 +353,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 							Selector: dst,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: srcLinkRef.Address,
+									Address: srcTokenAddress,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
 										DestGasOverhead: utils.NewOptional(uint32(150_000)),
@@ -371,7 +370,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 							Selector: src,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: dstLinkRef.Address,
+									Address: dstTokenAddress,
 									IsReset: false,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
 										DestGasOverhead: utils.NewOptional(uint32(150_000)),
@@ -385,25 +384,65 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 		})
 	require.NoError(t, err)
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
-	// require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 
 	// Confirm that the config was correctly set on the source
-	srcCfg, err := evmFeesAdapterV2_0.GetOnchainTokenTransferFeeConfig(*e, src, dst, srcLinkRef.Address)
+	srcCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
-	srcSensibleDefaults := evmFeesAdapterV2_0.GetDefaultTokenTransferFeeConfig(src, dst)
+	srcSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(src, dst)
 	require.Equal(t, srcCfg.DestBytesOverhead, srcSensibleDefaults.DestBytesOverhead)
 	require.Equal(t, srcCfg.DestGasOverhead, uint32(150_000))
 	require.Equal(t, srcCfg.MinFeeUSDCents, srcSensibleDefaults.MinFeeUSDCents)
 	require.True(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was correctly set on the destination
-	dstCfg, err := evmFeesAdapterV2_0.GetOnchainTokenTransferFeeConfig(*e, dst, src, dstLinkRef.Address)
+	dstCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
-	dstSensibleDefaults := evmFeesAdapterV2_0.GetDefaultTokenTransferFeeConfig(dst, src)
+	dstSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(dst, src)
 	require.Equal(t, dstCfg.DestBytesOverhead, dstSensibleDefaults.DestBytesOverhead)
 	require.Equal(t, dstCfg.DestGasOverhead, uint32(150_000))
 	require.Equal(t, dstCfg.MinFeeUSDCents, dstSensibleDefaults.MinFeeUSDCents)
 	require.True(t, dstCfg.IsEnabled)
+
+	out, err = fees.
+		SetTokenTransferFee().
+		Apply(*e, fees.SetTokenTransferFeeInput{
+			Version: utils.Version_2_0_0,
+			MCMS:    NewDefaultInputForMCMS("Set token transfer fee"),
+			Args: []fees.TokenTransferFeeForSrc{
+				{
+					Selector: src,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: dst,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: srcTokenAddress,
+									IsReset: false,
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
+								},
+							},
+						},
+					},
+				},
+				{
+					Selector: dst,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: src,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: dstTokenAddress,
+									IsReset: false,
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	require.NoError(t, err)
+	require.Empty(t, out.MCMSTimelockProposals)
 
 	// Now reset the configs
 	out, err = fees.
@@ -419,7 +458,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 							Selector: dst,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: srcLinkRef.Address,
+									Address: srcTokenAddress,
 									IsReset: true,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
 								},
@@ -434,7 +473,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 							Selector: src,
 							Settings: []fees.TokenTransferFee{
 								{
-									Address: dstLinkRef.Address,
+									Address: dstTokenAddress,
 									IsReset: true,
 									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
 								},
@@ -450,12 +489,12 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 
 	// Confirm that the config was disabled on the source
-	srcCfg, err = evmFeesAdapterV2_0.GetOnchainTokenTransferFeeConfig(*e, src, dst, srcLinkRef.Address)
+	srcCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	require.False(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was disabled on the destination
-	dstCfg, err = evmFeesAdapterV2_0.GetOnchainTokenTransferFeeConfig(*e, dst, src, dstLinkRef.Address)
+	dstCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	require.False(t, dstCfg.IsEnabled)
 }

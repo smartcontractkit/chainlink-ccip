@@ -69,6 +69,14 @@ func newMinimalTopology(nopAliases []string, executorQualifier string, mode shar
 	}
 }
 
+func makeTestNOPAliases(count int) []string {
+	aliases := make([]string, count)
+	for i := range aliases {
+		aliases[i] = fmt.Sprintf("nop%d", i+1)
+	}
+	return aliases
+}
+
 func newTestExecutorEnv(t *testing.T, selectors []uint64) deployment.Environment {
 	t.Helper()
 	lggr := logger.Test(t)
@@ -125,7 +133,16 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 				},
 				ExecutorQualifier: "pool1",
 			},
-			wantErr: "NOP topology with at least one NOP is required",
+			wantErr: "nop_topology is required",
+		},
+		{
+			name: "production topology with fewer than sixteen NOPs returns error",
+			env:  deployment.Environment{Name: "prod_mainnet", BlockChains: newExecutorTestBlockChains([]uint64{sel1})},
+			input: changesets.ApplyExecutorConfigInput{
+				Topology:          newMinimalTopology([]string{"nop1"}, "pool1", ""),
+				ExecutorQualifier: "pool1",
+			},
+			wantErr: "requires at least 16 unique NOPs",
 		},
 		{
 			name: "missing executor qualifier returns error",
@@ -159,7 +176,7 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 			env:  deployment.Environment{Name: "mainnet", BlockChains: newExecutorTestBlockChains([]uint64{sel1})},
 			input: changesets.ApplyExecutorConfigInput{
 				Topology: func() *offchain.EnvironmentTopology {
-					topo := newMinimalTopology([]string{"nop1"}, "pool1", "")
+					topo := newMinimalTopology(makeTestNOPAliases(16), "pool1", "")
 					topo.PyroscopeURL = "http://pyroscope"
 					return topo
 				}(),

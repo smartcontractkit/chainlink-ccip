@@ -1,6 +1,7 @@
 package tip20
 
 import (
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -9,11 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-// TIP20TokenABI is a minimal ABI for TIP-20 token role management (ITIP20 ISSUER_ROLE + ITIP20RolesAuth).
+// TIP20TokenABI is a minimal ABI for TIP-20 token role management and transfers (ITIP20 ISSUER_ROLE + ITIP20RolesAuth).
 // Role layout follows TIP20RolesAuth: https://github.com/tempoxyz/tempo/blob/main/tips/ref-impls/src/abstracts/TIP20RolesAuth.sol
 // hasRole is a public mapping, so the getter is hasRole(address,bytes32), not OpenZeppelin AccessControl order.
 // ISSUER_ROLE: https://github.com/tempoxyz/tempo-std/blob/master/src/interfaces/ITIP20.sol
-const TIP20TokenABI = `[{"type":"function","name":"grantRole","inputs":[{"name":"role","type":"bytes32"},{"name":"account","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"hasRole","inputs":[{"name":"account","type":"address"},{"name":"role","type":"bytes32"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},{"type":"function","name":"ISSUER_ROLE","inputs":[],"outputs":[{"name":"","type":"bytes32"}],"stateMutability":"view"}]`
+const TIP20TokenABI = `[{"type":"function","name":"grantRole","inputs":[{"name":"role","type":"bytes32"},{"name":"account","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"revokeRole","inputs":[{"name":"role","type":"bytes32"},{"name":"account","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"hasRole","inputs":[{"name":"account","type":"address"},{"name":"role","type":"bytes32"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},{"type":"function","name":"ISSUER_ROLE","inputs":[],"outputs":[{"name":"","type":"bytes32"}],"stateMutability":"view"},{"type":"function","name":"transfer","inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"nonpayable"}]`
 
 // DefaultAdminRole is TIP20RolesAuth.DEFAULT_ADMIN_ROLE (bytes32(0)).
 var DefaultAdminRole [32]byte
@@ -41,6 +42,14 @@ func (t *TIP20Token) Address() common.Address {
 
 func (t *TIP20Token) GrantRole(opts *bind.TransactOpts, role [32]byte, account common.Address) (*types.Transaction, error) {
 	return t.contract.Transact(opts, "grantRole", role, account)
+}
+
+func (t *TIP20Token) RevokeRole(opts *bind.TransactOpts, role [32]byte, account common.Address) (*types.Transaction, error) {
+	return t.contract.Transact(opts, "revokeRole", role, account)
+}
+
+func (t *TIP20Token) Transfer(opts *bind.TransactOpts, to common.Address, amount *big.Int) (*types.Transaction, error) {
+	return t.contract.Transact(opts, "transfer", to, amount)
 }
 
 func (t *TIP20Token) HasRole(opts *bind.CallOpts, account common.Address, role [32]byte) (bool, error) {
