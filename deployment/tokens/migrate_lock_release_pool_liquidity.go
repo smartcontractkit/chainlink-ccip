@@ -75,11 +75,20 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: adapter for family '%s' version '%s' does not support liquidity migration", i, family, migration.NewPoolRef.Version)
 			}
 
-			oldPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, migration.OldPoolRef, migration.ChainSelector, datastore_utils.FullRef)
+			oldRef, err := TryNormalizeAddressRef(migration.ChainSelector, migration.OldPoolRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to normalize old pool ref address: %w", i, err)
+			}
+			newRef, err := TryNormalizeAddressRef(migration.ChainSelector, migration.NewPoolRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to normalize new pool ref address: %w", i, err)
+			}
+
+			oldPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, oldRef, migration.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve old pool ref: %w", i, err)
 			}
-			newPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, migration.NewPoolRef, migration.ChainSelector, datastore_utils.FullRef)
+			newPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, newRef, migration.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve new pool ref: %w", i, err)
 			}
@@ -96,11 +105,19 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 
 			var setPoolConfig *MigrationSetPoolConfig
 			if migration.RegistryRef != nil && migration.TokenRef != nil {
-				registryRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *migration.RegistryRef, migration.ChainSelector, datastore_utils.FullRef)
+				regRef, err := TryNormalizeAddressRef(migration.ChainSelector, *migration.RegistryRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to normalize registry ref address: %w", i, err)
+				}
+				tokRef, err := TryNormalizeAddressRef(migration.ChainSelector, *migration.TokenRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to normalize token ref address for setPool: %w", i, err)
+				}
+				registryRef, err := datastore_utils.FindAndFormatRef(e.DataStore, regRef, migration.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve registry ref: %w", i, err)
 				}
-				tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *migration.TokenRef, migration.ChainSelector, datastore_utils.FullRef)
+				tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokRef, migration.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve token ref: %w", i, err)
 				}
