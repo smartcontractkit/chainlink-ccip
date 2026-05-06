@@ -411,7 +411,7 @@ func addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(
 		}
 		cfg, ok := remoteChainConfigs[remoteSel]
 		if !ok {
-			continue
+			return nil, fmt.Errorf("missing remote chain config for remote chain %d on chain %d", remoteSel, input.ChainSelector)
 		}
 		if !slices.Contains(supportedChains, remoteSel) {
 			continue
