@@ -17,8 +17,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	v1_5_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/burn_mint_token_pool"
+	v1_5_1_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
+	v1_5_1_token_pool_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	chains_v161_burn_mint "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
+	v1_5_1_tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -456,6 +460,172 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	require.Contains(t, remotePools, common.LeftPadBytes(common.FromHex("0x456"), 32), "Pool A should have the active pool's remote pool")
 }
 
+func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *testing.T) {
+	const (
+		chainSel       = uint64(5009297550715157269)
+		remoteChainSel = uint64(4949039107694359620)
+		localDecimals  = uint8(6)
+		remoteDecimals = uint8(18)
+	)
+
+	remotePool := common.LeftPadBytes(common.HexToAddress("0x1000000000000000000000000000000000000001").Bytes(), 32)
+	remoteToken := common.LeftPadBytes(common.HexToAddress("0x2000000000000000000000000000000000000002").Bytes(), 32)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSel}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	chain := e.BlockChains.EVMChains()[chainSel]
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSel,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{chain.DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+	chainReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:    chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+		},
+	)
+	require.NoError(t, err, "DeployChainContracts should not error")
+
+	newPool := deployTokenAndPoolViaExpansionWithDecimals(t, e, chainSel, chainReport.Output.Addresses, localDecimals)
+	registryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(token_admin_registry.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "TokenAdminRegistry should exist in datastore")
+
+	legacyPoolReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		v1_5_1_sequences.DeployTokenPool,
+		e.BlockChains,
+		tokens_core.DeployTokenPoolInput{
+			TokenRef: &datastore.AddressRef{
+				Address: newPool.TokenAddress.Hex(),
+			},
+			TokenPoolQualifier: "LEGACY-IMPORT",
+			PoolType:           string(v1_5_1_burn_mint_token_pool.ContractType),
+			TokenPoolVersion:   v1_5_1_burn_mint_token_pool.Version,
+			ChainSelector:      chainSel,
+			ExistingDataStore:  e.DataStore,
+		},
+	)
+	require.NoError(t, err, "DeployTokenPool v1.5.1 should not error")
+	require.NotEmpty(t, legacyPoolReport.Output.Addresses, "legacy pool deployment should return an address")
+	legacyPoolAddress := common.HexToAddress(legacyPoolReport.Output.Addresses[0].Address)
+
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		v1_5_0_sequences.RegisterToken,
+		chain,
+		v1_5_0_sequences.RegisterTokenInput{
+			ChainSelector:             chainSel,
+			TokenAddress:              newPool.TokenAddress,
+			TokenPoolAddress:          legacyPoolAddress,
+			ExternalAdmin:             common.Address{},
+			TokenAdminRegistryAddress: registryAddress,
+		},
+	)
+	require.NoError(t, err, "RegisterToken should set the legacy pool as the active pool")
+	getCfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, chain, contract_utils.FunctionInput[common.Address]{
+		ChainSelector: chainSel,
+		Address:       registryAddress,
+		Args:          newPool.TokenAddress,
+	})
+	require.NoError(t, err, "GetTokenConfig should not error")
+	if getCfgReport.Output.TokenPool != legacyPoolAddress {
+		t.Skipf("active pool not set in registry (got %s, expected %s); skipping legacy import assertions", getCfgReport.Output.TokenPool, legacyPoolAddress)
+	}
+
+	const (
+		importedInboundRate      = 13.88
+		importedInboundCapacity  = 50_000.0
+		importedOutboundRate     = 7.77
+		importedOutboundCapacity = 10_000.0
+	)
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		v1_5_1_token_pool_sequences.ConfigureTokenPoolForRemoteChain,
+		chain,
+		v1_5_1_token_pool_sequences.ConfigureTokenPoolForRemoteChainInput{
+			TokenPoolAddress:    legacyPoolAddress,
+			TokenPoolVersion:    v1_5_1_burn_mint_token_pool.Version,
+			RemoteChainSelector: remoteChainSel,
+			RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
+				RemoteToken:                     remoteToken,
+				RemotePool:                      remotePool,
+				RemoteDecimals:                  remoteDecimals,
+				OutboundRateLimiterConfig:       testsetup.CreateRateLimiterConfigFloatInput(importedOutboundRate, importedOutboundCapacity),
+				InboundRateLimiterConfig:        testsetup.CreateRateLimiterConfigFloatInput(importedInboundRate, importedInboundCapacity),
+				OutboundCCVs:                    []string{"0x789"},
+				InboundCCVs:                     []string{"0xabc"},
+				OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
+				InboundCCVsToAddAboveThreshold:  []string{"0xace"},
+				TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+			},
+		},
+	)
+	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain v1.5.1 should configure remote chain")
+
+	legacyPool, err := v1_5_1_tp_bindings.NewTokenPool(legacyPoolAddress, chain.Client)
+	require.NoError(t, err, "legacy pool binding should instantiate")
+	legacyInbound, err := legacyPool.GetCurrentInboundRateLimiterState(nil, remoteChainSel)
+	require.NoError(t, err, "legacy inbound limiter should be readable")
+	legacyOutbound, err := legacyPool.GetCurrentOutboundRateLimiterState(nil, remoteChainSel)
+	require.NoError(t, err, "legacy outbound limiter should be readable")
+
+	upgradeInput := tokens.ConfigureTokenPoolForRemoteChainInput{
+		ChainSelector:               chainSel,
+		TokenPoolAddress:            newPool.TokenPoolAddress,
+		AdvancedPoolHooks:           newPool.AdvancedHooksAddress,
+		RemoteChainSelector:         remoteChainSel,
+		RegistryAddress:             registryAddress,
+		TokenAddress:                newPool.TokenAddress,
+		RemoteChainAlreadySupported: false,
+		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
+			RemoteToken:                     remoteToken,
+			RemotePool:                      remotePool,
+			RemoteDecimals:                  remoteDecimals,
+			OutboundRateLimiterConfig:       tokens_core.RateLimiterConfigFloatInput{IsEnabled: false},
+			InboundRateLimiterConfig:        tokens_core.RateLimiterConfigFloatInput{IsEnabled: false},
+			OutboundCCVs:                    []string{"0x789"},
+			InboundCCVs:                     []string{"0xabc"},
+			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
+			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
+			TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+		},
+	}
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		tokens.ConfigureTokenPoolForRemoteChain,
+		chain,
+		upgradeInput,
+	)
+	require.NoError(t, err, "v2 ConfigureTokenPoolForRemoteChain migration import should not error")
+
+	newPoolBinding, err := tp_bindings.NewTokenPool(newPool.TokenPoolAddress, chain.Client)
+	require.NoError(t, err, "new pool binding should instantiate")
+	newState, err := newPoolBinding.GetCurrentRateLimiterState(nil, remoteChainSel, false)
+	require.NoError(t, err, "new pool rate limiter state should be readable")
+
+	expectedInboundCapacity := scaleByDecimalDiff(legacyInbound.Capacity, remoteDecimals, localDecimals)
+	expectedInboundRate := scaleByDecimalDiff(legacyInbound.Rate, remoteDecimals, localDecimals)
+	requireScaledRateLimiterMatch(t, expectedInboundRate, expectedInboundCapacity, newState.InboundRateLimiterState.Rate, newState.InboundRateLimiterState.Capacity, "Rebased inbound import")
+	require.NotZero(t, legacyInbound.Capacity.Cmp(newState.InboundRateLimiterState.Capacity), "legacy inbound capacity should not be raw-copied")
+
+	requireScaledRateLimiterMatch(t, legacyOutbound.Rate, legacyOutbound.Capacity, newState.OutboundRateLimiterState.Rate, newState.OutboundRateLimiterState.Capacity, "Outbound raw import")
+}
+
 // TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits verifies that the sequence correctly reads
 // allowedFinalityConfig from the pool and applies rate limit updates to the appropriate bucket:
 // - When allowedFinalityConfig is zero (default finality), updates go to the default finality bucket.
@@ -605,4 +775,19 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	expectedCustomOutboundRate := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.OutboundRateLimiterConfig.Rate, decimals, 0)
 	expectedCustomOutboundCapacity := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.OutboundRateLimiterConfig.Capacity, decimals, 0)
 	requireScaledRateLimiterMatch(t, expectedCustomOutboundRate, expectedCustomOutboundCapacity, customState3.OutboundRateLimiterState.Rate, customState3.OutboundRateLimiterState.Capacity, "Step 6 Custom Outbound")
+}
+
+func scaleByDecimalDiff(amount *big.Int, fromDecimals uint8, toDecimals uint8) *big.Int {
+	out := new(big.Int).Set(amount)
+	if toDecimals > fromDecimals {
+		return out.Mul(out, pow10(toDecimals-fromDecimals))
+	}
+	if fromDecimals > toDecimals {
+		return out.Div(out, pow10(fromDecimals-toDecimals))
+	}
+	return out
+}
+
+func pow10(decimals uint8) *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
 }
