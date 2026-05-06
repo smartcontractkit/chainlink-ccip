@@ -3,6 +3,7 @@ package hooks
 import (
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
@@ -32,12 +33,14 @@ func TestTimelocksInOwnershipCheck_LoadsAndCaches(t *testing.T) {
 		Type:          datastore.ContractType(common_utils.RBACTimelock),
 		Qualifier:     common_utils.CLLQualifier,
 		Address:       "0x00000000000000000000000000000000000000A1",
+		Version:       semver.MustParse("1.0.0"),
 	}))
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType(common_utils.RBACTimelock),
 		Qualifier:     common_utils.RMNTimelockQualifier,
 		Address:       "0x00000000000000000000000000000000000000B1",
+		Version:       semver.MustParse("1.0.0"),
 	}))
 
 	e := &EVMContractOwnership{}
