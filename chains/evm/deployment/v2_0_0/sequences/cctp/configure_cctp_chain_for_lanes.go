@@ -234,9 +234,15 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Proactively configure the CCTP-through-CCV pool for all CCTP-capable remotes.
 		// This excludes lock-release lanes, but includes V1/V2 remotes so the CCV pool
 		// is ready before proxy routing is switched to CCTP_V2_WITH_CCV.
+		// Non-EVM remotes (e.g. Solana) are excluded: CCIP 2.0 does not support them, so
+		// CCTP_V2_WITH_CCV will never be enabled for them and preconfiguring the CCV pool
+		// would be wasted state.
 		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
 			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == mechanismLockRelease {
+				continue
+			}
+			if !isEVMRemote(remoteChainSelector) {
 				continue
 			}
 			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
@@ -372,11 +378,18 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 	return configs, nil
 }
 
-// buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver (one per remote chain).
+// buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver.
+// Includes every CCTP-capable EVM remote (V1, V2, V2_WITH_CCV) and excludes lock-release lanes, matching the
+// set of chains preconfigured on the CCTP-through-CCV pool. This keeps CCTPThroughCCVTokenPool.getTokenTransferFeeConfig
+// from reverting on V1 remotes before proxy routing is switched to CCTP_V2_WITH_CCV.
+// Non-EVM remotes (e.g. Solana) are skipped: CCIP 2.0 does not support them, so the CCV pool will never be used for them.
 func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanesInput, cctpVerifierAddress common.Address) []versioned_verifier_resolver.OutboundImplementationArgs {
 	out := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
+		if remoteChain.LockOrBurnMechanism == mechanismLockRelease {
+			continue
+		}
+		if !isEVMRemote(remoteChainSelector) {
 			continue
 		}
 		out = append(out, versioned_verifier_resolver.OutboundImplementationArgs{
@@ -385,6 +398,16 @@ func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanes
 		})
 	}
 	return out
+}
+
+// isEVMRemote reports whether a remote chain selector belongs to the EVM family.
+// Selectors that fail to resolve are treated as non-EVM (skipped by callers).
+func isEVMRemote(remoteChainSelector uint64) bool {
+	family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+	if err != nil {
+		return false
+	}
+	return family == chain_selectors.FamilyEVM
 }
 
 // buildUSDCTokenPoolProxyMechanismArgs builds remote chain selectors and lock/burn mechanisms for the USDCTokenPoolProxy.
