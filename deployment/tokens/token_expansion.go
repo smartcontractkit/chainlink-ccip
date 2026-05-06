@@ -454,7 +454,7 @@ func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (dat
 
 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
-		return datastore.AddressRef{}, err
+		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", chainSelector, err)
 	}
 
 	normalizer, ok := ccipdeploy.GetAddressNormalizerRegistry().GetAddressNormalizer(family)
