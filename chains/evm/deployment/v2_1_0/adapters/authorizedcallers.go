@@ -27,22 +27,31 @@ const evmCallerLen = 20
 // helper so that MCMS batch metadata (ContractType, ABI label, method selector) comes
 // from the real contract binding, not a generic shim.
 //
-// Address resolution: the adapter caches only resolved contract addresses (immutable
-// post-deployment). It never caches on-chain state; GetAllAuthorizedCallers always
-// reads directly from the chain via the injected read operation.
+// Registered adapters may be singletons (see init.go). Initialize must refresh the cached
+// address from the provided Environment.DataStore every time — not skip when the
+// (selector, type, version) key was seen before — so a new simulated chain / new deployment
+// in another test does not reuse a stale RMN address.
+//
+// addrCache memoizes the resolved address within a single deployment flow after Initialize.
+//
+// GetAllAuthorizedCallers uses getAllOp with operations.NewBundle(..., NewMemoryReporter())
+// on each call: deployment.Environment.OperationsBundle deduplicates ExecuteOperation reads
+// (same op + same input hash returns the first successful cached result). For
+// getAllAuthorizedCallers the input is always the same contract address on a chain, so
+// without a fresh reporter the read would stay stuck at the first observed state.
 type EVMAuthorizedCallersAdapter struct {
 	addrCache map[string]common.Address
-	// execApply executes the contract-specific applyAuthorizedCallerUpdates operation.
+	getAllOp  *cldf_ops.Operation[contract.FunctionInput[struct{}], []common.Address, cldf_evm.Chain]
+	// execApply executes the contract-specific applyAuthorizedCallerUpdates operation
+	// through the ops bundle so MCMS metadata is accurate.
 	execApply func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error)
-	// execGetAll executes the contract-specific getAllAuthorizedCallers read operation.
-	execGetAll func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address) ([]common.Address, error)
 }
 
 // NewEVMAuthorizedCallersAdapter constructs an EVMAuthorizedCallersAdapter backed by
 // per-contract generated operations. applyOp must be the generated
 // applyAuthorizedCallerUpdates write operation; getAllOp the generated
-// getAllAuthorizedCallers read operation; buildArgs converts the chain-agnostic
-// (added, removed) address slices into the contract-specific ARGS struct.
+// getAllAuthorizedCallers read operation; buildArgs converts chain-agnostic address
+// slices into the contract-specific ARGS struct.
 //
 // Example (adapters/init.go):
 //
@@ -60,6 +69,7 @@ func NewEVMAuthorizedCallersAdapter[ARGS any](
 ) *EVMAuthorizedCallersAdapter {
 	return &EVMAuthorizedCallersAdapter{
 		addrCache: make(map[string]common.Address),
+		getAllOp:  getAllOp,
 		execApply: func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error) {
 			report, err := cldf_ops.ExecuteOperation(b, applyOp, chain, contract.FunctionInput[ARGS]{
 				ChainSelector: chain.Selector,
@@ -75,27 +85,15 @@ func NewEVMAuthorizedCallersAdapter[ARGS any](
 			}
 			return sequtil.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batch}}, nil
 		},
-		execGetAll: func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address) ([]common.Address, error) {
-			report, err := cldf_ops.ExecuteOperation(b, getAllOp, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       addr,
-				Args:          struct{}{},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("getAllAuthorizedCallers on %s: %w", addr.Hex(), err)
-			}
-			return report.Output, nil
-		},
 	}
 }
 
-// Initialize resolves and caches the target contract address for the given ApplyInput.
-// Must be called before GetAllAuthorizedCallers or ApplyAuthorizedCallerUpdates.
+// Initialize resolves and caches the target contract address from e.DataStore for the given ApplyInput.
+// Called for every changeset invocation; always re-reads the datastore so singleton adapters
+// do not retain an RMN address from a prior Environment (e.g. another test's simulated chain).
+// Must still be invoked before GetAllAuthorizedCallers or ApplyAuthorizedCallerUpdates for a given triple.
 func (a *EVMAuthorizedCallersAdapter) Initialize(e cldf.Environment, in api.ApplyInput) error {
 	key := addrCacheKey(in.ChainSelector, in.ContractType, in.Version)
-	if _, exists := a.addrCache[key]; exists {
-		return nil
-	}
 	ref := datastore.AddressRef{
 		Type:    datastore.ContractType(in.ContractType),
 		Version: in.Version,
@@ -126,13 +124,18 @@ func (a *EVMAuthorizedCallersAdapter) GetAllAuthorizedCallers(
 	if !ok {
 		return nil, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-	addrs, err := a.execGetAll(e.OperationsBundle, chain, addr)
+	readBundle := cldf_ops.NewBundle(e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
+	report, err := cldf_ops.ExecuteOperation(readBundle, a.getAllOp, chain, contract.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       addr,
+		Args:          struct{}{},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("getAllAuthorizedCallers at %s on chain %d: %w", addr.Hex(), selector, err)
 	}
-	callers := make([]api.Caller, len(addrs))
-	for i, a := range addrs {
-		callers[i] = a.Bytes()
+	callers := make([]api.Caller, len(report.Output))
+	for i, c := range report.Output {
+		callers[i] = c.Bytes()
 	}
 	return callers, nil
 }

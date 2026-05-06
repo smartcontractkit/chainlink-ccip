@@ -33,7 +33,7 @@ func init() {
 		),
 	)
 	// Additional AuthorizedCallers-inheriting contracts (FeeQuoter, AdvancedPoolHooks, …)
-	// can be registered here following the same pattern once their ops packages are available:
+	// follow the same pattern once their ops packages are available:
 	//
 	//   authCallersRegistry.RegisterAdapter(
 	//       chainsel.FamilyEVM,

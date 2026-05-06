@@ -16,9 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
-// Compile-time check: EVM adapter satisfies the chain-agnostic interface.
-var _ api.AuthorizedCallersAdapter = (*adapters.EVMAuthorizedCallersAdapter)(nil)
-
 // TestAuthorizedCallersAdapter_OperatorFlow verifies the end-to-end operator workflow:
 //  1. Deploy RMN with no initial curse admins.
 //  2. Initialize the adapter.
@@ -27,7 +24,7 @@ var _ api.AuthorizedCallersAdapter = (*adapters.EVMAuthorizedCallersAdapter)(nil
 //  5. GetAllAuthorizedCallers → deployer present (reads directly from chain, always fresh).
 //  6. Apply a remove → GetAllAuthorizedCallers → empty.
 func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
-	chainSelector := uint64(1332)
+	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -123,7 +120,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 // TestConfigureAuthorizedCallersChangeset_Force confirms that Force=false pre-filters
 // already-present adds and already-absent removes, producing no batch ops (noop).
 func TestConfigureAuthorizedCallersChangeset_Force(t *testing.T) {
-	chainSelector := uint64(1332)
+	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -178,7 +175,7 @@ func TestConfigureAuthorizedCallersChangeset_Force(t *testing.T) {
 // on the same chain with different contract types are validated independently by the
 // changeset (VerifyPreconditions), proving the grouping key includes ContractType.
 func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
-	chainSelector := uint64(1332)
+	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)

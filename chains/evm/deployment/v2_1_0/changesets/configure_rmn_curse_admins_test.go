@@ -14,7 +14,7 @@ import (
 )
 
 func TestConfigureRMNCurseAdmins_Apply(t *testing.T) {
-	chainSelector := uint64(1332)
+	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -62,7 +62,7 @@ func TestConfigureRMNCurseAdmins_Apply(t *testing.T) {
 }
 
 func TestConfigureRMNCurseAdmins_VerifyPreconditions(t *testing.T) {
-	chainSelector := uint64(1332)
+	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
