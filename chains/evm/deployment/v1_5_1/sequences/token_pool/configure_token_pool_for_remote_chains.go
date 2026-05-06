@@ -141,7 +141,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the remote token onchain matches the one provided as input, then we won't call
 				// ApplyChainUpdates and instead handle the onchain updates via SetRateLimiterConfig
 				// and AddRemotePool.
-				remoteTP := input.RemoteChainConfig.RemotePool
+				// Remote pool addresses in CCIP messages are ABI-encoded (32-byte left-padded).
+				// Using left-padded addresses here ensures the stored value matches what
+				// the protocol sends, preventing "invalid source pool" errors on delivery.
+				remoteTP := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
 				remoteCS := input.RemoteChainSelector
 
 				// Query rate limits and remote pools
@@ -168,9 +171,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					inputIRL.Capacity.Cmp(onchainIRL.Capacity) == 0 &&
 					inputIRL.Rate.Cmp(onchainIRL.Rate) == 0
 
-				// Check if the provided remote token pool is already registered onchain
+				// Normalize stored pool addresses to 32 bytes for comparison, since pools may have
+				// been stored as 20-byte or 32-byte values depending on how they were configured.
 				hasRemoteTP := slices.ContainsFunc(remoteTPs, func(rtp []byte) bool {
-					return bytes.Equal(rtp, remoteTP)
+					return bytes.Equal(common.LeftPadBytes(rtp, 32), remoteTP)
 				})
 
 				// If either rate limiter config is different, then update it
