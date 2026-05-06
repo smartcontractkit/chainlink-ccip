@@ -174,7 +174,15 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	}
 	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"), "CLLCCIP")
 	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
+		found0 := strings.Contains(err.Error(), "expected to find exactly 1 ref with criteria ") && strings.HasSuffix(err.Error(), "found 0")
+		if !found0 {
+			return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
+		}
+		// try again without qualifier to be compatible with older deployments that didn't set the qualifier
+		bnmPool, err = a.getAddress(datastore.ContractType("BurnMintTokenPool"))
+		if err != nil {
+			return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address with qualifier 'CLLCCIP', and fallback without qualifier also failed: %w", err)
+		}
 	}
 	// lnrPool, err := a.getAddress(datastore.ContractType("LockReleaseTokenPool"))
 	// if err != nil {
