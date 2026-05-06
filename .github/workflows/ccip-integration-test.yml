@@ -246,8 +246,7 @@ jobs:
       - name: Setup DB
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE/chainlink
-          go run ./core/store/cmd/preparetest
+          go -C $GITHUB_WORKSPACE/chainlink run ./core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Install gotestsum
