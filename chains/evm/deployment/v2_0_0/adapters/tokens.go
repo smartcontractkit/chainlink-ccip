@@ -19,6 +19,7 @@ import (
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	bnmERC677Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -114,6 +115,58 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			if qualifier == "" {
 				qualifier = tokenAddr
 			}
+			poolType := deployment.ContractType(input.PoolType)
+
+			grantMintBurnRoles := func(poolRef datastore.AddressRef) (*mcms_types.BatchOperation, error) {
+				if !isBurnMintPoolType(poolType) {
+					return nil, nil
+				}
+
+				tokenRef, lookupErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+					ChainSelector: input.ChainSelector,
+					Address:       tokenAddr,
+				}, input.ChainSelector, datastore_utils.FullRef)
+				if lookupErr != nil || !isBurnMintTokenType(tokenRef.Type) {
+					return nil, nil
+				}
+
+				poolAddr := common.HexToAddress(poolRef.Address)
+				if poolAddr == (common.Address{}) {
+					return nil, errors.New("token pool address is zero")
+				}
+
+				grantInput := contract.FunctionInput[common.Address]{
+					ChainSelector: input.ChainSelector,
+					Address:       common.HexToAddress(tokenAddr),
+					Args:          poolAddr,
+				}
+				var writes []contract.WriteOutput
+				if isBurnMintERC677TokenType(tokenRef.Type) {
+					var grantErr error
+					writes, grantErr = bnmERC677Ops.PrepareGrantMintAndBurnRoles(
+						b,
+						evmChain,
+						grantInput,
+						common.HexToAddress(input.TimelockAddress),
+					)
+					if grantErr != nil {
+						return nil, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
+					}
+				} else {
+					grantReport, grantErr := cldf_ops.ExecuteOperation(b,
+						bnmOps.GrantMintAndBurnRoles, evmChain, grantInput)
+					if grantErr != nil {
+						return nil, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
+					}
+					writes = append(writes, grantReport.Output)
+				}
+
+				batchOp, bErr := contract.NewBatchOperationFromWrites(writes)
+				if bErr != nil {
+					return nil, fmt.Errorf("failed to create batch operation for role grants: %w", bErr)
+				}
+				return &batchOp, nil
+			}
 
 			matches := input.ExistingDataStore.Addresses().Filter(
 				datastore.AddressRefByType(datastore.ContractType(input.PoolType)),
@@ -127,7 +180,18 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			}
 			if len(matches) == 1 {
 				b.Logger.Info("Token pool already deployed at address:", matches[0].Address)
-				return sequences.OnChainOutput{}, nil
+				// A previous partial run can leave the pool in datastore before
+				// the token grants it burn/mint rights. Keep DeployTokenPoolForToken
+				// declarative: after it runs, the token/pool authority relationship
+				// should be correct whether the pool was just deployed or reused.
+				batchOp, err := grantMintBurnRoles(matches[0])
+				if err != nil {
+					return sequences.OnChainOutput{}, err
+				}
+				if batchOp == nil {
+					return sequences.OnChainOutput{}, nil
+				}
+				return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{*batchOp}}, nil
 			}
 
 			tokenContract, err := erc20.NewERC20(common.HexToAddress(tokenAddr), evmChain.Client)
@@ -179,7 +243,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				},
 			}
 
-			poolType := deployment.ContractType(input.PoolType)
 			var deployOutput sequences.OnChainOutput
 
 			switch {
@@ -204,34 +267,12 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			result.BatchOps = append(result.BatchOps, deployOutput.BatchOps...)
 
 			if isBurnMintPoolType(poolType) && len(deployOutput.Addresses) >= 1 {
-				toknRef, lookupErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Address:       tokenAddr,
-				}, input.ChainSelector, datastore_utils.FullRef)
-				if lookupErr == nil && isBurnMintTokenType(toknRef.Type) {
-					poolRef := deployOutput.Addresses[0]
-					poolAddr := common.HexToAddress(poolRef.Address)
-					if poolAddr == (common.Address{}) {
-						return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero")
-					}
-
-					grantReport, grantErr := cldf_ops.ExecuteOperation(b,
-						bnmOps.GrantMintAndBurnRoles, evmChain,
-						contract.FunctionInput[common.Address]{
-							ChainSelector: input.ChainSelector,
-							Address:       common.HexToAddress(tokenAddr),
-							Args:          poolAddr,
-						},
-					)
-					if grantErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint/burn roles to pool %s for token %s: %w", poolAddr, tokenAddr, grantErr)
-					}
-
-					batchOp, bErr := contract.NewBatchOperationFromWrites([]contract.WriteOutput{grantReport.Output})
-					if bErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for role grants: %w", bErr)
-					}
-					result.BatchOps = append(result.BatchOps, batchOp)
+				batchOp, err := grantMintBurnRoles(deployOutput.Addresses[0])
+				if err != nil {
+					return sequences.OnChainOutput{}, err
+				}
+				if batchOp != nil {
+					result.BatchOps = append(result.BatchOps, *batchOp)
 				}
 			}
 
@@ -471,5 +512,11 @@ func isLockReleasePoolType(poolType deployment.ContractType) bool {
 func isBurnMintTokenType(typ datastore.ContractType) bool {
 	return typ.String() == bnmOps.ContractType.String() ||
 		typ.String() == bnmDripOps.ContractType.String() ||
-		typ.String() == bnmDripOps150.ContractType.String()
+		typ.String() == bnmDripOps150.ContractType.String() ||
+		isBurnMintERC677TokenType(typ)
+}
+
+func isBurnMintERC677TokenType(typ datastore.ContractType) bool {
+	return typ.String() == cciputils.BurnMintToken.String() ||
+		typ.String() == cciputils.ERC677TokenHelper.String()
 }

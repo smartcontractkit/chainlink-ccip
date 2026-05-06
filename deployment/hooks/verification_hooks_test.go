@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,10 +25,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
 )
-
-// concurrentStepsLimit must match hooks.concurrentVerificationsLimit so the test documents the
-// expected ceiling for in-flight step goroutines per network.
-const concurrentStepsLimit = 5
 
 // stubContractVerification implements hooks.ContractVerification with no-op behavior so
 // post/pre hooks exit quickly (empty network list, skip every network).
@@ -389,10 +386,11 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PassesRefsTo
 	}
 }
 
-// TestIterateVerifiers_VerificationStepsRespectConcurrencyLimit spawns more address refs than the
-// per-network verification limit; peak concurrent step executions should reach the limit (not 1),
-// proving errgroup-limited parallelism within a single network.
-func TestIterateVerifiers_VerificationStepsRespectConcurrencyLimit(t *testing.T) {
+// TestIterateVerifiers_VerificationStepsSerializedForExplorerRateLimit spawns more address refs
+// than the per-network errgroup limit, but IterateVerifiers holds a global mutex around each
+// verification step plus a post-step cooldown for explorer APIs. Peak concurrent step executions
+// should therefore stay at one.
+func TestIterateVerifiers_VerificationStepsSerializedForExplorerRateLimit(t *testing.T) {
 	t.Parallel()
 
 	chain, ok := chainsel.ChainBySelector(chainsel.ETHEREUM_MAINNET.Selector)
@@ -447,8 +445,8 @@ func TestIterateVerifiers_VerificationStepsRespectConcurrencyLimit(t *testing.T)
 			cur := inFlight
 			mu.Unlock()
 
-			if cur > concurrentStepsLimit {
-				t.Errorf("in-flight steps %d exceeds limit %d", cur, concurrentStepsLimit)
+			if cur > 1 {
+				t.Errorf("in-flight steps %d exceeds serialized limit 1", cur)
 			}
 
 			time.Sleep(5 * time.Millisecond)
@@ -460,14 +458,14 @@ func TestIterateVerifiers_VerificationStepsRespectConcurrencyLimit(t *testing.T)
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, concurrentStepsLimit, maxConcurrent,
-		"with %d refs and limit %d, peak concurrency should hit the limit", concurrentStepsLimit+1, concurrentStepsLimit)
+	require.Equal(t, 1, maxConcurrent,
+		"explorer rate-limit mutex should serialize steps so peak in-flight is 1")
 }
 
-// TestIterateVerifiers_MultipleNetworksRunInParallel uses three networks with one ref each and a
-// non-trivial step delay. If network iterations were strictly sequential, wall time would be ~3×
-// the delay; with parallel network goroutines, elapsed time should stay near one delay.
-func TestIterateVerifiers_MultipleNetworksRunInParallel(t *testing.T) {
+// TestIterateVerifiers_MultipleNetworksAllRefsProcessed runs three networks with one ref each and
+// asserts every ref receives a step. Network errgroups still run concurrently, but verification
+// steps are serialized globally with a cooldown, so wall time is not used as a signal here.
+func TestIterateVerifiers_MultipleNetworksAllRefsProcessed(t *testing.T) {
 	t.Parallel()
 
 	eth, ok := chainsel.ChainBySelector(chainsel.ETHEREUM_MAINNET.Selector)
@@ -498,20 +496,15 @@ func TestIterateVerifiers_MultipleNetworksRunInParallel(t *testing.T) {
 	cfg, err := verifier.FilterNetworks("", domain.Domain{}, logger.Test(t))
 	require.NoError(t, err)
 
-	const stepDelay = 80 * time.Millisecond
-	start := time.Now()
+	var stepCount atomic.Int32
 	err = hooks.IterateVerifiers(t.Context(), ds.Seal(), cfg, logger.Test(t), "test", verifier,
 		func(_ context.Context, _ cldverification.Verifiable, _ datastore.AddressRef, _ uint64) error {
-			time.Sleep(stepDelay)
+			stepCount.Add(1)
 			return nil
 		},
 	)
 	require.NoError(t, err)
-	elapsed := time.Since(start)
-
-	// Sequential network work would be ~3 * stepDelay; parallel network goroutines overlap.
-	require.Less(t, elapsed, 2*stepDelay,
-		"elapsed %v should be well under 3×%v if networks run in parallel", elapsed, stepDelay)
+	require.Equal(t, int32(3), stepCount.Load(), "each network's ref should run the step once")
 }
 
 func TestNewVerifyDeployedContractsPostHook_SkipsWhenApplyFailed(t *testing.T) {
