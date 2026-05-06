@@ -1,6 +1,8 @@
 package authorizedcallers
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -25,4 +27,16 @@ type ApplyInput struct {
 	ContractType  cldf.ContractType `json:"contractType"         yaml:"contractType"`
 	Version       *semver.Version   `json:"version"              yaml:"version"`
 	Update        CallerUpdate      `json:"update"               yaml:"update"`
+}
+
+// ValidateApplyInput returns an error when required fields are missing so registry
+// lookup and semver formatting never panic on nil version or empty contract type.
+func ValidateApplyInput(in ApplyInput) error {
+	if in.Version == nil {
+		return fmt.Errorf("authorized callers update requires a non-nil version for contract %q on chain %d", in.ContractType, in.ChainSelector)
+	}
+	if in.ContractType == "" {
+		return fmt.Errorf("authorized callers update requires contractType on chain %d", in.ChainSelector)
+	}
+	return nil
 }

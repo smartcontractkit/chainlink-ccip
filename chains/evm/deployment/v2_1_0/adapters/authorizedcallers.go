@@ -93,6 +93,9 @@ func NewEVMAuthorizedCallersAdapter[ARGS any](
 // do not retain an RMN address from a prior Environment (e.g. another test's simulated chain).
 // Must still be invoked before GetAllAuthorizedCallers or ApplyAuthorizedCallerUpdates for a given triple.
 func (a *EVMAuthorizedCallersAdapter) Initialize(e cldf.Environment, in api.ApplyInput) error {
+	if err := api.ValidateApplyInput(in); err != nil {
+		return err
+	}
 	key := addrCacheKey(in.ChainSelector, in.ContractType, in.Version)
 	ref := datastore.AddressRef{
 		Type:    datastore.ContractType(in.ContractType),
@@ -149,6 +152,9 @@ func (a *EVMAuthorizedCallersAdapter) ApplyAuthorizedCallerUpdates() *cldf_ops.S
 		semver.MustParse("1.0.0"),
 		"Applies authorized caller updates on an AuthorizedCallers-inheriting EVM contract",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in api.ApplyInput) (sequtil.OnChainOutput, error) {
+			if err := api.ValidateApplyInput(in); err != nil {
+				return sequtil.OnChainOutput{}, err
+			}
 			chain, ok := chains.EVMChains()[in.ChainSelector]
 			if !ok {
 				return sequtil.OnChainOutput{}, fmt.Errorf("chain %d not found", in.ChainSelector)
@@ -181,6 +187,12 @@ func (a *EVMAuthorizedCallersAdapter) cachedAddr(
 	contractType cldf.ContractType,
 	version *semver.Version,
 ) (common.Address, error) {
+	if version == nil {
+		return common.Address{}, fmt.Errorf("no cached address lookup: version is nil for %q on chain %d", contractType, selector)
+	}
+	if contractType == "" {
+		return common.Address{}, fmt.Errorf("no cached address lookup: contractType is empty on chain %d", selector)
+	}
 	key := addrCacheKey(selector, contractType, version)
 	addr, ok := a.addrCache[key]
 	if !ok {
@@ -192,7 +204,11 @@ func (a *EVMAuthorizedCallersAdapter) cachedAddr(
 }
 
 func addrCacheKey(selector uint64, contractType cldf.ContractType, version *semver.Version) string {
-	return fmt.Sprintf("%d|%s|%s", selector, contractType, version.String())
+	ver := ""
+	if version != nil {
+		ver = version.String()
+	}
+	return fmt.Sprintf("%d|%s|%s", selector, contractType, ver)
 }
 
 func toEVMAddresses(callers []api.Caller) ([]common.Address, error) {

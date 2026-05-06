@@ -26,8 +26,8 @@ type AuthorizedCallersAdapter interface {
 	Initialize(e cldf.Environment, in ApplyInput) error
 
 	// GetAllAuthorizedCallers returns the current set of authorized callers on the
-	// target contract. Uses a direct chain binding — not the OperationsBundle cache —
-	// so that post-write reads always return fresh state.
+	// target contract. Adapters should execute the generated read op against live chain
+	// RPC without replaying cached ExecuteOperation reports from the environment bundle.
 	GetAllAuthorizedCallers(e cldf.Environment, selector uint64, contractType cldf.ContractType, version *semver.Version) ([]Caller, error)
 
 	// ApplyAuthorizedCallerUpdates returns the sequence that calls
@@ -61,12 +61,16 @@ func GetAuthorizedCallersRegistry() *AuthorizedCallersRegistry {
 
 // RegisterAdapter registers an AuthorizedCallersAdapter for the given
 // (chain family, ContractType, version) triple. Silently skips duplicate registrations.
+// Skips (no-op) when version is nil or contractType is empty so adapterKey does not mis-register.
 func (r *AuthorizedCallersRegistry) RegisterAdapter(
 	family string,
 	contractType cldf.ContractType,
 	version *semver.Version,
 	a AuthorizedCallersAdapter,
 ) {
+	if version == nil || contractType == "" {
+		return
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := adapterKey(family, contractType, version)
@@ -91,6 +95,12 @@ func (r *AuthorizedCallersRegistry) GetAdapter(
 // (which only encodes family+version) by also including ContractType, because
 // multiple AuthorizedCallers-inheriting contracts may exist for the same
 // chain family and version (e.g. RMN, FeeQuoter, AdvancedPoolHooks).
+// A nil version yields an empty semver segment (avoid panics); callers should
+// validate inputs instead of relying on that encoding.
 func adapterKey(family string, contractType cldf.ContractType, version *semver.Version) string {
-	return fmt.Sprintf("%s-%s-%s", family, contractType, version.String())
+	verStr := ""
+	if version != nil {
+		verStr = version.String()
+	}
+	return fmt.Sprintf("%s-%s-%s", family, contractType, verStr)
 }

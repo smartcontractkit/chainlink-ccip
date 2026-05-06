@@ -38,6 +38,9 @@ func ConfigureAuthorizedCallersChangeset(
 func verifyAuthorizedCallersInput(reg *AuthorizedCallersRegistry) func(cldf.Environment, Config) error {
 	return func(e cldf.Environment, cfg Config) error {
 		for _, in := range cfg.Updates {
+			if err := ValidateApplyInput(in); err != nil {
+				return err
+			}
 			family, err := chain_selectors.GetSelectorFamily(in.ChainSelector)
 			if err != nil {
 				return fmt.Errorf("failed to get chain family for selector %d: %w", in.ChainSelector, err)
@@ -76,6 +79,9 @@ func applyAuthorizedCallers(
 		order := make([]groupKey, 0, len(cfg.Updates))
 
 		for _, in := range cfg.Updates {
+			if err := ValidateApplyInput(in); err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
 			family, err := chain_selectors.GetSelectorFamily(in.ChainSelector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", in.ChainSelector, err)
@@ -96,9 +102,12 @@ func applyAuthorizedCallers(
 				adapterKey:    adapterKey(family, in.ContractType, in.Version),
 				chainSelector: in.ChainSelector,
 			}
-			if _, exists := grouped[key]; !exists {
-				order = append(order, key)
+			if _, exists := grouped[key]; exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf(
+					"duplicate Updates entry for chain %d, contract type %q, version %s: merge into a single ApplyInput",
+					in.ChainSelector, in.ContractType, in.Version.String())
 			}
+			order = append(order, key)
 			grouped[key] = groupDetail{adapter: adapter, input: in}
 		}
 
