@@ -43,7 +43,7 @@ After the static header, variable-length fields are encoded in order. Each uses 
 | uint16 | `data` | Arbitrary user payload |
 
 - **INV-MSG-6**: All variable-length fields use a length prefix followed by content: `uint8` for addresses, `uint16` for data blobs. This applies uniformly across MessageV1, TokenTransferV1, and ExtraArgsV3.
-- **INV-MSG-7**: Addresses use the minimal native byte length for their chain family. Source-side addresses on must be padded for legacy reasons (e.g. 20-byte EVM addresses encoded as 32 bytes). Destination-side addresses are always unpadded.
+- **INV-MSG-7**: Addresses use the minimal native byte length for their chain family. Source-side addresses must be padded for legacy reasons (e.g. 20-byte EVM addresses encoded as 32 bytes). Destination-side addresses are always unpadded.
 - **INV-MSG-8**: Destination-side addresses must match the configured native byte length for the destination chain. Padded inputs are rejected unless the padding bytes are all zero, in which case they are trimmed to the native length.
 
 ### 1.4 TokenTransferV1 Encoding
