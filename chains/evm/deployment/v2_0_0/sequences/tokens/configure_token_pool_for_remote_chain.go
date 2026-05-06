@@ -70,6 +70,9 @@ type activePoolImportedConfig struct {
 	DefaultOutbound *tokens.RateLimiterConfig
 	DefaultInbound  *tokens.RateLimiterConfig
 	RemotePools     [][]byte
+	// LegacyPoolVersion is the version of the imported pool. Pre-1.6.1 EVM pools store inbound
+	// rate limits in source/remote decimals; the new pool expects local/destination decimals.
+	LegacyPoolVersion *semver.Version
 }
 
 var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
@@ -116,6 +119,22 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		if importedDefaultInbound != nil && !input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled {
 			inboundRateLimiterConfig = *importedDefaultInbound
+			// Pre-1.6.1 EVM pools stored inbound limits in source/remote decimals.
+			// New pools consume inbound limits in local/destination decimals, so rebase before applying.
+			if imported.LegacyPoolVersion != nil && imported.LegacyPoolVersion.LessThan(semver.MustParse("1.6.1")) {
+				if input.RemoteChainConfig.RemoteDecimals == 0 {
+					b.Logger.Warnf(
+						"remote decimals not set when importing inbound rate limits from pre-1.6.1 active pool for remote chain %d; preserving imported inbound limits without decimal normalization",
+						input.RemoteChainSelector,
+					)
+				} else {
+					inboundRateLimiterConfig = normalizeInboundRateLimiterConfig(
+						inboundRateLimiterConfig,
+						input.RemoteChainConfig.RemoteDecimals,
+						localDecimalsReport.Output,
+					)
+				}
+			}
 		}
 
 		// Read allowedFinalityConfig to determine whether to use fast finality (custom) or default finality
@@ -379,10 +398,20 @@ func importConfigFromActivePool(
 		// Configuration import from another 2.0.0 pool is not currently supported
 		return nil, nil
 	}
+	var cfg *activePoolImportedConfig
+	var importErr error
 	if tav.Version.LessThan(semver.MustParse("1.5.1")) {
-		return importConfigFromActivePoolV150(b, chain, chainSelector, activePool, remoteChainSelector, tav)
+		cfg, importErr = importConfigFromActivePoolV150(b, chain, chainSelector, activePool, remoteChainSelector, tav)
+	} else {
+		cfg, importErr = importConfigFromActivePoolV161(b, chain, chainSelector, activePool, remoteChainSelector)
 	}
-	return importConfigFromActivePoolV161(b, chain, chainSelector, activePool, remoteChainSelector)
+	if importErr != nil {
+		return nil, importErr
+	}
+	if cfg != nil {
+		cfg.LegacyPoolVersion = tav.Version
+	}
+	return cfg, nil
 }
 
 // importConfigFromActivePoolV150 imports rate limits and the single remote pool for the given remote chain
@@ -514,6 +543,36 @@ func importConfigFromActivePoolV161(
 		DefaultInbound:  tokenBucketToRateLimiterConfig(inboundReport.Output),
 		RemotePools:     remotePoolsReport.Output,
 	}, nil
+}
+
+// normalizeInboundRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
+// Applied when importing inbound limits from pre-1.6.1 EVM pools, which stored them in
+// source/remote decimals, into a new pool that expects local/destination decimals.
+func normalizeInboundRateLimiterConfig(cfg tokens.RateLimiterConfig, fromDecimals, toDecimals uint8) tokens.RateLimiterConfig {
+	if fromDecimals == toDecimals {
+		return cfg
+	}
+	out := cfg
+	out.Capacity = scaleDecimalsInt(cfg.Capacity, fromDecimals, toDecimals)
+	out.Rate = scaleDecimalsInt(cfg.Rate, fromDecimals, toDecimals)
+	return out
+}
+
+// scaleDecimalsInt rescales amount by 10^(toDecimals-fromDecimals).
+func scaleDecimalsInt(amount *big.Int, fromDecimals, toDecimals uint8) *big.Int {
+	if amount == nil {
+		return big.NewInt(0)
+	}
+	out := new(big.Int).Set(amount)
+	if toDecimals > fromDecimals {
+		factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(toDecimals-fromDecimals)), nil)
+		return out.Mul(out, factor)
+	}
+	if fromDecimals > toDecimals {
+		factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(fromDecimals-toDecimals)), nil)
+		return out.Div(out, factor)
+	}
+	return out
 }
 
 // tokenBucketV150ToRateLimiterConfig converts a 1.5.0 (proxy bindings) RateLimiterTokenBucket to tokens.RateLimiterConfig.
