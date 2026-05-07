@@ -8,6 +8,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -100,10 +101,10 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", src.Selector, err)
 			}
-			srcResolver, ok := feeRegistry.GetFeeResolver(srcFamily)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no fee resolver found for chain family %s (src selector %d)", srcFamily, src.Selector)
-			}
+			// srcResolver, ok := feeRegistry.GetFeeResolver(srcFamily)
+			// if !ok {
+			// 	return cldf.ChangesetOutput{}, fmt.Errorf("no fee resolver found for chain family %s (src selector %d)", srcFamily, src.Selector)
+			// }
 
 			// NOTE: we could have a pair A (src --> dst1) & a pair B (src --> dst2) where pair A has
 			// an FeeQ with version v1.6.0 and pair B has an FeeQ with version v2.0.0. In these cases
@@ -113,7 +114,10 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			feeGroups := map[datastore.AddressRefKey]FeeGroup{}
 			for _, dst := range src.Settings {
 				// Version inference part 1: we use the router contract to infer the currently configured on ramp
-				onRampRef, err := srcResolver.GetOnRampRef(e, src.Selector, dst.Selector)
+				onRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+					ChainSelector: src.Selector,
+					Type:          datastore.ContractType("OnRamp"),
+				}, src.Selector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get OnRamp address ref from Router for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
