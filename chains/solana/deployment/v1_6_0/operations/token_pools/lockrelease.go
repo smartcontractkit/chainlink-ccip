@@ -312,6 +312,35 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		batches := make([]types.BatchOperation, 0)
+		var ixns []solana.Instruction
+
+		// There is a bug on the token pool contract which does not allow us to set the actual rate limits directly.
+		// We have to setup dummy limits first and then update it.
+		// If the user is trying to set actual limits (enabled=true), we set dummy limits first and then update.
+		if inbound.Enabled || outbound.Enabled {
+			ixDummyRates, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				lockrelease_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				lockrelease_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, ixDummyRates)
+		}
+
 		ixn, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
 			input.RemoteSelector,
 			input.TokenMint,
@@ -324,10 +353,12 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+		ixns = append(ixns, ixn)
+
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
-				[]solana.Instruction{ixn},
+				ixns,
 				input.TokenPool.String(),
 				common_utils.LockReleaseTokenPool.String(),
 			)
@@ -337,7 +368,7 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 			batches = append(batches, b)
 			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
+			err = chain.Confirm(ixns)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
