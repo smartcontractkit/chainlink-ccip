@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-use crate::config::load_config_v1_unchecked;
-use crate::config::ConfigV1;
-use crate::context::{MigrateConfigV1ToV2, ANCHOR_DISCRIMINATOR};
+use crate::config::{load_config_v2_unchecked, ConfigV2};
+use crate::context::{MigrateConfigV2ToV3, ANCHOR_DISCRIMINATOR};
 use crate::instructions::interfaces::Public;
 use crate::state::Config;
 use crate::{CurseSubject, Curses, InspectCurses, RmnRemoteError};
@@ -28,15 +27,15 @@ impl Public for Impl {
         Ok(())
     }
 
-    fn migrate_config_v1_to_v2(&self, ctx: Context<MigrateConfigV1ToV2>) -> Result<()> {
-        let required_v2_space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE;
-        let minimum_balance = Rent::get()?.minimum_balance(required_v2_space);
+    fn migrate_config_v2_to_v3(&self, ctx: Context<MigrateConfigV2ToV3>) -> Result<()> {
+        let required_v3_space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE;
+        let minimum_balance = Rent::get()?.minimum_balance(required_v3_space);
 
         let account_info = &ctx.accounts.config.to_account_info();
 
         require_eq!(
             account_info.data_len(),
-            ANCHOR_DISCRIMINATOR + ConfigV1::INIT_SPACE, // it's v1 space
+            ANCHOR_DISCRIMINATOR + ConfigV2::INIT_SPACE, // it's v2 space
             RmnRemoteError::InvalidInputsConfigAccount
         );
 
@@ -55,26 +54,32 @@ impl Public for Impl {
                 minimum_balance.checked_sub(current_lamports).unwrap(),
             )?;
         }
-        account_info.realloc(required_v2_space, false)?;
+        account_info.realloc(required_v3_space, false)?;
 
         // Set the new values
-        msg!("Loading config V1...");
-        let config_v1 = load_config_v1_unchecked(account_info.try_borrow_data()?)?;
-        msg!("Read config V1: {:?}", config_v1);
+        msg!("Loading config V2...");
+        let config_v2 = load_config_v2_unchecked(account_info.try_borrow_data()?)?;
+        msg!("Read config V2: {:?}", config_v2);
         require_eq!(
-            config_v1.version,
-            1, // confirm it was v1
+            config_v2.version,
+            2, // confirm it was v2
             RmnRemoteError::InvalidInputsConfigAccount
         );
 
-        let mut config: Config = config_v1.try_into()?;
+        let new_config = Config {
+            version: 3,
+            owner: config_v2.owner,
+            proposed_owner: config_v2.proposed_owner,
+            default_code_version: config_v2.default_code_version,
+            event_authorities: config_v2.event_authorities,
 
-        config.version = 2; // migrate to version 2
-        config.event_authorities = vec![]; // backwards-compatible default, so the migration can be permissionless
+            // new v3 fields
+            curser: config_v2.owner, // initialize to same value as owner, so there is no downtime on cursing
+        };
 
         // Write back to permanent state
-        msg!("Writing migrated RMNRemote Config v2 to account...");
-        config.try_serialize(&mut &mut ctx.accounts.config.try_borrow_mut_data()?[..])?;
+        msg!("Writing migrated RMNRemote Config to account...");
+        new_config.try_serialize(&mut &mut ctx.accounts.config.try_borrow_mut_data()?[..])?;
 
         Ok(())
     }

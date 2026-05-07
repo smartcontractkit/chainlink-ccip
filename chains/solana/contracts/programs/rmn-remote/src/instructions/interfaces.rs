@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::context::{MigrateConfigV1ToV2, UpdateEventAuthorities};
+use crate::context::{MigrateConfigV2ToV3, UpdateEventAuthorities};
 use crate::state::CodeVersion;
 use crate::{AcceptOwnership, Curse, CurseSubject, InspectCurses, Uncurse, UpdateConfig};
 
 pub trait Public {
     fn verify_not_cursed(&self, ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()>;
 
-    fn migrate_config_v1_to_v2(&self, ctx: Context<MigrateConfigV1ToV2>) -> Result<()>;
+    fn migrate_config_v2_to_v3(&self, ctx: Context<MigrateConfigV2ToV3>) -> Result<()>;
 }
 
 pub trait Admin {

@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 use ccip_common::seed;
 
-use crate::{program::RmnRemote, Config, CurseSubject, Curses, RmnRemoteError};
+use crate::{
+    config::load_config, program::RmnRemote, Config, CurseSubject, Curses, RmnRemoteError,
+};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -22,7 +24,7 @@ pub fn uninitialized(v: u8) -> bool {
 
 /// Maximum acceptable config version accepted by this module: any accounts with higher
 /// version numbers than this will be rejected.
-pub const MAX_CONFIG_V: u8 = 2;
+pub const MAX_CONFIG_V: u8 = 3;
 pub const MAX_CURSES_V: u8 = 1;
 
 #[derive(Accounts)]
@@ -70,7 +72,7 @@ pub struct UpdateConfig<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+        constraint = config.version == MAX_CONFIG_V @ RmnRemoteError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -93,7 +95,7 @@ pub struct UpdateEventAuthorities<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = version_in_range(config.version, 2, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+        constraint = config.version == MAX_CONFIG_V @ RmnRemoteError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + Config::dynamic_len(new_event_authorities.len()),
         realloc::payer = authority,
         realloc::zero = false,
@@ -107,7 +109,7 @@ pub struct UpdateEventAuthorities<'info> {
 }
 
 #[derive(Accounts)]
-pub struct MigrateConfigV1ToV2<'info> {
+pub struct MigrateConfigV2ToV3<'info> {
     #[account(
         mut,
         seeds = [seed::CONFIG],
@@ -130,7 +132,7 @@ pub struct AcceptOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+        constraint = config.version == MAX_CONFIG_V @ RmnRemoteError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -141,15 +143,16 @@ pub struct AcceptOwnership<'info> {
 
 #[derive(Accounts)]
 pub struct Curse<'info> {
+    /// CHECK: Unchecked by Anchor as we will be migrating the Config account in-place. Thus, we will be loading the
+    /// account manually to handle the different structs before and after migration., allowing for no-downtime migration.
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
+    pub config: UncheckedAccount<'info>,
 
     // validate signer is registered admin
-    #[account(mut, address = config.owner @ RmnRemoteError::Unauthorized)]
+    #[account(mut, address = load_config(&config).unwrap().curser @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(
@@ -168,15 +171,16 @@ pub struct Curse<'info> {
 
 #[derive(Accounts)]
 pub struct Uncurse<'info> {
+    /// CHECK: Unchecked by Anchor as we will be migrating the Config account in-place. Thus, we will be loading the
+    /// account manually to handle the different structs before and after migration., allowing for no-downtime migration.
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
+    pub config: UncheckedAccount<'info>,
 
     // validate signer is registered admin
-    #[account(mut, address = config.owner @ RmnRemoteError::Unauthorized)]
+    #[account(mut, address = load_config(&config).unwrap().owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(
@@ -207,8 +211,7 @@ pub struct InspectCurses<'info> {
         bump,
         owner = crate::ID, // check it is initialized, can be removed when using Account<'info, Config>
     )]
-    /// CHECK: using UncheckedAccount to allow no-downtime during config upgrade, so load using load_config method.
-    /// After the upgrade is made, this can be changed to Account<'info, Config>.
+    /// CHECK: using UncheckedAccount to allow no-downtime during config upgrade.
     pub config: UncheckedAccount<'info>,
 }
 
@@ -217,12 +220,13 @@ pub struct CpiEvent<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = version_in_range(config.version, 2, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
+    /// CHECK: using UncheckedAccount to allow no-downtime during config upgrade, so load using load_config method.
+    /// After the upgrade is made, this can be changed to Account<'info, Config>.
+    pub config: UncheckedAccount<'info>,
 
     #[account(
-        constraint = config.event_authorities.contains(authority.key) @ RmnRemoteError::Unauthorized,
+        constraint = load_config(&config).unwrap().event_authorities.contains(authority.key) @ RmnRemoteError::Unauthorized,
     )]
     pub authority: Signer<'info>,
 }

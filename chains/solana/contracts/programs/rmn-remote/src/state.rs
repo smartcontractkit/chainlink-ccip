@@ -63,8 +63,10 @@ pub struct Config {
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
 
+    pub curser: Pubkey, // the only account authorized to curse subjects. Added in v3 struct (keeping variable-length fields at the end)
+
     #[max_len(0)] // just for INIT_SPACE calculation
-    pub event_authorities: Vec<Pubkey>,
+    pub event_authorities: Vec<Pubkey>, // added in v2 struct
 }
 
 impl Config {
