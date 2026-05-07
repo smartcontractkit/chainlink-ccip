@@ -3,6 +3,8 @@ package deployment
 import (
 	"bytes"
 	"fmt"
+	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -704,6 +706,200 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		assertPoolConnected(t, poolB, selB, selA, poolAddrA, tokAddrA)
 		assertBMRateLimitsEnabled(t, poolA, selB)
 		assertBMRateLimitsEnabled(t, poolB, selA)
+	})
+
+	// -----------------------------------------------------------------------
+	// Scenario 5: Re-run on pools seeded with unpadded 20-byte remote pool
+	// addresses (regression test for the ChainAlreadyExists / padding bug fix)
+	// -----------------------------------------------------------------------
+	t.Run("Scenario5_RemotePoolPaddingMigration", func(t *testing.T) {
+		tokenSymbolA := "S5E_TOK_A"
+		tokenSymbolB := "S5E_TOK_B"
+		poolQualA := "S5E_POOL_A"
+		poolQualB := "S5E_POOL_B"
+
+		// Deploy tokens + pools on both chains without connecting them yet.
+		// SkipOwnershipTransfer keeps the deployer as pool owner so we can
+		// directly seed the buggy 20-byte address state in the next step.
+		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 5E deploy"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				selA: {
+					SkipOwnershipTransfer: true,
+					TokenPoolVersion:      v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "Scenario5E Token A", Symbol: tokenSymbolA, Decimals: 18,
+						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: poolQualA,
+						PoolType:           bmPoolType.String(),
+					},
+				},
+				selB: {
+					SkipOwnershipTransfer: true,
+					TokenPoolVersion:      v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "Scenario5E Token B", Symbol: tokenSymbolB, Decimals: 18,
+						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: poolQualB,
+						PoolType:           bmPoolType.String(),
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, output.DataStore)
+
+		chainA := env.BlockChains.EVMChains()[selA]
+		chainB := env.BlockChains.EVMChains()[selB]
+
+		poolAddrA, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: selA, Qualifier: poolQualA, Type: datastore.ContractType(bmPoolType),
+		})
+		require.NoError(t, err)
+		poolAddrB, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: selB, Qualifier: poolQualB, Type: datastore.ContractType(bmPoolType),
+		})
+		require.NoError(t, err)
+
+		tokAddrA := assertTokenExists(t, env, selA, tokenSymbolA, "Scenario5E Token A", 18)
+		tokAddrB := assertTokenExists(t, env, selB, tokenSymbolB, "Scenario5E Token B", 18)
+
+		poolA, err := bnmpool.NewBurnMintTokenPool(poolAddrA, chainA.Client)
+		require.NoError(t, err)
+		poolB, err := bnmpool.NewBurnMintTokenPool(poolAddrB, chainB.Client)
+		require.NoError(t, err)
+
+		// Simulate the buggy prior state: call ApplyChainUpdates directly with raw 20-byte
+		// (unpadded) pool addresses. CCIP expects 32-byte ABI-encoded (left-padded) addresses,
+		// so this mimics what a pre-fix deployment would have stored on-chain.
+		disabledRL := bnmpool.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+		tx, err := poolA.ApplyChainUpdates(chainA.DeployerKey, []uint64{}, []bnmpool.TokenPoolChainUpdate{
+			{
+				RemoteChainSelector:       selB,
+				RemotePoolAddresses:       [][]byte{poolAddrB.Bytes()}, // 20-byte, not left-padded
+				RemoteTokenAddress:        common.LeftPadBytes(tokAddrB.Bytes(), 32),
+				OutboundRateLimiterConfig: disabledRL,
+				InboundRateLimiterConfig:  disabledRL,
+			},
+		})
+		require.NoError(t, err)
+		_, err = chainA.Confirm(tx)
+		require.NoError(t, err)
+
+		tx, err = poolB.ApplyChainUpdates(chainB.DeployerKey, []uint64{}, []bnmpool.TokenPoolChainUpdate{
+			{
+				RemoteChainSelector:       selA,
+				RemotePoolAddresses:       [][]byte{poolAddrA.Bytes()}, // 20-byte, not left-padded
+				RemoteTokenAddress:        common.LeftPadBytes(tokAddrA.Bytes(), 32),
+				OutboundRateLimiterConfig: disabledRL,
+				InboundRateLimiterConfig:  disabledRL,
+			},
+		})
+		require.NoError(t, err)
+		_, err = chainB.Confirm(tx)
+		require.NoError(t, err)
+
+		// Verify the seed: only the raw 20-byte entry exists on each pool.
+		remotePoolsOnA, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, selB)
+		require.NoError(t, err)
+		require.Len(t, remotePoolsOnA, 1)
+		require.Equal(t, poolAddrB.Bytes(), remotePoolsOnA[0], "seed: only the 20-byte entry should exist")
+
+		// Build the connect input once; it is reused for both the fix run and idempotency run.
+		connectInput := tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 5E connect"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				selA: {
+					SkipOwnershipTransfer: true,
+					TokenPoolVersion:      v1_5_1_scenarios,
+					TokenTransferConfig: &tokensapi.TokenTransferConfig{
+						TokenPoolRef: datastore.AddressRef{
+							ChainSelector: selA, Qualifier: poolQualA,
+							Type: datastore.ContractType(bmPoolType), Version: v1_5_1_scenarios,
+						},
+						TokenRef: datastore.AddressRef{
+							Qualifier: tokenSymbolA,
+							Type:      datastore.ContractType(bnmERC20ops.ContractType),
+						},
+						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							selB: {
+								RemoteToken: &datastore.AddressRef{
+									ChainSelector: selB, Qualifier: tokenSymbolB,
+									Type: datastore.ContractType(bnmERC20ops.ContractType),
+								},
+								RemotePool: &datastore.AddressRef{
+									ChainSelector: selB, Qualifier: poolQualB,
+									Type: datastore.ContractType(bmPoolType), Version: v1_5_1_scenarios,
+								},
+							},
+						},
+					},
+				},
+				selB: {
+					SkipOwnershipTransfer: true,
+					TokenPoolVersion:      v1_5_1_scenarios,
+					TokenTransferConfig: &tokensapi.TokenTransferConfig{
+						TokenPoolRef: datastore.AddressRef{
+							ChainSelector: selB, Qualifier: poolQualB,
+							Type: datastore.ContractType(bmPoolType), Version: v1_5_1_scenarios,
+						},
+						TokenRef: datastore.AddressRef{
+							Qualifier: tokenSymbolB,
+							Type:      datastore.ContractType(bnmERC20ops.ContractType),
+						},
+						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							selA: {
+								RemoteToken: &datastore.AddressRef{
+									ChainSelector: selA, Qualifier: tokenSymbolA,
+									Type: datastore.ContractType(bnmERC20ops.ContractType),
+								},
+								RemotePool: &datastore.AddressRef{
+									ChainSelector: selA, Qualifier: poolQualA,
+									Type: datastore.ContractType(bmPoolType), Version: v1_5_1_scenarios,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Run TokenExpansion to connect the pools. The exact-comparison fix ensures the sequence
+		// recognises that the stored 20-byte entry does not match the required 32-byte padded
+		// form and calls AddRemotePool rather than returning early — all without reverting with
+		// ChainAlreadyExists.
+		output, err = tokensapi.TokenExpansion().Apply(*env, connectInput)
+		require.NoError(t, err, "re-configuring pools seeded with 20-byte addresses must not return ChainAlreadyExists")
+		MergeAddresses(t, env, output.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+		// The 32-byte padded address must now be registered (alongside the legacy 20-byte entry).
+		paddedPoolAddrB := common.LeftPadBytes(poolAddrB.Bytes(), 32)
+		remotePoolsOnA, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, selB)
+		require.NoError(t, err)
+		require.True(t, slices.ContainsFunc(remotePoolsOnA, func(rp []byte) bool {
+			return bytes.Equal(rp, paddedPoolAddrB)
+		}), "32-byte padded pool B address should be registered on pool A after re-configuration")
+
+		paddedPoolAddrA := common.LeftPadBytes(poolAddrA.Bytes(), 32)
+		remotePoolsOnB, err := poolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, selA)
+		require.NoError(t, err)
+		require.True(t, slices.ContainsFunc(remotePoolsOnB, func(rp []byte) bool {
+			return bytes.Equal(rp, paddedPoolAddrA)
+		}), "32-byte padded pool A address should be registered on pool B after re-configuration")
+
+		// Idempotency: re-run the same connect config. The 32-byte address is now registered
+		// and rate limits are unchanged, so the sequence must return early (no-op). Without the
+		// early-return fix this path reverted with ChainAlreadyExists.
+		output, err = tokensapi.TokenExpansion().Apply(*env, connectInput)
+		require.NoError(t, err, "idempotent re-run must not revert with ChainAlreadyExists")
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 	})
 }
 

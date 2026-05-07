@@ -43,6 +43,9 @@ import (
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+
+	// Registers SolanaAddressNormalizer on deployapi (v1_6_0 sequences do not import v1_0_0 adapters).
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
 )
 
 func TestTokensAndTokenPools(t *testing.T) {
@@ -1020,5 +1023,60 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
 			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
+	})
+}
+
+func TestTryNormalizeAddressRef(t *testing.T) {
+	evmChainSel := chainsel.TEST_90000001.Selector
+	solChainSel := chainsel.SOLANA_DEVNET.Selector
+
+	t.Run("empty_address_returns_clone", func(t *testing.T) {
+		ref := datastore.AddressRef{ChainSelector: evmChainSel}
+		got, err := tokensapi.TryNormalizeAddressRef(evmChainSel, ref)
+		require.NoError(t, err)
+		require.Empty(t, got.Address)
+	})
+
+	t.Run("invalid_selector_returns_error", func(t *testing.T) {
+		ref := datastore.AddressRef{
+			Address:       "0xe939c02e92e9e66d1f0d8e4f099e7d3d269a8a11",
+			ChainSelector: 0,
+		}
+		_, err := tokensapi.TryNormalizeAddressRef(0, ref)
+		require.Error(t, err)
+	})
+
+	t.Run("lowercase_hex_to_EIP55_via_family_normalizer", func(t *testing.T) {
+		lower := "0xe939c02e92e9e66d1f0d8e4f099e7d3d269a8a11"
+		ref := datastore.AddressRef{
+			Address:       lower,
+			ChainSelector: evmChainSel,
+		}
+		got, err := tokensapi.TryNormalizeAddressRef(evmChainSel, ref)
+		require.NoError(t, err)
+		want := common.HexToAddress(lower).Hex()
+		require.Equal(t, want, got.Address)
+		require.NotEqual(t, lower, got.Address, "EIP-55 should not match all-lowercase input")
+	})
+
+	t.Run("solana_invalid_base58_address_returns_error", func(t *testing.T) {
+		ref := datastore.AddressRef{
+			Address:       "not-valid-base58!!!",
+			ChainSelector: solChainSel,
+		}
+		_, err := tokensapi.TryNormalizeAddressRef(solChainSel, ref)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to normalize address")
+	})
+
+	t.Run("solana_system_program_pubkey_via_family_normalizer", func(t *testing.T) {
+		canon := solana.SystemProgramID.String()
+		ref := datastore.AddressRef{
+			Address:       canon,
+			ChainSelector: solChainSel,
+		}
+		got, err := tokensapi.TryNormalizeAddressRef(solChainSel, ref)
+		require.NoError(t, err)
+		require.Equal(t, canon, got.Address)
 	})
 }

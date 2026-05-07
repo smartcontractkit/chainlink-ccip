@@ -308,12 +308,12 @@ func TestIterateContractVerifiers_SkipsNilVersion(t *testing.T) {
 	require.True(t, ok)
 
 	mds := datastore.NewMemoryDataStore()
-	require.NoError(t, mds.Addresses().Add(datastore.AddressRef{
+	require.ErrorContains(t, mds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: chain.Selector,
 		Type:          "MyContract",
 		Version:       nil,
 		Address:       "0x0000000000000000000000000000000000000001",
-	}))
+	}), "version is required")
 
 	cfg := cfgnet.NewConfig([]cfgnet.Network{{
 		Type:          cfgnet.NetworkTypeMainnet,
@@ -332,8 +332,7 @@ func TestIterateContractVerifiers_SkipsNilVersion(t *testing.T) {
 			return nil
 		},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "invalid address ref")
+	require.NoError(t, err)
 }
 
 func TestIterateContractVerifiers_StepError(t *testing.T) {
