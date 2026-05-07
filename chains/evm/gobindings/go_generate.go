@@ -14,7 +14,7 @@ package ccip
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
-//go:generate go run ./wrap ccip RMNRemote rmn_remote
+//go:generate go run ./wrap ccip RMN rmn
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
 
 // Skip these for ZKSync as it doesn't support the create2 opcode
