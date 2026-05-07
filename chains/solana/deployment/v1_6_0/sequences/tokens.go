@@ -22,8 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
 func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokenapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -470,7 +468,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				}
 				var premint uint64 = 0
 				if input.PreMint != nil {
-					value := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
+					value := tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
 					if !value.IsUint64() {
 						return sequences.OnChainOutput{}, fmt.Errorf("pre-mint amount is too large after scaling by decimals: %s", value.String())
 					}

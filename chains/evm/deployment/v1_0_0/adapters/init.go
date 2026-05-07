@@ -18,4 +18,5 @@ func init() {
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilyEVM, &EVMMCMSReader{})
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMTokenBase{})
 	feesapi.GetRegistry().RegisterFeeResolver(chain_selectors.FamilyEVM, &EVMFeeResolver{})
+	deployapi.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, &EVMAddressNormalizer{})
 }
