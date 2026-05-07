@@ -11,9 +11,19 @@ import (
 
 type EVMCCVAggregatorConfigAdapter struct{}
 
+// ResolveDestinationVerifierAddress implements [adapters.AggregatorConfigAdapter].
+func (a *EVMCCVAggregatorConfigAdapter) ResolveDestinationVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	return a.resolveVerifierAddress(ds, chainSelector, qualifier)
+}
+
+// ResolveSourceVerifierAddress implements [adapters.AggregatorConfigAdapter].
+func (a *EVMCCVAggregatorConfigAdapter) ResolveSourceVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	return a.resolveVerifierAddress(ds, chainSelector, qualifier)
+}
+
 var _ ccvdeploymentadapters.AggregatorConfigAdapter = (*EVMCCVAggregatorConfigAdapter)(nil)
 
-func (a *EVMCCVAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+func (a *EVMCCVAggregatorConfigAdapter) resolveVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
 	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
 		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
 		datastore.AddressRef{
