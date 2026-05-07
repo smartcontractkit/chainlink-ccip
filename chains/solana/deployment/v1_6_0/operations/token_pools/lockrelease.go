@@ -316,8 +316,13 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 
 		// There is a bug on the token pool contract which does not allow us to set the actual rate limits directly.
 		// We have to setup dummy limits first and then update it.
-		// If the user is trying to set actual limits (enabled=true), we set dummy limits first and then update.
-		if inbound.Enabled || outbound.Enabled {
+		// This workaround is only needed when the rate limits are being set for the first time (uninitialized),
+		// not when updating already-configured limits, to avoid resetting the token bucket.
+		var remoteChainConfigAccount base_token_pool.BaseChain
+		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		rateLimitsUninitialized := err != nil ||
+			(remoteChainConfigAccount.InboundRateLimit.LastUpdated == 0 && remoteChainConfigAccount.OutboundRateLimit.LastUpdated == 0)
+		if (inbound.Enabled || outbound.Enabled) && rateLimitsUninitialized {
 			ixDummyRates, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
 				input.RemoteSelector,
 				input.TokenMint,
