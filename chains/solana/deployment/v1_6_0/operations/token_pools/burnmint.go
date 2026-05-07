@@ -377,11 +377,16 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 		// not when updating already-enabled limits, to avoid resetting that direction's token bucket.
 		var remoteChainConfigAccount base_token_pool.BaseChain
 		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		// If the account doesn't exist yet (e.g. during token expansion where MCMS batches
+		// init_chain_remote_config and set_chain_rate_limit in a single proposal), we treat
+		// both directions as uninitialized and always prepend the dummy instruction.
+		needsDummy := false
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to read remote chain config account: %w", err)
+			needsDummy = inbound.Enabled || outbound.Enabled
+		} else {
+			needsDummy = (inbound.Enabled && !remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled) ||
+				(outbound.Enabled && !remoteChainConfigAccount.OutboundRateLimit.Cfg.Enabled)
 		}
-		needsDummy := (inbound.Enabled && !remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled) ||
-			(outbound.Enabled && !remoteChainConfigAccount.OutboundRateLimit.Cfg.Enabled)
 		if needsDummy {
 			ixDummyRates, err := burnmint_token_pool.NewSetChainRateLimitInstruction(
 				input.RemoteSelector,
