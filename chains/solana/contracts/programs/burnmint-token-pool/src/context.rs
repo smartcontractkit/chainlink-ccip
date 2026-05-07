@@ -1,3 +1,4 @@
+use crate::{program::BurnmintTokenPool, ChainConfig, State};
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
@@ -5,8 +6,6 @@ use anchor_spl::{
 };
 use base_token_pool::common::*;
 use ccip_common::seed;
-
-use crate::{program::BurnmintTokenPool, ChainConfig, State};
 
 const MAX_POOL_STATE_V: u8 = 1;
 const MAX_POOL_CONFIG_V: u8 = 1;
@@ -92,6 +91,7 @@ pub struct InitializeTokenPool<'info> {
 #[derive(Accounts)]
 pub struct AdminUpdateTokenPool<'info> {
     #[account(
+        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
         constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
@@ -139,6 +139,45 @@ pub struct TransferMintAuthority<'info> {
     // Ensures that the provided program is the BurnmintTokenPool program,
     // and that its associated program data account matches the expected one.
     // This guarantees that only the program's upgrade authority can modify the global config.
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, BurnmintTokenPool>,
+    // Transfer mint authority only allowed by program upgrade authority as it is a critical operation.
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct TransferMintAuthorityToPdaSigner<'info> {
+    #[account(
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        bump,
+        constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
+    )]
+    pub state: Account<'info, State>,
+    #[account(
+        mut,
+        constraint = mint.mint_authority.is_some() @ CcipBnMTokenPoolError::FixedMintToken,
+    )]
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    #[account(address = *mint.to_account_info().owner)]
+    pub token_program: Interface<'info, TokenInterface>,
+    #[account(
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
+        bump,
+        address = state.config.pool_signer,
+    )]
+    /// CHECK: unchecked CPI signer — this is the new mint authority
+    pub pool_signer: UncheckedAccount<'info>,
+    pub authority: Signer<'info>,
+    /// CHECK: validated via constraint — must match the current mint authority (multisig) and not be the pool signer
+    #[account(
+        constraint = valid_current_mint_authority(&mint, &current_mint_authority_account, &pool_signer) @ CcipBnMTokenPoolError::InvalidMultisig,
+    )]
+    pub current_mint_authority_account: UncheckedAccount<'info>,
+
+    // Ensures that the provided program is the BurnmintTokenPool program,
+    // and that its associated program data account matches the expected one.
+    // This guarantees that only the program's upgrade authority can invoke this method
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, BurnmintTokenPool>,
     // Transfer mint authority only allowed by program upgrade authority as it is a critical operation.
@@ -563,4 +602,14 @@ pub fn allowed_admin_modify_token_pool(
 ) -> bool {
     program_data.upgrade_authority_address == Some(authority.key()) && // Only the upgrade authority of the token pool program can modify certain values of a given token pool
     state.config.owner == authority.key() // if only if the token pool is owned by the upgrade authority
+}
+
+/// Checks that the current mint authority account matches the mint's authority and is not the pool signer.
+pub fn valid_current_mint_authority(
+    mint: &InterfaceAccount<Mint>,
+    current_mint_authority_account: &UncheckedAccount,
+    pool_signer: &UncheckedAccount,
+) -> bool {
+    mint.mint_authority == Some(current_mint_authority_account.key()).into()
+        && mint.mint_authority != Some(pool_signer.key()).into()
 }

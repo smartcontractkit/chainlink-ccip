@@ -1,5 +1,5 @@
 export type BurnmintTokenPool = {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "name": "burnmint_token_pool",
   "instructions": [
     {
@@ -223,6 +223,52 @@ export type BurnmintTokenPool = {
       "args": []
     },
     {
+      "name": "transferMintAuthorityToPdaSigner",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "currentMintAuthorityAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "typeVersion",
       "docs": [
         "Returns the program type (name) and version.",
@@ -293,7 +339,7 @@ export type BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -329,7 +375,7 @@ export type BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -947,7 +993,7 @@ export type BurnmintTokenPool = {
 };
 
 export const IDL: BurnmintTokenPool = {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "name": "burnmint_token_pool",
   "instructions": [
     {
@@ -1171,6 +1217,52 @@ export const IDL: BurnmintTokenPool = {
       "args": []
     },
     {
+      "name": "transferMintAuthorityToPdaSigner",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "currentMintAuthorityAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "typeVersion",
       "docs": [
         "Returns the program type (name) and version.",
@@ -1241,7 +1333,7 @@ export const IDL: BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1277,7 +1369,7 @@ export const IDL: BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {

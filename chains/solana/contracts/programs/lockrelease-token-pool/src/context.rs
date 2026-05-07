@@ -92,6 +92,7 @@ pub struct InitializeTokenPool<'info> {
 #[derive(Accounts)]
 pub struct AdminUpdateTokenPool<'info> {
     #[account(
+        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
         constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
