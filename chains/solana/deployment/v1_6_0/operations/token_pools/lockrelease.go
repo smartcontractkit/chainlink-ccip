@@ -321,7 +321,7 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 		var remoteChainConfigAccount base_token_pool.BaseChain
 		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		rateLimitsUninitialized := err != nil ||
-			(remoteChainConfigAccount.InboundRateLimit.LastUpdated == 0 && remoteChainConfigAccount.OutboundRateLimit.LastUpdated == 0)
+			(remoteChainConfigAccount.InboundRateLimit.LastUpdated == 0 || remoteChainConfigAccount.OutboundRateLimit.LastUpdated == 0)
 		if (inbound.Enabled || outbound.Enabled) && rateLimitsUninitialized {
 			ixDummyRates, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
 				input.RemoteSelector,
