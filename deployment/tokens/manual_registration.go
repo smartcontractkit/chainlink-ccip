@@ -118,7 +118,7 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 			}
 
 			var adapterVersion *semver.Version
-			fullPool, findErr := datastore_utils.FindAndFormatRef(e.DataStore, registration.TokenPoolRef, registration.ChainSelector, datastore_utils.FullRef)
+			fullPool, findErr := datastore_utils.FindAndFormatRef(ds.Seal(), registration.TokenPoolRef, registration.ChainSelector, datastore_utils.FullRef)
 			if findErr == nil {
 				adapterVersion = fullPool.Version
 			}
@@ -135,7 +135,7 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 
 			adapter, exists := tokenPoolRegistry.GetTokenAdapter(chainfam, adapterVersion)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", chainfam, adapterVersion)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", chainfam, adapterVersion)
 			}
 
 			report, err := cldf_ops.ExecuteSequence(

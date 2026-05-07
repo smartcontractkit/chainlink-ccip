@@ -86,12 +86,12 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 
 			adapter, ok := tokenRegistry.GetTokenAdapter(family, newPoolRef.Version)
 			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: no token adapter registered for chain family '%s' and version '%s'", i, family, newPoolRef.Version)
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: no token adapter registered for chain family '%s' and version '%v'", i, family, newPoolRef.Version)
 			}
 
 			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
 			if migrationSeq == nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: adapter for family '%s' version '%s' does not support liquidity migration", i, family, newPoolRef.Version)
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: adapter for family '%s' version '%v' does not support liquidity migration", i, family, newPoolRef.Version)
 			}
 
 			// Derive the timelock address from the MCMS config.

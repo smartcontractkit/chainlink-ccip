@@ -119,7 +119,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			}
 			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, tokenPool.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, tokenPool.Version)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", family, tokenPool.Version)
 			}
 			tokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, tokenPoolAdapter.AddressRefToBytes)
 			if err != nil {
@@ -171,7 +171,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				}
 				counterPartAdapter, exists := tokenPoolRegistry.GetTokenAdapter(counterpartFamily, remoteTokenPool.Version)
 				if !exists {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", counterpartFamily, remoteTokenPool.Version)
+					return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", counterpartFamily, remoteTokenPool.Version)
 				}
 				remoteTokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, counterPartAdapter.AddressRefToBytes)
 				if err != nil {
