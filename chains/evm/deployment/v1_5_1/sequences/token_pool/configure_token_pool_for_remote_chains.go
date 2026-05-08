@@ -9,12 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -110,13 +111,23 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
+		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       input.TokenPoolAddress,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
+		}
+
 		inputORL, inputIRL := tokensapi.GenerateTPRLConfigs(
 			input.RemoteChainConfig.OutboundRateLimiterConfig,
 			input.RemoteChainConfig.InboundRateLimiterConfig,
 			localDecimals,
 			input.RemoteChainConfig.RemoteDecimals,
 			chain.Family(),
-			input.TokenPoolVersion,
+			tvReport.Output.Version,
+			tvReport.Output.Type.String(),
 		)
 
 		// Token pool remote chain configuration can vary depending on whether the remote

@@ -140,6 +140,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 					remoteChainConfig.RemoteDecimals,
 					chain.Family(),
 					common_utils.Version_1_6_0,
+					input.PoolType,
 				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
