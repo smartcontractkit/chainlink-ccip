@@ -28,7 +28,6 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 
 type ConfigureTokenPoolForRemoteChainInput struct {
 	TokenPoolAddress    common.Address
-	TokenPoolVersion    *semver.Version
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
@@ -70,7 +69,6 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
 					TokenPoolAddress:    tokenPool.Address(),
-					TokenPoolVersion:    input.TokenPoolVersion,
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
 				},
@@ -111,6 +109,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
+		// A pool's type and version is immutable so we can safely use ExecuteOperation here
+		// without worrying about stale data from the cache.
 		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       input.TokenPoolAddress,

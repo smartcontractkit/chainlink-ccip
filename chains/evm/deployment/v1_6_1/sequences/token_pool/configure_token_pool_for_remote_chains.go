@@ -9,13 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -28,7 +28,6 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 
 type ConfigureTokenPoolForRemoteChainInput struct {
 	TokenPoolAddress    common.Address
-	TokenPoolVersion    *semver.Version
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
@@ -70,7 +69,6 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
 					TokenPoolAddress:    tokenPool.Address(),
-					TokenPoolVersion:    input.TokenPoolVersion,
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
 				},
@@ -111,6 +109,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
+		// A pool's type and version is immutable so we can safely use ExecuteOperation here
+		// without worrying about stale data from the cache.
 		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       input.TokenPoolAddress,
