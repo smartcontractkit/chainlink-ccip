@@ -285,7 +285,8 @@ func GenerateTPRLConfigs(
 			isBurnMintWithExternalMinterTokenPool := tokenPoolType == "HybridWithExternalMinterTokenPool"
 			isHybridWithExternalMinterTokenPool := tokenPoolType == "BurnMintWithExternalMinterTokenPool"
 			if tokenPoolVersion.Equal(utils.Version_1_6_0) && (isBurnMintWithExternalMinterTokenPool || isHybridWithExternalMinterTokenPool) {
-				// pass through - these contracts scale by local decimals: (https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code)
+				// These contracts scale by local decimals: https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code
+				scaleByDecimals = decimals
 			} else {
 				scaleByDecimals = remoteDecimals
 			}
