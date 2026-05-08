@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
+import {IRMN} from "../../../interfaces/IRMN.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
@@ -49,7 +49,7 @@ contract OnRamp_constructor is OnRampSetup {
     // Zero rmnRemote.
     OnRamp.StaticConfig memory staticConfigZeroRMNRemote = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
-      rmnRemote: IRMNRemote(address(0)),
+      rmnRemote: IRMN(address(0)),
       maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol";
-import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
+import {IRMN} from "../../interfaces/IRMN.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -60,7 +60,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   }
 
   /// @dev The rmn contract.
-  IRMNRemote internal immutable i_rmn;
+  IRMN internal immutable i_rmn;
   /// @dev The version tag that this instance of the verifier supports. This could be used as a domain separator, but
   /// should never be the primary defense against signature replay attacks across different verifiers. The primary
   /// defense should be using non-overlapping signer sets for different verifiers, and the version tag should only be
@@ -93,7 +93,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     if (_versionTag == bytes4(0)) revert VersionTagCannotBeZero();
     i_versionTag = _versionTag;
 
-    i_rmn = IRMNRemote(rmnAddress);
+    i_rmn = IRMN(rmnAddress);
   }
 
   /// @notice Updates the storage locations.

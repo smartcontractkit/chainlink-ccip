@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -99,17 +100,42 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 				return cldf.ChangesetOutput{}, err
 			}
 
-			adapter, exists := tokenPoolRegistry.GetTokenAdapter(chainfam, cfg.ChainAdapterVersion)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", chainfam)
-			}
-
 			// Safeguard: always prevent chain selector mismatches
 			if registration.TokenPoolRef.ChainSelector != 0 && registration.TokenPoolRef.ChainSelector != registration.ChainSelector {
 				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenPoolRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenPoolRef.ChainSelector)
 			}
 			if registration.TokenRef.ChainSelector != 0 && registration.TokenRef.ChainSelector != registration.ChainSelector {
 				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenRef.ChainSelector)
+			}
+
+			registration.TokenPoolRef, err = TryNormalizeAddressRef(registration.ChainSelector, registration.TokenPoolRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token pool ref for registration index %d: %w", i, err)
+			}
+			registration.TokenRef, err = TryNormalizeAddressRef(registration.ChainSelector, registration.TokenRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref for registration index %d: %w", i, err)
+			}
+
+			var adapterVersion *semver.Version
+			fullPool, findErr := datastore_utils.FindAndFormatRef(ds.Seal(), registration.TokenPoolRef, registration.ChainSelector, datastore_utils.FullRef)
+			if findErr == nil {
+				adapterVersion = fullPool.Version
+			}
+			if adapterVersion == nil {
+				switch {
+				case registration.TokenPoolRef.Version != nil:
+					adapterVersion = registration.TokenPoolRef.Version
+				case cfg.ChainAdapterVersion != nil:
+					adapterVersion = cfg.ChainAdapterVersion
+				default:
+					return cldf.ChangesetOutput{}, fmt.Errorf("registration[%d]: cannot determine token pool adapter version: pool not found in datastore under tokenPoolRef and neither tokenPoolRef.version nor chainAdapterVersion is set", i)
+				}
+			}
+
+			adapter, exists := tokenPoolRegistry.GetTokenAdapter(chainfam, adapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", chainfam, adapterVersion)
 			}
 
 			report, err := cldf_ops.ExecuteSequence(

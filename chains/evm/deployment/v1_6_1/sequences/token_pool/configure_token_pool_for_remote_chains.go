@@ -145,7 +145,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the remote token onchain matches the one provided as input, then we won't call
 				// ApplyChainUpdates and instead handle the onchain updates via SetRateLimiterConfig
 				// and AddRemotePool.
-				remoteTP := input.RemoteChainConfig.RemotePool
+				// Remote pool addresses in CCIP messages are ABI-encoded (32-byte left-padded).
+				// Using left-padded addresses here ensures the stored value matches what
+				// the protocol sends, preventing "invalid source pool" errors on delivery.
+				remoteTP := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
 				remoteCS := input.RemoteChainSelector
 
 				// Query rate limits and remote pools
@@ -172,7 +175,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					inputIRL.Capacity.Cmp(onchainIRL.Capacity) == 0 &&
 					inputIRL.Rate.Cmp(onchainIRL.Rate) == 0
 
-				// Check if the provided remote token pool is already registered onchain
+				// Check whether the exact 32-byte padded address is already registered.
+				// We intentionally use an exact (not normalized) comparison: if only a
+				// 20-byte entry exists from a prior run, this returns false and we will
+				// call AddRemotePool to register the correct 32-byte value alongside it.
 				hasRemoteTP := slices.ContainsFunc(remoteTPs, func(rtp []byte) bool {
 					return bytes.Equal(rtp, remoteTP)
 				})
@@ -194,7 +200,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					reportWrites = append(reportWrites, report.Output)
 				}
 
-				// If the remote token pool is not registered, then add it
+				// If the exact 32-byte remote pool address is not registered, add it
 				if !hasRemoteTP {
 					report, err := cldf_ops.ExecuteOperation(b, tpops.AddRemotePool, chain, contract.FunctionInput[tpops.AddRemotePoolArgs]{
 						ChainSelector: chain.Selector,
@@ -209,6 +215,13 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					}
 					reportWrites = append(reportWrites, report.Output)
 				}
+
+				// The chain is already supported with a matching remote token. If
+				// reportWrites is still empty here, rate limiters and pool addresses are
+				// all already correct — nothing left to do.
+				if len(reportWrites) == 0 {
+					return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{}}, nil
+				}
 			}
 		}
 
@@ -217,13 +230,14 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		//   1. The chain is not supported yet in which case the only thing that's needed is to add
 		//      it via ApplyChainUpdates. No removals are necessary, and rate limiters will be set.
 		// --
-		//   2. The chain is already supported AND the input remote token EQUALS the onchain remote
-		//      token. In this case, we need to ensure that any existing remote configs are removed
-		//      before adding a new one via ApplyChainUpdates.
+		//   2. The chain is already supported AND the input remote token DIFFERS from the onchain
+		//      remote token. In this case, we need to ensure that any existing remote configs are
+		//      removed before adding a new one via ApplyChainUpdates.
 		// --
-		//   3. The chain is already supported AND the input remote token DIFFERS from the onchain
-		//      remote token. In this case, we will never call ApplyChainUpdates. Instead, we will
-		//      update on chain state purely using SetRateLimiterConfig and AddRemotePool above.
+		//   3. The chain is already supported AND the input remote token EQUALS the onchain remote
+		//      token. In this case, we will never call ApplyChainUpdates. Instead, we handle
+		//      onchain updates via SetRateLimiterConfig and AddRemotePool above, returning early
+		//      if the chain is already fully configured.
 		//
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)

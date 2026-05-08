@@ -155,14 +155,28 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		isHomeChain := chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 		var siloedLockReleaseTokenPoolRef datastore.AddressRef
 		if isHomeChain {
-			// Only the siloed USDC lock release pool will be deployed here.
-			// Lockboxes are deployed per lane and are therefore deployed during ConfigureCCTPChainForLanes.
+			// Check if SiloedUSDCTokenPool is already present in the datastore,
+			// otherwise the sequence will deploy a fresh pool. Lockboxes are deployed per
+			// lane during ConfigureCCTPChainForLanes, not here.
+			var existingSiloedPoolAddr string
+			existingSiloedRefs := dep.DataStore.Addresses().Filter(
+				datastore.AddressRefByChainSelector(input.ChainSelector),
+				datastore.AddressRefByType(datastore.ContractType(siloed_usdc_token_pool.ContractType)),
+				datastore.AddressRefByVersion(siloed_usdc_token_pool.Version),
+			)
+			if len(existingSiloedRefs) > 1 {
+				return sequences.OnChainOutput{}, fmt.Errorf("expected at most one SiloedUSDCTokenPool v%s on chain %d, found %d", siloed_usdc_token_pool.Version.String(), input.ChainSelector, len(existingSiloedRefs))
+			}
+			if len(existingSiloedRefs) == 1 {
+				existingSiloedPoolAddr = existingSiloedRefs[0].Address
+			}
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
-				ChainSelector: input.ChainSelector,
-				TokenDecimals: input.TokenDecimals,
-				USDCToken:     input.USDCToken,
-				RMN:           rmnAddress.Hex(),
-				Router:        routerAddress.Hex(),
+				ChainSelector:       input.ChainSelector,
+				TokenDecimals:       input.TokenDecimals,
+				USDCToken:           input.USDCToken,
+				RMN:                 rmnAddress.Hex(),
+				Router:              routerAddress.Hex(),
+				SiloedUSDCTokenPool: existingSiloedPoolAddr,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed USDC lock release stack: %w", err)

@@ -100,9 +100,14 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, config.ChainAdapterVersion)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+
+			config.TokenPoolRef, err = TryNormalizeAddressRef(selector, config.TokenPoolRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token pool ref address on chain selector %d: %w", selector, err)
+			}
+			config.TokenRef, err = TryNormalizeAddressRef(selector, config.TokenRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref address on chain selector %d: %w", selector, err)
 			}
 			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenPoolRef, selector, datastore_utils.FullRef)
 			if err != nil {
@@ -111,6 +116,10 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			tokenFull, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, tokenPool.Version)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", family, tokenPool.Version)
 			}
 			tokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, tokenPoolAdapter.AddressRefToBytes)
 			if err != nil {
@@ -142,26 +151,35 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, err
 				}
-				counterPartAdapter, exists := tokenPoolRegistry.GetTokenAdapter(counterpartFamily, counterpart.ChainAdapterVersion)
-				if !exists {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", counterpartFamily)
-				}
 				remoteInputs, ok := counterpart.RemoteOutbounds[selector]
 				if !ok {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
+				}
+
+				counterpart.TokenPoolRef, err = TryNormalizeAddressRef(remoteSelector, counterpart.TokenPoolRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize counterpart token pool ref address on chain selector %d: %w", remoteSelector, err)
+				}
+				counterpart.TokenRef, err = TryNormalizeAddressRef(remoteSelector, counterpart.TokenRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize counterpart token ref address on chain selector %d: %w", remoteSelector, err)
 				}
 
 				remoteTokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenPoolRef, remoteSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", remoteSelector, err)
 				}
+				counterPartAdapter, exists := tokenPoolRegistry.GetTokenAdapter(counterpartFamily, remoteTokenPool.Version)
+				if !exists {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", counterpartFamily, remoteTokenPool.Version)
+				}
 				remoteTokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, counterPartAdapter.AddressRefToBytes)
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", remoteSelector, err)
 				}
 				remoteDecimals, err := counterPartAdapter.DeriveTokenDecimals(e, remoteSelector, remoteTokenPool, remoteTokenBytes)
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", remoteSelector, err)
 				}
 				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs.RateLimit, remoteInputs.RateLimit, decimals, remoteDecimals, family, tokenPool.Version)
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
