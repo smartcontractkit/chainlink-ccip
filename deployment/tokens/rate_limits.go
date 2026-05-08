@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -181,7 +182,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", remoteSelector, err)
 				}
-				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs.RateLimit, remoteInputs.RateLimit, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs.RateLimit, remoteInputs.RateLimit, decimals, remoteDecimals, family, tokenPool.Version, tokenPool.Type.String())
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {
@@ -252,6 +253,7 @@ func GenerateTPRLConfigs(
 	remoteDecimals uint8,
 	chainFamily string,
 	tokenPoolVersion *semver.Version,
+	tokenPoolType string,
 ) (RateLimiterConfig, RateLimiterConfig) {
 	outboundConfig := RateLimiterConfig{}
 	inboundConfig := RateLimiterConfig{}
@@ -278,8 +280,15 @@ func GenerateTPRLConfigs(
 		// Only old EVM pools need to scale by remote deciamls on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
 		// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
 		// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
-		if chainFamily == chain_selectors.FamilyEVM && tokenPoolVersion.LessThan(semver.MustParse("1.6.1")) {
-			scaleByDecimals = remoteDecimals
+		if chainFamily == chain_selectors.FamilyEVM && tokenPoolVersion.LessThan(utils.Version_1_6_1) {
+			// NOTE: need to hardcode EVM contract types to avoid import cycle
+			isBurnMintWithExternalMinterTokenPool := tokenPoolType == "HybridWithExternalMinterTokenPool"
+			isHybridWithExternalMinterTokenPool := tokenPoolType == "BurnMintWithExternalMinterTokenPool"
+			if tokenPoolVersion.Equal(utils.Version_1_6_0) && (isBurnMintWithExternalMinterTokenPool || isHybridWithExternalMinterTokenPool) {
+				// pass through - these contracts scale by local decimals: (https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code)
+			} else {
+				scaleByDecimals = remoteDecimals
+			}
 		}
 		inboundConfig.IsEnabled = true
 		inboundConfig.Capacity = ScaleFloatToBigInt(inboundInput.Capacity, int(scaleByDecimals), .10)
