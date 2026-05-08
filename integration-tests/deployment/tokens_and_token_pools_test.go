@@ -670,36 +670,36 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %q", preMint.String(), balance))
 
-				if data.RateLimitAdmin == "" {
-					continue
-				}
-				expectedRLA, err := solana.PublicKeyFromBase58(data.RateLimitAdmin)
-				require.NoError(t, err)
+				if data.RateLimitAdmin != "" {
+					expectedRLA, err := solana.PublicKeyFromBase58(data.RateLimitAdmin)
+					require.NoError(t, err)
 
-				tokenPoolRef, err := datastore_utils.FindAndFormatRef(
-					env.DataStore,
-					datastore.AddressRef{
-						ChainSelector: data.Chain.Selector,
-						Qualifier:     data.TokenPoolQualifier,
-						Type:          datastore.ContractType(data.TokenPoolType),
-						Version:       common_utils.Version_1_6_0,
-					},
-					data.Chain.Selector,
-					datastore_utils.FullRef,
-				)
-				require.NoError(t, err)
-				tokenPoolProgramID := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
-				tokenPoolStatePDA, err := tokens.TokenPoolConfigAddress(tokenAddr, tokenPoolProgramID)
-				require.NoError(t, err)
+					tokenPoolRef, err := datastore_utils.FindAndFormatRef(
+						env.DataStore,
+						datastore.AddressRef{
+							ChainSelector: data.Chain.Selector,
+							Qualifier:     data.TokenPoolQualifier,
+							Type:          datastore.ContractType(data.TokenPoolType),
+							Version:       common_utils.Version_1_6_0,
+						},
+						data.Chain.Selector,
+						datastore_utils.FullRef,
+					)
+					require.NoError(t, err)
 
-				switch data.TokenPoolType {
-				case common_utils.BurnMintTokenPool.String():
-					var poolState burnmint_token_pool.State
-					require.NoError(t, data.Chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &poolState))
-					require.Equal(t, expectedRLA, poolState.Config.RateLimitAdmin,
-						"token pool rate limit admin should match DeployTokenPoolInput.RateLimitAdmin")
-				default:
-					t.Fatalf("unexpected TokenPoolType %q with RateLimitAdmin set", data.TokenPoolType)
+					tokenPoolProgramID := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
+					tokenPoolStatePDA, err := tokens.TokenPoolConfigAddress(tokenAddr, tokenPoolProgramID)
+					require.NoError(t, err)
+
+					switch data.TokenPoolType {
+					case common_utils.BurnMintTokenPool.String():
+						var poolState burnmint_token_pool.State
+						require.NoError(t, data.Chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &poolState))
+						require.Equal(t, expectedRLA, poolState.Config.RateLimitAdmin,
+							"token pool rate limit admin should match DeployTokenPoolInput.RateLimitAdmin")
+					default:
+						t.Fatalf("unexpected TokenPoolType %q with RateLimitAdmin set", data.TokenPoolType)
+					}
 				}
 			}
 		})
