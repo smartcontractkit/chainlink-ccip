@@ -282,7 +282,9 @@ func GenerateTPRLConfigs(
 		// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
 		// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
 		if chainFamily == chain_selectors.FamilyEVM && poolVersion.LessThan(utils.Version_1_6_1) {
-			// These custom contracts actually scale by local decimals: https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code
+			// These custom contracts actually scale by local decimals:
+			//   BurnMintWithExternalMinterTokenPool: https://explorer.plume.org/address/0x770318D51052871DeF5Eb5c452F4fd28B7960C4e?tab=contract
+			//   HybridWithExternalMinterTokenPool: https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code
 			isBurnMintWithExternalMinterTokenPool := poolType == utils.BurnMintWithExternalMinterTokenPool.String()
 			isHybridWithExternalMinterTokenPool := poolType == utils.HybridWithExternalMinterTokenPool.String()
 			if poolVersion.Equal(utils.Version_1_6_0) && (isBurnMintWithExternalMinterTokenPool || isHybridWithExternalMinterTokenPool) {
