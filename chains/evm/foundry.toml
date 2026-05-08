@@ -31,6 +31,7 @@ optimizer_runs = 1
 [profile.ccip-compile]
 optimizer_runs = 80_000
 via_ir = true
+extra_output_files = ["abi", "bin", "metadata"]
 
 [fmt]
 tab_width = 2
