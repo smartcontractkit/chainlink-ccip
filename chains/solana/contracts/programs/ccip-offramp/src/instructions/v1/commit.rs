@@ -274,7 +274,9 @@ fn all_messages_executed(report: &CommitReport) -> bool {
     // execution_states follow geometric series 2^1 + 2^3 + 2^5 + ... + 2 * 2^(2 * (num_messages - 1))
     // it can be converted to 2 * (4^0 + 4^1 + 4^2 + ... + 4^(num_messages - 1))
     // sum is calculated as 2 * (4^num_messages - 1) / 3
-    let fully_executed = (4u128.pow(num_messages as u32) - 1) * 2 / 3;
+    // Note: wrapping ops are needed because 4^64 = 2^128 overflows u128, but 4^64 - 1 = u128::MAX
+    // fits. Division by 3 is exact since 4 ≡ 1 (mod 3) implies 4^n - 1 ≡ 0 (mod 3).
+    let fully_executed = 4u128.wrapping_pow(num_messages as u32).wrapping_sub(1) / 3 * 2;
     report.execution_states == fully_executed
 }
 
@@ -421,5 +423,45 @@ mod tests {
         );
         report.execution_states = 0b101010;
         assert!(all_messages_executed(&report), "All messages executed");
+    }
+
+    #[test]
+    fn all_messages_executed_max_capacity() {
+        // 64 messages is the maximum supported (128-bit execution_states / 2 bits per message)
+        let report = CommitReport {
+            version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
+            timestamp: 0,
+            min_msg_nr: 0,
+            max_msg_nr: 63,
+            execution_states: 0, // none executed
+        };
+        assert!(
+            !all_messages_executed(&report),
+            "No messages executed in a full 64-message report"
+        );
+    }
+
+    #[test]
+    fn all_messages_executed_max_capacity_all_executed() {
+        // With 64 messages all in Success state, execution_states should be
+        // 0b10_10_10...10 (64 "10" pairs) = the expected fully_executed value.
+        // The fully_executed formula must not overflow for this case.
+        let report = CommitReport {
+            version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
+            timestamp: 0,
+            min_msg_nr: 0,
+            max_msg_nr: 63,
+            // Every 2-bit pair is 0b10 (Success). This is the bit pattern:
+            // 0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            execution_states: 0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAu128,
+        };
+        assert!(
+            all_messages_executed(&report),
+            "All 64 messages executed should be recognized"
+        );
     }
 }
