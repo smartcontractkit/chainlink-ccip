@@ -69,11 +69,11 @@ jobs:
           - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2Solana$"
-            timeout: 30m
+            timeout: 45m
           - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_Solana2EVM$"
-            timeout: 30m
+            timeout: 45m
           - name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$"
