@@ -31,12 +31,13 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for initialization.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
-            version: 3,
+            version: Config::LATEST_VERSION,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
             default_code_version: CodeVersion::V1,
             event_authorities: vec![],
             curser: ctx.accounts.authority.key(), // initialize the curser as the admin, so that they can perform curses right away if needed
+            bump: ctx.bumps.config,               // initialize the bump
         });
 
         ctx.accounts.curses.set_inner(Curses {

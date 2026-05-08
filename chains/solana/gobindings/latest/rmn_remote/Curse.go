@@ -23,6 +23,7 @@ type Curse struct {
 	Subject *CurseSubject
 
 	// [0] = [] config
+	// ··········· account manually to handle the different structs before and after migration., allowing for no-downtime migration.
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
@@ -47,12 +48,14 @@ func (inst *Curse) SetSubject(subject CurseSubject) *Curse {
 }
 
 // SetConfigAccount sets the "config" account.
+// account manually to handle the different structs before and after migration., allowing for no-downtime migration.
 func (inst *Curse) SetConfigAccount(config ag_solanago.PublicKey) *Curse {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
+// account manually to handle the different structs before and after migration., allowing for no-downtime migration.
 func (inst *Curse) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }

@@ -2,7 +2,76 @@
 
 package rmn_remote
 
-import ag_binary "github.com/gagliardetto/binary"
+import (
+	ag_binary "github.com/gagliardetto/binary"
+	ag_solanago "github.com/gagliardetto/solana-go"
+)
+
+type ConfigV2 struct {
+	Version            uint8
+	Owner              ag_solanago.PublicKey
+	ProposedOwner      ag_solanago.PublicKey
+	DefaultCodeVersion CodeVersion
+	EventAuthorities   []ag_solanago.PublicKey
+}
+
+func (obj ConfigV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	// Serialize `EventAuthorities` param:
+	err = encoder.Encode(obj.EventAuthorities)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	// Deserialize `EventAuthorities`:
+	err = decoder.Decode(&obj.EventAuthorities)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 type CurseSubject struct {
 	Value [16]uint8

@@ -13,6 +13,8 @@ type Config struct {
 	Owner              ag_solanago.PublicKey
 	ProposedOwner      ag_solanago.PublicKey
 	DefaultCodeVersion CodeVersion
+	Curser             ag_solanago.PublicKey
+	Bump               uint8
 	EventAuthorities   []ag_solanago.PublicKey
 }
 
@@ -41,6 +43,16 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `DefaultCodeVersion` param:
 	err = encoder.Encode(obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	// Serialize `Curser` param:
+	err = encoder.Encode(obj.Curser)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -83,6 +95,16 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `DefaultCodeVersion`:
 	err = decoder.Decode(&obj.DefaultCodeVersion)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Curser`:
+	err = decoder.Decode(&obj.Curser)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
 	if err != nil {
 		return err
 	}

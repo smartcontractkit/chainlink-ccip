@@ -16,7 +16,7 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for the migration.
-type MigrateConfigV1ToV2 struct {
+type MigrateConfigV2ToV3 struct {
 
 	// [0] = [WRITE] config
 	// ··········· has the new property in it, so it can't be deserialized as Config before the migration has happened.
@@ -27,9 +27,9 @@ type MigrateConfigV1ToV2 struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewMigrateConfigV1ToV2InstructionBuilder creates a new `MigrateConfigV1ToV2` instruction builder.
-func NewMigrateConfigV1ToV2InstructionBuilder() *MigrateConfigV1ToV2 {
-	nd := &MigrateConfigV1ToV2{
+// NewMigrateConfigV2ToV3InstructionBuilder creates a new `MigrateConfigV2ToV3` instruction builder.
+func NewMigrateConfigV2ToV3InstructionBuilder() *MigrateConfigV2ToV3 {
+	nd := &MigrateConfigV2ToV3{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
@@ -37,57 +37,57 @@ func NewMigrateConfigV1ToV2InstructionBuilder() *MigrateConfigV1ToV2 {
 
 // SetConfigAccount sets the "config" account.
 // has the new property in it, so it can't be deserialized as Config before the migration has happened.
-func (inst *MigrateConfigV1ToV2) SetConfigAccount(config ag_solanago.PublicKey) *MigrateConfigV1ToV2 {
+func (inst *MigrateConfigV2ToV3) SetConfigAccount(config ag_solanago.PublicKey) *MigrateConfigV2ToV3 {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
 // has the new property in it, so it can't be deserialized as Config before the migration has happened.
-func (inst *MigrateConfigV1ToV2) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *MigrateConfigV2ToV3) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *MigrateConfigV1ToV2) SetAuthorityAccount(authority ag_solanago.PublicKey) *MigrateConfigV1ToV2 {
+func (inst *MigrateConfigV2ToV3) SetAuthorityAccount(authority ag_solanago.PublicKey) *MigrateConfigV2ToV3 {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *MigrateConfigV1ToV2) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *MigrateConfigV2ToV3) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *MigrateConfigV1ToV2) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *MigrateConfigV1ToV2 {
+func (inst *MigrateConfigV2ToV3) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *MigrateConfigV2ToV3 {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *MigrateConfigV1ToV2) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *MigrateConfigV2ToV3) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-func (inst MigrateConfigV1ToV2) Build() *Instruction {
+func (inst MigrateConfigV2ToV3) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_MigrateConfigV1ToV2,
+		TypeID: Instruction_MigrateConfigV2ToV3,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst MigrateConfigV1ToV2) ValidateAndBuild() (*Instruction, error) {
+func (inst MigrateConfigV2ToV3) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *MigrateConfigV1ToV2) Validate() error {
+func (inst *MigrateConfigV2ToV3) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -103,11 +103,11 @@ func (inst *MigrateConfigV1ToV2) Validate() error {
 	return nil
 }
 
-func (inst *MigrateConfigV1ToV2) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *MigrateConfigV2ToV3) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("MigrateConfigV1ToV2")).
+			programBranch.Child(ag_format.Instruction("MigrateConfigV2ToV3")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -124,20 +124,20 @@ func (inst *MigrateConfigV1ToV2) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj MigrateConfigV1ToV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj MigrateConfigV2ToV3) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
-func (obj *MigrateConfigV1ToV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *MigrateConfigV2ToV3) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-// NewMigrateConfigV1ToV2Instruction declares a new MigrateConfigV1ToV2 instruction with the provided parameters and accounts.
-func NewMigrateConfigV1ToV2Instruction(
+// NewMigrateConfigV2ToV3Instruction declares a new MigrateConfigV2ToV3 instruction with the provided parameters and accounts.
+func NewMigrateConfigV2ToV3Instruction(
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *MigrateConfigV1ToV2 {
-	return NewMigrateConfigV1ToV2InstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *MigrateConfigV2ToV3 {
+	return NewMigrateConfigV2ToV3InstructionBuilder().
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

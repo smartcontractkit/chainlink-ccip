@@ -24,7 +24,6 @@ type VerifyNotCursed struct {
 	// [0] = [] curses
 	//
 	// [1] = [] config
-	// ··········· After the upgrade is made, this can be changed to Account<'info, Config>.
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
@@ -54,14 +53,12 @@ func (inst *VerifyNotCursed) GetCursesAccount() *ag_solanago.AccountMeta {
 }
 
 // SetConfigAccount sets the "config" account.
-// After the upgrade is made, this can be changed to Account<'info, Config>.
 func (inst *VerifyNotCursed) SetConfigAccount(config ag_solanago.PublicKey) *VerifyNotCursed {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-// After the upgrade is made, this can be changed to Account<'info, Config>.
 func (inst *VerifyNotCursed) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }

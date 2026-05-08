@@ -71,7 +71,7 @@ pub struct UpdateConfig<'info> {
     #[account(
         mut,
         seeds = [seed::CONFIG],
-        bump,
+        bump = config.bump,
         constraint = config.version == MAX_CONFIG_V @ RmnRemoteError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
@@ -94,7 +94,7 @@ pub struct UpdateEventAuthorities<'info> {
     #[account(
         mut,
         seeds = [seed::CONFIG],
-        bump,
+        bump = config.bump,
         constraint = config.version == MAX_CONFIG_V @ RmnRemoteError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + Config::dynamic_len(new_event_authorities.len()),
         realloc::payer = authority,
@@ -131,7 +131,7 @@ pub struct AcceptOwnership<'info> {
     #[account(
         mut,
         seeds = [seed::CONFIG],
-        bump,
+        bump = config.bump,
         constraint = config.version == MAX_CONFIG_V @ RmnRemoteError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
@@ -148,6 +148,7 @@ pub struct Curse<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
+        owner = crate::ID, // check it is initialized
     )]
     pub config: UncheckedAccount<'info>,
 
@@ -176,6 +177,7 @@ pub struct Uncurse<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
+        owner = crate::ID, // check it is initialized
     )]
     pub config: UncheckedAccount<'info>,
 
@@ -220,6 +222,7 @@ pub struct CpiEvent<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
+        owner = crate::ID, // check it is initialized
     )]
     /// CHECK: using UncheckedAccount to allow no-downtime during config upgrade, so load using load_config method.
     /// After the upgrade is made, this can be changed to Account<'info, Config>.

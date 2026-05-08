@@ -25,6 +25,7 @@ type CpiEvent struct {
 	EventData *[]byte
 
 	// [0] = [] config
+	// ··········· After the upgrade is made, this can be changed to Account<'info, Config>.
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -45,12 +46,14 @@ func (inst *CpiEvent) SetEventData(eventData []byte) *CpiEvent {
 }
 
 // SetConfigAccount sets the "config" account.
+// After the upgrade is made, this can be changed to Account<'info, Config>.
 func (inst *CpiEvent) SetConfigAccount(config ag_solanago.PublicKey) *CpiEvent {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
+// After the upgrade is made, this can be changed to Account<'info, Config>.
 func (inst *CpiEvent) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }

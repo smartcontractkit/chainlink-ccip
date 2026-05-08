@@ -136,7 +136,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for the migration.
-	Instruction_MigrateConfigV1ToV2 = ag_binary.TypeID([8]byte{201, 212, 171, 0, 73, 91, 124, 99})
+	Instruction_MigrateConfigV2ToV3 = ag_binary.TypeID([8]byte{164, 212, 48, 121, 32, 23, 211, 44})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -162,8 +162,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "VerifyNotCursed"
 	case Instruction_CpiEvent:
 		return "CpiEvent"
-	case Instruction_MigrateConfigV1ToV2:
-		return "MigrateConfigV1ToV2"
+	case Instruction_MigrateConfigV2ToV3:
+		return "MigrateConfigV2ToV3"
 	default:
 		return ""
 	}
@@ -215,7 +215,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"cpi_event", (*CpiEvent)(nil),
 		},
 		{
-			"migrate_config_v1_to_v2", (*MigrateConfigV1ToV2)(nil),
+			"migrate_config_v2_to_v3", (*MigrateConfigV2ToV3)(nil),
 		},
 	},
 )

@@ -55,7 +55,7 @@ impl Display for CodeVersion {
 }
 
 #[account]
-#[derive(InitSpace, Debug)]
+#[derive(InitSpace, PartialEq, Debug)]
 pub struct Config {
     pub version: u8,
     pub owner: Pubkey,
@@ -63,13 +63,18 @@ pub struct Config {
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
 
-    pub curser: Pubkey, // the only account authorized to curse subjects. Added in v3 struct (keeping variable-length fields at the end)
+    // --- v3 fields below ---
+    pub curser: Pubkey, // the only account authorized to curse subjects.
+    pub bump: u8,
 
+    // --- v2 fields below (keeping variable-length fields at the end) ---
     #[max_len(0)] // just for INIT_SPACE calculation
     pub event_authorities: Vec<Pubkey>, // added in v2 struct
 }
 
 impl Config {
+    pub const LATEST_VERSION: u8 = 3;
+
     pub fn dynamic_len(event_authorities_len: usize) -> usize {
         Config::INIT_SPACE + event_authorities_len * PUBKEY_BYTES
     }

@@ -1,7 +1,9 @@
+use std::cell::Ref;
+
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-use crate::config::{load_config_v2_unchecked, ConfigV2};
+use crate::config::{load_old_config, ConfigV2};
 use crate::context::{MigrateConfigV2ToV3, ANCHOR_DISCRIMINATOR};
 use crate::instructions::interfaces::Public;
 use crate::state::Config;
@@ -28,8 +30,8 @@ impl Public for Impl {
     }
 
     fn migrate_config_v2_to_v3(&self, ctx: Context<MigrateConfigV2ToV3>) -> Result<()> {
-        let required_v3_space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE;
-        let minimum_balance = Rent::get()?.minimum_balance(required_v3_space);
+        let required_space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE;
+        let minimum_balance = Rent::get()?.minimum_balance(required_space);
 
         let account_info = &ctx.accounts.config.to_account_info();
 
@@ -54,28 +56,10 @@ impl Public for Impl {
                 minimum_balance.checked_sub(current_lamports).unwrap(),
             )?;
         }
-        account_info.realloc(required_v3_space, false)?;
+        account_info.realloc(required_space, false)?;
 
         // Set the new values
-        msg!("Loading config V2...");
-        let config_v2 = load_config_v2_unchecked(account_info.try_borrow_data()?)?;
-        msg!("Read config V2: {:?}", config_v2);
-        require_eq!(
-            config_v2.version,
-            2, // confirm it was v2
-            RmnRemoteError::InvalidInputsConfigAccount
-        );
-
-        let new_config = Config {
-            version: 3,
-            owner: config_v2.owner,
-            proposed_owner: config_v2.proposed_owner,
-            default_code_version: config_v2.default_code_version,
-            event_authorities: config_v2.event_authorities,
-
-            // new v3 fields
-            curser: config_v2.owner, // initialize to same value as owner, so there is no downtime on cursing
-        };
+        let new_config = old_to_new(account_info.try_borrow_data()?, ctx.bumps.config)?;
 
         // Write back to permanent state
         msg!("Writing migrated RMNRemote Config to account...");
@@ -85,10 +69,82 @@ impl Public for Impl {
     }
 }
 
+fn old_to_new(bytes: Ref<&mut [u8]>, bump: u8) -> Result<Config> {
+    msg!("Loading config V2...");
+    let config_v2 = load_old_config::<ConfigV2>(bytes)?;
+    msg!("Read config V2: {:?}", config_v2);
+
+    require_eq!(
+        config_v2.version,
+        2, // confirm it was v2
+        RmnRemoteError::InvalidInputsConfigAccount
+    );
+
+    let new_config = Config {
+        version: Config::LATEST_VERSION,
+        owner: config_v2.owner,
+        proposed_owner: config_v2.proposed_owner,
+        default_code_version: config_v2.default_code_version,
+        event_authorities: config_v2.event_authorities,
+
+        // new v3 fields
+        curser: config_v2.owner, // initialize to same value as owner, so there is no downtime on cursing
+        bump,
+    };
+    Ok(new_config)
+}
+
 fn is_subject_cursed(curses: &Curses, subject: CurseSubject) -> bool {
     curses.cursed_subjects.contains(&subject)
 }
 
 fn is_chain_globally_cursed(curses: &Curses) -> bool {
     curses.cursed_subjects.contains(&CurseSubject::GLOBAL)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state::CodeVersion;
+    use anchor_lang::Discriminator;
+    use std::cell::RefCell;
+
+    use super::*;
+
+    #[test]
+    fn test_v2_to_v3() {
+        let owner = Pubkey::new_unique();
+        let proposed_owner = Pubkey::new_unique();
+        let event_authority = Pubkey::new_unique();
+
+        let old = ConfigV2 {
+            version: 2,
+            owner,
+            proposed_owner,
+            default_code_version: CodeVersion::V1,
+            event_authorities: vec![event_authority],
+        };
+
+        // Prepend the discriminator: load_old_config_unchecked expects [discriminator | data]
+        let mut old_bytes = Config::DISCRIMINATOR.to_vec();
+        old_bytes.extend_from_slice(&old.try_to_vec().unwrap());
+
+        // Wrap in RefCell to obtain a Ref<&mut [u8]> (same type as AccountInfo::try_borrow_data)
+        let rc: RefCell<&mut [u8]> = RefCell::new(&mut old_bytes);
+        let data = rc.borrow();
+        let bump = 255;
+        let migrated = old_to_new(data, bump).unwrap();
+
+        assert_eq!(
+            migrated,
+            Config {
+                version: 3, // hardcode expected version, so that if LATEST_VERSION is updated without updating this test, the test will fail and alert us to update the migration logic as well
+                owner,
+                proposed_owner,
+                default_code_version: CodeVersion::V1,
+                event_authorities: vec![event_authority],
+                curser: owner, // curser initialized to same value as owner
+                bump,
+            }
+        );
+    }
 }
