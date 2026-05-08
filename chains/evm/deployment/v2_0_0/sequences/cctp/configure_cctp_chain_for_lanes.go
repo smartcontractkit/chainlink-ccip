@@ -654,12 +654,34 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 	return out, nil
 }
 
-// applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver.
+// applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver,
+// skipping entries that are already at the desired state.
 func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, resolverAddress common.Address, args []versioned_verifier_resolver.OutboundImplementationArgs) ([]contract_utils.WriteOutput, error) {
+	currentReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chain.Selector,
+		Address:       resolverAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outbound implementations from CCTPVerifierResolver: %w", err)
+	}
+	existing := make(map[uint64]common.Address, len(currentReport.Output))
+	for _, impl := range currentReport.Output {
+		existing[impl.DestChainSelector] = impl.Verifier
+	}
+	toApply := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(args))
+	for _, arg := range args {
+		if v, ok := existing[arg.DestChainSelector]; ok && v == arg.Verifier {
+			continue
+		}
+		toApply = append(toApply, arg)
+	}
+	if len(toApply) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 		ChainSelector: chain.Selector,
 		Address:       resolverAddress,
-		Args:          args,
+		Args:          toApply,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set outbound implementation on CCTPVerifierResolver: %w", err)
