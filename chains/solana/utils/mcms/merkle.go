@@ -356,24 +356,24 @@ func DumpOpDetails(op *McmOpNode) string {
 	sb.WriteString("=================\n\n")
 
 	// Print basic info
-	sb.WriteString(fmt.Sprintf("Nonce: %d\n", op.Nonce))
-	sb.WriteString(fmt.Sprintf("Multisig: %s\n", op.Multisig.String()))
-	sb.WriteString(fmt.Sprintf("To: %s\n", op.To.String()))
+	fmt.Fprintf(&sb, "Nonce: %d\n", op.Nonce)
+	fmt.Fprintf(&sb, "Multisig: %s\n", op.Multisig.String())
+	fmt.Fprintf(&sb, "To: %s\n", op.To.String())
 
 	// Print raw buffers
 	sb.WriteString("Raw Buffers:\n")
 	buffers := op.Buffers()
 	for i, buf := range buffers {
-		sb.WriteString(fmt.Sprintf("Buffer[%d]: %s\n", i, hex.EncodeToString(buf)))
+		fmt.Fprintf(&sb, "Buffer[%d]: %s\n", i, hex.EncodeToString(buf))
 	}
 	sb.WriteString("\n")
 
 	// Print execution data
-	sb.WriteString(fmt.Sprintf("Execution Data: %s\n\n", hex.EncodeToString(op.Data)))
+	fmt.Fprintf(&sb, "Execution Data: %s\n\n", hex.EncodeToString(op.Data))
 
 	// Print hash
 	hash := op.Hash()
-	sb.WriteString(fmt.Sprintf("Leaf Hash: %s\n", hex.EncodeToString(hash[:])))
+	fmt.Fprintf(&sb, "Leaf Hash: %s\n", hex.EncodeToString(hash[:]))
 
 	// Print Merkle proofs if available
 	if op.Parent() != nil {
@@ -381,7 +381,7 @@ func DumpOpDetails(op *McmOpNode) string {
 		if err == nil {
 			sb.WriteString("\nMerkle Proofs:\n")
 			for i, proof := range proofs {
-				sb.WriteString(fmt.Sprintf("Proof[%d]: %s\n", i, hex.EncodeToString(proof[:])))
+				fmt.Fprintf(&sb, "Proof[%d]: %s\n", i, hex.EncodeToString(proof[:]))
 			}
 		}
 	}
@@ -390,13 +390,13 @@ func DumpOpDetails(op *McmOpNode) string {
 	if len(op.RemainingAccounts) > 0 {
 		sb.WriteString("\nRemaining Accounts:\n")
 		for i, acc := range op.RemainingAccounts {
-			sb.WriteString(fmt.Sprintf("Account[%d]:\n", i))
-			sb.WriteString(fmt.Sprintf("  Address: %s\n", acc.PublicKey.String()))
-			sb.WriteString(fmt.Sprintf("  Is Signer: %v\n", acc.IsSigner))
-			sb.WriteString(fmt.Sprintf("  Is Writable: %v\n", acc.IsWritable))
+			fmt.Fprintf(&sb, "Account[%d]:\n", i)
+			fmt.Fprintf(&sb, "  Address: %s\n", acc.PublicKey.String())
+			fmt.Fprintf(&sb, "  Is Signer: %v\n", acc.IsSigner)
+			fmt.Fprintf(&sb, "  Is Writable: %v\n", acc.IsWritable)
 			// Print serialized form for verification
-			sb.WriteString(fmt.Sprintf("  Serialized: %s\n",
-				hex.EncodeToString(serializeAccountMeta(acc))))
+			fmt.Fprintf(&sb, "  Serialized: %s\n",
+				hex.EncodeToString(serializeAccountMeta(acc)))
 		}
 	}
 

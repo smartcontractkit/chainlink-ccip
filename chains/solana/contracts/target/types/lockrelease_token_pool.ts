@@ -1,5 +1,5 @@
 export type LockreleaseTokenPool = {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "name": "lockrelease_token_pool",
   "instructions": [
     {
@@ -247,7 +247,7 @@ export type LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -283,7 +283,7 @@ export type LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -983,7 +983,7 @@ export type LockreleaseTokenPool = {
 };
 
 export const IDL: LockreleaseTokenPool = {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "name": "lockrelease_token_pool",
   "instructions": [
     {
@@ -1231,7 +1231,7 @@ export const IDL: LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1267,7 +1267,7 @@ export const IDL: LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
