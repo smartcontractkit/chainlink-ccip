@@ -65,15 +65,6 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to get chain family for selector %d: %w", i, migration.ChainSelector, err)
 			}
-			adapter, ok := tokenRegistry.GetTokenAdapter(family, migration.NewPoolRef.Version)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: no token adapter registered for chain family '%s' and version '%s'", i, family, migration.NewPoolRef.Version)
-			}
-
-			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
-			if migrationSeq == nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: adapter for family '%s' version '%s' does not support liquidity migration", i, family, migration.NewPoolRef.Version)
-			}
 
 			oldRef, err := TryNormalizeAddressRef(migration.ChainSelector, migration.OldPoolRef)
 			if err != nil {
@@ -91,6 +82,16 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 			newPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, newRef, migration.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve new pool ref: %w", i, err)
+			}
+
+			adapter, ok := tokenRegistry.GetTokenAdapter(family, newPoolRef.Version)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: no token adapter registered for chain family '%s' and version '%v'", i, family, newPoolRef.Version)
+			}
+
+			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
+			if migrationSeq == nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: adapter for family '%s' version '%v' does not support liquidity migration", i, family, newPoolRef.Version)
 			}
 
 			// Derive the timelock address from the MCMS config.
