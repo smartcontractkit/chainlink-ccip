@@ -232,28 +232,28 @@ func LogTxResult(instructions []*AnchorInstruction) string {
 
 	var printInstruction func(*AnchorInstruction, int, string)
 	printInstruction = func(instruction *AnchorInstruction, index int, indent string) {
-		output.WriteString(fmt.Sprintf("%sInstruction %d: %s\n", indent, index, instruction.Name))
-		output.WriteString(fmt.Sprintf("%s  Program ID: %s\n", indent, instruction.ProgramID))
-		output.WriteString(fmt.Sprintf("%s  Compute Units: %d\n", indent, instruction.ComputeUnits))
+		fmt.Fprintf(&output, "%sInstruction %d: %s\n", indent, index, instruction.Name)
+		fmt.Fprintf(&output, "%s  Program ID: %s\n", indent, instruction.ProgramID)
+		fmt.Fprintf(&output, "%s  Compute Units: %d\n", indent, instruction.ComputeUnits)
 
 		// Print Events
 		if len(instruction.EventData) > 0 {
-			output.WriteString(fmt.Sprintf("%s  Events:\n", indent))
+			fmt.Fprintf(&output, "%s  Events:\n", indent)
 			for _, event := range instruction.EventData {
-				output.WriteString(fmt.Sprintf("%s    Event: %s:\n", indent, event.EventName))
-				output.WriteString(fmt.Sprintf("%s      Base64Data: %+v\n", indent, event.Base64Data))
-				output.WriteString(fmt.Sprintf("%s      DecodedData: %+v\n", indent, event.DecodedData))
-				output.WriteString(fmt.Sprintf("%s      Data: %+v\n", indent, event.Data))
+				fmt.Fprintf(&output, "%s    Event: %s:\n", indent, event.EventName)
+				fmt.Fprintf(&output, "%s      Base64Data: %+v\n", indent, event.Base64Data)
+				fmt.Fprintf(&output, "%s      DecodedData: %+v\n", indent, event.DecodedData)
+				fmt.Fprintf(&output, "%s      Data: %+v\n", indent, event.Data)
 			}
 		}
 
-		output.WriteString(fmt.Sprintf("%s  Logs:\n", indent))
+		fmt.Fprintf(&output, "%s  Logs:\n", indent)
 		for _, log := range instruction.Logs {
-			output.WriteString(fmt.Sprintf("%s    %s\n", indent, log))
+			fmt.Fprintf(&output, "%s    %s\n", indent, log)
 		}
 
 		if len(instruction.InnerCalls) > 0 {
-			output.WriteString(fmt.Sprintf("%s  Inner Calls:\n", indent))
+			fmt.Fprintf(&output, "%s  Inner Calls:\n", indent)
 			for i, innerCall := range instruction.InnerCalls {
 				printInstruction(innerCall, i+1, indent+"    ")
 			}

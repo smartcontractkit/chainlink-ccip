@@ -3,6 +3,7 @@ set -euo pipefail
 
 ANCHOR_VERSION="0.29.0"
 SOLANA_VERSION="1.17.25"
+RUST_VERSION="1.72.1"
 ANCHOR_GO_VERSION="v0.2.3"
 
 RED='\033[0;31m'
@@ -29,6 +30,20 @@ info "Checking prerequisites..."
 check_command rustc "https://www.rust-lang.org/tools/install" || exit 1
 check_command cargo "https://www.rust-lang.org/tools/install" || exit 1
 check_command go    "https://go.dev/doc/install"              || exit 1
+
+# ─── Rust Toolchain ─────────────────────────────────────────────────────────────
+
+CURRENT_RUST=$(rustc --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "none")
+if [[ "$CURRENT_RUST" != "$RUST_VERSION" ]]; then
+    info "Installing Rust toolchain ${RUST_VERSION} (current: ${CURRENT_RUST})..."
+    rustup toolchain install "$RUST_VERSION" --component clippy rustfmt
+    # Set as override for the solana directory so it doesn't affect other projects
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SOLANA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+    rustup override set "$RUST_VERSION" --path "$SOLANA_DIR"
+else
+    info "Rust ${RUST_VERSION} already active."
+fi
 
 # ─── AVM / Anchor ───────────────────────────────────────────────────────────────
 
