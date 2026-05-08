@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	LinkContractType cldf_deployment.ContractType = "LINK"
+	LinkContractType cldf_deployment.ContractType = "LinkToken"
 	Version          *semver.Version              = semver.MustParse("1.6.0")
 )
 

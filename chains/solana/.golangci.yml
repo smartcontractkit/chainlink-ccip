@@ -143,6 +143,10 @@ linters:
         path: _test.go
         text: 'G115:'
       - linters:
+          - gosec
+        path: _test.go
+        text: 'G602:'
+      - linters:
             - revive
         text: "dot-imports"
     paths:

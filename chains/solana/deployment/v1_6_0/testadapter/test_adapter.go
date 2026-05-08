@@ -13,15 +13,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog"
-	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/stretchr/testify/require"
 	"github.com/xssnick/tonutils-go/tlb"
+
+	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
+	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -30,6 +33,7 @@ import (
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
@@ -63,7 +67,7 @@ func init() {
 }
 
 type SVMAdapter struct {
-	state testadapters.StateProvider
+	state *testadapters.DataStoreStateProvider
 	cldf_solana.Chain
 }
 
@@ -131,8 +135,8 @@ func (a *SVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 	}, nil
 }
 
-func (a *SVMAdapter) getAddress(ty datastore.ContractType) (solana.PublicKey, error) {
-	addr, err := a.state.GetAddress(ty)
+func (a *SVMAdapter) getAddress(ty datastore.ContractType, qualifier ...string) (solana.PublicKey, error) {
+	addr, err := a.state.GetAddress(ty, qualifier...)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to get %v address: %w", ty, err)
 	}
@@ -164,13 +168,21 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get RMNRemote address: %w", err)
 	}
-	linkAddr, err := a.getAddress(datastore.ContractType("LINK"))
+	linkAddr, err := a.getAddress(datastore.ContractType(tokenops.LinkContractType))
 	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to get LINK address: %w", err)
+		return 0, messageID, fmt.Errorf("failed to get LinkToken address: %w", err)
 	}
-	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"))
+	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"), "CLLCCIP")
 	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
+		found0 := strings.Contains(err.Error(), "expected to find exactly 1 ref with criteria ") && strings.HasSuffix(err.Error(), "found 0")
+		if !found0 {
+			return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
+		}
+		// try again without qualifier to be compatible with older deployments that didn't set the qualifier
+		bnmPool, err = a.getAddress(datastore.ContractType("BurnMintTokenPool"))
+		if err != nil {
+			return 0, messageID, fmt.Errorf("failed to get BurnMintTokenPool address with qualifier 'CLLCCIP', and fallback without qualifier also failed: %w", err)
+		}
 	}
 	// lnrPool, err := a.getAddress(datastore.ContractType("LockReleaseTokenPool"))
 	// if err != nil {
@@ -473,6 +485,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 	}
 }
 
+// TODO: This doesn't work because the sent amount is higher than the specified gas limit.
 func (a *SVMAdapter) LowGasLimit() *big.Int {
 	return big.NewInt(1)
 }
@@ -727,6 +740,9 @@ func SolEventEmitter[T any](ctx context.Context, client *solrpc.Client, address 
 					},
 				)
 				if err != nil {
+					if isTransientSolanaRPCError(err) {
+						continue
+					}
 					errorCh <- err
 					return
 				}
@@ -756,6 +772,13 @@ func SolEventEmitter[T any](ctx context.Context, client *solrpc.Client, address 
 						},
 					)
 					if err != nil {
+						// Skip transient Solana RPC errors (e.g. "Transaction not found",
+						// code -32020) which occur on devnet when the signature exists in
+						// the address history but the full transaction data is not yet
+						// available from this RPC node.
+						if isTransientSolanaRPCError(err) {
+							continue
+						}
 						errorCh <- err
 						return
 					}
@@ -965,4 +988,18 @@ func confirmExecWithSeqNrsSol(
 	}
 
 	return executionStates, nil
+}
+
+// isTransientSolanaRPCError returns true for RPC errors that are transient and
+// should be retried, such as "Transaction not found" (-32020) on Solana devnet.
+func isTransientSolanaRPCError(err error) bool {
+	var rpcErr *jsonrpc.RPCError
+	if errors.As(err, &rpcErr) && rpcErr.Code == -32020 {
+		return true
+	}
+	// Fallback: string match for cases where the error is wrapped differently
+	if strings.Contains(err.Error(), "not found") && strings.Contains(err.Error(), "Transaction") {
+		return true
+	}
+	return false
 }

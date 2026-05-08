@@ -1091,13 +1091,33 @@ func TestTokenPool(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
+					// set rate limit
+					ixRates, err := cctp_token_pool.NewSetChainRateLimitInstruction(
+						config.SvmChainSelector,
+						usdcMint,
+						cctp_token_pool.RateLimitConfig{
+							Enabled:  true,
+							Capacity: 1e5, // 0.1 USDC, drains in one offramp
+							Rate:     1,   // slow refill
+						},
+						cctp_token_pool.RateLimitConfig{
+							Enabled:  true,
+							Capacity: 1e5, // 0.1 USDC, drains in one onramp
+							Rate:     1,   // slow refill
+						},
+						cctpPool.State,
+						cctpPool.SvmChainConfig,
+						admin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
 					// create pool token account
 					createP, poolTokenAccount, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, usdcMint, cctpPool.Signer, admin.PublicKey())
 					require.NoError(t, err)
 					require.Equal(t, poolTokenAccount, cctpPool.TokenAccount)
 
 					// submit tx with all instructions
-					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolGlobalInitI, poolInitI, ixConfigure, ixCctpConfigure, ixAppend, createP}, admin, config.DefaultCommitment)
+					res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolGlobalInitI, poolInitI, ixConfigure, ixCctpConfigure, ixAppend, ixRates, createP}, admin, config.DefaultCommitment)
 					require.NotNil(t, res)
 
 					// validate state
@@ -1126,6 +1146,17 @@ func TestTokenPool(t *testing.T) {
 					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainCctpConfigChanged", &eventCctpEdit, config.PrintEvents))
 					require.Equal(t, domain, eventCctpEdit.Config.DomainId)
 					require.Equal(t, cctpPool.Signer, eventCctpEdit.Config.DestinationCaller)
+
+					eventRateLimit := tokens.EventRateLimitConfigured{}
+					require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RateLimitConfigured", &eventRateLimit, config.PrintEvents))
+					require.Equal(t, config.SvmChainSelector, eventRateLimit.ChainSelector)
+					require.Equal(t, true, eventRateLimit.InboundRateLimit.Enabled)
+					require.Equal(t, uint64(1e5), eventRateLimit.InboundRateLimit.Capacity)
+					require.Equal(t, uint64(1), eventRateLimit.InboundRateLimit.Rate)
+					require.Equal(t, true, eventRateLimit.OutboundRateLimit.Enabled)
+					require.Equal(t, uint64(1e5), eventRateLimit.OutboundRateLimit.Capacity)
+					require.Equal(t, uint64(1), eventRateLimit.OutboundRateLimit.Rate)
+					require.Equal(t, usdcMint, eventRateLimit.Mint)
 				})
 			})
 
@@ -1586,6 +1617,78 @@ func TestTokenPool(t *testing.T) {
 					require.Equal(t, outputNonce, cctp.GetNonce(messageSentEventData.Message))              // in event account data
 					require.Equal(t, outputNonce, ccipCctpMessageSentEvent.CctpNonce)                       // in the event field
 				})
+
+				t.Run("Rate limit persists after onramp", func(t *testing.T) {
+					var cfg cctp_token_pool.ChainConfig
+					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, cctpPool.SvmChainConfig, config.DefaultCommitment, &cfg))
+
+					require.Less(t, cfg.Base.OutboundRateLimit.Tokens, cfg.Base.OutboundRateLimit.Cfg.Capacity,
+						"rate limit tokens should decrease after onramp")
+				})
+
+				t.Run("Rate limit exceeded on second onramp", func(t *testing.T) {
+					// The outbound rate limit bucket is depleted from the first onramp,
+					// so a second onramp of the same amount should fail.
+					// Use a different nonce so the CCTP event account PDA is fresh
+					// (the previous one is already initialized from the first onramp).
+					secondNonce := fakeCcipTotalNonce + 1
+					secondEventAddress, _, err := solana.FindProgramAddress([][]byte{
+						[]byte("ccip_cctp_message_sent_event"),
+						user.PublicKey().Bytes(),
+						common.Uint64ToLE(remoteChainSelector),
+						common.Uint64ToLE(secondNonce),
+					}, cctpPool.Program)
+					require.NoError(t, err)
+
+					secondLockOrBurnIn := cctp_token_pool.LockOrBurnInV1{
+						LocalToken:          usdcMint,
+						Amount:              messageAmount,
+						RemoteChainSelector: config.SvmChainSelector,
+						Receiver:            cctpPool.TokenAccount.Bytes(),
+						OriginalSender:      user.PublicKey(),
+						MsgTotalNonce:       secondNonce,
+					}
+
+					secondDynamicMetas := []*solana.AccountMeta{
+						solana.Meta(tokenMessengerMinter.AuthorityPda),
+						solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
+						solana.Meta(secondEventAddress).WRITE(),
+					}
+
+					secondAdditionalMetas := []*solana.AccountMeta{
+						solana.Meta(messageTransmitter.MessageTransmitter).WRITE(),
+						solana.Meta(tokenMessengerMinter.Program),
+						solana.Meta(solana.SystemProgramID),
+						solana.Meta(messageTransmitter.Program),
+						solana.Meta(tokenMessengerMinter.TokenMessenger),
+						solana.Meta(tokenMessengerMinter.TokenMinter),
+						solana.Meta(tokenMessengerMinter.LocalToken).WRITE(),
+						solana.Meta(tokenMessengerMinter.EventAuthority),
+					}
+					secondAdditionalMetas = append(secondAdditionalMetas, secondDynamicMetas...)
+
+					secondRaw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+						test_ccip_invalid_receiver.LockOrBurnInV1(secondLockOrBurnIn),
+						cctpPool.Program,
+						dumbRampCctpSigner,
+						cctpPool.State,
+						solana.TokenProgramID,
+						usdcMint,
+						cctpPool.Signer,
+						cctpPool.TokenAccount,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
+						cctpPool.SvmChainConfig,
+					)
+					secondRaw.AccountMetaSlice = append(secondRaw.AccountMetaSlice, secondAdditionalMetas...)
+					secondIx, err := secondRaw.ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndFailWith(ctx, t, solanaGoClient,
+						[]solana.Instruction{transferI, fundPoolSignerIx, secondIx},
+						admin, config.DefaultCommitment, []string{"rate limit reached"})
+				})
 			})
 
 			t.Run("Basic offramp", func(t *testing.T) {
@@ -1746,6 +1849,22 @@ func TestTokenPool(t *testing.T) {
 					require.NoError(t, err)
 
 					require.Equal(t, uint64(initial)+messageAmount, uint64(final), "Admin should have received the USDC after receiving the message")
+				})
+
+				t.Run("Rate limit persists after offramp", func(t *testing.T) {
+					var cfg cctp_token_pool.ChainConfig
+					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, cctpPool.SvmChainConfig, config.DefaultCommitment, &cfg))
+
+					require.Less(t, cfg.Base.InboundRateLimit.Tokens, cfg.Base.InboundRateLimit.Cfg.Capacity,
+						"rate limit tokens should decrease after offramp")
+				})
+
+				t.Run("Rate limit exceeded on second offramp", func(t *testing.T) {
+					// The inbound rate limit bucket is depleted from the first offramp,
+					// so a second offramp of the same amount should fail.
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient,
+						[]solana.Instruction{fundCustodyIx, ix},
+						admin, config.DefaultCommitment, lookupTables, []string{"rate limit reached"})
 				})
 			})
 
