@@ -20,10 +20,11 @@ import (
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog"
-	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/stretchr/testify/require"
 	"github.com/xssnick/tonutils-go/tlb"
+
+	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
+	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -484,6 +485,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 	}
 }
 
+// TODO: This doesn't work because the sent amount is higher than the specified gas limit.
 func (a *SVMAdapter) LowGasLimit() *big.Int {
 	return big.NewInt(1)
 }
