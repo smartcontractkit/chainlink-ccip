@@ -485,6 +485,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 	}
 }
 
+// TODO: This doesn't work because the sent amount is higher than the specified gas limit.
 func (a *SVMAdapter) LowGasLimit() *big.Int {
 	return big.NewInt(1)
 }
