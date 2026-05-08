@@ -87,6 +87,7 @@ pub struct InitializeTokenPool<'info> {
 #[derive(Accounts)]
 pub struct AdminUpdateTokenPool<'info> {
     #[account(
+        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
         constraint = valid_version(state.version, MAX_POOL_STATE_V) @ CcipTokenPoolError::InvalidVersion,
@@ -266,6 +267,7 @@ pub struct TokenOfframp<'info> {
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
+        mut,
         seeds = [
             POOL_CHAINCONFIG_SEED,
             &release_or_mint.remote_chain_selector.to_le_bytes(),
@@ -496,6 +498,7 @@ pub struct TokenOnramp<'info> {
     pub rmn_remote_config: UncheckedAccount<'info>,
 
     #[account(
+        mut,
         seeds = [
             POOL_CHAINCONFIG_SEED,
             lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(),
