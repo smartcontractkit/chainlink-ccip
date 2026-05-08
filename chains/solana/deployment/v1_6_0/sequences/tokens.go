@@ -515,7 +515,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 	return operations.NewSequence(
 		"DeployTokenPoolForToken",
 		common_utils.Version_1_6_0,
-		"Configures a token pool for a given token on Solana. Doesn't actually deploy a new token pool contract, as Solana token pools are just accounts.",
+		"Configures a token pool for a given token on Solana (no new program deploy). Initializes the pool, sets rate limit admin to RateLimitAdmin input or timelock signer PDA, then pool signer ATA and mint authority as needed.",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			b.Logger.Info("SVM Deploying token:", input)
@@ -567,6 +567,47 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			}
 			result.Addresses = append(result.Addresses, deployOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, deployOut.Output.BatchOps...)
+
+			updateRLOp := tokenpoolops.UpdateRateLimitAdminBurnMint
+			switch input.PoolType {
+			case common_utils.BurnMintTokenPool.String():
+				updateRLOp = tokenpoolops.UpdateRateLimitAdminBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				updateRLOp = tokenpoolops.UpdateRateLimitAdminLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+			}
+
+			var rlAdmin solana.PublicKey
+			if input.RateLimitAdmin != "" {
+				rlAdmin, err = solana.PublicKeyFromBase58(input.RateLimitAdmin)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid base58 pubkey: %w", input.RateLimitAdmin, err)
+				}
+				if rlAdmin.IsZero() {
+					return sequences.OnChainOutput{}, errors.New("rate limit admin cannot be the zero pubkey")
+				}
+			} else {
+				rlAdmin = utils.GetTimelockSignerPDA(
+					input.ExistingDataStore.Addresses().Filter(),
+					chain.Selector,
+					common_utils.CLLQualifier,
+				)
+				if rlAdmin.IsZero() {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: ensure MCMS RBACTimelock is in the datastore", chain.Selector)
+				}
+			}
+
+			rlOut, err := operations.ExecuteOperation(b, updateRLOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   tokenPool,
+				TokenMint: tokenMint,
+				NewOwner:  rlAdmin,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
+			}
+			result.Addresses = append(result.Addresses, rlOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, rlOut.Output.BatchOps...)
 
 			poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
 
@@ -670,28 +711,15 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 			acceptOwnershipTPOp := tokenpoolops.AcceptOwnershipBurnMint
-			tprlAdminTPOp := tokenpoolops.UpdateRateLimitAdminBurnMint
 			switch tokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				// Already set to burn mint
 			case common_utils.LockReleaseTokenPool.String():
 				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
 				acceptOwnershipTPOp = tokenpoolops.AcceptOwnershipLockRelease
-				tprlAdminTPOp = tokenpoolops.UpdateRateLimitAdminLockRelease
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 			}
-
-			tprlAdminOut, err := operations.ExecuteOperation(b, tprlAdminTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-				Program:   tokenPool,
-				TokenMint: tokenMint,
-				NewOwner:  timelockSigner,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to update TPRL admin: %w", err)
-			}
-			result.Addresses = append(result.Addresses, tprlAdminOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, tprlAdminOut.Output.BatchOps...)
 
 			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
 			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{

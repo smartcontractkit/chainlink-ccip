@@ -99,7 +99,8 @@ type DeployTokenPoolInput struct {
 	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
 	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
-	// If empty, then this remains unconfigured on the token pool (i.e. the zero address).
+	// For Solana: If empty, DeployTokenPoolForToken sets the timelock signer PDA from the datastore;
+	// if non-empty, sets this base58 pubkey. On EVM, empty leaves the pool default (unchanged from contract deploy).
 	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
