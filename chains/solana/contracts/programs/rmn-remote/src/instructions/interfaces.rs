@@ -29,4 +29,6 @@ pub trait Admin {
         ctx: Context<UpdateEventAuthorities>,
         new_event_authorities: Vec<Pubkey>,
     ) -> Result<()>;
+
+    fn set_curser(&self, ctx: Context<UpdateConfig>, curser: Pubkey) -> Result<()>;
 }

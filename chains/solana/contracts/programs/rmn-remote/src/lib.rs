@@ -147,6 +147,18 @@ pub mod rmn_remote {
         router::admin(code_version).set_event_authorities(ctx, new_event_authorities)
     }
 
+    /// Sets the address for the curser role who, alongside the contract owner, is authorized to curse.
+    ///
+    /// Only the CCIP Admin may perform this operation.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for updating event authorities.
+    /// * `curser` - The new curser public key.
+    pub fn set_curser(ctx: Context<UpdateConfig>, curser: Pubkey) -> Result<()> {
+        let code_version = ctx.accounts.config.default_code_version;
+        router::admin(code_version).set_curser(ctx, curser)
+    }
+
     /// Verifies that the subject is not cursed AND that this chain is not globally cursed.
     /// In case either of those assumptions fail, the instruction reverts.
     ///

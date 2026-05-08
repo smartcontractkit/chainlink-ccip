@@ -107,6 +107,15 @@ var (
 	// * `new_event_authorities` - The new list of event authority public keys.
 	Instruction_SetEventAuthorities = ag_binary.TypeID([8]byte{76, 83, 229, 160, 40, 1, 149, 103})
 
+	// Sets the address for the curser role who, alongside the contract owner, is authorized to curse.
+	//
+	// Only the CCIP Admin may perform this operation.
+	//
+	// # Arguments
+	// * `ctx` - The context containing the accounts required for updating event authorities.
+	// * `curser` - The new curser public key.
+	Instruction_SetCurser = ag_binary.TypeID([8]byte{107, 220, 52, 86, 132, 117, 92, 232})
+
 	// Verifies that the subject is not cursed AND that this chain is not globally cursed.
 	// In case either of those assumptions fail, the instruction reverts.
 	//
@@ -158,6 +167,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Uncurse"
 	case Instruction_SetEventAuthorities:
 		return "SetEventAuthorities"
+	case Instruction_SetCurser:
+		return "SetCurser"
 	case Instruction_VerifyNotCursed:
 		return "VerifyNotCursed"
 	case Instruction_CpiEvent:
@@ -207,6 +218,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_event_authorities", (*SetEventAuthorities)(nil),
+		},
+		{
+			"set_curser", (*SetCurser)(nil),
 		},
 		{
 			"verify_not_cursed", (*VerifyNotCursed)(nil),

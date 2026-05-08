@@ -152,8 +152,13 @@ pub struct Curse<'info> {
     )]
     pub config: UncheckedAccount<'info>,
 
-    // validate signer is registered admin
-    #[account(mut, address = load_config(&config).unwrap().curser @ RmnRemoteError::Unauthorized)]
+    #[account(
+        mut,
+        constraint = {
+            let config_data = load_config(&config).unwrap();
+            authority.key() == config_data.curser || authority.key() == config_data.owner
+        } @ RmnRemoteError::Unauthorized)
+    ]
     pub authority: Signer<'info>,
 
     #[account(

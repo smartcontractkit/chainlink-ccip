@@ -300,6 +300,41 @@
       ]
     },
     {
+      "name": "setCurser",
+      "docs": [
+        "Sets the address for the curser role who, alongside the contract owner, is authorized to curse.",
+        "",
+        "Only the CCIP Admin may perform this operation.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for updating event authorities.",
+        "* `curser` - The new curser public key."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "curses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "curser",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "verifyNotCursed",
       "docs": [
         "Verifies that the subject is not cursed AND that this chain is not globally cursed.",
@@ -613,6 +648,16 @@
           "type": {
             "vec": "publicKey"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CurserSet",
+      "fields": [
+        {
+          "name": "curser",
+          "type": "publicKey",
           "index": false
         }
       ]
