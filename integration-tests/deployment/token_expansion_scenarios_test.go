@@ -20,7 +20,6 @@ import (
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	lrpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
-	datastore_utils_solana "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -1192,7 +1191,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 		env.DataStore,
 		datastore.AddressRef{Qualifier: TestTokenSymbol},
 		solChainSel,
-		datastore_utils_solana.ToAddress,
+		solanautils.ToAddress,
 	)
 	require.NoError(t, err)
 

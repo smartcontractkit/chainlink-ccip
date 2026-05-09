@@ -101,7 +101,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 					Admin:             pendingSigner,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
 				}
 				result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
