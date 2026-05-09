@@ -1235,7 +1235,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 	err = solChain.Confirm([]solana.Instruction{setAuthIx})
 	require.NoError(t, err)
 
-	// Build an MCMS batch that sets the pending administrator for the token on TAR that is a third party (not the timelock signer)
+	// Build an MCMS batch that sets the pending administrator for the token on TAR to a 3rd party (not the timelock signer)
 	customer := solana.NewWallet().PublicKey()
 	reg1Report, err := operations.ExecuteOperation(
 		env.OperationsBundle,
@@ -1260,7 +1260,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 	require.Len(t, reg1ProposalOut.MCMSTimelockProposals, 1)
 	testhelpers.ProcessTimelockProposals(t, *env, reg1ProposalOut.MCMSTimelockProposals, false)
 
-	// Assert that the pending administrator is set to the customer after the MCMS batch executes
+	// Assert that the pending admin is set to the customer after the MCMS batch executes
 	tarState := fetchTAR(true)
 	require.Equal(t, customer, tarState.PendingAdministrator)
 
