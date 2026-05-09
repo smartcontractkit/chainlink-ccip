@@ -596,8 +596,13 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			}
 			pendingAdmin = input.Admin
 		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
-			// we can only sign as either the deployer or timelock
-			return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
+			if input.Admin != timelockSigner {
+				return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
+			}
+			// TEMP: On-chain pending can lag a Ccip-admin override already queued by Register (BatchOps). input.Admin is the
+			// timelock acceptor from that flow; use it for Accept ix. Proper fix: sequence override+accept in one batch (or re-fetch after apply).
+			b.Logger.Infof("accept token admin registry: on-chain pending %s is not timelock/deployer; using input.Admin (timelock) after queued override", pendingAdmin.String())
+			pendingAdmin = input.Admin
 		}
 		// sign as the pending admin to accept
 		// when there is no pending admin, we assume the authority is timelock
