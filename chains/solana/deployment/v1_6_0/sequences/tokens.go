@@ -30,7 +30,9 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-			var result sequences.OnChainOutput
+			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
+			addrs := input.ExistingDataStore.Addresses().Filter()
+
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
@@ -47,7 +49,6 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
 
 			// if no token admin provided, ccip admin becomes the admin
 			var tokenAdmin solana.PublicKey
@@ -55,11 +56,12 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				tokenAdmin = solana.MustPublicKeyFromBase58(input.ExternalAdmin)
 			}
 
+			var result sequences.OnChainOutput
 			rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
 				Router:            solana.PublicKeyFromBytes(routerAddr),
 				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
 				Admin:             tokenAdmin,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
+				ExistingAddresses: addrs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
@@ -67,45 +69,59 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
 			pendingSigner := rtarOut.Output.PendingSigner
 
-			// NOTE: MCMS batches **DO NOT** execute immediately - we need to construct the batch ops for
-			// RegisterTokenAdminRegistry and AcceptTokenAdminRegistry conditionally otherwise the Accept
-			// stage may wrongly assume that Register has already been performed on chain when in reality
-			// it hasn't.
+			timelockSigner := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
 			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			deployerPK := chain.DeployerKey.PublicKey()
 			routerPK := solana.PublicKeyFromBytes(routerAddr)
-			if len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0 {
-				// Case 1: RegisterTokenAdminRegistry requires a proposal - in this case, we need to build a **combined batch** that
-				// includes the accept instruction AFTER the pending admin override/propose instructions.
-				atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+			if pendingSigner == timelockSigner || pendingSigner == deployerPK {
+				// If the proposed pending admin is timelock or deployer, then we can accept automatically, but
+				// we need to handle the batches carefully here. MCMS batches *DO NOT* execute immediately - we
+				// need to construct the `BatchOps` for RegisterTokenAdminRegistry and AcceptTokenAdminRegistry
+				// *conditionally* otherwise the Accept stage may wrongly assume that Register has already been
+				// performed on chain when in reality it hasn't.
+				if len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0 {
+					// Case 1: RegisterTokenAdminRegistry requires a proposal - in this case, we can append Accept
+					// in the same batch so Accept does not run before Register lands.
+					atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+					}
+					batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
+					batchOps, err := utils.BuildMCMSBatchOperation(
+						chain.Selector,
+						batchIxn,
+						routerPK.String(),
+						routerops.ContractType.String(),
+					)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
+					}
+					result.BatchOps = append(result.BatchOps, batchOps)
+				} else {
+					// Case 2: RegisterTokenAdminRegistry does not require a proposal - in this case, we can execute
+					// the accept instruction immediately using a separate operation since there aren't any proposal
+					// instructions that need to be batched together with it.
+					atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+						ExistingAddresses: addrs,
+						TokenMint:         tokenMintPK,
+						Router:            routerPK,
+						Admin:             pendingSigner,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
+					}
+					result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
+					result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+					result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
 				}
-				batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
-				batchOps, err := utils.BuildMCMSBatchOperation(
-					chain.Selector,
-					batchIxn,
-					routerPK.String(),
-					routerops.ContractType.String(),
-				)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
-				}
-				result.BatchOps = append(result.BatchOps, batchOps)
 			} else {
-				// Case 2: RegisterTokenAdminRegistry doesn't require a proposal - in this case, we can execute the accept instruction
-				// immediately using a separate op, since there are no proposal instructions that need to be batched together with it.
-				atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
-					ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
-					TokenMint:         tokenMintPK,
-					Router:            routerPK,
-					Admin:             pendingSigner,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
-				}
-				result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
+				// MCMS cannot sign as an external pending admin; in that case emit register-only batches and the
+				// pending signer must accept after execute.
+				b.Logger.Infof(
+					"Proposed pending admin (%s) is neither timelock signer (%s) nor deployer (%s), so they must accept the token admin role separately.",
+					pendingSigner, timelockSigner, deployerPK,
+				)
 				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
-				result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
 			}
 
 			b.Logger.Info("SVM Setting token pool:", input)
