@@ -30,14 +30,13 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
-			addrs := input.ExistingDataStore.Addresses().Filter()
-
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
+			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
+			addrs := input.ExistingDataStore.Addresses().Filter()
 			b.Logger.Info("SVM Registering token:", input)
 
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)

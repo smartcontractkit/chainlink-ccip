@@ -623,7 +623,7 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept token admin registry: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -697,7 +697,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm transfer token admin registry: %w", err)
 		}
 
 		return TokenAdminRegistryOut{
