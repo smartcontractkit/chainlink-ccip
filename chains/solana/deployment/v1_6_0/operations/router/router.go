@@ -427,7 +427,7 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
-				return TokenAdminRegistryOut{}, nil
+				return TokenAdminRegistryOut{PendingSigner: input.Admin}, nil
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 			// there is already an admin registered, we need to transfer
@@ -657,7 +657,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		}
 		if currentAdmin == input.Admin {
 			b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
-			return TokenAdminRegistryOut{}, nil
+			return TokenAdminRegistryOut{PendingSigner: input.Admin}, nil
 		}
 		// sign as the current admin to transfer
 		tempIx, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
@@ -776,6 +776,7 @@ type TokenAdminRegistryOut struct {
 	ProposalInstructions []solana.Instruction `json:"-" yaml:"-"`
 
 	// PendingSigner is the key that needs to sign the accept instruction on-chain or via MCMS to complete the
-	// registration/transfer of the token admin registry.
+	// registration/transfer of the token admin registry. It is still set on no-op returns (no instruction executed)
+	// to the effective target admin (Admin after defaulting to CCIP authority) so callers can sequence Accept.
 	PendingSigner solana.PublicKey
 }
