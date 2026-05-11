@@ -54,6 +54,7 @@ func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffR
 
 func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterForkCCIPSendTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMForkCCIPSendTestAdapter)
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMTestAdapterForFamily)
 }
 
@@ -74,6 +75,10 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 		state: s,
 		Chain: c,
 	}
+}
+
+func NewEVMForkCCIPSendTestAdapter(env *deployment.Environment, selector uint64) testadapters.ForkCCIPSendTestAdapter {
+	return NewEVMAdapter(env, selector).(testadapters.ForkCCIPSendTestAdapter)
 }
 
 func NewEVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
