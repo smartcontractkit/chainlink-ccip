@@ -704,14 +704,35 @@ func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, res
 	return []contract_utils.WriteOutput{report.Output}, nil
 }
 
-// applyUSDCTokenPoolProxyMechanismWrites updates lock/burn mechanisms on the USDCTokenPoolProxy.
+// applyUSDCTokenPoolProxyMechanismWrites updates lock/burn mechanisms on the USDCTokenPoolProxy,
+// skipping selectors whose on-chain mechanism already matches the desired value.
 func applyUSDCTokenPoolProxyMechanismWrites(b cldf_ops.Bundle, chain evm.Chain, proxyAddress common.Address, remoteChainSelectors []uint64, mechanisms []uint8) ([]contract_utils.WriteOutput, error) {
+	toUpdateSelectors := make([]uint64, 0, len(remoteChainSelectors))
+	toUpdateMechanisms := make([]uint8, 0, len(mechanisms))
+	for i, sel := range remoteChainSelectors {
+		currentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetLockOrBurnMechanism, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       proxyAddress,
+			Args:          sel,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get lock or burn mechanism for remote chain %d: %w", sel, err)
+		}
+		if currentReport.Output == mechanisms[i] {
+			continue
+		}
+		toUpdateSelectors = append(toUpdateSelectors, sel)
+		toUpdateMechanisms = append(toUpdateMechanisms, mechanisms[i])
+	}
+	if len(toUpdateSelectors) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
 		ChainSelector: chain.Selector,
 		Address:       proxyAddress,
 		Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
-			RemoteChainSelectors: remoteChainSelectors,
-			Mechanisms:           mechanisms,
+			RemoteChainSelectors: toUpdateSelectors,
+			Mechanisms:           toUpdateMechanisms,
 		},
 	})
 	if err != nil {
