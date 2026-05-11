@@ -12,44 +12,37 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
-func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
-	tonSelector, evmSelector uint64) {
-
-	getAdapter := func(selector uint64) ccip.CCIP16ProductConfiguration {
-		family, err := chainsel.GetSelectorFamily(selector)
-		require.NoError(t, err)
-		chainID, err := chainsel.GetChainIDFromSelector(selector)
-		require.NoError(t, err)
-		adapter, err := ccip.NewCCIPImplFromNetwork(family, chainID)
-		require.NoError(t, err)
-		adapter.SetCLDF(e)
-		return adapter
-	}
-
-	tonAdapter := getAdapter(tonSelector)
-	evmAdapter := getAdapter(evmSelector)
+func RunQAInteractiveTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
+	selectorsToImpl := buildImplsMap(t, e, selectors)
 
 	type chainPair struct {
 		src  ccip.CCIP16ProductConfiguration
 		dest ccip.CCIP16ProductConfiguration
 	}
+	lanes := []chainPair{}
+	for _, i := range selectors {
+		for _, j := range selectors {
+			if i == j {
+				continue
+			}
+			lanes = append(lanes, chainPair{
+				src:  selectorsToImpl[i],
+				dest: selectorsToImpl[j],
+			})
+		}
+	}
+
 	type testCase struct {
 		name     string
-		lanes    []chainPair
 		testFunc func(t *testing.T, lane chainPair)
 	}
 	testCases := []testCase{
 		{
 			"message to eoa",
-			[]chainPair{
-				{evmAdapter, tonAdapter},
-			},
 			func(t *testing.T, lane chainPair) {
 				receiver := lane.dest.EOAReceiver(t)
 				extraArgs, err := lane.dest.GetExtraArgs(receiver, lane.src.Family())
@@ -75,10 +68,6 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 		},
 		{
 			"not enough gas; manual re-exec",
-			[]chainPair{
-				{tonAdapter, evmAdapter},
-				{evmAdapter, tonAdapter},
-			},
 			func(t *testing.T, lane chainPair) {
 				receiver := lane.dest.CCIPReceiver()
 
@@ -100,9 +89,6 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 		},
 		{
 			"receiver fails; manual re-exec",
-			[]chainPair{
-				{evmAdapter, tonAdapter},
-			},
 			func(t *testing.T, lane chainPair) {
 				isRejectAll := false
 				setReceiverRejectAll := func(rejectAll bool) {
@@ -153,7 +139,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment,
 	}
 
 	for _, tc := range testCases {
-		for _, lane := range tc.lanes {
+		for _, lane := range lanes {
 			laneTag := fmt.Sprintf("%s->%s", lane.src.Family(), lane.dest.Family())
 			t.Run(fmt.Sprintf("%s:%s", laneTag, tc.name), func(t *testing.T) {
 				tc.testFunc(t, lane)

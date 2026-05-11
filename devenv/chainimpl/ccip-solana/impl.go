@@ -14,6 +14,7 @@ import (
 
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -28,6 +30,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
@@ -96,7 +99,7 @@ func updatePrices(ds datastore.DataStore, src, dest uint64, srcChain cldf_solana
 	}
 	linkAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: src,
-		Type:          datastore.ContractType("LINK"),
+		Type:          datastore.ContractType(tokenops.LinkContractType),
 	}, src, datastore_utils.FullRef)
 	if err != nil {
 		return fmt.Errorf("failed to get LINK address: %w", err)
@@ -306,7 +309,7 @@ func (m *CCIP16Solana) PostDeployContractsForSelector(ctx context.Context, env *
 	a := &solanaseqs.SolanaAdapter{}
 	linkAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: selector,
-		Type:          datastore.ContractType("LINK"),
+		Type:          datastore.ContractType(tokenops.LinkContractType),
 	}, selector, datastore_utils.FullRef)
 	if err != nil {
 		return fmt.Errorf("failed to get LINK address: %w", err)
