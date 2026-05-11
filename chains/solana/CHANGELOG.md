@@ -4,7 +4,26 @@ This document describes the changes introduced in the different versions of the 
 
 ---
 
+## [1.6.2]
+
+### Added
+
+- [BurnMintTokenPool] New `transfer_mint_authority_to_pda_signer` instruction to revert mint authority from a multisig back to the pool signer PDA during migration cleanup
+
+### Changed
+
+- [Offramp] Fix `all_messages_executed` overflow for 64-message commit reports by using wrapping arithmetic on the execution states formula
+- [ExampleCcipSender] Remove `smalloc` global allocator requirement by boxing large account types (`InterfaceAccount`) to reduce stack usage
+- [BurnMintTokenPool] Mark `AdminUpdateTokenPool.state` account as mutable
+- [LockReleaseTokenPool] Mark `AdminUpdateTokenPool.state` account as mutable
+- [CctpTokenPool] Mark `AdminUpdateTokenPool.state`, `TokenOfframp.chain_config`, and `TokenOnramp.chain_config` accounts as mutable
+
+---
+
 ## [1.6.1]
+
+- Commit [`cb23ec38649f9d23aabd0350e30d3d649ebc2174`](https://github.com/smartcontractkit/chainlink-ccip/commit/cb23ec38649f9d23aabd0350e30d3d649ebc2174)
+- Git Tag: [solana-v1.6.1](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v1.6.1)
 
 ### Added
 
@@ -14,6 +33,9 @@ This document describes the changes introduced in the different versions of the 
 ---
 
 ## [1.6.0]
+
+- Commit [`d9c8e1b0c5f`](https://github.com/smartcontractkit/chainlink-ccip/commit/d9c8e1b0c5f)
+- Git Tag: [solana-v1.6.0](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v1.6.0)
 
 ### Changed
 
