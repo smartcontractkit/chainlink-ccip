@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -25,4 +26,36 @@ func (a *EVMCCVAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.Data
 			Qualifier: qualifier,
 		},
 	)
+}
+
+func (a *EVMCCVAggregatorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qualifier string) []uint64 {
+	if ds == nil {
+		return nil
+	}
+	resolverRefs := ds.Addresses().Filter(
+		datastore.AddressRefByQualifier(qualifier),
+		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType)),
+		datastore.AddressRefByVersion(versioned_verifier_resolver.Version),
+	)
+	verifierRefs := ds.Addresses().Filter(
+		datastore.AddressRefByQualifier(qualifier),
+		datastore.AddressRefByType(datastore.ContractType(committee_verifier.ContractType)),
+		datastore.AddressRefByVersion(committee_verifier.Version),
+	)
+	seen := make(map[uint64]struct{}, len(resolverRefs)+len(verifierRefs))
+	chains := make([]uint64, 0, len(resolverRefs)+len(verifierRefs))
+	for _, refs := range [][]datastore.AddressRef{resolverRefs, verifierRefs} {
+		for _, ref := range refs {
+			if _, exists := seen[ref.ChainSelector]; exists {
+				continue
+			}
+			family, err := chainsel.GetSelectorFamily(ref.ChainSelector)
+			if err != nil || family != chainsel.FamilyEVM {
+				continue
+			}
+			seen[ref.ChainSelector] = struct{}{}
+			chains = append(chains, ref.ChainSelector)
+		}
+	}
+	return chains
 }
