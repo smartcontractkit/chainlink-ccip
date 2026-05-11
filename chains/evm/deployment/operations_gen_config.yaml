@@ -624,7 +624,7 @@ contracts:
     version: "2.1.0"
     functions:
       - name: curse
-        access: public
+        access: authorized_callers
       - name: uncurse
         access: owner
       - name: isCursed

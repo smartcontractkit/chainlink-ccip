@@ -49,8 +49,9 @@ contracts:
 
 ### Access Control
 
-- `owner`: Generates write operation with MCMS support
-- `public`: Generates read-only or public write operation
+- `owner`: Write uses `OnlyOwner` for direct execution vs MCMS proposals
+- `public`: Write uses `AllCallersAllowed` (always eligible for direct execution when a tx is prepared)
+- `authorized_callers`: Write uses `contract.IsAuthorizedCaller` (AuthorizedCallers mixin — checks `getAllAuthorizedCallers`)
 
 ## Output
 
