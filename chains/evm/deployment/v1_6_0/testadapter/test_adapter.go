@@ -69,7 +69,7 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 		panic(fmt.Sprintf("chain not found: %d", selector))
 	}
 
-	s := &testadapters.DataStoreStateProvider{Selector: selector, Version: semver.MustParse("1.6.0"), DS: env.DataStore}
+	s := &testadapters.DataStoreStateProvider{Selector: selector, DS: env.DataStore}
 	return &EVMAdapter{
 		state: s,
 		Chain: c,
@@ -78,7 +78,7 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 
 func NewEVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
 	return &EVMAdapter{
-		state: &testadapters.DataStoreStateProvider{Selector: selector, Version: semver.MustParse("1.6.0"), DS: ds},
+		state: &testadapters.DataStoreStateProvider{Selector: selector, DS: ds},
 	}
 }
 

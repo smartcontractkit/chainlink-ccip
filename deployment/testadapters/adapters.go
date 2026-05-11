@@ -264,7 +264,6 @@ type StateProvider interface {
 
 type DataStoreStateProvider struct {
 	Selector uint64
-	Version  *semver.Version
 	DS       datastore.DataStore
 }
 
@@ -276,8 +275,8 @@ func (p *DataStoreStateProvider) GetAddress(ty datastore.ContractType, qualifier
 	addr, err := datastore_utils.FindAndFormatRef(p.DS, datastore.AddressRef{
 		ChainSelector: p.Selector,
 		Type:          ty,
-		Version:       p.Version,
 		Qualifier:     ql,
+		// TODO: version
 	}, p.Selector, datastore_utils.FullRef)
 	if err != nil {
 		return "", err

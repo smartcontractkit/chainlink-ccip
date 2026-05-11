@@ -84,7 +84,7 @@ func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	if !ok {
 		panic(fmt.Sprintf("chain not found: %d", selector))
 	}
-	s := &testadapters.DataStoreStateProvider{Selector: selector, Version: semver.MustParse("1.6.0"), DS: env.DataStore}
+	s := &testadapters.DataStoreStateProvider{Selector: selector, DS: env.DataStore}
 	return &SVMAdapter{
 		state: s,
 		Chain: c,
@@ -93,7 +93,7 @@ func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 
 func NewSVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {
 	return &SVMAdapter{
-		state: &testadapters.DataStoreStateProvider{Selector: selector, Version: semver.MustParse("1.6.0"), DS: ds},
+		state: &testadapters.DataStoreStateProvider{Selector: selector, DS: ds},
 	}
 }
 
