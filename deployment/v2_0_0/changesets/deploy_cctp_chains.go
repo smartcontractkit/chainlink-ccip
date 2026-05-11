@@ -45,8 +45,10 @@ type CCTPChainConfig struct {
 	USDCType adapters.USDCType
 	// TokenDecimals is the number of decimals of the USDC on the chain.
 	TokenDecimals uint8
-	// AllowedFinality is the CCTPVerifier allowed finality config for this chain (see deployment/finality).
-	// If zero, ConfigureCCTPChainForLanes uses wait-for-finality (on-chain 0x00).
+	// AllowedFinality is the finality config (see deployment/finality) reconciled on the CCTPVerifier
+	// and used as the AllowedFinalityConfig on the CCTP-through-CCV token pool for this chain.
+	// Applied regardless of remote mechanism mix; if zero, the sequence uses wait-for-finality
+	// (on-chain 0x00).
 	AllowedFinality finality.Config
 }
 

@@ -64,7 +64,9 @@ type ConfigureCCTPChainForLanesInput struct {
 	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
-	// AllowedFinality is written to the CCTPVerifier as the allowed finality bitmask (see deployment/finality).
+	// AllowedFinality is the finality bitmask (see deployment/finality) on the CCTPVerifier
+	// for this chain and used as the AllowedFinalityConfig on the CCTP-through-CCV token pool when
+	// configuring CCTP-capable EVM remotes.
 	// If zero (unset), the sequence uses wait-for-finality (on-chain 0x00), the FinalityCodec default.
 	AllowedFinality finality.Config
 }
