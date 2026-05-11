@@ -105,13 +105,23 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
+		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       input.TokenPoolAddress,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
+		}
+
 		outboundRateLimiterConfig, inboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
 			input.RemoteChainConfig.OutboundRateLimiterConfig,
 			input.RemoteChainConfig.InboundRateLimiterConfig,
 			localDecimalsReport.Output,
 			input.RemoteChainConfig.RemoteDecimals,
 			chain.Family(),
-			token_pool.Version,
+			tvReport.Output.Version,
+			tvReport.Output.Type.String(),
 		)
 		// If input did not provide rate limits, use imported from active pool when available.
 		if importedDefaultOutbound != nil && !input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled {

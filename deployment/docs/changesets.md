@@ -197,7 +197,7 @@ func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput]
 1. **Deploy tokens** (if `DeployTokenInput` is non-nil): Executes `adapter.DeployToken()`
 2. **Deploy token pools** (if `DeployTokenPoolInput` is non-nil): Executes `adapter.DeployTokenPoolForToken()`
 3. **Configure for transfers** (if `TokenTransferConfig` is non-nil): Calls `processTokenConfigForChain()` which executes `adapter.ConfigureTokenForTransfersSequence()`
-4. **Update authorities** (unless `SkipOwnershipTransfer` is true): Executes `adapter.UpdateAuthorities()` to transfer ownership to the timelock
+4. **Update authorities** (unless `SkipOwnershipTransfer` is true): Executes `adapter.UpdateAuthorities()` to transfer pool ownership to the timelock (Solana: rate limit admin is already set in step 2 via `DeployTokenPoolForToken`; this step only transfers ownership)
 
 ### ConfigureTokensForTransfers
 
