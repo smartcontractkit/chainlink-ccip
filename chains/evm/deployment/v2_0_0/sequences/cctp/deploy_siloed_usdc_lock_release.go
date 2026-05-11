@@ -10,6 +10,7 @@ import (
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -29,6 +30,8 @@ type DeploySiloedUSDCLockReleaseInput struct {
 	// Existing siloed pool address; optional.
 	SiloedUSDCTokenPool       string
 	LockReleaseChainSelectors []uint64
+	// Existing address refs from the datastore; used to skip re-deploying already-deployed lockboxes.
+	ExistingAddresses []datastore.AddressRef
 	// Remote chain configs for lock-release chains; used to run ConfigureTokenPoolForRemoteChain (2.0.0) on the siloed pool.
 	RemoteChainConfigs map[uint64]tokens.RemoteChainConfig[[]byte, string]
 }
@@ -81,22 +84,38 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			configs := make([]siloed_usdc_token_pool.LockBoxConfig, 0, len(input.LockReleaseChainSelectors))
 			for _, sel := range input.LockReleaseChainSelectors {
 				qualifier := fmt.Sprintf("remoteChainSelector(%d)", sel)
-				lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
-					ChainSelector:  chain.Selector,
-					Qualifier:      &qualifier,
-					Args: erc20_lock_box.ConstructorArgs{
-						Token: common.HexToAddress(input.USDCToken),
-					},
-				})
-				if err != nil {
-					return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to deploy ERC20LockBox for chain %d: %w", sel, err)
+
+				existingRef := datastore_utils.GetAddressRef(
+					input.ExistingAddresses,
+					input.ChainSelector,
+					erc20_lock_box.ContractType,
+					erc20_lock_box.Version,
+					qualifier,
+				)
+
+				var lbAddr string
+				if !datastore_utils.IsAddressRefEmpty(existingRef) {
+					lbAddr = existingRef.Address
+				} else {
+					lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
+						TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
+						ChainSelector:  chain.Selector,
+						Qualifier:      &qualifier,
+						Args: erc20_lock_box.ConstructorArgs{
+							Token: common.HexToAddress(input.USDCToken),
+						},
+					})
+					if err != nil {
+						return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to deploy ERC20LockBox for chain %d: %w", sel, err)
+					}
+					addresses = append(addresses, lbReport.Output)
+					lbAddr = lbReport.Output.Address
 				}
-				addresses = append(addresses, lbReport.Output)
-				lockBoxes[sel] = lbReport.Output.Address
+
+				lockBoxes[sel] = lbAddr
 				configs = append(configs, siloed_usdc_token_pool.LockBoxConfig{
 					RemoteChainSelector: sel,
-					LockBox:             common.HexToAddress(lbReport.Output.Address),
+					LockBox:             common.HexToAddress(lbAddr),
 				})
 			}
 
