@@ -1058,6 +1058,14 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		require.Equal(t, solTokenMint, solPoolState.Config.Mint,
 			fmt.Sprintf("Solana pool mint should match token %s", solTokenRef.Address))
 
+		timelockSigner := solanautils.GetTimelockSignerPDA(
+			env.DataStore.Addresses().Filter(),
+			solChainSel,
+			cciputils.CLLQualifier,
+		)
+		require.Equal(t, timelockSigner, solPoolState.Config.RateLimitAdmin,
+			"empty DeployTokenPoolInput.RateLimitAdmin should set RL admin to MCMS timelock signer PDA on Solana")
+
 		// Verify Solana router address is set
 		routerAddr, err := solAdapter.GetRouterAddress(env.DataStore, solChainSel)
 		require.NoError(t, err)

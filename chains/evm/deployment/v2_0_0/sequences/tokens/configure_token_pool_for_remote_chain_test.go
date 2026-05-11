@@ -559,7 +559,6 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 		chain,
 		v1_5_1_token_pool_sequences.ConfigureTokenPoolForRemoteChainInput{
 			TokenPoolAddress:    legacyPoolAddress,
-			TokenPoolVersion:    v1_5_1_burn_mint_token_pool.Version,
 			RemoteChainSelector: remoteChainSel,
 			RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 				RemoteToken:                     remoteToken,
