@@ -177,6 +177,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				RMN:                 rmnAddress.Hex(),
 				Router:              routerAddress.Hex(),
 				SiloedUSDCTokenPool: existingSiloedPoolAddr,
+				ExistingAddresses:   existingAddresses,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed USDC lock release stack: %w", err)
