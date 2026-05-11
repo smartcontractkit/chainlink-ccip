@@ -84,6 +84,11 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		isHomeChainAndConfigureSiloedPool := isHomeChain && len(lockReleaseSelectors) > 0
 
+		// Auto-resolved per Circle's Fast Transfer source list (see finality_defaults.go):
+		// BlockDepth 1 for Fast Transfer chains, wait-for-finality elsewhere. Reconciled on
+		// the CCTPVerifier and used as AllowedFinalityConfig on the CCTP-through-CCV pool.
+		allowedFinality := defaultAllowedFinalityForChain(chain.Selector)
+
 		// Resolve address refs
 		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, input.RegisteredPoolRef)
 		if err != nil {
@@ -156,6 +161,12 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			writes = append(writes, w...)
 		}
+
+		finalityWrites, err := applyCCTPVerifierFinality(b, chain, cctpVerifierAddress, allowedFinality)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		writes = append(writes, finalityWrites...)
 
 		// CCTP V2 token pool: set domains
 		cctpV2DomainUpdates, err := buildCCTPV2PoolDomainUpdates(dep, input)
@@ -266,7 +277,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			TokenPoolAddress:         refs.CCTPV2WithCCVsPool.Address,
 			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
-			AllowedFinalityConfig:    finality.Config{BlockDepth: 1},
+			AllowedFinalityConfig:    allowedFinality,
 			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
 		})
 		if err != nil {
@@ -654,12 +665,34 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 	return out, nil
 }
 
-// applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver.
+// applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver,
+// skipping entries that are already at the desired state.
 func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, resolverAddress common.Address, args []versioned_verifier_resolver.OutboundImplementationArgs) ([]contract_utils.WriteOutput, error) {
+	currentReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chain.Selector,
+		Address:       resolverAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outbound implementations from CCTPVerifierResolver: %w", err)
+	}
+	existing := make(map[uint64]common.Address, len(currentReport.Output))
+	for _, impl := range currentReport.Output {
+		existing[impl.DestChainSelector] = impl.Verifier
+	}
+	toApply := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(args))
+	for _, arg := range args {
+		if v, ok := existing[arg.DestChainSelector]; ok && v == arg.Verifier {
+			continue
+		}
+		toApply = append(toApply, arg)
+	}
+	if len(toApply) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 		ChainSelector: chain.Selector,
 		Address:       resolverAddress,
-		Args:          args,
+		Args:          toApply,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set outbound implementation on CCTPVerifierResolver: %w", err)
@@ -704,8 +737,13 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 		return nil, fmt.Errorf("failed to set domains on CCTPVerifier: %w", err)
 	}
 	writes = append(writes, domainsReport.Output)
+	return writes, nil
+}
 
-	desiredFinality := finality.Config{BlockDepth: 1}.Raw()
+// applyCCTPVerifierFinality applies the CCTPVerifier's allowed-finality bitmask with
+// the requested config.
+func applyCCTPVerifierFinality(b cldf_ops.Bundle, chain evm.Chain, verifierAddress common.Address, allowedFinality finality.Config) ([]contract_utils.WriteOutput, error) {
+	desiredFinality := allowedFinality.Raw()
 	currentFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetAllowedFinalityConfig, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chain.Selector,
 		Address:       verifierAddress,
@@ -713,19 +751,18 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allowed finality config from CCTPVerifier: %w", err)
 	}
-	if currentFinalityReport.Output != desiredFinality {
-		setFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
-			ChainSelector: chain.Selector,
-			Address:       verifierAddress,
-			Args:          desiredFinality,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to set allowed finality config on CCTPVerifier: %w", err)
-		}
-		writes = append(writes, setFinalityReport.Output)
+	if currentFinalityReport.Output == desiredFinality {
+		return nil, nil
 	}
-
-	return writes, nil
+	setFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
+		ChainSelector: chain.Selector,
+		Address:       verifierAddress,
+		Args:          desiredFinality,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set allowed finality config on CCTPVerifier: %w", err)
+	}
+	return []contract_utils.WriteOutput{setFinalityReport.Output}, nil
 }
 
 // applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool.
