@@ -69,11 +69,12 @@ func (c *USDCTokenPoolProxyContract) GetPools(opts *bind.CallOpts) (PoolAddresse
 	return *abi.ConvertType(out[0], new(PoolAddresses)).(*PoolAddresses), nil
 }
 
-func (c *USDCTokenPoolProxyContract) GetLockOrBurnMechanism(opts *bind.CallOpts, remoteChainSelector uint64) (uint8, error) {
+func (c *USDCTokenPoolProxyContract) GetLockOrBurnMechanism(opts *bind.CallOpts, args uint64) (uint8, error) {
 	var out []any
-	err := c.contract.Call(opts, &out, "getLockOrBurnMechanism", remoteChainSelector)
+	err := c.contract.Call(opts, &out, "getLockOrBurnMechanism", args)
 	if err != nil {
-		return 0, err
+		var zero uint8
+		return zero, err
 	}
 	return *abi.ConvertType(out[0], new(uint8)).(*uint8), nil
 }
@@ -142,8 +143,8 @@ var GetLockOrBurnMechanism = contract.NewRead(contract.ReadParams[uint64, uint8,
 	Description:  "Calls getLockOrBurnMechanism on the contract",
 	ContractType: ContractType,
 	NewContract:  NewUSDCTokenPoolProxyContract,
-	CallContract: func(c *USDCTokenPoolProxyContract, opts *bind.CallOpts, remoteChainSelector uint64) (uint8, error) {
-		return c.GetLockOrBurnMechanism(opts, remoteChainSelector)
+	CallContract: func(c *USDCTokenPoolProxyContract, opts *bind.CallOpts, args uint64) (uint8, error) {
+		return c.GetLockOrBurnMechanism(opts, args)
 	},
 })
 

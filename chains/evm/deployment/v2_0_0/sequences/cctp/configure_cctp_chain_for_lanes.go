@@ -790,12 +790,37 @@ func applyCCTPVerifierFinality(b cldf_ops.Bundle, chain evm.Chain, verifierAddre
 	return []contract_utils.WriteOutput{setFinalityReport.Output}, nil
 }
 
-// applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool.
+// applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool,
+// skipping entries whose on-chain state already matches the desired config.
 func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool_cctp_v2.DomainUpdate) ([]contract_utils.WriteOutput, error) {
+	toUpdate := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0, len(domainUpdates))
+	for _, update := range domainUpdates {
+		currentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.GetDomain, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddress,
+			Args:          update.DestChainSelector,
+		})
+		if err != nil {
+			// Domain not yet set (UnknownDomain) or unreadable — include it.
+			toUpdate = append(toUpdate, update)
+			continue
+		}
+		current := currentReport.Output
+		if current.AllowedCaller == update.AllowedCaller &&
+			current.MintRecipient == update.MintRecipient &&
+			current.DomainIdentifier == update.DomainIdentifier &&
+			current.Enabled == update.Enabled {
+			continue
+		}
+		toUpdate = append(toUpdate, update)
+	}
+	if len(toUpdate) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool_cctp_v2.DomainUpdate]{
 		ChainSelector: chain.Selector,
 		Address:       poolAddress,
-		Args:          domainUpdates,
+		Args:          toUpdate,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set domains on CCTP V2 token pool: %w", err)
@@ -803,12 +828,37 @@ func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 	return []contract_utils.WriteOutput{report.Output}, nil
 }
 
-// applyCCTPV1PoolSetDomainsWrites sets domains on the CCTP V1 token pool.
+// applyCCTPV1PoolSetDomainsWrites sets domains on the CCTP V1 token pool,
+// skipping entries whose on-chain state already matches the desired config.
 func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool.DomainUpdate) ([]contract_utils.WriteOutput, error) {
+	toUpdate := make([]usdc_token_pool.DomainUpdate, 0, len(domainUpdates))
+	for _, update := range domainUpdates {
+		currentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.GetDomain, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddress,
+			Args:          update.DestChainSelector,
+		})
+		if err != nil {
+			// Domain not yet set (UnknownDomain) or unreadable — include it.
+			toUpdate = append(toUpdate, update)
+			continue
+		}
+		current := currentReport.Output
+		if current.AllowedCaller == update.AllowedCaller &&
+			current.MintRecipient == update.MintRecipient &&
+			current.DomainIdentifier == update.DomainIdentifier &&
+			current.Enabled == update.Enabled {
+			continue
+		}
+		toUpdate = append(toUpdate, update)
+	}
+	if len(toUpdate) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool.DomainUpdate]{
 		ChainSelector: chain.Selector,
 		Address:       poolAddress,
-		Args:          domainUpdates,
+		Args:          toUpdate,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set domains on CCTP V1 token pool: %w", err)
