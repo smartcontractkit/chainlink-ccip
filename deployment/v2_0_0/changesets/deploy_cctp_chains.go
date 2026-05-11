@@ -14,7 +14,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -45,11 +44,6 @@ type CCTPChainConfig struct {
 	USDCType adapters.USDCType
 	// TokenDecimals is the number of decimals of the USDC on the chain.
 	TokenDecimals uint8
-	// AllowedFinality is the finality config (see deployment/finality) reconciled on the CCTPVerifier
-	// and used as the AllowedFinalityConfig on the CCTP-through-CCV token pool for this chain.
-	// Applied regardless of remote mechanism mix; if zero, the sequence uses wait-for-finality
-	// (on-chain 0x00).
-	AllowedFinality finality.Config
 }
 
 // DeployCCTPChainsConfig is the configuration for the DeployCCTPChains changeset.
@@ -77,11 +71,6 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 		for chainSel, chainCfg := range cfg.Chains {
 			if !chainCfg.USDCType.IsValid() {
 				return fmt.Errorf("invalid CCTP type for chain %d: %s", chainSel, chainCfg.USDCType)
-			}
-			if !chainCfg.AllowedFinality.IsZero() {
-				if err := chainCfg.AllowedFinality.Validate(); err != nil {
-					return fmt.Errorf("invalid allowed finality for chain %d: %w", chainSel, err)
-				}
 			}
 			family, err := chain_selectors.GetSelectorFamily(chainSel)
 			if err != nil {
@@ -225,7 +214,6 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
 				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
 				RemoteChains:             remoteChainConfigs,
-				AllowedFinality:          chainCfg.AllowedFinality,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {

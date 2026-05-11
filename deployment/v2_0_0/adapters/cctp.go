@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -64,11 +63,6 @@ type ConfigureCCTPChainForLanesInput struct {
 	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
-	// AllowedFinality is the finality bitmask (see deployment/finality) on the CCTPVerifier
-	// for this chain and used as the AllowedFinalityConfig on the CCTP-through-CCV token pool when
-	// configuring CCTP-capable EVM remotes.
-	// If zero (unset), the sequence uses wait-for-finality (on-chain 0x00), the FinalityCodec default.
-	AllowedFinality finality.Config
 }
 
 // DeployCCTPInput specifies the input for the DeployCCTPChain sequence.

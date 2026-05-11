@@ -84,13 +84,10 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		isHomeChainAndConfigureSiloedPool := isHomeChain && len(lockReleaseSelectors) > 0
 
-		// If AllowedFinality not present in input → wait-for-finality (raw 0x00); see deployment/finality and FinalityCodec.
-		allowedFinality := input.AllowedFinality
-		if allowedFinality.IsZero() {
-			allowedFinality = finality.Config{WaitForFinality: true}
-		} else if err := allowedFinality.Validate(); err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("invalid allowed finality: %w", err)
-		}
+		// Auto-resolved per Circle's Fast Transfer source list (see finality_defaults.go):
+		// BlockDepth 1 for Fast Transfer chains, wait-for-finality elsewhere. Reconciled on
+		// the CCTPVerifier and used as AllowedFinalityConfig on the CCTP-through-CCV pool.
+		allowedFinality := defaultAllowedFinalityForChain(chain.Selector)
 
 		// Resolve address refs
 		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, input.RegisteredPoolRef)
