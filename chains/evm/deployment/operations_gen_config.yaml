@@ -449,6 +449,8 @@ contracts:
     functions:
       - name: getPools
         access: public
+      - name: getLockOrBurnMechanism
+        access: public
       - name: updateLockOrBurnMechanisms
         access: owner
       - name: updatePoolAddresses
