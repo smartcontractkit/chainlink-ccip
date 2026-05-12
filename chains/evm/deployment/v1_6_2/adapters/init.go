@@ -13,14 +13,5 @@ import (
 func init() {
 	adapter := adapters.NewTokenAdapter()
 	version := utils.Version_1_6_2
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(
-		chain_selectors.FamilyEVM,
-		version,
-		adapter,
-	)
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(
-		chain_selectors.FamilyEVM,
-		version,
-		adapter,
-	)
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, version, adapter)
 }
