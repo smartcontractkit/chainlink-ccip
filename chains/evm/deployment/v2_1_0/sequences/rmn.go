@@ -91,14 +91,16 @@ var DeployRMN = cldf_ops.NewSequence(
 
 // SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.1.0 contract.
 type SeqCurseInput struct {
-	RMNAddress common.Address
-	Subjects   [][16]byte
+	ChainSelector uint64
+	RMNAddress    common.Address
+	Subjects      [][16]byte
 }
 
 // SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.1.0 contract.
 type SeqUncurseInput struct {
-	RMNAddress common.Address
-	Subjects   [][16]byte
+	ChainSelector uint64
+	RMNAddress    common.Address
+	Subjects      [][16]byte
 }
 
 // RmnCurse curses one or more subjects on an RMN v2.1.0 contract.
