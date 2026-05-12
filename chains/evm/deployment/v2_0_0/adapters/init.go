@@ -4,26 +4,9 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
-
-	cctpthroughccvtokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
-	committeeverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
-	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
-	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
-	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
-	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/verification"
-	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
-	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
-	adapters1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
-	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	evmseqV1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	burnfromminttokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_from_mint_token_pool"
 	burnminttokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_token_pool"
 	burnmintwithlockreleaseflagtokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_with_lock_release_flag_token_pool"
@@ -40,15 +23,35 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
+	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
+	"github.com/smartcontractkit/chainlink-ccv/deployment/shared"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/verification"
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
+	adapters1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
+	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	evmseqV1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	cctpthroughccvtokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
+	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
+	committeeverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
+	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
+	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
+	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
-
-	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
-	"github.com/smartcontractkit/chainlink-ccv/deployment/shared"
 )
 
 func init() {
@@ -112,6 +115,28 @@ func init() {
 	tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())
 	feeAggReg := fees.GetFeeAggregatorRegistry()
 	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, v, NewFeeAggregatorAdapter())
+
+	curseRegistry := fastcurse.GetCurseRegistry()
+	curseRegistry.RegisterNewCurse(fastcurse.CurseRegistryInput{
+		CursingFamily:       chainsel.FamilyEVM,
+		CursingVersion:      v,
+		CurseAdapter:        NewCurseAdapter(),
+		CurseSubjectAdapter: NewCurseAdapter(),
+	})
+
+	authCallersRegistry := authorizedcallers.GetAuthorizedCallersRegistry()
+	authCallersRegistry.RegisterAdapter(
+		chainsel.FamilyEVM,
+		rmnops.ContractType,
+		rmnops.Version,
+		NewEVMAuthorizedCallersAdapter(
+			rmnops.ApplyAuthorizedCallerUpdates,
+			rmnops.GetAllAuthorizedCallers,
+			func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
+				return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
+			},
+		),
+	)
 }
 
 func registerContractVerificationMetadata(v *semver.Version) {

@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ILockBox} from "../interfaces/ILockBox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -104,19 +103,4 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (!exists) revert LockBoxNotConfigured(remoteChainSelector);
     return ILockBox(lockBox);
   }
-
-  /// @notice No-op override to purge the unused code path from the contract.
-  function _postflightCheck(
-    Pool.ReleaseOrMintInV1 calldata,
-    uint256,
-    bytes4
-  ) internal virtual override {}
-
-  /// @notice No-op override to purge the unused code path from the contract.
-  function _preflightCheck(
-    Pool.LockOrBurnInV1 calldata,
-    bytes4,
-    bytes memory,
-    uint256
-  ) internal virtual override {}
 }

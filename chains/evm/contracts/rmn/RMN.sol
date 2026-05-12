@@ -21,7 +21,7 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
-  string public constant override typeAndVersion = "RMN 2.1.0";
+  string public constant override typeAndVersion = "RMN 2.0.0";
 
   EnumerableSet.Bytes16Set private s_cursedSubjects;
 

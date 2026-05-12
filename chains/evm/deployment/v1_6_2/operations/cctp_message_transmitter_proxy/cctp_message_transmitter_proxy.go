@@ -59,6 +59,16 @@ func (c *CCTPMessageTransmitterProxyContract) Owner(opts *bind.CallOpts) (common
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *CCTPMessageTransmitterProxyContract) GetAllowedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllowedCallers")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 func (c *CCTPMessageTransmitterProxyContract) ConfigureAllowedCallers(opts *bind.TransactOpts, args []AllowedCallerConfigArgs) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "configureAllowedCallers", args)
 }
@@ -86,6 +96,17 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var GetAllowedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *CCTPMessageTransmitterProxyContract]{
+	Name:         "cctp-message-transmitter-proxy:get-allowed-callers",
+	Version:      Version,
+	Description:  "Calls getAllowedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewCCTPMessageTransmitterProxyContract,
+	CallContract: func(c *CCTPMessageTransmitterProxyContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllowedCallers(opts)
+	},
 })
 
 var ConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *CCTPMessageTransmitterProxyContract]{
