@@ -30,11 +30,10 @@ type RevokeTokenAdminRoleConfig struct {
 }
 
 type RevokeTokenAdminRoleSequenceInput struct {
-	ChainSelector     uint64
-	TokenRef          datastore.AddressRef
-	AdminAddress      string
-	TimelockAddress   string
-	ExistingDataStore datastore.DataStore
+	ChainSelector   uint64
+	TokenRef        datastore.AddressRef
+	AdminAddress    string
+	TimelockAddress string
 }
 
 func RevokeTokenAdminRole() cldf.ChangeSetV2[RevokeTokenAdminRoleInput] {
@@ -101,6 +100,12 @@ func revokeTokenAdminRoleApply() func(cldf.Environment, RevokeTokenAdminRoleInpu
 		mcmsRegistry := changesets.GetRegistry()
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		opsBundle := cldf_ops.NewBundle(
+			e.GetContext,
+			e.Logger,
+			cldf_ops.NewMemoryReporter(),
+			cldf_ops.WithOperationRegistry(e.OperationsBundle.OperationRegistry),
+		)
 
 		adapterVersion := cfg.ChainAdapterVersion
 		if adapterVersion == nil {
@@ -144,12 +149,11 @@ func revokeTokenAdminRoleApply() func(cldf.Environment, RevokeTokenAdminRoleInpu
 				adminAddress = timelockAddress
 			}
 
-			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, seq, e.BlockChains, RevokeTokenAdminRoleSequenceInput{
-				ChainSelector:     revocation.ChainSelector,
-				TokenRef:          tokenRef,
-				AdminAddress:      adminAddress,
-				TimelockAddress:   timelockAddress,
-				ExistingDataStore: e.DataStore,
+			report, err := cldf_ops.ExecuteSequence(opsBundle, seq, e.BlockChains, RevokeTokenAdminRoleSequenceInput{
+				ChainSelector:   revocation.ChainSelector,
+				TokenRef:        tokenRef,
+				AdminAddress:    adminAddress,
+				TimelockAddress: timelockAddress,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to revoke token admin role: %w", i, err)

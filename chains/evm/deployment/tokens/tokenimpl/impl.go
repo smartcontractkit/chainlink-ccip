@@ -51,11 +51,6 @@ type Token interface {
 	// contract-specific admin role. Callers should consult SupportsAdminRole first.
 	HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error)
 
-	// KnownAdminRoleHolders returns current admin role holders that can be
-	// reconstructed from token-specific onchain state. It is best effort and is
-	// used as an additional safety check before revoking an admin.
-	KnownAdminRoleHolders(ctx context.Context, chain evm.Chain, token common.Address) ([]common.Address, error)
-
 	// GrantAdminRole grants the default-admin or contract-specific
 	// admin role to user. Returns an error for token types whose
 	// Capabilities.SupportsAdminRole is false; callers should consult

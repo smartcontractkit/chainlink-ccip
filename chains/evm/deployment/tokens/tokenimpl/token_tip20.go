@@ -56,10 +56,6 @@ func (tokenTIP20) HasAdminRole(ctx context.Context, chain evm.Chain, token, user
 	return hasRole, nil
 }
 
-func (tokenTIP20) KnownAdminRoleHolders(ctx context.Context, chain evm.Chain, token common.Address) ([]common.Address, error) {
-	return currentRoleHoldersFromLogs(ctx, chain, token, tip20.DefaultAdminRole)
-}
-
 func (tokenTIP20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
 	report, err := operations.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,

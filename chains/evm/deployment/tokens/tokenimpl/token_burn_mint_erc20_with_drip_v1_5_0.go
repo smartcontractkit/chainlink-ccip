@@ -39,10 +39,6 @@ func (tokenBurnMintERC20WithDripV1_5_0) HasAdminRole(ctx context.Context, chain 
 	return hasDefaultAdminRoleBurnMintERC20(ctx, chain, token, user)
 }
 
-func (tokenBurnMintERC20WithDripV1_5_0) KnownAdminRoleHolders(ctx context.Context, chain evm.Chain, token common.Address) ([]common.Address, error) {
-	return knownDefaultAdminRoleHoldersBurnMintERC20(ctx, chain, token)
-}
-
 func (tokenBurnMintERC20WithDripV1_5_0) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
 	return grantDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }

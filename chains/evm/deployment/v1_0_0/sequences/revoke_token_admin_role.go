@@ -65,11 +65,11 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, nil
 		}
 
-		remainingAdmins, err := knownRemainingTokenAdmins(b, chain, tokenImpl, input, tokenAddress, adminAddress)
+		hasRemainingAdmin, err := hasKnownRemainingTokenAdmin(b, chain, tokenImpl, input, tokenAddress, adminAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		if len(remainingAdmins) == 0 {
+		if !hasRemainingAdmin {
 			return sequences.OnChainOutput{}, fmt.Errorf("refusing to revoke admin role from %s on token %s because no remaining admin could be confirmed", adminAddress.Hex(), tokenAddress.Hex())
 		}
 
@@ -89,19 +89,16 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 	},
 )
 
-func knownRemainingTokenAdmins(
+func hasKnownRemainingTokenAdmin(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	tokenImpl tokenimpl.Token,
 	input tokensapi.RevokeTokenAdminRoleSequenceInput,
 	tokenAddress common.Address,
 	revokedAdmin common.Address,
-) ([]common.Address, error) {
+) (bool, error) {
 	candidates := []common.Address{chain.DeployerKey.From}
-	if input.TimelockAddress != "" {
-		if !common.IsHexAddress(input.TimelockAddress) {
-			return nil, fmt.Errorf("timelock address %q is not a valid hex address", input.TimelockAddress)
-		}
+	if common.IsHexAddress(input.TimelockAddress) {
 		candidates = append(candidates, common.HexToAddress(input.TimelockAddress))
 	}
 	for _, user := range chain.Users {
@@ -111,28 +108,20 @@ func knownRemainingTokenAdmins(
 	}
 
 	ctx := b.GetContext()
-	knownAdmins, err := tokenImpl.KnownAdminRoleHolders(ctx, chain, tokenAddress)
-	if err != nil {
-		b.Logger.Warnf("failed to reconstruct known admin role holders for token %s on chain %d: %v", tokenAddress.Hex(), input.ChainSelector, err)
-	} else {
-		candidates = append(candidates, knownAdmins...)
-	}
-
-	remaining := make([]common.Address, 0)
 	for _, candidate := range uniqueAddresses(candidates) {
 		if candidate == (common.Address{}) || candidate == revokedAdmin {
 			continue
 		}
 		hasAdminRole, err := tokenImpl.HasAdminRole(ctx, chain, tokenAddress, candidate)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check admin role for candidate %s on token %s: %w", candidate.Hex(), tokenAddress.Hex(), err)
+			return false, fmt.Errorf("failed to check admin role for candidate %s on token %s: %w", candidate.Hex(), tokenAddress.Hex(), err)
 		}
 		if hasAdminRole {
-			remaining = append(remaining, candidate)
+			return true, nil
 		}
 	}
 
-	return remaining, nil
+	return false, nil
 }
 
 func uniqueAddresses(in []common.Address) []common.Address {

@@ -40,10 +40,6 @@ func (tokenERC20) HasAdminRole(_ context.Context, _ evm.Chain, _, _ common.Addre
 	return false, fmt.Errorf("admin role not supported for plain ERC20 token")
 }
 
-func (tokenERC20) KnownAdminRoleHolders(_ context.Context, _ evm.Chain, _ common.Address) ([]common.Address, error) {
-	return nil, fmt.Errorf("admin role not supported for plain ERC20 token")
-}
-
 func (tokenERC20) GrantAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
 	return nil, fmt.Errorf("admin role granting not supported for plain ERC20 token")
 }

@@ -20,8 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/onchain"
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
-	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
@@ -32,7 +32,9 @@ func TestRevokeTokenAdminRoleEVMBurnMint(t *testing.T) {
 	v1_6_1 := semver.MustParse("1.6.1")
 	chainSelector := chainsel.TEST_90000001.Selector
 
-	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{chainSelector}))
+	env, err := environment.New(t.Context(), environment.WithEVMSimulatedWithConfig(t, []uint64{chainSelector}, onchain.EVMSimLoaderConfig{
+		NumAdditionalAccounts: 1,
+	}))
 	require.NoError(t, err)
 
 	chain, ok := env.BlockChains.EVMChains()[chainSelector]
@@ -60,7 +62,8 @@ func TestRevokeTokenAdminRoleEVMBurnMint(t *testing.T) {
 	timelockAddress := common.HexToAddress(timelockRef.Address)
 
 	t.Run("revoke timelock admin while customer admin remains", func(t *testing.T) {
-		customerAdmin := evmutils.RandomAddress()
+		require.NotEmpty(t, chain.Users)
+		customerAdmin := chain.Users[0].From
 		token := deployBurnMintTokenForAdminRevocation(t, env, chainSelector, v1_6_1, "REVOKE_POS", "REVOKE_POS_POOL", customerAdmin.Hex())
 		tokenContract, defaultAdminRole := loadBurnMintTokenAdminRole(t, chain.Client, token.Address)
 
