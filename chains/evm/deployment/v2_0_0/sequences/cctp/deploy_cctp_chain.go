@@ -463,7 +463,10 @@ func resolveExistingCCTPV1MessageTransmitterProxy(
 	return common.Address{}, datastore.AddressRef{}, fmt.Errorf("missing required CCTPMessageTransmitterProxy v1.6.2 on chain %d for CCTP V1 pool deployment", chain.Selector)
 }
 
-// applyCCTPAuthorizedCallerWrites adds CCTPVerifier + CCTP pools to message transmitter proxy and authorizes proxy on CCTP pools. Returns writes to append.
+// applyCCTPAuthorizedCallerWrites wires message transmitter proxies and pool authorized callers.
+// CCTPMessageTransmitterProxy v1.6.2 (V1 TokenMessenger): only USDCTokenPool v1.6.5 must call receiveMessage—CCTPVerifier is bound to the v2.0.0 proxy only.
+// CCTPMessageTransmitterProxy v2.0.0: CCTPVerifier + USDCTokenPoolCCTPV2.
+// It also authorizes USDCTokenPoolProxy on the CCTP pools. Returns writes to append.
 func applyCCTPAuthorizedCallerWrites(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
@@ -481,7 +484,7 @@ func applyCCTPAuthorizedCallerWrites(
 		}
 		v1Current := v1CurrentReport.Output
 		toAddV1 := make([]cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs, 0)
-		for _, caller := range []common.Address{cctpVerifierAddr, cctpV1PoolAddr} {
+		for _, caller := range []common.Address{cctpV1PoolAddr} {
 			if !slices.Contains(v1Current, caller) {
 				toAddV1 = append(toAddV1, cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs{Caller: caller, Allowed: true})
 			}
