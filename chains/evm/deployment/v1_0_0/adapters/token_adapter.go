@@ -19,7 +19,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var _ tokensapi.TokenAdapter = &EVMTokenBase{}
+var (
+	_ tokensapi.TokenAdapter          = &EVMTokenBase{}
+	_ tokensapi.TokenAdminRoleAdapter = &EVMTokenBase{}
+)
 
 // EVMTokenBase provides version-agnostic EVM token adapter methods that are
 // shared across all pool versions (v1.5.1, v1.6.0, v1.6.1, v2.0.0).
@@ -37,6 +40,10 @@ func (a *EVMTokenBase) AddressRefToBytes(ref datastore.AddressRef) ([]byte, erro
 
 func (a *EVMTokenBase) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return v1_0_0_seq.DeployToken
+}
+
+func (a *EVMTokenBase) RevokeTokenAdminRole() *cldf_ops.Sequence[tokensapi.RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return v1_0_0_seq.RevokeTokenAdminRole
 }
 
 func (a *EVMTokenBase) DeployTokenVerify(e deployment.Environment, input tokensapi.DeployTokenInput) error {
