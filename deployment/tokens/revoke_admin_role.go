@@ -35,10 +35,13 @@ type RevokeTokenAdminRoleSequenceInput struct {
 }
 
 func RevokeTokenAdminRole() cldf.ChangeSetV2[RevokeTokenAdminRoleInput] {
-	return cldf.CreateChangeSet(revokeTokenAdminRoleApply(), revokeTokenAdminRoleVerify())
+	return cldf.CreateChangeSet(
+		revokeTokenAdminRoleApply(GetTokenAdapterRegistry(), changesets.GetRegistry()),
+		revokeTokenAdminRoleVerify(GetTokenAdapterRegistry()),
+	)
 }
 
-func revokeTokenAdminRoleVerify() func(cldf.Environment, RevokeTokenAdminRoleInput) error {
+func revokeTokenAdminRoleVerify(tokenRegistry *TokenAdapterRegistry) func(cldf.Environment, RevokeTokenAdminRoleInput) error {
 	return func(e cldf.Environment, cfg RevokeTokenAdminRoleInput) error {
 		if len(cfg.Revocations) == 0 {
 			return errors.New("at least one token admin role revocation is required")
@@ -62,7 +65,7 @@ func revokeTokenAdminRoleVerify() func(cldf.Environment, RevokeTokenAdminRoleInp
 			if err != nil {
 				return fmt.Errorf("revocation[%d]: invalid chain selector %d: %w", i, revocation.ChainSelector, err)
 			}
-			adapter, exists := GetTokenAdapterRegistry().GetTokenAdapter(family, cciputils.Version_1_0_0)
+			adapter, exists := tokenRegistry.GetTokenAdapter(family, cciputils.Version_1_0_0)
 			if !exists {
 				return fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, cciputils.Version_1_0_0)
 			}
@@ -78,9 +81,8 @@ func revokeTokenAdminRoleVerify() func(cldf.Environment, RevokeTokenAdminRoleInp
 	}
 }
 
-func revokeTokenAdminRoleApply() func(cldf.Environment, RevokeTokenAdminRoleInput) (cldf.ChangesetOutput, error) {
+func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RevokeTokenAdminRoleInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RevokeTokenAdminRoleInput) (cldf.ChangesetOutput, error) {
-		mcmsRegistry := changesets.GetRegistry()
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		opsBundle := cldf_ops.NewBundle(
@@ -96,7 +98,7 @@ func revokeTokenAdminRoleApply() func(cldf.Environment, RevokeTokenAdminRoleInpu
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: invalid chain selector %d: %w", i, revocation.ChainSelector, err)
 			}
 
-			adapter, exists := GetTokenAdapterRegistry().GetTokenAdapter(family, cciputils.Version_1_0_0)
+			adapter, exists := tokenRegistry.GetTokenAdapter(family, cciputils.Version_1_0_0)
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, cciputils.Version_1_0_0)
 			}
