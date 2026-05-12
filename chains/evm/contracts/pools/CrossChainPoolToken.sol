@@ -15,7 +15,7 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 /// register the token in the token admin registry.
 contract CrossChainPoolToken is TokenPool, BaseERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "CrossChainPoolToken 2.0.0-dev";
+    return "CrossChainPoolToken 2.0.0";
   }
 
   constructor(

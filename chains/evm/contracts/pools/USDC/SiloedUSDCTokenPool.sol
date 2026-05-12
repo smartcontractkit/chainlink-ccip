@@ -335,4 +335,19 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _postflightCheck(
+    Pool.ReleaseOrMintInV1 calldata,
+    uint256,
+    bytes4
+  ) internal virtual override {}
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _preflightCheck(
+    Pool.LockOrBurnInV1 calldata,
+    bytes4,
+    bytes memory,
+    uint256
+  ) internal virtual override {}
 }

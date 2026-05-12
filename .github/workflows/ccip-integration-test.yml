@@ -70,14 +70,17 @@ jobs:
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2Solana$"
             timeout: 30m
+            installLoopPlugins: true
           - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_Solana2EVM$"
             timeout: 30m
+            installLoopPlugins: true
           - name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$"
             timeout: 35m
+            installLoopPlugins: true
           - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
             file: ccip_batching_test.go
             run: "Test_CCIPBatching_MaxBatchSizeEVM"
@@ -243,6 +246,11 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/chainlink
           go build -o ccip.test .
+      - name: Install LOOP plugins
+        if: matrix.type.installLoopPlugins
+        run: |
+          cd $GITHUB_WORKSPACE/chainlink
+          make install-plugins-public
       - name: Setup DB
         shell: bash
         run: |

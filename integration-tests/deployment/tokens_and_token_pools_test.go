@@ -668,7 +668,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, deployerATA, solchain.SolDefaultCommitment)
 				require.NoError(t, err)
 
-				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %q", preMint.String(), balance))
+				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %d", preMint.String(), balance))
 
 				if data.RateLimitAdmin != "" {
 					expectedRLA, err := solana.PublicKeyFromBase58(data.RateLimitAdmin)
