@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/devenv
 
-go 1.25.7
+go 1.26.2
 
 replace (
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.303.1
@@ -365,7 +365,7 @@ require (
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260306142855-8d629e752265 // indirect
 	github.com/smartcontractkit/chainlink-ccv v0.0.1 // indirect
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260506132513-a41224d756a2 // indirect
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260512122614-dac96f8f568b // indirect
 	github.com/smartcontractkit/chainlink-common/keystore v1.0.2 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260401162955-be2bc6b5264b // indirect
