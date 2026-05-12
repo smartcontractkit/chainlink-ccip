@@ -177,6 +177,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				RMN:                 rmnAddress.Hex(),
 				Router:              routerAddress.Hex(),
 				SiloedUSDCTokenPool: existingSiloedPoolAddr,
+				ExistingAddresses:   existingAddresses,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed USDC lock release stack: %w", err)
@@ -471,31 +472,60 @@ func applyCCTPAuthorizedCallerWrites(
 ) ([]contract_utils.WriteOutput, error) {
 	writes := make([]contract_utils.WriteOutput, 0)
 	if enableCCTPV1 {
-		v1MsgTxReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy_v1_6_2.ConfigureAllowedCallers, chain, contract_utils.FunctionInput[[]cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs]{
+		v1CurrentReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy_v1_6_2.GetAllowedCallers, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       cctpV1MessageTransmitterProxyAddr,
-			Args: []cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs{
-				{Caller: cctpVerifierAddr, Allowed: true},
-				{Caller: cctpV1PoolAddr, Allowed: true},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get allowed callers from CCTPMessageTransmitterProxy v1.6.2: %w", err)
+		}
+		v1Current := v1CurrentReport.Output
+		toAddV1 := make([]cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs, 0)
+		for _, caller := range []common.Address{cctpVerifierAddr, cctpV1PoolAddr} {
+			if !slices.Contains(v1Current, caller) {
+				toAddV1 = append(toAddV1, cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs{Caller: caller, Allowed: true})
+			}
+		}
+		if len(toAddV1) > 0 {
+			v1MsgTxReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy_v1_6_2.ConfigureAllowedCallers, chain, contract_utils.FunctionInput[[]cctp_message_transmitter_proxy_v1_6_2.AllowedCallerConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       cctpV1MessageTransmitterProxyAddr,
+				Args:          toAddV1,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to configure allowed callers on CCTPMessageTransmitterProxy v1.6.2: %w", err)
+			}
+			writes = append(writes, v1MsgTxReport.Output)
+		}
+	}
+
+	v2CurrentReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       cctpV2MessageTransmitterProxyAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authorized callers from CCTPMessageTransmitterProxy v2.0.0: %w", err)
+	}
+	v2Current := v2CurrentReport.Output
+	toAddV2 := make([]common.Address, 0)
+	for _, caller := range []common.Address{cctpVerifierAddr, cctpV2PoolAddr} {
+		if !slices.Contains(v2Current, caller) {
+			toAddV2 = append(toAddV2, caller)
+		}
+	}
+	if len(toAddV2) > 0 {
+		v2MsgTxReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_message_transmitter_proxy.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       cctpV2MessageTransmitterProxyAddr,
+			Args: cctp_message_transmitter_proxy.AuthorizedCallerArgs{
+				AddedCallers: toAddV2,
 			},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to configure allowed callers on CCTPMessageTransmitterProxy v1.6.2: %w", err)
+			return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPMessageTransmitterProxy v2.0.0: %w", err)
 		}
-		writes = append(writes, v1MsgTxReport.Output)
+		writes = append(writes, v2MsgTxReport.Output)
 	}
-
-	v2MsgTxReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_message_transmitter_proxy.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       cctpV2MessageTransmitterProxyAddr,
-		Args: cctp_message_transmitter_proxy.AuthorizedCallerArgs{
-			AddedCallers: []common.Address{cctpVerifierAddr, cctpV2PoolAddr},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPMessageTransmitterProxy v2.0.0: %w", err)
-	}
-	writes = append(writes, v2MsgTxReport.Output)
 
 	if enableCCTPV1 {
 		cctpV1TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool.AuthorizedCallerArgs]{

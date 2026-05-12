@@ -51,6 +51,11 @@ var fastTransferSourceSelectors = map[uint64]struct{}{
 	// Plume
 	chain_selectors.PLUME_MAINNET.Selector:         {},
 	chain_selectors.PLUME_TESTNET_SEPOLIA.Selector: {},
+
+	// Test selectors - used in E2E tests
+	chain_selectors.GETH_TESTNET.Selector:  {}, // chain ID 1337
+	chain_selectors.GETH_DEVNET_2.Selector: {}, // chain ID 2337
+	chain_selectors.GETH_DEVNET_3.Selector: {}, // chain ID 3337
 }
 
 // defaultAllowedFinalityForChain returns BlockDepth 1 when the source chain is in
