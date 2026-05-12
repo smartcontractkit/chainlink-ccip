@@ -69,6 +69,16 @@ func (c *USDCTokenPoolProxyContract) GetPools(opts *bind.CallOpts) (PoolAddresse
 	return *abi.ConvertType(out[0], new(PoolAddresses)).(*PoolAddresses), nil
 }
 
+func (c *USDCTokenPoolProxyContract) GetLockOrBurnMechanism(opts *bind.CallOpts, args uint64) (uint8, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getLockOrBurnMechanism", args)
+	if err != nil {
+		var zero uint8
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(uint8)).(*uint8), nil
+}
+
 func (c *USDCTokenPoolProxyContract) UpdateLockOrBurnMechanisms(opts *bind.TransactOpts, remoteChainSelectors []uint64, mechanisms []uint8) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "updateLockOrBurnMechanisms", remoteChainSelectors, mechanisms)
 }
@@ -124,6 +134,17 @@ var GetPools = contract.NewRead(contract.ReadParams[struct{}, PoolAddresses, *US
 	NewContract:  NewUSDCTokenPoolProxyContract,
 	CallContract: func(c *USDCTokenPoolProxyContract, opts *bind.CallOpts, args struct{}) (PoolAddresses, error) {
 		return c.GetPools(opts)
+	},
+})
+
+var GetLockOrBurnMechanism = contract.NewRead(contract.ReadParams[uint64, uint8, *USDCTokenPoolProxyContract]{
+	Name:         "usdc-token-pool-proxy:get-lock-or-burn-mechanism",
+	Version:      Version,
+	Description:  "Calls getLockOrBurnMechanism on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolProxyContract,
+	CallContract: func(c *USDCTokenPoolProxyContract, opts *bind.CallOpts, args uint64) (uint8, error) {
+		return c.GetLockOrBurnMechanism(opts, args)
 	},
 })
 
