@@ -67,46 +67,18 @@ func TestRevokeTokenAdminRoleEVMBurnMint(t *testing.T) {
 		token := deployBurnMintTokenForAdminRevocation(t, env, chainSelector, v1_6_1, "REVOKE_POS", "REVOKE_POS_POOL", customerAdmin.Hex())
 		tokenContract, defaultAdminRole := loadBurnMintTokenAdminRole(t, chain.Client, token.Address)
 
-		timelockHasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
-		require.NoError(t, err)
-		require.True(t, timelockHasRole)
-		customerHasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, customerAdmin)
-		require.NoError(t, err)
-		require.True(t, customerHasRole)
+		requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, timelockAddress, true)
+		requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, customerAdmin, true)
 
-		revokeOutput, err := tokensapi.RevokeTokenAdminRole().Apply(*env, tokensapi.RevokeTokenAdminRoleInput{
-			Revocations: []tokensapi.RevokeTokenAdminRoleConfig{
-				{
-					ChainSelector: chainSelector,
-					TokenRef: datastore.AddressRef{
-						Qualifier: token.Qualifier,
-					},
-				},
-			},
-			MCMS: NewDefaultInputForMCMS("Revoke token admin role"),
-		})
+		revokeOutput, err := revokeTokenAdminRoleForTest(t, env, chainSelector, token, "Revoke token admin role")
 		require.NoError(t, err)
 		require.Len(t, revokeOutput.MCMSTimelockProposals, 1)
 		testhelpers.ProcessTimelockProposals(t, *env, revokeOutput.MCMSTimelockProposals, false)
 
-		timelockHasRole, err = tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
-		require.NoError(t, err)
-		require.False(t, timelockHasRole)
-		customerHasRole, err = tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, customerAdmin)
-		require.NoError(t, err)
-		require.True(t, customerHasRole)
+		requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, timelockAddress, false)
+		requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, customerAdmin, true)
 
-		revokeOutput, err = tokensapi.RevokeTokenAdminRole().Apply(*env, tokensapi.RevokeTokenAdminRoleInput{
-			Revocations: []tokensapi.RevokeTokenAdminRoleConfig{
-				{
-					ChainSelector: chainSelector,
-					TokenRef: datastore.AddressRef{
-						Qualifier: token.Qualifier,
-					},
-				},
-			},
-			MCMS: NewDefaultInputForMCMS("Revoke token admin role idempotent"),
-		})
+		revokeOutput, err = revokeTokenAdminRoleForTest(t, env, chainSelector, token, "Revoke token admin role idempotent")
 		require.NoError(t, err)
 		require.Empty(t, revokeOutput.MCMSTimelockProposals)
 	})
@@ -115,27 +87,37 @@ func TestRevokeTokenAdminRoleEVMBurnMint(t *testing.T) {
 		token := deployBurnMintTokenForAdminRevocation(t, env, chainSelector, v1_6_1, "REVOKE_NEG", "REVOKE_NEG_POOL", "")
 		tokenContract, defaultAdminRole := loadBurnMintTokenAdminRole(t, chain.Client, token.Address)
 
-		timelockHasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
-		require.NoError(t, err)
-		require.True(t, timelockHasRole)
-		deployerHasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, chain.DeployerKey.From)
-		require.NoError(t, err)
-		require.False(t, deployerHasRole)
+		requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, timelockAddress, true)
+		requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, chain.DeployerKey.From, false)
 
-		_, err = tokensapi.RevokeTokenAdminRole().Apply(*env, tokensapi.RevokeTokenAdminRoleInput{
-			Revocations: []tokensapi.RevokeTokenAdminRoleConfig{
-				{
-					ChainSelector: chainSelector,
-					TokenRef: datastore.AddressRef{
-						Qualifier: token.Qualifier,
-					},
-				},
-			},
-			MCMS: NewDefaultInputForMCMS("Reject unsafe token admin role revoke"),
-		})
+		_, err = revokeTokenAdminRoleForTest(t, env, chainSelector, token, "Reject unsafe token admin role revoke")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no remaining admin could be confirmed")
 	})
+}
+
+func revokeTokenAdminRoleForTest(t *testing.T, env *cldf_deployment.Environment, chainSelector uint64, token datastore.AddressRef, description string) (cldf_deployment.ChangesetOutput, error) {
+	t.Helper()
+
+	return tokensapi.RevokeTokenAdminRole().Apply(*env, tokensapi.RevokeTokenAdminRoleInput{
+		Revocations: []tokensapi.RevokeTokenAdminRoleConfig{
+			{
+				ChainSelector: chainSelector,
+				TokenRef: datastore.AddressRef{
+					Qualifier: token.Qualifier,
+				},
+			},
+		},
+		MCMS: NewDefaultInputForMCMS(description),
+	})
+}
+
+func requireBurnMintAdminRole(t *testing.T, tokenContract *bnmERC20gen.BurnMintERC20, role [32]byte, account common.Address, expected bool) {
+	t.Helper()
+
+	hasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: t.Context()}, role, account)
+	require.NoError(t, err)
+	require.Equal(t, expected, hasRole)
 }
 
 func deployBurnMintTokenForAdminRevocation(t *testing.T, env *cldf_deployment.Environment, chainSelector uint64, tokenPoolVersion *semver.Version, tokenSymbol string, tokenPoolQualifier string, externalAdmin string) datastore.AddressRef {

@@ -47,10 +47,6 @@ type Token interface {
 	// role from user. Callers should consult SupportsAdminRole first.
 	RevokeAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error)
 
-	// HasAdminRole returns whether user currently has the default-admin or
-	// contract-specific admin role. Callers should consult SupportsAdminRole first.
-	HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error)
-
 	// GrantAdminRole grants the default-admin or contract-specific
 	// admin role to user. Returns an error for token types whose
 	// Capabilities.SupportsAdminRole is false; callers should consult
@@ -80,4 +76,9 @@ type Token interface {
 	// deployment operations or helpers, but batching is handled by the
 	// outer token deployment sequence.
 	Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error)
+}
+
+// Separate interface for tokens that support admin role checks.
+type AdminRoleToken interface {
+	HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error)
 }

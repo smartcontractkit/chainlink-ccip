@@ -1,7 +1,6 @@
 package tokenimpl
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
@@ -34,10 +33,6 @@ func (tokenERC20) Capabilities() CapabilitySet {
 
 func (tokenERC20) RevokeAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
 	return nil, fmt.Errorf("admin role not supported for plain ERC20 token")
-}
-
-func (tokenERC20) HasAdminRole(_ context.Context, _ evm.Chain, _, _ common.Address) (bool, error) {
-	return false, fmt.Errorf("admin role not supported for plain ERC20 token")
 }
 
 func (tokenERC20) GrantAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {

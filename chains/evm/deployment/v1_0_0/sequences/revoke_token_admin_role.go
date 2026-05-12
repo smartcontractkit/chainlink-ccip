@@ -13,7 +13,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -51,12 +50,13 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type %q for token ref %s", input.TokenRef.Type, datastore_utils.SprintRef(input.TokenRef))
 		}
-		if !tokenImpl.Capabilities().SupportsAdminRole {
-			return sequences.OnChainOutput{}, fmt.Errorf("token type %q does not support admin role revocation", input.TokenRef.Type)
+		adminRoleToken, ok := tokenImpl.(tokenimpl.AdminRoleToken)
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("token type %q does not support admin role checks", input.TokenRef.Type)
 		}
 
 		ctx := b.GetContext()
-		hasAdminRole, err := tokenImpl.HasAdminRole(ctx, chain, tokenAddress, adminAddress)
+		hasAdminRole, err := adminRoleToken.HasAdminRole(ctx, chain, tokenAddress, adminAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for %s on token %s: %w", adminAddress.Hex(), tokenAddress.Hex(), err)
 		}
@@ -65,9 +65,29 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, nil
 		}
 
-		hasRemainingAdmin, err := hasKnownRemainingTokenAdmin(b, chain, tokenImpl, input, tokenAddress, adminAddress)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+		candidates := []common.Address{chain.DeployerKey.From}
+		if common.IsHexAddress(input.TimelockAddress) {
+			candidates = append(candidates, common.HexToAddress(input.TimelockAddress))
+		}
+		for _, user := range chain.Users {
+			if user != nil {
+				candidates = append(candidates, user.From)
+			}
+		}
+
+		hasRemainingAdmin := false
+		for _, candidate := range candidates {
+			if candidate == (common.Address{}) || candidate == adminAddress {
+				continue
+			}
+			hasAdminRole, err := adminRoleToken.HasAdminRole(ctx, chain, tokenAddress, candidate)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for candidate %s on token %s: %w", candidate.Hex(), tokenAddress.Hex(), err)
+			}
+			if hasAdminRole {
+				hasRemainingAdmin = true
+				break
+			}
 		}
 		if !hasRemainingAdmin {
 			return sequences.OnChainOutput{}, fmt.Errorf("refusing to revoke admin role from %s on token %s because no remaining admin could be confirmed", adminAddress.Hex(), tokenAddress.Hex())
@@ -88,51 +108,3 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	},
 )
-
-func hasKnownRemainingTokenAdmin(
-	b cldf_ops.Bundle,
-	chain evm.Chain,
-	tokenImpl tokenimpl.Token,
-	input tokensapi.RevokeTokenAdminRoleSequenceInput,
-	tokenAddress common.Address,
-	revokedAdmin common.Address,
-) (bool, error) {
-	candidates := []common.Address{chain.DeployerKey.From}
-	if common.IsHexAddress(input.TimelockAddress) {
-		candidates = append(candidates, common.HexToAddress(input.TimelockAddress))
-	}
-	for _, user := range chain.Users {
-		if user != nil {
-			candidates = append(candidates, user.From)
-		}
-	}
-
-	ctx := b.GetContext()
-	for _, candidate := range uniqueAddresses(candidates) {
-		if candidate == (common.Address{}) || candidate == revokedAdmin {
-			continue
-		}
-		hasAdminRole, err := tokenImpl.HasAdminRole(ctx, chain, tokenAddress, candidate)
-		if err != nil {
-			return false, fmt.Errorf("failed to check admin role for candidate %s on token %s: %w", candidate.Hex(), tokenAddress.Hex(), err)
-		}
-		if hasAdminRole {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func uniqueAddresses(in []common.Address) []common.Address {
-	seen := make(map[common.Address]struct{}, len(in))
-	out := make([]common.Address, 0, len(in))
-	for _, address := range in {
-		if _, ok := seen[address]; ok {
-			continue
-		}
-		seen[address] = struct{}{}
-		out = append(out, address)
-	}
-	return out
-}
