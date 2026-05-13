@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -19,8 +21,11 @@ import (
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	lrpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/lockrelease_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -1071,4 +1076,270 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, routerAddr, "Solana router should be deployed")
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 6: MCMS batches do NOT execute immediately, so the changeset should
+// not perform validation assuming on-chain state changes have already occurred
+// within the same batch until the batch is executed. This is relevant to token
+// expansion flows where multiple changesets in the same batch update the Token
+// Admin Registry (TAR) state for a mint - such as a RegisterTokenAdminRegistry
+// that sets a non-timelock pending admin followed by ConfigureTokenForTransfer
+// that overrides pending to timelock, and then Accepts that finalised timelock
+// admin slot *all within the same batch*. If the Configure or Accept changeset
+// incorrectly assumes the Register's pending admin change is already on-chain,
+// it may read stale state and fail validation (e.g., "pending admin  ...  does
+// not match timelock signer ...") even though the intended final state after a
+// batch execution is correct. The scenario below is based on an actual mainnet
+// request that wrongly failed due to this issue.
+// ---------------------------------------------------------------------------
+func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
+	// Helper consts
+	const (
+		RateLimitAdminEVM = "0x8C245711032b426945D04Df60c28DF04d30c15eB"
+		RateLimitAdminSVM = "9o4rGhjgughgQxYXibqQfBwSCtXbJ3GJtzNVFhYCcRYg"
+		TestTokenSymbol   = "TEST"
+	)
+
+	// Helper vars
+	evmChainSel := chainsel.TEST_90000001.Selector
+	solChainSel := chainsel.SOLANA_DEVNET.Selector
+	realWorldRL := tokensapi.RateLimiterConfigFloatInput{
+		IsEnabled: true,
+		Capacity:  7_000_000,
+		Rate:      1944.0,
+	}
+
+	// Setup Solana environment
+	programsPath, ds, err := PreloadSolanaEnvironment(t, solChainSel)
+	require.NoError(t, err)
+
+	// Setup test env
+	env, err := environment.New(t.Context(),
+		environment.WithSolanaContainer(t, []uint64{solChainSel}, programsPath, solanaProgramIDs),
+		environment.WithEVMSimulated(t, []uint64{evmChainSel}),
+	)
+	require.NoError(t, err)
+	env.DataStore = ds.Seal()
+
+	// Ensure the chains exist
+	solChain, ok := env.BlockChains.SolanaChains()[solChainSel]
+	require.True(t, ok)
+	_, ok = env.BlockChains.EVMChains()[evmChainSel]
+	require.True(t, ok)
+
+	// Define adapters
+	solAdapter := solseqV1_6_0.SolanaAdapter{}
+	evmDeployer := evmadapters.EVMDeployer{}
+	evmReader := evmadapters.EVMMCMSReader{}
+
+	// Setup deployment registry
+	deployRegistry := deployapi.GetRegistry()
+	deployRegistry.RegisterDeployer(chainsel.FamilySolana, deployapi.MCMSVersion, &solAdapter)
+	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deployapi.MCMSVersion, &evmDeployer)
+
+	// Setup MCMS registry
+	mcmsRegistry := changesets.GetRegistry()
+	mcmsRegistry.RegisterMCMSReader(chainsel.FamilySolana, &solAdapter)
+	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &evmReader)
+
+	// Deploy chain contracts
+	deployInput := deployapi.ContractDeploymentConfig{
+		Chains: map[uint64]deployapi.ContractDeploymentConfigPerChain{
+			solChainSel: NewDefaultDeploymentConfigForSolana(v1_6_0_scenarios),
+			evmChainSel: NewDefaultDeploymentConfigForEVM(v1_6_0_scenarios),
+		},
+		MCMS: mcms.Input{},
+	}
+	deployOut, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployInput)
+	require.NoError(t, err)
+	MergeAddresses(t, env, deployOut.DataStore)
+
+	// Setup MCMS
+	DeployMCMS(t, env, evmChainSel, []string{cciputils.CLLQualifier})
+	DeployMCMS(t, env, solChainSel, []string{cciputils.CLLQualifier})
+	EVMTransferOwnership(t, env, evmChainSel)
+	SolanaTransferOwnership(t, env, solChainSel)
+
+	// Setup an existing token on Solana
+	env.OperationsBundle = operations.NewBundle(env.GetContext, env.Logger, operations.NewMemoryReporter())
+	expandTE1, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: v1_6_0_scenarios,
+		MCMS:                NewDefaultInputForMCMS("deploy Solana token for test"),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			solChainSel: {
+				TokenPoolVersion: v1_6_0_scenarios,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					DisableFreezeAuthority: false,
+					Decimals:               9,
+					Symbol:                 TestTokenSymbol,
+					Type:                   solanautils.SPLTokens,
+					Name:                   "",
+					Senders: []string{
+						solChain.DeployerKey.PublicKey().String(),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, expandTE1.DataStore)
+	testhelpers.ProcessTimelockProposals(t, *env, expandTE1.MCMSTimelockProposals, false)
+
+	// Fetch the deployed Solana token from the datastore
+	solMintPK, err := datastore_utils.FindAndFormatRef(
+		env.DataStore,
+		datastore.AddressRef{Qualifier: TestTokenSymbol},
+		solChainSel,
+		solanautils.ToAddress,
+	)
+	require.NoError(t, err)
+
+	// Fetch the router address for Solana
+	routerAddr, err := solAdapter.GetRouterAddress(env.DataStore, solChainSel)
+	require.NoError(t, err)
+	routerPK := solana.PublicKeyFromBytes(routerAddr)
+
+	// Get the TAR PDA for the deployed token mint and router
+	tarPDA, _, err := state.FindTokenAdminRegistryPDA(solMintPK, routerPK)
+	require.NoError(t, err)
+
+	// Helper for fetching and decoding the TAR on chain state
+	fetchTAR := func(show bool) ccip_common.TokenAdminRegistry {
+		t.Helper()
+		var tarState ccip_common.TokenAdminRegistry
+		decodeErr := solChain.GetAccountDataBorshInto(t.Context(), tarPDA, &tarState)
+		require.NoError(t, decodeErr)
+		if show {
+			t.Logf(
+				"TAR: Version=%d Administrator=%s PendingAdministrator=%s Mint=%s LookupTable=%s SupportsAutoDerivation=%v",
+				tarState.Version,
+				tarState.Administrator,
+				tarState.PendingAdministrator,
+				tarState.Mint,
+				tarState.LookupTable,
+				tarState.SupportsAutoDerivation,
+			)
+		}
+		return tarState
+	}
+
+	// Configure mint authority on newly deployed Solana token
+	externalMintAuth, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	err = solanautils.FundFromDeployerKey(solChain, []solana.PublicKey{externalMintAuth.PublicKey()}, 10)
+	require.NoError(t, err)
+	setAuthIx, err := tokens.SetTokenMintAuthority(solana.TokenProgramID, externalMintAuth.PublicKey(), solMintPK, solChain.DeployerKey.PublicKey())
+	require.NoError(t, err)
+	err = solChain.Confirm([]solana.Instruction{setAuthIx})
+	require.NoError(t, err)
+
+	// Build an MCMS batch that sets the pending administrator for the token on TAR to a 3rd party (not the timelock signer)
+	customer := solana.NewWallet().PublicKey()
+	reg1Report, err := operations.ExecuteOperation(
+		env.OperationsBundle,
+		routerops.RegisterTokenAdminRegistry,
+		solChain,
+		routerops.TokenAdminRegistryParams{
+			ExistingAddresses: env.DataStore.Addresses().Filter(),
+			TokenMint:         solMintPK,
+			Router:            routerPK,
+			Admin:             customer,
+		},
+		operations.WithForceExecute[routerops.TokenAdminRegistryParams, solchain.Chain](),
+	)
+	require.NoError(t, err, "register should return batch ops when mint authority != deployer")
+	require.NotEmpty(t, reg1Report.Output.BatchOps, "first Register should require MCMS")
+
+	// Set the 3rd party pending admin for the token on TAR via timelock
+	mcmsProposalInput := NewDefaultInputForMCMS("propose third party as pending TAR admin")
+	require.NoError(t, mcmsProposalInput.Validate())
+	reg1ProposalOut, err := changesets.NewOutputBuilder(*env, mcmsRegistry).WithBatchOps(reg1Report.Output.BatchOps).Build(mcmsProposalInput)
+	require.NoError(t, err)
+	require.Len(t, reg1ProposalOut.MCMSTimelockProposals, 1)
+	testhelpers.ProcessTimelockProposals(t, *env, reg1ProposalOut.MCMSTimelockProposals, false)
+
+	// Assert that the pending admin is set to the customer after the MCMS batch executes
+	tarState := fetchTAR(true)
+	require.Equal(t, customer, tarState.PendingAdministrator)
+
+	// Mimic the real-world token expansion scenario:
+	//   On Solana: hook up the existing 3rd party token to the CLL self-service LnR pool
+	//   On EVM: deploy a new token and pool
+	//   Connect them together
+	env.OperationsBundle = operations.NewBundle(env.GetContext, env.Logger, operations.NewMemoryReporter())
+	expandTE2, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: v1_6_0_scenarios,
+		MCMS:                NewDefaultInputForMCMS("cross-family TE2 deploy pools + transfer config"),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			solChainSel: {
+				TokenPoolVersion:      v1_6_0_scenarios,
+				SkipOwnershipTransfer: false,
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: "",
+					RateLimitAdmin:     RateLimitAdminSVM,
+					TokenRef:           &datastore.AddressRef{Address: solMintPK.String()},
+					PoolType:           cciputils.LockReleaseTokenPool.String(),
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					TokenRef:     datastore.AddressRef{}, // inferred
+					TokenPoolRef: datastore.AddressRef{}, // inferred
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						evmChainSel: {OutboundRateLimiterConfig: realWorldRL},
+					},
+				},
+			},
+			evmChainSel: {
+				SkipOwnershipTransfer: false,
+				TokenPoolVersion:      cciputils.Version_1_6_1,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					ExternalAdmin: RateLimitAdminEVM,
+					CCIPAdmin:     "",
+					Currency:      "",
+					Symbol:        TestTokenSymbol,
+					Name:          "Test Token",
+					Type:          bnmERC20ops.ContractType,
+					Decimals:      6,
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: "", // a sensible default will be used
+					RateLimitAdmin:     RateLimitAdminEVM,
+					PoolType:           cciputils.BurnMintTokenPool.String(),
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					TokenRef:     datastore.AddressRef{},
+					TokenPoolRef: datastore.AddressRef{},
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						solChainSel: {OutboundRateLimiterConfig: realWorldRL},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, expandTE2.DataStore)
+	testhelpers.ProcessTimelockProposals(t, *env, expandTE2.MCMSTimelockProposals, false)
+
+	// For Solana, the changeset should have overridden the pending admin in TAR with the timelock
+	// signer and then accepted that timelock admin, all within the same batch. We assert that the
+	// final TAR state is correct and reflects the intended final state after all changesets in the
+	// batch, not stale state partway through the batch execution.
+	tarState = fetchTAR(true)
+
+	// Assert final expected Solana TAR state
+	timelockSigner := solanautils.GetTimelockSignerPDA(
+		env.DataStore.Addresses().Filter(), solChainSel, cciputils.CLLQualifier,
+	)
+	require.Equal(t, solMintPK, tarState.Mint,
+		"TAR mint must stay bound to the SPL mint deployed in the first token expansion",
+	)
+	require.Equal(t, timelockSigner, tarState.Administrator,
+		"the TAR administrator should be the MCMS timelock signer after override + accept in ConfigureTokenForTransfers",
+	)
+	require.True(t, tarState.PendingAdministrator.IsZero(),
+		"no pending administrator should remain after TAR accept completes",
+	)
+	require.NotEqual(t, customer, tarState.Administrator,
+		"third-party key from the between-pass Register must not be the final TAR administrator",
+	)
 }
