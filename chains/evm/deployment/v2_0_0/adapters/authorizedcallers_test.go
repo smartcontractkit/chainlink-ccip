@@ -8,9 +8,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/changesets"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -77,7 +77,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 
 	// Step 4 — add deployer via the chain-agnostic changeset (operator-facing path).
 	// The changeset blank-imports this adapters package via init(), so the registry
-	// already has the (EVM, RMN, 2.1.0) adapter registered.
+	// already has the (EVM, RMN, 2.0.0) adapter registered.
 	reg := api.GetAuthorizedCallersRegistry()
 	_, err = api.ConfigureAuthorizedCallersChangeset(reg, mcmsRegistry).Apply(*e, api.Config{
 		Force: true,
