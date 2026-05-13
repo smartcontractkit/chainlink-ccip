@@ -31,6 +31,6 @@ contract CrossChainPoolToken_constructor is CrossChainPoolTokenSetup {
   }
 
   function test_typeAndVersion() public view {
-    assertEq("CrossChainPoolToken 2.0.0-dev", s_cctPool.typeAndVersion());
+    assertEq("CrossChainPoolToken 2.0.0", s_cctPool.typeAndVersion());
   }
 }

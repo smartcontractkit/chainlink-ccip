@@ -56,6 +56,8 @@ contracts:
     version: "1.6.2"
     package_name: cctp_message_transmitter_proxy
     functions:
+      - name: getAllowedCallers
+        access: public
       - name: configureAllowedCallers
         access: owner
 
@@ -449,6 +451,8 @@ contracts:
     functions:
       - name: getPools
         access: public
+      - name: getLockOrBurnMechanism
+        access: public
       - name: updateLockOrBurnMechanisms
         access: owner
       - name: updatePoolAddresses
@@ -621,7 +625,7 @@ contracts:
         access: public
 
   - contract_name: RMN
-    version: "2.1.0"
+    version: "2.0.0"
     functions:
       - name: curse
         access: public

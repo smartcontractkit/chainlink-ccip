@@ -11,7 +11,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -89,21 +89,21 @@ var DeployRMN = cldf_ops.NewSequence(
 	},
 )
 
-// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.1.0 contract.
+// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.0.0 contract.
 type SeqCurseInput struct {
 	ChainSelector uint64
 	RMNAddress    common.Address
 	Subjects      [][16]byte
 }
 
-// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.1.0 contract.
+// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.0.0 contract.
 type SeqUncurseInput struct {
 	ChainSelector uint64
 	RMNAddress    common.Address
 	Subjects      [][16]byte
 }
 
-// RmnCurse curses one or more subjects on an RMN v2.1.0 contract.
+// RmnCurse curses one or more subjects on an RMN v2.0.0 contract.
 var RmnCurse = cldf_ops.NewSequence(
 	"rmn-curse",
 	rmnops.Version,
@@ -124,7 +124,7 @@ var RmnCurse = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	})
 
-// RmnUncurse uncurses one or more subjects on an RMN v2.1.0 contract.
+// RmnUncurse uncurses one or more subjects on an RMN v2.0.0 contract.
 var RmnUncurse = cldf_ops.NewSequence(
 	"rmn-uncurse",
 	rmnops.Version,
