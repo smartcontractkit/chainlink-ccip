@@ -91,6 +91,8 @@ var DeployRMN = cldf_ops.NewSequence(
 
 // SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.0.0 contract.
 type SeqCurseInput struct {
+	// ChainSelector is added to make the input distinct from other chains that have the same RMN address and Subjects
+	// Without this distinction the sequence will trigger an cache hit in CLD and might not be executed.
 	ChainSelector uint64
 	RMNAddress    common.Address
 	Subjects      [][16]byte
@@ -98,6 +100,8 @@ type SeqCurseInput struct {
 
 // SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.0.0 contract.
 type SeqUncurseInput struct {
+	// ChainSelector is added to make the input distinct from other chains that have the same RMN address and Subjects
+	// Without this distinction the sequence will trigger an cache hit in CLD and might not be executed.
 	ChainSelector uint64
 	RMNAddress    common.Address
 	Subjects      [][16]byte
