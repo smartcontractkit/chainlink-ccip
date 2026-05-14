@@ -129,13 +129,14 @@ type StructDef struct {
 }
 
 type FunctionInfo struct {
-	Name            string
-	StateMutability string
-	Parameters      []ParameterInfo
-	ReturnParams    []ParameterInfo
-	IsWrite         bool
-	CallMethod      string // The method name or full signature for overloaded functions
-	HasOnlyOwner    bool
+	Name                string
+	StateMutability     string
+	Parameters          []ParameterInfo
+	ReturnParams        []ParameterInfo
+	IsWrite             bool
+	CallMethod          string // The method name or full signature for overloaded functions
+	HasOnlyOwner        bool
+	UseAuthorizedCaller bool
 }
 
 type ParameterInfo struct {
@@ -370,10 +371,15 @@ func extractFunctions(info *ContractInfo, funcConfigs []FunctionConfig, abiEntri
 			switch funcCfg.Access {
 			case "owner":
 				funcInfo.HasOnlyOwner = true
+				funcInfo.UseAuthorizedCaller = false
 			case "public":
 				funcInfo.HasOnlyOwner = false
+				funcInfo.UseAuthorizedCaller = false
+			case "authorized_callers":
+				funcInfo.HasOnlyOwner = false
+				funcInfo.UseAuthorizedCaller = true
 			default:
-				return fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')",
+				return fmt.Errorf("unknown access control '%s' for function %s (use 'owner', 'public', or 'authorized_callers')",
 					funcCfg.Access, funcCfg.Name)
 			}
 
@@ -835,8 +841,11 @@ func prepareWriteOp(funcInfo *FunctionInfo) WriteOpData {
 	argsType, callArgs := buildCallArgs(funcInfo, "args")
 
 	accessControl := "AllCallersAllowed"
-	if funcInfo.HasOnlyOwner {
+	switch {
+	case funcInfo.HasOnlyOwner:
 		accessControl = "OnlyOwner"
+	case funcInfo.UseAuthorizedCaller:
+		accessControl = "IsAuthorizedCaller"
 	}
 
 	return WriteOpData{

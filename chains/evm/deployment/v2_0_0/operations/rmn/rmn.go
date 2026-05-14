@@ -151,7 +151,7 @@ var Curse = contract.NewWrite(contract.WriteParams[[16]byte, *RMNContract]{
 	ContractType:    ContractType,
 	ContractABI:     RMNABI,
 	NewContract:     NewRMNContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*RMNContract, [16]byte],
+	IsAllowedCaller: contract.IsAuthorizedCaller[*RMNContract, [16]byte],
 	Validate:        func([16]byte) error { return nil },
 	CallContract: func(
 		c *RMNContract,
@@ -169,7 +169,7 @@ var Curse0 = contract.NewWrite(contract.WriteParams[[][16]byte, *RMNContract]{
 	ContractType:    ContractType,
 	ContractABI:     RMNABI,
 	NewContract:     NewRMNContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*RMNContract, [][16]byte],
+	IsAllowedCaller: contract.IsAuthorizedCaller[*RMNContract, [][16]byte],
 	Validate:        func([][16]byte) error { return nil },
 	CallContract: func(
 		c *RMNContract,

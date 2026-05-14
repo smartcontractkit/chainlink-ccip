@@ -427,7 +427,7 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
-				return TokenAdminRegistryOut{}, nil
+				return TokenAdminRegistryOut{PendingSigner: input.Admin}, nil
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 			// there is already an admin registered, we need to transfer
@@ -546,7 +546,8 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 				return TokenAdminRegistryOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			return TokenAdminRegistryOut{
-				PendingSigner: pendingSigner,
+				ProposalInstructions: []solana.Instruction{ixn},
+				PendingSigner:        pendingSigner,
 				OnChainOutput: sequences.OnChainOutput{
 					BatchOps: []types.BatchOperation{batches},
 				},
@@ -569,7 +570,6 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 	"Accepts a Token Admin Registry with the Router 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
-		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var pendingAdmin solana.PublicKey
 		var currentAdmin solana.PublicKey
@@ -596,25 +596,14 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			}
 			pendingAdmin = input.Admin
 		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
-			// we can only sign as either the deployer or timelock
 			return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
 		}
 		// sign as the pending admin to accept
 		// when there is no pending admin, we assume the authority is timelock
-		tempIx, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
-			routerConfigPDA,
-			tokenAdminRegistryPDA,
-			input.TokenMint,
-			pendingAdmin,
-		).ValidateAndBuild()
+		ixn, err := BuildAcceptTokenAdminRegistrySolanaInstruction(input.Router, input.TokenMint, pendingAdmin)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
 		}
-		ixData, err := tempIx.Data()
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload router accept admin role token admin registry instruction: %w", err)
-		}
-		ixn := solana.NewInstruction(input.Router, tempIx.Accounts(), ixData)
 		// pending admin unset = we're proposing and accepting in the same batch, so timelock must be the signer
 		// pending admin set = we need a proposal if the admin is not the deployer
 		if pendingAdmin.IsZero() || pendingAdmin != chain.DeployerKey.PublicKey() {
@@ -634,7 +623,7 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept token admin registry: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -668,7 +657,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		}
 		if currentAdmin == input.Admin {
 			b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
-			return TokenAdminRegistryOut{}, nil
+			return TokenAdminRegistryOut{PendingSigner: input.Admin}, nil
 		}
 		// sign as the current admin to transfer
 		tempIx, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
@@ -698,7 +687,8 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 				return TokenAdminRegistryOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			return TokenAdminRegistryOut{
-				PendingSigner: input.Admin,
+				ProposalInstructions: []solana.Instruction{ixn},
+				PendingSigner:        input.Admin,
 				OnChainOutput: sequences.OnChainOutput{
 					BatchOps: []types.BatchOperation{batches},
 				},
@@ -707,7 +697,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm transfer token admin registry: %w", err)
 		}
 
 		return TokenAdminRegistryOut{
@@ -715,6 +705,34 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		}, nil
 	},
 )
+
+// BuildAcceptTokenAdminRegistrySolanaInstruction builds the router program instruction to accept the token admin registry
+// role for pendingAdministrator (who must sign accept on-chain or via MCMS).
+func BuildAcceptTokenAdminRegistrySolanaInstruction(router, tokenMint, pendingAdministrator solana.PublicKey) (solana.Instruction, error) {
+	ccip_router.SetProgramID(router)
+	var out solana.Instruction
+
+	tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, router)
+	routerConfigPDA, _, _ := state.FindConfigPDA(router)
+	ixTemp, err := ccip_router.
+		NewAcceptAdminRoleTokenAdminRegistryInstruction(
+			routerConfigPDA,
+			tokenAdminRegistryPDA,
+			tokenMint,
+			pendingAdministrator,
+		).
+		ValidateAndBuild()
+	if err != nil {
+		return out, fmt.Errorf("failed to generate accept admin role token admin registry instruction: %w", err)
+	}
+
+	ixData, err := ixTemp.Data()
+	if err != nil {
+		return out, fmt.Errorf("failed to extract data payload for accept admin role token admin registry instruction: %w", err)
+	}
+
+	return solana.NewInstruction(router, ixTemp.Accounts(), ixData), nil
+}
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
 	programData := ccip_router.Config{}
@@ -751,5 +769,14 @@ type TokenAdminRegistryParams struct {
 
 type TokenAdminRegistryOut struct {
 	sequences.OnChainOutput
+
+	// ProposalInstructions holds the register/transfer Solana instructions that were wrapped into BatchOps, so
+	// callers can combine them with Accept in a single MCMS batch op (same transaction order as queued onchain
+	// effects).
+	ProposalInstructions []solana.Instruction `json:"-" yaml:"-"`
+
+	// PendingSigner is the key that needs to sign the accept instruction on-chain or via MCMS to complete the
+	// registration/transfer of the token admin registry. It is still set on no-op returns (no instruction executed)
+	// to the effective target admin (Admin after defaulting to CCIP authority) so callers can sequence Accept.
 	PendingSigner solana.PublicKey
 }
