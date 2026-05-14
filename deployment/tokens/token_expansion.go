@@ -116,6 +116,25 @@ type DeployTokenPoolInput struct {
 	// thresholdAmountForAdditionalCCVs. Applicable to EVM 2.0.0+ token pools.
 	// If empty or "0", no threshold is set.
 	ThresholdAmountForAdditionalCCVs string `yaml:"thresholdAmountForAdditionalCCVs,omitempty" json:"thresholdAmountForAdditionalCCVs,omitempty"`
+	// RouterRef optionally selects which router to wire into the pool. If nil, the
+	// production router for the chain is used. To target the test router, set Type
+	// to the chain's TestRouter contract type (e.g. on EVM:
+	// datastore.ContractType(router.TestRouterContractType)). An explicit Address
+	// on the ref bypasses datastore lookup.
+	//
+	// On fresh deploys this address is passed into the pool's constructor (which
+	// seeds the dynamic config). When the pool already exists in the datastore,
+	// providing a RouterRef triggers a declarative setDynamicConfig to align the
+	// pool's router with the resolved address; the call is a no-op if it already
+	// matches. EVM 2.0.0+ only.
+	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
+	// FeeAggregator is the per-pool feeAdmin: an address (besides the pool owner)
+	// allowed to call WithdrawFeeTokens on the pool. Empty leaves the current
+	// on-chain feeAdmin unchanged. On fresh deploys this flows through to the
+	// pool's dynamic config; on existing pools it triggers a declarative
+	// setDynamicConfig reconcile (no-op if it already matches).
+	// EVM 2.0.0+ only.
+	FeeAggregator string `yaml:"feeAggregator,omitempty" json:"feeAggregator,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
