@@ -112,7 +112,7 @@ gomodtidy: gomods
 	gomods tidy
 
 modgraph: gomods
-	go install github.com/jmank88/modgraph@v0.1.2
+	go install github.com/jmank88/modgraph@v0.1.3
 	./modgraph > go.md
 
 pin_deployment_dependencies:
