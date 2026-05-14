@@ -83,12 +83,29 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			}
 
 			threshold := big.NewInt(0)
-			if input.ThresholdAmountForAdditionalCCVs != "" {
+			thresholdProvided := input.ThresholdAmountForAdditionalCCVs != ""
+			if thresholdProvided {
 				var ok bool
 				threshold, ok = new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10)
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs %q: must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
 				}
+			}
+
+			var rateLimitAdmin common.Address
+			if input.RateLimitAdmin != "" {
+				if !common.IsHexAddress(input.RateLimitAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid RateLimitAdmin address %q", input.RateLimitAdmin)
+				}
+				rateLimitAdmin = common.HexToAddress(input.RateLimitAdmin)
+			}
+
+			var feeAggregator common.Address
+			if input.FeeAggregator != "" {
+				if !common.IsHexAddress(input.FeeAggregator) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAggregator address %q", input.FeeAggregator)
+				}
+				feeAggregator = common.HexToAddress(input.FeeAggregator)
 			}
 
 			var tokenAddr string
@@ -184,14 +201,55 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				// the token grants it burn/mint rights. Keep DeployTokenPoolForToken
 				// declarative: after it runs, the token/pool authority relationship
 				// should be correct whether the pool was just deployed or reused.
+				var result sequences.OnChainOutput
 				batchOp, err := grantMintBurnRoles(matches[0])
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}
-				if batchOp == nil {
-					return sequences.OnChainOutput{}, nil
+				if batchOp != nil {
+					result.BatchOps = append(result.BatchOps, *batchOp)
 				}
-				return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{*batchOp}}, nil
+
+				// Reconcile any dynamic-config fields the caller explicitly supplied
+				// (router, rate-limit admin, fee aggregator, additional-CCVs
+				// threshold). ConfigureTokenPool reads current values and only
+				// emits a write when they differ, so re-runs with the same inputs
+				// are no-ops. Fields the caller leaves unset (zero/empty) retain
+				// their current on-chain values.
+				if input.RouterRef != nil || rateLimitAdmin != (common.Address{}) || feeAggregator != (common.Address{}) || thresholdProvided {
+					poolAddr := common.HexToAddress(matches[0].Address)
+					configureInput := evm_tokens.ConfigureTokenPoolInput{
+						ChainSelector:    input.ChainSelector,
+						TokenPoolAddress: poolAddr,
+						RateLimitAdmin:   rateLimitAdmin,
+						FeeAggregator:    feeAggregator,
+					}
+					if input.RouterRef != nil {
+						resolved, err := resolveRouterAddress(input.ExistingDataStore, input.ChainSelector, input.RouterRef)
+						if err != nil {
+							return sequences.OnChainOutput{}, err
+						}
+						configureInput.RouterAddress = resolved
+					}
+					if thresholdProvided {
+						hooksReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, evmChain, contract.FunctionInput[struct{}]{
+							ChainSelector: input.ChainSelector,
+							Address:       poolAddr,
+						})
+						if err != nil {
+							return sequences.OnChainOutput{}, fmt.Errorf("failed to read advanced pool hooks address from existing token pool %s on chain %d: %w", poolAddr, input.ChainSelector, err)
+						}
+						configureInput.AdvancedPoolHooks = hooksReport.Output
+						configureInput.ThresholdAmountForAdditionalCCVs = threshold
+					}
+					configureReport, err := cldf_ops.ExecuteSequence(b, evm_tokens.ConfigureTokenPool, evmChain, configureInput)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to reconcile dynamic config for existing token pool %s on chain %d: %w", poolAddr, input.ChainSelector, err)
+					}
+					result.BatchOps = append(result.BatchOps, configureReport.Output.BatchOps...)
+				}
+
+				return result, nil
 			}
 
 			tokenContract, err := erc20.NewERC20(common.HexToAddress(tokenAddr), evmChain.Client)
@@ -203,12 +261,9 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get decimals for token at %s: %w", tokenAddr, err)
 			}
 
-			routerRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: input.ChainSelector,
-				Type:          datastore.ContractType(router.ContractType),
-			}, input.ChainSelector, datastore_utils.FullRef)
+			resolvedRouter, err := resolveRouterAddress(input.ExistingDataStore, input.ChainSelector, input.RouterRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find router in datastore for chain %d: %w", input.ChainSelector, err)
+				return sequences.OnChainOutput{}, err
 			}
 			rmnProxyRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: input.ChainSelector,
@@ -231,12 +286,14 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				TokenPoolType:                    datastore.ContractType(input.PoolType),
 				TokenPoolVersion:                 input.TokenPoolVersion,
 				TokenSymbol:                      qualifier,
+				RateLimitAdmin:                   rateLimitAdmin,
+				FeeAggregator:                    feeAggregator,
 				ThresholdAmountForAdditionalCCVs: threshold,
 				ConstructorArgs: evm_tokens.ConstructorArgs{
 					Token:    common.HexToAddress(tokenAddr),
 					Decimals: tokenDecimals,
 					RMNProxy: common.HexToAddress(rmnProxyRef.Address),
-					Router:   common.HexToAddress(routerRef.Address),
+					Router:   resolvedRouter,
 				},
 				AdvancedPoolHooksConfig: evm_tokens.AdvancedPoolHooksConfig{
 					Allowlist: allowlist,
@@ -519,4 +576,43 @@ func isBurnMintTokenType(typ datastore.ContractType) bool {
 func isBurnMintERC677TokenType(typ datastore.ContractType) bool {
 	return typ.String() == cciputils.BurnMintToken.String() ||
 		typ.String() == cciputils.ERC677TokenHelper.String()
+}
+
+// resolveRouterAddress returns the router address to wire into the pool.
+// If routerRef is nil, the chain's production Router is looked up in the datastore.
+// If routerRef.Address is non-empty, it is used directly (no datastore lookup).
+// Otherwise the ref is resolved against the datastore; ChainSelector is forced to
+// the target chain and Type defaults to the production Router when unset, so callers
+// targeting the TestRouter only need to set Type=router.TestRouterContractType.
+func resolveRouterAddress(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	routerRef *datastore.AddressRef,
+) (common.Address, error) {
+	ref := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.ContractType),
+	}
+	if routerRef != nil {
+		if routerRef.Address != "" {
+			if !common.IsHexAddress(routerRef.Address) {
+				return common.Address{}, fmt.Errorf("invalid RouterRef.Address %q: not a hex address", routerRef.Address)
+			}
+			addr := common.HexToAddress(routerRef.Address)
+			if addr == (common.Address{}) {
+				return common.Address{}, errors.New("RouterRef.Address resolves to the zero address")
+			}
+			return addr, nil
+		}
+		ref = *routerRef
+		ref.ChainSelector = chainSelector
+		if ref.Type == "" {
+			ref.Type = datastore.ContractType(router.ContractType)
+		}
+	}
+	resolved, err := datastore_utils.FindAndFormatRef(ds, ref, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find router (type=%q qualifier=%q) in datastore for chain %d: %w", ref.Type, ref.Qualifier, chainSelector, err)
+	}
+	return common.HexToAddress(resolved.Address), nil
 }
