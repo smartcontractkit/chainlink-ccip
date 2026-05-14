@@ -58,6 +58,24 @@ func TestResolveRouterAddress(t *testing.T) {
 		require.Equal(t, override, got)
 	})
 
+	t.Run("ref with non-hex Address errors", func(t *testing.T) {
+		// "0x123" is not 20 bytes; common.HexToAddress would silently pad it,
+		// so resolveRouterAddress must reject it up-front.
+		_, err := resolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
+			Address: "0x123",
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not a hex address")
+	})
+
+	t.Run("ref with zero Address errors", func(t *testing.T) {
+		_, err := resolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
+			Address: "0x0000000000000000000000000000000000000000",
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "zero address")
+	})
+
 	t.Run("ref forces chain selector to target chain", func(t *testing.T) {
 		// User passes a ref with the wrong chain selector — the helper must
 		// rewrite it to the target chain so the lookup succeeds.

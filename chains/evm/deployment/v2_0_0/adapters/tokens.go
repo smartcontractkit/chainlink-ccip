@@ -211,11 +211,11 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				}
 
 				// Reconcile any dynamic-config fields the caller explicitly supplied
-				// (router, rate-limit admin, additional-CCVs threshold).
-				// ConfigureTokenPool reads current values and only emits a write
-				// when they differ, so re-runs with the same inputs are no-ops.
-				// Fields the caller leaves unset (zero/empty) retain their current
-				// on-chain values.
+				// (router, rate-limit admin, fee aggregator, additional-CCVs
+				// threshold). ConfigureTokenPool reads current values and only
+				// emits a write when they differ, so re-runs with the same inputs
+				// are no-ops. Fields the caller leaves unset (zero/empty) retain
+				// their current on-chain values.
 				if input.RouterRef != nil || rateLimitAdmin != (common.Address{}) || feeAggregator != (common.Address{}) || thresholdProvided {
 					poolAddr := common.HexToAddress(matches[0].Address)
 					configureInput := evm_tokens.ConfigureTokenPoolInput{
@@ -595,7 +595,14 @@ func resolveRouterAddress(
 	}
 	if routerRef != nil {
 		if routerRef.Address != "" {
-			return common.HexToAddress(routerRef.Address), nil
+			if !common.IsHexAddress(routerRef.Address) {
+				return common.Address{}, fmt.Errorf("invalid RouterRef.Address %q: not a hex address", routerRef.Address)
+			}
+			addr := common.HexToAddress(routerRef.Address)
+			if addr == (common.Address{}) {
+				return common.Address{}, errors.New("RouterRef.Address resolves to the zero address")
+			}
+			return addr, nil
 		}
 		ref = *routerRef
 		ref.ChainSelector = chainSelector

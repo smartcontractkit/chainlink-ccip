@@ -606,7 +606,7 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 				RouterRef:          opts.routerRef,
 				FeeAggregator:      opts.feeAggregator,
 				// On reconcile runs (no DeployTokenInput), TokenExpansion still
-				// needs a TokenRef to merge against. Point at the v1.5.0
+				// needs a TokenRef to merge against. Point at the v1.0.0
 				// burn-mint-drip token deployed on the first run.
 				TokenRef: &datastore.AddressRef{
 					Type:      datastore.ContractType(bnm_drip_v1_0.ContractType),
@@ -692,6 +692,113 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	cfg = readDynamicConfig(t)
 	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter after idempotent reconcile")
 	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should remain set after idempotent reconcile")
+}
+
+// TestTokenExpansion_FreshDeployWithRouterRef covers the fresh-deploy
+// constructor path: when DeployTokenPoolInput.RouterRef points at TestRouter,
+// the pool is deployed wired to TestRouter (not the production Router).
+// Complements TestTokenExpansion_RouterRefReconcile, which exercises the
+// existing-pool reconcile path.
+func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSel}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	mcmsRegistry := changesets.GetRegistry()
+	ds := datastore.NewMemoryDataStore()
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSel,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+		Cfg: v2_0_0.DeployChainContractsCfg{
+			ChainSel:         chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			Params:           testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+			DeployTestRouter: true,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Merge(deployChainOut.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	prodRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	testRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.TestRouterContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+	require.NotEqual(t, prodRouter, testRouter)
+
+	deployer := e.BlockChains.EVMChains()[chainSel].DeployerKey.From
+	evmChain := e.BlockChains.EVMChains()[chainSel]
+
+	const symbol = "FRTR"
+	maxSupply := uint64(1_000_000)
+	preMint := uint64(0)
+
+	out, err := tokens.TokenExpansion().Apply(*e, tokens.TokenExpansionInput{
+		ChainAdapterVersion: semver.MustParse("2.0.0"),
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+			chainSel: {
+				TokenPoolVersion:      burn_mint_token_pool.Version,
+				SkipOwnershipTransfer: true,
+				DeployTokenInput: &tokens.DeployTokenInput{
+					Name:          "Fresh Router Token",
+					Symbol:        symbol,
+					Decimals:      18,
+					Supply:        &maxSupply,
+					PreMint:       &preMint,
+					ExternalAdmin: deployer.Hex(),
+					CCIPAdmin:     deployer.Hex(),
+					Type:          bnm_drip_v1_0.ContractType,
+				},
+				DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+					PoolType:           string(burn_mint_token_pool.ContractType),
+					TokenPoolQualifier: symbol,
+					// Drive RouterRef on the fresh-deploy path so the resolved
+					// TestRouter address flows into the pool constructor.
+					RouterRef: &datastore.AddressRef{Type: datastore.ContractType(router.TestRouterContractType)},
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "fresh TokenExpansion with RouterRef=TestRouter should succeed")
+	require.NoError(t, ds.Merge(out.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
+
+	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
+		Version:       burn_mint_token_pool.Version,
+		Qualifier:     symbol,
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
+		ChainSelector: chainSel,
+		Address:       poolAddr,
+	})
+	require.NoError(t, err)
+	require.Equal(t, testRouter, cfgReport.Output.Router, "freshly-deployed pool should be wired to TestRouter when RouterRef points at it")
 }
 
 // TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens verifies that when TokenExpansion
