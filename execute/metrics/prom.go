@@ -104,7 +104,7 @@ var (
 	promExecConfigDigestMismatch = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_exec_config_digest_mismatch",
 		Help: "Reports whether the home chain config digest differs from the offramp config digest (1 = mismatch, 0 = match)",
-	}, []string{"chainFamily", "chainID"})
+	}, []string{"chain_family", "chain_id"})
 )
 
 type PromReporter struct {
@@ -420,7 +420,7 @@ func (p *PromReporter) TrackConfigDigestMismatch(mismatch bool) {
 	}
 	p.configDigestMismatch.WithLabelValues(p.chainFamily, p.chainID).Set(value)
 	p.bhConfigDigestMismatch.Record(context.Background(), int64(value), metric.WithAttributes(
-		attribute.String("chainFamily", p.chainFamily),
-		attribute.String("chainID", p.chainID),
+		attribute.String("chain_family", p.chainFamily),
+		attribute.String("chain_id", p.chainID),
 	))
 }

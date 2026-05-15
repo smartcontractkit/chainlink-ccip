@@ -420,7 +420,11 @@ func (p *Plugin) trackConfigDigestMismatch(ctx context.Context, lggr logger.Logg
 		ctx, p.ccipReader, consts.PluginTypeCommit, p.reportingCfg.ConfigDigest,
 	)
 	if err != nil {
-		lggr.Errorw("failed to check config digest", "err", err)
+		lggr.Errorw("failed to check for config digest mismatch",
+			"err", err,
+			"homeChainConfigDigest", p.reportingCfg.ConfigDigest,
+			"pluginType", consts.PluginTypeCommit,
+		)
 		return
 	}
 	p.metricsReporter.TrackConfigDigestMismatch(!configMatch)

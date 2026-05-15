@@ -61,7 +61,11 @@ func (p *Plugin) Observation(
 		ctx, p.ccipReader, consts.PluginTypeExecute, p.reportingCfg.ConfigDigest,
 	)
 	if configDigestErr != nil {
-		lggr.Errorw("failed to check config digest", "err", configDigestErr)
+		lggr.Errorw("failed to check for config digest mismatch",
+			"err", configDigestErr,
+			"homeChainConfigDigest", p.reportingCfg.ConfigDigest,
+			"pluginType", consts.PluginTypeExecute,
+		)
 	} else {
 		p.observer.TrackConfigDigestMismatch(!configMatch)
 	}
