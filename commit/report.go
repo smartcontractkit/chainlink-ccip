@@ -214,8 +214,8 @@ func (p *Plugin) validateReport(
 		ctx, p.ccipReader, consts.PluginTypeCommit, p.reportingCfg.ConfigDigest,
 	)
 	if err != nil {
-		err = plugincommon.NewErrValidatingReport(fmt.Errorf("check config digest: %w", err))
-		return cciptypes.CommitPluginReport{}, plugincommon.NewErrValidatingReport(err)
+		return cciptypes.CommitPluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("check config digest: %w", err))
 	}
 
 	if !match {
