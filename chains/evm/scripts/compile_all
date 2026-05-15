@@ -12,7 +12,7 @@ OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_ONRAMP=1500
 OPTIMIZE_RUNS_OFFRAMP=23000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
-OPTIMIZE_RUNS_CCV_POOL=17000
+OPTIMIZE_RUNS_LARGE_POOL=17000
 
 
 PROJECT="ccip"
@@ -68,19 +68,22 @@ function getOptimizations() {
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
       "LombardTokenPool")
-          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
           ;;
       "MockE2ELBTCTokenPool")
-          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
           ;;
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
       "SiloedUSDCTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
         ;;
       "CrossChainPoolToken")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
+        ;;
+      "SiloedLockReleaseTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
         ;;
     esac
 

@@ -99,7 +99,8 @@ type DeployTokenPoolInput struct {
 	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
 	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
-	// If empty, then this remains unconfigured on the token pool (i.e. the zero address).
+	// For Solana: If empty, DeployTokenPoolForToken sets the timelock signer PDA from the datastore;
+	// if non-empty, sets this base58 pubkey. On EVM, empty leaves the pool default (unchanged from contract deploy).
 	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
@@ -115,6 +116,30 @@ type DeployTokenPoolInput struct {
 	// thresholdAmountForAdditionalCCVs. Applicable to EVM 2.0.0+ token pools.
 	// If empty or "0", no threshold is set.
 	ThresholdAmountForAdditionalCCVs string `yaml:"thresholdAmountForAdditionalCCVs,omitempty" json:"thresholdAmountForAdditionalCCVs,omitempty"`
+	// RouterRef optionally selects which router to wire into the pool. To target
+	// the test router, set Type to the chain's TestRouter contract type (e.g. on
+	// EVM: datastore.ContractType(router.TestRouterContractType)). An explicit
+	// non-zero Address on the ref bypasses datastore lookup.
+	//
+	// Behavior by deploy state:
+	//   - Fresh deploy: if nil, the chain's production Router is used; otherwise
+	//     the resolved address is passed into the pool's constructor (which
+	//     seeds the dynamic config).
+	//   - Existing pool: if nil, the pool's current dynamic-config router is
+	//     retained; otherwise a declarative setDynamicConfig op is emitted to
+	//     align the router with the resolved address (no-op if it already
+	//     matches). The production Router is NOT re-applied on existing pools.
+	// EVM 2.0.0+ only.
+	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
+	// FeeAggregator is the per-pool feeAdmin: an address (besides the pool owner)
+	// allowed to call WithdrawFeeTokens on the pool. Empty or the zero address
+	// leaves the current on-chain feeAdmin unchanged; this changeset cannot be
+	// used to clear an existing feeAdmin back to the zero address (use a direct
+	// setDynamicConfig call for that). On fresh deploys a non-zero value flows
+	// through to the pool's dynamic config; on existing pools it triggers a
+	// declarative setDynamicConfig reconcile (no-op if it already matches).
+	// EVM 2.0.0+ only.
+	FeeAggregator string `yaml:"feeAggregator,omitempty" json:"feeAggregator,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore

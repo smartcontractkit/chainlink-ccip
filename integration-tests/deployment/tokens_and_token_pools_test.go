@@ -117,10 +117,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 		Deployer           *solana.PrivateKey
 		Chain              solchain.Chain
 		Deploy             deployapi.ContractDeploymentConfigPerChain
+		// RateLimitAdmin is optional; when set on BurnMint, DeployTokenPoolForToken should set it on-chain.
+		RateLimitAdmin string
 	}{
 		{
 			TokenPoolQualifier: "",
 			TokenPoolType:      cciputils.BurnMintTokenPool.String(),
+			RateLimitAdmin:     solana.NewWallet().PublicKey().String(),
 			Deployer:           solChain.DeployerKey,
 			Chain:              solChain,
 			Deploy:             NewDefaultDeploymentConfigForSolana(v1_6_0),
@@ -278,6 +281,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 				TokenPoolQualifier: solbnm.TokenPoolQualifier,
 				PoolType:           solbnm.TokenPoolType,
+				RateLimitAdmin:     solbnm.RateLimitAdmin,
 			},
 			DeployTokenInput: solbnm.Token,
 		}
@@ -312,6 +316,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 				TokenPoolQualifier: sollnr.TokenPoolQualifier,
 				PoolType:           sollnr.TokenPoolType,
+				RateLimitAdmin:     sollnr.RateLimitAdmin,
 			},
 			DeployTokenInput: sollnr.Token,
 		}
@@ -663,7 +668,39 @@ func TestTokensAndTokenPools(t *testing.T) {
 				_, balance, err := tokens.TokenBalance(t.Context(), data.Chain.Client, deployerATA, solchain.SolDefaultCommitment)
 				require.NoError(t, err)
 
-				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %q", preMint.String(), balance))
+				require.Equal(t, 0, preMint.Cmp(big.NewInt(int64(balance))), fmt.Sprintf("expected pre-mint %q to match actual balance %d", preMint.String(), balance))
+
+				if data.RateLimitAdmin != "" {
+					expectedRLA, err := solana.PublicKeyFromBase58(data.RateLimitAdmin)
+					require.NoError(t, err)
+
+					tokenPoolRef, err := datastore_utils.FindAndFormatRef(
+						env.DataStore,
+						datastore.AddressRef{
+							ChainSelector: data.Chain.Selector,
+							Qualifier:     data.TokenPoolQualifier,
+							Type:          datastore.ContractType(data.TokenPoolType),
+							Version:       common_utils.Version_1_6_0,
+						},
+						data.Chain.Selector,
+						datastore_utils.FullRef,
+					)
+					require.NoError(t, err)
+
+					tokenPoolProgramID := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
+					tokenPoolStatePDA, err := tokens.TokenPoolConfigAddress(tokenAddr, tokenPoolProgramID)
+					require.NoError(t, err)
+
+					switch data.TokenPoolType {
+					case common_utils.BurnMintTokenPool.String():
+						var poolState burnmint_token_pool.State
+						require.NoError(t, data.Chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &poolState))
+						require.Equal(t, expectedRLA, poolState.Config.RateLimitAdmin,
+							"token pool rate limit admin should match DeployTokenPoolInput.RateLimitAdmin")
+					default:
+						t.Fatalf("unexpected TokenPoolType %q with RateLimitAdmin set", data.TokenPoolType)
+					}
+				}
 			}
 		})
 
@@ -1021,7 +1058,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, stateErr)
 			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
-			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+			expectedRLA := timelockSigner
+			if solbnm.RateLimitAdmin != "" {
+				pk, pkErr := solana.PublicKeyFromBase58(solbnm.RateLimitAdmin)
+				require.NoError(t, pkErr)
+				expectedRLA = pk
+			}
+			require.Equal(t, expectedRLA, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 	})
 }

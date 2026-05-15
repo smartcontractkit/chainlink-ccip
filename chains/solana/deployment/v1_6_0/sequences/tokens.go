@@ -30,12 +30,13 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-			var result sequences.OnChainOutput
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
+			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
+			addrs := input.ExistingDataStore.Addresses().Filter()
 			b.Logger.Info("SVM Registering token:", input)
 
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
@@ -47,7 +48,6 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
 
 			// if no token admin provided, ccip admin becomes the admin
 			var tokenAdmin solana.PublicKey
@@ -55,31 +55,75 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				tokenAdmin = solana.MustPublicKeyFromBase58(input.ExternalAdmin)
 			}
 
+			var result sequences.OnChainOutput
 			rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
 				Router:            solana.PublicKeyFromBytes(routerAddr),
 				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
 				Admin:             tokenAdmin,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
+				ExistingAddresses: addrs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
 			}
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
 			pendingSigner := rtarOut.Output.PendingSigner
 
-			// accept if we can
-			atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
-				Router:            solana.PublicKeyFromBytes(routerAddr),
-				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
-				Admin:             pendingSigner,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
+			timelockSigner := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			deployerPK := chain.DeployerKey.PublicKey()
+			routerPK := solana.PublicKeyFromBytes(routerAddr)
+
+			// If the proposed token admin is timelock or the deployer, then we can run Register + Accept
+			// in this sequence, but we need to be careful when orchestrating both of these operations as
+			// MCMS batch ops DON'T execute immediately. If the Register op creates any MCMS batches that
+			// modify the TAR, then reading the live on-chain state of the TAR in the Accept op will lead
+			// to bugs since it is operating on an incomplete snapshot. The switch statement below should
+			// account for this case and cover the non-batch case as well.
+			hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
+			isTimelockPendingAdmin := pendingSigner == timelockSigner
+			isDeployerPendingAdmin := pendingSigner == deployerPK
+			switch {
+			// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
+			// no proposal - in this case either timelock or the deployer can immediately run the Accept
+			// op since there aren't any proposal instructions that need to be batched together with it.
+			case !hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
+				atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+					ExistingAddresses: addrs,
+					TokenMint:         tokenMintPK,
+					Router:            routerPK,
+					Admin:             pendingSigner,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
+				}
+				result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+				result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
+
+			// Case 2: the RegisterTokenAdminRegistry operation has MCMS batches and the proposed admin
+			// is timelock - in this case we bundle Register and Accept into the same MCMS batch.
+			case hasMCMSProposal && isTimelockPendingAdmin:
+				atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+				}
+				batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
+				batchOps, err := utils.BuildMCMSBatchOperation(
+					chain.Selector,
+					batchIxn,
+					routerPK.String(),
+					routerops.ContractType.String(),
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
+				}
+				result.BatchOps = append(result.BatchOps, batchOps)
+
+			// Case 3: skip Accept only do Register
+			default:
+				b.Logger.Infof("Deferring token admin role acceptance to proposed admin (%s)", pendingSigner)
+				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
 			}
-			result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
 
 			b.Logger.Info("SVM Setting token pool:", input)
 
@@ -140,6 +184,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 					remoteChainConfig.RemoteDecimals,
 					chain.Family(),
 					common_utils.Version_1_6_0,
+					input.PoolType,
 				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
@@ -515,7 +560,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 	return operations.NewSequence(
 		"DeployTokenPoolForToken",
 		common_utils.Version_1_6_0,
-		"Configures a token pool for a given token on Solana. Doesn't actually deploy a new token pool contract, as Solana token pools are just accounts.",
+		"Configures a token pool for a given token on Solana (no new program deploy). Initializes the pool, sets rate limit admin to RateLimitAdmin input or timelock signer PDA, then pool signer ATA and mint authority as needed.",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			b.Logger.Info("SVM Deploying token:", input)
@@ -567,6 +612,47 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			}
 			result.Addresses = append(result.Addresses, deployOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, deployOut.Output.BatchOps...)
+
+			updateRLOp := tokenpoolops.UpdateRateLimitAdminBurnMint
+			switch input.PoolType {
+			case common_utils.BurnMintTokenPool.String():
+				updateRLOp = tokenpoolops.UpdateRateLimitAdminBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				updateRLOp = tokenpoolops.UpdateRateLimitAdminLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+			}
+
+			var rlAdmin solana.PublicKey
+			if input.RateLimitAdmin != "" {
+				rlAdmin, err = solana.PublicKeyFromBase58(input.RateLimitAdmin)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid base58 pubkey: %w", input.RateLimitAdmin, err)
+				}
+				if rlAdmin.IsZero() {
+					return sequences.OnChainOutput{}, errors.New("rate limit admin cannot be the zero pubkey")
+				}
+			} else {
+				rlAdmin = utils.GetTimelockSignerPDA(
+					input.ExistingDataStore.Addresses().Filter(),
+					chain.Selector,
+					common_utils.CLLQualifier,
+				)
+				if rlAdmin.IsZero() {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: ensure MCMS RBACTimelock is in the datastore", chain.Selector)
+				}
+			}
+
+			rlOut, err := operations.ExecuteOperation(b, updateRLOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   tokenPool,
+				TokenMint: tokenMint,
+				NewOwner:  rlAdmin,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
+			}
+			result.Addresses = append(result.Addresses, rlOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, rlOut.Output.BatchOps...)
 
 			poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
 
@@ -670,28 +756,15 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 			acceptOwnershipTPOp := tokenpoolops.AcceptOwnershipBurnMint
-			tprlAdminTPOp := tokenpoolops.UpdateRateLimitAdminBurnMint
 			switch tokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				// Already set to burn mint
 			case common_utils.LockReleaseTokenPool.String():
 				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
 				acceptOwnershipTPOp = tokenpoolops.AcceptOwnershipLockRelease
-				tprlAdminTPOp = tokenpoolops.UpdateRateLimitAdminLockRelease
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 			}
-
-			tprlAdminOut, err := operations.ExecuteOperation(b, tprlAdminTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-				Program:   tokenPool,
-				TokenMint: tokenMint,
-				NewOwner:  timelockSigner,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to update TPRL admin: %w", err)
-			}
-			result.Addresses = append(result.Addresses, tprlAdminOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, tprlAdminOut.Output.BatchOps...)
 
 			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
 			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{

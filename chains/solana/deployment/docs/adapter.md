@@ -110,8 +110,8 @@ func init() {
 | `SetTokenPoolRateLimits()` | Sets inbound/outbound rate limits for BurnMint or LockRelease pools |
 | `DeployToken()` | Deploys SPL/SPL2022 token, creates ATAs for senders, optionally uploads metadata |
 | `DeployTokenVerify()` | No-op (returns nil) |
-| `DeployTokenPoolForToken()` | Initializes pool account (BurnMint or LockRelease), creates pool signer ATA, sets mint authority for BurnMint pools |
-| `UpdateAuthorities()` | Transfers token pool ownership to timelock signer PDA, updates rate limit admin |
+| `DeployTokenPoolForToken()` | Initializes pool account (BurnMint or LockRelease), sets rate limit admin to `RateLimitAdmin` or timelock signer PDA, creates pool signer ATA, sets mint authority for BurnMint pools |
+| `UpdateAuthorities()` | Transfers token pool ownership to timelock signer PDA and accepts ownership |
 
 ### TransferOwnershipAdapter Interface
 

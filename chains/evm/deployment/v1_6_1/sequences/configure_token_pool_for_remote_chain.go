@@ -13,10 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -65,13 +66,23 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
+		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       input.TokenPoolAddress,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
+		}
+
 		outboundConfig, inboundConfig := tokens.GenerateTPRLConfigs(
 			input.RemoteChainConfig.OutboundRateLimiterConfig,
 			input.RemoteChainConfig.InboundRateLimiterConfig,
 			localDecimalsReport.Output,
 			input.RemoteChainConfig.RemoteDecimals,
 			chain.Family(),
-			semver.MustParse("1.6.1"),
+			tvReport.Output.Version,
+			tvReport.Output.Type.String(),
 		)
 
 		// If the chain is supported
