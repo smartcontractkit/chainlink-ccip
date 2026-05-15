@@ -71,6 +71,11 @@ type chainCache struct {
 	sourceChainMu            sync.RWMutex
 	staticSourceChainConfigs map[cciptypes.ChainSelector]StaticSourceChainConfig
 	sourceChainRefresh       time.Time // Single timestamp for all source chain configs
+	// attemptedSourceChains tracks which source chains have been included in at least one
+	// fetch attempt. Chains in this set that are NOT in staticSourceChainConfigs were either
+	// unconfigured on-chain or had an RPC error, either way, re-fetching inline on every
+	// call creates a doom-loop of redundant RPC calls and error log spam.
+	attemptedSourceChains map[cciptypes.ChainSelector]struct{}
 }
 
 // newConfigPollerV2 creates a new instance of configPollerV2 with improved batch fetching capabilities.
@@ -297,16 +302,19 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 		staticSourceChainConfig, exists := destChainCache.staticSourceChainConfigs[chain]
 		if exists {
 			cachedSourceConfigs[chain] = staticSourceChainConfig
-		} else {
-			// This chain isn't in cache yet
+		} else if _, attempted := destChainCache.attemptedSourceChains[chain]; !attempted {
+			// Only treat as missing if we haven't attempted to fetch this chain before.
+			// Chains that were attempted but not returned are either unconfigured on-chain
+			// or had an RPC error. Re-fetching inline on every call creates a doom-loop
+			// of redundant RPC calls and error log spam. The background poller will retry.
 			missingChains = append(missingChains, chain)
 		}
 	}
 
-	// If all chains are in cache, return them immediately
+	// If all chains are in cache or already attempted, return immediately
 	if len(missingChains) == 0 {
 		destChainCache.sourceChainMu.RUnlock()
-		c.lggr.Debugw("All source chain configs found in cache",
+		c.lggr.Debugw("All source chain configs found in cache or already attempted",
 			"destChain", c.destChainSelector,
 			"sourceChains", filteredSourceChains)
 		return cachedSourceConfigs, nil
@@ -354,6 +362,7 @@ func (c *configPollerV2) getOrCreateChainCache(chainSel cciptypes.ChainSelector)
 
 	cache := &chainCache{
 		staticSourceChainConfigs: make(map[cciptypes.ChainSelector]StaticSourceChainConfig),
+		attemptedSourceChains:    make(map[cciptypes.ChainSelector]struct{}),
 	}
 	c.chainCaches[chainSel] = cache
 	return cache
@@ -446,14 +455,21 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	cache.chainConfigMu.Unlock()
 
 	// Acquire StaticSourceChainConfigs lock and update
-	if fetchingForDestChain && len(sourceChainConfigs) > 0 {
+	if fetchingForDestChain {
 		cache.sourceChainMu.Lock()
 		for chain, cfg := range sourceChainConfigs {
 			cache.staticSourceChainConfigs[chain] = staticSourceChainConfigFromSourceChainConfig(cfg)
 		}
+		// Record all source chains that were included in this fetch attempt.
+		// Chains that were attempted but not returned (due to RPC errors or being
+		// unconfigured on-chain) won't trigger inline re-fetches — the background
+		// poller will retry them on its own schedule.
+		for _, chain := range sourceChainSelectors {
+			cache.attemptedSourceChains[chain] = struct{}{}
+		}
 		cache.sourceChainRefresh = time.Now()
 		cache.sourceChainMu.Unlock()
-	} else if !fetchingForDestChain && len(sourceChainConfigs) > 0 {
+	} else if len(sourceChainConfigs) > 0 {
 		c.lggr.Errorw("OffRamp SourceChainConfigs were returned when fetching configs from a source chain, "+
 			"this is not expected",
 			"destChainSelector", c.destChainSelector,
