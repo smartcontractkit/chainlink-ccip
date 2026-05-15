@@ -173,7 +173,7 @@ func NewPromReporter(
 		sequenceNumbers:        promSequenceNumbers,
 		commitLatestRound:      promCommitLatestRoundID,
 		looppProviderSupported: promLooppCCIPProviderSupported,
-		configDigestMismatch:  promCommitConfigDigestMismatch,
+		configDigestMismatch:   promCommitConfigDigestMismatch,
 
 		processorLatencyHistogram: promProcessorLatencyHistogram,
 		processorOutputCounter:    promProcessorOutputCounter,
