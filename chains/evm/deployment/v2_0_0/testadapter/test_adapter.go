@@ -32,8 +32,8 @@ import (
 )
 
 func init() {
-	testadapters.GetTestAdapterRegistry().RegisterForkCCIPSendTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMForkCCIPSendTestAdapter)
-	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMTestAdapterForFamily)
+	testadapters.GetTestAdapterRegistry().RegisterForkCCIPSendTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("2.0.0"), NewEVMForkCCIPSendTestAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilyEVM, semver.MustParse("2.0.0"), NewEVMTestAdapterForFamily)
 }
 
 type EVMAdapter struct {
@@ -114,23 +114,6 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if !ok {
 		return 0, messageID, errors.New("expected router.ClientEVM2AnyMessage")
 	}
-	// case chainsel.FamilyTon:
-	// 	receiverAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
-	// 		ChainSelector: dest,
-	// 		Type:          datastore.ContractType("Receiver"),
-	// 	}, dest, datastore_utils.FullRef)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to get TonReceiver address: %w", err)
-	// 	}
-	// 	tonreceiver, err := address.ParseAddr(receiverAddr.Address)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to parse TON receiver address: %w", err)
-	// 	}
-	// 	ac := codec.NewAddressCodec()
-	// 	receiver, err = ac.AddressStringToBytes(tonreceiver.String())
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to convert TON address to bytes: %w", err)
-	// 	}
 
 	const errCodeInsufficientFee = "0x07da6ee6"
 	const cannotDecodeErrorReason = "could not decode error reason"
