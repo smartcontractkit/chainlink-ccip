@@ -30,12 +30,13 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-			var result sequences.OnChainOutput
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
+			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
+			addrs := input.ExistingDataStore.Addresses().Filter()
 			b.Logger.Info("SVM Registering token:", input)
 
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
@@ -47,7 +48,6 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
 
 			// if no token admin provided, ccip admin becomes the admin
 			var tokenAdmin solana.PublicKey
@@ -55,31 +55,75 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				tokenAdmin = solana.MustPublicKeyFromBase58(input.ExternalAdmin)
 			}
 
+			var result sequences.OnChainOutput
 			rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
 				Router:            solana.PublicKeyFromBytes(routerAddr),
 				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
 				Admin:             tokenAdmin,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
+				ExistingAddresses: addrs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
 			}
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
 			pendingSigner := rtarOut.Output.PendingSigner
 
-			// accept if we can
-			atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
-				Router:            solana.PublicKeyFromBytes(routerAddr),
-				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
-				Admin:             pendingSigner,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
+			timelockSigner := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			deployerPK := chain.DeployerKey.PublicKey()
+			routerPK := solana.PublicKeyFromBytes(routerAddr)
+
+			// If the proposed token admin is timelock or the deployer, then we can run Register + Accept
+			// in this sequence, but we need to be careful when orchestrating both of these operations as
+			// MCMS batch ops DON'T execute immediately. If the Register op creates any MCMS batches that
+			// modify the TAR, then reading the live on-chain state of the TAR in the Accept op will lead
+			// to bugs since it is operating on an incomplete snapshot. The switch statement below should
+			// account for this case and cover the non-batch case as well.
+			hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
+			isTimelockPendingAdmin := pendingSigner == timelockSigner
+			isDeployerPendingAdmin := pendingSigner == deployerPK
+			switch {
+			// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
+			// no proposal - in this case either timelock or the deployer can immediately run the Accept
+			// op since there aren't any proposal instructions that need to be batched together with it.
+			case !hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
+				atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+					ExistingAddresses: addrs,
+					TokenMint:         tokenMintPK,
+					Router:            routerPK,
+					Admin:             pendingSigner,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
+				}
+				result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+				result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
+
+			// Case 2: the RegisterTokenAdminRegistry operation has MCMS batches and the proposed admin
+			// is timelock - in this case we bundle Register and Accept into the same MCMS batch.
+			case hasMCMSProposal && isTimelockPendingAdmin:
+				atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+				}
+				batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
+				batchOps, err := utils.BuildMCMSBatchOperation(
+					chain.Selector,
+					batchIxn,
+					routerPK.String(),
+					routerops.ContractType.String(),
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
+				}
+				result.BatchOps = append(result.BatchOps, batchOps)
+
+			// Case 3: skip Accept only do Register
+			default:
+				b.Logger.Infof("Deferring token admin role acceptance to proposed admin (%s)", pendingSigner)
+				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
 			}
-			result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
 
 			b.Logger.Info("SVM Setting token pool:", input)
 

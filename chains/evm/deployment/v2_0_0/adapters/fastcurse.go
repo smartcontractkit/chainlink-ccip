@@ -135,8 +135,9 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMN address cached for chain %d", chain.Selector)
 			}
 			seqOutput, err := cldf_ops.ExecuteSequence(b, rmnsequences.RmnCurse, chain, rmnsequences.SeqCurseInput{
-				RMNAddress: rmnAddr,
-				Subjects:   in.Subjects,
+				ChainSelector: chain.Selector,
+				RMNAddress:    rmnAddr,
+				Subjects:      in.Subjects,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to curse subjects on chain %d: %w", chain.Selector, err)
@@ -161,8 +162,9 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMN address cached for chain %d", chain.Selector)
 			}
 			seqOutput, err := cldf_ops.ExecuteSequence(b, rmnsequences.RmnUncurse, chain, rmnsequences.SeqUncurseInput{
-				RMNAddress: rmnAddr,
-				Subjects:   in.Subjects,
+				ChainSelector: chain.Selector,
+				RMNAddress:    rmnAddr,
+				Subjects:      in.Subjects,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse subjects on chain %d: %w", chain.Selector, err)

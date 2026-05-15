@@ -531,6 +531,276 @@ func TestTokenExpansion(t *testing.T) {
 	}
 }
 
+// TestTokenExpansion_RouterRefReconcile exercises the existing-pool reconcile
+// branch in the v2.0.0 EVM token adapter: re-running TokenExpansion against an
+// already-deployed pool with a RouterRef flips the pool's dynamic-config router
+// (e.g. from production Router to TestRouter), and a subsequent run with the
+// same RouterRef is a no-op (the on-chain router stays put).
+func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSel}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	mcmsRegistry := changesets.GetRegistry()
+	ds := datastore.NewMemoryDataStore()
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSel,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+		Cfg: v2_0_0.DeployChainContractsCfg{
+			ChainSel:         chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			Params:           testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+			DeployTestRouter: true,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Merge(deployChainOut.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	// Resolve both routers up-front so we can assert against their addresses.
+	prodRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "production Router should be in datastore after DeployChainContracts")
+
+	testRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.TestRouterContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "TestRouter should be in datastore when DeployTestRouter=true")
+	require.NotEqual(t, prodRouter, testRouter, "TestRouter and Router must differ for this test to be meaningful")
+
+	deployer := e.BlockChains.EVMChains()[chainSel].DeployerKey.From
+	evmChain := e.BlockChains.EVMChains()[chainSel]
+
+	const symbol = "RTRT"
+	maxSupply := uint64(1_000_000)
+	preMint := uint64(0)
+
+	// 1. Fresh deploy via TokenExpansion (no reconcile opts).
+	type reconcileOpts struct {
+		routerRef     *datastore.AddressRef
+		feeAggregator string
+	}
+	expansion := func(opts reconcileOpts, deploy bool) tokens.TokenExpansionInputPerChain {
+		in := tokens.TokenExpansionInputPerChain{
+			TokenPoolVersion:      burn_mint_token_pool.Version,
+			SkipOwnershipTransfer: true,
+			DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+				PoolType:           string(burn_mint_token_pool.ContractType),
+				TokenPoolQualifier: symbol,
+				RouterRef:          opts.routerRef,
+				FeeAggregator:      opts.feeAggregator,
+				// On reconcile runs (no DeployTokenInput), TokenExpansion still
+				// needs a TokenRef to merge against. Point at the v1.0.0
+				// burn-mint-drip token deployed on the first run.
+				TokenRef: &datastore.AddressRef{
+					Type:      datastore.ContractType(bnm_drip_v1_0.ContractType),
+					Qualifier: symbol,
+				},
+			},
+		}
+		if deploy {
+			in.DeployTokenInput = &tokens.DeployTokenInput{
+				Name:          "Router Reconcile Token",
+				Symbol:        symbol,
+				Decimals:      18,
+				Supply:        &maxSupply,
+				PreMint:       &preMint,
+				ExternalAdmin: deployer.Hex(),
+				CCIPAdmin:     deployer.Hex(),
+				Type:          bnm_drip_v1_0.ContractType,
+			}
+		}
+		return in
+	}
+	apply := func(t *testing.T, opts reconcileOpts, deploy bool, label string) {
+		t.Helper()
+		out, err := tokens.TokenExpansion().Apply(*e, tokens.TokenExpansionInput{
+			ChainAdapterVersion: semver.MustParse("2.0.0"),
+			MCMS:                mcms.Input{},
+			TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+				chainSel: expansion(opts, deploy),
+			},
+		})
+		require.NoError(t, err, "%s should succeed", label)
+		require.NoError(t, ds.Merge(out.DataStore.Seal()))
+		e.DataStore = ds.Seal()
+		e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
+	}
+
+	apply(t, reconcileOpts{}, true, "fresh TokenExpansion (no reconcile opts)")
+
+	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
+		Version:       burn_mint_token_pool.Version,
+		Qualifier:     symbol,
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	readDynamicConfig := func(t *testing.T) token_pool.GetDynamicConfigResult {
+		t.Helper()
+		report, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       poolAddr,
+		})
+		require.NoError(t, err)
+		return report.Output
+	}
+
+	cfg := readDynamicConfig(t)
+	require.Equal(t, prodRouter, cfg.Router, "fresh deploy should point at the production Router")
+	require.Equal(t, common.Address{}, cfg.FeeAdmin, "fresh deploy should leave feeAdmin unset")
+
+	// 2. Reconcile RouterRef → TestRouter. FeeAdmin should stay at its zero
+	//    value because we didn't supply a FeeAggregator.
+	testRouterRef := &datastore.AddressRef{Type: datastore.ContractType(router.TestRouterContractType)}
+	apply(t, reconcileOpts{routerRef: testRouterRef}, false, "reconcile RouterRef=TestRouter")
+
+	cfg = readDynamicConfig(t)
+	require.Equal(t, testRouter, cfg.Router, "router should flip to TestRouter")
+	require.Equal(t, common.Address{}, cfg.FeeAdmin, "feeAdmin should remain unchanged when FeeAggregator not provided")
+
+	// 3. Reconcile FeeAggregator without RouterRef. Router must stay on
+	//    TestRouter (proves fields reconcile independently), feeAdmin flips.
+	feeAggAddr := common.HexToAddress("0x000000000000000000000000000000000000fEEE")
+	apply(t, reconcileOpts{feeAggregator: feeAggAddr.Hex()}, false, "reconcile FeeAggregator only")
+
+	cfg = readDynamicConfig(t)
+	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter when only FeeAggregator is reconciled")
+	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should be set to provided FeeAggregator")
+
+	// 4. Idempotent re-run with both fields. ConfigureTokenPool detects no
+	//    diff and skips the setDynamicConfig write; on-chain state unchanged.
+	apply(t, reconcileOpts{routerRef: testRouterRef, feeAggregator: feeAggAddr.Hex()}, false, "idempotent reconcile")
+
+	cfg = readDynamicConfig(t)
+	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter after idempotent reconcile")
+	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should remain set after idempotent reconcile")
+}
+
+// TestTokenExpansion_FreshDeployWithRouterRef covers the fresh-deploy
+// constructor path: when DeployTokenPoolInput.RouterRef points at TestRouter,
+// the pool is deployed wired to TestRouter (not the production Router).
+// Complements TestTokenExpansion_RouterRefReconcile, which exercises the
+// existing-pool reconcile path.
+func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSel}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	mcmsRegistry := changesets.GetRegistry()
+	ds := datastore.NewMemoryDataStore()
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSel,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+		Cfg: v2_0_0.DeployChainContractsCfg{
+			ChainSel:         chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			Params:           testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+			DeployTestRouter: true,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Merge(deployChainOut.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	prodRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.ContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	testRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(router.TestRouterContractType),
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+	require.NotEqual(t, prodRouter, testRouter)
+
+	deployer := e.BlockChains.EVMChains()[chainSel].DeployerKey.From
+	evmChain := e.BlockChains.EVMChains()[chainSel]
+
+	const symbol = "FRTR"
+	maxSupply := uint64(1_000_000)
+	preMint := uint64(0)
+
+	out, err := tokens.TokenExpansion().Apply(*e, tokens.TokenExpansionInput{
+		ChainAdapterVersion: semver.MustParse("2.0.0"),
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+			chainSel: {
+				TokenPoolVersion:      burn_mint_token_pool.Version,
+				SkipOwnershipTransfer: true,
+				DeployTokenInput: &tokens.DeployTokenInput{
+					Name:          "Fresh Router Token",
+					Symbol:        symbol,
+					Decimals:      18,
+					Supply:        &maxSupply,
+					PreMint:       &preMint,
+					ExternalAdmin: deployer.Hex(),
+					CCIPAdmin:     deployer.Hex(),
+					Type:          bnm_drip_v1_0.ContractType,
+				},
+				DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+					PoolType:           string(burn_mint_token_pool.ContractType),
+					TokenPoolQualifier: symbol,
+					// Drive RouterRef on the fresh-deploy path so the resolved
+					// TestRouter address flows into the pool constructor.
+					RouterRef: &datastore.AddressRef{Type: datastore.ContractType(router.TestRouterContractType)},
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "fresh TokenExpansion with RouterRef=TestRouter should succeed")
+	require.NoError(t, ds.Merge(out.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
+
+	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
+		Version:       burn_mint_token_pool.Version,
+		Qualifier:     symbol,
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
+		ChainSelector: chainSel,
+		Address:       poolAddr,
+	})
+	require.NoError(t, err)
+	require.Equal(t, testRouter, cfgReport.Output.Router, "freshly-deployed pool should be wired to TestRouter when RouterRef points at it")
+}
+
 // TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens verifies that when TokenExpansion
 // is called to deploy only the pool for an existing burn/mint token, burn/mint roles are correctly
 // granted to the pool. This is the production pattern and a regression test for token ref types
