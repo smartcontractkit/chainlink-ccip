@@ -17,6 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/message_hasher"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+
 	op_router "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -25,12 +29,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 func TestInit_RegistersForkCCIPSendAndFamilyAdapters(t *testing.T) {
@@ -103,6 +104,11 @@ type laneContracts struct {
 	addresses                 []datastore.AddressRef
 }
 
+// evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
+var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
+
+func boolPtr(v bool) *bool { return &v }
+
 func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_evm.Chain, chainSelector uint64) laneContracts {
 	t.Helper()
 
@@ -142,7 +148,9 @@ func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_e
 		case datastore.ContractType(committee_verifier.ContractType):
 			out.committeeVerifier = addr.Address
 		case datastore.ContractType(sequences.ExecutorProxyType):
-			out.executor = addr.Address
+			if addr.Qualifier == "default" {
+				out.executor = addr.Address
+			}
 		case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 			out.committeeVerifierResolver = addr.Address
 		}
@@ -159,39 +167,67 @@ func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_e
 	return out
 }
 
-func makeLaneDefinition(selector, remoteSelector uint64, contracts laneContracts) *lanes.ChainDefinition {
-	return &lanes.ChainDefinition{
-		Selector:             selector,
-		Router:               common.HexToAddress(contracts.router).Bytes(),
-		OnRamp:               common.HexToAddress(contracts.onRamp).Bytes(),
-		FeeQuoter:            common.HexToAddress(contracts.feeQuoter).Bytes(),
-		OffRamp:              common.HexToAddress(contracts.offRamp).Bytes(),
-		AddressBytesLength:   20,
-		BaseExecutionGasCost: 80_000,
-		CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+func buildConfigureChainForLanesInput(
+	local laneContracts,
+	localSelector uint64,
+	remote laneContracts,
+	remoteSelector uint64,
+) changesetadapters.ConfigureChainForLanesInput {
+	return changesetadapters.ConfigureChainForLanesInput{
+		ChainSelector: localSelector,
+		Router:        common.HexToAddress(local.router).Bytes(),
+		OnRamp:        common.HexToAddress(local.onRamp).Bytes(),
+		FeeQuoter:     common.HexToAddress(local.feeQuoter).Bytes(),
+		OffRamp:       common.HexToAddress(local.offRamp).Bytes(),
+		CommitteeVerifiers: []changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
 				CommitteeVerifier: []datastore.AddressRef{
 					{
-						Address: contracts.committeeVerifier,
+						Address: local.committeeVerifier,
 						Type:    datastore.ContractType(committee_verifier.ContractType),
 						Version: committee_verifier.Version,
 					},
 					{
-						Address: contracts.committeeVerifierResolver,
+						Address: local.committeeVerifierResolver,
 						Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-						Version: committee_verifier.Version,
+						Version: semver.MustParse("2.0.0"),
 					},
 				},
-				RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-					remoteSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+				RemoteChains: map[uint64]changesetadapters.CommitteeVerifierRemoteChainConfig{
+					remoteSelector: testsetup.AdapterCommitteeVerifierRemoteChainConfig(),
 				},
 			},
 		},
-		DefaultInboundCCVs:       []datastore.AddressRef{{Address: contracts.committeeVerifier}},
-		DefaultOutboundCCVs:      []datastore.AddressRef{{Address: contracts.committeeVerifier}},
-		DefaultExecutor:          datastore.AddressRef{Address: contracts.executor},
-		FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
-		ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
+			remoteSelector: {
+				AllowTrafficFrom:    boolPtr(true),
+				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
+				DefaultExecutor:     local.executor,
+				DefaultInboundCCVs:  []string{local.committeeVerifier},
+				DefaultOutboundCCVs: []string{local.committeeVerifier},
+				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
+					IsEnabled:                   true,
+					MaxDataBytes:                30_000,
+					MaxPerMsgGasLimit:           3_000_000,
+					DestGasOverhead:             300_000,
+					DefaultTokenFeeUSDCents:     25,
+					DestGasPerPayloadByteBase:   16,
+					DefaultTokenDestGasOverhead: 90_000,
+					DefaultTxGasLimit:           200_000,
+					NetworkFeeUSDCents:          10,
+					ChainFamilySelector:         evmFamilySelector,
+					LinkFeeMultiplierPercent:    90,
+					USDPerUnitGas:               big.NewInt(20_000_000_000_000),
+				},
+				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
+					USDCentsFee: 50,
+					Enabled:     true,
+				},
+				AddressBytesLength:   20,
+				BaseExecutionGasCost: 80_000,
+			},
+		},
 	}
 }
 
@@ -210,28 +246,22 @@ func TestEVMForkCCIPSendAdapter_SendMessageAfterLaneConfiguration(t *testing.T) 
 	sourceContracts := deployLaneContracts(t, env, sourceChain, sourceSelector)
 	destContracts := deployLaneContracts(t, env, destChain, destSelector)
 
-	sourceDef := makeLaneDefinition(sourceSelector, destSelector, sourceContracts)
-	destDef := makeLaneDefinition(destSelector, sourceSelector, destContracts)
+	sourceInput := buildConfigureChainForLanesInput(sourceContracts, sourceSelector, destContracts, destSelector)
+	destInput := buildConfigureChainForLanesInput(destContracts, destSelector, sourceContracts, sourceSelector)
 
 	_, err = operations.ExecuteSequence(
 		testsetup.BundleWithFreshReporter(env.OperationsBundle),
-		sequences.ConfigureLaneLegAsSource,
+		sequences.ConfigureChainForLanes,
 		env.BlockChains,
-		lanes.UpdateLanesInput{
-			Source: sourceDef,
-			Dest:   destDef,
-		},
+		sourceInput,
 	)
 	require.NoError(t, err)
 
 	_, err = operations.ExecuteSequence(
 		testsetup.BundleWithFreshReporter(env.OperationsBundle),
-		sequences.ConfigureLaneLegAsDest,
+		sequences.ConfigureChainForLanes,
 		env.BlockChains,
-		lanes.UpdateLanesInput{
-			Source: destDef,
-			Dest:   sourceDef,
-		},
+		destInput,
 	)
 	require.NoError(t, err)
 
