@@ -92,6 +92,10 @@ var (
 		Name: "ccip_commit_loopp_ccip_provider_supported",
 		Help: "Tracks whether LOOPP CCIP provider is supported for each chain family (1 = supported, 0 = not supported)",
 	}, []string{"chain_family"})
+	promCommitConfigDigestMismatch = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ccip_commit_config_digest_mismatch",
+		Help: "Reports whether the home chain config digest differs from the offramp config digest (1 = mismatch, 0 = match)",
+	}, []string{"chainFamily", "chainID"})
 )
 
 type PromReporter struct {
@@ -116,6 +120,9 @@ type PromReporter struct {
 	bhSequenceNumbers           metric.Int64Gauge
 	bhCommitLatestRound         metric.Int64Gauge
 	bhLooppProviderSupported    metric.Int64Gauge
+
+	configDigestMismatch   *prometheus.GaugeVec
+	bhConfigDigestMismatch metric.Int64Gauge
 }
 
 func NewPromReporter(
@@ -149,6 +156,10 @@ func NewPromReporter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_loopp_ccip_provider_supported gauge: %w", err)
 	}
+	configDigestMismatch, err := bhClient.Meter.Int64Gauge("ccip_commit_config_digest_mismatch")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_config_digest_mismatch gauge: %w", err)
+	}
 
 	return &PromReporter{
 		lggr:        lggr,
@@ -161,8 +172,7 @@ func NewPromReporter(
 
 		sequenceNumbers:        promSequenceNumbers,
 		commitLatestRound:      promCommitLatestRoundID,
-		looppProviderSupported: promLooppCCIPProviderSupported,
-
+		looppProviderSupported: promLooppCCIPProviderSupported, configDigestMismatch: promCommitConfigDigestMismatch,
 		processorLatencyHistogram: promProcessorLatencyHistogram,
 		processorOutputCounter:    promProcessorOutputCounter,
 		processorErrors:           promProcessorErrors,
@@ -173,6 +183,7 @@ func NewPromReporter(
 		bhSequenceNumbers:           sequenceNumbers,
 		bhCommitLatestRound:         commitLatestRoundID,
 		bhLooppProviderSupported:    looppProviderSupported,
+		bhConfigDigestMismatch:      configDigestMismatch,
 	}, nil
 }
 
@@ -339,4 +350,16 @@ func (p *PromReporter) TrackLooppProviderSupported(looppCCIPProviderSupported ma
 			attribute.String("chain_family", chainFamily),
 		))
 	}
+}
+
+func (p *PromReporter) TrackConfigDigestMismatch(mismatch bool) {
+	var value float64
+	if mismatch {
+		value = 1
+	}
+	p.configDigestMismatch.WithLabelValues(p.chainFamily, p.chainID).Set(value)
+	p.bhConfigDigestMismatch.Record(context.Background(), int64(value), metric.WithAttributes(
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+	))
 }

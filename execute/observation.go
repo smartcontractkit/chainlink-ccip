@@ -1,9 +1,7 @@
 package execute
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -19,6 +17,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
@@ -55,6 +54,17 @@ func (p *Plugin) Observation(
 		return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 	lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+
+	// Check config digest every round and emit a mismatch metric.
+	// Both home chain and offramp config digest reads are cached, safe to call every round.
+	configMatch, _, configDigestErr := plugincommon.ConfigDigestsMatch(
+		ctx, p.ccipReader, consts.PluginTypeExecute, p.reportingCfg.ConfigDigest,
+	)
+	if configDigestErr != nil {
+		lggr.Errorw("failed to check config digest", "err", configDigestErr)
+	} else {
+		p.observer.TrackConfigDigestMismatch(!configMatch)
+	}
 
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
 	if previousOutcome.State == exectypes.Filter {
@@ -544,15 +554,17 @@ func (p *Plugin) getFilterObservation(
 }
 
 func (p *Plugin) checkConfigDigest(ctx context.Context) error {
-	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
+	match, offRampDigest, err := plugincommon.ConfigDigestsMatch(
+		ctx, p.ccipReader, consts.PluginTypeExecute, p.reportingCfg.ConfigDigest,
+	)
 	if err != nil {
-		return fmt.Errorf("get offramp config digest: %w", err)
+		return err
 	}
 
-	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+	if !match {
 		p.lggr.Warnw("home chain config digest doesn't match offramp's config digest, not starting",
 			"homeChainConfigDigest", p.reportingCfg.ConfigDigest,
-			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+			"offRampConfigDigest", plugincommon.FormatConfigDigest(offRampDigest),
 		)
 		return errOffRampConfigMismatch
 	}

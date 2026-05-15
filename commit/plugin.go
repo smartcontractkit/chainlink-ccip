@@ -291,6 +291,16 @@ func (p *Plugin) Observation(
 		return encoded, nil
 	}
 
+	// Check config digest every round and emit a mismatch metric.
+	configMatch, _, configDigestErr := plugincommon.ConfigDigestsMatch(
+		ctx, p.ccipReader, consts.PluginTypeCommit, p.reportingCfg.ConfigDigest,
+	)
+	if configDigestErr != nil {
+		lggr.Errorw("failed to check config digest", "err", configDigestErr)
+	} else {
+		p.metricsReporter.TrackConfigDigestMismatch(!configMatch)
+	}
+
 	prevOutcome, err := p.ocrTypeCodec.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
