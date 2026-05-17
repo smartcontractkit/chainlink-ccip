@@ -87,18 +87,10 @@ var evmDeployCommitteeVerifier = cldf_ops.NewSequence(
 				fmt.Errorf("EVM DeployCommitteeVerifier failed: %w", err)
 		}
 
-		out := ccvdeploymentadapters.DeployCommitteeVerifierOutput{
+		return ccvdeploymentadapters.DeployCommitteeVerifierOutput{
 			Addresses: report.Output.Addresses,
 			BatchOps:  report.Output.BatchOps,
-		}
-		if !input.DeployerKeyOwned {
-			// Ownership transfer is not yet wired through this chain-agnostic
-			// flow. Surface every deployed contract so a future caller can
-			// build the transfer step, mirroring how the full DeployChainContracts
-			// sequence enumerates ownableContracts.
-			out.RefsToTransferOwnership = report.Output.Addresses
-		}
-		return out, nil
+		}, nil
 	},
 )
 
