@@ -3,18 +3,20 @@ package token_pool
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -27,7 +29,6 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 
 type ConfigureTokenPoolForRemoteChainInput struct {
 	TokenPoolAddress    common.Address
-	TokenPoolVersion    *semver.Version
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
@@ -69,7 +70,6 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
 					TokenPoolAddress:    tokenPool.Address(),
-					TokenPoolVersion:    input.TokenPoolVersion,
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
 				},
@@ -92,6 +92,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	tpops.Version,
 	"Configures a token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
+		if err := input.RemoteChainConfig.Validate(); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid remote chain config for remote chain selector %d: %w", input.RemoteChainSelector, err)
+		}
+
 		// Below, we read onchain state directly from the contract binding. We intentionally
 		// avoid the use of ExecuteOperation because it could return stale onchain data from
 		// the operations reports cache if this sequence is called as part of a broader, and
@@ -110,14 +114,83 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
 		}
 
-		inputORL, inputIRL := tokensapi.GenerateTPRLConfigs(
-			input.RemoteChainConfig.OutboundRateLimiterConfig,
-			input.RemoteChainConfig.InboundRateLimiterConfig,
-			localDecimals,
-			input.RemoteChainConfig.RemoteDecimals,
-			chain.Family(),
-			input.TokenPoolVersion,
-		)
+		// A pool's type and version is immutable so we can safely use ExecuteOperation here
+		// without worrying about stale data from the cache.
+		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       input.TokenPoolAddress,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
+		}
+
+		// Get outbound and inbound rate limits from the input
+		outboundRL, outboundOk := input.RemoteChainConfig.GetOutboundRateLimitBuckets().DefaultBucket()
+		inboundRL, inboundOk := input.RemoteChainConfig.GetInboundRateLimitBuckets().DefaultBucket()
+
+		// Resolve the outbound and inbound rate limits
+		var inputORL, inputIRL tokensapi.RateLimiterConfig
+		switch {
+		case outboundOk && inboundOk:
+			// If the user explicitly provided both the outbound and inbound rate limits, then
+			// we use them.
+			inputORL, inputIRL = tokensapi.GenerateTPRLConfigs(
+				outboundRL.RateLimit,
+				inboundRL.RateLimit,
+				localDecimals,
+				input.RemoteChainConfig.RemoteDecimals,
+				chain.Family(),
+				tvReport.Output.Version,
+				tvReport.Output.Type.String(),
+			)
+
+		case !outboundOk && !inboundOk:
+			if slices.Contains(sc, input.RemoteChainSelector) {
+				// Idempotent behavior: if we're re-calling this sequence and no rate limits are
+				// specified, then we re-use whatever is currently onchain to avoid accidentally
+				// overwriting existing onchain config
+				onchainOutboundBucket, err := tp.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get outbound rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
+				}
+				onchainInboundBucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
+				}
+				inputORL = tokensapi.RateLimiterConfig{
+					IsEnabled: onchainOutboundBucket.IsEnabled,
+					Capacity:  onchainOutboundBucket.Capacity,
+					Rate:      onchainOutboundBucket.Rate,
+				}
+				inputIRL = tokensapi.RateLimiterConfig{
+					IsEnabled: onchainInboundBucket.IsEnabled,
+					Capacity:  onchainInboundBucket.Capacity,
+					Rate:      onchainInboundBucket.Rate,
+				}
+			} else {
+				// If this is a fresh configuration for a remote chain (i.e. the remote chain selector
+				// is not currently supported onchain), and no rate limits are specified in the input,
+				// then we default to disabled rate limiters.
+				inputORL = tokensapi.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+				inputIRL = tokensapi.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+			}
+
+		default:
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"default outbound and inbound rate limits must both be specified together or both omitted for remote chain %d",
+				input.RemoteChainSelector,
+			)
+		}
+
+		// NOTE: EVM v1.5.1 pools have slightly different rate limit validation rules than v1.6.1+ pools.
+		// See: https://basescan.org/address/0x5192Bd10f28A0206211CcBB66671118f85c2E539#code#F12#L119
+		if inputORL.IsEnabled && inputORL.Capacity.Cmp(big.NewInt(0)) == 0 && inputORL.Rate.Cmp(big.NewInt(0)) == 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf("outbound rate limiter config is enabled but rate and capacity are both zero")
+		}
+		if inputIRL.IsEnabled && inputIRL.Capacity.Cmp(big.NewInt(0)) == 0 && inputIRL.Rate.Cmp(big.NewInt(0)) == 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf("inbound rate limiter config is enabled but rate and capacity are both zero")
+		}
 
 		// Token pool remote chain configuration can vary depending on whether the remote
 		// pool is or isn't supported. The different cases to consider are recorded below

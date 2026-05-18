@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -21,20 +22,89 @@ type TPRLInput struct {
 	MCMS    mcms.Input            `yaml:"mcms,omitempty" json:"mcms"`
 }
 
+type RateLimitConfig struct {
+	RateLimit    RateLimiterConfigFloatInput `yaml:"rateLimit" json:"rateLimit"`
+	FastFinality bool                        `yaml:"fastFinality" json:"fastFinality"`
+}
+
+// RemoteOutbounds holds the outbound rate limit configuration for a given remote chain. RateLimit is a
+// backwards-compatible alias for the default bucket (FastFinality = false); Outbounds carries explicit
+// per-bucket rows.
+//
+// Fast-finality buckets (Outbounds entries with FastFinality = true) target CCIP v2; pre-v2 adapters
+// ignore those rows for legacy TPRL writes (they only touch default-lane scalars).
 type RemoteOutbounds struct {
-	// RateLimit is the rate limiter config. For CCIP v2.0, there are two types of rate limits: custom and default.
-	// Originally, this struct had two separate fields (one for each rate limit type), which isn't ideal because:
-	// ---
-	//   1. Only one of these rate limits is ever active at a time depending on the value of `allowedFinality`
-	//   2. It forces the user to configure more than they actually need on-chain leading to higher risk of misconfiguration
-	//   3. The user is forced to provide both rate limits up front; failure to provide one of them will lead to the unspecified one being reset by mistake
-	// ---
-	// For v2.0, it is possible to avoid these hazards entirely by collapsing both fields into one. With one
-	// rate limit config, we simply need to read the allowedFinalityConfig from the chain and if it is zero,
-	// then we update the default rate limit; otherwise we update the custom rate limit. This not only makes
-	// the operation safer and easier to run, but also reduces the mental overhead involved in keeping track
-	// of different rate limit semantics between versions v1.5, v1.6, and v2.0.
-	RateLimit RateLimiterConfigFloatInput `yaml:"rateLimit" json:"rateLimit"`
+	// RateLimit is the backwards compatible alias for the default rate limit bucket. This field has
+	// lower precedence than Outbounds: when resolving the default bucket, Outbounds will be checked
+	// first for any entry with FastFinality = false. If such an entry exists then it'll be used for
+	// the default bucket, otherwise this field will be used when non-nil.
+	RateLimit *RateLimiterConfigFloatInput `yaml:"rateLimit" json:"rateLimit"`
+
+	// Outbounds is the primary source of truth for outbound rate limit configuration and can be used
+	// for all token pool versions. The slice should only contain up to two entries (one per finality
+	// flag). Pre-v2 adapters ignore fast-finality rows and only apply default buckets if they exist.
+	Outbounds []RateLimitConfig `yaml:"outbounds" json:"outbounds"`
+}
+
+// DefaultBucket gets the default lane (FastFinality = false) RateLimitConfig from Outbounds
+// falling back to the legacy RateLimit alias if no such Outbounds entry exists. The boolean
+// return indicates whether a bucket was found.
+func (ro RemoteOutbounds) DefaultBucket() (RateLimitConfig, bool) {
+	return ro.BucketForFinality(false)
+}
+
+// FastFinalityBucket gets the fast-finality lane (FastFinality = true) RateLimitConfig from
+// Outbounds. The boolean return indicates whether a bucket was found. This is only relevant
+// for CCIP v2 adapters.
+func (ro RemoteOutbounds) FastFinalityBucket() (RateLimitConfig, bool) {
+	return ro.BucketForFinality(true)
+}
+
+// BucketForFinality fetches the outbound rate limit bucket for the given FastFinality setting.
+// Callers should prefer [RemoteOutbounds.DefaultBucket] / [RemoteOutbounds.FastFinalityBucket]
+// at fixed call sites; this method is useful when the lane is parameterized (e.g. in tests).
+func (ro RemoteOutbounds) BucketForFinality(fastFinality bool) (RateLimitConfig, bool) {
+	for _, ob := range ro.Outbounds {
+		if ob.FastFinality == fastFinality {
+			return ob, true
+		}
+	}
+	if !fastFinality && ro.RateLimit != nil {
+		return RateLimitConfig{RateLimit: *ro.RateLimit, FastFinality: false}, true
+	}
+	return RateLimitConfig{}, false
+}
+
+// Validate checks structural rules on operator input: validates the legacy RateLimit alias when set, at most
+// two Outbounds buckets, and at most one per FastFinality value—aligned with TPRL verify preconditions.
+func (ro RemoteOutbounds) Validate() error {
+	if ro.RateLimit != nil {
+		if err := ro.RateLimit.Validate(); err != nil {
+			return fmt.Errorf("rate limit alias: %w", err)
+		}
+	}
+	if len(ro.Outbounds) > 2 {
+		return fmt.Errorf("at most two rate limit buckets allowed")
+	}
+
+	defaultCount, fastFinCount := 0, 0
+	for _, rl := range ro.Outbounds {
+		if err := rl.RateLimit.Validate(); err != nil {
+			return fmt.Errorf("rate limit bucket: %w", err)
+		}
+		if rl.FastFinality {
+			fastFinCount++
+		} else {
+			defaultCount++
+		}
+	}
+	if defaultCount > 1 {
+		return fmt.Errorf("multiple rate limit buckets with fastFinality=false")
+	}
+	if fastFinCount > 1 {
+		return fmt.Errorf("multiple rate limit buckets with fastFinality=true")
+	}
+	return nil
 }
 
 type TPRLConfig struct {
@@ -44,6 +114,13 @@ type TPRLConfig struct {
 	AllowedFinalityConfig    finality.Config            `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	RemoteOutbounds          map[uint64]RemoteOutbounds `yaml:"remoteOutbounds" json:"remoteOutbounds"`
 	SkipIfMissingPermissions bool                       `yaml:"skipIfMissingPermissions" json:"skipIfMissingPermissions"`
+}
+
+// TPRLRateLimitBucket is one outbound/inbound pair after scaling for a given TokenPool fastFinality bucket.
+type TPRLRateLimitBucket struct {
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	FastFinality              bool
 }
 
 type TPRLRemotes struct {
@@ -56,6 +133,11 @@ type TPRLRemotes struct {
 	TokenPoolRef              datastore.AddressRef
 	ExistingDataStore         datastore.DataStore
 
+	// RateLimitBuckets carries built TPRL buckets (default and optional fast-finality). CCIP v2 adapters apply
+	// all entries. Pre-v2 EVM pool adapters apply default-lane outbound/inbound scalars only when a default RL
+	// bucket exists otherwise a warning is emitted (fast-finality-only inputs are ignored).
+	RateLimitBuckets []TPRLRateLimitBucket
+
 	// If true, the changeset will check if timelock or the deployer key has sufficient permissions to set rate limits
 	// on the token pool. If both accounts are missing permissions (i.e. not the pool owner or rate limit admin), then
 	// a warning will be logged and the changeset will NOT perform the rate limit update since it has a high chance of
@@ -65,6 +147,17 @@ type TPRLRemotes struct {
 	SkipIfMissingPermissions bool
 }
 
+// GetBucketForFinality gets the TPRLRateLimitBucket for the given finality flag.
+// Returns a boolean indicating whether a bucket was found for that finality flag.
+func (r TPRLRemotes) GetBucketForFinality(fastFinality bool) (TPRLRateLimitBucket, bool) {
+	for _, b := range r.RateLimitBuckets {
+		if b.FastFinality == fastFinality {
+			return b, true
+		}
+	}
+	return TPRLRateLimitBucket{}, false
+}
+
 // SetTokenPoolRateLimits returns a changeset that sets rate limits for token pools on multiple chains.
 func SetTokenPoolRateLimits() cldf.ChangeSetV2[TPRLInput] {
 	return cldf.CreateChangeSet(setTokenPoolRateLimitsApply(), setTokenPoolRateLimitsVerify())
@@ -72,15 +165,44 @@ func SetTokenPoolRateLimits() cldf.ChangeSetV2[TPRLInput] {
 
 func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
-		for _, config := range cfg.Configs {
-			for remoteSelector, input := range config.RemoteOutbounds {
-				if input.RateLimit.IsEnabled {
-					if input.RateLimit.Capacity <= 0 || input.RateLimit.Rate <= 0 {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
-					}
-					if input.RateLimit.Rate > input.RateLimit.Capacity {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d has rate greater than capacity", remoteSelector)
-					}
+		for localSelector, config := range cfg.Configs {
+			for remoteSelector, localOutbound := range config.RemoteOutbounds {
+				// Counterpart must exist
+				remote, ok := cfg.Configs[remoteSelector]
+				if !ok {
+					return fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
+				}
+				remoteOutbound, ok := remote.RemoteOutbounds[localSelector]
+				if !ok {
+					return fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", remoteSelector, localSelector)
+				}
+
+				// Rate limit must be valid on both sides
+				if err := remoteOutbound.Validate(); err != nil {
+					return fmt.Errorf("outbound rate limiter config from chain %d toward %d: %w", remoteSelector, localSelector, err)
+				}
+				if err := localOutbound.Validate(); err != nil {
+					return fmt.Errorf("outbound rate limiter config for remote chain %d: %w", remoteSelector, err)
+				}
+
+				// Fast-finality rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
+				_, remoteFastFinalityRateLimitExists := remoteOutbound.FastFinalityBucket()
+				_, localFastFinalityRateLimitExists := localOutbound.FastFinalityBucket()
+				if localFastFinalityRateLimitExists != remoteFastFinalityRateLimitExists {
+					return fmt.Errorf(
+						"both local and remote buckets must be provided for fastFinality=true or neither can be provided for chain selector %d and remote selector %d",
+						localSelector, remoteSelector,
+					)
+				}
+
+				// Default rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
+				_, remoteDefaultRateLimitExists := remoteOutbound.DefaultBucket()
+				_, localDefaultRateLimitExists := localOutbound.DefaultBucket()
+				if localDefaultRateLimitExists != remoteDefaultRateLimitExists {
+					return fmt.Errorf(
+						"both local and remote buckets must be provided for fastFinality=false or neither can be provided for chain selector %d and remote selector %d",
+						localSelector, remoteSelector,
+					)
 				}
 			}
 		}
@@ -181,7 +303,21 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", remoteSelector, err)
 				}
-				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs.RateLimit, remoteInputs.RateLimit, decimals, remoteDecimals, family, tokenPool.Version)
+
+				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig, tprlRemote.RateLimitBuckets, err = buildTPRLRemotesForSetRateLimitsLane(
+					family,
+					tokenPool,
+					selector,
+					decimals,
+					inputs,
+					remoteSelector,
+					remoteDecimals,
+					remoteInputs,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate TPRL configs for chain selector %d and remote selector %d: %w", selector, remoteSelector, err)
+				}
+
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {
@@ -197,6 +333,71 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+// buildTPRLRemotesForSetRateLimitsLane constructs the TPRL rate limiter configs for both outbound and
+// inbound directions for a given local-remote chain pair based on user input. It validates that both
+// sides of the lane are configured correctly (i.e. both must specify a bucket for a given finality flag,
+// or neither can specify a bucket for that finality flag) and returns an error if not. It also returns
+// a slice of TPRLRateLimitBucket which includes one entry per configured lane (default and optional
+// fast-finality) with the outbound/inbound configs already scaled and converted to big.Int.
+func buildTPRLRemotesForSetRateLimitsLane(
+	chainFamily string,
+	tokenPoolRef datastore.AddressRef,
+	localSelector uint64,
+	localDecimals uint8,
+	localOutbounds RemoteOutbounds,
+	remoteSelector uint64,
+	remoteDecimals uint8,
+	remoteOutbounds RemoteOutbounds,
+) (RateLimiterConfig, RateLimiterConfig, []TPRLRateLimitBucket, error) {
+	buckets := []TPRLRateLimitBucket{}
+
+	remoteFastFinalityBucket, remoteFastFinalityExists := remoteOutbounds.FastFinalityBucket()
+	localFastFinalityBucket, localFastFinalityExists := localOutbounds.FastFinalityBucket()
+	if localFastFinalityExists != remoteFastFinalityExists {
+		return RateLimiterConfig{}, RateLimiterConfig{}, nil, fmt.Errorf(
+			"both local and remote buckets must be provided for fastFinality=true or neither can be provided for chain selector %d and remote selector %d",
+			localSelector, remoteSelector,
+		)
+	}
+
+	remoteDefaultBucket, remoteDefaultExists := remoteOutbounds.DefaultBucket()
+	localDefaultBucket, localDefaultExists := localOutbounds.DefaultBucket()
+	if localDefaultExists != remoteDefaultExists {
+		return RateLimiterConfig{}, RateLimiterConfig{}, nil, fmt.Errorf(
+			"both local and remote buckets must be provided for fastFinality=false or neither can be provided for chain selector %d and remote selector %d",
+			localSelector, remoteSelector,
+		)
+	}
+
+	var fastFinalityOutboundRL, fastFinalityInboundRL RateLimiterConfig
+	if localFastFinalityExists && remoteFastFinalityExists {
+		fastFinalityOutboundRL, fastFinalityInboundRL = GenerateTPRLConfigs(
+			localFastFinalityBucket.RateLimit, remoteFastFinalityBucket.RateLimit, localDecimals, remoteDecimals,
+			chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
+		)
+		buckets = append(buckets, TPRLRateLimitBucket{
+			FastFinality:              true,
+			OutboundRateLimiterConfig: fastFinalityOutboundRL,
+			InboundRateLimiterConfig:  fastFinalityInboundRL,
+		})
+	}
+
+	var defaultOutboundRL, defaultInboundRL RateLimiterConfig
+	if localDefaultExists && remoteDefaultExists {
+		defaultOutboundRL, defaultInboundRL = GenerateTPRLConfigs(
+			localDefaultBucket.RateLimit, remoteDefaultBucket.RateLimit, localDecimals, remoteDecimals,
+			chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
+		)
+		buckets = append(buckets, TPRLRateLimitBucket{
+			FastFinality:              false,
+			OutboundRateLimiterConfig: defaultOutboundRL,
+			InboundRateLimiterConfig:  defaultInboundRL,
+		})
+	}
+
+	return defaultOutboundRL, defaultInboundRL, buckets, nil
 }
 
 // AI generated code below
@@ -248,10 +449,11 @@ func ScaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.
 func GenerateTPRLConfigs(
 	outboundInput RateLimiterConfigFloatInput,
 	inboundInput RateLimiterConfigFloatInput,
-	decimals uint8,
+	localDecimals uint8,
 	remoteDecimals uint8,
 	chainFamily string,
-	tokenPoolVersion *semver.Version,
+	poolVersion *semver.Version,
+	poolType string,
 ) (RateLimiterConfig, RateLimiterConfig) {
 	outboundConfig := RateLimiterConfig{}
 	inboundConfig := RateLimiterConfig{}
@@ -263,8 +465,8 @@ func GenerateTPRLConfigs(
 		// We scale the rate limiter configs by the token decimals to convert from
 		// human-readable token amounts to the on-chain representation
 		outboundConfig.IsEnabled = true
-		outboundConfig.Capacity = ScaleFloatToBigInt(outboundInput.Capacity, int(decimals), 0)
-		outboundConfig.Rate = ScaleFloatToBigInt(outboundInput.Rate, int(decimals), 0)
+		outboundConfig.Capacity = ScaleFloatToBigInt(outboundInput.Capacity, int(localDecimals), 0)
+		outboundConfig.Rate = ScaleFloatToBigInt(outboundInput.Rate, int(localDecimals), 0)
 	}
 
 	if !inboundInput.IsEnabled {
@@ -273,13 +475,23 @@ func GenerateTPRLConfigs(
 		inboundConfig.Rate = big.NewInt(0)
 	} else {
 		// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
-		scaleByDecimals := decimals
+		scaleByDecimals := localDecimals
+
 		// https://github.com/smartcontractkit/chainlink-deployments/blob/cce886554ca0587492955784381321ce817fb6bb/domains/ccip/shared/tokendefaults.go#L1904
-		// Only old EVM pools need to scale by remote deciamls on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
+		// Only old EVM pools need to scale by remote decimals on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
 		// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
 		// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
-		if chainFamily == chain_selectors.FamilyEVM && tokenPoolVersion.LessThan(semver.MustParse("1.6.1")) {
-			scaleByDecimals = remoteDecimals
+		if chainFamily == chain_selectors.FamilyEVM && poolVersion.LessThan(utils.Version_1_6_1) {
+			// These custom contracts actually scale by local decimals:
+			//   BurnMintWithExternalMinterTokenPool: https://explorer.plume.org/address/0x770318D51052871DeF5Eb5c452F4fd28B7960C4e?tab=contract
+			//   HybridWithExternalMinterTokenPool: https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code
+			isBurnMintWithExternalMinterTokenPool := poolType == utils.BurnMintWithExternalMinterTokenPool.String()
+			isHybridWithExternalMinterTokenPool := poolType == utils.HybridWithExternalMinterTokenPool.String()
+			if poolVersion.Equal(utils.Version_1_6_0) && (isBurnMintWithExternalMinterTokenPool || isHybridWithExternalMinterTokenPool) {
+				scaleByDecimals = localDecimals
+			} else {
+				scaleByDecimals = remoteDecimals
+			}
 		}
 		inboundConfig.IsEnabled = true
 		inboundConfig.Capacity = ScaleFloatToBigInt(inboundInput.Capacity, int(scaleByDecimals), .10)

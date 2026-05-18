@@ -14,6 +14,7 @@ import (
 	evm_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	tpV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -108,7 +109,13 @@ func (p *poolOpsV161) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolA
 	return owner, rlAdmin, nil
 }
 
-func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error) {
+func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error) {
+	bucket, ok := input.GetBucketForFinality(false)
+	if !ok {
+		b.Logger.Warnf("skipping rate limiter config for token pool (%s) on chain %d since no default bucket was provided", datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector)
+		return nil, nil
+	}
+
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
 		evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
@@ -116,22 +123,22 @@ func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 			Address:       poolAddr,
 			Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
 				OutboundConfig: tpOpsV1_6_1.Config{
-					IsEnabled: outbound.IsEnabled,
-					Capacity:  outbound.Capacity,
-					Rate:      outbound.Rate,
+					IsEnabled: bucket.OutboundRateLimiterConfig.IsEnabled,
+					Capacity:  bucket.OutboundRateLimiterConfig.Capacity,
+					Rate:      bucket.OutboundRateLimiterConfig.Rate,
 				},
 				InboundConfig: tpOpsV1_6_1.Config{
-					IsEnabled: inbound.IsEnabled,
-					Capacity:  inbound.Capacity,
-					Rate:      inbound.Rate,
+					IsEnabled: bucket.InboundRateLimiterConfig.IsEnabled,
+					Capacity:  bucket.InboundRateLimiterConfig.Capacity,
+					Rate:      bucket.InboundRateLimiterConfig.Rate,
 				},
-				RemoteChainSelector: remoteChainSelector,
+				RemoteChainSelector: input.RemoteChainSelector,
 			},
 		})
 	if err != nil {
-		return evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.6.1: %w", err)
+		return nil, fmt.Errorf("SetChainRateLimiterConfig v1.6.1: %w", err)
 	}
-	return report.Output, nil
+	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
 func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {

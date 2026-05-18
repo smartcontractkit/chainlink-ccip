@@ -540,6 +540,7 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	EVMTransferOwnership(t, env, evmChainSelC)
 
 	// Define a full pool mesh between all EVM chains
+	disabledOutboundRL := tokens.RateLimiterConfigFloatInput{IsEnabled: false}
 	tokenExpansionInput := map[uint64]tokens.TokenExpansionInputPerChain{
 		evmChainSelA: {
 			TokenPoolVersion: utils.Version_2_0_0,
@@ -556,8 +557,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelB: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
-					evmChainSelC: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelB: {OutboundRateLimiterConfig: &disabledOutboundRL},
+					evmChainSelC: {OutboundRateLimiterConfig: &disabledOutboundRL},
 				},
 			},
 		},
@@ -576,8 +577,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelA: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
-					evmChainSelC: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelA: {OutboundRateLimiterConfig: &disabledOutboundRL},
+					evmChainSelC: {OutboundRateLimiterConfig: &disabledOutboundRL},
 				},
 			},
 		},
@@ -596,8 +597,8 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 			},
 			TokenTransferConfig: &tokens.TokenTransferConfig{
 				RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					evmChainSelA: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
-					evmChainSelB: {OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false}},
+					evmChainSelA: {OutboundRateLimiterConfig: &disabledOutboundRL},
+					evmChainSelB: {OutboundRateLimiterConfig: &disabledOutboundRL},
 				},
 			},
 		},

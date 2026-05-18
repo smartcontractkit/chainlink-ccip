@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
+	execmetrics "github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
@@ -58,6 +59,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		ocrTypeCodec:         ocrTypeCodec,
 		inflightMessageCache: cache.NewInflightMessageCache(10 * time.Minute),
 		ccipReader:           ccipReaderMock,
+		observer:             &execmetrics.Noop{},
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			OracleID:     commontypes.OracleID(1),
 			ConfigDigest: configDigest,
