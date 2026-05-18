@@ -98,7 +98,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     bytes4,
     bytes calldata tokenArgs,
     uint256
-  ) external {
+  ) public virtual {
     _validateCaller();
     checkAllowList(lockOrBurnIn.originalSender);
 
@@ -118,7 +118,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256,
     bytes4
-  ) external {
+  ) public virtual {
     _validateCaller();
 
     IPolicyEngine policyEngine = s_policyEngine;
@@ -141,7 +141,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @param sender The address to check.
   function checkAllowList(
     address sender
-  ) public view {
+  ) public view virtual {
     if (i_allowlistEnabled) {
       if (!s_allowlist.contains(sender)) {
         revert SenderNotAllowed(sender);
@@ -151,13 +151,13 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
 
   /// @notice Gets whether the allowlist functionality is enabled.
   /// @return true is enabled, false if not.
-  function getAllowListEnabled() external view returns (bool) {
+  function getAllowListEnabled() public view virtual returns (bool) {
     return i_allowlistEnabled;
   }
 
   /// @notice Gets the allowed addresses.
   /// @return The allowed addresses.
-  function getAllowList() external view returns (address[] memory) {
+  function getAllowList() public view virtual returns (address[] memory) {
     return s_allowlist.values();
   }
 
@@ -167,7 +167,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   function applyAllowListUpdates(
     address[] calldata removes,
     address[] calldata adds
-  ) external onlyOwner {
+  ) public virtual onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
@@ -177,7 +177,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   function _applyAllowListUpdates(
     address[] memory removes,
     address[] memory adds
-  ) internal {
+  ) internal virtual {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {
@@ -206,13 +206,13 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @return The CCV configuration containing outbound, threshold outbound, inbound, and threshold inbound CCVs.
   function getCCVConfig(
     uint64 remoteChainSelector
-  ) external view returns (CCVConfig memory) {
+  ) public view virtual returns (CCVConfig memory) {
     return s_verifierConfig[remoteChainSelector];
   }
 
   /// @notice Returns all CCV configurations across every configured remote chain selector.
   /// @return The array of CCVConfigArg structs, one per configured chain selector.
-  function getAllCCVConfigs() external view returns (CCVConfigArg[] memory) {
+  function getAllCCVConfigs() public view virtual returns (CCVConfigArg[] memory) {
     uint256 length = s_configuredChainSelectors.length();
     CCVConfigArg[] memory configs = new CCVConfigArg[](length);
 
@@ -238,7 +238,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @param ccvConfigArgs The CCV configuration updates to apply.
   function applyCCVConfigUpdates(
     CCVConfigArg[] calldata ccvConfigArgs
-  ) external onlyOwner {
+  ) public virtual onlyOwner {
     for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
       uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
       address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
@@ -312,7 +312,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     bytes4,
     bytes calldata,
     IPoolV2.MessageDirection direction
-  ) external view returns (address[] memory requiredCCVs) {
+  ) public view virtual returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[remoteChainSelector];
     if (direction == IPoolV2.MessageDirection.Inbound) {
       return _resolveRequiredCCVs(config.inboundCCVs, config.thresholdInboundCCVs, amount);
@@ -322,7 +322,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
 
   /// @notice Gets the threshold amount above which additional CCVs are required.
   /// @return The threshold amount.
-  function getThresholdAmount() external view returns (uint256) {
+  function getThresholdAmount() public view virtual returns (uint256) {
     return s_thresholdAmountForAdditionalCCVs;
   }
 
@@ -330,7 +330,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @param thresholdAmount The new threshold amount.
   function setThresholdAmount(
     uint256 thresholdAmount
-  ) external onlyOwner {
+  ) public virtual onlyOwner {
     s_thresholdAmountForAdditionalCCVs = thresholdAmount;
 
     emit ThresholdAmountSet(thresholdAmount);
@@ -340,7 +340,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     address[] memory baseCCVs,
     address[] storage requiredCCVsAboveThresholdStorage,
     uint256 amount
-  ) internal view returns (address[] memory requiredCCVs) {
+  ) internal view virtual returns (address[] memory requiredCCVs) {
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
     if (thresholdAmount != 0 && amount >= thresholdAmount) {
@@ -369,7 +369,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @param newPolicyEngine The address of the new policy engine.
   function setPolicyEngine(
     address newPolicyEngine
-  ) external onlyOwner {
+  ) public virtual onlyOwner {
     _setPolicyEngine(newPolicyEngine, false);
   }
 
@@ -378,7 +378,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @param newPolicyEngine The address of the new policy engine.
   function setPolicyEngineAllowFailedDetach(
     address newPolicyEngine
-  ) external onlyOwner {
+  ) public virtual onlyOwner {
     _setPolicyEngine(newPolicyEngine, true);
   }
 
@@ -388,7 +388,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   function _setPolicyEngine(
     address newPolicyEngine,
     bool allowFailedDetach
-  ) internal {
+  ) internal virtual {
     address oldPolicyEngine = address(s_policyEngine);
 
     if (newPolicyEngine == oldPolicyEngine) {
@@ -416,7 +416,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
 
   /// @notice Gets the current policy engine address.
   /// @return The address of the policy engine.
-  function getPolicyEngine() external view returns (address) {
+  function getPolicyEngine() public view virtual returns (address) {
     return address(s_policyEngine);
   }
 }

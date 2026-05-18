@@ -291,6 +291,9 @@ func (p *Plugin) Observation(
 		return encoded, nil
 	}
 
+	// Check config digest every round and emit a mismatch metric.
+	p.trackConfigDigestMismatch(ctx, lggr)
+
 	prevOutcome, err := p.ocrTypeCodec.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
@@ -410,6 +413,21 @@ func (p *Plugin) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelector]i
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
+}
+
+func (p *Plugin) trackConfigDigestMismatch(ctx context.Context, lggr logger.Logger) {
+	configMatch, _, err := plugincommon.ConfigDigestsMatch(
+		ctx, p.ccipReader, consts.PluginTypeCommit, p.reportingCfg.ConfigDigest,
+	)
+	if err != nil {
+		lggr.Errorw("failed to check for config digest mismatch",
+			"err", err,
+			"homeChainConfigDigest", p.reportingCfg.ConfigDigest,
+			"pluginType", consts.PluginTypeCommit,
+		)
+		return
+	}
+	p.metricsReporter.TrackConfigDigestMismatch(!configMatch)
 }
 
 //nolint:gocyclo
