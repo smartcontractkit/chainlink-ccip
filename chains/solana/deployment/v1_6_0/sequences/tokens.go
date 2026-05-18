@@ -319,13 +319,17 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			/// Initialize Token Pool ///
 			/////////////////////////////
 
-			tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
-			}
+			skipPoolInit := input.SVMExtraArgs != nil && input.SVMExtraArgs.SkipTokenPoolInit
+			if !skipPoolInit {
+				tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+				}
+				tokenPool, err := solana.PublicKeyFromBase58(tokenPoolRef.Address)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token pool address '%s' as a Solana public key: %w", tokenPoolRef.Address, err)
+				}
 
-			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
-			if input.SVMExtraArgs == nil || !input.SVMExtraArgs.SkipTokenPoolInit {
 				initTPOp := tokenpoolops.InitializeBurnMint
 				transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 				switch tokenPoolRef.Type.String() {
@@ -366,15 +370,20 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 			}
+
 			/////////////////////////////
 			/// Create Token Multisig ///
 			/////////////////////////////
 
 			if needTokenMultisig {
+				tokenPool, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, utils.ToAddress)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+				}
+
 				// The multisig will be used as the mint authority (or owner) depending on the pool flow.
 				// We include the TokenPoolSigner PDA as one of the multisig signers so the Token Pool Program
 				// can "sign" via PDA seeds when it needs to act (PDA signing).
-
 				poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
 				signers := make([]solana.PublicKey, 0, 1+len(input.SVMExtraArgs.CustomerMintAuthorities))
 				signers = append(signers, poolSigner)
