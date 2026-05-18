@@ -92,6 +92,8 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		{
 			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
+			deps.ccipReader.EXPECT().GetOffRampConfigDigest(mock.Anything, mock.AnythingOfType("uint8")).
+				Return([32]byte{}, nil).Maybe()
 		}
 
 		// Source Chain Expectations - Makes sure only oracles that support specific source chains are reading them.
@@ -209,6 +211,8 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 		{
 			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
+			deps.ccipReader.EXPECT().GetOffRampConfigDigest(mock.Anything, mock.AnythingOfType("uint8")).
+				Return([32]byte{}, nil).Maybe()
 		}
 
 		// Source Chain Expectations - Makes sure only oracles that support specific source chains are reading them.
@@ -372,6 +376,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 					}, addresses)
 					return nil
 				})
+			deps.ccipReader.EXPECT().GetOffRampConfigDigest(mock.Anything, mock.AnythingOfType("uint8")).
+				Return([32]byte{}, nil).Maybe()
 		}
 
 		p := s.newRoleDonTestPlugin(oracleID, true)

@@ -19,6 +19,7 @@ type Reporter interface {
 	TrackLatency(state exectypes.PluginState, method plugincommon.MethodType, latency time.Duration, err error)
 	TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable)
 	TrackProcessorLatency(processor string, method plugincommon.MethodType, latency time.Duration, err error)
+	TrackConfigDigestMismatch(mismatch bool)
 }
 
 type Noop struct{}
@@ -32,6 +33,8 @@ func (n *Noop) TrackLatency(exectypes.PluginState, plugincommon.MethodType, time
 func (n *Noop) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
 
 func (n *Noop) TrackProcessorLatency(string, plugincommon.MethodType, time.Duration, error) {}
+
+func (n *Noop) TrackConfigDigestMismatch(bool) {}
 
 var _ Reporter = &Noop{}
 var _ Reporter = &PromReporter{}
