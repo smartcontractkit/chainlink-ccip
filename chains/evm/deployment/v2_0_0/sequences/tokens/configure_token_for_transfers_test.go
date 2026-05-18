@@ -134,15 +134,10 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NoError(t, err, "Failed to get allowed finality config")
 		require.Equal(t, input.AllowedFinalityConfig.Raw(), allowedFinalityConfig, "Allowed finality config should match input")
 
-		// Since AllowedFinalityConfig is non-zero (BlockDepth: 12), rate limits should be applied to the custom finality bucket.
-		// Note: applyChainUpdates also sets rate limits in the DEFAULT bucket (this is expected on-chain behavior).
-		// The key verification is that the CUSTOM bucket has the configured rate limits when AllowedFinalityConfig is set.
-
-		// Verify configuration for first remote chain in custom finality bucket (fastFinality=true)
-		checkRemoteChainConfiguration(t, tp, remoteChainSel1, input.RemoteChains[remoteChainSel1], true)
-
-		// Verify configuration for second remote chain in custom finality bucket (fastFinality=true)
-		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2], true)
+		// Scalar RemoteChainConfig rate limits reconcile to the default (FastFinality=false) TPRL bucket.
+		// AllowedFinalityConfig on the pool is orthogonal: it does not choose which bucket these floats populate.
+		checkRemoteChainConfiguration(t, tp, remoteChainSel1, input.RemoteChains[remoteChainSel1], false)
+		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2], false)
 
 		// Verify token registration in token admin registry
 		tokenConfigReport, err := operations.ExecuteOperation(
@@ -260,14 +255,14 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 const testTokenDecimals = 18
 
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool.
-// The fastFinality parameter determines which rate limiter bucket to check (true=custom, false=default).
-// Rate/capacity are in token units in config; on-chain values are scaled by 10^decimals (inbound also by 1.1x).
 func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string], fastFinality bool) {
 	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, fastFinality)
 	require.NoError(t, err, "Failed to get rate limiter state")
 
 	// Check inbound rate limiter (scaled by 10^decimals and 1.1x)
 	inboundRateLimiter := rateLimiterStates.InboundRateLimiterState
+	require.NotNil(t, config.InboundRateLimiterConfig)
+	require.NotNil(t, config.OutboundRateLimiterConfig)
 	require.Equal(t, config.InboundRateLimiterConfig.IsEnabled, inboundRateLimiter.IsEnabled, "Inbound rate limiter enabled state should match")
 	expectedInboundRate := tokens_core.ScaleFloatToBigInt(config.InboundRateLimiterConfig.Rate, testTokenDecimals, 0.10)
 	expectedInboundCapacity := tokens_core.ScaleFloatToBigInt(config.InboundRateLimiterConfig.Capacity, testTokenDecimals, 0.10)

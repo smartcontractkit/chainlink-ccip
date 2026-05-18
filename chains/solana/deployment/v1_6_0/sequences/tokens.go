@@ -148,6 +148,10 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
+				if err := remoteChainConfig.Validate(); err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("remote chain config for chain selector %d is invalid: %w", remoteChainSelector, err)
+				}
+
 				op := tokenpoolops.UpsertRemoteChainConfigBurnMint
 				tprl := tokenpoolops.UpsertRateLimitsBurnMint
 				switch input.PoolType {
@@ -173,35 +177,53 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert remote chain config for token pool: %w", err)
 				}
-				localDecimals, err := utils.GetTokenDecimals(chain, tokenMint)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
-				}
-				obRL, ibRL := tokenapi.GenerateTPRLConfigs(
-					remoteChainConfig.OutboundRateLimiterConfig,
-					remoteChainConfig.InboundRateLimiterConfig,
-					localDecimals,
-					remoteChainConfig.RemoteDecimals,
-					chain.Family(),
-					common_utils.Version_1_6_0,
-					input.PoolType,
-				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
-				rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
-					tokenpoolops.RemoteChainConfig{
-						TokenPool:                 tpAddr,
-						TokenMint:                 tokenMint,
-						TokenProgramID:            tokenProgramId,
-						RemoteSelector:            remoteChainSelector,
-						InboundRateLimiterConfig:  ibRL,
-						OutboundRateLimiterConfig: obRL,
-					})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+
+				outboundRL, outboundOk := remoteChainConfig.GetOutboundRateLimitBuckets().DefaultBucket()
+				inboundRL, inboundOk := remoteChainConfig.GetInboundRateLimitBuckets().DefaultBucket()
+				switch {
+				case outboundOk && inboundOk:
+					localDecimals, err := utils.GetTokenDecimals(chain, tokenMint)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
+					}
+					obRL, ibRL := tokenapi.GenerateTPRLConfigs(
+						outboundRL.RateLimit,
+						inboundRL.RateLimit,
+						localDecimals,
+						remoteChainConfig.RemoteDecimals,
+						chain.Family(),
+						common_utils.Version_1_6_0,
+						input.PoolType,
+					)
+					rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
+						tokenpoolops.RemoteChainConfig{
+							TokenPool:                 tpAddr,
+							TokenMint:                 tokenMint,
+							TokenProgramID:            tokenProgramId,
+							RemoteSelector:            remoteChainSelector,
+							InboundRateLimiterConfig:  ibRL,
+							OutboundRateLimiterConfig: obRL,
+						})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+					}
+					result.Addresses = append(result.Addresses, rateLimitOut.Output.Addresses...)
+					result.BatchOps = append(result.BatchOps, rateLimitOut.Output.BatchOps...)
+
+				case !outboundOk && !inboundOk:
+					b.Logger.Warnf(
+						"ConfigureTokenForTransfers: skipping rate limit upsert for remote chain %d since no default bucket was provided",
+						remoteChainSelector,
+					)
+
+				default:
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"default outbound and inbound rate limits must both be specified together or both omitted for remote chain %d",
+						remoteChainSelector,
+					)
 				}
-				result.Addresses = append(result.Addresses, rateLimitOut.Output.Addresses...)
-				result.BatchOps = append(result.BatchOps, rateLimitOut.Output.BatchOps...)
 			}
 			return result, nil
 		})
@@ -454,6 +476,12 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			chain := chains.SolanaChains()[input.ChainSelector]
 
+			rl, ok := input.GetBucketForFinality(false)
+			if !ok {
+				b.Logger.Warnf("skipping rate limiter config for token pool (%s) on chain %d since no default bucket was provided", datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector)
+				return sequences.OnChainOutput{}, nil
+			}
+
 			op := tokenpoolops.UpsertRateLimitsBurnMint
 			switch input.TokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
@@ -476,8 +504,8 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 					TokenMint:                 tokenMint,
 					TokenProgramID:            tokenProgramId,
 					RemoteSelector:            input.RemoteChainSelector,
-					InboundRateLimiterConfig:  input.InboundRateLimiterConfig,
-					OutboundRateLimiterConfig: input.OutboundRateLimiterConfig,
+					InboundRateLimiterConfig:  rl.InboundRateLimiterConfig,
+					OutboundRateLimiterConfig: rl.OutboundRateLimiterConfig,
 				})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)

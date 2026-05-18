@@ -62,8 +62,8 @@ var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
 				TokenTransferFeeConfig:    remoteChainConfig.TokenTransferFeeConfig,
 				RemoteToken:               remoteToken,
 				RemotePool:                remotePool,
-				InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
-				OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
+				InboundRateLimiterConfig:  &remoteChainConfig.InboundRateLimiterConfig,
+				OutboundRateLimiterConfig: &remoteChainConfig.OutboundRateLimiterConfig,
 			}
 		}
 

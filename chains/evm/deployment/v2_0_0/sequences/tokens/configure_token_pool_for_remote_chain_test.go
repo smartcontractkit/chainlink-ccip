@@ -71,6 +71,8 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	currentRateLimiterState, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get current rate limiter state from token pool")
 	inboundRateLimiterReport := currentRateLimiterState.InboundRateLimiterState
+	require.NotNil(t, input.RemoteChainConfig.InboundRateLimiterConfig)
+	require.NotNil(t, input.RemoteChainConfig.OutboundRateLimiterConfig)
 	require.Equal(t, input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled, inboundRateLimiterReport.IsEnabled, "Inbound rate limiter enabled state should match")
 	expectedInboundRate := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.InboundRateLimiterConfig.Rate, decimals, 0.10)
 	expectedInboundCapacity := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.InboundRateLimiterConfig.Capacity, decimals, 0.10)
@@ -409,7 +411,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	)
 	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain (1.6.1) should not error")
 
-	// Configure pool A (2.0.0) for remote with RegistryAddress and TokenAddress set but rate limits NOT provided (disabled) — should import from pool B
+	// Configure pool A (2.0.0) for remote with RegistryAddress and TokenAddress set but rate limits NOT provided (nil) — should import from pool B
 	upgradeInput := tokens.ConfigureTokenPoolForRemoteChainInput{
 		ChainSelector:               chainSel,
 		TokenPoolAddress:            poolAAddress,
@@ -421,8 +423,8 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken:                     common.LeftPadBytes(common.FromHex("0x123"), 32),
 			RemotePool:                      common.LeftPadBytes(common.FromHex("0x456"), 32),
-			OutboundRateLimiterConfig:       tokens_core.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-			InboundRateLimiterConfig:        tokens_core.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+			OutboundRateLimiterConfig:       nil, // import configs
+			InboundRateLimiterConfig:        nil, // import configs
 			OutboundCCVs:                    []string{"0x789"},
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
@@ -595,8 +597,8 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 			RemoteToken:                     remoteToken,
 			RemotePool:                      remotePool,
 			RemoteDecimals:                  remoteDecimals,
-			OutboundRateLimiterConfig:       tokens_core.RateLimiterConfigFloatInput{IsEnabled: false},
-			InboundRateLimiterConfig:        tokens_core.RateLimiterConfigFloatInput{IsEnabled: false},
+			OutboundRateLimiterConfig:       nil, // import configs
+			InboundRateLimiterConfig:        nil, // import configs
 			OutboundCCVs:                    []string{"0x789"},
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
@@ -625,10 +627,13 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 	requireScaledRateLimiterMatch(t, legacyOutbound.Rate, legacyOutbound.Capacity, newState.OutboundRateLimiterState.Rate, newState.OutboundRateLimiterState.Capacity, "Outbound raw import")
 }
 
-// TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits verifies that the sequence correctly reads
-// allowedFinalityConfig from the pool and applies rate limit updates to the appropriate bucket:
-// - When allowedFinalityConfig is zero (default finality), updates go to the default finality bucket.
-// - When allowedFinalityConfig is non-zero (custom finality), updates go to the custom finality bucket.
+// TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits verifies ConfigureTokenPoolForRemoteChain TPRL behavior
+// around AllowedFinalityConfig and scalar rate-limit fields:
+//   - Legacy scalar InboundRateLimiterConfig / OutboundRateLimiterConfig map to the default (FastFinality=false)
+//     bucket when the sequence applies TPRL, regardless of AllowedFinalityConfig on the pool.
+//   - Changing AllowedFinalityConfig alone does not populate or migrate rate limits into the fast-finality bucket.
+//   - Second-pass scalar updates still update the default bucket only; adding paired FF slices in a subsequent pass
+//     enables and sets the fast-finality bucket via SetRateLimitConfig.
 func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	remoteChainSel := uint64(4949039107694359620)
@@ -680,7 +685,7 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	require.NoError(t, err, "First pass ConfigureTokenPoolForRemoteChain should not error")
 
 	// ========================================
-	// Step 2: Verify default finality bucket has rate limits, custom bucket is empty
+	// Step 2: Verify default finality bucket has rate limits, fast-finality bucket is empty
 	// ========================================
 	const decimals = 18
 	defaultState1, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
@@ -737,7 +742,7 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	require.False(t, customState2.OutboundRateLimiterState.IsEnabled, "Step 4: Custom outbound rate limiter should still NOT be enabled")
 
 	// ========================================
-	// Step 5: Update rate limits with new values (should now go to custom finality bucket)
+	// Step 5: Second pass with updated scalar rate limits (still applied to the default FastFinality=false bucket)
 	// ========================================
 	secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 	secondPassInput.RemoteChainAlreadySupported = true
@@ -753,27 +758,65 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	require.NoError(t, err, "Second pass ConfigureTokenPoolForRemoteChain should not error")
 
 	// ========================================
-	// Step 6: Verify default bucket UNCHANGED, custom bucket NOW SET with new values
+	// Step 6: Default bucket reflects updated scalars; fast-finality bucket stays unset without explicit FF slices
 	// ========================================
 	defaultState3, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get default finality rate limiter state after second pass")
 	require.True(t, defaultState3.InboundRateLimiterState.IsEnabled, "Step 6: Default inbound rate limiter should still be enabled")
 	require.True(t, defaultState3.OutboundRateLimiterState.IsEnabled, "Step 6: Default outbound rate limiter should still be enabled")
-	requireScaledRateLimiterMatch(t, expectedInboundRate, expectedInboundCapacity, defaultState3.InboundRateLimiterState.Rate, defaultState3.InboundRateLimiterState.Capacity, "Step 6 Default Inbound (unchanged)")
-	requireScaledRateLimiterMatch(t, expectedOutboundRate, expectedOutboundCapacity, defaultState3.OutboundRateLimiterState.Rate, defaultState3.OutboundRateLimiterState.Capacity, "Step 6 Default Outbound (unchanged)")
+
+	expectedInboundRatePass2 := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.InboundRateLimiterConfig.Rate, decimals, 0.10)
+	expectedInboundCapacityPass2 := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.InboundRateLimiterConfig.Capacity, decimals, 0.10)
+	requireScaledRateLimiterMatch(t, expectedInboundRatePass2, expectedInboundCapacityPass2, defaultState3.InboundRateLimiterState.Rate, defaultState3.InboundRateLimiterState.Capacity, "Step 6 Default Inbound (updated from scalars)")
+
+	expectedOutboundRatePass2 := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.OutboundRateLimiterConfig.Rate, decimals, 0)
+	expectedOutboundCapacityPass2 := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.OutboundRateLimiterConfig.Capacity, decimals, 0)
+	requireScaledRateLimiterMatch(t, expectedOutboundRatePass2, expectedOutboundCapacityPass2, defaultState3.OutboundRateLimiterState.Rate, defaultState3.OutboundRateLimiterState.Capacity, "Step 6 Default Outbound (updated from scalars)")
 
 	customState3, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, true)
 	require.NoError(t, err, "Failed to get custom finality rate limiter state after second pass")
-	require.True(t, customState3.InboundRateLimiterState.IsEnabled, "Step 6: Custom inbound rate limiter should NOW be enabled")
-	require.True(t, customState3.OutboundRateLimiterState.IsEnabled, "Step 6: Custom outbound rate limiter should NOW be enabled")
+	require.False(t, customState3.InboundRateLimiterState.IsEnabled, "Step 6: Custom inbound should remain disabled without explicit paired FF buckets in RemoteChainConfig")
+	require.False(t, customState3.OutboundRateLimiterState.IsEnabled, "Step 6: Custom outbound should remain disabled without explicit paired FF buckets in RemoteChainConfig")
 
-	expectedCustomInboundRate := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.InboundRateLimiterConfig.Rate, decimals, 0.10)
-	expectedCustomInboundCapacity := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.InboundRateLimiterConfig.Capacity, decimals, 0.10)
-	requireScaledRateLimiterMatch(t, expectedCustomInboundRate, expectedCustomInboundCapacity, customState3.InboundRateLimiterState.Rate, customState3.InboundRateLimiterState.Capacity, "Step 6 Custom Inbound")
+	// ========================================
+	// Step 7: Third pass adds paired FF buckets (OutboundRateLimits / InboundRateLimits)
+	// ========================================
+	ffPassInput := secondPassInput
+	ffPassInput.RemoteChainConfig.RemoteDecimals = decimals
+	ffPassInput.RemoteChainConfig.OutboundRateLimits = []tokens_core.RateLimitConfig{
+		{RateLimit: tokens_core.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3030, Rate: 303}, FastFinality: true},
+	}
+	ffPassInput.RemoteChainConfig.InboundRateLimits = []tokens_core.RateLimitConfig{
+		{RateLimit: tokens_core.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 4040, Rate: 404}, FastFinality: true},
+	}
+	_, err = operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		tokens.ConfigureTokenPoolForRemoteChain,
+		e.BlockChains.EVMChains()[chainSel],
+		ffPassInput,
+	)
+	require.NoError(t, err, "Step 7: ConfigureTokenPoolForRemoteChain with paired FF buckets should not error")
 
-	expectedCustomOutboundRate := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.OutboundRateLimiterConfig.Rate, decimals, 0)
-	expectedCustomOutboundCapacity := tokens_core.ScaleFloatToBigInt(secondPassInput.RemoteChainConfig.OutboundRateLimiterConfig.Capacity, decimals, 0)
-	requireScaledRateLimiterMatch(t, expectedCustomOutboundRate, expectedCustomOutboundCapacity, customState3.OutboundRateLimiterState.Rate, customState3.OutboundRateLimiterState.Capacity, "Step 6 Custom Outbound")
+	// ========================================
+	// Step 8: Default bucket unchanged; FF bucket populated (v2 inbound uses local decimals + 1.1x margin)
+	// ========================================
+	defaultStateFF, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
+	require.NoError(t, err)
+	require.True(t, defaultStateFF.InboundRateLimiterState.IsEnabled, "Step 8: Default inbound still enabled")
+	require.True(t, defaultStateFF.OutboundRateLimiterState.IsEnabled, "Step 8: Default outbound still enabled")
+	requireScaledRateLimiterMatch(t, expectedInboundRatePass2, expectedInboundCapacityPass2, defaultStateFF.InboundRateLimiterState.Rate, defaultStateFF.InboundRateLimiterState.Capacity, "Step 8 Default inbound unchanged")
+	requireScaledRateLimiterMatch(t, expectedOutboundRatePass2, expectedOutboundCapacityPass2, defaultStateFF.OutboundRateLimiterState.Rate, defaultStateFF.OutboundRateLimiterState.Capacity, "Step 8 Default outbound unchanged")
+
+	customStateFF, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, true)
+	require.NoError(t, err)
+	require.True(t, customStateFF.InboundRateLimiterState.IsEnabled, "Step 8: FF inbound should be enabled")
+	require.True(t, customStateFF.OutboundRateLimiterState.IsEnabled, "Step 8: FF outbound should be enabled")
+	expFFOutboundRate := tokens_core.ScaleFloatToBigInt(303, decimals, 0)
+	expFFOutboundCap := tokens_core.ScaleFloatToBigInt(3030, decimals, 0)
+	expFFInboundRate := tokens_core.ScaleFloatToBigInt(404, decimals, 0.10)
+	expFFInboundCap := tokens_core.ScaleFloatToBigInt(4040, decimals, 0.10)
+	requireScaledRateLimiterMatch(t, expFFOutboundRate, expFFOutboundCap, customStateFF.OutboundRateLimiterState.Rate, customStateFF.OutboundRateLimiterState.Capacity, "Step 8 FF outbound")
+	requireScaledRateLimiterMatch(t, expFFInboundRate, expFFInboundCap, customStateFF.InboundRateLimiterState.Rate, customStateFF.InboundRateLimiterState.Capacity, "Step 8 FF inbound")
 }
 
 func scaleByDecimalDiff(amount *big.Int, fromDecimals uint8, toDecimals uint8) *big.Int {

@@ -249,7 +249,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
 									Capacity:  1000,
 									Rate:      100,
@@ -281,7 +281,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
 									Capacity:  1000,
 									Rate:      100,
@@ -320,7 +320,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
 									Capacity:  1000,
 									Rate:      100,
@@ -348,7 +348,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
 									Capacity:  1000,
 									Rate:      100,
@@ -487,7 +487,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -515,7 +515,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -560,7 +560,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -588,7 +588,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -624,7 +624,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -648,7 +648,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -688,7 +688,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -716,7 +716,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -791,4 +791,83 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRemoteOutbounds_DefaultBucket_legacyRateLimitAlias(t *testing.T) {
+	rl := tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}
+	ro := tokens.RemoteOutbounds{RateLimit: &rl}
+	require.NoError(t, ro.Validate())
+
+	d, dOk := ro.DefaultBucket()
+	require.True(t, dOk)
+	_, fOk := ro.FastFinalityBucket()
+	require.False(t, fOk)
+	require.Equal(t, rl, d.RateLimit)
+	require.False(t, d.FastFinality)
+}
+
+func TestRemoteOutbounds_DefaultAndFastFinality_slices(t *testing.T) {
+	ro := tokens.RemoteOutbounds{
+		Outbounds: []tokens.RateLimitConfig{
+			{RateLimit: tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 50, Rate: 5}, FastFinality: false},
+			{RateLimit: tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 200, Rate: 20}, FastFinality: true},
+		},
+	}
+	require.NoError(t, ro.Validate())
+
+	d, dOk := ro.DefaultBucket()
+	f, fOk := ro.FastFinalityBucket()
+	require.True(t, dOk)
+	require.True(t, fOk)
+	require.NoError(t, d.RateLimit.Validate())
+	require.NoError(t, f.RateLimit.Validate())
+	require.Equal(t, ro.Outbounds[0].RateLimit, d.RateLimit)
+	require.Equal(t, ro.Outbounds[1].RateLimit, f.RateLimit)
+	require.False(t, d.FastFinality)
+	require.True(t, f.FastFinality)
+}
+
+func TestRemoteOutbounds_FastFinalitySliceWithLegacyAlias(t *testing.T) {
+	ro := tokens.RemoteOutbounds{
+		RateLimit: &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 7010, Rate: 701},
+		Outbounds: []tokens.RateLimitConfig{
+			{
+				RateLimit:    tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 6060, Rate: 606},
+				FastFinality: true,
+			},
+		},
+	}
+	require.NoError(t, ro.Validate())
+
+	d, dOk := ro.DefaultBucket()
+	f, fOk := ro.FastFinalityBucket()
+	require.True(t, dOk)
+	require.True(t, fOk)
+	require.NoError(t, d.RateLimit.Validate())
+	require.NoError(t, f.RateLimit.Validate())
+	require.Equal(t, *ro.RateLimit, d.RateLimit)
+	require.Equal(t, ro.Outbounds[0].RateLimit, f.RateLimit)
+	require.False(t, d.FastFinality)
+	require.True(t, f.FastFinality)
+}
+
+func TestRemoteChainConfig_GetOutboundInboundRateLimitBuckets(t *testing.T) {
+	cfg := tokens.RemoteChainConfig[[]byte, string]{
+		OutboundRateLimits: []tokens.RateLimitConfig{
+			{RateLimit: tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1, Rate: 1}, FastFinality: false},
+			{RateLimit: tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 2, Rate: 2}, FastFinality: true},
+		},
+		InboundRateLimits: []tokens.RateLimitConfig{
+			{RateLimit: tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3, Rate: 3}, FastFinality: false},
+			{RateLimit: tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 4, Rate: 4}, FastFinality: true},
+		},
+	}
+
+	ffOB, ok := cfg.GetOutboundRateLimitBuckets().FastFinalityBucket()
+	require.True(t, ok)
+	require.Equal(t, 2.0, ffOB.RateLimit.Capacity)
+
+	ffIB, ok := cfg.GetInboundRateLimitBuckets().FastFinalityBucket()
+	require.True(t, ok)
+	require.Equal(t, 4.0, ffIB.RateLimit.Capacity)
 }

@@ -252,7 +252,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {OutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -272,7 +272,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {OutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -341,7 +341,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {OutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -356,7 +356,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {OutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -396,7 +396,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {OutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -413,7 +413,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {OutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -516,7 +516,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selB: {OutboundRateLimiterConfig: defaultRL},
+							selB: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -532,7 +532,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							selA: {OutboundRateLimiterConfig: defaultRL},
+							selA: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -652,7 +652,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							selB: {
-								OutboundRateLimiterConfig: defaultRL,
+								OutboundRateLimiterConfig: &defaultRL,
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: selB,
 									Qualifier:     tokenSymbolB,
@@ -684,7 +684,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							selA: {
-								OutboundRateLimiterConfig: defaultRL,
+								OutboundRateLimiterConfig: &defaultRL,
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: selA,
 									Qualifier:     tokenSymbolA,
@@ -816,6 +816,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		require.Equal(t, poolAddrB.Bytes(), remotePoolsOnA[0], "seed: only the 20-byte entry should exist")
 
 		// Build the connect input once; it is reused for both the fix run and idempotency run.
+		disabledOutboundTPRL := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
 		connectInput := tokensapi.TokenExpansionInput{
 			ChainAdapterVersion: v1_6_0_scenarios,
 			MCMS:                NewDefaultInputForMCMS("Scenario 5E connect"),
@@ -834,6 +835,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							selB: {
+								OutboundRateLimiterConfig: &disabledOutboundTPRL,
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: selB, Qualifier: tokenSymbolB,
 									Type: datastore.ContractType(bnmERC20ops.ContractType),
@@ -860,6 +862,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							selA: {
+								OutboundRateLimiterConfig: &disabledOutboundTPRL,
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: selA, Qualifier: tokenSymbolA,
 									Type: datastore.ContractType(bnmERC20ops.ContractType),
@@ -908,9 +911,9 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Scenario 5: Solana LockRelease + EVM BurnMint cross-chain
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------
+// Scenario 5: Solana LockRelease + EVM BurnMint cross-chain + Rate Limits (with asymmetric decimals)
+// --------------------------------------------------------------------------------------------------
 
 func TestTokenExpansionScenariosSolana(t *testing.T) {
 	evmChainSel := chainsel.TEST_90000001.Selector
@@ -961,6 +964,8 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		solTokenSymbol := "S5_SOL_TOK"
 		defaultMaxSupply := uint64(1e6)
 		defaultPreMint := uint64(1e5)
+		evmDecimals := uint8(18)
+		svmDecimals := uint8(9)
 
 		defaultRL := tokensapi.RateLimiterConfigFloatInput{
 			Capacity:  100,
@@ -975,7 +980,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				evmChainSel: {
 					TokenPoolVersion: v1_5_1_scenarios,
 					DeployTokenInput: &tokensapi.DeployTokenInput{
-						Name: "Scenario5 EVM Token", Symbol: evmTokenSymbol, Decimals: 18,
+						Name: "Scenario5 EVM Token", Symbol: evmTokenSymbol, Decimals: evmDecimals,
 						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply, PreMint: &defaultPreMint,
 					},
 					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
@@ -984,14 +989,14 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							solChainSel: {OutboundRateLimiterConfig: defaultRL},
+							solChainSel: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
 				solChainSel: {
 					TokenPoolVersion: v1_6_0_scenarios,
 					DeployTokenInput: &tokensapi.DeployTokenInput{
-						Name: "Scenario5 SOL Token", Symbol: solTokenSymbol, Decimals: 9,
+						Name: "Scenario5 SOL Token", Symbol: solTokenSymbol, Decimals: svmDecimals,
 						Type:                   solanautils.SPLTokens,
 						ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 						DisableFreezeAuthority: true,
@@ -1004,7 +1009,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							evmChainSel: {OutboundRateLimiterConfig: defaultRL},
+							evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
 						},
 					},
 				},
@@ -1075,6 +1080,77 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		routerAddr, err := solAdapter.GetRouterAddress(env.DataStore, solChainSel)
 		require.NoError(t, err)
 		require.NotEmpty(t, routerAddr, "Solana router should be deployed")
+
+		// Now try updating the rate limits in both directions and verify on-chain state is updated accordingly
+		t.Run("SetTokenPoolRateLimits", func(t *testing.T) {
+			evmTowardSVM := tokensapi.RemoteOutbounds{RateLimit: &tokensapi.RateLimiterConfigFloatInput{Capacity: 111, Rate: 11, IsEnabled: true}}
+			svmTowardEVM := tokensapi.RemoteOutbounds{RateLimit: &tokensapi.RateLimiterConfigFloatInput{Capacity: 222, Rate: 22, IsEnabled: true}}
+			tprlOut, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+				MCMS: NewDefaultInputForMCMS("Scenario 5 TPRL"),
+				Configs: map[uint64]tokensapi.TPRLConfig{
+					evmChainSel: {
+						ChainAdapterVersion: v1_6_0_scenarios,
+						TokenPoolRef:        datastore.AddressRef{Address: evmPoolAddr.Hex()},
+						TokenRef:            datastore.AddressRef{Address: evmTokAddr.Hex()},
+						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+							solChainSel: evmTowardSVM,
+						},
+					},
+					solChainSel: {
+						ChainAdapterVersion: v1_6_0_scenarios,
+						TokenPoolRef:        datastore.AddressRef{Address: solPoolProgramID.String()},
+						TokenRef:            datastore.AddressRef{Address: solTokenMint.String()},
+						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+							evmChainSel: svmTowardEVM,
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			testhelpers.ProcessTimelockProposals(t, *env, tprlOut.MCMSTimelockProposals, false)
+
+			// Read EVM rate limits from the chain
+			outboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+			require.NoError(t, err)
+			inboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+			require.NoError(t, err)
+
+			// Verify EVM rate limit state matches expected values (with correct scaling for decimals). The
+			// inbound on legacy EVM pools (<v1.6.1 non-external-minter) scales using remote token decimals
+			// (see tokensapi.GenerateTPRLConfigs); counterpart outbound is Solana -> use svmDecimals.
+			expInboundCapEVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Capacity, int(svmDecimals), 0.10)
+			expInboundRateEVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Rate, int(svmDecimals), 0.10)
+			expOutboundCapEVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Capacity, int(evmDecimals), 0)
+			expOutboundRateEVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Rate, int(evmDecimals), 0)
+			require.Zero(t, expOutboundCapEVM.Cmp(outboundEVM.Capacity), "EVM outbound capacity toward Solana should match TPRL input after scaling (want %s, got %s)", expOutboundCapEVM.String(), outboundEVM.Capacity.String())
+			require.Zero(t, expOutboundRateEVM.Cmp(outboundEVM.Rate), "EVM outbound rate toward Solana should match TPRL input after scaling (want %s, got %s)", expOutboundRateEVM.String(), outboundEVM.Rate.String())
+			require.Zero(t, expInboundCapEVM.Cmp(inboundEVM.Capacity), "EVM inbound capacity from Solana should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundCapEVM.String(), inboundEVM.Capacity.String())
+			require.Zero(t, expInboundRateEVM.Cmp(inboundEVM.Rate), "EVM inbound rate from Solana should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundRateEVM.String(), inboundEVM.Rate.String())
+			require.True(t, outboundEVM.IsEnabled)
+			require.True(t, inboundEVM.IsEnabled)
+
+			// Read Solana rate limits from the chain
+			chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
+			require.NoError(t, err)
+			var chainCfg lockrelease_token_pool.ChainConfig
+			require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &chainCfg))
+			outboundCapSVM := big.NewInt(0).SetUint64(chainCfg.Base.OutboundRateLimit.Cfg.Capacity)
+			outboundRateSVM := big.NewInt(0).SetUint64(chainCfg.Base.OutboundRateLimit.Cfg.Rate)
+			inboundCapSVM := big.NewInt(0).SetUint64(chainCfg.Base.InboundRateLimit.Cfg.Capacity)
+			inboundRateSVM := big.NewInt(0).SetUint64(chainCfg.Base.InboundRateLimit.Cfg.Rate)
+
+			// Verify Solana rate limit state matches expected values (with correct scaling for decimals)
+			expInboundCapSVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Capacity, int(svmDecimals), 0.10)
+			expInboundRateSVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Rate, int(svmDecimals), 0.10)
+			expOutboundCapSVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Capacity, int(svmDecimals), 0)
+			expOutboundRateSVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Rate, int(svmDecimals), 0)
+			require.Zero(t, expOutboundCapSVM.Cmp(outboundCapSVM), "Solana outbound capacity toward EVM should match TPRL input after scaling (want %s, got %s)", expOutboundCapSVM.String(), outboundCapSVM.String())
+			require.Zero(t, expOutboundRateSVM.Cmp(outboundRateSVM), "Solana outbound rate toward EVM should match TPRL input after scaling (want %s, got %s)", expOutboundRateSVM.String(), outboundRateSVM.String())
+			require.Zero(t, expInboundCapSVM.Cmp(inboundCapSVM), "Solana inbound capacity from EVM should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundCapSVM.String(), inboundCapSVM.String())
+			require.Zero(t, expInboundRateSVM.Cmp(inboundRateSVM), "Solana inbound rate from EVM should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundRateSVM.String(), inboundRateSVM.String())
+			require.True(t, chainCfg.Base.OutboundRateLimit.Cfg.Enabled)
+			require.True(t, chainCfg.Base.InboundRateLimit.Cfg.Enabled)
+		})
 	})
 }
 
@@ -1285,7 +1361,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 					TokenRef:     datastore.AddressRef{}, // inferred
 					TokenPoolRef: datastore.AddressRef{}, // inferred
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-						evmChainSel: {OutboundRateLimiterConfig: realWorldRL},
+						evmChainSel: {OutboundRateLimiterConfig: &realWorldRL},
 					},
 				},
 			},
@@ -1310,7 +1386,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 					TokenRef:     datastore.AddressRef{},
 					TokenPoolRef: datastore.AddressRef{},
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-						solChainSel: {OutboundRateLimiterConfig: realWorldRL},
+						solChainSel: {OutboundRateLimiterConfig: &realWorldRL},
 					},
 				},
 			},
