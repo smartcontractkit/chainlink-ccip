@@ -324,7 +324,6 @@ func convertRemoteChainConfig(
 		}
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
-
 	return outCfg, nil
 }
 
