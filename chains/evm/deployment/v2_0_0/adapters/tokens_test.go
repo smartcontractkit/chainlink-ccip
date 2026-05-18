@@ -210,12 +210,12 @@ func TestTokenAdapter(t *testing.T) {
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
-					InboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+					InboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
 						Rate:      10,
 						Capacity:  100,
 					},
-					OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
+					OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
 						Rate:      10,
 						Capacity:  100,
@@ -350,6 +350,8 @@ func TestTokenAdapter(t *testing.T) {
 					currentStates := rateLimiterStateReport.Output
 					cfg := getRemoteChainConfig(nil, nil, nil)
 					const decimals = 18
+					require.NotNil(t, cfg.InboundRateLimiterConfig)
+					require.NotNil(t, cfg.OutboundRateLimiterConfig)
 					require.Equal(t, cfg.InboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
 					requireRateLimiterScaled(t, cfg.InboundRateLimiterConfig.Rate, cfg.InboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Rate, currentStates.InboundRateLimiterState.Capacity, decimals, true)
 					require.Equal(t, cfg.OutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")

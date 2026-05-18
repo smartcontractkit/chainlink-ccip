@@ -62,6 +62,9 @@ func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
 	if c.ChainSelector != chain.Selector {
 		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
 	}
+	if err := c.RemoteChainConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid remote chain config: %w", err)
+	}
 	return nil
 }
 
@@ -114,24 +117,39 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
 		}
 
-		outboundRateLimiterConfig, inboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
-			input.RemoteChainConfig.OutboundRateLimiterConfig,
-			input.RemoteChainConfig.InboundRateLimiterConfig,
-			localDecimalsReport.Output,
-			input.RemoteChainConfig.RemoteDecimals,
-			chain.Family(),
-			tvReport.Output.Version,
-			tvReport.Output.Type.String(),
-		)
-		// If input did not provide rate limits, use imported from active pool when available.
-		if importedDefaultOutbound != nil && !input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled {
+		// Fetch rate limit buckets from input config
+		outbounds := input.RemoteChainConfig.GetOutboundRateLimitBuckets()
+		inbounds := input.RemoteChainConfig.GetInboundRateLimitBuckets()
+		defaultOutboundBucket, defaultOutboundExists := outbounds.DefaultBucket()
+		defaultInboundBucket, defaultInboundExists := inbounds.DefaultBucket()
+
+		// Resolve default outbound/inbound TPRL limits in order:
+		// (1) both default buckets in deployment input → GenerateTPRLConfigs;
+		// (2) else both defaults imported from the active pool → normalize legacy inbound when needed;
+		// (3) else fully omitted from input and import → chain read when remote already supported, else disabled;
+		// (4) else error — partial defaults in input or import are ambiguous and the intent is too unclear.
+		var outboundRateLimiterConfig tokens.RateLimiterConfig
+		var inboundRateLimiterConfig tokens.RateLimiterConfig
+		defaultFullyOmittedFromImport := importedDefaultOutbound == nil && importedDefaultInbound == nil
+		defaultFullyOmittedFromInput := !defaultOutboundExists && !defaultInboundExists
+		switch {
+		case defaultOutboundExists && defaultInboundExists:
+			outboundRateLimiterConfig, inboundRateLimiterConfig = tokens.GenerateTPRLConfigs(
+				defaultOutboundBucket.RateLimit,
+				defaultInboundBucket.RateLimit,
+				localDecimalsReport.Output,
+				input.RemoteChainConfig.RemoteDecimals,
+				chain.Family(),
+				tvReport.Output.Version,
+				tvReport.Output.Type.String(),
+			)
+
+		case importedDefaultOutbound != nil && importedDefaultInbound != nil:
 			outboundRateLimiterConfig = *importedDefaultOutbound
-		}
-		if importedDefaultInbound != nil && !input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled {
 			inboundRateLimiterConfig = *importedDefaultInbound
 			// Pre-1.6.1 EVM pools stored inbound limits in source/remote decimals.
 			// New pools consume inbound limits in local/destination decimals, so rebase before applying.
-			if imported.LegacyPoolVersion != nil && imported.LegacyPoolVersion.LessThan(semver.MustParse("1.6.1")) {
+			if imported != nil && imported.LegacyPoolVersion != nil && imported.LegacyPoolVersion.LessThan(semver.MustParse("1.6.1")) {
 				if input.RemoteChainConfig.RemoteDecimals == 0 {
 					b.Logger.Warnf(
 						"remote decimals not set when importing inbound rate limits from pre-1.6.1 active pool for remote chain %d; preserving imported inbound limits without decimal normalization",
@@ -145,18 +163,81 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					)
 				}
 			}
+
+		case defaultFullyOmittedFromInput && defaultFullyOmittedFromImport:
+			if input.RemoteChainAlreadySupported {
+				// Idempotent behavior: if we're re-calling this sequence and no rate limits are
+				// specified, then we re-use whatever is currently onchain to avoid accidentally
+				// overwriting existing onchain config
+				rlStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+					ChainSelector: input.ChainSelector,
+					Address:       input.TokenPoolAddress,
+					Args: token_pool.GetCurrentRateLimiterStateArgs{
+						RemoteChainSelector: input.RemoteChainSelector,
+						FastFinality:        false,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get default rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
+				}
+				outboundRateLimiterConfig = tokens.RateLimiterConfig{
+					IsEnabled: rlStateReport.Output.OutboundRateLimiterState.IsEnabled,
+					Capacity:  rlStateReport.Output.OutboundRateLimiterState.Capacity,
+					Rate:      rlStateReport.Output.OutboundRateLimiterState.Rate,
+				}
+				inboundRateLimiterConfig = tokens.RateLimiterConfig{
+					IsEnabled: rlStateReport.Output.InboundRateLimiterState.IsEnabled,
+					Capacity:  rlStateReport.Output.InboundRateLimiterState.Capacity,
+					Rate:      rlStateReport.Output.InboundRateLimiterState.Rate,
+				}
+			} else {
+				// If none of the above sources provided default rate limits, we will fall back to
+				// a disabled rate limiter by default (idempotent if chain is not yet supported).
+				outboundRateLimiterConfig = tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+				inboundRateLimiterConfig = tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+			}
+
+		default:
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"default outbound and inbound rate limits must both be specified together in deployment input or imported together from the active pool, or fully omitted from both sources for remote chain %d",
+				input.RemoteChainSelector,
+			)
 		}
 
-		// Read allowedFinalityConfig to determine whether to use fast finality (custom) or default finality
-		finalityConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args:          struct{}{},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config: %w", err)
+		// Default rate limit bucket should be fully resolved at this point
+		rlInputs := []tokens.TPRLRateLimitBucket{
+			{
+				OutboundRateLimiterConfig: outboundRateLimiterConfig,
+				InboundRateLimiterConfig:  inboundRateLimiterConfig,
+				FastFinality:              false,
+			},
 		}
-		fastFinality := finalityConfigReport.Output != finality.RawWaitForFinality
+
+		// Handle fast finality rate limits
+		ffOutboundBucket, ffOutboundExists := outbounds.FastFinalityBucket()
+		ffInboundBucket, ffInboundExists := inbounds.FastFinalityBucket()
+		if ffOutboundExists != ffInboundExists {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"fast-finality rate limits for remote chain %d require both OutboundRateLimits and InboundRateLimits to include a bucket with fastFinality=true, or neither",
+				input.RemoteChainSelector,
+			)
+		}
+		if ffOutboundExists && ffInboundExists {
+			customOutboundRateLimiterConfig, customInboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
+				ffOutboundBucket.RateLimit,
+				ffInboundBucket.RateLimit,
+				localDecimalsReport.Output,
+				input.RemoteChainConfig.RemoteDecimals,
+				chain.Family(),
+				tvReport.Output.Version,
+				tvReport.Output.Type.String(),
+			)
+			rlInputs = append(rlInputs, tokens.TPRLRateLimitBucket{
+				OutboundRateLimiterConfig: customOutboundRateLimiterConfig,
+				InboundRateLimiterConfig:  customInboundRateLimiterConfig,
+				FastFinality:              true,
+			})
+		}
 
 		// Set CCVs for the remote chain (idempotent: only apply when on-chain differs from desired)
 		if input.AdvancedPoolHooks != (common.Address{}) {
@@ -203,16 +284,14 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 			// Only proceed further if we do NOT need to remove and re-add the chain
 			if len(removes) == 0 {
-				// Check and update rate limiters based on the current finality config
+				// Check and update TPRL buckets in rlInputs (default always; fast-finality only when paired FF floats exist on RemoteChainConfig).
 				rateLimitersReport, err := maybeUpdateRateLimiters(
 					b,
 					chain,
 					input.ChainSelector,
 					input.TokenPoolAddress,
 					input.RemoteChainSelector,
-					fastFinality,
-					inboundRateLimiterConfig,
-					outboundRateLimiterConfig,
+					rlInputs,
 				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
@@ -323,16 +402,14 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, tokenTransferFeeWrites...)
 
-		// Check and update rate limiters based on the current finality config
+		// Check and update TPRL buckets in rlInputs (default always; fast-finality only when paired FF floats exist on RemoteChainConfig).
 		rateLimitersReport, err := maybeUpdateRateLimiters(
 			b,
 			chain,
 			input.ChainSelector,
 			input.TokenPoolAddress,
 			input.RemoteChainSelector,
-			fastFinality,
-			inboundRateLimiterConfig,
-			outboundRateLimiterConfig,
+			rlInputs,
 		)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
@@ -603,49 +680,51 @@ func tokenBucketToRateLimiterConfig(b token_pool_v161.TokenBucket) *tokens.RateL
 	}
 }
 
-// maybeUpdateRateLimiters checks and updates the rate limiters for a given remote chain if they do not match the
-// desired config. Returns nil if no update is needed.
+// maybeUpdateRateLimiters checks and updates each TPRL bucket listed in desiredRateLimiterConfigs (by FastFinality flag).
+// Returns nil if no update is needed.
 func maybeUpdateRateLimiters(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	chainSelector uint64,
 	tokenPoolAddress common.Address,
 	remoteChainSelector uint64,
-	fastFinality bool,
-	desiredInboundRateLimiterConfig tokens.RateLimiterConfig,
-	desiredOutboundRateLimiterConfig tokens.RateLimiterConfig,
+	desiredRateLimiterConfigs []tokens.TPRLRateLimitBucket,
 ) (*evm_contract.WriteOutput, error) {
-	// Check existing rate limiters
-	rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
-		ChainSelector: chainSelector,
-		Address:       tokenPoolAddress,
-		Args: token_pool.GetCurrentRateLimiterStateArgs{
-			RemoteChainSelector: remoteChainSelector,
-			FastFinality:        fastFinality,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get rate limiter state: %w", err)
-	}
-	currentStates := rateLimiterStateReport.Output
+	args := []token_pool.RateLimitConfigArgs{}
+	for _, desiredRL := range desiredRateLimiterConfigs {
+		// Check existing rate limiters
+		rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+			ChainSelector: chainSelector,
+			Address:       tokenPoolAddress,
+			Args: token_pool.GetCurrentRateLimiterStateArgs{
+				RemoteChainSelector: remoteChainSelector,
+				FastFinality:        desiredRL.FastFinality,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get rate limiter state: %w", err)
+		}
 
-	// Update the rate limiters if they do not match the desired config.
-	// We only allow updates to the rate limiters, we do not allow disabling them.
-	// This is to reduce the risk of accidentally disabling the rate limiters.
-	// Disabling traffic on a token is allowed, as in this case IsEnabled would be true with rate = capacity = 0.
-	if (!rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) && desiredInboundRateLimiterConfig.IsEnabled) ||
-		(!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) && desiredOutboundRateLimiterConfig.IsEnabled) {
+		// Update whenever on-chain state differs from the resolved desired config, including
+		// IsEnabled=false (explicit limiter off). Stopping traffic without disabling the limiter remains
+		// represented as IsEnabled=true with rate and capacity zero.
+		onchainRL := rateLimiterStateReport.Output
+		if !rateLimiterConfigsEqual(onchainRL.InboundRateLimiterState, desiredRL.InboundRateLimiterConfig) ||
+			!rateLimiterConfigsEqual(onchainRL.OutboundRateLimiterState, desiredRL.OutboundRateLimiterConfig) {
+			args = append(args, token_pool.RateLimitConfigArgs{
+				OutboundRateLimiterConfig: tokensRateLimiterToConfig(desiredRL.OutboundRateLimiterConfig),
+				InboundRateLimiterConfig:  tokensRateLimiterToConfig(desiredRL.InboundRateLimiterConfig),
+				RemoteChainSelector:       remoteChainSelector,
+				FastFinality:              desiredRL.FastFinality,
+			})
+		}
+	}
+
+	if len(args) > 0 {
 		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
 			ChainSelector: chainSelector,
 			Address:       tokenPoolAddress,
-			Args: []token_pool.RateLimitConfigArgs{
-				{
-					RemoteChainSelector:       remoteChainSelector,
-					FastFinality:              fastFinality,
-					InboundRateLimiterConfig:  tokensRateLimiterToConfig(desiredInboundRateLimiterConfig),
-					OutboundRateLimiterConfig: tokensRateLimiterToConfig(desiredOutboundRateLimiterConfig),
-				},
-			},
+			Args:          args,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to set rate limiters config: %w", err)
