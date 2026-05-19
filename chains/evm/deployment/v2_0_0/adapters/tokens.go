@@ -425,28 +425,6 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 
 			args := make([]token_pool.RateLimitConfigArgs, 0, len(input.RateLimitBuckets))
 			for _, bucket := range input.RateLimitBuckets {
-				inboundCfg := bucket.InboundRateLimiterConfig
-				// In OutboundOnly mode the inbound side of the lane is not authored from user input;
-				// read the current on-chain inbound for this finality bucket and pass it through
-				// unchanged. setRateLimitConfig takes outbound+inbound atomically. We call the
-				// contract binding directly here rather than the cldf_ops Read because the framework
-				// caches read reports by input hash, which would replay stale state if the lane was
-				// initialized earlier in the same Apply run.
-				if bucket.OutboundOnly {
-					tp, err := tpBindingsV2_0_0.NewTokenPool(tokenPoolAddr, evmChain.Client)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate v2.0.0 token pool for current inbound read: %w", err)
-					}
-					state, err := tp.GetCurrentRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector, bucket.FastFinality)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to read current inbound rate limit for pass-through on outbound-only update (fastFinality=%v): %w", bucket.FastFinality, err)
-					}
-					inboundCfg = tokens.RateLimiterConfig{
-						IsEnabled: state.InboundRateLimiterState.IsEnabled,
-						Capacity:  state.InboundRateLimiterState.Capacity,
-						Rate:      state.InboundRateLimiterState.Rate,
-					}
-				}
 				args = append(args, token_pool.RateLimitConfigArgs{
 					RemoteChainSelector: input.RemoteChainSelector,
 					FastFinality:        bucket.FastFinality,
@@ -456,9 +434,9 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 						Rate:      bucket.OutboundRateLimiterConfig.Rate,
 					},
 					InboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: inboundCfg.IsEnabled,
-						Capacity:  inboundCfg.Capacity,
-						Rate:      inboundCfg.Rate,
+						IsEnabled: bucket.InboundRateLimiterConfig.IsEnabled,
+						Capacity:  bucket.InboundRateLimiterConfig.Capacity,
+						Rate:      bucket.InboundRateLimiterConfig.Rate,
 					},
 				})
 			}
@@ -489,11 +467,12 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 
 // GetOnchainInboundRateLimit overrides the v1.x EVMPoolAdapter implementation so v2.0.0 pools
 // can be read via getCurrentRateLimiterState(remoteChainSelector, fastFinality), which supports
-// both default and fast-finality buckets.
+// both default and fast-finality buckets. tokenRef is unused on EVM (pool address suffices).
 func (t *TokenAdapter) GetOnchainInboundRateLimit(
 	e deployment.Environment,
 	chainSelector uint64,
 	poolRef datastore.AddressRef,
+	_ datastore.AddressRef,
 	remoteSelector uint64,
 	fastFinality bool,
 ) (tokens.RateLimiterConfig, error) {

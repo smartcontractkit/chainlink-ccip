@@ -112,11 +112,14 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 
 // GetOnchainInboundRateLimit reads the on-chain inbound rate limiter state on the token pool
 // referenced by poolRef on chainSelector, for the given remote selector. fastFinality=true is
-// not supported for v1.x EVM pools and returns an error.
+// not supported for v1.x EVM pools and returns an error. tokenRef is unused on EVM (pools are
+// keyed by pool address alone) and exists for parity with chain families that need the token
+// mint to resolve the read.
 func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(
 	e deployment.Environment,
 	chainSelector uint64,
 	poolRef datastore.AddressRef,
+	_ datastore.AddressRef,
 	remoteSelector uint64,
 	fastFinality bool,
 ) (tokensapi.RateLimiterConfig, error) {

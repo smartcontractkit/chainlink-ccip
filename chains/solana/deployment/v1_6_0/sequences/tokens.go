@@ -500,34 +500,13 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenPool := solana.MustPublicKeyFromBase58(input.TokenPoolRef.Address)
 
-			inboundRL := rl.InboundRateLimiterConfig
-			// In OutboundOnly mode the inbound side of the lane is not authored from user input;
-			// read the current on-chain inbound from the token pool's remote-chain config PDA and
-			// pass it through unchanged. setChainRateLimit on Solana takes both inbound and outbound
-			// atomically.
-			if rl.OutboundOnly {
-				remoteChainConfigPDA, _, pdaErr := tokens.TokenPoolChainConfigPDA(input.RemoteChainSelector, tokenMint, tokenPool)
-				if pdaErr != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to derive remote chain config PDA for pass-through inbound: %w", pdaErr)
-				}
-				var remoteChainConfigAccount base_token_pool.BaseChain
-				if readErr := chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); readErr != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to read remote chain config account for pass-through inbound: %w", readErr)
-				}
-				inboundRL = tokenapi.RateLimiterConfig{
-					IsEnabled: remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled,
-					Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Capacity),
-					Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Rate),
-				}
-			}
-
 			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
 				tokenpoolops.RemoteChainConfig{
 					TokenPool:                 tokenPool,
 					TokenMint:                 tokenMint,
 					TokenProgramID:            tokenProgramId,
 					RemoteSelector:            input.RemoteChainSelector,
-					InboundRateLimiterConfig:  inboundRL,
+					InboundRateLimiterConfig:  rl.InboundRateLimiterConfig,
 					OutboundRateLimiterConfig: rl.OutboundRateLimiterConfig,
 				})
 			if err != nil {
@@ -540,13 +519,15 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 	)
 }
 
-// GetOnchainInboundRateLimit implements tokenapi.RateLimitReaderAdapter so the changeset can
-// validate chain B's existing inbound when chain A is being configured with OutboundOnly. Solana
-// pools have a single bucket per remote lane; fastFinality=true is not supported.
+// GetOnchainInboundRateLimit implements tokenapi.RateLimitReaderAdapter. It needs the token
+// mint to derive the remote-chain config PDA, so tokenRef must resolve to the token (pool
+// qualifiers are independent from token qualifiers and may be empty). Solana pools have a
+// single bucket per remote lane; fastFinality=true is not supported.
 func (a *SolanaAdapter) GetOnchainInboundRateLimit(
 	e deployment.Environment,
 	chainSelector uint64,
 	poolRef datastore.AddressRef,
+	tokenRef datastore.AddressRef,
 	remoteSelector uint64,
 	fastFinality bool,
 ) (tokenapi.RateLimiterConfig, error) {
@@ -557,20 +538,9 @@ func (a *SolanaAdapter) GetOnchainInboundRateLimit(
 	if !ok {
 		return tokenapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
-	// Resolve the token mint via the TokenRef carried on poolRef's sibling lookup: the changeset
-	// passes a Full pool ref whose Address is the on-chain pool program. We still need the token
-	// mint for the PDA, which means looking up the token via the datastore using poolRef context.
-	// The changeset only guarantees poolRef has been fully resolved (Address populated). To derive
-	// the token mint, we use the token pool's known relationship to the token: the qualifier on the
-	// pool ref matches the token's qualifier. We resolve the token ref by qualifier on the same
-	// chain.
-	tokenRef := datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Qualifier:     poolRef.Qualifier,
-	}
 	tokenAddr, _, err := getTokenMintAndTokenProgram(e.DataStore, tokenRef, chain)
 	if err != nil {
-		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for pool ref (%+v): %w", poolRef, err)
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for ref (%+v): %w", tokenRef, err)
 	}
 	tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 	tokenPool := solana.MustPublicKeyFromBase58(poolRef.Address)

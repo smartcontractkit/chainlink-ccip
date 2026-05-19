@@ -129,12 +129,6 @@ type TPRLRateLimitBucket struct {
 	OutboundRateLimiterConfig RateLimiterConfig
 	InboundRateLimiterConfig  RateLimiterConfig
 	FastFinality              bool
-
-	// OutboundOnly, when true, signals that the adapter should not author a new inbound
-	// rate limiter config for this bucket. On chain contracts that take outbound+inbound
-	// atomically (EVM, Solana), the adapter must read the current on-chain inbound and
-	// pass it through unchanged. InboundRateLimiterConfig is the zero value in this mode.
-	OutboundOnly bool
 }
 
 type TPRLRemotes struct {
@@ -159,13 +153,6 @@ type TPRLRemotes struct {
 	// limit permission updates AND token pool rate limit updates in parallel / in the same batch. At the time of this
 	// writing, this flag is only applicable for EVM, but can be extended to other chains in the future if needed.
 	SkipIfMissingPermissions bool
-
-	// OutboundOnly signals that the inbound rate limiter config for every bucket in
-	// RateLimitBuckets must not be authored from user input — the adapter must read the
-	// current on-chain inbound and pass it through unchanged. Each bucket also carries its
-	// own OutboundOnly flag for the same purpose; the top-level flag is set when the lane
-	// as a whole was authored with [RemoteOutbounds.OutboundOnly] = true.
-	OutboundOnly bool
 }
 
 // GetBucketForFinality gets the TPRLRateLimitBucket for the given finality flag.
@@ -339,11 +326,11 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				}
 
 				// In OutboundOnly mode the counterpart's RemoteOutbounds[selector] is not required; we
-				// pass an empty RemoteOutbounds into the build so no inbound config is generated.
+				// pass an empty RemoteOutbounds into the build so no inbound config is generated and
+				// then overwrite each bucket's InboundRateLimiterConfig with the local pool's current
+				// on-chain inbound below.
 				var remoteInputs RemoteOutbounds
-				if inputs.OutboundOnly {
-					tprlRemote.OutboundOnly = true
-				} else {
+				if !inputs.OutboundOnly {
 					remoteInputs, ok = counterpart.RemoteOutbounds[selector]
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
@@ -365,11 +352,31 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				}
 
 				if inputs.OutboundOnly {
+					// The local pool setter is atomic over outbound+inbound, so we read the current
+					// on-chain inbound for each finality bucket and pass it through unchanged.
+					localReader, ok := tokenPoolAdapter.(RateLimitReaderAdapter)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf(
+							"adapter for local chain selector %d (family %s, version %v) does not implement RateLimitReaderAdapter; outbound-only mode unsupported for this lane",
+							selector, family, tokenPool.Version,
+						)
+					}
+					for i, bucket := range tprlRemote.RateLimitBuckets {
+						current, err := localReader.GetOnchainInboundRateLimit(
+							e, selector, tokenPool, tokenFull, remoteSelector, bucket.FastFinality,
+						)
+						if err != nil {
+							return cldf.ChangesetOutput{}, fmt.Errorf("failed to read current inbound rate limit for pass-through on outbound-only update (chain %d, remote %d, fastFinality=%v): %w", selector, remoteSelector, bucket.FastFinality, err)
+						}
+						tprlRemote.RateLimitBuckets[i].InboundRateLimiterConfig = current
+					}
+
 					if err := validateOutboundOnlyAgainstCounterpartInbound(
 						e,
 						counterPartAdapter,
 						counterpartFamily,
 						remoteTokenPool,
+						counterpart.TokenRef,
 						remoteSelector,
 						remoteDecimals,
 						selector,
@@ -434,6 +441,8 @@ func buildTPRLRemotesForSetRateLimitsLane(
 		)
 	}
 
+	// When outboundOnly, inbound is left zero here; the changeset overwrites each bucket's
+	// InboundRateLimiterConfig with the local pool's current on-chain inbound before dispatch.
 	var fastFinalityOutboundRL, fastFinalityInboundRL RateLimiterConfig
 	if localFastFinalityExists {
 		if outboundOnly {
@@ -451,7 +460,6 @@ func buildTPRLRemotesForSetRateLimitsLane(
 			FastFinality:              true,
 			OutboundRateLimiterConfig: fastFinalityOutboundRL,
 			InboundRateLimiterConfig:  fastFinalityInboundRL,
-			OutboundOnly:              outboundOnly,
 		})
 	}
 
@@ -472,7 +480,6 @@ func buildTPRLRemotesForSetRateLimitsLane(
 			FastFinality:              false,
 			OutboundRateLimiterConfig: defaultOutboundRL,
 			InboundRateLimiterConfig:  defaultInboundRL,
-			OutboundOnly:              outboundOnly,
 		})
 	}
 
@@ -490,6 +497,7 @@ func validateOutboundOnlyAgainstCounterpartInbound(
 	counterpartAdapter TokenAdapter,
 	counterpartFamily string,
 	counterpartPoolRef datastore.AddressRef,
+	counterpartTokenRef datastore.AddressRef,
 	counterpartSelector uint64,
 	counterpartDecimals uint8,
 	localSelector uint64,
@@ -521,7 +529,7 @@ func validateOutboundOnlyAgainstCounterpartInbound(
 			return nil
 		}
 		onchainInbound, err := reader.GetOnchainInboundRateLimit(
-			e, counterpartSelector, counterpartPoolRef, localSelector, bucket.FastFinality,
+			e, counterpartSelector, counterpartPoolRef, counterpartTokenRef, localSelector, bucket.FastFinality,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to read on-chain inbound rate limit on counterpart chain selector %d (fastFinality=%v): %w", counterpartSelector, bucket.FastFinality, err)
