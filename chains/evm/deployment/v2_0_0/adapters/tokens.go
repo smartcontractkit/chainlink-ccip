@@ -17,6 +17,8 @@ import (
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
+	tpBindingsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
+
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	bnmERC677Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
@@ -463,6 +465,51 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 		})
 }
 
+// GetOnchainInboundRateLimit overrides the v1.x EVMPoolAdapter implementation so v2.0.0 pools
+// can be read via getCurrentRateLimiterState(remoteChainSelector, fastFinality), which supports
+// both default and fast-finality buckets. tokenRef is unused on EVM (pool address suffices).
+func (t *TokenAdapter) GetOnchainInboundRateLimit(
+	e deployment.Environment,
+	chainSelector uint64,
+	poolRef datastore.AddressRef,
+	_ datastore.AddressRef,
+	remoteSelector uint64,
+	fastFinality bool,
+) (tokens.RateLimiterConfig, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+	}
+	addrBytes, err := t.AddressRefToBytes(addrRef)
+	if err != nil {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to convert pool address ref to bytes: %w", err)
+	}
+	poolAddr := common.BytesToAddress(addrBytes)
+	if poolAddr == (common.Address{}) {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("token pool address for ref (%+v) is zero", addrRef)
+	}
+	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
+	// reports by input hash, and earlier sequences in the same Apply run may have read this
+	// same lane while it was still uninitialized — caching that stale result.
+	tp, err := tpBindingsV2_0_0.NewTokenPool(poolAddr, evmChain.Client)
+	if err != nil {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v2.0.0 token pool contract at %s: %w", poolAddr.Hex(), err)
+	}
+	state, err := tp.GetCurrentRateLimiterState(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, remoteSelector, fastFinality)
+	if err != nil {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d (fastFinality=%v): %w", remoteSelector, fastFinality, err)
+	}
+	return tokens.RateLimiterConfig{
+		IsEnabled: state.InboundRateLimiterState.IsEnabled,
+		Capacity:  state.InboundRateLimiterState.Capacity,
+		Rate:      state.InboundRateLimiterState.Rate,
+	}, nil
+}
+
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.MigrateLockReleasePoolLiquidity
 }
@@ -554,6 +601,10 @@ func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 
 func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (contract.WriteOutput, error) {
 	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimitAdmin: not used; v2.0.0 adapter overrides SetRateLimitAdmin")
+}
+
+func (p *poolOpsV200) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokens.RateLimiterConfig, error) {
+	return tokens.RateLimiterConfig{}, errors.New("poolOpsV200.GetCurrentInboundRateLimit: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits and implements RateLimitReaderAdapter directly")
 }
 
 func (p *poolOpsV200) Version() *semver.Version {
