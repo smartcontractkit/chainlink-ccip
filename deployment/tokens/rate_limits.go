@@ -534,6 +534,9 @@ func validateOutboundOnlyAgainstCounterpartInbound(
 		if err != nil {
 			return fmt.Errorf("failed to read on-chain inbound rate limit on counterpart chain selector %d (fastFinality=%v): %w", counterpartSelector, bucket.FastFinality, err)
 		}
+		if !onchainInbound.IsEnabled {
+			return nil // If the counterpart's on-chain inbound is disabled, we allow any outbound to be set since it won't be enforced
+		}
 		if onchainInbound.Capacity == nil || onchainInbound.Capacity.Cmp(requiredInbound.Capacity) < 0 {
 			return fmt.Errorf(
 				"on-chain inbound capacity (%v) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound capacity (%v) for fastFinality=%v",
