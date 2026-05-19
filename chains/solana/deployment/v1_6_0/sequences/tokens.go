@@ -6,12 +6,13 @@ import (
 	"math/big"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -548,8 +549,13 @@ func (a *SolanaAdapter) GetOnchainInboundRateLimit(
 	if err != nil {
 		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
 	}
-	var remoteChainConfigAccount base_token_pool.BaseChain
-	if err := chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); err != nil {
+	// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain), not a bare
+	// BaseChain. Decoding into BaseChain consumes the discriminator as the start of the
+	// payload and corrupts the parse. ChainConfig has the same discriminator and layout
+	// across burnmint/lockrelease pools, so either binding decodes any pool's account.
+	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
+	err = chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+	if errors.Is(err, rpc.ErrNotFound) {
 		// Pool/lane not configured yet on chain — return a zero RateLimiterConfig so the caller's
 		// 110% check rejects any positive new outbound (the documented behavior in
 		// RateLimitReaderAdapter).
@@ -559,10 +565,13 @@ func (a *SolanaAdapter) GetOnchainInboundRateLimit(
 			Rate:      big.NewInt(0),
 		}, nil
 	}
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chainSelector, remoteSelector, err)
+	}
 	return tokenapi.RateLimiterConfig{
-		IsEnabled: remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled,
-		Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Capacity),
-		Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Rate),
+		IsEnabled: remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled,
+		Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Capacity),
+		Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate),
 	}, nil
 }
 
