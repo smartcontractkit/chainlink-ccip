@@ -21,6 +21,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
@@ -859,4 +860,447 @@ func getRateLimits(t *testing.T, version *semver.Version, address common.Address
 		require.FailNow(t, fmt.Sprintf("unsupported token pool version for fetching rate limits: %s", version.String()))
 		return nil, nil
 	}
+}
+
+// forceSimGasLimit bumps the deployer key's GasLimit on every EVM chain in the test environment.
+// The simulated chain's gas estimator under-charges SSTORE refunds when a setRateLimitConfig call
+// writes the same value back to storage, causing the tx to run out of gas. Setting a manual
+// GasLimit bypasses estimation and matches real-chain behavior. The fix is test-only — production
+// chains return a correct estimate.
+func forceSimGasLimit(env *cldf_deployment.Environment, gasLimit uint64) {
+	for _, chain := range env.BlockChains.EVMChains() {
+		if chain.DeployerKey != nil {
+			chain.DeployerKey.GasLimit = gasLimit
+		}
+	}
+}
+
+// TestTPRL_OutboundOnly_Verify exercises the verify-time rules for the OutboundOnly flag:
+// the counterpart's RemoteOutbounds[A] entry is not required, but the counterpart's TPRLConfig
+// must still exist, and the local lane must have at least one outbound bucket.
+func TestTPRL_OutboundOnly_Verify(t *testing.T) {
+	selA := chainsel.TEST_90000001.Selector
+	selB := chainsel.TEST_90000002.Selector
+	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{selA}))
+	require.NoError(t, err)
+
+	cs := tokensapi.SetTokenPoolRateLimits()
+
+	validOutbound := tokensapi.RemoteOutbounds{
+		OutboundOnly: true,
+		Outbounds: []tokensapi.RateLimitConfig{
+			{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}, FastFinality: false},
+		},
+	}
+
+	t.Run("passes_without_counterpart_remote_outbounds", func(t *testing.T) {
+		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
+			MCMS: mcms.Input{},
+			Configs: map[uint64]tokensapi.TPRLConfig{
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
+				selB: {}, // refs-only config — RemoteOutbounds[selA] intentionally absent
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects_when_counterpart_config_missing", func(t *testing.T) {
+		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
+			MCMS: mcms.Input{},
+			Configs: map[uint64]tokensapi.TPRLConfig{
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no config provided for remote chain")
+	})
+
+	t.Run("rejects_when_no_outbound_buckets", func(t *testing.T) {
+		emptyOutboundOnly := tokensapi.RemoteOutbounds{OutboundOnly: true}
+		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
+			MCMS: mcms.Input{},
+			Configs: map[uint64]tokensapi.TPRLConfig{
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: emptyOutboundOnly}},
+				selB: {},
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no outbound buckets")
+	})
+
+	t.Run("allows_asymmetric_outbound_only_on_one_side", func(t *testing.T) {
+		// A→B is OutboundOnly while B→A is a normal symmetric lane. The symmetry checks only
+		// apply when neither side is OutboundOnly; OutboundOnly on A→B should not force B→A
+		// to also be OutboundOnly.
+		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
+			MCMS: mcms.Input{},
+			Configs: map[uint64]tokensapi.TPRLConfig{
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
+				selB: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selA: {
+					Outbounds: []tokensapi.RateLimitConfig{
+						{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 200, Rate: 20}, FastFinality: false},
+					},
+				}}},
+			},
+		})
+		require.NoError(t, err)
+	})
+}
+
+// outboundOnlyV2Setup deploys a pair of v2.0.0 pools, performs an initial symmetric TPRL apply
+// to seed the on-chain rate limits, and returns the resolved pool refs and decimals. Returning
+// these makes the actual OutboundOnly cases in the table-driven tests trivial.
+func outboundOnlyV2Setup(t *testing.T, tokenSymb string, decimalsA, decimalsB uint8, initialAB, initialBA tokensapi.RateLimitConfig) (
+	env *cldf_deployment.Environment,
+	selA, selB uint64,
+	poolARef, poolBRef datastore.AddressRef,
+	clientA, clientB bind.ContractBackend,
+) {
+	t.Helper()
+
+	selA = chainsel.TEST_90000001.Selector
+	selB = chainsel.TEST_90000002.Selector
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{selA, selB}))
+	require.NoError(t, err)
+	env = e
+
+	cumulative := datastore.NewMemoryDataStore()
+	DeployChainContractsV2_0_0(t, env, cumulative, selA)
+	DeployChainContractsV2_0_0(t, env, cumulative, selB)
+	env.DataStore = cumulative.Seal()
+
+	disabledOutbound := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
+	deployerA := env.BlockChains.EVMChains()[selA].DeployerKey.From
+	deployerB := env.BlockChains.EVMChains()[selB].DeployerKey.From
+	clientA = env.BlockChains.EVMChains()[selA].Client
+	clientB = env.BlockChains.EVMChains()[selB].Client
+
+	expansionOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: cciputils.Version_2_0_0,
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selA: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      bnmOpsV2_0_0.Version,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name: tokenSymb, Symbol: tokenSymb, Decimals: decimalsA,
+					ExternalAdmin: deployerA.Hex(), CCIPAdmin: deployerA.Hex(),
+					Type: bnmERC20ops.ContractType,
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					PoolType: string(bnmOpsV2_0_0.ContractType), TokenPoolQualifier: "",
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						selB: {OutboundRateLimiterConfig: &disabledOutbound},
+					},
+				},
+			},
+			selB: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      bnmOpsV2_0_0.Version,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name: tokenSymb, Symbol: tokenSymb, Decimals: decimalsB,
+					ExternalAdmin: deployerB.Hex(), CCIPAdmin: deployerB.Hex(),
+					Type: bnmERC20ops.ContractType,
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					PoolType: string(bnmOpsV2_0_0.ContractType), TokenPoolQualifier: "",
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						selA: {OutboundRateLimiterConfig: &disabledOutbound},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, expansionOut.DataStore)
+
+	fltrA := datastore.AddressRef{ChainSelector: selA, Type: datastore.ContractType(bnmOpsV2_0_0.ContractType), Version: bnmOpsV2_0_0.Version, Qualifier: ""}
+	poolA, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrA, selA, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+	fltrB := datastore.AddressRef{ChainSelector: selB, Type: datastore.ContractType(bnmOpsV2_0_0.ContractType), Version: bnmOpsV2_0_0.Version, Qualifier: ""}
+	poolB, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrB, selB, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	poolARef = datastore.AddressRef{Address: poolA.Hex()}
+	poolBRef = datastore.AddressRef{Address: poolB.Hex()}
+
+	// Seed the on-chain rate limits with a normal (non-OutboundOnly) symmetric apply so that
+	// subsequent OutboundOnly tests have something to validate against.
+	_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+		MCMS: mcms.Input{},
+		Configs: map[uint64]tokensapi.TPRLConfig{
+			selA: {
+				ChainAdapterVersion: cciputils.Version_2_0_0,
+				TokenRef:            datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:        poolARef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: {
+					Outbounds: []tokensapi.RateLimitConfig{initialAB},
+				}},
+			},
+			selB: {
+				ChainAdapterVersion: cciputils.Version_2_0_0,
+				TokenRef:            datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:        poolBRef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selA: {
+					Outbounds: []tokensapi.RateLimitConfig{initialBA},
+				}},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	return env, selA, selB, poolARef, poolBRef, clientA, clientB
+}
+
+// TestTPRL_OutboundOnly_AppliesAndLeavesCounterpartUntouchedV2 verifies that an OutboundOnly
+// apply on chain A updates A's outbound, leaves A's inbound and chain B's pool untouched, and
+// passes the +110% on-chain validation when the new outbound stays within counterpart headroom.
+func TestTPRL_OutboundOnly_AppliesAndLeavesCounterpartUntouchedV2(t *testing.T) {
+	const tokenSymb = "TPRL_OBO_OK"
+	const decimalsA, decimalsB = uint8(18), uint8(6)
+
+	initialAB := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100}, FastFinality: false}
+	initialBA := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 2000, Rate: 200}, FastFinality: false}
+
+	env, selA, selB, poolARef, poolBRef, clientA, clientB := outboundOnlyV2Setup(t, tokenSymb, decimalsA, decimalsB, initialAB, initialBA)
+
+	// Snapshot the seeded state. Chain B's inbound (from A) is 1000 * 1.10 in B's decimals,
+	// so the new A outbound can be at most 1000 without breaching the +110% rule.
+	preA, _ := getRateLimits(t, cciputils.Version_2_0_0, common.HexToAddress(poolARef.Address), clientA, selB)
+	preB, _ := getRateLimits(t, cciputils.Version_2_0_0, common.HexToAddress(poolBRef.Address), clientB, selA)
+	require.True(t, preA.OutboundRateLimiterConfig.IsEnabled, "seed: A→B outbound should be enabled")
+	require.True(t, preB.InboundRateLimiterConfig.IsEnabled, "seed: B's inbound from A should be enabled")
+
+	// Sim-only workaround: passing through the on-chain inbound writes the same uint128 back
+	// to storage, which trips the simulated chain's gas estimator. Force a manual gas limit.
+	forceSimGasLimit(env, 5_000_000)
+
+	// Set A's outbound to 500 (half the seed): requiredInbound = 500*1.10 = 550 (<= 1100).
+	newA := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 500, Rate: 50}, FastFinality: false}
+	_, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+		MCMS: mcms.Input{},
+		Configs: map[uint64]tokensapi.TPRLConfig{
+			selA: {
+				ChainAdapterVersion: cciputils.Version_2_0_0,
+				TokenRef:            datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:        poolARef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: {
+					OutboundOnly: true,
+					Outbounds:    []tokensapi.RateLimitConfig{newA},
+				}},
+			},
+			// chain B has refs-only config; no RemoteOutbounds[selA] entry.
+			selB: {
+				ChainAdapterVersion: cciputils.Version_2_0_0,
+				TokenRef:            datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:        poolBRef,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	postA, _ := getRateLimits(t, cciputils.Version_2_0_0, common.HexToAddress(poolARef.Address), clientA, selB)
+	postB, _ := getRateLimits(t, cciputils.Version_2_0_0, common.HexToAddress(poolBRef.Address), clientB, selA)
+
+	// A's outbound (to B) was rewritten to the new value.
+	expOutCap := tokensapi.ScaleFloatToBigInt(newA.RateLimit.Capacity, int(decimalsA), 0)
+	expOutRate := tokensapi.ScaleFloatToBigInt(newA.RateLimit.Rate, int(decimalsA), 0)
+	require.True(t, postA.OutboundRateLimiterConfig.IsEnabled, "post: A→B outbound should remain enabled")
+	RequireBigIntsEqual(t, expOutCap, postA.OutboundRateLimiterConfig.Capacity, "A new outbound capacity")
+	RequireBigIntsEqual(t, expOutRate, postA.OutboundRateLimiterConfig.Rate, "A new outbound rate")
+
+	// A's inbound (from B) is unchanged (pass-through).
+	require.Equal(t, preA.InboundRateLimiterConfig.IsEnabled, postA.InboundRateLimiterConfig.IsEnabled, "A inbound IsEnabled unchanged")
+	RequireBigIntsEqual(t, preA.InboundRateLimiterConfig.Capacity, postA.InboundRateLimiterConfig.Capacity, "A inbound capacity unchanged")
+	RequireBigIntsEqual(t, preA.InboundRateLimiterConfig.Rate, postA.InboundRateLimiterConfig.Rate, "A inbound rate unchanged")
+
+	// Chain B was not touched at all — both directions unchanged.
+	assertTPRLBucketRateLimiterConfigsUnchanged(t, "B pool unchanged after OutboundOnly on A", preB, postB)
+}
+
+// TestTPRL_OutboundOnly_RejectsBelowThresholdV2 verifies the apply path returns an error when
+// chain B's on-chain inbound is below the new outbound * 1.10 threshold and that nothing is
+// written to chain A as a result.
+func TestTPRL_OutboundOnly_RejectsBelowThresholdV2(t *testing.T) {
+	const tokenSymb = "TPRL_OBO_REJ"
+	const decimalsA, decimalsB = uint8(18), uint8(6)
+
+	initialAB := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100}, FastFinality: false}
+	initialBA := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 2000, Rate: 200}, FastFinality: false}
+
+	env, selA, selB, poolARef, poolBRef, clientA, _ := outboundOnlyV2Setup(t, tokenSymb, decimalsA, decimalsB, initialAB, initialBA)
+	forceSimGasLimit(env, 5_000_000)
+
+	preA, _ := getRateLimits(t, cciputils.Version_2_0_0, common.HexToAddress(poolARef.Address), clientA, selB)
+
+	// Try to bump A's outbound to 1.5x the original. Chain B's existing inbound from A was
+	// seeded at 1000 * 1.10 — anything above 1000 should fail the +110% check.
+	overLimit := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1500, Rate: 150}, FastFinality: false}
+	_, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+		MCMS: mcms.Input{},
+		Configs: map[uint64]tokensapi.TPRLConfig{
+			selA: {
+				ChainAdapterVersion: cciputils.Version_2_0_0,
+				TokenRef:            datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:        poolARef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: {
+					OutboundOnly: true,
+					Outbounds:    []tokensapi.RateLimitConfig{overLimit},
+				}},
+			},
+			selB: {
+				ChainAdapterVersion: cciputils.Version_2_0_0,
+				TokenRef:            datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:        poolBRef,
+			},
+		},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "below required 110%")
+
+	// A's pool must not have been modified by the failed apply.
+	postA, _ := getRateLimits(t, cciputils.Version_2_0_0, common.HexToAddress(poolARef.Address), clientA, selB)
+	assertTPRLBucketRateLimiterConfigsUnchanged(t, "A pool unchanged after rejected OutboundOnly", preA, postA)
+}
+
+// TestTPRL_OutboundOnly_V161 mirrors the v2.0.0 success-path test but on a v1.6.1 pool. v1.6.1
+// pools only support a single default bucket; the test exercises the v1.x adapter path (PoolOps
+// GetCurrentInboundRateLimit pass-through and EVMPoolAdapter.GetOnchainInboundRateLimit).
+func TestTPRL_OutboundOnly_V161(t *testing.T) {
+	const tokenSymb = "TPRL_OBO_V161"
+	const decimalsA, decimalsB = uint8(18), uint8(6)
+
+	selA := chainsel.TEST_90000001.Selector
+	selB := chainsel.TEST_90000002.Selector
+	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{selA, selB}))
+	require.NoError(t, err)
+
+	cumulative := datastore.NewMemoryDataStore()
+	DeployChainContractsV2_0_0(t, env, cumulative, selA)
+	DeployChainContractsV2_0_0(t, env, cumulative, selB)
+	env.DataStore = cumulative.Seal()
+
+	disabledOutbound := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
+	deployerA := env.BlockChains.EVMChains()[selA].DeployerKey.From
+	deployerB := env.BlockChains.EVMChains()[selB].DeployerKey.From
+	clientA := env.BlockChains.EVMChains()[selA].Client
+	clientB := env.BlockChains.EVMChains()[selB].Client
+
+	expansionOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: cciputils.Version_2_0_0,
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selA: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      bnmOpsV1_6_1.Version,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name: tokenSymb, Symbol: tokenSymb, Decimals: decimalsA,
+					ExternalAdmin: deployerA.Hex(), CCIPAdmin: deployerA.Hex(),
+					Type: bnmERC20ops.ContractType,
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					PoolType: string(bnmOpsV1_6_1.ContractType), TokenPoolQualifier: "",
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						selB: {OutboundRateLimiterConfig: &disabledOutbound, RemoteDecimals: decimalsB},
+					},
+				},
+			},
+			selB: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      bnmOpsV1_6_1.Version,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name: tokenSymb, Symbol: tokenSymb, Decimals: decimalsB,
+					ExternalAdmin: deployerB.Hex(), CCIPAdmin: deployerB.Hex(),
+					Type: bnmERC20ops.ContractType,
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					PoolType: string(bnmOpsV1_6_1.ContractType), TokenPoolQualifier: "",
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						selA: {OutboundRateLimiterConfig: &disabledOutbound, RemoteDecimals: decimalsA},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, expansionOut.DataStore)
+
+	fltrA := datastore.AddressRef{ChainSelector: selA, Type: datastore.ContractType(bnmOpsV1_6_1.ContractType), Version: bnmOpsV1_6_1.Version, Qualifier: ""}
+	poolA, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrA, selA, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+	fltrB := datastore.AddressRef{ChainSelector: selB, Type: datastore.ContractType(bnmOpsV1_6_1.ContractType), Version: bnmOpsV1_6_1.Version, Qualifier: ""}
+	poolB, err := datastore_utils.FindAndFormatRef(env.DataStore, fltrB, selB, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+	poolARef := datastore.AddressRef{Address: poolA.Hex()}
+	poolBRef := datastore.AddressRef{Address: poolB.Hex()}
+
+	// Seed symmetric rate limits.
+	initialAB := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100}, FastFinality: false}
+	initialBA := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 2000, Rate: 200}, FastFinality: false}
+	_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+		MCMS: mcms.Input{},
+		Configs: map[uint64]tokensapi.TPRLConfig{
+			selA: {
+				TokenRef:        datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:    poolARef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: {Outbounds: []tokensapi.RateLimitConfig{initialAB}}},
+			},
+			selB: {
+				TokenRef:        datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef:    poolBRef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selA: {Outbounds: []tokensapi.RateLimitConfig{initialBA}}},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	preA, _ := getRateLimits(t, cciputils.Version_1_6_1, poolA, clientA, selB)
+	preB, _ := getRateLimits(t, cciputils.Version_1_6_1, poolB, clientB, selA)
+
+	// Sim-only workaround: passing through the on-chain inbound writes the same uint128 back
+	// to storage, which trips the simulated chain's gas estimator. Force a manual gas limit.
+	forceSimGasLimit(env, 5_000_000)
+
+	// Within-headroom OutboundOnly update: new outbound is half of original.
+	newA := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 500, Rate: 50}, FastFinality: false}
+	_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+		MCMS: mcms.Input{},
+		Configs: map[uint64]tokensapi.TPRLConfig{
+			selA: {
+				TokenRef:     datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef: poolARef,
+				RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: {
+					OutboundOnly: true,
+					Outbounds:    []tokensapi.RateLimitConfig{newA},
+				}},
+			},
+			selB: {
+				TokenRef:     datastore.AddressRef{Qualifier: tokenSymb},
+				TokenPoolRef: poolBRef,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	postA, _ := getRateLimits(t, cciputils.Version_1_6_1, poolA, clientA, selB)
+	postB, _ := getRateLimits(t, cciputils.Version_1_6_1, poolB, clientB, selA)
+
+	// A's outbound updated; A's inbound unchanged.
+	expOutCap := tokensapi.ScaleFloatToBigInt(newA.RateLimit.Capacity, int(decimalsA), 0)
+	expOutRate := tokensapi.ScaleFloatToBigInt(newA.RateLimit.Rate, int(decimalsA), 0)
+	RequireBigIntsEqual(t, expOutCap, postA.OutboundRateLimiterConfig.Capacity, "v161 A new outbound capacity")
+	RequireBigIntsEqual(t, expOutRate, postA.OutboundRateLimiterConfig.Rate, "v161 A new outbound rate")
+	RequireBigIntsEqual(t, preA.InboundRateLimiterConfig.Capacity, postA.InboundRateLimiterConfig.Capacity, "v161 A inbound capacity unchanged")
+	RequireBigIntsEqual(t, preA.InboundRateLimiterConfig.Rate, postA.InboundRateLimiterConfig.Rate, "v161 A inbound rate unchanged")
+
+	// Chain B's pool was not touched.
+	assertTPRLBucketRateLimiterConfigsUnchanged(t, "v161 B pool unchanged after OutboundOnly on A", preB, postB)
 }
