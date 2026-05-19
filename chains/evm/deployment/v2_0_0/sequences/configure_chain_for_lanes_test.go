@@ -16,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
@@ -24,14 +26,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
 
 func boolPtr(v bool) *bool { return &v }
+
+func uint32Ptr(v uint32) *uint32 { return &v }
 
 type deployedContracts struct {
 	router                    string
@@ -131,19 +133,7 @@ func buildConfigureChainForLanesInput(
 				DefaultExecutor:     local.executor,
 				DefaultInboundCCVs:  []string{local.committeeVerifier},
 				DefaultOutboundCCVs: []string{local.committeeVerifier},
-				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
-					IsEnabled:                   true,
-					MaxDataBytes:                30_000,
-					MaxPerMsgGasLimit:           3_000_000,
-					DestGasOverhead:             300_000,
-					DefaultTokenFeeUSDCents:     25,
-					DestGasPerPayloadByteBase:   16,
-					DefaultTokenDestGasOverhead: 90_000,
-					DefaultTxGasLimit:           200_000,
-					NetworkFeeUSDCents:          10,
-					ChainFamilySelector:         evmFamilySelector,
-					LinkFeeMultiplierPercent:    90,
-				},
+				FeeQuoterDestChainConfigOverrides: testsetup.CreateBasicFeeQuoterDestChainConfigOverrides(),
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
 					Enabled:     true,
@@ -552,19 +542,17 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 		DefaultExecutor:     local.executor,
 		DefaultInboundCCVs:  []string{local.committeeVerifier},
 		DefaultOutboundCCVs: []string{local.committeeVerifier},
-		FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
-			IsEnabled:                   true,
-			MaxDataBytes:                50_000,
-			MaxPerMsgGasLimit:           5_000_000,
-			DestGasOverhead:             400_000,
-			DefaultTokenFeeUSDCents:     30,
-			DestGasPerPayloadByteBase:   16,
-			DefaultTokenDestGasOverhead: 100_000,
-			DefaultTxGasLimit:           250_000,
-			NetworkFeeUSDCents:          20,
-			ChainFamilySelector:         evmFamilySelector,
-			LinkFeeMultiplierPercent:    90,
-		},
+		FeeQuoterDestChainConfigOverrides: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
+			cfg := testsetup.CreateBasicFeeQuoterDestChainConfigOverrides()
+			cfg.MaxDataBytes = uint32Ptr(50_000)
+			cfg.MaxPerMsgGasLimit = uint32Ptr(5_000_000)
+			cfg.DestGasOverhead = uint32Ptr(400_000)
+			cfg.DefaultTokenFeeUSDCents = func() *uint16 { v := uint16(30); return &v }()
+			cfg.DefaultTokenDestGasOverhead = uint32Ptr(100_000)
+			cfg.DefaultTxGasLimit = uint32Ptr(250_000)
+			cfg.NetworkFeeUSDCents = func() *uint16 { v := uint16(20); return &v }()
+			return cfg
+		}(),
 		ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 			USDCentsFee: 100,
 			Enabled:     true,
@@ -765,9 +753,9 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 				DefaultInboundCCVs:   []string{local.committeeVerifier},
 				DefaultOutboundCCVs:  []string{local.committeeVerifier},
 				BaseExecutionGasCost: 120_000,
-				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
+				FeeQuoterDestChainConfigOverrides: changesetadapters.FeeQuoterDestChainConfigOverrides{
 					OverrideExistingConfig: true,
-					DestGasOverhead:        500_000,
+					DestGasOverhead:        uint32Ptr(500_000),
 				},
 				DefaultExecutor: local.executor,
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
@@ -835,8 +823,8 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 
 	noOverrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
 	rc := noOverrideInput.RemoteChains[remoteSelector]
-	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = false
-	rc.FeeQuoterDestChainConfig.MaxDataBytes = 99_000
+	rc.FeeQuoterDestChainConfigOverrides.OverrideExistingConfig = false
+	rc.FeeQuoterDestChainConfigOverrides.MaxDataBytes = uint32Ptr(99_000)
 	noOverrideInput.RemoteChains[remoteSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -855,8 +843,8 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 
 	overrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
 	rc = overrideInput.RemoteChains[remoteSelector]
-	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = true
-	rc.FeeQuoterDestChainConfig.MaxDataBytes = 99_000
+	rc.FeeQuoterDestChainConfigOverrides.OverrideExistingConfig = true
+	rc.FeeQuoterDestChainConfigOverrides.MaxDataBytes = uint32Ptr(99_000)
 	overrideInput.RemoteChains[remoteSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -1188,7 +1176,7 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 
 	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
 	rc := input.RemoteChains[remoteChainSelector]
-	rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(42_000)
+	rc.FeeQuoterDestChainConfigOverrides.USDPerUnitGas = big.NewInt(42_000)
 	input.RemoteChains[remoteChainSelector] = rc
 
 	report1, err := operations.ExecuteSequence(

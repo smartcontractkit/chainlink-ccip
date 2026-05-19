@@ -126,11 +126,11 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
 				// Lombard does not use rate limiters
-				InboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+				InboundRateLimiterConfig: &tokens_core.RateLimiterConfigFloatInput{
 					Capacity: 0,
 					Rate:     0,
 				},
-				OutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+				OutboundRateLimiterConfig: &tokens_core.RateLimiterConfigFloatInput{
 					Capacity: 0,
 					Rate:     0,
 				},

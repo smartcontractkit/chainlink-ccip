@@ -31,7 +31,7 @@ type PoolOps interface {
 	GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error)
 	GetTokenDecimals(ctx context.Context, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
-	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error)
+	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
 	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
@@ -146,15 +146,15 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 				}
 			}
 
-			output, err := a.Ops.SetRateLimiterConfig(b, chain, tokenPoolAddr, input.RemoteChainSelector,
-				input.OutboundRateLimiterConfig,
-				input.InboundRateLimiterConfig,
-			)
+			output, err := a.Ops.SetRateLimiterConfig(b, chain, tokenPoolAddr, input)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)
 			}
+			if len(output) == 0 {
+				return sequences.OnChainOutput{}, nil
+			}
 
-			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{output})
+			batchOp, err := evm_contract.NewBatchOperationFromWrites(output)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
 			}

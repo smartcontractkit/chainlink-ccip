@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"k8s.io/utils/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -45,6 +46,23 @@ func CreateBasicFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 			LinkFeeMultiplierPercent: 90,
 			USDPerUnitGas:            big.NewInt(1e6),
 		},
+	}
+}
+
+// CreateBasicFeeQuoterDestChainConfigOverrides creates adapter-level FeeQuoter dest chain overrides for v2.0.0 lane tests.
+func CreateBasicFeeQuoterDestChainConfigOverrides() changesetadapters.FeeQuoterDestChainConfigOverrides {
+	return changesetadapters.FeeQuoterDestChainConfigOverrides{
+		IsEnabled:                   ptr.To(true),
+		MaxDataBytes:                ptr.To(uint32(30_000)),
+		MaxPerMsgGasLimit:           ptr.To(uint32(3_000_000)),
+		DestGasOverhead:             ptr.To(uint32(300_000)),
+		DefaultTokenFeeUSDCents:     ptr.To(uint16(25)),
+		DestGasPerPayloadByteBase:   ptr.To(uint8(16)),
+		DefaultTokenDestGasOverhead: ptr.To(uint32(90_000)),
+		DefaultTxGasLimit:           ptr.To(uint32(200_000)),
+		NetworkFeeUSDCents:          ptr.To(uint16(10)),
+		ChainFamilySelector:         evmFamilySelector,
+		LinkFeeMultiplierPercent:    ptr.To(uint8(90)),
 	}
 }
 
@@ -112,15 +130,15 @@ func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfi
 	}
 }
 
-func CreateRateLimiterConfigFloatInput(rate float64, capacity float64) tokens.RateLimiterConfigFloatInput {
+func CreateRateLimiterConfigFloatInput(rate float64, capacity float64) *tokens.RateLimiterConfigFloatInput {
 	if rate == 0 && capacity == 0 {
-		return tokens.RateLimiterConfigFloatInput{
+		return &tokens.RateLimiterConfigFloatInput{
 			IsEnabled: false,
 			Rate:      0,
 			Capacity:  0,
 		}
 	}
-	return tokens.RateLimiterConfigFloatInput{
+	return &tokens.RateLimiterConfigFloatInput{
 		IsEnabled: true,
 		Rate:      rate,
 		Capacity:  capacity,
