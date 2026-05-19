@@ -71,11 +71,14 @@ type chainCache struct {
 	sourceChainMu            sync.RWMutex
 	staticSourceChainConfigs map[cciptypes.ChainSelector]StaticSourceChainConfig
 	sourceChainRefresh       time.Time // Single timestamp for all source chain configs
-	// attemptedSourceChains tracks which source chains have been included in at least one
-	// fetch attempt. Chains in this set that are NOT in staticSourceChainConfigs were either
-	// unconfigured on-chain or had an RPC error, either way, re-fetching inline on every
-	// call creates a doom-loop of redundant RPC calls and error log spam.
-	attemptedSourceChains map[cciptypes.ChainSelector]struct{}
+	// attemptedSourceChains records the wall-clock time of the most recent fetch attempt
+	// that included each source chain. Chains in this map that are NOT in
+	// staticSourceChainConfigs were either unconfigured on-chain or had an RPC error.
+	// Re-fetching inline on every call creates a doom-loop of redundant RPC calls and
+	// error log spam, so we suppress inline retries when the last attempt was within
+	// configPollerV2.refreshPeriod. After that backoff elapses, inline retries resume so
+	// that recovery does not depend solely on the background poller being healthy.
+	attemptedSourceChains map[cciptypes.ChainSelector]time.Time
 }
 
 // newConfigPollerV2 creates a new instance of configPollerV2 with improved batch fetching capabilities.
@@ -302,19 +305,22 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 		staticSourceChainConfig, exists := destChainCache.staticSourceChainConfigs[chain]
 		if exists {
 			cachedSourceConfigs[chain] = staticSourceChainConfig
-		} else if _, attempted := destChainCache.attemptedSourceChains[chain]; !attempted {
-			// Only treat as missing if we haven't attempted to fetch this chain before.
-			// Chains that were attempted but not returned are either unconfigured on-chain
-			// or had an RPC error. Re-fetching inline on every call creates a doom-loop
-			// of redundant RPC calls and error log spam. The background poller will retry.
+			continue
+		}
+		// Chain isn't in cache. Suppress the inline re-fetch only if we tried to fetch it
+		// recently (within refreshPeriod). After that backoff has elapsed we resume inline
+		// retries so recovery still happens even if the background poller is unhealthy or
+		// has been killed. Chains never attempted always trigger an inline fetch.
+		lastAttempted, attempted := destChainCache.attemptedSourceChains[chain]
+		if !attempted || time.Since(lastAttempted) >= c.refreshPeriod {
 			missingChains = append(missingChains, chain)
 		}
 	}
 
-	// If all chains are in cache or already attempted, return immediately
+	// If all chains are in cache or were attempted within the suppression window, return immediately
 	if len(missingChains) == 0 {
 		destChainCache.sourceChainMu.RUnlock()
-		c.lggr.Debugw("All source chain configs found in cache or already attempted",
+		c.lggr.Debugw("All source chain configs found in cache or attempted within backoff window",
 			"destChain", c.destChainSelector,
 			"sourceChains", filteredSourceChains)
 		return cachedSourceConfigs, nil
@@ -362,7 +368,7 @@ func (c *configPollerV2) getOrCreateChainCache(chainSel cciptypes.ChainSelector)
 
 	cache := &chainCache{
 		staticSourceChainConfigs: make(map[cciptypes.ChainSelector]StaticSourceChainConfig),
-		attemptedSourceChains:    make(map[cciptypes.ChainSelector]struct{}),
+		attemptedSourceChains:    make(map[cciptypes.ChainSelector]time.Time),
 	}
 	c.chainCaches[chainSel] = cache
 	return cache
@@ -456,18 +462,20 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 
 	// Acquire StaticSourceChainConfigs lock and update
 	if fetchingForDestChain {
+		now := time.Now()
 		cache.sourceChainMu.Lock()
 		for chain, cfg := range sourceChainConfigs {
 			cache.staticSourceChainConfigs[chain] = staticSourceChainConfigFromSourceChainConfig(cfg)
 		}
-		// Record all source chains that were included in this fetch attempt.
+		// Record the time of this fetch attempt for every source chain we asked about.
 		// Chains that were attempted but not returned (due to RPC errors or being
-		// unconfigured on-chain) won't trigger inline re-fetches — the background
-		// poller will retry them on its own schedule.
+		// unconfigured on-chain) won't trigger inline re-fetches for the next
+		// refreshPeriod, after which inline retries resume so recovery doesn't depend
+		// solely on the background poller.
 		for _, chain := range sourceChainSelectors {
-			cache.attemptedSourceChains[chain] = struct{}{}
+			cache.attemptedSourceChains[chain] = now
 		}
-		cache.sourceChainRefresh = time.Now()
+		cache.sourceChainRefresh = now
 		cache.sourceChainMu.Unlock()
 	} else if len(sourceChainConfigs) > 0 {
 		c.lggr.Errorw("OffRamp SourceChainConfigs were returned when fetching configs from a source chain, "+

@@ -910,10 +910,14 @@ func chainSelectorSliceMatcher(expected []cciptypes.ChainSelector) func([]ccipty
 
 // TestConfigPollerV2_FailedSourceChainDoesNotRetriggerInlineFetch verifies that when a source chain
 // config fetch fails (e.g. RPC error), subsequent calls to GetOfframpSourceChainConfigs do NOT
-// trigger another inline batchRefreshChainAndSourceConfigs call. This prevents the "doom-loop"
-// where persistently failing chains cause redundant RPC calls and error log spam on every tick.
+// trigger another inline batchRefreshChainAndSourceConfigs call within the suppression window.
+// This prevents the "doom-loop" where persistently failing chains cause redundant RPC calls
+// and error log spam on every tick.
 func TestConfigPollerV2_FailedSourceChainDoesNotRetriggerInlineFetch(t *testing.T) {
 	cPollerV2, accessors := setupConfigPollerV2(t)
+	// Use a long refresh period so the inline-retry backoff comfortably covers the test
+	// (suppression is `time.Since(lastAttempted) < refreshPeriod`).
+	cPollerV2.refreshPeriod = 30 * time.Second
 	ctx := context.Background()
 
 	sourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
@@ -1055,9 +1059,11 @@ func TestConfigPollerV2_NewSourceChainStillTriggersInlineFetch(t *testing.T) {
 }
 
 // TestConfigPollerV2_AllSourceChainsFail_NoInlineRetry verifies that when ALL source chains
-// fail on the initial fetch, subsequent calls still don't trigger inline re-fetches.
+// fail on the initial fetch, subsequent calls within the suppression window still don't
+// trigger inline re-fetches.
 func TestConfigPollerV2_AllSourceChainsFail_NoInlineRetry(t *testing.T) {
 	cPollerV2, accessors := setupConfigPollerV2(t)
+	cPollerV2.refreshPeriod = 30 * time.Second
 	ctx := context.Background()
 
 	sourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
@@ -1085,4 +1091,109 @@ func TestConfigPollerV2_AllSourceChainsFail_NoInlineRetry(t *testing.T) {
 
 	// Verify only one call was made
 	accessors[destChain].AssertNumberOfCalls(t, "GetAllConfigsLegacy", 1)
+}
+
+// TestConfigPollerV2_BatchErrorDoesNotPoisonAttemptedSet verifies that when the top-level
+// GetAllConfigsLegacy call returns an error (as opposed to a successful response with partial
+// per-chain failures), attemptedSourceChains is NOT populated. Inline retries must continue
+// across transient batch failures (e.g., provider RPC unavailable) so we don't get wedged on
+// the first failed call.
+func TestConfigPollerV2_BatchErrorDoesNotPoisonAttemptedSet(t *testing.T) {
+	cPollerV2, accessors := setupConfigPollerV2(t)
+	cPollerV2.refreshPeriod = 30 * time.Second
+	ctx := context.Background()
+
+	sourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
+	expectedChainConfig := createMockChainConfigSnapshot()
+	fullSourceConfigs := createMockSourceChainConfigs(sourceChains)
+	var nilSourceConfigs map[cciptypes.ChainSelector]cciptypes.SourceChainConfig
+
+	// First call: top-level batch errors (simulates RPC provider unavailable).
+	accessors[destChain].On(
+		"GetAllConfigsLegacy",
+		mock.Anything,
+		destChain,
+		mock.MatchedBy(chainSelectorSliceMatcher(sourceChains))).
+		Return(cciptypes.ChainConfigSnapshot{}, nilSourceConfigs, errors.New("rpc unavailable")).Once()
+
+	_, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.Error(t, err)
+
+	// attemptedSourceChains must remain empty after a batch-level error so the next call
+	// is treated as a true cache miss and triggers another inline fetch.
+	destCache := cPollerV2.getOrCreateChainCache(destChain)
+	require.NotNil(t, destCache)
+	destCache.sourceChainMu.RLock()
+	assert.Empty(t, destCache.attemptedSourceChains,
+		"attemptedSourceChains must not be populated when GetAllConfigsLegacy returns an error")
+	destCache.sourceChainMu.RUnlock()
+
+	// Second call: top-level batch now succeeds for both chains.
+	accessors[destChain].On(
+		"GetAllConfigsLegacy",
+		mock.Anything,
+		destChain,
+		mock.MatchedBy(chainSelectorSliceMatcher(sourceChains))).
+		Return(expectedChainConfig, fullSourceConfigs, nil).Once()
+
+	configs, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.NoError(t, err)
+	assert.Len(t, configs, 2)
+	assert.Contains(t, configs, sourceChain1)
+	assert.Contains(t, configs, sourceChain2)
+
+	// Verify GetAllConfigsLegacy was called exactly twice (one error + one success).
+	accessors[destChain].AssertNumberOfCalls(t, "GetAllConfigsLegacy", 2)
+}
+
+// TestConfigPollerV2_InlineRetryResumesAfterBackoff verifies that once the suppression window
+// elapses, a still-missing source chain triggers another inline fetch. This guards the recovery
+// path used when the background poller is unhealthy or has been killed.
+func TestConfigPollerV2_InlineRetryResumesAfterBackoff(t *testing.T) {
+	cPollerV2, accessors := setupConfigPollerV2(t)
+	// Very short backoff so the test can wait it out without flakiness.
+	cPollerV2.refreshPeriod = 50 * time.Millisecond
+	ctx := context.Background()
+
+	sourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
+	expectedChainConfig := createMockChainConfigSnapshot()
+
+	// First fetch: sourceChain1 succeeds, sourceChain2 is missing.
+	partialSourceConfigs := createMockSourceChainConfigs([]cciptypes.ChainSelector{sourceChain1})
+	accessors[destChain].On(
+		"GetAllConfigsLegacy",
+		mock.Anything,
+		destChain,
+		mock.MatchedBy(chainSelectorSliceMatcher(sourceChains))).
+		Return(expectedChainConfig, partialSourceConfigs, nil).Once()
+
+	configs, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+	assert.Contains(t, configs, sourceChain1)
+
+	// While the suppression window is open, no additional fetch should fire.
+	configs2, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.NoError(t, err)
+	assert.Len(t, configs2, 1)
+	accessors[destChain].AssertNumberOfCalls(t, "GetAllConfigsLegacy", 1)
+
+	// Wait for the backoff to elapse, then expect an inline retry that recovers sourceChain2.
+	time.Sleep(75 * time.Millisecond)
+
+	fullSourceConfigs := createMockSourceChainConfigs(sourceChains)
+	accessors[destChain].On(
+		"GetAllConfigsLegacy",
+		mock.Anything,
+		destChain,
+		mock.MatchedBy(chainSelectorSliceMatcher(sourceChains))).
+		Return(expectedChainConfig, fullSourceConfigs, nil).Once()
+
+	configs3, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.NoError(t, err)
+	assert.Len(t, configs3, 2)
+	assert.Contains(t, configs3, sourceChain1)
+	assert.Contains(t, configs3, sourceChain2)
+
+	accessors[destChain].AssertNumberOfCalls(t, "GetAllConfigsLegacy", 2)
 }

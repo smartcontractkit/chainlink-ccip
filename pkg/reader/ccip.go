@@ -122,12 +122,15 @@ func newCCIPChainReaderWithConfigPollerInternal(
 		lggr.Errorw("failed to sync contracts", "err", err)
 	}
 
-	// After contracts are synced, start the background polling
+	// After contracts are synced, start the background polling.
+	// The config poller is load-bearing: without the background refresh, transiently
+	// missing source chain configs would only recover via the inline-retry backoff
+	// inside configPollerV2.GetOfframpSourceChainConfigs, which is best-effort. Fail
+	// reader initialization rather than silently degrade.
 	lggr.Info("Starting config background polling")
 	if err := reader.configPoller.Start(ctx); err != nil {
-		// Log the error but don't fail - we can still function without background polling
-		// by fetching configs on demand
 		lggr.Errorw("failed to start config background polling", "err", err)
+		return nil, fmt.Errorf("start config background polling: %w", err)
 	}
 
 	return reader, nil
