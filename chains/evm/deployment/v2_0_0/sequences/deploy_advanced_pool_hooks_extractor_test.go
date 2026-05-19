@@ -101,5 +101,6 @@ func TestDeployAdvancedPoolHooksExtractor_MultipleChains(t *testing.T) {
 	}
 
 	require.Len(t, addresses, len(chainSelectors))
-	require.NotEqual(t, addresses[chainSelectors[0]], addresses[chainSelectors[1]])
+	// CREATE2 deploys the same implementation address on each chain.
+	require.Equal(t, addresses[chainSelectors[0]], addresses[chainSelectors[1]])
 }

@@ -623,14 +623,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return output, fmt.Errorf("bind executor proxy: %w", err)
 			}
 
-			// Fetch the target on the ExecutorProxy
-			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.NewReadGetTarget(execProxyContract), chain, ops2contract.FunctionInput[struct{}]{})
+			// Fetch the target on the ExecutorProxy (direct read avoids ops-bundle cache collisions across chains).
+			currentTarget, err := execProxyContract.GetTarget(&bind.CallOpts{Context: b.GetContext()})
 			if err != nil {
 				return output, fmt.Errorf("failed to get target on ExecutorProxy: %w", err)
 			}
 
 			// Set target on the ExecutorProxy if diff exists
-			if targetReport.Output != common.HexToAddress(executorRef.Address) {
+			if currentTarget != common.HexToAddress(executorRef.Address) {
 				setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.NewWriteSetTarget(execProxyContract), chain, ops2contract.FunctionInput[common.Address]{
 					Args: common.HexToAddress(executorRef.Address),
 				})
@@ -640,14 +640,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				writes = append(writes, writeOutputOps2ToUpstream(setTargetReport.Output))
 			}
 
-			// Fetch the fee aggregator on the ExecutorProxy
-			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.NewReadGetFeeAggregator(execProxyContract), chain, ops2contract.FunctionInput[struct{}]{})
+			// Fetch the fee aggregator on the ExecutorProxy (direct read avoids ops-bundle cache collisions across chains).
+			currentFeeAggregator, err := execProxyContract.GetFeeAggregator(&bind.CallOpts{Context: b.GetContext()})
 			if err != nil {
 				return output, fmt.Errorf("failed to get fee aggregator on ExecutorProxy: %w", err)
 			}
 
 			// Set fee aggregator on the ExecutorProxy if diff exists
-			if feeAggregatorReport.Output != executorParam.DynamicConfig.FeeAggregator {
+			if currentFeeAggregator != executorParam.DynamicConfig.FeeAggregator {
 				setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.NewWriteSetFeeAggregator(execProxyContract), chain, ops2contract.FunctionInput[common.Address]{
 					Args: executorParam.DynamicConfig.FeeAggregator,
 				})

@@ -326,16 +326,16 @@ func TestTokenAdapter(t *testing.T) {
 
 				tp, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 				require.NoError(t, err, "Failed to bind token pool")
-				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetSupportedChains(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
+				supportedChains, err := tp.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err, "Failed to get supported chains from token pool")
-				require.Len(t, chainSupportReport.Output, 1, "There should be 1 supported remote chain in the token pool")
+				require.Len(t, supportedChains, 1, "There should be 1 supported remote chain in the token pool")
 				var remoteChainSel uint64
 				if chainSel == chainA {
 					remoteChainSel = chainB
 				} else {
 					remoteChainSel = chainA
 				}
-				require.Equal(t, remoteChainSel, chainSupportReport.Output[0], "Remote chain in token pool should match expected")
+				require.Equal(t, remoteChainSel, supportedChains[0], "Remote chain in token pool should match expected")
 
 				// GetCurrentRateLimiterState is only available in version 2.0.0+
 				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
@@ -501,9 +501,9 @@ func TestTokenExpansion(t *testing.T) {
 		// Verify token pool points to the correct token
 		tp, err := tp_bindings.NewTokenPool(poolAddr, evmChain.Client)
 		require.NoError(t, err)
-		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetToken(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
+		onChainToken, err := tp.GetToken(&bind.CallOpts{Context: t.Context()})
 		require.NoError(t, err)
-		require.Equal(t, tokenAddr, getTokenReport.Output, "Token pool should point to the deployed token")
+		require.Equal(t, tokenAddr, onChainToken, "Token pool should point to the deployed token")
 
 		// Verify token pool decimals
 		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetTokenDecimals(tp), evmChain, ops2contract.FunctionInput[struct{}]{})

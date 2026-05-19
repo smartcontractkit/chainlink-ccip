@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -17,7 +18,6 @@ import (
 	erc20_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20"
 	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
-	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
@@ -215,27 +215,26 @@ func migrateSiloedPool(
 		return sequences.OnChainOutput{}, err
 	}
 
-	chainsReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetSupportedChains(oldSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
+	callOpts := &bind.CallOpts{Context: b.GetContext()}
+	supportedChains, err := oldSiloed.GetSupportedChains(callOpts)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from old siloed pool %s: %w", oldPoolAddr, err)
 	}
-	supportedChains := chainsReport.Output
 
-	lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops_v170.NewReadGetAllLockBoxConfigs(newSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
+	lockboxConfigs, err := newSiloed.GetAllLockBoxConfigs(callOpts)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get lockbox configs from new pool %s: %w", newPoolAddr, err)
 	}
 
 	lockboxByChain := make(map[uint64]common.Address)
-	for _, config := range lockboxConfigsReport.Output {
+	for _, config := range lockboxConfigs {
 		lockboxByChain[config.RemoteChainSelector] = config.LockBox
 	}
 
-	rebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
+	originalUnsiloedRebalancer, err := oldSiloed.GetRebalancer(callOpts)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed rebalancer from old pool %s: %w", oldPoolAddr, err)
 	}
-	originalUnsiloedRebalancer := rebalancerReport.Output
 
 	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteSetRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[common.Address]{
 		Args: timelockAddr,
@@ -253,17 +252,13 @@ func migrateSiloedPool(
 	var siloInfos []chainRebalancerInfo
 
 	for _, remoteChain := range supportedChains {
-		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadIsSiloed(oldSiloed), evmChain, ops2contract.FunctionInput[uint64]{
-			Args: remoteChain,
-		})
+		isSiloed, err := oldSiloed.IsSiloed(callOpts, remoteChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if chain %d is siloed on old pool %s: %w", remoteChain, oldPoolAddr, err)
 		}
 
-		if isSiloedReport.Output {
-			chainRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetChainRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[uint64]{
-				Args: remoteChain,
-			})
+		if isSiloed {
+			chainRebalancer, err := oldSiloed.GetChainRebalancer(callOpts, remoteChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get chain rebalancer for chain %d: %w", remoteChain, err)
 			}
@@ -281,7 +276,7 @@ func migrateSiloedPool(
 
 			siloInfos = append(siloInfos, chainRebalancerInfo{
 				chainSelector:      remoteChain,
-				originalRebalancer: chainRebalancerReport.Output,
+				originalRebalancer: chainRebalancer,
 				isSiloed:           true,
 			})
 		} else {
@@ -307,14 +302,10 @@ func migrateSiloedPool(
 			firstLockbox = lockbox
 		}
 
-		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetAvailableTokens(oldSiloed), evmChain, ops2contract.FunctionInput[uint64]{
-			Args: info.chainSelector,
-		})
+		siloBalance, err := oldSiloed.GetAvailableTokens(callOpts, info.chainSelector)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get available tokens for chain %d: %w", info.chainSelector, err)
 		}
-
-		siloBalance := availableReport.Output
 		siloAmount := computeAmount(siloBalance, input)
 		if siloAmount.Sign() == 0 {
 			continue
@@ -338,11 +329,10 @@ func migrateSiloedPool(
 		usedLockboxes[lockbox] = true
 	}
 
-	unsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetUnsiloedLiquidity(oldSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
+	unsiloedBalance, err := oldSiloed.GetUnsiloedLiquidity(callOpts)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed liquidity from old pool %s: %w", oldPoolAddr, err)
 	}
-	unsiloedBalance := unsiloedReport.Output
 	unsiloedAmount := computeAmount(unsiloedBalance, input)
 
 	if unsiloedAmount.Sign() > 0 {
@@ -400,7 +390,8 @@ func migrateSiloedPool(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.NewWriteApplyAuthorizedCallerUpdates(lockBox), evmChain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
+		cleanupBundle := cldf_ops.NewBundle(b.GetContext, b.Logger, cldf_ops.NewMemoryReporter())
+		removeAuthReport, err := cldf_ops.ExecuteOperation(cleanupBundle, lockbox_ops.NewWriteApplyAuthorizedCallerUpdates(lockBox), evmChain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
 			Args: lockboxbind.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers:   []common.Address{},
 				RemovedCallers: []common.Address{timelockAddr},
@@ -465,6 +456,9 @@ func appendAuthApproveDeposit(
 	remoteChainSelector uint64,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
+	// Fresh reporter per lockbox: identical authorized-caller/deposit args must not be deduped across lockboxes.
+	b = cldf_ops.NewBundle(b.GetContext, b.Logger, cldf_ops.NewMemoryReporter())
+
 	lockBox, err := bindLockBox(lockboxAddr, evmChain)
 	if err != nil {
 		return nil, err

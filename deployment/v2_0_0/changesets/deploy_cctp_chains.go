@@ -152,7 +152,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				FeeAggregator:    chainCfg.FeeAggregator,
 				TokenDecimals:    chainCfg.TokenDecimals,
 			}
-			deployCCTPChainReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].DeployCCTPChain(), dep, in)
+			deployCCTPChainReport, err := cldf_ops.ExecuteSequence(changesets.BundleWithFreshReporter(e.OperationsBundle), adaptersByChain[chainSel].DeployCCTPChain(), dep, in)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCTP on chain with selector %d: %w", chainSel, err)
 			}
@@ -215,7 +215,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
 				RemoteChains:             remoteChainConfigs,
 			}
-			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
+			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(changesets.BundleWithFreshReporter(e.OperationsBundle), adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure CCTP on chain with selector %d: %w", chainSel, err)
 			}

@@ -26,6 +26,13 @@ type WithMCMS[CFG any] struct {
 	Cfg  CFG
 }
 
+// BundleWithFreshReporter returns a bundle that does not share operation reports with b.
+// Use when executing the same operation on multiple chains or contracts in one deployment flow,
+// so reads and writes are not incorrectly deduplicated across targets.
+func BundleWithFreshReporter(b operations.Bundle) operations.Bundle {
+	return operations.NewBundle(b.GetContext, b.Logger, operations.NewMemoryReporter())
+}
+
 // NewFromOnChainSequence creates a Changeset from an operations.Sequence that deploys contracts on-chain and performs write operations.
 // It wraps sequence execution with DataStore and MCMS integration. The returned function takes an MCMSReaderRegistry and returns a Changeset.
 func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSequenceParams[IN, DEP, CFG]) func(mcmsRegistry *MCMSReaderRegistry) deployment.ChangeSetV2[WithMCMS[CFG]] {

@@ -176,7 +176,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 				{src: chainA, dest: chainB, srcAdapter: chainAAdapter, destAdapter: chainBAdapter},
 				{src: chainB, dest: chainA, srcAdapter: chainBAdapter, destAdapter: chainAAdapter},
 			} {
-				configureLaneReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, pair.srcAdapter.ConfigureLaneLegAsSource(), e.BlockChains, UpdateLanesInput{
+				configureLaneReport, err := cldf_ops.ExecuteSequence(changesets.BundleWithFreshReporter(e.OperationsBundle), pair.srcAdapter.ConfigureLaneLegAsSource(), e.BlockChains, UpdateLanesInput{
 					Source:       pair.src,
 					Dest:         pair.dest,
 					IsDisabled:   lane.IsDisabled,
@@ -198,7 +198,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to write metadata to datastore: %w", err)
 				}
 
-				configureLaneReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, pair.destAdapter.ConfigureLaneLegAsDest(), e.BlockChains, UpdateLanesInput{
+				configureLaneReport, err = cldf_ops.ExecuteSequence(changesets.BundleWithFreshReporter(e.OperationsBundle), pair.destAdapter.ConfigureLaneLegAsDest(), e.BlockChains, UpdateLanesInput{
 					Source:       pair.src,
 					Dest:         pair.dest,
 					IsDisabled:   lane.IsDisabled,

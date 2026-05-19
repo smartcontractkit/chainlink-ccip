@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -132,6 +133,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			writes = append(writes, tokens_sequences.WriteOutputOps2ToLegacy(cfgReport.Output))
 		}
 
+		callOpts := &bind.CallOpts{Context: b.GetContext()}
 		for sel := range lockBoxes {
 			lbAddr := lockBoxes[sel]
 			lockBoxAddress := common.HexToAddress(lbAddr)
@@ -139,12 +141,13 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			if err != nil {
 				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to bind ERC20LockBox at %s: %w", lockBoxAddress.Hex(), err)
 			}
-			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.NewReadGetAllAuthorizedCallers(lockBox), chain, ops2contract.FunctionInput[struct{}]{})
+			currentCallers, err := lockBox.GetAllAuthorizedCallers(callOpts)
 			if err != nil {
 				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to get authorized callers on lockbox %s (chain %d): %w", lbAddr, sel, err)
 			}
-			if !slices.Contains(callersReport.Output, siloedPoolAddress) {
-				authReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.NewWriteApplyAuthorizedCallerUpdates(lockBox), chain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
+			if !slices.Contains(currentCallers, siloedPoolAddress) {
+				authBundle := cldf_ops.NewBundle(b.GetContext, b.Logger, cldf_ops.NewMemoryReporter())
+				authReport, err := cldf_ops.ExecuteOperation(authBundle, erc20_lock_box.NewWriteApplyAuthorizedCallerUpdates(lockBox), chain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
 					Args: lockboxbind.AuthorizedCallersAuthorizedCallerArgs{
 						AddedCallers: []common.Address{siloedPoolAddress},
 					},

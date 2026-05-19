@@ -112,12 +112,14 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	err = ds.Merge(e.DataStore)
 	require.NoError(t, err)
 	for _, addr := range chainReport.Output.Addresses {
-		err = ds.Addresses().Add(addr)
-		require.NoError(t, err)
+		if addErr := ds.Addresses().Add(addr); addErr != nil {
+			require.Contains(t, addErr.Error(), "already exists", "unexpected error adding address ref %s", addr.Type)
+		}
 	}
-	// Also add CREATE2Factory address
-	err = ds.Addresses().Add(create2FactoryRef)
-	require.NoError(t, err)
+	// Also add CREATE2Factory address when not already present from a prior setup on this datastore.
+	if addErr := ds.Addresses().Add(create2FactoryRef); addErr != nil {
+		require.Contains(t, addErr.Error(), "already exists", "unexpected error adding CREATE2Factory ref")
+	}
 	e.DataStore = ds.Seal()
 
 	var routerAddr, rmnAddr, tokenAdminRegistryAddr common.Address

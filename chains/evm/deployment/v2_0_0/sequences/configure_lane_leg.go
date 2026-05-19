@@ -27,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
-	evmproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	fqc "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
 	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
@@ -96,14 +95,14 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to bind executor proxy at %s on chain %s: %w", defaultExecutor.Hex(), chain.String(), err)
 		}
-		getTargetReport, err := cldf_ops.ExecuteOperation(b, evmproxyops.NewReadGetTarget(execProxyContract), chain, ops2contract.FunctionInput[struct{}]{})
+		executorImpl, err := execProxyContract.GetTarget(&bind.CallOpts{Context: b.GetContext()})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 		}
-		if destChainSelectorsPerExecutor[getTargetReport.Output] == nil {
-			destChainSelectorsPerExecutor[getTargetReport.Output] = []ExecutorRemoteChainConfigArgs{}
+		if destChainSelectorsPerExecutor[executorImpl] == nil {
+			destChainSelectorsPerExecutor[executorImpl] = []ExecutorRemoteChainConfigArgs{}
 		}
-		destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
+		destChainSelectorsPerExecutor[executorImpl] = append(destChainSelectorsPerExecutor[executorImpl], ExecutorRemoteChainConfigArgs{
 			DestChainSelector: remoteSelector,
 			Config:            changesetadapters.ExecutorDestChainConfig(destChain.ExecutorDestChainConfig),
 		})

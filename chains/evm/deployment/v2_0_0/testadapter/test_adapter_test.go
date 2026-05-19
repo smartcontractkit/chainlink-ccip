@@ -112,7 +112,8 @@ func boolPtr(v bool) *bool { return &v }
 func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_evm.Chain, chainSelector uint64) laneContracts {
 	t.Helper()
 
-	create2FactoryRef, err := contract.MaybeDeployContract(env.OperationsBundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
+	bundle := testsetup.BundleWithFreshReporter(env.OperationsBundle)
+	create2FactoryRef, err := contract.MaybeDeployContract(bundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
@@ -122,7 +123,7 @@ func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_e
 	require.NoError(t, err)
 
 	deploymentReport, err := operations.ExecuteSequence(
-		env.OperationsBundle,
+		bundle,
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{

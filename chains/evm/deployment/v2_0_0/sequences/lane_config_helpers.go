@@ -3,6 +3,7 @@ package sequences
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -11,9 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
-	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 // FilterOffRampAdds reads all currently registered OffRamps from the Router in a single call,
@@ -58,12 +56,12 @@ func FilterExecutorDestChains(
 		if err != nil {
 			return nil, fmt.Errorf("bind executor at %s: %w", executorAddr.Hex(), err)
 		}
-		currentReport, err := cldf_ops.ExecuteOperation(b, executor.NewReadGetDestChains(execContract), chain, ops2contract.FunctionInput[struct{}]{})
+		currentDestChains, err := execContract.GetDestChains(&bind.CallOpts{Context: b.GetContext()})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dest chains from Executor(%s) on chain %v: %w", executorAddr, chain, err)
 		}
-		currentMap := make(map[uint64]execbind.ExecutorRemoteChainConfigArgs, len(currentReport.Output))
-		for _, current := range currentReport.Output {
+		currentMap := make(map[uint64]execbind.ExecutorRemoteChainConfigArgs, len(currentDestChains))
+		for _, current := range currentDestChains {
 			currentMap[current.DestChainSelector] = current
 		}
 		filtered := toAdd[:0]

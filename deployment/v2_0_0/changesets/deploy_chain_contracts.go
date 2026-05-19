@@ -188,7 +188,7 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				"committees", len(committeeVerifiers),
 			)
 
-			report, err := operations.ExecuteSequence(e.OperationsBundle, adapter.DeployChainContracts(), e.BlockChains, input)
+			report, err := operations.ExecuteSequence(changesets.BundleWithFreshReporter(e.OperationsBundle), adapter.DeployChainContracts(), e.BlockChains, input)
 			if err != nil {
 				return deployment.ChangesetOutput{Reports: allReports},
 					fmt.Errorf("failed to deploy chain contracts on chain %d: %w", sel, err)
