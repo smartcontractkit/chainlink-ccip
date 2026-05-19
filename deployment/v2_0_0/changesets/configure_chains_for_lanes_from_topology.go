@@ -7,6 +7,11 @@ import (
 	"strconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -14,10 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 const defaultQualifier = "default"
@@ -39,27 +40,6 @@ type CommitteeVerifierInputConfig struct {
 	CommitteeQualifier    string
 	RemoteChains          map[uint64]CommitteeVerifierRemoteChainConfig
 	AllowedFinalityConfig *finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
-}
-
-// FeeQuoterDestChainConfigOverrides provides lane-pair-specific overrides on top of the
-// chain-family defaults returned by the remote adapter's GetDefaultFeeQuoterDestChainConfig.
-// Nil fields are left at the adapter default; non-nil fields replace the default.
-//
-// DestGasOverhead is intentionally omitted — it is a LEGACY v2 field whose responsibility
-// moved to OnRamp.BaseExecutionGasCost. ChainFamilySelector is also omitted because it is
-// always auto-populated from the remote adapter.
-type FeeQuoterDestChainConfigOverrides struct {
-	OverrideExistingConfig      bool
-	IsEnabled                   *bool
-	MaxDataBytes                *uint32
-	MaxPerMsgGasLimit           *uint32
-	DestGasPerPayloadByteBase   *uint8
-	DefaultTokenFeeUSDCents     *uint16
-	DefaultTokenDestGasOverhead *uint32
-	DefaultTxGasLimit           *uint32
-	NetworkFeeUSDCents          *uint16
-	LinkFeeMultiplierPercent    *uint8
-	USDPerUnitGas               *big.Int
 }
 
 // PartialRemoteChainConfig is the user-facing input for a single remote chain. All fields
@@ -84,7 +64,7 @@ type PartialRemoteChainConfig struct {
 	LaneMandatedInboundCCVs   []datastore.AddressRef
 	DefaultOutboundCCVs       []datastore.AddressRef
 	LaneMandatedOutboundCCVs  []datastore.AddressRef
-	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
+	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides
 	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig // nil = use adapter default
 	BaseExecutionGasCost      *uint32                           // nil = use adapter default
 	TokenReceiverAllowed      *bool
@@ -501,21 +481,21 @@ func resolveRemoteChainConfig(
 	}
 
 	return adapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:          &allowTrafficFrom,
-		OnRamps:                   [][]byte{remoteOnRampBytes},
-		OffRamp:                   remoteOffRampBytes,
-		DefaultExecutor:           executorAddr,
-		DefaultInboundCCVs:        defaultInboundCCVs,
-		LaneMandatedInboundCCVs:   laneMandatedInboundCCVs,
-		DefaultOutboundCCVs:       defaultOutboundCCVs,
-		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
-		FeeQuoterDestChainConfig:  fqConfig,
-		ExecutorDestChainConfig:   executorConfig,
-		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
-		BaseExecutionGasCost:      baseExecutionGasCost,
-		TokenReceiverAllowed:      &tokenReceiverAllowed,
-		MessageNetworkFeeUSDCents: messageNetworkFeeUSDCents,
-		TokenNetworkFeeUSDCents:   tokenNetworkFeeUSDCents,
+		AllowTrafficFrom:                  &allowTrafficFrom,
+		OnRamps:                           [][]byte{remoteOnRampBytes},
+		OffRamp:                           remoteOffRampBytes,
+		DefaultExecutor:                   executorAddr,
+		DefaultInboundCCVs:                defaultInboundCCVs,
+		LaneMandatedInboundCCVs:           laneMandatedInboundCCVs,
+		DefaultOutboundCCVs:               defaultOutboundCCVs,
+		LaneMandatedOutboundCCVs:          laneMandatedOutboundCCVs,
+		FeeQuoterDestChainConfigOverrides: fqConfig,
+		ExecutorDestChainConfig:           executorConfig,
+		AddressBytesLength:                remoteAdapter.GetAddressBytesLength(),
+		BaseExecutionGasCost:              baseExecutionGasCost,
+		TokenReceiverAllowed:              &tokenReceiverAllowed,
+		MessageNetworkFeeUSDCents:         messageNetworkFeeUSDCents,
+		TokenNetworkFeeUSDCents:           tokenNetworkFeeUSDCents,
 	}, nil
 }
 
@@ -627,41 +607,45 @@ func mergeCommitteeVerifierRemoteChainConfig(
 }
 
 func mergeFeeQuoterDestChainConfig(
-	defaults adapters.FeeQuoterDestChainConfig,
-	overrides FeeQuoterDestChainConfigOverrides,
-) adapters.FeeQuoterDestChainConfig {
-	defaults.OverrideExistingConfig = overrides.OverrideExistingConfig
+	defaults adapters.FeeQuoterDestChainConfigOverrides,
+	overrides adapters.FeeQuoterDestChainConfigOverrides,
+) adapters.FeeQuoterDestChainConfigOverrides {
+	out := defaults
+	out.OverrideExistingConfig = overrides.OverrideExistingConfig
 	if overrides.IsEnabled != nil {
-		defaults.IsEnabled = *overrides.IsEnabled
+		out.IsEnabled = overrides.IsEnabled
 	}
 	if overrides.MaxDataBytes != nil {
-		defaults.MaxDataBytes = *overrides.MaxDataBytes
+		out.MaxDataBytes = overrides.MaxDataBytes
 	}
 	if overrides.MaxPerMsgGasLimit != nil {
-		defaults.MaxPerMsgGasLimit = *overrides.MaxPerMsgGasLimit
+		out.MaxPerMsgGasLimit = overrides.MaxPerMsgGasLimit
 	}
 	if overrides.DestGasPerPayloadByteBase != nil {
-		defaults.DestGasPerPayloadByteBase = *overrides.DestGasPerPayloadByteBase
+		out.DestGasPerPayloadByteBase = overrides.DestGasPerPayloadByteBase
+	}
+	if overrides.ChainFamilySelector != [4]byte{} {
+		out.ChainFamilySelector = overrides.ChainFamilySelector
 	}
 	if overrides.DefaultTokenFeeUSDCents != nil {
-		defaults.DefaultTokenFeeUSDCents = *overrides.DefaultTokenFeeUSDCents
+		out.DefaultTokenFeeUSDCents = overrides.DefaultTokenFeeUSDCents
 	}
 	if overrides.DefaultTokenDestGasOverhead != nil {
-		defaults.DefaultTokenDestGasOverhead = *overrides.DefaultTokenDestGasOverhead
+		out.DefaultTokenDestGasOverhead = overrides.DefaultTokenDestGasOverhead
 	}
 	if overrides.DefaultTxGasLimit != nil {
-		defaults.DefaultTxGasLimit = *overrides.DefaultTxGasLimit
+		out.DefaultTxGasLimit = overrides.DefaultTxGasLimit
 	}
 	if overrides.NetworkFeeUSDCents != nil {
-		defaults.NetworkFeeUSDCents = *overrides.NetworkFeeUSDCents
+		out.NetworkFeeUSDCents = overrides.NetworkFeeUSDCents
 	}
 	if overrides.LinkFeeMultiplierPercent != nil {
-		defaults.LinkFeeMultiplierPercent = *overrides.LinkFeeMultiplierPercent
+		out.LinkFeeMultiplierPercent = overrides.LinkFeeMultiplierPercent
 	}
 	if overrides.USDPerUnitGas != nil {
-		defaults.USDPerUnitGas = new(big.Int).Set(overrides.USDPerUnitGas)
+		out.USDPerUnitGas = new(big.Int).Set(overrides.USDPerUnitGas)
 	}
-	return defaults
+	return out
 }
 
 // filterNOPsToCommitteeMembers returns only the NOPs whose aliases appear in at least one
