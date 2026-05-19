@@ -933,33 +933,11 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				}
 			}
 
-			// Demo OutboundOnly TPRL: re-seed symmetric enabled rate limits (the rls loop
-			// above ends in a disabled state), then shrink the selector→dst outbound only.
-			// The counterpart config is refs-only — the changeset reads dst's on-chain
-			// inbound and verifies it has at least 110% headroom for the new outbound.
-			seedRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 1234567.89, Rate: 123456.789, IsEnabled: true}
-			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
-				Configs: map[uint64]tokensapi.TPRLConfig{
-					selector: {
-						ChainAdapterVersion: v1_6_0,
-						TokenRef:            tokenRef,
-						TokenPoolRef:        tokenPoolRef,
-						RemoteOutbounds:     map[uint64]tokensapi.RemoteOutbounds{dst.ChainSelector(): {RateLimit: &seedRL}},
-					},
-					dst.ChainSelector(): {
-						ChainAdapterVersion: v1_6_0,
-						TokenRef:            dstTokenRef,
-						TokenPoolRef:        dstTokenPoolRef,
-						RemoteOutbounds:     map[uint64]tokensapi.RemoteOutbounds{selector: {RateLimit: &seedRL}},
-					},
-				},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("seeding rate limits before OutboundOnly demo for selector %d to %d: %w",
-					selector, dst.ChainSelector(), err)
-			}
-
-			shrunkOutbound := tokensapi.RateLimiterConfigFloatInput{Capacity: 500000, Rate: 50000, IsEnabled: true}
+			// Demo OutboundOnly TPRL: disable the selector→dst outbound only. A disabled
+			// outbound short-circuits the changeset's 110% counterpart-inbound check, so this
+			// demo exercises the OutboundOnly flag plumbing (local pass-through inbound read
+			// on selector's pool) without depending on the counterpart's current state.
+			disabledOutbound := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
 			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
 				Configs: map[uint64]tokensapi.TPRLConfig{
 					selector: {
@@ -968,7 +946,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 						TokenPoolRef:        tokenPoolRef,
 						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{dst.ChainSelector(): {
 							OutboundOnly: true,
-							RateLimit:    &shrunkOutbound,
+							RateLimit:    &disabledOutbound,
 						}},
 					},
 					// Counterpart still needs refs (used to resolve pool/decimals for the
