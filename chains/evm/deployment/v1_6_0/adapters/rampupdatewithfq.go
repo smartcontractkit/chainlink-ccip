@@ -14,6 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -22,7 +25,6 @@ import (
 type RampUpdateWithFQ struct{}
 
 func (ru RampUpdateWithFQ) ResolveRampsInput(e cldf.Environment, input deploy.UpdateRampsInput) (deploy.UpdateRampsInput, error) {
-	// fetch address of Ramps
 	onRampAddr := datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -69,47 +71,49 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-			onDCfgReport, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.OnRampAddressRef.Address),
-			})
+
+			onRampAddr := common.HexToAddress(input.OnRampAddressRef.Address)
+			onRamp, err := orbind.NewOnRamp(onRampAddr, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind OnRamp at %s: %w", onRampAddr.Hex(), err)
+			}
+
+			onDCfgReport, err := cldf_ops.ExecuteOperation(b, onrampops.NewReadGetDynamicConfig(onRamp), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
 			existingDynamicConfig := onDCfgReport.Output
 			if existingDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
-				// Update OnRamp's FeeQuoter address
 				existingDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
-				onRampReport, err := cldf_ops.ExecuteOperation(b, onrampops.SetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
-					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(input.OnRampAddressRef.Address),
-					Args:          existingDynamicConfig,
+				onRampReport, err := cldf_ops.ExecuteOperation(b, onrampops.NewWriteSetDynamicConfig(onRamp), chain, ops2contract.FunctionInput[orbind.OnRampDynamicConfig]{
+					Args: existingDynamicConfig,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}
-				writes = append(writes, onRampReport.Output)
+				writes = append(writes, writeOutputOps2ToLegacy(onRampReport.Output))
 			}
-			// Similarly, update OffRamp's FeeQuoter address
-			offDCfgReport, err := cldf_ops.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-			})
+
+			offRampAddr := common.HexToAddress(input.OffRampAddressRef.Address)
+			offRamp, err := offbind.NewOffRamp(offRampAddr, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind OffRamp at %s: %w", offRampAddr.Hex(), err)
+			}
+
+			offDCfgReport, err := cldf_ops.ExecuteOperation(b, offrampops.NewReadGetDynamicConfig(offRamp), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
 			existingOffDynamicConfig := offDCfgReport.Output
 			if existingOffDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
 				existingOffDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
-				offRampReport, err := cldf_ops.ExecuteOperation(b, offrampops.SetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
-					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-					Args:          existingOffDynamicConfig,
+				offRampReport, err := cldf_ops.ExecuteOperation(b, offrampops.NewWriteSetDynamicConfig(offRamp), chain, ops2contract.FunctionInput[offbind.OffRampDynamicConfig]{
+					Args: existingOffDynamicConfig,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}
-				writes = append(writes, offRampReport.Output)
+				writes = append(writes, writeOutputOps2ToLegacy(offRampReport.Output))
 			}
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {

@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	burnfromminttokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_from_mint_token_pool"
@@ -129,13 +128,7 @@ func init() {
 		chainsel.FamilyEVM,
 		rmnops.ContractType,
 		rmnops.Version,
-		NewEVMAuthorizedCallersAdapter(
-			rmnops.ApplyAuthorizedCallerUpdates,
-			rmnops.GetAllAuthorizedCallers,
-			func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-				return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
-			},
-		),
+		NewRMNAuthorizedCallersAdapter(),
 	)
 }
 

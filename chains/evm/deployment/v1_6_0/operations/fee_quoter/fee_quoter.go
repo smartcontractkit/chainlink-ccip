@@ -29,28 +29,6 @@ type GetTokenTransferFeeConfigArgs struct {
 	Token             common.Address `json:"token"`
 }
 
-type ConstructorArgs struct {
-	StaticConfig                   gobindings.FeeQuoterStaticConfig                 `json:"staticConfig"`
-	PriceUpdaters                  []common.Address                                 `json:"priceUpdaters"`
-	FeeTokens                      []common.Address                                 `json:"feeTokens"`
-	TokenPriceFeeds                []gobindings.FeeQuoterTokenPriceFeedUpdate       `json:"tokenPriceFeeds"`
-	TokenTransferFeeConfigArgs     []gobindings.FeeQuoterTokenTransferFeeConfigArgs `json:"tokenTransferFeeConfigArgs"`
-	PremiumMultiplierWeiPerEthArgs []gobindings.FeeQuoterPremiumMultiplierWeiPerEthArgs `json:"premiumMultiplierWeiPerEthArgs"`
-	DestChainConfigArgs            []gobindings.FeeQuoterDestChainConfigArgs        `json:"destChainConfigArgs"`
-}
-
-var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:             "fee-quoter:deploy",
-	Version:          Version,
-	Description:      "Deploys the FeeQuoter contract",
-	ContractMetadata: gobindings.FeeQuoterMetaData,
-	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
-			EVM: common.FromHex(gobindings.FeeQuoterMetaData.Bin),
-		},
-	},
-})
-
 func NewWriteApplyDestChainConfigUpdates(c gobindings.FeeQuoterInterface) *cld_ops.Operation[contract.FunctionInput[[]gobindings.FeeQuoterDestChainConfigArgs], contract.WriteOutput, cldf_evm.Chain] {
 	return contract.NewWrite(contract.WriteParams[[]gobindings.FeeQuoterDestChainConfigArgs, gobindings.FeeQuoterInterface]{
 		Name:         "fee-quoter:apply-dest-chain-config-updates",

@@ -10,6 +10,7 @@ import (
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	fqbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 )
 
 func TestFeeQuoterUpdate_IsEmpty(t *testing.T) {
@@ -49,7 +50,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         linkToken,
 					MaxFeeJuelsPerMsg: maxFeeJuelsPerMsg,
 				},
@@ -68,7 +69,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		maxFeeJuelsPerMsg15 := big.NewInt(1000000000000000000) // 1 LINK
 		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         linkToken16,
 					MaxFeeJuelsPerMsg: maxFeeJuelsPerMsg16,
 				},
@@ -76,7 +77,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         linkToken15,
 					MaxFeeJuelsPerMsg: maxFeeJuelsPerMsg15,
 				},
@@ -92,23 +93,23 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	t.Run("ConstructorArgs - merge DestChainConfig,PriceUpdaters TokenTransferFeeConfigArgs", func(t *testing.T) {
 		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 					MaxFeeJuelsPerMsg: big.NewInt(2000000000000000000), // 2 LINK
 				},
 				PriceUpdaters: []common.Address{addr1, addr2},
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1},
 						},
 					},
 				},
-				DestChainConfigArgs: []fqops.DestChainConfigArgs{
+				DestChainConfigArgs: []fqbind.FeeQuoterDestChainConfigArgs{
 					{
 						DestChainSelector: 100,
-						DestChainConfig: fqops.DestChainConfig{
+						DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 1000,
 						},
@@ -118,36 +119,36 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
 					MaxFeeJuelsPerMsg: big.NewInt(1000000000000000000), // 1 LINK
 				},
 				PriceUpdaters: []common.Address{addr2, addr3}, // addr2 is duplicate
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate selector
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr2},
 						},
 					},
 					{
 						DestChainSelector: 200, // unique selector
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3},
 						},
 					},
 				},
-				DestChainConfigArgs: []fqops.DestChainConfigArgs{
+				DestChainConfigArgs: []fqbind.FeeQuoterDestChainConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate selector
-						DestChainConfig: fqops.DestChainConfig{
+						DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 							IsEnabled:    false,
 							MaxDataBytes: 2000,
 						},
 					},
 					{
 						DestChainSelector: 200, // unique selector
-						DestChainConfig: fqops.DestChainConfig{
+						DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 3000,
 						},
@@ -157,36 +158,36 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		expected := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 					MaxFeeJuelsPerMsg: big.NewInt(2000000000000000000), // from output16
 				},
 				PriceUpdaters: []common.Address{addr1, addr2, addr3}, // merged with duplicates removed
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1}, // from output16 (takes precedence)
 						},
 					},
 					{
 						DestChainSelector: 200,
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3}, // from output15
 						},
 					},
 				},
-				DestChainConfigArgs: []fqops.DestChainConfigArgs{
+				DestChainConfigArgs: []fqbind.FeeQuoterDestChainConfigArgs{
 					{
 						DestChainSelector: 100,
-						DestChainConfig: fqops.DestChainConfig{
+						DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 1000,
 						},
 					},
 					{
 						DestChainSelector: 200,
-						DestChainConfig: fqops.DestChainConfig{
+						DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 3000,
 						},
@@ -214,10 +215,10 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 
 	t.Run("DestChainConfigs - output16 takes precedence for duplicates", func(t *testing.T) {
 		output16 := sequences.FeeQuoterUpdate{
-			DestChainConfigs: []fqops.DestChainConfigArgs{
+			DestChainConfigs: []fqbind.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: 100,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 						IsEnabled:    true,
 						MaxDataBytes: 1000,
 					},
@@ -225,17 +226,17 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 			},
 		}
 		output15 := sequences.FeeQuoterUpdate{
-			DestChainConfigs: []fqops.DestChainConfigArgs{
+			DestChainConfigs: []fqbind.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: 100, // duplicate selector
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 						IsEnabled:    false,
 						MaxDataBytes: 2000,
 					},
 				},
 				{
 					DestChainSelector: 200, // unique selector
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 						IsEnabled:    true,
 						MaxDataBytes: 3000,
 					},
@@ -257,10 +258,10 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	t.Run("TokenTransferFeeConfigArgs - output16 takes precedence for duplicates", func(t *testing.T) {
 		output16 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1},
 						},
 					},
@@ -269,16 +270,16 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		output15 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr2},
 						},
 					},
 					{
 						DestChainSelector: 200, // unique
-						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3},
 						},
 					},
@@ -299,7 +300,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	t.Run("TokensToUseDefaultFeeConfigs - merge by DestChainSelector and Token", func(t *testing.T) {
 		output16 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokensToUseDefaultFeeConfigs: []fqops.TokenTransferFeeConfigRemoveArgs{
+				TokensToUseDefaultFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs{
 					{DestChainSelector: 100, Token: addr1},
 					{DestChainSelector: 100, Token: addr2},
 				},
@@ -307,7 +308,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		output15 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokensToUseDefaultFeeConfigs: []fqops.TokenTransferFeeConfigRemoveArgs{
+				TokensToUseDefaultFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs{
 					{DestChainSelector: 100, Token: addr2}, // duplicate
 					{DestChainSelector: 200, Token: addr3}, // unique
 				},
@@ -318,22 +319,22 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		require.Len(t, result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs, 3)
 		// Verify all expected entries are present
 		require.Contains(t, result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
-			fqops.TokenTransferFeeConfigRemoveArgs{DestChainSelector: 100, Token: addr1})
+			fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs{DestChainSelector: 100, Token: addr1})
 		require.Contains(t, result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
-			fqops.TokenTransferFeeConfigRemoveArgs{DestChainSelector: 100, Token: addr2})
+			fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs{DestChainSelector: 100, Token: addr2})
 		require.Contains(t, result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
-			fqops.TokenTransferFeeConfigRemoveArgs{DestChainSelector: 200, Token: addr3})
+			fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs{DestChainSelector: 200, Token: addr3})
 	})
 
 	t.Run("AuthorizedCallerUpdates - merge unique entries", func(t *testing.T) {
 		output16 := sequences.FeeQuoterUpdate{
-			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AuthorizedCallerUpdates: fqbind.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers:   []common.Address{addr1, addr2},
 				RemovedCallers: []common.Address{addr3},
 			},
 		}
 		output15 := sequences.FeeQuoterUpdate{
-			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AuthorizedCallerUpdates: fqbind.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers:   []common.Address{addr2, addr4}, // addr2 is duplicate
 				RemovedCallers: []common.Address{addr3, addr5}, // addr3 is duplicate
 			},
@@ -356,41 +357,41 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		maxFeeJuelsPerMsg15 := big.NewInt(1000000000000000000) // 1 LINK
 		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         linkToken16,
 					MaxFeeJuelsPerMsg: maxFeeJuelsPerMsg16,
 				},
 			},
-			DestChainConfigs: []fqops.DestChainConfigArgs{
-				{DestChainSelector: 200, DestChainConfig: fqops.DestChainConfig{IsEnabled: true}},
+			DestChainConfigs: []fqbind.FeeQuoterDestChainConfigArgs{
+				{DestChainSelector: 200, DestChainConfig: fqbind.FeeQuoterDestChainConfig{IsEnabled: true}},
 			},
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
-					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr1}}},
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
+					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr1}}},
 				},
 			},
-			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AuthorizedCallerUpdates: fqbind.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers: []common.Address{addr1},
 			},
 		}
 		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					LinkToken:         linkToken15,
 					MaxFeeJuelsPerMsg: maxFeeJuelsPerMsg15,
 				},
 			},
-			DestChainConfigs: []fqops.DestChainConfigArgs{
-				{DestChainSelector: 200, DestChainConfig: fqops.DestChainConfig{IsEnabled: false}}, // duplicate
-				{DestChainSelector: 300, DestChainConfig: fqops.DestChainConfig{IsEnabled: true}},  // unique
+			DestChainConfigs: []fqbind.FeeQuoterDestChainConfigArgs{
+				{DestChainSelector: 200, DestChainConfig: fqbind.FeeQuoterDestChainConfig{IsEnabled: false}}, // duplicate
+				{DestChainSelector: 300, DestChainConfig: fqbind.FeeQuoterDestChainConfig{IsEnabled: true}},  // unique
 			},
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
-					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr2}}}, // duplicate
-					{DestChainSelector: 500, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr3}}}, // unique
+				TokenTransferFeeConfigArgs: []fqbind.FeeQuoterTokenTransferFeeConfigArgs{
+					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr2}}}, // duplicate
+					{DestChainSelector: 500, TokenTransferFeeConfigs: []fqbind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr3}}}, // unique
 				},
 			},
-			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
+			AuthorizedCallerUpdates: fqbind.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers: []common.Address{addr2, addr3},
 			},
 		}
@@ -414,21 +415,21 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	})
 }
 
-func destChainConfigsFromSelectors(selectors ...uint64) []fqops.DestChainConfigArgs {
-	out := make([]fqops.DestChainConfigArgs, len(selectors))
+func destChainConfigsFromSelectors(selectors ...uint64) []fqbind.FeeQuoterDestChainConfigArgs {
+	out := make([]fqbind.FeeQuoterDestChainConfigArgs, len(selectors))
 	for i, s := range selectors {
-		out[i] = fqops.DestChainConfigArgs{
+		out[i] = fqbind.FeeQuoterDestChainConfigArgs{
 			DestChainSelector: s,
-			DestChainConfig:   fqops.DestChainConfig{IsEnabled: true},
+			DestChainConfig:   fqbind.FeeQuoterDestChainConfig{IsEnabled: true},
 		}
 	}
 	return out
 }
 
-func tokenTransferFeeConfigArgsFromSelectors(selectors ...uint64) []fqops.TokenTransferFeeConfigArgs {
-	out := make([]fqops.TokenTransferFeeConfigArgs, len(selectors))
+func tokenTransferFeeConfigArgsFromSelectors(selectors ...uint64) []fqbind.FeeQuoterTokenTransferFeeConfigArgs {
+	out := make([]fqbind.FeeQuoterTokenTransferFeeConfigArgs, len(selectors))
 	for i, s := range selectors {
-		out[i] = fqops.TokenTransferFeeConfigArgs{DestChainSelector: s}
+		out[i] = fqbind.FeeQuoterTokenTransferFeeConfigArgs{DestChainSelector: s}
 	}
 	return out
 }
@@ -447,7 +448,7 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		cfgs := destChainConfigsFromSelectors(1, 2, 3)
 		input := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
+				DestChainConfigArgs: append([]fqbind.FeeQuoterDestChainConfigArgs(nil), cfgs...),
 			},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
@@ -467,14 +468,14 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		cfgs := destChainConfigsFromSelectors(selectors...)
 		input := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
+				DestChainConfigArgs: append([]fqbind.FeeQuoterDestChainConfigArgs(nil), cfgs...),
 			},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Len(t, input.ConstructorArgs.DestChainConfigArgs, 8)
 		require.Equal(t, cfgs[:8], input.ConstructorArgs.DestChainConfigArgs)
 		require.Len(t, got.DestChainConfigBatches, 1)
-		require.Equal(t, []fqops.DestChainConfigArgs{cfgs[8]}, got.DestChainConfigBatches[0])
+		require.Equal(t, []fqbind.FeeQuoterDestChainConfigArgs{cfgs[8]}, got.DestChainConfigBatches[0])
 		require.Nil(t, got.TokenTransferFeeConfigBatches)
 		require.Nil(t, got.GasPriceUpdateBatches)
 		require.Nil(t, got.TokenPriceUpdateBatches)
@@ -487,7 +488,7 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		}
 		cfgs := destChainConfigsFromSelectors(selectors...)
 		input := sequences.FeeQuoterUpdate{
-			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), cfgs...),
+			DestChainConfigs: append([]fqbind.FeeQuoterDestChainConfigArgs(nil), cfgs...),
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Len(t, got.DestChainConfigBatches, 2)
@@ -504,13 +505,13 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		updates := destChainConfigsFromSelectors(10, 11, 12)
 		input := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				DestChainConfigArgs: append([]fqops.DestChainConfigArgs(nil), cons...),
+				DestChainConfigArgs: append([]fqbind.FeeQuoterDestChainConfigArgs(nil), cons...),
 			},
-			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), updates...),
+			DestChainConfigs: append([]fqbind.FeeQuoterDestChainConfigArgs(nil), updates...),
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Len(t, got.DestChainConfigBatches, 2)
-		require.Equal(t, []fqops.DestChainConfigArgs{cons[sequences.DestChainConfigUpdateBatchLen]}, got.DestChainConfigBatches[0])
+		require.Equal(t, []fqbind.FeeQuoterDestChainConfigArgs{cons[sequences.DestChainConfigUpdateBatchLen]}, got.DestChainConfigBatches[0])
 		require.Equal(t, updates, got.DestChainConfigBatches[1])
 	})
 
@@ -522,7 +523,7 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		args := tokenTransferFeeConfigArgsFromSelectors(selectors...)
 		input := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
-				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), args...),
+				TokenTransferFeeConfigArgs: append([]fqbind.FeeQuoterTokenTransferFeeConfigArgs(nil), args...),
 			},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
@@ -530,7 +531,7 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		require.Len(t, input.ConstructorArgs.TokenTransferFeeConfigArgs, sequences.TokenTransferFeeConfigUpdateBatchLen)
 		require.Equal(t, args[:sequences.TokenTransferFeeConfigUpdateBatchLen], input.ConstructorArgs.TokenTransferFeeConfigArgs)
 		require.Len(t, got.TokenTransferFeeConfigBatches, 1)
-		require.Equal(t, []fqops.TokenTransferFeeConfigArgs{args[sequences.TokenTransferFeeConfigUpdateBatchLen]}, got.TokenTransferFeeConfigBatches[0])
+		require.Equal(t, []fqbind.FeeQuoterTokenTransferFeeConfigArgs{args[sequences.TokenTransferFeeConfigUpdateBatchLen]}, got.TokenTransferFeeConfigBatches[0])
 		require.Nil(t, got.GasPriceUpdateBatches)
 		require.Nil(t, got.TokenPriceUpdateBatches)
 	})
@@ -543,7 +544,7 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		args := tokenTransferFeeConfigArgsFromSelectors(selectors...)
 		input := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), args...),
+				TokenTransferFeeConfigArgs: append([]fqbind.FeeQuoterTokenTransferFeeConfigArgs(nil), args...),
 			},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
@@ -569,9 +570,9 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 		tokenArgs := tokenTransferFeeConfigArgsFromSelectors(tokenSelectors...)
 
 		input := sequences.FeeQuoterUpdate{
-			DestChainConfigs: append([]fqops.DestChainConfigArgs(nil), destCfgs...),
+			DestChainConfigs: append([]fqbind.FeeQuoterDestChainConfigArgs(nil), destCfgs...),
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: append([]fqops.TokenTransferFeeConfigArgs(nil), tokenArgs...),
+				TokenTransferFeeConfigArgs: append([]fqbind.FeeQuoterTokenTransferFeeConfigArgs(nil), tokenArgs...),
 			},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
@@ -588,15 +589,15 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 	})
 
 	t.Run("GasPriceUpdates within batch size returns single batch", func(t *testing.T) {
-		gasUpdates := make([]fqops.GasPriceUpdate, sequences.GasPriceUpdateBatchLen)
+		gasUpdates := make([]fqbind.InternalGasPriceUpdate, sequences.GasPriceUpdateBatchLen)
 		for i := range gasUpdates {
-			gasUpdates[i] = fqops.GasPriceUpdate{
+			gasUpdates[i] = fqbind.InternalGasPriceUpdate{
 				DestChainSelector: uint64(i + 1),
 				UsdPerUnitGas:     big.NewInt(int64(i + 1)),
 			}
 		}
 		input := sequences.FeeQuoterUpdate{
-			PriceUpdates: fqops.PriceUpdates{GasPriceUpdates: append([]fqops.GasPriceUpdate(nil), gasUpdates...)},
+			PriceUpdates: fqbind.InternalPriceUpdates{GasPriceUpdates: append([]fqbind.InternalGasPriceUpdate(nil), gasUpdates...)},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Nil(t, got.DestChainConfigBatches)
@@ -609,15 +610,15 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 
 	t.Run("GasPriceUpdates over batch size split into batches of GasPriceUpdateBatchLen", func(t *testing.T) {
 		n := sequences.GasPriceUpdateBatchLen + 3
-		gasUpdates := make([]fqops.GasPriceUpdate, n)
+		gasUpdates := make([]fqbind.InternalGasPriceUpdate, n)
 		for i := range gasUpdates {
-			gasUpdates[i] = fqops.GasPriceUpdate{
+			gasUpdates[i] = fqbind.InternalGasPriceUpdate{
 				DestChainSelector: uint64(100 + i),
 				UsdPerUnitGas:     big.NewInt(int64(100 + i)),
 			}
 		}
 		input := sequences.FeeQuoterUpdate{
-			PriceUpdates: fqops.PriceUpdates{GasPriceUpdates: append([]fqops.GasPriceUpdate(nil), gasUpdates...)},
+			PriceUpdates: fqbind.InternalPriceUpdates{GasPriceUpdates: append([]fqbind.InternalGasPriceUpdate(nil), gasUpdates...)},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Nil(t, got.DestChainConfigBatches)
@@ -630,15 +631,15 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 	})
 
 	t.Run("TokenPriceUpdates within batch size returns single batch", func(t *testing.T) {
-		tokenUpdates := make([]fqops.TokenPriceUpdate, sequences.TokenPriceUpdateBatchLen)
+		tokenUpdates := make([]fqbind.InternalTokenPriceUpdate, sequences.TokenPriceUpdateBatchLen)
 		for i := range tokenUpdates {
-			tokenUpdates[i] = fqops.TokenPriceUpdate{
+			tokenUpdates[i] = fqbind.InternalTokenPriceUpdate{
 				SourceToken: common.BytesToAddress([]byte{byte(i + 1)}),
 				UsdPerToken: big.NewInt(int64(i + 1)),
 			}
 		}
 		input := sequences.FeeQuoterUpdate{
-			PriceUpdates: fqops.PriceUpdates{TokenPriceUpdates: append([]fqops.TokenPriceUpdate(nil), tokenUpdates...)},
+			PriceUpdates: fqbind.InternalPriceUpdates{TokenPriceUpdates: append([]fqbind.InternalTokenPriceUpdate(nil), tokenUpdates...)},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Nil(t, got.DestChainConfigBatches)
@@ -651,15 +652,15 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 
 	t.Run("TokenPriceUpdates over batch size split into batches of TokenPriceUpdateBatchLen", func(t *testing.T) {
 		n := sequences.TokenPriceUpdateBatchLen + 2
-		tokenUpdates := make([]fqops.TokenPriceUpdate, n)
+		tokenUpdates := make([]fqbind.InternalTokenPriceUpdate, n)
 		for i := range tokenUpdates {
-			tokenUpdates[i] = fqops.TokenPriceUpdate{
+			tokenUpdates[i] = fqbind.InternalTokenPriceUpdate{
 				SourceToken: common.BytesToAddress([]byte{byte(100 + i)}),
 				UsdPerToken: big.NewInt(int64(100 + i)),
 			}
 		}
 		input := sequences.FeeQuoterUpdate{
-			PriceUpdates: fqops.PriceUpdates{TokenPriceUpdates: append([]fqops.TokenPriceUpdate(nil), tokenUpdates...)},
+			PriceUpdates: fqbind.InternalPriceUpdates{TokenPriceUpdates: append([]fqbind.InternalTokenPriceUpdate(nil), tokenUpdates...)},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)
 		require.Nil(t, got.DestChainConfigBatches)
@@ -673,19 +674,19 @@ func TestBatchedInputForSequenceFeeQuoterUpdate(t *testing.T) {
 
 	t.Run("gas and token price batches both split for large inputs", func(t *testing.T) {
 		gasN := sequences.GasPriceUpdateBatchLen + 1
-		gasUpdates := make([]fqops.GasPriceUpdate, gasN)
+		gasUpdates := make([]fqbind.InternalGasPriceUpdate, gasN)
 		for i := range gasUpdates {
-			gasUpdates[i] = fqops.GasPriceUpdate{DestChainSelector: uint64(i), UsdPerUnitGas: big.NewInt(1)}
+			gasUpdates[i] = fqbind.InternalGasPriceUpdate{DestChainSelector: uint64(i), UsdPerUnitGas: big.NewInt(1)}
 		}
 		tokenN := sequences.TokenPriceUpdateBatchLen + 3
-		tokenUpdates := make([]fqops.TokenPriceUpdate, tokenN)
+		tokenUpdates := make([]fqbind.InternalTokenPriceUpdate, tokenN)
 		for i := range tokenUpdates {
-			tokenUpdates[i] = fqops.TokenPriceUpdate{SourceToken: common.BytesToAddress([]byte{byte(200 + i)}), UsdPerToken: big.NewInt(2)}
+			tokenUpdates[i] = fqbind.InternalTokenPriceUpdate{SourceToken: common.BytesToAddress([]byte{byte(200 + i)}), UsdPerToken: big.NewInt(2)}
 		}
 		input := sequences.FeeQuoterUpdate{
-			PriceUpdates: fqops.PriceUpdates{
-				GasPriceUpdates:   append([]fqops.GasPriceUpdate(nil), gasUpdates...),
-				TokenPriceUpdates: append([]fqops.TokenPriceUpdate(nil), tokenUpdates...),
+			PriceUpdates: fqbind.InternalPriceUpdates{
+				GasPriceUpdates:   append([]fqbind.InternalGasPriceUpdate(nil), gasUpdates...),
+				TokenPriceUpdates: append([]fqbind.InternalTokenPriceUpdate(nil), tokenUpdates...),
 			},
 		}
 		got := sequences.BatchedInputForSequenceFeeQuoterUpdate(&input)

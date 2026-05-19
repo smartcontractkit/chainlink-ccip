@@ -12,6 +12,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -323,10 +324,9 @@ func TestTokenAdapter(t *testing.T) {
 				require.Equal(t, tokenPoolAddr, tokenConfigReport.Output.TokenPool, "Token pool address in registry should match deployed token pool address")
 				require.Equal(t, evmChain.DeployerKey.From, tokenConfigReport.Output.Administrator, "Deployer should be the admin of the token in the registry")
 
-				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       tokenPoolAddr,
-				})
+				tp, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
+				require.NoError(t, err, "Failed to bind token pool")
+				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetSupportedChains(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 				require.NoError(t, err, "Failed to get supported chains from token pool")
 				require.Len(t, chainSupportReport.Output, 1, "There should be 1 supported remote chain in the token pool")
 				var remoteChainSel uint64
@@ -339,9 +339,7 @@ func TestTokenAdapter(t *testing.T) {
 
 				// GetCurrentRateLimiterState is only available in version 2.0.0+
 				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
-					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
-						ChainSelector: chainSel,
-						Address:       tokenPoolAddr,
+					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetCurrentRateLimiterState(tp), evmChain, ops2contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
 						Args: token_pool.GetCurrentRateLimiterStateArgs{
 							RemoteChainSelector: remoteChainSel,
 						},
@@ -501,18 +499,14 @@ func TestTokenExpansion(t *testing.T) {
 		require.NoError(t, err, "Token pool should exist in datastore")
 
 		// Verify token pool points to the correct token
-		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
-		})
+		tp, err := tp_bindings.NewTokenPool(poolAddr, evmChain.Client)
+		require.NoError(t, err)
+		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetToken(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 		require.NoError(t, err)
 		require.Equal(t, tokenAddr, getTokenReport.Output, "Token pool should point to the deployed token")
 
 		// Verify token pool decimals
-		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
-		})
+		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetTokenDecimals(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 		require.NoError(t, err)
 		require.Equal(t, uint8(18), getDecimalsReport.Output, "Token pool decimals should match token decimals")
 
@@ -653,12 +647,11 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
-	readDynamicConfig := func(t *testing.T) token_pool.GetDynamicConfigResult {
+	tp, err := tp_bindings.NewTokenPool(poolAddr, evmChain.Client)
+	require.NoError(t, err)
+	readDynamicConfig := func(t *testing.T) tp_bindings.GetDynamicConfig {
 		t.Helper()
-		report, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
-		})
+		report, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetDynamicConfig(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 		require.NoError(t, err)
 		return report.Output
 	}
@@ -793,10 +786,9 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
-	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       poolAddr,
-	})
+	tp, err := tp_bindings.NewTokenPool(poolAddr, evmChain.Client)
+	require.NoError(t, err)
+	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetDynamicConfig(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 	require.NoError(t, err)
 	require.Equal(t, testRouter, cfgReport.Output.Router, "freshly-deployed pool should be wired to TestRouter when RouterRef points at it")
 }

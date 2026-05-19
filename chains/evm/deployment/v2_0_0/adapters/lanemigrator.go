@@ -15,9 +15,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -27,11 +24,18 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
+	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	or160bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	fqbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
@@ -185,11 +189,12 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 		}
 
 		// get the fee quoter from onRamp
-		feeQuoterOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampops_v160.GetDynamicConfig,
-			evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: chainSelector,
-				Address:       onRampOnRouterOut.Output,
-			})
+		onRamp160, err := or160bind.NewOnRamp(onRampOnRouterOut.Output, evmChain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to bind OnRamp v1.6.0 at %s: %w", onRampOnRouterOut.Output.Hex(), err)
+		}
+		feeQuoterOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampops_v160.NewReadGetDynamicConfig(onRamp160),
+			evmChain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return fmt.Errorf("error fetching fee quoter from onRamp for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
 		}
@@ -322,7 +327,15 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error finding feequoter address ref: %w", err)
 			}
-			feeQuoterContract, err := fee_quoter.NewFeeQuoter(feequoterAddr, c.Client)
+			onRamp, err := orbind.NewOnRamp(onRampAddr, c.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind OnRamp at %s: %w", onRampAddr.Hex(), err)
+			}
+			offRamp, err := offbind.NewOffRamp(offRampAddr, c.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind OffRamp at %s: %w", offRampAddr.Hex(), err)
+			}
+			feeQuoterContract, err := fqbind.NewFeeQuoter(feequoterAddr, c.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error creating fee quoter contract instance: %w", err)
 			}
@@ -331,15 +344,12 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error formatting router address ref: %w", err)
 			}
-			var onRampArgs []onrampops.DestChainConfigArgs
-			var offRampArgs []offrampops.SourceChainConfigArgs
-			var fqArgs []fqops.DestChainConfigArgs
+			var onRampArgs []orbind.OnRampDestChainConfigArgs
+			var offRampArgs []offbind.OffRampSourceChainConfigArgs
+			var fqArgs []fqbind.FeeQuoterDestChainConfigArgs
 			for _, remoteChainSelector := range input.RemoteChainSelectors {
-				// get existing destChainConfig for the onRamp
-				existingDestChainCfgOut, err := cldf_ops.ExecuteOperation(b, onrampops.GetDestChainConfig, c, contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       onRampAddr,
-					Args:          remoteChainSelector,
+				existingDestChainCfgOut, err := cldf_ops.ExecuteOperation(b, onrampops.NewReadGetDestChainConfig(onRamp), c, ops2contract.FunctionInput[uint64]{
+					Args: remoteChainSelector,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing destChainConfig for onRamp: %w", err)
@@ -353,10 +363,8 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				existingDestChainCfg.Router = routerAddr
 
 				// get the sourceChainConfig for the offRamp
-				srcChainCfgOut, err := cldf_ops.ExecuteOperation(b, offrampops.GetSourceChainConfig, c, contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
-					Args:          remoteChainSelector,
+				srcChainCfgOut, err := cldf_ops.ExecuteOperation(b, offrampops.NewReadGetSourceChainConfig(offRamp), c, ops2contract.FunctionInput[uint64]{
+					Args: remoteChainSelector,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing sourceChainConfig for offRamp: %w", err)
@@ -364,7 +372,7 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				existingSrcChainCfg := srcChainCfgOut.Output
 				// update router on offRamp for the remote c
 				existingSrcChainCfg.Router = routerAddr
-				onRampArgs = append(onRampArgs, onrampops.DestChainConfigArgs{
+				onRampArgs = append(onRampArgs, orbind.OnRampDestChainConfigArgs{
 					DestChainSelector:         remoteChainSelector,
 					Router:                    routerAddr,
 					AddressBytesLength:        existingDestChainCfg.AddressBytesLength,
@@ -378,7 +386,7 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 					OffRamp:                   existingDestChainCfg.OffRamp,
 				})
 
-				offRampArgs = append(offRampArgs, offrampops.SourceChainConfigArgs{
+				offRampArgs = append(offRampArgs, offbind.OffRampSourceChainConfigArgs{
 					SourceChainSelector: remoteChainSelector,
 					Router:              routerAddr,
 					IsEnabled:           existingSrcChainCfg.IsEnabled,
@@ -394,9 +402,9 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing destChainConfig for fee quoter: %w", err)
 				}
-				fqArgs = append(fqArgs, fqops.DestChainConfigArgs{
+				fqArgs = append(fqArgs, fqbind.FeeQuoterDestChainConfigArgs{
 					DestChainSelector: remoteChainSelector,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fqbind.FeeQuoterDestChainConfig{
 						IsEnabled:                   dstChainCfg.IsEnabled,
 						MaxDataBytes:                DefaultMaxDataBytes,
 						MaxPerMsgGasLimit:           DefaultMaxPerMsgGasLimit,
@@ -412,37 +420,29 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				})
 			}
 			//  set the destChainConfig with the updated router
-			writeOutputOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, c, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       onRampAddr,
-				Args:          onRampArgs,
+			writeOutputOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.NewWriteApplyDestChainConfigUpdates(onRamp), c, ops2contract.FunctionInput[[]orbind.OnRampDestChainConfigArgs]{
+				Args: onRampArgs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying destChainConfig update to onRamp: %w", err)
 			}
-			writes = append(writes, writeOutputOnRamp.Output)
-			// now set the sourceChainConfig with the updated router
+			writes = append(writes, writeOutputOps2ToLegacy(writeOutputOnRamp.Output))
 			writeOutputOffRamp, err := cldf_ops.ExecuteOperation(
-				b, offrampops.ApplySourceChainConfigUpdates, c,
-				contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
-					Args:          offRampArgs,
+				b, offrampops.NewWriteApplySourceChainConfigUpdates(offRamp), c,
+				ops2contract.FunctionInput[[]offbind.OffRampSourceChainConfigArgs]{
+					Args: offRampArgs,
 				})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying sourceChainConfig update to offRamp: %w", err)
 			}
-			writes = append(writes, writeOutputOffRamp.Output)
-			// update fq 2.0 to have defaultTxLimit set to 8M
-			fqDestChainUpdateRep, err := cldf_ops.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, c, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       feequoterAddr,
-				Args:          fqArgs,
+			writes = append(writes, writeOutputOps2ToLegacy(writeOutputOffRamp.Output))
+			fqDestChainUpdateRep, err := cldf_ops.ExecuteOperation(b, fqops.NewWriteApplyDestChainConfigUpdates(feeQuoterContract), c, ops2contract.FunctionInput[[]fqbind.FeeQuoterDestChainConfigArgs]{
+				Args: fqArgs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying destChainConfig update to fee quoter: %w", err)
 			}
-			writes = append(writes, fqDestChainUpdateRep.Output)
+			writes = append(writes, writeOutputOps2ToLegacy(fqDestChainUpdateRep.Output))
 			batchOp, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)

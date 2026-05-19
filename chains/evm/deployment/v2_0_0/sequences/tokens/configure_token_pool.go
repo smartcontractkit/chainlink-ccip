@@ -9,6 +9,7 @@ import (
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -46,32 +47,32 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// Set threshold amount for additional CCVs (if necessary)
 		if input.ThresholdAmountForAdditionalCCVs != nil {
-			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.AdvancedPoolHooks,
-			})
+			aph, err := bindAdvancedPoolHooks(input.AdvancedPoolHooks, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.NewReadGetThresholdAmount(aph), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
 			if currentThresholdAmountReport.Output.Cmp(input.ThresholdAmountForAdditionalCCVs) != 0 {
-				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.AdvancedPoolHooks,
-					Args:          input.ThresholdAmountForAdditionalCCVs,
+				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.NewWriteSetThresholdAmount(aph), chain, ops2contract.FunctionInput[*big.Int]{
+					Args: input.ThresholdAmountForAdditionalCCVs,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 				}
-				writes = append(writes, setThresholdAmountReport.Output)
+				writes = append(writes, writeOutputOps2ToLegacy(setThresholdAmountReport.Output))
 			}
 		}
 
 		// Set dynamic config (if necessary)
 		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
-			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
+			tp, err := bindTokenPool(input.TokenPoolAddress, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetDynamicConfig(tp), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current dynamic config from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
@@ -94,9 +95,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 
 			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewWriteSetDynamicConfig(tp), chain, ops2contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
 					Args: token_pool.SetDynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
@@ -106,7 +105,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
-				writes = append(writes, setDynamicConfigReport.Output)
+				writes = append(writes, writeOutputOps2ToLegacy(setDynamicConfigReport.Output))
 			}
 		}
 

@@ -16,6 +16,8 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	fqbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -143,10 +145,10 @@ func TestLaneMigrator(t *testing.T) {
 					Version: fee_quoter.Version,
 				}, chainA, evm_datastore_utils.ToEVMAddress)
 			require.NoError(t, err)
-			opOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fee_quoter.GetDestChainConfig, evmChain1, contract_utils.FunctionInput[uint64]{
-				ChainSelector: chainA,
-				Address:       feeQuoterAddr,
-				Args:          chainB,
+			fq, err := fqbind.NewFeeQuoter(feeQuoterAddr, evmChain1.Client)
+			require.NoError(t, err)
+			opOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fee_quoter.NewReadGetDestChainConfig(fq), evmChain1, ops2contract.FunctionInput[uint64]{
+				Args: chainB,
 			})
 			require.NoError(t, err)
 			destConfig := opOut.Output

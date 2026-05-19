@@ -4,19 +4,23 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	proxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	usdcproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
+	proxybind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
+	utppbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -35,6 +39,18 @@ type FeeAggregatorAdapter struct{}
 
 func NewFeeAggregatorAdapter() *FeeAggregatorAdapter {
 	return &FeeAggregatorAdapter{}
+}
+
+func writeOutputOps2ToLegacy(w ops2contract.WriteOutput) contract.WriteOutput {
+	var ei *contract.ExecInfo
+	if w.ExecInfo != nil {
+		ei = &contract.ExecInfo{Hash: w.ExecInfo.Hash}
+	}
+	return contract.WriteOutput{
+		ChainSelector: w.ChainSelector,
+		Tx:            w.Tx,
+		ExecInfo:      ei,
+	}
 }
 
 func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelector uint64) (string, error) {
@@ -58,17 +74,22 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	}
 
 	proxyAddr := common.HexToAddress(ref.Address)
-	proxyContract, err := proxyops.NewProxyContract(proxyAddr, chain.Client)
+	proxyContract, err := proxybind.NewProxy(proxyAddr, chain.Client)
 	if err != nil {
 		return "", fmt.Errorf("failed to instantiate Proxy at %s on chain %d: %w", proxyAddr.Hex(), chainSelector, err)
 	}
 
-	feeAgg, err := proxyContract.GetFeeAggregator(&bind.CallOpts{Context: e.GetContext()})
+	report, err := operations.ExecuteOperation(
+		e.OperationsBundle,
+		proxyops.NewReadGetFeeAggregator(proxyContract),
+		chain,
+		ops2contract.FunctionInput[struct{}]{},
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to read fee aggregator from Proxy at %s on chain %d: %w", proxyAddr.Hex(), chainSelector, err)
 	}
 
-	return feeAgg.Hex(), nil
+	return report.Output.Hex(), nil
 }
 
 func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -159,10 +180,30 @@ func setFeeAggregatorOnContract(
 
 	switch ref.Type {
 	case datastore.ContractType(proxyops.ContractType):
-		return setFeeAggregatorDirect(b, chain, addr, proxyops.SetFeeAggregator, newFeeAggregator)
+		proxyContract, err := proxybind.NewProxy(addr, chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("bind Proxy at %s: %w", addr.Hex(), err)
+		}
+		report, err := operations.ExecuteOperation(b, proxyops.NewWriteSetFeeAggregator(proxyContract), chain, ops2contract.FunctionInput[common.Address]{
+			Args: newFeeAggregator,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return []contract.WriteOutput{writeOutputOps2ToLegacy(report.Output)}, nil
 
 	case datastore.ContractType(usdcproxyops.ContractType):
-		return setFeeAggregatorDirect(b, chain, addr, usdcproxyops.SetFeeAggregator, newFeeAggregator)
+		usdcProxy, err := utppbind.NewUSDCTokenPoolProxy(addr, chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("bind USDCTokenPoolProxy at %s: %w", addr.Hex(), err)
+		}
+		report, err := operations.ExecuteOperation(b, usdcproxyops.NewWriteSetFeeAggregator(usdcProxy), chain, ops2contract.FunctionInput[common.Address]{
+			Args: newFeeAggregator,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return []contract.WriteOutput{writeOutputOps2ToLegacy(report.Output)}, nil
 
 	case datastore.ContractType(onrampops.ContractType):
 		return setFeeAggregatorViaOnRampDynamicConfig(b, chain, addr, newFeeAggregator)
@@ -175,40 +216,17 @@ func setFeeAggregatorOnContract(
 	}
 }
 
-func setFeeAggregatorDirect(
-	b operations.Bundle,
-	chain cldf_evm.Chain,
-	addr common.Address,
-	op *operations.Operation[contract.FunctionInput[common.Address], contract.WriteOutput, cldf_evm.Chain],
-	newFeeAggregator common.Address,
-) ([]contract.WriteOutput, error) {
-	report, err := operations.ExecuteOperation(
-		b, op, chain,
-		contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-			Args:          newFeeAggregator,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return []contract.WriteOutput{report.Output}, nil
-}
-
 func setFeeAggregatorViaOnRampDynamicConfig(
 	b operations.Bundle,
 	chain cldf_evm.Chain,
 	addr common.Address,
 	newFeeAggregator common.Address,
 ) ([]contract.WriteOutput, error) {
-	readReport, err := operations.ExecuteOperation(
-		b, onrampops.GetDynamicConfig, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-		},
-	)
+	onRamp, err := orbind.NewOnRamp(addr, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("bind OnRamp at %s: %w", addr.Hex(), err)
+	}
+	readReport, err := operations.ExecuteOperation(b, onrampops.NewReadGetDynamicConfig(onRamp), chain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to read OnRamp DynamicConfig: %w", err)
 	}
@@ -216,18 +234,13 @@ func setFeeAggregatorViaOnRampDynamicConfig(
 	cfg := readReport.Output
 	cfg.FeeAggregator = newFeeAggregator
 
-	writeReport, err := operations.ExecuteOperation(
-		b, onrampops.SetDynamicConfig, chain,
-		contract.FunctionInput[onrampops.DynamicConfig]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-			Args:          cfg,
-		},
-	)
+	writeReport, err := operations.ExecuteOperation(b, onrampops.NewWriteSetDynamicConfig(onRamp), chain, ops2contract.FunctionInput[orbind.OnRampDynamicConfig]{
+		Args: cfg,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to write OnRamp DynamicConfig: %w", err)
 	}
-	return []contract.WriteOutput{writeReport.Output}, nil
+	return []contract.WriteOutput{writeOutputOps2ToLegacy(writeReport.Output)}, nil
 }
 
 func setFeeAggregatorViaExecutorDynamicConfig(
@@ -236,13 +249,11 @@ func setFeeAggregatorViaExecutorDynamicConfig(
 	addr common.Address,
 	newFeeAggregator common.Address,
 ) ([]contract.WriteOutput, error) {
-	readReport, err := operations.ExecuteOperation(
-		b, executorops.GetDynamicConfig, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-		},
-	)
+	exec, err := execbind.NewExecutor(addr, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("bind Executor at %s: %w", addr.Hex(), err)
+	}
+	readReport, err := operations.ExecuteOperation(b, executorops.NewReadGetDynamicConfig(exec), chain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Executor DynamicConfig: %w", err)
 	}
@@ -250,16 +261,11 @@ func setFeeAggregatorViaExecutorDynamicConfig(
 	cfg := readReport.Output
 	cfg.FeeAggregator = newFeeAggregator
 
-	writeReport, err := operations.ExecuteOperation(
-		b, executorops.SetDynamicConfig, chain,
-		contract.FunctionInput[executorops.DynamicConfig]{
-			ChainSelector: chain.Selector,
-			Address:       addr,
-			Args:          cfg,
-		},
-	)
+	writeReport, err := operations.ExecuteOperation(b, executorops.NewWriteSetDynamicConfig(exec), chain, ops2contract.FunctionInput[execbind.ExecutorDynamicConfig]{
+		Args: cfg,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to write Executor DynamicConfig: %w", err)
 	}
-	return []contract.WriteOutput{writeReport.Output}, nil
+	return []contract.WriteOutput{writeOutputOps2ToLegacy(writeReport.Output)}, nil
 }

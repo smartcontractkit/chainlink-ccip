@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	contract_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
@@ -706,13 +707,9 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	// ========================================
 	_, err = operations.ExecuteOperation(
 		e.OperationsBundle,
-		token_pool.SetAllowedFinalityConfig,
+		token_pool.NewWriteSetAllowedFinalityConfig(tp),
 		e.BlockChains.EVMChains()[chainSel],
-		contract_utils.FunctionInput[[4]byte]{
-			ChainSelector: chainSel,
-			Address:       tokenPoolAddress,
-			Args:          finality.Config{BlockDepth: 12}.Raw(),
-		},
+		ops2contract.FunctionInput[[4]byte]{Args: finality.Config{BlockDepth: 12}.Raw()},
 	)
 	require.NoError(t, err, "SetAllowedFinalityConfig should not error")
 

@@ -11,6 +11,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
+	usdc_token_pool_cctp_v2_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool_cctp_v2"
 	evm_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
@@ -195,16 +197,15 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	require.NoError(t, err, "Failed to confirm MockE2EUSDCTokenMessenger V2 deployment")
 
 	// Deploy and register required CCTPMessageTransmitterProxy v1.6.2 for CCTP V1 wiring.
-	cctpV1ProxyRef, err := contract_utils.MaybeDeployContract(
+	cctpV1ProxyRef, err := ops2contract.MaybeDeployContract(
 		e.OperationsBundle,
 		cctp_message_transmitter_proxy_v1_6_2.Deploy,
 		chain,
-		contract_utils.DeployInput[cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs]{
+		ops2contract.DeployInput[cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(
 				cctp_message_transmitter_proxy_v1_6_2.ContractType,
 				*cctp_message_transmitter_proxy_v1_6_2.Version,
 			),
-			ChainSelector: chainSelector,
 			Args: cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs{
 				TokenMessenger: tokenMessengerV1Addr,
 			},
@@ -616,7 +617,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, homeCCTPTokenPoolAddr, homePools.CctpV2PoolWithCCV, "CCTP V2-with-CCV pool should match on home chain")
 
 	// Check CCTP V2 token pool authorized callers on home chain (proxy must be authorized)
-	homeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2.NewUSDCTokenPoolCCTPV2Contract(homeCCTPV2TokenPoolAddr, homeChain.Client)
+	homeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(homeCCTPV2TokenPoolAddr, homeChain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTP V2 token pool contract on home chain")
 	homeCCTPV2AuthorizedCallers, err := homeCCTPV2TokenPool.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get authorized callers from CCTP V2 token pool on home chain")
@@ -759,7 +760,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, nonHomeSetup.Router, nonHomeVerifierRemoteChainConfig.RemoteChainConfig.Router, "CCTPVerifier remote chain config Router should match on non-home chain")
 
 	// Check CCTP V2 token pool domain on non-home chain
-	nonHomeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2.NewUSDCTokenPoolCCTPV2Contract(nonHomeCCTPV2TokenPoolAddr, nonHomeChain.Client)
+	nonHomeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(nonHomeCCTPV2TokenPoolAddr, nonHomeChain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTP V2 token pool contract on non-home chain")
 	nonHomeCCTPV2Domain, err := nonHomeCCTPV2TokenPool.GetDomain(nil, homeChainSelector)
 	require.NoError(t, err, "Failed to get domain from CCTP V2 token pool on non-home chain")

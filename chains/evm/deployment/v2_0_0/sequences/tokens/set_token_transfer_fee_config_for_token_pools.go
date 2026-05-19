@@ -6,10 +6,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	tpbinding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -37,9 +39,14 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", src)
 			}
 
+			tp, err := bindTokenPool(addr, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
 			args := token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
 				DisableTokenTransferFeeConfigs: []uint64{},
-				TokenTransferFeeConfigArgs:     []token_pool.TokenTransferFeeConfigArgs{},
+				TokenTransferFeeConfigArgs:     []tpbinding.TokenPoolTokenTransferFeeConfigArgs{},
 			}
 
 			for dst, fee := range cfg {
@@ -48,9 +55,9 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 				} else {
 					args.TokenTransferFeeConfigArgs = append(
 						args.TokenTransferFeeConfigArgs,
-						token_pool.TokenTransferFeeConfigArgs{
+						tpbinding.TokenPoolTokenTransferFeeConfigArgs{
 							DestChainSelector: dst,
-							TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: tpbinding.IPoolV2TokenTransferFeeConfig{
 								FinalityTransferFeeBps:     fee.DefaultFinalityTransferFeeBps,
 								FastFinalityTransferFeeBps: fee.CustomFinalityTransferFeeBps,
 								FinalityFeeUSDCents:        fee.DefaultFinalityFeeUSDCents,
@@ -66,18 +73,16 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 
 			if len(args.DisableTokenTransferFeeConfigs) > 0 || len(args.TokenTransferFeeConfigArgs) > 0 {
 				report, err := operations.ExecuteOperation(
-					b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain,
-					contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: src,
-						Address:       addr,
-						Args:          args,
+					b, token_pool.NewWriteApplyTokenTransferFeeConfigUpdates(tp), chain,
+					ops2contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
+						Args: args,
 					},
 				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute token_pool.ApplyTokenTransferFeeConfigUpdates on %s: %w", chain.String(), err)
 				}
 
-				writes = append(writes, report.Output)
+				writes = append(writes, writeOutputOps2ToLegacy(report.Output))
 			}
 		}
 

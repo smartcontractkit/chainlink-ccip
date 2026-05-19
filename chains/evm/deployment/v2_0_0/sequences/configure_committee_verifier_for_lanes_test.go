@@ -13,9 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	cvbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -200,17 +201,15 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, configureReport.Output.BatchOps, 1, "Expected 1 batch operation in output")
 
+			cvContract, err := cvbind.NewCommitteeVerifier(common.HexToAddress(input.CommitteeVerifier[0].Address), evmChain.Client)
+			require.NoError(t, err)
 			for remoteSelector, remoteConfig := range input.RemoteChains {
 				// Check remote chain config on CommitteeVerifier
 				remoteChainConfigReport, err := operations.ExecuteOperation(
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.GetRemoteChainConfig,
+					committee_verifier.NewReadGetRemoteChainConfig(cvContract),
 					evmChain,
-					contract.FunctionInput[uint64]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
-						Args:          remoteSelector,
-					},
+					ops2contract.FunctionInput[uint64]{Args: remoteSelector},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				require.Equal(t, common.HexToAddress(input.Router), remoteChainConfigReport.Output.RemoteChainConfig.Router, "Router in remote chain config should match")
@@ -357,17 +356,15 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, configureReport.Output.BatchOps, 1, "Expected 1 batch operation in output")
 
+			cvContract, err := cvbind.NewCommitteeVerifier(common.HexToAddress(input.CommitteeVerifier[0].Address), evmChain.Client)
+			require.NoError(t, err)
 			for remoteSelector, remoteConfig := range input.RemoteChains {
 				// Check signature config on CommitteeVerifier
 				signatureConfigReport, err := operations.ExecuteOperation(
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.GetSignatureConfig,
+					committee_verifier.NewReadGetSignatureConfig(cvContract),
 					evmChain,
-					contract.FunctionInput[uint64]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
-						Args:          remoteSelector,
-					},
+					ops2contract.FunctionInput[uint64]{Args: remoteSelector},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				require.Equal(t, remoteConfig.SignatureConfig.Threshold, signatureConfigReport.Output.Threshold, "Threshold should match")
@@ -385,12 +382,9 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 				require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
 				versionTagReport, err := operations.ExecuteOperation(
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.VersionTag,
+					committee_verifier.NewReadVersionTag(cvContract),
 					evmChain,
-					contract.FunctionInput[struct{}]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
-					},
+					ops2contract.FunctionInput[struct{}]{},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				inboundImpl, err := boundResolver.GetInboundImplementation(

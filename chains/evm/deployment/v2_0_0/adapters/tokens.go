@@ -15,7 +15,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
+	tpbinding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
@@ -232,10 +234,11 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 						configureInput.RouterAddress = resolved
 					}
 					if thresholdProvided {
-						hooksReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, evmChain, contract.FunctionInput[struct{}]{
-							ChainSelector: input.ChainSelector,
-							Address:       poolAddr,
-						})
+						tp, bindErr := evm_tokens.BindTokenPool(poolAddr, evmChain)
+						if bindErr != nil {
+							return sequences.OnChainOutput{}, bindErr
+						}
+						hooksReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetAdvancedPoolHooks(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 						if err != nil {
 							return sequences.OnChainOutput{}, fmt.Errorf("failed to read advanced pool hooks address from existing token pool %s on chain %d: %w", poolAddr, input.ChainSelector, err)
 						}
@@ -345,10 +348,11 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 	if !ok {
 		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
-	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       common.HexToAddress(poolRef.Address),
-	})
+	tp, err := evm_tokens.BindTokenPool(common.HexToAddress(poolRef.Address), evmChain)
+	if err != nil {
+		return 0, err
+	}
+	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetTokenDecimals(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err == nil {
 		return getTokenDecimalsReport.Output, nil
 	}
@@ -356,10 +360,7 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 
 	tokenAddr := common.BytesToAddress(tokenBytes)
 	if tokenAddr.Cmp(common.Address{}) == 0 {
-		getTokenReport, getTokErr := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(poolRef.Address),
-		})
+		getTokenReport, getTokErr := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.NewReadGetToken(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 		if getTokErr != nil {
 			return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w", poolRef.Address, evmChain, poolErr)
 		}
@@ -399,11 +400,11 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref %+v is zero", input.TokenPoolRef)
 			}
 
-			currentFinalityConfig, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       tokenPoolAddr,
-				Args:          struct{}{},
-			})
+			tp, err := evm_tokens.BindTokenPool(tokenPoolAddr, evmChain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			currentFinalityConfig, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetAllowedFinalityConfig(tp), evmChain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config for token pool at %s on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
 			}
@@ -412,10 +413,8 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 			if !input.AllowedFinalityConfig.IsZero() {
 				requestedFinalityConfig := input.AllowedFinalityConfig.Raw()
 				if requestedFinalityConfig != currentFinalityConfig.Output {
-					_, err = cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, contract.FunctionInput[[4]byte]{
-						ChainSelector: input.ChainSelector,
-						Address:       tokenPoolAddr,
-						Args:          requestedFinalityConfig,
+					_, err = cldf_ops.ExecuteOperation(b, token_pool.NewWriteSetAllowedFinalityConfig(tp), evmChain, ops2contract.FunctionInput[[4]byte]{
+						Args: requestedFinalityConfig,
 					})
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config on token pool at %s on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
@@ -424,16 +423,16 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				}
 			}
 
-			args := []token_pool.RateLimitConfigArgs{
+			args := []tpbinding.TokenPoolRateLimitConfigArgs{
 				{
 					RemoteChainSelector: input.RemoteChainSelector,
 					FastFinality:        finalityConfig != finality.RawWaitForFinality,
-					OutboundRateLimiterConfig: token_pool.Config{
+					OutboundRateLimiterConfig: tpbinding.RateLimiterConfig{
 						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
 						Capacity:  input.OutboundRateLimiterConfig.Capacity,
 						Rate:      input.OutboundRateLimiterConfig.Rate,
 					},
-					InboundRateLimiterConfig: token_pool.Config{
+					InboundRateLimiterConfig: tpbinding.RateLimiterConfig{
 						IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
 						Capacity:  input.InboundRateLimiterConfig.Capacity,
 						Rate:      input.InboundRateLimiterConfig.Rate,
@@ -441,16 +440,14 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRe
 				},
 			}
 
-			report, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, evmChain, contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       tokenPoolAddr,
-				Args:          args,
+			report, err := cldf_ops.ExecuteOperation(b, token_pool.NewWriteSetRateLimitConfig(tp), evmChain, ops2contract.FunctionInput[[]tpbinding.TokenPoolRateLimitConfigArgs]{
+				Args: args,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit config on pool %s: %w", tokenPoolAddr, err)
 			}
 
-			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeOutputOps2ToLegacy(report.Output)})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
 			}
@@ -490,14 +487,16 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 		return tokens.TokenTransferFeeConfig{}, errors.New("pool address cannot be the zero address")
 	}
 
+	tp, err := evm_tokens.BindTokenPool(addr, chain)
+	if err != nil {
+		return tokens.TokenTransferFeeConfig{}, err
+	}
 	report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		token_pool.GetTokenTransferFeeConfig,
+		token_pool.NewReadGetTokenTransferFeeConfig(tp),
 		chain,
-		contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: src,
-			Address:       addr,
-			Args:          args,
+		ops2contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+			Args: args,
 		},
 	)
 	if err != nil {
@@ -522,12 +521,13 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 type poolOpsV200 struct{}
 
 func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.Address) (common.Address, error) {
+	tp, err := evm_tokens.BindTokenPool(poolAddr, ch)
+	if err != nil {
+		return common.Address{}, err
+	}
 	res, err := cldf_ops.ExecuteOperation(b,
-		token_pool.GetToken, ch,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: ch.Selector,
-			Address:       poolAddr,
-		},
+		token_pool.NewReadGetToken(tp), ch,
+		ops2contract.FunctionInput[struct{}]{},
 	)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("GetToken v2.0.0: %w", err)

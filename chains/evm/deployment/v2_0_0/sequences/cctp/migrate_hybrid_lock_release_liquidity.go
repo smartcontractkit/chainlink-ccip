@@ -14,12 +14,15 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
+	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
+	hybridbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
 	erc20_lock_box_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
+	sutpbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
@@ -73,13 +76,16 @@ func migrateHybridLockReleaseLiquidity(
 		return sequences.OnChainOutput{}, err
 	}
 
+	hybridPool, err := hybridbind.NewHybridLockReleaseUSDCTokenPool(hybridPoolAddr, chain.Client)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to bind HybridLockReleaseUSDCTokenPool at %s: %w", hybridPoolAddr.Hex(), err)
+	}
+
 	// Validate all selectors: configured for lock-release, have lockboxes, amounts don't exceed locked.
 	lockBoxes := make(map[uint64]common.Address, len(selectors))
 	for _, sel := range selectors {
-		shouldUseReport, err := cldf_ops.ExecuteOperation(b, hybrid_lock_release_usdc_token_pool.ShouldUseLockRelease, chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: input.ChainSelector,
-			Address:       hybridPoolAddr,
-			Args:          sel,
+		shouldUseReport, err := cldf_ops.ExecuteOperation(b, hybrid_lock_release_usdc_token_pool.NewReadShouldUseLockRelease(hybridPool), chain, ops2contract.FunctionInput[uint64]{
+			Args: sel,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check lock-release mechanism for chain %d: %w", sel, err)
@@ -94,10 +100,8 @@ func migrateHybridLockReleaseLiquidity(
 		}
 		lockBoxes[sel] = lockBoxAddr
 
-		lockedReport, err := cldf_ops.ExecuteOperation(b, hybrid_lock_release_usdc_token_pool.GetLockedTokensForChain, chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: input.ChainSelector,
-			Address:       hybridPoolAddr,
-			Args:          sel,
+		lockedReport, err := cldf_ops.ExecuteOperation(b, hybrid_lock_release_usdc_token_pool.NewReadGetLockedTokensForChain(hybridPool), chain, ops2contract.FunctionInput[uint64]{
+			Args: sel,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get locked tokens for chain %d: %w", sel, err)
@@ -124,6 +128,7 @@ func migrateHybridLockReleaseLiquidity(
 		b:              b,
 		chain:          chain,
 		input:          input,
+		hybridPool:     hybridPool,
 		hybridPoolAddr: hybridPoolAddr,
 		siloedPoolAddr: siloedPoolAddr,
 		tokenAddr:      tokenAddr,
@@ -166,6 +171,7 @@ type migratePhaseCtx struct {
 	b              cldf_ops.Bundle
 	chain          evm.Chain
 	input          adapters.MigrateHybridLockReleaseLiquidityInput
+	hybridPool     hybridbind.HybridLockReleaseUSDCTokenPoolInterface
 	hybridPoolAddr common.Address
 	siloedPoolAddr common.Address
 	tokenAddr      common.Address
@@ -196,10 +202,8 @@ func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput
 	for _, sel := range ctx.selectors {
 		lockBoxAddr := ctx.lockBoxes[sel]
 
-		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.GetLiquidityProvider, ctx.chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
-			Args:          sel,
+		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.NewReadGetLiquidityProvider(ctx.hybridPool), ctx.chain, ops2contract.FunctionInput[uint64]{
+			Args: sel,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("authorizeLockboxCallers: chain %d lockbox %s: get liquidity provider: %w", sel, lockBoxAddr.Hex(), err)
@@ -260,9 +264,7 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		lockBoxAddr := ctx.lockBoxes[sel]
 		withdrawAmount := new(big.Int).SetUint64(ctx.input.WithdrawAmounts[sel])
 
-		withdrawReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.WithdrawLiquidity, ctx.chain, contract_utils.FunctionInput[hybrid_lock_release_usdc_token_pool.WithdrawLiquidityArgs]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
+		withdrawReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.NewWriteWithdrawLiquidity(ctx.hybridPool), ctx.chain, ops2contract.FunctionInput[hybrid_lock_release_usdc_token_pool.WithdrawLiquidityArgs]{
 			Args: hybrid_lock_release_usdc_token_pool.WithdrawLiquidityArgs{
 				RemoteChainSelector: sel,
 				Amount:              withdrawAmount,
@@ -271,7 +273,7 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		if err != nil {
 			return nil, fmt.Errorf("migrateLiquidityToLockboxes: chain %d lockbox %s amount %s: withdraw: %w", sel, lockBoxAddr.Hex(), withdrawAmount.String(), err)
 		}
-		writes = append(writes, withdrawReport.Output)
+		writes = append(writes, tokens_sequences.WriteOutputOps2ToLegacy(withdrawReport.Output))
 
 		approveReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20.ApproveProposalOnly, ctx.chain, contract_utils.FunctionInput[erc20.ApproveArgs]{
 			ChainSelector: ctx.input.ChainSelector,
@@ -316,10 +318,8 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 	for _, sel := range ctx.selectors {
 		lockBoxAddr := ctx.lockBoxes[sel]
 
-		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.GetLiquidityProvider, ctx.chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
-			Args:          sel,
+		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.NewReadGetLiquidityProvider(ctx.hybridPool), ctx.chain, ops2contract.FunctionInput[uint64]{
+			Args: sel,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s: get liquidity provider: %w", sel, lockBoxAddr.Hex(), err)
@@ -380,21 +380,21 @@ func parseHexAddress(name, address string) (common.Address, error) {
 }
 
 func fetchLockBoxesFromSiloedPool(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, poolAddress common.Address) (map[uint64]common.Address, error) {
-	lockBoxReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllLockBoxConfigs, chain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       poolAddress,
-		Args:          struct{}{},
-	})
+	siloedPool, err := sutpbind.NewSiloedUSDCTokenPool(poolAddress, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("fetchLockBoxesFromSiloedPool: bind siloedPool=%s chainSelector=%d: %w", poolAddress.Hex(), chainSelector, err)
+	}
+	lockBoxReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.NewReadGetAllLockBoxConfigs(siloedPool), chain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return nil, fmt.Errorf("fetchLockBoxesFromSiloedPool: siloedPool=%s chainSelector=%d: %w", poolAddress.Hex(), chainSelector, err)
 	}
 	configs := lockBoxReport.Output
 	if configs == nil {
-		configs = []siloed_usdc_token_pool.LockBoxConfig{}
+		configs = []sutpbind.SiloedLockReleaseTokenPoolLockBoxConfig{}
 	}
 
 	lockBoxes := make(map[uint64]common.Address, len(configs))
-	for _, cfg := range lockBoxReport.Output {
+	for _, cfg := range configs {
 		lockBoxes[cfg.RemoteChainSelector] = cfg.LockBox
 	}
 	return lockBoxes, nil

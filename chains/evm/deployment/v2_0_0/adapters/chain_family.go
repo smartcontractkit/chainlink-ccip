@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -96,7 +97,7 @@ func (a *ChainFamilyAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSe
 
 	chain := chains.EVMChains()[chainSelector]
 
-	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	onrampContract, err := orbind.NewOnRamp(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -23,6 +24,8 @@ import (
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	lrtp_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	siloed_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
+	lockboxbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
+	lrtp161bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -54,10 +57,11 @@ var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 		}
 		oldPoolType := string(tvReport.Output.Type)
 
-		tokenReport, err := cldf_ops.ExecuteOperation(b, token_pool_ops.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       newPoolAddr,
-		})
+		newTP, err := bindTokenPool(newPoolAddr, evmChain)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		tokenReport, err := cldf_ops.ExecuteOperation(b, token_pool_ops.NewReadGetToken(newTP), evmChain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from new pool %s: %w", newPoolAddr, err)
 		}
@@ -121,19 +125,22 @@ func migrateUnsiloedPool(
 	chainSel := input.ChainSelector
 	var ops []evm_contract.WriteOutput
 
-	lockboxReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v170.GetLockBox, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       newPoolAddr,
-	})
+	newLRTP, err := bindLRTP170(newPoolAddr, evmChain)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+	lockboxReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v170.NewReadGetLockBox(newLRTP), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get lockbox from new pool %s: %w", newPoolAddr, err)
 	}
 	lockboxAddr := lockboxReport.Output
 
-	balanceReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.BalanceOf, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       tokenAddr,
-		Args:          oldPoolAddr,
+	token, err := bindCrossChainToken(tokenAddr, evmChain)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+	balanceReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.NewReadBalanceOf(token), evmChain, ops2contract.FunctionInput[common.Address]{
+		Args: oldPoolAddr,
 	})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get balance of old pool %s: %w", oldPoolAddr, err)
@@ -148,16 +155,17 @@ func migrateUnsiloedPool(
 		return sequences.OnChainOutput{}, fmt.Errorf("migration amount %s exceeds old pool balance %s", amount, balance)
 	}
 
-	rebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-	})
+	oldLRTP, err := bindLRTP161(oldPoolAddr, evmChain)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+	rebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.NewReadGetRebalancer(oldLRTP), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get rebalancer from old pool %s: %w", oldPoolAddr, err)
 	}
 	originalRebalancer := rebalancerReport.Output
 
-	ops, err = appendSetRebalancerAndWithdraw(b, evmChain, chainSel, oldPoolAddr, timelockAddr, amount, ops)
+	ops, err = appendSetRebalancerAndWithdraw(b, evmChain, oldLRTP, timelockAddr, amount, ops)
 	if err != nil {
 		return sequences.OnChainOutput{}, err
 	}
@@ -167,7 +175,7 @@ func migrateUnsiloedPool(
 		return sequences.OnChainOutput{}, err
 	}
 
-	ops, err = appendCleanup(b, evmChain, chainSel, lockboxAddr, oldPoolAddr, timelockAddr, originalRebalancer, ops)
+	ops, err = appendCleanup(b, evmChain, lockboxAddr, oldLRTP, timelockAddr, originalRebalancer, ops)
 	if err != nil {
 		return sequences.OnChainOutput{}, err
 	}
@@ -198,19 +206,22 @@ func migrateSiloedPool(
 	chainSel := input.ChainSelector
 	var ops []evm_contract.WriteOutput
 
-	chainsReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetSupportedChains, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-	})
+	oldSiloed, err := bindSiloedLRTP161(oldPoolAddr, evmChain)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+	newSiloed, err := bindSiloedLRTP170(newPoolAddr, evmChain)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	chainsReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetSupportedChains(oldSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from old siloed pool %s: %w", oldPoolAddr, err)
 	}
 	supportedChains := chainsReport.Output
 
-	lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops_v170.GetAllLockBoxConfigs, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       newPoolAddr,
-	})
+	lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops_v170.NewReadGetAllLockBoxConfigs(newSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get lockbox configs from new pool %s: %w", newPoolAddr, err)
 	}
@@ -220,24 +231,19 @@ func migrateSiloedPool(
 		lockboxByChain[config.RemoteChainSelector] = config.LockBox
 	}
 
-	rebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-	})
+	rebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed rebalancer from old pool %s: %w", oldPoolAddr, err)
 	}
 	originalUnsiloedRebalancer := rebalancerReport.Output
 
-	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-		Args:          timelockAddr,
+	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteSetRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[common.Address]{
+		Args: timelockAddr,
 	})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to set unsiloed rebalancer on old pool %s: %w", oldPoolAddr, err)
 	}
-	ops = append(ops, setRebalancerReport.Output)
+	ops = appendWrite(ops, setRebalancerReport.Output)
 
 	type chainRebalancerInfo struct {
 		chainSelector      uint64
@@ -247,28 +253,22 @@ func migrateSiloedPool(
 	var siloInfos []chainRebalancerInfo
 
 	for _, remoteChain := range supportedChains {
-		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.IsSiloed, evmChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          remoteChain,
+		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadIsSiloed(oldSiloed), evmChain, ops2contract.FunctionInput[uint64]{
+			Args: remoteChain,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if chain %d is siloed on old pool %s: %w", remoteChain, oldPoolAddr, err)
 		}
 
 		if isSiloedReport.Output {
-			chainRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetChainRebalancer, evmChain, evm_contract.FunctionInput[uint64]{
-				ChainSelector: chainSel,
-				Address:       oldPoolAddr,
-				Args:          remoteChain,
+			chainRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetChainRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[uint64]{
+				Args: remoteChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get chain rebalancer for chain %d: %w", remoteChain, err)
 			}
 
-			setSiloReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.SetSiloRebalancer, evmChain, evm_contract.FunctionInput[siloed_ops_v161.SetSiloRebalancerArgs]{
-				ChainSelector: chainSel,
-				Address:       oldPoolAddr,
+			setSiloReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteSetSiloRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[siloed_ops_v161.SetSiloRebalancerArgs]{
 				Args: siloed_ops_v161.SetSiloRebalancerArgs{
 					RemoteChainSelector: remoteChain,
 					NewRebalancer:       timelockAddr,
@@ -277,7 +277,7 @@ func migrateSiloedPool(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set silo rebalancer for chain %d: %w", remoteChain, err)
 			}
-			ops = append(ops, setSiloReport.Output)
+			ops = appendWrite(ops, setSiloReport.Output)
 
 			siloInfos = append(siloInfos, chainRebalancerInfo{
 				chainSelector:      remoteChain,
@@ -307,10 +307,8 @@ func migrateSiloedPool(
 			firstLockbox = lockbox
 		}
 
-		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetAvailableTokens, evmChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          info.chainSelector,
+		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetAvailableTokens(oldSiloed), evmChain, ops2contract.FunctionInput[uint64]{
+			Args: info.chainSelector,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get available tokens for chain %d: %w", info.chainSelector, err)
@@ -322,9 +320,7 @@ func migrateSiloedPool(
 			continue
 		}
 
-		withdrawReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.WithdrawSiloedLiquidity, evmChain, evm_contract.FunctionInput[siloed_ops_v161.WithdrawSiloedLiquidityArgs]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
+		withdrawReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteWithdrawSiloedLiquidity(oldSiloed), evmChain, ops2contract.FunctionInput[siloed_ops_v161.WithdrawSiloedLiquidityArgs]{
 			Args: siloed_ops_v161.WithdrawSiloedLiquidityArgs{
 				RemoteChainSelector: info.chainSelector,
 				Amount:              siloAmount,
@@ -333,7 +329,7 @@ func migrateSiloedPool(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw siloed liquidity for chain %d: %w", info.chainSelector, err)
 		}
-		ops = append(ops, withdrawReport.Output)
+		ops = appendWrite(ops, withdrawReport.Output)
 
 		ops, err = appendAuthApproveDeposit(b, evmChain, chainSel, lockbox, tokenAddr, timelockAddr, siloAmount, info.chainSelector, ops)
 		if err != nil {
@@ -342,10 +338,7 @@ func migrateSiloedPool(
 		usedLockboxes[lockbox] = true
 	}
 
-	unsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetUnsiloedLiquidity, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-	})
+	unsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewReadGetUnsiloedLiquidity(oldSiloed), evmChain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed liquidity from old pool %s: %w", oldPoolAddr, err)
 	}
@@ -364,15 +357,13 @@ func migrateSiloedPool(
 			return sequences.OnChainOutput{}, fmt.Errorf("no lockbox available for unsiloed liquidity deposit")
 		}
 
-		withdrawUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.WithdrawLiquidity, evmChain, evm_contract.FunctionInput[*big.Int]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          unsiloedAmount,
+		withdrawUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteWithdrawLiquidity(oldSiloed), evmChain, ops2contract.FunctionInput[*big.Int]{
+			Args: unsiloedAmount,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw unsiloed liquidity: %w", err)
 		}
-		ops = append(ops, withdrawUnsiloedReport.Output)
+		ops = appendWrite(ops, withdrawUnsiloedReport.Output)
 
 		ops, err = appendAuthApproveDeposit(b, evmChain, chainSel, depositLockbox, tokenAddr, timelockAddr, unsiloedAmount, 0, ops)
 		if err != nil {
@@ -383,9 +374,7 @@ func migrateSiloedPool(
 
 	for _, info := range siloInfos {
 		if info.isSiloed {
-			restoreReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.SetSiloRebalancer, evmChain, evm_contract.FunctionInput[siloed_ops_v161.SetSiloRebalancerArgs]{
-				ChainSelector: chainSel,
-				Address:       oldPoolAddr,
+			restoreReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteSetSiloRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[siloed_ops_v161.SetSiloRebalancerArgs]{
 				Args: siloed_ops_v161.SetSiloRebalancerArgs{
 					RemoteChainSelector: info.chainSelector,
 					NewRebalancer:       info.originalRebalancer,
@@ -394,25 +383,25 @@ func migrateSiloedPool(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to restore silo rebalancer for chain %d: %w", info.chainSelector, err)
 			}
-			ops = append(ops, restoreReport.Output)
+			ops = appendWrite(ops, restoreReport.Output)
 		}
 	}
 
-	restoreUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-		Args:          originalUnsiloedRebalancer,
+	restoreUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.NewWriteSetRebalancer(oldSiloed), evmChain, ops2contract.FunctionInput[common.Address]{
+		Args: originalUnsiloedRebalancer,
 	})
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to restore unsiloed rebalancer: %w", err)
 	}
-	ops = append(ops, restoreUnsiloedReport.Output)
+	ops = appendWrite(ops, restoreUnsiloedReport.Output)
 
 	for lb := range usedLockboxes {
-		removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-			ChainSelector: chainSel,
-			Address:       lb,
-			Args: lockbox_ops.AuthorizedCallerArgs{
+		lockBox, err := bindLockBox(lb, evmChain)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.NewWriteApplyAuthorizedCallerUpdates(lockBox), evmChain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
+			Args: lockboxbind.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers:   []common.Address{},
 				RemovedCallers: []common.Address{timelockAddr},
 			},
@@ -420,7 +409,7 @@ func migrateSiloedPool(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to remove timelock from lockbox %s authorized callers: %w", lb, err)
 		}
-		ops = append(ops, removeAuthReport.Output)
+		ops = appendWrite(ops, removeAuthReport.Output)
 	}
 
 	if input.SetPoolConfig != nil {
@@ -443,30 +432,26 @@ func migrateSiloedPool(
 func appendSetRebalancerAndWithdraw(
 	b cldf_ops.Bundle,
 	evmChain evm.Chain,
-	chainSel uint64,
-	oldPoolAddr, timelockAddr common.Address,
+	oldLRTP lrtp161bind.LockReleaseTokenPoolInterface,
+	timelockAddr common.Address,
 	amount *big.Int,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
-	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-		Args:          timelockAddr,
+	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.NewWriteSetRebalancer(oldLRTP), evmChain, ops2contract.FunctionInput[common.Address]{
+		Args: timelockAddr,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to set rebalancer on old pool %s: %w", oldPoolAddr, err)
+		return nil, fmt.Errorf("failed to set rebalancer on old pool: %w", err)
 	}
-	ops = append(ops, setRebalancerReport.Output)
+	ops = appendWrite(ops, setRebalancerReport.Output)
 
-	withdrawReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.WithdrawLiquidity, evmChain, evm_contract.FunctionInput[*big.Int]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-		Args:          amount,
+	withdrawReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.NewWriteWithdrawLiquidity(oldLRTP), evmChain, ops2contract.FunctionInput[*big.Int]{
+		Args: amount,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to withdraw liquidity from old pool %s: %w", oldPoolAddr, err)
+		return nil, fmt.Errorf("failed to withdraw liquidity from old pool: %w", err)
 	}
-	ops = append(ops, withdrawReport.Output)
+	ops = appendWrite(ops, withdrawReport.Output)
 
 	return ops, nil
 }
@@ -480,10 +465,12 @@ func appendAuthApproveDeposit(
 	remoteChainSelector uint64,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
-	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-		ChainSelector: chainSel,
-		Address:       lockboxAddr,
-		Args: lockbox_ops.AuthorizedCallerArgs{
+	lockBox, err := bindLockBox(lockboxAddr, evmChain)
+	if err != nil {
+		return nil, err
+	}
+	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.NewWriteApplyAuthorizedCallerUpdates(lockBox), evmChain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
+		Args: lockboxbind.AuthorizedCallersAuthorizedCallerArgs{
 			AddedCallers:   []common.Address{timelockAddr},
 			RemovedCallers: []common.Address{},
 		},
@@ -491,11 +478,13 @@ func appendAuthApproveDeposit(
 	if err != nil {
 		return nil, fmt.Errorf("failed to add timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
 	}
-	ops = append(ops, addAuthReport.Output)
+	ops = appendWrite(ops, addAuthReport.Output)
 
-	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Approve, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
-		ChainSelector: chainSel,
-		Address:       tokenAddr,
+	token, err := bindCrossChainToken(tokenAddr, evmChain)
+	if err != nil {
+		return nil, err
+	}
+	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.NewWriteApprove(token), evmChain, ops2contract.FunctionInput[erc20_ops.ApproveArgs]{
 		Args: erc20_ops.ApproveArgs{
 			Spender: lockboxAddr,
 			Value:   amount,
@@ -504,11 +493,9 @@ func appendAuthApproveDeposit(
 	if err != nil {
 		return nil, fmt.Errorf("failed to approve lockbox %s to spend tokens: %w", lockboxAddr, err)
 	}
-	ops = append(ops, approveReport.Output)
+	ops = appendWrite(ops, approveReport.Output)
 
-	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.Deposit, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
-		ChainSelector: chainSel,
-		Address:       lockboxAddr,
+	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.NewWriteDeposit(lockBox), evmChain, ops2contract.FunctionInput[lockbox_ops.DepositArgs]{
 		Args: lockbox_ops.DepositArgs{
 			Token:               tokenAddr,
 			RemoteChainSelector: remoteChainSelector,
@@ -518,7 +505,7 @@ func appendAuthApproveDeposit(
 	if err != nil {
 		return nil, fmt.Errorf("failed to deposit into lockbox %s: %w", lockboxAddr, err)
 	}
-	ops = append(ops, depositReport.Output)
+	ops = appendWrite(ops, depositReport.Output)
 
 	return ops, nil
 }
@@ -526,14 +513,17 @@ func appendAuthApproveDeposit(
 func appendCleanup(
 	b cldf_ops.Bundle,
 	evmChain evm.Chain,
-	chainSel uint64,
-	lockboxAddr, oldPoolAddr, timelockAddr, originalRebalancer common.Address,
+	lockboxAddr common.Address,
+	oldLRTP lrtp161bind.LockReleaseTokenPoolInterface,
+	timelockAddr, originalRebalancer common.Address,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
-	removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-		ChainSelector: chainSel,
-		Address:       lockboxAddr,
-		Args: lockbox_ops.AuthorizedCallerArgs{
+	lockBox, err := bindLockBox(lockboxAddr, evmChain)
+	if err != nil {
+		return nil, err
+	}
+	removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.NewWriteApplyAuthorizedCallerUpdates(lockBox), evmChain, ops2contract.FunctionInput[lockboxbind.AuthorizedCallersAuthorizedCallerArgs]{
+		Args: lockboxbind.AuthorizedCallersAuthorizedCallerArgs{
 			AddedCallers:   []common.Address{},
 			RemovedCallers: []common.Address{timelockAddr},
 		},
@@ -541,17 +531,15 @@ func appendCleanup(
 	if err != nil {
 		return nil, fmt.Errorf("failed to remove timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
 	}
-	ops = append(ops, removeAuthReport.Output)
+	ops = appendWrite(ops, removeAuthReport.Output)
 
-	restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-		Args:          originalRebalancer,
+	restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.NewWriteSetRebalancer(oldLRTP), evmChain, ops2contract.FunctionInput[common.Address]{
+		Args: originalRebalancer,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", oldPoolAddr, err)
+		return nil, fmt.Errorf("failed to restore rebalancer on old pool: %w", err)
 	}
-	ops = append(ops, restoreRebalancerReport.Output)
+	ops = appendWrite(ops, restoreRebalancerReport.Output)
 
 	return ops, nil
 }

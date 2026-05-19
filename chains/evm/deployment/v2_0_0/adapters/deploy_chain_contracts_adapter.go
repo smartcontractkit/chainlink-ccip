@@ -5,22 +5,21 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	upstream "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
-
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	off160bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type EVMDeployChainContractsAdapter struct{}
@@ -180,11 +179,11 @@ func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapter
 		}
 	}
 	// directly fetch offRamp static config
-	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, upstream.FunctionInput[struct{}]{
-		ChainSelector: input.ChainSelector,
-		Address:       common.HexToAddress(offRampAddr.Address),
-		Args:          struct{}{},
-	})
+	offRamp, err := off160bind.NewOffRamp(common.HexToAddress(offRampAddr.Address), chain.Client)
+	if err != nil {
+		return output, fmt.Errorf("bind OffRamp v1.6.0 for chain selector %d: %w", input.ChainSelector, err)
+	}
+	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.NewReadGetStaticConfig(offRamp), chain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return output, fmt.Errorf("failed to execute operation to get offRamp v1.6.0 static config for chain selector %d: %w", input.ChainSelector, err)
 	}
@@ -304,7 +303,7 @@ func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.Ex
 		result = append(result, sequences.ExecutorParams{
 			Version:       ep.Version,
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
-			DynamicConfig: executor.DynamicConfig{
+			DynamicConfig: execbind.ExecutorDynamicConfig{
 				FeeAggregator:         feeAgg,
 				AllowedFinalityConfig: ep.DynamicConfig.AllowedFinalityConfig.Raw(),
 				CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,

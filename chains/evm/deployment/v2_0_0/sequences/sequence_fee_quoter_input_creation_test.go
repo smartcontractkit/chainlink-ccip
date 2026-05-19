@@ -15,6 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	onramp160bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	evm_2_evm_onramp_v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
@@ -26,9 +28,10 @@ import (
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	onrampv1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	fq160bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	evmadapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	fq2bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -70,7 +73,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 		Metadata: seq1_6.FeeQuoterImportConfigSequenceOutput{
 			RemoteChainCfgs: map[uint64]seq1_6.FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 				15971525489660198786: {
-					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
+					DestChainCfg: fq160bind.FeeQuoterDestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           3,
 						MaxDataBytes:                      8000,
@@ -91,7 +94,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        10,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{
+					TokenTransferFeeCfgs: map[common.Address]fq160bind.FeeQuoterTokenTransferFeeConfig{
 						common.HexToAddress("0x2222222222222222222222222222222222222222"): {
 							MinFeeUSDCents:    4,
 							MaxFeeUSDCents:    40,
@@ -104,7 +107,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 					GasPrice: new(big.Int).Set(testImportGasPriceWei),
 				},
 			},
-			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
+			StaticCfg: fq160bind.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1000000000000000000),
 				LinkToken:                    common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 				TokenPriceStalenessThreshold: 3600,
@@ -176,7 +179,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 		Metadata: seq1_6.FeeQuoterImportConfigSequenceOutput{
 			RemoteChainCfgs: map[uint64]seq1_6.FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 				15971525489660198786: {
-					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
+					DestChainCfg: fq160bind.FeeQuoterDestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           3,
 						MaxDataBytes:                      8000,
@@ -197,7 +200,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        10,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{
+					TokenTransferFeeCfgs: map[common.Address]fq160bind.FeeQuoterTokenTransferFeeConfig{
 						common.HexToAddress("0x2222222222222222222222222222222222222222"): {
 							MinFeeUSDCents:    4,
 							MaxFeeUSDCents:    40,
@@ -210,7 +213,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 					GasPrice: new(big.Int).Set(testImportGasPriceWei),
 				},
 			},
-			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
+			StaticCfg: fq160bind.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1000000000000000000),
 				LinkToken:                    common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 				TokenPriceStalenessThreshold: 3600,
@@ -325,7 +328,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 		Metadata: seq1_6.FeeQuoterImportConfigSequenceOutput{
 			RemoteChainCfgs: map[uint64]seq1_6.FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 				5009297550715157269: {
-					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
+					DestChainCfg: fq160bind.FeeQuoterDestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           5,
 						MaxDataBytes:                      10000,
@@ -346,11 +349,11 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
+					TokenTransferFeeCfgs: map[common.Address]fq160bind.FeeQuoterTokenTransferFeeConfig{},
 					GasPrice:             new(big.Int).Set(testImportGasPriceWei),
 				},
 				4949039107694359620: {
-					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
+					DestChainCfg: fq160bind.FeeQuoterDestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           4,
 						MaxDataBytes:                      9000,
@@ -371,11 +374,11 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
+					TokenTransferFeeCfgs: map[common.Address]fq160bind.FeeQuoterTokenTransferFeeConfig{},
 					GasPrice:             new(big.Int).Set(testImportGasPriceWei),
 				},
 			},
-			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
+			StaticCfg: fq160bind.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1000000000000000000),
 				LinkToken:                    common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 				TokenPriceStalenessThreshold: 3600,
@@ -515,7 +518,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
-			StaticConfig: fqops.StaticConfig{
+			StaticConfig: fq2bind.FeeQuoterStaticConfig{
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
@@ -524,10 +527,10 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
 				common.HexToAddress("0x2222222222222222222222222222222222222221"),
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
+			DestChainConfigArgs: []fq2bind.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                8000,
 						MaxPerMsgGasLimit:           4000000,
@@ -542,13 +545,13 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 					},
 				},
 			},
-			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+			TokenTransferFeeConfigArgs: []fq2bind.FeeQuoterTokenTransferFeeConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+					TokenTransferFeeConfigs: []fq2bind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						{
 							Token: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: fq2bind.FeeQuoterTokenTransferFeeConfig{
 								FeeUSDCents:       4,
 								DestGasOverhead:   25000,
 								DestBytesOverhead: 80,
@@ -559,11 +562,11 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 			},
 		},
-		PriceUpdates: fqops.PriceUpdates{
-			GasPriceUpdates: []fqops.GasPriceUpdate{
+		PriceUpdates: fq2bind.InternalPriceUpdates{
+			GasPriceUpdates: []fq2bind.InternalGasPriceUpdate{
 				{DestChainSelector: 15971525489660198786, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 			},
-			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+			TokenPriceUpdates: []fq2bind.InternalTokenPriceUpdate{
 				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
 			},
 		},
@@ -573,7 +576,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected[4949039107694359620] = sequences.FeeQuoterUpdate{
 		ChainSelector: 4949039107694359620,
 		ConstructorArgs: fqops.ConstructorArgs{
-			StaticConfig: fqops.StaticConfig{
+			StaticConfig: fq2bind.FeeQuoterStaticConfig{
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
@@ -583,10 +586,10 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				common.HexToAddress("0x3333333333333333333333333333333333333333"),
 				common.HexToAddress("0x9999999999999999999999999999999999999999"),
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
+			DestChainConfigArgs: []fq2bind.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                8000,
 						MaxPerMsgGasLimit:           4000000,
@@ -602,7 +605,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 				{
 					DestChainSelector: 5009297550715157269,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                10000,
 						MaxPerMsgGasLimit:           5000000,
@@ -617,13 +620,13 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 					},
 				},
 			},
-			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+			TokenTransferFeeConfigArgs: []fq2bind.FeeQuoterTokenTransferFeeConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+					TokenTransferFeeConfigs: []fq2bind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						{
 							Token: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: fq2bind.FeeQuoterTokenTransferFeeConfig{
 								FeeUSDCents:       4,
 								DestGasOverhead:   25000,
 								DestBytesOverhead: 80,
@@ -634,10 +637,10 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 				{
 					DestChainSelector: 5009297550715157269,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+					TokenTransferFeeConfigs: []fq2bind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						{
 							Token: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: fq2bind.FeeQuoterTokenTransferFeeConfig{
 								FeeUSDCents:       5,
 								DestGasOverhead:   30000,
 								DestBytesOverhead: 100,
@@ -648,12 +651,12 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 			},
 		},
-		PriceUpdates: fqops.PriceUpdates{
-			GasPriceUpdates: []fqops.GasPriceUpdate{
+		PriceUpdates: fq2bind.InternalPriceUpdates{
+			GasPriceUpdates: []fq2bind.InternalGasPriceUpdate{
 				{DestChainSelector: 5009297550715157269, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 				{DestChainSelector: 15971525489660198786, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 			},
-			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+			TokenPriceUpdates: []fq2bind.InternalTokenPriceUpdate{
 				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
 			},
 		},
@@ -664,14 +667,14 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected[15971525489660198786] = sequences.FeeQuoterUpdate{
 		ChainSelector: 15971525489660198786,
 		ConstructorArgs: fqops.ConstructorArgs{
-			StaticConfig: fqops.StaticConfig{
+			StaticConfig: fq2bind.FeeQuoterStaticConfig{
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels159,
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
+			DestChainConfigArgs: []fq2bind.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: 5009297550715157269,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                10000,
 						MaxPerMsgGasLimit:           5000000,
@@ -686,13 +689,13 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 					},
 				},
 			},
-			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+			TokenTransferFeeConfigArgs: []fq2bind.FeeQuoterTokenTransferFeeConfigArgs{
 				{
 					DestChainSelector: 5009297550715157269,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+					TokenTransferFeeConfigs: []fq2bind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						{
 							Token: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: fq2bind.FeeQuoterTokenTransferFeeConfig{
 								FeeUSDCents:       5,
 								DestGasOverhead:   30000,
 								DestBytesOverhead: 100,
@@ -701,7 +704,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						},
 						{
 							Token: common.HexToAddress("0x3333333333333333333333333333333333333333"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: fq2bind.FeeQuoterTokenTransferFeeConfig{
 								FeeUSDCents:       10,
 								DestGasOverhead:   40000,
 								DestBytesOverhead: 200,
@@ -715,11 +718,11 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				common.HexToAddress("0x4444444444444444444444444444444444444444"),
 			},
 		},
-		PriceUpdates: fqops.PriceUpdates{
-			GasPriceUpdates: []fqops.GasPriceUpdate{
+		PriceUpdates: fq2bind.InternalPriceUpdates{
+			GasPriceUpdates: []fq2bind.InternalGasPriceUpdate{
 				{DestChainSelector: 5009297550715157269, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 			},
-			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+			TokenPriceUpdates: []fq2bind.InternalTokenPriceUpdate{
 				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
 			},
 		},
@@ -729,7 +732,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected[5936861837188149645] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5936861837188149645,
 		ConstructorArgs: fqops.ConstructorArgs{
-			StaticConfig: fqops.StaticConfig{
+			StaticConfig: fq2bind.FeeQuoterStaticConfig{
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
@@ -738,10 +741,10 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				common.HexToAddress("0x5555555555555555555555555555555555555555"),
 				common.HexToAddress("0x5555555555555555555555555555555555555551"),
 			},
-			DestChainConfigArgs: []fqops.DestChainConfigArgs{
+			DestChainConfigArgs: []fq2bind.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: 5009297550715157269,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                10000,
 						MaxPerMsgGasLimit:           5000000,
@@ -757,7 +760,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 				{
 					DestChainSelector: 4949039107694359620,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                9000,
 						MaxPerMsgGasLimit:           4500000,
@@ -773,7 +776,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 				},
 				{
 					DestChainSelector: 15971525489660198786,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq2bind.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                8000,
 						MaxPerMsgGasLimit:           4000000,
@@ -788,24 +791,24 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 					},
 				},
 			},
-			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
+			TokenTransferFeeConfigArgs: []fq2bind.FeeQuoterTokenTransferFeeConfigArgs{
 				{
 					DestChainSelector:       5009297550715157269,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{},
+					TokenTransferFeeConfigs: []fq2bind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{},
 				},
 				{
 					DestChainSelector:       4949039107694359620,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{},
+					TokenTransferFeeConfigs: []fq2bind.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{},
 				},
 			},
 		},
-		PriceUpdates: fqops.PriceUpdates{
-			GasPriceUpdates: []fqops.GasPriceUpdate{
+		PriceUpdates: fq2bind.InternalPriceUpdates{
+			GasPriceUpdates: []fq2bind.InternalGasPriceUpdate{
 				{DestChainSelector: 5009297550715157269, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 				{DestChainSelector: 4949039107694359620, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 				{DestChainSelector: 15971525489660198786, UsdPerUnitGas: new(big.Int).Set(testImportGasPriceWei)},
 			},
-			TokenPriceUpdates: []fqops.TokenPriceUpdate{
+			TokenPriceUpdates: []fq2bind.InternalTokenPriceUpdate{
 				{SourceToken: linkToken, UsdPerToken: new(big.Int).Set(testImportTokenPriceWei)},
 			},
 		},
@@ -814,7 +817,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	return expected
 }
 
-func requirePriceUpdatesMatch(t *testing.T, expected, actual fqops.PriceUpdates, chainSelector uint64) {
+func requirePriceUpdatesMatch(t *testing.T, expected, actual fq2bind.InternalPriceUpdates, chainSelector uint64) {
 	t.Helper()
 	require.Len(t, actual.GasPriceUpdates, len(expected.GasPriceUpdates),
 		"gas price update count on chain %d", chainSelector)
@@ -1042,7 +1045,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 		// Verify DestChainConfigs against expected values
 		// Build a map of expected dest chain configs for easier lookup
-		expectedDestChainConfigsMap := make(map[uint64]fqops.DestChainConfigArgs)
+		expectedDestChainConfigsMap := make(map[uint64]fq2bind.FeeQuoterDestChainConfigArgs)
 		for _, cfg := range expected.DestChainConfigs {
 			expectedDestChainConfigsMap[cfg.DestChainSelector] = cfg
 		}
@@ -1292,24 +1295,23 @@ func deployOnRamps(t *testing.T, e *cldf.Environment, chainSelector uint64, remo
 			require.NoError(t, err)
 			rampAddr = out.Output
 		case "1.6.0":
-			out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampv1_6ops.Deploy, chain, contract.DeployInput[onrampv1_6ops.ConstructorArgs]{
-				ChainSelector:  chainSelector,
+			out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onrampv1_6ops.Deploy, chain, ops2contract.DeployInput[onrampv1_6ops.ConstructorArgs]{
 				TypeAndVersion: cldf.NewTypeAndVersion(onrampv1_6ops.ContractType, *onrampv1_6ops.Version),
 				Args: onrampv1_6ops.ConstructorArgs{
-					StaticConfig: onrampv1_6ops.StaticConfig{
+					StaticConfig: onramp160bind.OnRampStaticConfig{
 						ChainSelector:      chainSelector,
 						RmnRemote:          rmnProxyPlaceholder,
 						NonceManager:       utils2.RandomAddress(),
 						TokenAdminRegistry: tokenAdminRegistryPlaceholder,
 					},
-					DynamicConfig: onrampv1_6ops.DynamicConfig{
+					DynamicConfig: onramp160bind.OnRampDynamicConfig{
 						FeeQuoter:              utils2.RandomAddress(),
 						ReentrancyGuardEntered: false,
 						MessageInterceptor:     common.Address{},
 						FeeAggregator:          chain.DeployerKey.From,
 						AllowlistAdmin:         chain.DeployerKey.From,
 					},
-					DestChainConfigArgs: []onrampv1_6ops.DestChainConfigArgs{
+					DestChainConfigArgs: []onramp160bind.OnRampDestChainConfigArgs{
 						{
 							DestChainSelector: remoteChainSelector,
 							Router:            routerAddr,

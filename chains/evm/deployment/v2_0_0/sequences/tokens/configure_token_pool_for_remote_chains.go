@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -50,10 +51,11 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			}
 			activePool := tokenConfigReport.Output.TokenPool
 			if activePool != (common.Address{}) {
-				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       activePool,
-				})
+				activeTP, err := bindTokenPool(activePool, chain)
+				if err != nil {
+					return sequences.OnChainOutput{}, err
+				}
+				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetSupportedChains(activeTP), chain, ops2contract.FunctionInput[struct{}]{})
 				if err == nil {
 					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
 					supportedChains := supportedChainsReport.Output
@@ -69,10 +71,11 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			}
 		}
 		ops := make([]mcms_types.BatchOperation, 0)
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-		})
+		tp, err := bindTokenPool(input.TokenPoolAddress, chain)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.NewReadGetSupportedChains(tp), chain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from pool: %w", err)
 		}

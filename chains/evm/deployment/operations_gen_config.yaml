@@ -65,6 +65,62 @@ contracts:
       - name: configureAllowedCallers
         access: owner
 
+  - contract_name: HybridLockReleaseUSDCTokenPool
+    version: "1.6.2"
+    package_name: hybrid_lock_release_usdc_token_pool
+    functions:
+      - name: shouldUseLockRelease
+        access: public
+      - name: getLockedTokensForChain
+        access: public
+      - name: getLiquidityProvider
+        access: public
+      - name: withdrawLiquidity
+        access: owner
+
+  # 1.6.5
+  - contract_name: USDCTokenPool
+    version: "1.6.5"
+    package_name: usdc_token_pool
+    functions:
+      - name: getDomain
+        access: public
+      - name: setDomains
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: applyChainUpdates
+        access: owner
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: getSupportedChains
+        access: public
+
+  - contract_name: USDCTokenPoolCCTPV2
+    version: "1.6.5"
+    package_name: usdc_token_pool_cctp_v2
+    functions:
+      - name: getDomain
+        access: public
+      - name: setDomains
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: applyChainUpdates
+        access: owner
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: getSupportedChains
+        access: public
+
   # 1.6.1
   - contract_name: TokenPool
     version: "1.6.1"
@@ -179,6 +235,7 @@ contracts:
 
   - contract_name: FeeQuoter
     version: "1.6.0"
+    omit_deploy: true
     functions:
       - name: applyDestChainConfigUpdates
         access: owner

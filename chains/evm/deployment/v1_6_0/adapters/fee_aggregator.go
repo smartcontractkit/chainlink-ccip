@@ -4,16 +4,17 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -49,6 +50,18 @@ func (a *FeeAggregatorAdapter) getOnRampRef(e cldf.Environment, chainSelector ui
 	return ref, nil
 }
 
+func writeOutputOps2ToLegacy(w ops2contract.WriteOutput) contract.WriteOutput {
+	var ei *contract.ExecInfo
+	if w.ExecInfo != nil {
+		ei = &contract.ExecInfo{Hash: w.ExecInfo.Hash}
+	}
+	return contract.WriteOutput{
+		ChainSelector: w.ChainSelector,
+		Tx:            w.Tx,
+		ExecInfo:      ei,
+	}
+}
+
 func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelector uint64) (string, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
@@ -61,17 +74,22 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	}
 
 	onRampAddr := common.HexToAddress(onRampRef.Address)
-	onRamp, err := onrampops.NewOnRampContract(onRampAddr, chain.Client)
+	onRamp, err := orbind.NewOnRamp(onRampAddr, chain.Client)
 	if err != nil {
 		return "", fmt.Errorf("failed to instantiate OnRamp at %s on chain %d: %w", onRampAddr.Hex(), chainSelector, err)
 	}
 
-	dynamicCfg, err := onRamp.GetDynamicConfig(&bind.CallOpts{Context: e.GetContext()})
+	report, err := operations.ExecuteOperation(
+		e.OperationsBundle,
+		onrampops.NewReadGetDynamicConfig(onRamp),
+		chain,
+		ops2contract.FunctionInput[struct{}]{},
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to get OnRamp dynamic config on chain %d: %w", chainSelector, err)
 	}
 
-	return dynamicCfg.FeeAggregator.Hex(), nil
+	return report.Output.FeeAggregator.Hex(), nil
 }
 
 func (a *FeeAggregatorAdapter) resolveOnRampRef(e cldf.Environment, input fees.FeeAggregatorForChain) (datastore.AddressRef, error) {
@@ -112,12 +130,14 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			}
 			onRampAddr := common.HexToAddress(onRampRef.Address)
 
+			onRamp, err := orbind.NewOnRamp(onRampAddr, evmChain.Client)
+			if err != nil {
+				return result, fmt.Errorf("failed to instantiate OnRamp at %s on chain %d: %w", onRampAddr.Hex(), input.ChainSelector, err)
+			}
+
 			readReport, err := operations.ExecuteOperation(
-				b, onrampops.GetDynamicConfig, evmChain,
-				contract.FunctionInput[struct{}]{
-					ChainSelector: evmChain.Selector,
-					Address:       onRampAddr,
-				},
+				b, onrampops.NewReadGetDynamicConfig(onRamp), evmChain,
+				ops2contract.FunctionInput[struct{}]{},
 			)
 			if err != nil {
 				return result, fmt.Errorf("failed to read OnRamp dynamic config on chain %d: %w", input.ChainSelector, err)
@@ -127,18 +147,16 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			currentCfg.FeeAggregator = newFeeAggregator
 
 			writeReport, err := operations.ExecuteOperation(
-				b, onrampops.SetDynamicConfig, evmChain,
-				contract.FunctionInput[onrampops.DynamicConfig]{
-					ChainSelector: evmChain.Selector,
-					Address:       onRampAddr,
-					Args:          currentCfg,
+				b, onrampops.NewWriteSetDynamicConfig(onRamp), evmChain,
+				ops2contract.FunctionInput[orbind.OnRampDynamicConfig]{
+					Args: currentCfg,
 				},
 			)
 			if err != nil {
 				return result, fmt.Errorf("failed to set OnRamp dynamic config on chain %d: %w", input.ChainSelector, err)
 			}
 
-			batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeReport.Output})
+			batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeOutputOps2ToLegacy(writeReport.Output)})
 			if err != nil {
 				return result, fmt.Errorf("failed to create batch operation from writes for chain %d: %w", input.ChainSelector, err)
 			}

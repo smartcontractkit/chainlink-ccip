@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -14,6 +15,8 @@ import (
 
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -42,9 +45,48 @@ const evmCallerLen = 20
 type EVMAuthorizedCallersAdapter struct {
 	addrCache map[string]common.Address
 	getAllOp  *cldf_ops.Operation[contract.FunctionInput[struct{}], []common.Address, cldf_evm.Chain]
+	getAllFn  func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address) ([]common.Address, error)
 	// execApply executes the contract-specific applyAuthorizedCallerUpdates operation
 	// through the ops bundle so MCMS metadata is accurate.
 	execApply func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error)
+}
+
+// NewRMNAuthorizedCallersAdapter registers an adapter for the v2.0 RMN contract using ops2 operations.
+func NewRMNAuthorizedCallersAdapter() *EVMAuthorizedCallersAdapter {
+	return &EVMAuthorizedCallersAdapter{
+		addrCache: make(map[string]common.Address),
+		getAllFn: func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address) ([]common.Address, error) {
+			rmn, err := rmnbind.NewRMN(addr, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("bind RMN at %s: %w", addr.Hex(), err)
+			}
+			report, err := cldf_ops.ExecuteOperation(b, rmnops.NewReadGetAllAuthorizedCallers(rmn), chain, ops2contract.FunctionInput[struct{}]{})
+			if err != nil {
+				return nil, err
+			}
+			return report.Output, nil
+		},
+		execApply: func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error) {
+			rmn, err := rmnbind.NewRMN(addr, chain.Client)
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("bind RMN at %s: %w", addr.Hex(), err)
+			}
+			report, err := cldf_ops.ExecuteOperation(b, rmnops.NewWriteApplyAuthorizedCallerUpdates(rmn), chain, ops2contract.FunctionInput[rmnbind.AuthorizedCallersAuthorizedCallerArgs]{
+				Args: rmnbind.AuthorizedCallersAuthorizedCallerArgs{
+					AddedCallers:   added,
+					RemovedCallers: removed,
+				},
+			})
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("applyAuthorizedCallerUpdates on %s: %w", addr.Hex(), err)
+			}
+			batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeOutputOps2ToLegacy(report.Output)})
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to create batch from writes: %w", err)
+			}
+			return sequtil.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batch}}, nil
+		},
+	}
 }
 
 // NewEVMAuthorizedCallersAdapter constructs an EVMAuthorizedCallersAdapter backed by
@@ -128,16 +170,26 @@ func (a *EVMAuthorizedCallersAdapter) GetAllAuthorizedCallers(
 		return nil, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
 	readBundle := cldf_ops.NewBundle(e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
-	report, err := cldf_ops.ExecuteOperation(readBundle, a.getAllOp, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       addr,
-		Args:          struct{}{},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("getAllAuthorizedCallers at %s on chain %d: %w", addr.Hex(), selector, err)
+	var addrs []common.Address
+	var readErr error
+	if a.getAllFn != nil {
+		addrs, readErr = a.getAllFn(readBundle, chain, addr)
+	} else {
+		report, readErr := cldf_ops.ExecuteOperation(readBundle, a.getAllOp, chain, contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       addr,
+			Args:          struct{}{},
+		})
+		if readErr != nil {
+			return nil, fmt.Errorf("getAllAuthorizedCallers at %s on chain %d: %w", addr.Hex(), selector, readErr)
+		}
+		addrs = report.Output
 	}
-	callers := make([]api.Caller, len(report.Output))
-	for i, c := range report.Output {
+	if readErr != nil {
+		return nil, fmt.Errorf("getAllAuthorizedCallers at %s on chain %d: %w", addr.Hex(), selector, readErr)
+	}
+	callers := make([]api.Caller, len(addrs))
+	for i, c := range addrs {
 		callers[i] = c.Bytes()
 	}
 	return callers, nil

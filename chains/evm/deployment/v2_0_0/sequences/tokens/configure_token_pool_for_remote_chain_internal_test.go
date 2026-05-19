@@ -6,23 +6,22 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
-	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	tp161bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
+	fq163bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	fq2bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-
-	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
 func Test_tokenBucketToRateLimiterConfig(t *testing.T) {
 	tests := []struct {
 		name string
-		b    token_pool_v161.TokenBucket
+		b    tp161bind.RateLimiterTokenBucket
 		want *tokens.RateLimiterConfig
 	}{
 		{
 			name: "enabled with capacity and rate",
-			b: token_pool_v161.TokenBucket{
+			b: tp161bind.RateLimiterTokenBucket{
 				IsEnabled: true,
 				Capacity:  big.NewInt(1000),
 				Rate:      big.NewInt(100),
@@ -35,7 +34,7 @@ func Test_tokenBucketToRateLimiterConfig(t *testing.T) {
 		},
 		{
 			name: "disabled",
-			b: token_pool_v161.TokenBucket{
+			b: tp161bind.RateLimiterTokenBucket{
 				IsEnabled: false,
 				Capacity:  big.NewInt(0),
 				Rate:      big.NewInt(0),
@@ -80,7 +79,7 @@ func Test_v150OnRampConfigToTokenTransferFeeConfig(t *testing.T) {
 }
 
 func Test_v163FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
-	cfg := fqops_v163.TokenTransferFeeConfig{
+	cfg := fq163bind.FeeQuoterTokenTransferFeeConfig{
 		MinFeeUSDCents:    75,
 		MaxFeeUSDCents:    750,
 		DeciBps:           150,
@@ -100,7 +99,7 @@ func Test_v163FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
 }
 
 func Test_v2FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
-	cfg := fqops.TokenTransferFeeConfig{
+	cfg := fq2bind.FeeQuoterTokenTransferFeeConfig{
 		FeeUSDCents:       100,
 		DestGasOverhead:   180_000,
 		DestBytesOverhead: 48,

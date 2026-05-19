@@ -6,8 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -96,14 +96,14 @@ func TestConfigurePool(t *testing.T) {
 			require.Len(t, configureReport.Output.Addresses, 0, "Expected 0 addresses in output")
 
 			// Check dynamic config
+			evmChain := e.BlockChains.EVMChains()[chainSel]
+			tp, err := tokens.BindTokenPool(input.TokenPoolAddress, evmChain)
+			require.NoError(t, err, "BindTokenPool should not error")
 			getDynamicConfigReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetDynamicConfig,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       input.TokenPoolAddress,
-				},
+				token_pool.NewReadGetDynamicConfig(tp),
+				evmChain,
+				ops2contract.FunctionInput[struct{}]{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.RouterAddress, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")

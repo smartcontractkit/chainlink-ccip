@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cldfevm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -26,12 +27,42 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	cvbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
+	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	fqc "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
 
 func boolPtr(v bool) *bool { return &v }
+
+func bindLaneContracts(
+	t *testing.T,
+	evmChain cldfevm.Chain,
+	local deployedContracts,
+) (
+	offbind.OffRampInterface,
+	orbind.OnRampInterface,
+	execbind.ExecutorInterface,
+	fqc.FeeQuoterInterface,
+	cvbind.CommitteeVerifierInterface,
+) {
+	t.Helper()
+	offRampContract, err := offbind.NewOffRamp(common.HexToAddress(local.offRamp), evmChain.Client)
+	require.NoError(t, err)
+	onRampContract, err := orbind.NewOnRamp(common.HexToAddress(local.onRamp), evmChain.Client)
+	require.NoError(t, err)
+	execContract, err := execbind.NewExecutor(common.HexToAddress(local.executor), evmChain.Client)
+	require.NoError(t, err)
+	fqContract, err := fqc.NewFeeQuoter(common.HexToAddress(local.feeQuoter), evmChain.Client)
+	require.NoError(t, err)
+	cvContract, err := cvbind.NewCommitteeVerifier(common.HexToAddress(local.committeeVerifier), evmChain.Client)
+	require.NoError(t, err)
+	return offRampContract, onRampContract, execContract, fqContract, cvContract
+}
 
 type deployedContracts struct {
 	router                    string
@@ -165,6 +196,8 @@ func assertOnChainState(
 ) {
 	t.Helper()
 
+	offRampContract, onRampContract, execContract, fqContract, cvContract := bindLaneContracts(t, evmChain, local)
+
 	onRampOnRouter, err := operations.ExecuteOperation(b, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.router), Args: remoteChainSelector,
 	})
@@ -178,9 +211,7 @@ func assertOnChainState(
 	require.Len(t, offRampsOnRouter.Output, 1)
 	assert.Equal(t, local.offRamp, offRampsOnRouter.Output[0].OffRamp.Hex())
 
-	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
-	})
+	srcCfg, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.True(t, srcCfg.Output.IsEnabled)
 	assert.Equal(t, local.router, srcCfg.Output.Router.Hex())
@@ -189,9 +220,7 @@ func assertOnChainState(
 	assert.Len(t, srcCfg.Output.DefaultCCVs, 1)
 	assert.Equal(t, local.committeeVerifier, srcCfg.Output.DefaultCCVs[0].Hex())
 
-	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.onRamp), Args: remoteChainSelector,
-	})
+	destCfg, err := operations.ExecuteOperation(b, onramp.NewReadGetDestChainConfig(onRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.Equal(t, local.router, destCfg.Output.Router.Hex())
 	assert.Equal(t, common.HexToAddress(remote.offRamp).Bytes(), destCfg.Output.OffRamp)
@@ -199,18 +228,14 @@ func assertOnChainState(
 	assert.Len(t, destCfg.Output.DefaultCCVs, 1)
 	assert.Equal(t, local.committeeVerifier, destCfg.Output.DefaultCCVs[0].Hex())
 
-	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
-	})
+	executorDestChains, err := operations.ExecuteOperation(b, executor.NewReadGetDestChains(execContract), evmChain, ops2contract.FunctionInput[struct{}]{})
 	require.NoError(t, err)
 	require.Len(t, executorDestChains.Output, 1)
 	assert.Equal(t, remoteChainSelector, executorDestChains.Output[0].DestChainSelector)
 	assert.Equal(t, uint16(50), executorDestChains.Output[0].Config.UsdCentsFee)
 	assert.True(t, executorDestChains.Output[0].Config.Enabled)
 
-	fqDestCfg, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteChainSelector,
-	})
+	fqDestCfg, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.True(t, fqDestCfg.Output.IsEnabled)
 	assert.Equal(t, uint32(30_000), fqDestCfg.Output.MaxDataBytes)
@@ -218,9 +243,7 @@ func assertOnChainState(
 	assert.Equal(t, uint32(300_000), fqDestCfg.Output.DestGasOverhead)
 	assert.Equal(t, evmFamilySelector, fqDestCfg.Output.ChainFamilySelector)
 
-	verifierRemoteCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteChainSelector,
-	})
+	verifierRemoteCfg, err := operations.ExecuteOperation(b, committee_verifier.NewReadGetRemoteChainConfig(cvContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.Equal(t, local.router, verifierRemoteCfg.Output.RemoteChainConfig.Router.Hex())
 	assert.False(t, verifierRemoteCfg.Output.RemoteChainConfig.AllowlistEnabled)
@@ -387,19 +410,16 @@ func captureLaneState(
 ) laneSnapshot {
 	t.Helper()
 	var s laneSnapshot
+	offRampContract, onRampContract, execContract, fqContract, cvContract := bindLaneContracts(t, evmChain, local)
 
-	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteSelector,
-	})
+	srcCfg, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	s.offRampSourceEnabled = srcCfg.Output.IsEnabled
 	s.offRampRouter = srcCfg.Output.Router.Hex()
 	s.offRampOnRamps = srcCfg.Output.OnRamps
 	s.offRampDefaultCCVs = srcCfg.Output.DefaultCCVs
 
-	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.onRamp), Args: remoteSelector,
-	})
+	destCfg, err := operations.ExecuteOperation(b, onramp.NewReadGetDestChainConfig(onRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	s.onRampDestRouter = destCfg.Output.Router.Hex()
 	s.onRampOffRamp = destCfg.Output.OffRamp
@@ -411,9 +431,7 @@ func captureLaneState(
 	s.onRampTokenFeeUSD = destCfg.Output.TokenNetworkFeeUSDCents
 	s.onRampTokenReceiver = destCfg.Output.TokenReceiverAllowed
 
-	fqCfg, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
+	fqCfg, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	s.feeQuoterEnabled = fqCfg.Output.IsEnabled
 	s.feeQuoterMaxData = fqCfg.Output.MaxDataBytes
@@ -427,9 +445,7 @@ func captureLaneState(
 	s.feeQuoterDefTxGas = fqCfg.Output.DefaultTxGasLimit
 	s.feeQuoterGasPerByte = fqCfg.Output.DestGasPerPayloadByteBase
 
-	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
-	})
+	executorDestChains, err := operations.ExecuteOperation(b, executor.NewReadGetDestChains(execContract), evmChain, ops2contract.FunctionInput[struct{}]{})
 	require.NoError(t, err)
 	for _, dc := range executorDestChains.Output {
 		if dc.DestChainSelector == remoteSelector {
@@ -439,16 +455,13 @@ func captureLaneState(
 		}
 	}
 
-	verifierCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
-	})
+	verifierCfg, err := operations.ExecuteOperation(b, committee_verifier.NewReadGetRemoteChainConfig(cvContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	s.verifierRouter = verifierCfg.Output.RemoteChainConfig.Router.Hex()
 	s.verifierAllowlistEnabled = verifierCfg.Output.RemoteChainConfig.AllowlistEnabled
 	s.verifierAllowedSenders = verifierCfg.Output.AllowedSendersList
 
-	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.GetFee, evmChain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier),
+	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.NewReadGetFee(cvContract), evmChain, ops2contract.FunctionInput[committee_verifier.GetFeeArgs]{
 		Args: committee_verifier.GetFeeArgs{DestChainSelector: remoteSelector},
 	})
 	require.NoError(t, err)
@@ -456,9 +469,7 @@ func captureLaneState(
 	s.verifierGasForVerify = verifierFee.Output.GasForVerification
 	s.verifierPayloadSize = verifierFee.Output.PayloadSizeBytes
 
-	sigCfg, err := operations.ExecuteOperation(b, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
-	})
+	sigCfg, err := operations.ExecuteOperation(b, committee_verifier.NewReadGetSignatureConfig(cvContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	s.verifierSigners = sigCfg.Output.Signers
 	s.verifierThreshold = sigCfg.Output.Threshold
@@ -589,29 +600,23 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 	require.NoError(t, err)
 	assert.Len(t, offRampsOnRouter.Output, 2)
 
+	offRampContract, _, _, fqContract, _ := bindLaneContracts(t, evmChain, local)
 	for _, remoteSelector := range []uint64{remoteA, remoteB} {
-		srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-			ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteSelector,
-		})
+		srcCfg, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 		require.NoError(t, err)
 		assert.True(t, srcCfg.Output.IsEnabled, "source chain config for %d should be enabled", remoteSelector)
 	}
 
-	fqDestA, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteA,
-	})
+	fqDestA, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteA})
 	require.NoError(t, err)
 	assert.Equal(t, uint32(30_000), fqDestA.Output.MaxDataBytes)
 
-	fqDestB, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteB,
-	})
+	fqDestB, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteB})
 	require.NoError(t, err)
 	assert.Equal(t, uint32(50_000), fqDestB.Output.MaxDataBytes)
 
-	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
-	})
+	_, _, execContract, _, _ := bindLaneContracts(t, evmChain, local)
+	executorDestChains, err := operations.ExecuteOperation(b, executor.NewReadGetDestChains(execContract), evmChain, ops2contract.FunctionInput[struct{}]{})
 	require.NoError(t, err)
 	assert.Len(t, executorDestChains.Output, 2)
 }
@@ -826,10 +831,9 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, _, _, fqContract, _ := bindLaneContracts(t, evmChain, local)
 
-	fqBefore, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
+	fqBefore, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, uint32(30_000), fqBefore.Output.MaxDataBytes)
 
@@ -846,9 +850,7 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	fqAfterNoOverride, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
+	fqAfterNoOverride, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, uint32(30_000), fqAfterNoOverride.Output.MaxDataBytes,
 		"with OverrideExistingConfig=false, an already-enabled FeeQuoter config should not be updated")
@@ -866,9 +868,7 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	fqAfterOverride, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
+	fqAfterOverride, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestChainConfig(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, uint32(99_000), fqAfterOverride.Output.MaxDataBytes,
 		"with OverrideExistingConfig=true, FeeQuoter config should be updated")
@@ -931,23 +931,18 @@ func TestConfigureChainForLanes_TestRouterSetup(t *testing.T) {
 	assert.Empty(t, offRampsOnProdRouter.Output,
 		"production Router should NOT have OffRamps wired")
 
-	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.offRamp), Args: remoteSelector,
-	})
+	offRampContract, onRampContract, _, _, cvContract := bindLaneContracts(t, evmChain, localWithTest.deployedContracts)
+	srcCfg, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, localWithTest.testRouter, srcCfg.Output.Router.Hex(),
 		"OffRamp source config should reference the TestRouter")
 
-	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.onRamp), Args: remoteSelector,
-	})
+	destCfg, err := operations.ExecuteOperation(b, onramp.NewReadGetDestChainConfig(onRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, localWithTest.testRouter, destCfg.Output.Router.Hex(),
 		"OnRamp dest config should reference the TestRouter")
 
-	verifierCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(localWithTest.committeeVerifier), Args: remoteSelector,
-	})
+	verifierCfg, err := operations.ExecuteOperation(b, committee_verifier.NewReadGetRemoteChainConfig(cvContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, localWithTest.testRouter, verifierCfg.Output.RemoteChainConfig.Router.Hex(),
 		"CommitteeVerifier remote config should reference the TestRouter")
@@ -978,10 +973,9 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseDisablesTraffic(t *testing.
 
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	offRampContract, _, _, _, _ := bindLaneContracts(t, evmChain, local)
 
-	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
-	})
+	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	require.True(t, srcCfgEnabled.Output.IsEnabled, "traffic should be enabled after first run")
 
@@ -997,9 +991,7 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseDisablesTraffic(t *testing.
 	require.NoError(t, err)
 
 	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
-	})
+	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.False(t, srcCfgDisabled.Output.IsEnabled,
 		"AllowTrafficFrom=false should disable traffic on the OffRamp source config")
@@ -1030,10 +1022,9 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *tes
 
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	offRampContract, _, _, _, _ := bindLaneContracts(t, evmChain, local)
 
-	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
-	})
+	srcCfgDisabled, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	require.False(t, srcCfgDisabled.Output.IsEnabled, "traffic should be disabled after first run")
 
@@ -1046,9 +1037,7 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *tes
 	require.NoError(t, err)
 
 	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteChainSelector,
-	})
+	srcCfgEnabled, err := operations.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.True(t, srcCfgEnabled.Output.IsEnabled,
 		"AllowTrafficFrom=true should re-enable traffic on the OffRamp source config")
@@ -1199,10 +1188,9 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, _, _, fqContract, _ := bindLaneContracts(t, evmChain, local)
 
-	gasPrice, err := operations.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteChainSelector,
-	})
+	gasPrice, err := operations.ExecuteOperation(b, fee_quoter.NewReadGetDestinationChainGasPrice(fqContract), evmChain, ops2contract.FunctionInput[uint64]{Args: remoteChainSelector})
 	require.NoError(t, err)
 	assert.Equal(t, big.NewInt(42_000), gasPrice.Output.Value, "gas price should be 42000 after first run")
 

@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -41,19 +42,22 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", src)
 			}
 
+			tp, err := bindTokenPool(addr, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
 			report, err := operations.ExecuteOperation(
-				b, token_pool.SetAllowedFinalityConfig, chain,
-				contract.FunctionInput[[4]byte]{
-					ChainSelector: src,
-					Address:       addr,
-					Args:          finalityConfig.Raw(),
+				b, token_pool.NewWriteSetAllowedFinalityConfig(tp), chain,
+				ops2contract.FunctionInput[[4]byte]{
+					Args: finalityConfig.Raw(),
 				},
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute token_pool.SetAllowedFinalityConfig for pool %s on src %d: %w", pool, src, err)
 			}
 
-			writes = append(writes, report.Output)
+			writes = append(writes, writeOutputOps2ToLegacy(report.Output))
 		}
 
 		batch, err := contract.NewBatchOperationFromWrites(writes)

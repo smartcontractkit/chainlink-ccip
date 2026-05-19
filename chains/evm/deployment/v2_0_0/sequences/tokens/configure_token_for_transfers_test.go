@@ -20,6 +20,7 @@ import (
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -163,14 +164,12 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.Equal(t, common.HexToAddress(tokenPoolAddress), tokenConfigReport.Output.TokenPool, "Token pool address should be set correctly")
 
 		// Verify token address from token pool
+		evmChain := e.BlockChains.EVMChains()[chainSel]
 		actualTokenAddress, err := operations.ExecuteOperation(
 			testsetup.BundleWithFreshReporter(e.OperationsBundle),
-			token_pool.GetToken,
-			e.BlockChains.EVMChains()[chainSel],
-			evm_contract.FunctionInput[struct{}]{
-				ChainSelector: chainSel,
-				Address:       common.HexToAddress(tokenPoolAddress),
-			},
+			token_pool.NewReadGetToken(tp),
+			evmChain,
+			ops2contract.FunctionInput[struct{}]{},
 		)
 		require.NoError(t, err, "ExecuteOperation should not error")
 		require.Equal(t, common.HexToAddress(tokenAddress), actualTokenAddress.Output, "Token address should match")

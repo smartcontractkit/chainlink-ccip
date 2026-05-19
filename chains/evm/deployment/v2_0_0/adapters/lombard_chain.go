@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -64,10 +65,12 @@ func (c *LombardChainAdapter) RemoteTokenAddress(bundle operations.Bundle, ds da
 		return nil, fmt.Errorf("failed to get token pool: %w", err)
 	}
 
-	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.GetToken, chains.EVMChains()[selector], evm_contract.FunctionInput[struct{}]{
-		ChainSelector: selector,
-		Address:       common.HexToAddress(tokenPool.Address),
-	})
+	chain := chains.EVMChains()[selector]
+	tp, err := evm_tokens.BindTokenPool(common.HexToAddress(tokenPool.Address), chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind token pool: %w", err)
+	}
+	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.NewReadGetToken(tp), chain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute get token operation: %w", err)
 	}

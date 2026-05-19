@@ -17,10 +17,11 @@ import (
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
 	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	rmnbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -73,7 +74,7 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if !ok {
 		return false, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-	rmnC, err := ops.NewRMNContract(rmnAddr, chain.Client)
+	rmnC, err := rmnbind.NewRMN(rmnAddr, chain.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate RMN contract at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 	}
@@ -123,7 +124,7 @@ func (ca *CurseAdapter) SelectorToSubject(selector uint64) api.Subject {
 func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"curse_rmn",
-		ops.Version,
+		rmnops.Version,
 		"Cursing subjects with RMN",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in api.CurseInput) (output sequences.OnChainOutput, err error) {
 			chain, ok := chains.EVMChains()[in.ChainSelector]
@@ -150,7 +151,7 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"uncurse_rmn",
-		ops.Version,
+		rmnops.Version,
 		"Uncursing subjects with RMN",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in api.CurseInput) (output sequences.OnChainOutput, err error) {
 			chain, ok := chains.EVMChains()[in.ChainSelector]
@@ -189,8 +190,8 @@ func routerAddressOnChain(e cldf.Environment, selector uint64) (common.Address, 
 
 func rmnAddressOnChain(e cldf.Environment, selector uint64) (common.Address, error) {
 	rmnRef := datastore.AddressRef{
-		Type:    datastore.ContractType(ops.ContractType),
-		Version: ops.Version,
+		Type:    datastore.ContractType(rmnops.ContractType),
+		Version: rmnops.Version,
 	}
 	rmnAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, rmnRef, selector, evmds.ToEVMAddress)
 	if err != nil {

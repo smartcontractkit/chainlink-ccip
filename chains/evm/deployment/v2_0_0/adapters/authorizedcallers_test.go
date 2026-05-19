@@ -56,13 +56,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	// Initialize the adapter.
-	adapter := adapters.NewEVMAuthorizedCallersAdapter(
-		rmnops.ApplyAuthorizedCallerUpdates,
-		rmnops.GetAllAuthorizedCallers,
-		func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-			return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
-		},
-	)
+	adapter := adapters.NewRMNAuthorizedCallersAdapter()
 	applyIn := api.ApplyInput{
 		ChainSelector: chainSelector,
 		ContractType:  rmnops.ContractType,
@@ -200,13 +194,7 @@ func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
 	// Register a second adapter for a stub type so validation resolves both entries.
 	const secondType = "AuthorizedCallersV2"
 	reg := api.GetAuthorizedCallersRegistry()
-	reg.RegisterAdapter("evm", secondType, rmnops.Version, adapters.NewEVMAuthorizedCallersAdapter(
-		rmnops.ApplyAuthorizedCallerUpdates,
-		rmnops.GetAllAuthorizedCallers,
-		func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-			return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
-		},
-	))
+	reg.RegisterAdapter("evm", secondType, rmnops.Version, adapters.NewRMNAuthorizedCallersAdapter())
 
 	// Insert a stub datastore ref for the second contract type.
 	secondRef := datastore.AddressRef{
