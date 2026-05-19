@@ -96,17 +96,17 @@ func (m *mockChainFamilyAdapter) GetChainFamilySelector() [4]byte {
 	return [4]byte{0x28, 0x12, 0xd5, 0x2c}
 }
 
-func (m *mockChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
-	return adapters.FeeQuoterDestChainConfig{
-		IsEnabled:                   true,
-		MaxDataBytes:                32_000,
-		MaxPerMsgGasLimit:           8_000_000,
-		DestGasPerPayloadByteBase:   16,
-		DefaultTokenFeeUSDCents:     25,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		LinkFeeMultiplierPercent:    90,
+func (m *mockChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfigOverrides {
+	return adapters.FeeQuoterDestChainConfigOverrides{
+		IsEnabled:                   ptrTo(true),
+		MaxDataBytes:                ptrTo(uint32(32_000)),
+		MaxPerMsgGasLimit:           ptrTo(uint32(8_000_000)),
+		DestGasPerPayloadByteBase:   ptrTo(uint8(16)),
+		DefaultTokenFeeUSDCents:     ptrTo(uint16(25)),
+		DefaultTokenDestGasOverhead: ptrTo(uint32(90_000)),
+		DefaultTxGasLimit:           ptrTo(uint32(200_000)),
+		NetworkFeeUSDCents:          ptrTo(uint16(10)),
+		LinkFeeMultiplierPercent:    ptrTo(uint8(90)),
 	}
 }
 
@@ -596,7 +596,7 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				},
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
-						FeeQuoterDestChainConfig: changesets.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](1000)},
+						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](1000)},
 						ExecutorDestChainConfig:  &adapters.ExecutorDestChainConfig{USDCentsFee: 100, Enabled: true},
 					},
 				},
@@ -608,7 +608,7 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				},
 				RemoteChains: map[uint64]changesets.PartialRemoteChainConfig{
 					sharedDest: {
-						FeeQuoterDestChainConfig: changesets.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](2000)},
+						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfigOverrides{MaxDataBytes: ptrTo[uint32](2000)},
 						ExecutorDestChainConfig:  &adapters.ExecutorDestChainConfig{USDCentsFee: 200, Enabled: true},
 					},
 				},
@@ -625,11 +625,11 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 	}
 
 	inputA := inputsByChain[chainA]
-	assert.Equal(t, uint32(1000), inputA.RemoteChains[sharedDest].FeeQuoterDestChainConfig.MaxDataBytes)
+	assert.Equal(t, uint32(1000), *inputA.RemoteChains[sharedDest].FeeQuoterDestChainConfigOverrides.MaxDataBytes)
 	assert.Equal(t, uint16(100), inputA.RemoteChains[sharedDest].ExecutorDestChainConfig.USDCentsFee)
 
 	inputB := inputsByChain[chainB]
-	assert.Equal(t, uint32(2000), inputB.RemoteChains[sharedDest].FeeQuoterDestChainConfig.MaxDataBytes)
+	assert.Equal(t, uint32(2000), *inputB.RemoteChains[sharedDest].FeeQuoterDestChainConfigOverrides.MaxDataBytes)
 	assert.Equal(t, uint16(200), inputB.RemoteChains[sharedDest].ExecutorDestChainConfig.USDCentsFee)
 }
 

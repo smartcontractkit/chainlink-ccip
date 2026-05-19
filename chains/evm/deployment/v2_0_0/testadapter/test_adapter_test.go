@@ -104,9 +104,6 @@ type laneContracts struct {
 	addresses                 []datastore.AddressRef
 }
 
-// evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
-var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
-
 func boolPtr(v bool) *bool { return &v }
 
 func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_evm.Chain, chainSelector uint64) laneContracts {
@@ -206,20 +203,11 @@ func buildConfigureChainForLanesInput(
 				DefaultExecutor:     local.executor,
 				DefaultInboundCCVs:  []string{local.committeeVerifier},
 				DefaultOutboundCCVs: []string{local.committeeVerifier},
-				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfig{
-					IsEnabled:                   true,
-					MaxDataBytes:                30_000,
-					MaxPerMsgGasLimit:           3_000_000,
-					DestGasOverhead:             300_000,
-					DefaultTokenFeeUSDCents:     25,
-					DestGasPerPayloadByteBase:   16,
-					DefaultTokenDestGasOverhead: 90_000,
-					DefaultTxGasLimit:           200_000,
-					NetworkFeeUSDCents:          10,
-					ChainFamilySelector:         evmFamilySelector,
-					LinkFeeMultiplierPercent:    90,
-					USDPerUnitGas:               big.NewInt(20_000_000_000_000),
-				},
+				FeeQuoterDestChainConfigOverrides: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
+					cfg := testsetup.CreateBasicFeeQuoterDestChainConfigOverrides()
+					cfg.USDPerUnitGas = big.NewInt(20_000_000_000_000)
+					return cfg
+				}(),
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
 					Enabled:     true,
