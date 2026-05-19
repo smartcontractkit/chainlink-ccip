@@ -27,6 +27,27 @@ type TokenFeeAdapter interface {
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
 }
 
+// RateLimitReaderAdapter is an optional interface that exposes on-chain rate limit reads
+// for a token pool's lane. It is required on the counterpart adapter to support
+// OutboundOnly mode (so the changeset can validate chain B's inbound against chain A's
+// new outbound) and on the local adapter so that "outbound-only" writes can pass through
+// the current inbound unchanged when the on-chain setter takes both directions atomically.
+type RateLimitReaderAdapter interface {
+	// GetOnchainInboundRateLimit returns the existing on-chain inbound RateLimiterConfig
+	// for the given lane (chainSelector, remoteSelector) and FastFinality bucket. Adapters
+	// that do not distinguish FastFinality buckets should return an error when called with
+	// fastFinality=true. If no bucket has been configured on-chain for the lane, the adapter
+	// should return a zero-value RateLimiterConfig (IsEnabled=false, Capacity=0, Rate=0) and
+	// no error so the caller can apply its own minimum-threshold checks.
+	GetOnchainInboundRateLimit(
+		e deployment.Environment,
+		chainSelector uint64,
+		poolRef datastore.AddressRef,
+		remoteSelector uint64,
+		fastFinality bool,
+	) (RateLimiterConfig, error)
+}
+
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.
 type TokenAdapter interface {
 	// ConfigureTokenForTransfersSequence returns a sequence that configures a token pool for cross-chain transfers.

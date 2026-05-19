@@ -116,6 +116,17 @@ func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 		return nil, nil
 	}
 
+	// In OutboundOnly mode the inbound side of the lane is not authored from user input; read the
+	// current on-chain inbound and pass it through unchanged so setChainRateLimiterConfig (which
+	// takes outbound+inbound atomically) is effectively a no-op on the inbound side.
+	if bucket.OutboundOnly {
+		current, err := p.GetCurrentInboundRateLimit(b, chain, poolAddr, input.RemoteChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read current inbound rate limit for pass-through on outbound-only update: %w", err)
+		}
+		bucket.InboundRateLimiterConfig = current
+	}
+
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
 		evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
@@ -153,6 +164,25 @@ func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.6.1: %w", err)
 	}
 	return report.Output, nil
+}
+
+func (p *poolOpsV161) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
+	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
+	// reports by input hash, and earlier sequences in the same Apply run may have read this
+	// same lane while it was still uninitialized — caching that stale result.
+	tp, err := tpV1_6_1.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v1.6.1 token pool contract at %s: %w", poolAddr.Hex(), err)
+	}
+	bucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
+	}
+	return tokensapi.RateLimiterConfig{
+		IsEnabled: bucket.IsEnabled,
+		Capacity:  bucket.Capacity,
+		Rate:      bucket.Rate,
+	}, nil
 }
 
 func (p *poolOpsV161) Version() *semver.Version {

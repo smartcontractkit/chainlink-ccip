@@ -11,6 +11,7 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -498,13 +499,35 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenPool := solana.MustPublicKeyFromBase58(input.TokenPoolRef.Address)
+
+			inboundRL := rl.InboundRateLimiterConfig
+			// In OutboundOnly mode the inbound side of the lane is not authored from user input;
+			// read the current on-chain inbound from the token pool's remote-chain config PDA and
+			// pass it through unchanged. setChainRateLimit on Solana takes both inbound and outbound
+			// atomically.
+			if rl.OutboundOnly {
+				remoteChainConfigPDA, _, pdaErr := tokens.TokenPoolChainConfigPDA(input.RemoteChainSelector, tokenMint, tokenPool)
+				if pdaErr != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to derive remote chain config PDA for pass-through inbound: %w", pdaErr)
+				}
+				var remoteChainConfigAccount base_token_pool.BaseChain
+				if readErr := chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); readErr != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to read remote chain config account for pass-through inbound: %w", readErr)
+				}
+				inboundRL = tokenapi.RateLimiterConfig{
+					IsEnabled: remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled,
+					Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Capacity),
+					Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Rate),
+				}
+			}
+
 			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
 				tokenpoolops.RemoteChainConfig{
 					TokenPool:                 tokenPool,
 					TokenMint:                 tokenMint,
 					TokenProgramID:            tokenProgramId,
 					RemoteSelector:            input.RemoteChainSelector,
-					InboundRateLimiterConfig:  rl.InboundRateLimiterConfig,
+					InboundRateLimiterConfig:  inboundRL,
 					OutboundRateLimiterConfig: rl.OutboundRateLimiterConfig,
 				})
 			if err != nil {
@@ -515,6 +538,62 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 			}, nil
 		},
 	)
+}
+
+// GetOnchainInboundRateLimit implements tokenapi.RateLimitReaderAdapter so the changeset can
+// validate chain B's existing inbound when chain A is being configured with OutboundOnly. Solana
+// pools have a single bucket per remote lane; fastFinality=true is not supported.
+func (a *SolanaAdapter) GetOnchainInboundRateLimit(
+	e deployment.Environment,
+	chainSelector uint64,
+	poolRef datastore.AddressRef,
+	remoteSelector uint64,
+	fastFinality bool,
+) (tokenapi.RateLimiterConfig, error) {
+	if fastFinality {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("Solana token pools do not support fastFinality rate limit buckets")
+	}
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	// Resolve the token mint via the TokenRef carried on poolRef's sibling lookup: the changeset
+	// passes a Full pool ref whose Address is the on-chain pool program. We still need the token
+	// mint for the PDA, which means looking up the token via the datastore using poolRef context.
+	// The changeset only guarantees poolRef has been fully resolved (Address populated). To derive
+	// the token mint, we use the token pool's known relationship to the token: the qualifier on the
+	// pool ref matches the token's qualifier. We resolve the token ref by qualifier on the same
+	// chain.
+	tokenRef := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Qualifier:     poolRef.Qualifier,
+	}
+	tokenAddr, _, err := getTokenMintAndTokenProgram(e.DataStore, tokenRef, chain)
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for pool ref (%+v): %w", poolRef, err)
+	}
+	tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+	tokenPool := solana.MustPublicKeyFromBase58(poolRef.Address)
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, tokenMint, tokenPool)
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
+	}
+	var remoteChainConfigAccount base_token_pool.BaseChain
+	if err := chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); err != nil {
+		// Pool/lane not configured yet on chain — return a zero RateLimiterConfig so the caller's
+		// 110% check rejects any positive new outbound (the documented behavior in
+		// RateLimitReaderAdapter).
+		return tokenapi.RateLimiterConfig{
+			IsEnabled: false,
+			Capacity:  big.NewInt(0),
+			Rate:      big.NewInt(0),
+		}, nil
+	}
+	return tokenapi.RateLimiterConfig{
+		IsEnabled: remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled,
+		Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Capacity),
+		Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.InboundRateLimit.Cfg.Rate),
+	}, nil
 }
 
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

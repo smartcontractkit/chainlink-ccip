@@ -165,6 +165,17 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 		return nil, nil
 	}
 
+	// In OutboundOnly mode the inbound side of the lane is not authored from user input; read the
+	// current on-chain inbound and pass it through unchanged so setChainRateLimiterConfig (which
+	// takes outbound+inbound atomically) is effectively a no-op on the inbound side.
+	if bucket.OutboundOnly {
+		current, err := p.GetCurrentInboundRateLimit(b, chain, poolAddr, input.RemoteChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read current inbound rate limit for pass-through on outbound-only update: %w", err)
+		}
+		bucket.InboundRateLimiterConfig = current
+	}
+
 	// NOTE: EVM v1.5.1 pools have slightly different rate limit validation rules than v1.6.1+ pools.
 	// See: https://basescan.org/address/0x5192Bd10f28A0206211CcBB66671118f85c2E539#code#F12#L119
 	outbound, inbound := bucket.OutboundRateLimiterConfig, bucket.InboundRateLimiterConfig
@@ -214,6 +225,22 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
 	}
 	return report.Output, nil
+}
+
+func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
+	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+	}
+	bucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
+	}
+	return tokensapi.RateLimiterConfig{
+		IsEnabled: bucket.IsEnabled,
+		Capacity:  bucket.Capacity,
+		Rate:      bucket.Rate,
+	}, nil
 }
 
 func (p *poolOpsV151) Version() *semver.Version {
