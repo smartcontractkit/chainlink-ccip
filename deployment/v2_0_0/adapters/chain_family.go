@@ -66,21 +66,21 @@ type RemoteChainDefaults struct {
 
 // RemoteChainConfig defines the configuration for a remote chain.
 type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
-	AllowTrafficFrom                  *bool
-	OnRamps                           []RemoteContract
-	OffRamp                           RemoteContract
-	DefaultInboundCCVs                []LocalContract
-	LaneMandatedInboundCCVs           []LocalContract
-	DefaultOutboundCCVs               []LocalContract
-	LaneMandatedOutboundCCVs          []LocalContract
-	DefaultExecutor                   LocalContract
-	FeeQuoterDestChainConfigOverrides FeeQuoterDestChainConfigOverrides
-	ExecutorDestChainConfig           ExecutorDestChainConfig
-	AddressBytesLength                uint8
-	BaseExecutionGasCost              uint32
-	TokenReceiverAllowed              *bool
-	MessageNetworkFeeUSDCents         uint16
-	TokenNetworkFeeUSDCents           uint16
+	AllowTrafficFrom          *bool
+	OnRamps                   []RemoteContract
+	OffRamp                   RemoteContract
+	DefaultInboundCCVs        []LocalContract
+	LaneMandatedInboundCCVs   []LocalContract
+	DefaultOutboundCCVs       []LocalContract
+	LaneMandatedOutboundCCVs  []LocalContract
+	DefaultExecutor           LocalContract
+	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
+	ExecutorDestChainConfig   ExecutorDestChainConfig
+	AddressBytesLength        uint8
+	BaseExecutionGasCost      uint32
+	TokenReceiverAllowed      *bool
+	MessageNetworkFeeUSDCents uint16
+	TokenNetworkFeeUSDCents   uint16
 }
 
 // ConfigureChainForLanesInput is the input for the chain-centric lane configuration sequence.
