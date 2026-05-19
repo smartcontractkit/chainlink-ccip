@@ -1,14 +1,18 @@
-version: "1.0"
+# Schema for github.com/smartcontractkit/chainlink-deployments-framework/tools/operations-gen
+# (generates operations using chain/evm/operations2/contract).
+version: "1.0.0"
+chain_family: evm
 
 input:
-  base_path: ".."  # Directory containing abi/ and bytecode/ folders
+  gobindings_package: "../gobindings/generated"
 
 output:
-  base_path: "." # Directory for generated operations/
+  base_path: "."
 
-# Access control aliases
-# - owner: Only contract owner can call (OnlyOwner)
-# - (none): Public/Read functions don't need access control
+# Access control (writes):
+# - owner: OnlyOwner-style gate (MCMS when deployer is not owner)
+# - public: read or unrestricted write
+# - role: OpenZeppelin HasRole (requires role: on the function)
 
 contracts:
   # 1.5.0
@@ -64,8 +68,7 @@ contracts:
   # 1.6.1
   - contract_name: TokenPool
     version: "1.6.1"
-    abi_file: burn_mint_token_pool.json
-    no_deployment: true
+    omit_deploy: true
     functions:
       - name: applyChainUpdates
         access: owner
@@ -197,9 +200,14 @@ contracts:
         access: public
       - name: getAllAuthorizedCallers
         access: public
+      - name: getFeeTokens
+        access: public
+      - name: getTokenPrices
+        access: public
 
   - contract_name: OnRamp
     version: "1.6.0"
+    package_name: onramp
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
@@ -258,8 +266,8 @@ contracts:
   - contract_name: CrossChainToken
     version: "2.0.0"
     package_name: erc20
-    abi_file: cross_chain_token.json
-    no_deployment: true
+    gobindings_package: "../gobindings/generated/v2_0_0/cross_chain_token"
+    omit_deploy: true
     functions:
       - name: approve
         access: public
@@ -340,8 +348,7 @@ contracts:
 
   - contract_name: TokenPool
     version: "2.0.0"
-    abi_file: burn_mint_token_pool.json
-    no_deployment: true
+    omit_deploy: true
     functions:
       - name: setAllowedFinalityConfig
         access: owner
@@ -479,13 +486,13 @@ contracts:
         access: owner
       - name: getAllAuthorizedCallers
         access: public
-      - name : transferOwnership
+      - name: transferOwnership
         access: owner
 
   - contract_name: MockReceiverV2
     version: "2.0.0"
     package_name: mock_receiver
-    abi_file: mock_receiver_v2.json
+    gobindings_package: "../gobindings/generated/v2_0_0/mock_receiver_v2"
     functions: []
 
   - contract_name: Executor
@@ -627,8 +634,10 @@ contracts:
   - contract_name: RMN
     version: "2.0.0"
     functions:
+      # tools/operations-gen supports owner | public | role only. On-chain curse also allows
+      # authorized callers; use owner here so non-owners follow the proposal path like other gated writes.
       - name: curse
-        access: authorized_callers
+        access: owner
       - name: uncurse
         access: owner
       - name: isCursed

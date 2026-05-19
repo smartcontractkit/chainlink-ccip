@@ -69,8 +69,8 @@ extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to b
 
 .PHONY: operations
 operations: pnpmdep wrappers
-	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
+	go run github.com/smartcontractkit/chainlink-deployments-framework/tools/operations-gen@v0.0.2-0.20260515181606-62d38f5a89b0 -config deployment/operations_gen_config.yaml
 
 .PHONY: operations-fast
 operations-fast:
-	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
+	go run github.com/smartcontractkit/chainlink-deployments-framework/tools/operations-gen@v0.0.2-0.20260515181606-62d38f5a89b0 -config deployment/operations_gen_config.yaml
