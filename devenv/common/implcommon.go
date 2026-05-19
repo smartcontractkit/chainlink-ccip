@@ -933,6 +933,58 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				}
 			}
 
+			// Demo OutboundOnly TPRL: re-seed symmetric enabled rate limits (the rls loop
+			// above ends in a disabled state), then shrink the selector→dst outbound only.
+			// The counterpart config is refs-only — the changeset reads dst's on-chain
+			// inbound and verifies it has at least 110% headroom for the new outbound.
+			seedRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 1234567.89, Rate: 123456.789, IsEnabled: true}
+			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+				Configs: map[uint64]tokensapi.TPRLConfig{
+					selector: {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            tokenRef,
+						TokenPoolRef:        tokenPoolRef,
+						RemoteOutbounds:     map[uint64]tokensapi.RemoteOutbounds{dst.ChainSelector(): {RateLimit: &seedRL}},
+					},
+					dst.ChainSelector(): {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            dstTokenRef,
+						TokenPoolRef:        dstTokenPoolRef,
+						RemoteOutbounds:     map[uint64]tokensapi.RemoteOutbounds{selector: {RateLimit: &seedRL}},
+					},
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("seeding rate limits before OutboundOnly demo for selector %d to %d: %w",
+					selector, dst.ChainSelector(), err)
+			}
+
+			shrunkOutbound := tokensapi.RateLimiterConfigFloatInput{Capacity: 500000, Rate: 50000, IsEnabled: true}
+			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+				Configs: map[uint64]tokensapi.TPRLConfig{
+					selector: {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            tokenRef,
+						TokenPoolRef:        tokenPoolRef,
+						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{dst.ChainSelector(): {
+							OutboundOnly: true,
+							RateLimit:    &shrunkOutbound,
+						}},
+					},
+					// Counterpart still needs refs (used to resolve pool/decimals for the
+					// validation read) but no RemoteOutbounds entry for the local lane.
+					dst.ChainSelector(): {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            dstTokenRef,
+						TokenPoolRef:        dstTokenPoolRef,
+					},
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("OutboundOnly TPRL demo for selector %d to %d: %w",
+					selector, dst.ChainSelector(), err)
+			}
+
 		}
 
 	}
