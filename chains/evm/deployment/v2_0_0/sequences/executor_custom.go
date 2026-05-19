@@ -6,8 +6,8 @@ import (
 
 	executor_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -29,7 +29,7 @@ var ExecutorApplyDestChainUpdates = contract_utils.NewWrite(contract_utils.Write
 	Version:         executor.Version,
 	Description:     "Applies updates to supported destination chains on the Executor",
 	ContractType:    executor.ContractType,
-	ContractABI:     executor.ExecutorABI,
+	ContractABI:     executor_bindings.ExecutorMetaData.ABI,
 	NewContract:     executor_bindings.NewExecutor,
 	IsAllowedCaller: contract_utils.OnlyOwner[*executor_bindings.Executor, ExecutorApplyDestChainUpdatesArgs],
 	Validate:        func(ExecutorApplyDestChainUpdatesArgs) error { return nil },

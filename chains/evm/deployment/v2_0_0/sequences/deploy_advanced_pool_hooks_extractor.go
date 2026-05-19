@@ -5,9 +5,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks_extractor"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -23,9 +23,8 @@ var DeployAdvancedPoolHooksExtractor = cldf_ops.NewSequence(
 	semver.MustParse("2.0.0"),
 	"Deploys the AdvancedPoolHooksExtractor contract",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployAdvancedPoolHooksExtractorInput) (sequences.OnChainOutput, error) {
-		ref, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks_extractor.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks_extractor.ConstructorArgs]{
+		ref, err := ops2contract.MaybeDeployContract(b, advanced_pool_hooks_extractor.Deploy, chain, ops2contract.DeployInput[advanced_pool_hooks_extractor.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks_extractor.ContractType, *advanced_pool_hooks_extractor.Version),
-			ChainSelector:  chain.Selector,
 			Args:           advanced_pool_hooks_extractor.ConstructorArgs{},
 		}, input.ExistingAddresses)
 		if err != nil {

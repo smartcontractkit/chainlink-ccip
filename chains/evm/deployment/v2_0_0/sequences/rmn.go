@@ -5,13 +5,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -19,7 +20,7 @@ import (
 type ConfigureRMNCurseAdminsInput struct {
 	ChainSelector uint64
 	RMNAddress    common.Address
-	Args          rmnops.AuthorizedCallerArgs
+	Args          rmnbind.AuthorizedCallersAuthorizedCallerArgs
 }
 
 // ConfigureRMNCurseAdmins applies authorized caller (curse admin) updates to an already-deployed RMN contract.
@@ -35,18 +36,20 @@ var ConfigureRMNCurseAdmins = cldf_ops.NewSequence(
 		if len(input.Args.AddedCallers) == 0 && len(input.Args.RemovedCallers) == 0 {
 			return sequences.OnChainOutput{}, nil
 		}
+		rmn, err := rmnbind.NewRMN(input.RMNAddress, chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("bind RMN: %w", err)
+		}
 		report, err := cldf_ops.ExecuteOperation(
-			b, rmnops.ApplyAuthorizedCallerUpdates, chain,
-			contract.FunctionInput[rmnops.AuthorizedCallerArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.RMNAddress,
-				Args:          input.Args,
+			b, rmnops.NewWriteApplyAuthorizedCallerUpdates(rmn), chain,
+			ops2contract.FunctionInput[rmnbind.AuthorizedCallersAuthorizedCallerArgs]{
+				Args: input.Args,
 			})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to RMN(%s) on chain %d: %w",
 				input.RMNAddress.Hex(), chain.Selector, err)
 		}
-		batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+		batch, err := ops2contract.NewBatchOperationFromWrites([]ops2contract.WriteOutput{report.Output})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
@@ -73,9 +76,8 @@ var DeployRMN = cldf_ops.NewSequence(
 				input.ChainSelector, chain.Selector)
 		}
 
-		rmnRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
+		rmnRef, err := ops2contract.MaybeDeployContract(b, rmnops.Deploy, chain, ops2contract.DeployInput[rmnops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
-			ChainSelector:  chain.Selector,
 			Args:           input.Args,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -113,15 +115,17 @@ var RmnCurse = cldf_ops.NewSequence(
 	rmnops.Version,
 	"Cursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.RMNAddress,
-			ChainSelector: chain.Selector,
-			Args:          in.Subjects,
+		rmn, err := rmnbind.NewRMN(in.RMNAddress, chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("bind RMN: %w", err)
+		}
+		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.NewWriteCurse0(rmn), chain, ops2contract.FunctionInput[[][16]byte]{
+			Args: in.Subjects,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMN at %s on chain %d: %w", in.RMNAddress.String(), chain.Selector, err)
 		}
-		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{opOutput.Output})
+		batchOp, err := ops2contract.NewBatchOperationFromWrites([]ops2contract.WriteOutput{opOutput.Output})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
@@ -134,15 +138,17 @@ var RmnUncurse = cldf_ops.NewSequence(
 	rmnops.Version,
 	"Uncursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, in SeqUncurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Uncurse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.RMNAddress,
-			ChainSelector: chain.Selector,
-			Args:          in.Subjects,
+		rmn, err := rmnbind.NewRMN(in.RMNAddress, chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("bind RMN: %w", err)
+		}
+		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.NewWriteUncurse0(rmn), chain, ops2contract.FunctionInput[[][16]byte]{
+			Args: in.Subjects,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse with RMN at %s on chain %d: %w", in.RMNAddress.String(), chain.Selector, err)
 		}
-		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{opOutput.Output})
+		batchOp, err := ops2contract.NewBatchOperationFromWrites([]ops2contract.WriteOutput{opOutput.Output})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

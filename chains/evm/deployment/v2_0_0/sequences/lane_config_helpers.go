@@ -10,8 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 // FilterOffRampAdds reads all currently registered OffRamps from the Router in a single call,
@@ -52,14 +54,15 @@ func FilterExecutorDestChains(
 ) (map[common.Address][]ExecutorRemoteChainConfigArgs, error) {
 	out := make(map[common.Address][]ExecutorRemoteChainConfigArgs, len(destChainSelectorsPerExecutor))
 	for executorAddr, toAdd := range destChainSelectorsPerExecutor {
-		currentReport, err := cldf_ops.ExecuteOperation(b, executor.GetDestChains, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       executorAddr,
-		})
+		execContract, err := execbind.NewExecutor(executorAddr, chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("bind executor at %s: %w", executorAddr.Hex(), err)
+		}
+		currentReport, err := cldf_ops.ExecuteOperation(b, executor.NewReadGetDestChains(execContract), chain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dest chains from Executor(%s) on chain %v: %w", executorAddr, chain, err)
 		}
-		currentMap := make(map[uint64]executor.RemoteChainConfigArgs, len(currentReport.Output))
+		currentMap := make(map[uint64]execbind.ExecutorRemoteChainConfigArgs, len(currentReport.Output))
 		for _, current := range currentReport.Output {
 			currentMap[current.DestChainSelector] = current
 		}

@@ -12,11 +12,13 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/verifier_tags"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	cvbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 var CommitteeVerifierResolverType = versioned_verifier_resolver.CommitteeVerifierResolverType
@@ -51,11 +53,10 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		if input.Params.Qualifier != "" {
 			qualifierPtr = &input.Params.Qualifier
 		}
-		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract_utils.DeployInput[committee_verifier.ConstructorArgs]{
+		committeeVerifierRef, err := ops2contract.MaybeDeployContract(b, committee_verifier.Deploy, chain, ops2contract.DeployInput[committee_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
-			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
-				DynamicConfig: committee_verifier.DynamicConfig{
+				DynamicConfig: cvbind.CommitteeVerifierDynamicConfig{
 					FeeAggregator:  input.Params.FeeAggregator,
 					AllowlistAdmin: input.Params.AllowlistAdmin,
 				},
@@ -70,12 +71,13 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierRef)
 
+		cvContract, err := cvbind.NewCommitteeVerifier(common.HexToAddress(committeeVerifierRef.Address), chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("bind committee verifier: %w", err)
+		}
+
 		// Fetch dynamic config on the CommitteeVerifier
-		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
-			Args:          struct{}{},
-		})
+		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewReadGetDynamicConfig(cvContract), chain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config on CommitteeVerifier: %w", err)
 		}
@@ -90,10 +92,8 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			desiredAllowlistAdmin = input.Params.AllowlistAdmin
 		}
 		if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator || desiredAllowlistAdmin != dynamicConfigReport.Output.AllowlistAdmin {
-			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.DynamicConfig]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierRef.Address),
-				Args: committee_verifier.DynamicConfig{
+			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewWriteSetDynamicConfig(cvContract), chain, ops2contract.FunctionInput[cvbind.CommitteeVerifierDynamicConfig]{
+				Args: cvbind.CommitteeVerifierDynamicConfig{
 					AllowlistAdmin: desiredAllowlistAdmin,
 					FeeAggregator:  desiredFeeAggregator,
 				},
@@ -101,7 +101,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on CommitteeVerifier: %w", err)
 			}
-			writes = append(writes, setDynamicConfigReport.Output)
+			writes = append(writes, writeOutputOps2ToUpstream(setDynamicConfigReport.Output))
 		}
 
 		if input.CREATE2Factory == (common.Address{}) {

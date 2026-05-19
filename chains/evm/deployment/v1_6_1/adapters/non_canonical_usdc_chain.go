@@ -6,8 +6,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
+	tpbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -92,7 +92,7 @@ func (c *NonCanonicalUSDCChainAdapter) TokenAddress(d datastore.DataStore, b cha
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
 
-	boundTokenPool, err := token_pool.NewTokenPoolContract(common.HexToAddress(poolAddressRef.Address), chain.Client)
+	boundTokenPool, err := tpbind.NewTokenPool(common.HexToAddress(poolAddressRef.Address), chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind token pool: %w", err)
 	}

@@ -24,7 +24,8 @@ import (
 	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/ping_pong_dapp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -46,8 +47,8 @@ type EVMAdapter struct {
 func (a *EVMAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(onramp.ContractType),
-		Version:       onramp.Version,
+		Type:          datastore.ContractType(onrampops.ContractType),
+		Version:       onrampops.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return nil, err
@@ -272,8 +273,8 @@ func (a *EVMAdapter) GetFQVersion(ds datastore.DataStore, address []byte, chainS
 func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) (common.Address, *semver.Version, error) {
 	onRampAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(onramp.ContractType),
-		Version:       onramp.Version,
+		Type:          datastore.ContractType(onrampops.ContractType),
+		Version:       onrampops.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("failed to find onramp address for chain selector %d: %w", chainSelector, err)
@@ -284,7 +285,7 @@ func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelect
 		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
 	}
 
-	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	onrampContract, err := orbind.NewOnRamp(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
 	}

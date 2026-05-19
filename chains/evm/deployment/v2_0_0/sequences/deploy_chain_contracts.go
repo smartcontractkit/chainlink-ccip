@@ -13,10 +13,16 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	fqbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	mrv2bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
+	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
@@ -48,12 +54,24 @@ type proxyAcceptOwnershipArgs struct {
 	IsProposedOwner bool
 }
 
+func writeOutputOps2ToUpstream(w ops2contract.WriteOutput) upstream.WriteOutput {
+	var ei *upstream.ExecInfo
+	if w.ExecInfo != nil {
+		ei = &upstream.ExecInfo{Hash: w.ExecInfo.Hash}
+	}
+	return upstream.WriteOutput{
+		ChainSelector: w.ChainSelector,
+		Tx:            w.Tx,
+		ExecInfo:      ei,
+	}
+}
+
 var proxyAcceptOwnership = contract_utils.NewWrite(contract_utils.WriteParams[proxyAcceptOwnershipArgs, *proxy_bindings.Proxy]{
 	Name:         "proxy:accept-ownership",
 	Version:      proxy.Version,
 	Description:  "Accept ownership of the proxy",
 	ContractType: proxy.ContractType,
-	ContractABI:  proxy.ProxyABI,
+	ContractABI:  proxy_bindings.ProxyMetaData.ABI,
 	NewContract:  proxy_bindings.NewProxy,
 	IsAllowedCaller: func(_ *proxy_bindings.Proxy, _ *bind.CallOpts, _ common.Address, args proxyAcceptOwnershipArgs) (bool, error) {
 		return args.IsProposedOwner, nil
@@ -113,7 +131,7 @@ type FeeQuoterParams struct {
 type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
-	DynamicConfig executor.DynamicConfig
+	DynamicConfig execbind.ExecutorDynamicConfig
 	Qualifier     string
 }
 
@@ -183,9 +201,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, linkRef)
 
 		// Deploy RMNRemote
-		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract_utils.DeployInput[rmn_remote.ConstructorArgs]{
+		rmnRemoteRef, err := ops2contract.MaybeDeployContract(b, rmn_remote.Deploy, chain, ops2contract.DeployInput[rmn_remote.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
-			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
 				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
@@ -354,11 +371,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if cllccipTimelockAddr != (common.Address{}) {
 			priceUpdaters = append(priceUpdaters, cllccipTimelockAddr)
 		}
-		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
+		feeQuoterRef, err := ops2contract.MaybeDeployContract(b, fee_quoter.Deploy, chain, ops2contract.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
-			ChainSelector:  chain.Selector,
 			Args: fee_quoter.ConstructorArgs{
-				StaticConfig: fee_quoter.StaticConfig{
+				StaticConfig: fqbind.FeeQuoterStaticConfig{
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
@@ -375,39 +391,40 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, feeQuoterRef)
 		ownableContracts = append(ownableContracts, feeQuoterRef)
 
-		var tokenPriceUpdates []fee_quoter.TokenPriceUpdate
+		var tokenPriceUpdates []fqbind.InternalTokenPriceUpdate
 		if input.ContractParams.FeeQuoter.USDPerLINK != nil {
-			tokenPriceUpdates = append(tokenPriceUpdates, fee_quoter.TokenPriceUpdate{
+			tokenPriceUpdates = append(tokenPriceUpdates, fqbind.InternalTokenPriceUpdate{
 				SourceToken: common.HexToAddress(linkRef.Address),
 				UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
 			})
 		}
 		if input.ContractParams.FeeQuoter.USDPerWETH != nil {
-			tokenPriceUpdates = append(tokenPriceUpdates, fee_quoter.TokenPriceUpdate{
+			tokenPriceUpdates = append(tokenPriceUpdates, fqbind.InternalTokenPriceUpdate{
 				SourceToken: common.HexToAddress(wethRef.Address),
 				UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
 			})
 		}
 		if len(tokenPriceUpdates) > 0 {
-			updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(feeQuoterRef.Address),
-				Args: fee_quoter.PriceUpdates{
+			fqForPrices, err := fqbind.NewFeeQuoter(common.HexToAddress(feeQuoterRef.Address), chain.Client)
+			if err != nil {
+				return output, fmt.Errorf("bind fee quoter for price updates: %w", err)
+			}
+			updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.NewWriteUpdatePrices(fqForPrices), chain, ops2contract.FunctionInput[fqbind.InternalPriceUpdates]{
+				Args: fqbind.InternalPriceUpdates{
 					TokenPriceUpdates: tokenPriceUpdates,
 				},
 			})
 			if err != nil {
 				return output, fmt.Errorf("failed to update token prices on FeeQuoter: %w", err)
 			}
-			writes = append(writes, updatePricesReport.Output)
+			writes = append(writes, writeOutputOps2ToUpstream(updatePricesReport.Output))
 		}
 
 		// Deploy OffRamp
-		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
+		offRampRef, err := ops2contract.MaybeDeployContract(b, offramp.Deploy, chain, ops2contract.DeployInput[offramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(offramp.ContractType, *input.ContractParams.OffRamp.Version),
-			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
-				StaticConfig: offramp.StaticConfig{
+				StaticConfig: offbind.OffRampStaticConfig{
 					LocalChainSelector:        chain.Selector,
 					RmnRemote:                 common.HexToAddress(rmnProxyRef.Address),
 					GasForCallExactCheck:      input.ContractParams.OffRamp.GasForCallExactCheck,
@@ -423,17 +440,16 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, offRampRef)
 
 		// Deploy OnRamp
-		onRampRef, err := contract_utils.MaybeDeployContract(b, onramp.Deploy, chain, contract_utils.DeployInput[onramp.ConstructorArgs]{
+		onRampRef, err := ops2contract.MaybeDeployContract(b, onramp.Deploy, chain, ops2contract.DeployInput[onramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(onramp.ContractType, *input.ContractParams.OnRamp.Version),
-			ChainSelector:  chain.Selector,
 			Args: onramp.ConstructorArgs{
-				StaticConfig: onramp.StaticConfig{
+				StaticConfig: orbind.OnRampStaticConfig{
 					ChainSelector:         chain.Selector,
 					RmnRemote:             common.HexToAddress(rmnRemoteRef.Address),
 					TokenAdminRegistry:    common.HexToAddress(tokenAdminRegistryRef.Address),
 					MaxUSDCentsPerMessage: input.ContractParams.OnRamp.MaxUSDCentsPerMessage,
 				},
-				DynamicConfig: onramp.DynamicConfig{
+				DynamicConfig: orbind.OnRampDynamicConfig{
 					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),
 					FeeAggregator: input.ContractParams.OnRamp.FeeAggregator,
 				},
@@ -445,12 +461,13 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, onRampRef)
 		ownableContracts = append(ownableContracts, onRampRef)
 
+		onRampContract, err := orbind.NewOnRamp(common.HexToAddress(onRampRef.Address), chain.Client)
+		if err != nil {
+			return output, fmt.Errorf("bind onramp: %w", err)
+		}
+
 		// Fetch the dynamic config on the OnRamp
-		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(onRampRef.Address),
-			Args:          struct{}{},
-		})
+		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.NewReadGetDynamicConfig(onRampContract), chain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return output, fmt.Errorf("failed to get dynamic config on OnRamp: %w", err)
 		}
@@ -461,20 +478,18 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			desiredFeeAggregator = input.ContractParams.OnRamp.FeeAggregator
 		}
 		if dynamicConfigReport.Output.FeeQuoter != common.HexToAddress(feeQuoterRef.Address) || desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator {
-			desiredDynamicConfig := onramp.DynamicConfig{
+			desiredDynamicConfig := orbind.OnRampDynamicConfig{
 				FeeQuoter:              common.HexToAddress(feeQuoterRef.Address),
 				ReentrancyGuardEntered: false, // This should never be true.
-				FeeAggregator:          input.ContractParams.OnRamp.FeeAggregator,
+				FeeAggregator:          desiredFeeAggregator,
 			}
-			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.DynamicConfig]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(onRampRef.Address),
-				Args:          desiredDynamicConfig,
+			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.NewWriteSetDynamicConfig(onRampContract), chain, ops2contract.FunctionInput[orbind.OnRampDynamicConfig]{
+				Args: desiredDynamicConfig,
 			})
 			if err != nil {
 				return output, fmt.Errorf("failed to set dynamic config on OnRamp: %w", err)
 			}
-			writes = append(writes, setDynamicConfigReport.Output)
+			writes = append(writes, writeOutputOps2ToUpstream(setDynamicConfigReport.Output))
 		}
 
 		// TODO: validate prior to deploying that qualifiers are unique?
@@ -501,9 +516,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if executorParam.Qualifier != "" {
 				qualifierPtr = &executorParam.Qualifier
 			}
-			executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract_utils.DeployInput[executor.ConstructorArgs]{
+			executorRef, err := ops2contract.MaybeDeployContract(b, executor.Deploy, chain, ops2contract.DeployInput[executor.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *executorParam.Version),
-				ChainSelector:  chain.Selector,
 				Args: executor.ConstructorArgs{
 					MaxCCVsPerMsg: executorParam.MaxCCVsPerMsg,
 					DynamicConfig: executorParam.DynamicConfig,
@@ -516,12 +530,13 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, executorRef)
 			ownableContracts = append(ownableContracts, executorRef)
 
+			execContract, err := execbind.NewExecutor(common.HexToAddress(executorRef.Address), chain.Client)
+			if err != nil {
+				return output, fmt.Errorf("bind executor: %w", err)
+			}
+
 			// Fetch the dynamic config on the Executor
-			dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(executorRef.Address),
-				Args:          struct{}{},
-			})
+			dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.NewReadGetDynamicConfig(execContract), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return output, fmt.Errorf("failed to get dynamic config on Executor: %w", err)
 			}
@@ -534,11 +549,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
 				dynamicConfigReport.Output.AllowedFinalityConfig != executorParam.DynamicConfig.AllowedFinalityConfig ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.DynamicConfig]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorRef.Address),
-					Args: executor.DynamicConfig{
-						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.NewWriteSetDynamicConfig(execContract), chain, ops2contract.FunctionInput[execbind.ExecutorDynamicConfig]{
+					Args: execbind.ExecutorDynamicConfig{
+						FeeAggregator:         desiredFeeAggregator,
 						AllowedFinalityConfig: executorParam.DynamicConfig.AllowedFinalityConfig,
 						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
 					},
@@ -546,7 +559,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				if err != nil {
 					return output, fmt.Errorf("failed to set dynamic config on Executor: %w", err)
 				}
-				writes = append(writes, setDynamicConfigReport.Output)
+				writes = append(writes, writeOutputOps2ToUpstream(setDynamicConfigReport.Output))
 			}
 
 			// Deploy ExecutorProxy via CREATE2
@@ -570,8 +583,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					Type:           datastore.ContractType(ExecutorProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
-					ABI:            proxy.ProxyABI,
-					BIN:            proxy.ProxyBin,
+					ABI:            proxy_bindings.ProxyMetaData.ABI,
+					BIN:            proxy_bindings.ProxyMetaData.Bin,
 					ConstructorArgs: []any{
 						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
 						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.
@@ -605,48 +618,43 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 			ownableContracts = append(ownableContracts, *executorProxyRef)
 
+			execProxyContract, err := proxy_bindings.NewProxy(common.HexToAddress(executorProxyRef.Address), chain.Client)
+			if err != nil {
+				return output, fmt.Errorf("bind executor proxy: %w", err)
+			}
+
 			// Fetch the target on the ExecutorProxy
-			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(executorProxyRef.Address),
-			})
+			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.NewReadGetTarget(execProxyContract), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return output, fmt.Errorf("failed to get target on ExecutorProxy: %w", err)
 			}
 
 			// Set target on the ExecutorProxy if diff exists
 			if targetReport.Output != common.HexToAddress(executorRef.Address) {
-				setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.SetTarget, chain, contract_utils.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args:          common.HexToAddress(executorRef.Address),
+				setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.NewWriteSetTarget(execProxyContract), chain, ops2contract.FunctionInput[common.Address]{
+					Args: common.HexToAddress(executorRef.Address),
 				})
 				if err != nil {
 					return output, fmt.Errorf("failed to set target on ExecutorProxy: %w", err)
 				}
-				writes = append(writes, setTargetReport.Output)
+				writes = append(writes, writeOutputOps2ToUpstream(setTargetReport.Output))
 			}
 
 			// Fetch the fee aggregator on the ExecutorProxy
-			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(executorProxyRef.Address),
-			})
+			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.NewReadGetFeeAggregator(execProxyContract), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return output, fmt.Errorf("failed to get fee aggregator on ExecutorProxy: %w", err)
 			}
 
 			// Set fee aggregator on the ExecutorProxy if diff exists
 			if feeAggregatorReport.Output != executorParam.DynamicConfig.FeeAggregator {
-				setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args:          executorParam.DynamicConfig.FeeAggregator,
+				setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.NewWriteSetFeeAggregator(execProxyContract), chain, ops2contract.FunctionInput[common.Address]{
+					Args: executorParam.DynamicConfig.FeeAggregator,
 				})
 				if err != nil {
 					return output, fmt.Errorf("failed to set fee aggregator on ExecutorProxy: %w", err)
 				}
-				writes = append(writes, setFeeAggregatorReport.Output)
+				writes = append(writes, writeOutputOps2ToUpstream(setFeeAggregatorReport.Output))
 			}
 		}
 
@@ -659,27 +667,28 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if mockReceiverParams.Qualifier != "" {
 				qualifierPtr = &mockReceiverParams.Qualifier
 			}
-			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
+			deployReceiverRef, err := ops2contract.MaybeDeployContract(b, mock_receiver.Deploy, chain, ops2contract.DeployInput[mock_receiver.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
-				ChainSelector:  chain.Selector,
+				Qualifier:      qualifierPtr,
 				Args: mock_receiver.ConstructorArgs{
 					Required:  requiredVerifiers,
 					Optional:  optionalVerifiers,
 					Threshold: mockReceiverParams.OptionalThreshold,
 				},
-				Qualifier: qualifierPtr,
-			})
+			}, input.ExistingAddresses)
 			if err != nil {
 				return output, fmt.Errorf("failed to deploy MockReceiver: %w", err)
 			}
-			addresses = append(addresses, deployReceiverReport.Output)
+			addresses = append(addresses, deployReceiverRef)
 
 			// Set finality config on the MockReceiver if diff exists
 			if mockReceiverParams.AllowedFinalityConfig != finality.RawWaitForFinality {
+				mockRecvContract, err := mrv2bind.NewMockReceiverV2(common.HexToAddress(deployReceiverRef.Address), chain.Client)
+				if err != nil {
+					return output, fmt.Errorf("bind mock receiver: %w", err)
+				}
 				// Get the current finality config on the MockReceiver
-				finalityConfigResult, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndFinalityConfig, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndFinalityConfigArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+				finalityConfigResult, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.NewReadGetCCVsAndFinalityConfig(mockRecvContract), chain, ops2contract.FunctionInput[mock_receiver_v2.GetCCVsAndFinalityConfigArgs]{
 					Args: mock_receiver_v2.GetCCVsAndFinalityConfigArgs{
 						Arg0: chain.Selector,
 						Arg1: []byte{},
@@ -690,15 +699,13 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				}
 				if finalityConfigResult.Output.AllowedFinalityConfig != mockReceiverParams.AllowedFinalityConfig {
 					// Set the finality config on the MockReceiver
-					setFinalityConfigReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
-						ChainSelector: chain.Selector,
-						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-						Args:          mockReceiverParams.AllowedFinalityConfig,
+					setFinalityConfigReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.NewWriteSetAllowedFinalityConfig(mockRecvContract), chain, ops2contract.FunctionInput[[4]byte]{
+						Args: mockReceiverParams.AllowedFinalityConfig,
 					})
 					if err != nil {
 						return output, fmt.Errorf("failed to set finality config on MockReceiver: %w", err)
 					}
-					writes = append(writes, setFinalityConfigReport.Output)
+					writes = append(writes, writeOutputOps2ToUpstream(setFinalityConfigReport.Output))
 				}
 			}
 		}

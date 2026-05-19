@@ -8,19 +8,19 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type OffRampApplySourceChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []offrampops.SourceChainConfigArgs
+	UpdatesByChain []offbind.OffRampSourceChainConfigArgs
 }
 
 type OffRampImportConfigSequenceInput struct {
@@ -30,9 +30,9 @@ type OffRampImportConfigSequenceInput struct {
 }
 
 type OffRampImportConfigSequenceOutput struct {
-	SourceChainCfgs map[uint64]offrampops.SourceChainConfig
-	StaticConfig    offrampops.StaticConfig
-	DynamicConfig   offrampops.DynamicConfig
+	SourceChainCfgs map[uint64]offbind.OffRampSourceChainConfig
+	StaticConfig    offbind.OffRampStaticConfig
+	DynamicConfig   offbind.OffRampDynamicConfig
 }
 
 var (
@@ -41,21 +41,23 @@ var (
 		semver.MustParse("1.6.0"),
 		"Applies updates to source chain configurations stored on OffRamp contracts on multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input OffRampApplySourceChainConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
-			writes := make([]contract.WriteOutput, 0)
+			writes := make([]ops2contract.WriteOutput, 0)
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
+			oor, err := offbind.NewOffRamp(input.Address, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("bind off ramp: %w", err)
+			}
+			report, err := operations.ExecuteOperation(b, offrampops.NewWriteApplySourceChainConfigUpdates(oor), chain, ops2contract.FunctionInput[[]offbind.OffRampSourceChainConfigArgs]{
+				Args: input.UpdatesByChain,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OffRampApplySourceChainConfigUpdatesOp on %s: %w", chain, err)
 			}
 			writes = append(writes, report.Output)
-			batch, err := contract.NewBatchOperationFromWrites(writes)
+			batch, err := ops2contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}
@@ -70,33 +72,33 @@ var (
 		"Imports OffRamp contract configuration from multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input OffRampImportConfigSequenceInput) (sequences.OnChainOutput, error) {
 			output := OffRampImportConfigSequenceOutput{
-				SourceChainCfgs: make(map[uint64]offrampops.SourceChainConfig),
+				SourceChainCfgs: make(map[uint64]offbind.OffRampSourceChainConfig),
 			}
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, offrampops.GetStaticConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+			oor, err := offbind.NewOffRamp(input.Address, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("bind off ramp: %w", err)
+			}
+			report, err := operations.ExecuteOperation(b, offrampops.NewReadGetStaticConfig(oor), chain, ops2contract.FunctionInput[struct{}]{
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetStaticConfig on %s: %w", chain, err)
 			}
 			output.StaticConfig = report.Output
-			out, err := operations.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
+			out, err := operations.ExecuteOperation(b, offrampops.NewReadGetDynamicConfig(oor), chain, ops2contract.FunctionInput[struct{}]{
+				Args: struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetDynamicConfig on %s: %w", chain, err)
 			}
 			output.DynamicConfig = out.Output
 			for _, remoteChain := range input.RemoteChains {
-				report, err := operations.ExecuteOperation(b, offrampops.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
-					Args:          remoteChain,
+				report, err := operations.ExecuteOperation(b, offrampops.NewReadGetSourceChainConfig(oor), chain, ops2contract.FunctionInput[uint64]{
+					Args: remoteChain,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetSourceChainConfig for chain %d on %s: %w", remoteChain, chain, err)

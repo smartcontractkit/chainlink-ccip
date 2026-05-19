@@ -12,6 +12,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -24,10 +25,26 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
+	evmproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	cvbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	fqc "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	offbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	orbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
+	proxybind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 )
+
+func writeOutputOps2ToSeq(w ops2contract.WriteOutput) contract.WriteOutput {
+	var ei *contract.ExecInfo
+	if w.ExecInfo != nil {
+		ei = &contract.ExecInfo{Hash: w.ExecInfo.Hash}
+	}
+	return contract.WriteOutput{
+		ChainSelector: w.ChainSelector,
+		Tx:            w.Tx,
+		ExecInfo:      ei,
+	}
+}
 
 // ConfigureChainForLanes is the canonical sequence for configuring an EVM chain to participate
 // in CCIP 2.0 lanes with multiple remote chains. It is self-contained: all contract writes
@@ -101,10 +118,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// For each remote chain we build the desired args for every contract.
 		// The "maybe" helpers read on-chain state and only append when a diff exists
 		// (idempotency). This avoids emitting no-op transactions in MCMS proposals.
-		offRampArgs := make([]offramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
-		onRampArgs := make([]onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
-		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
-		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
+		offRampArgs := make([]offbind.OffRampSourceChainConfigArgs, 0, len(input.RemoteChains))
+		onRampArgs := make([]orbind.OnRampDestChainConfigArgs, 0, len(input.RemoteChains))
+		feeQuoterArgs := make([]fqc.FeeQuoterDestChainConfigArgs, 0, len(input.RemoteChains))
+		gasPriceUpdates := make([]fqc.InternalGasPriceUpdate, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]ExecutorRemoteChainConfigArgs)
@@ -113,30 +130,36 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		if err != nil {
 			return seqtypes.OnChainOutput{}, fmt.Errorf("failed to bind fee quoter contract at address %s on chain %s: %w", feeQuoterAddr, chain.String(), err)
 		}
+		offRampContract, err := offbind.NewOffRamp(offRampAddr, chain.Client)
+		if err != nil {
+			return seqtypes.OnChainOutput{}, fmt.Errorf("failed to bind off ramp contract at address %s on chain %s: %w", offRampAddr, chain.String(), err)
+		}
+		onRampContract, err := orbind.NewOnRamp(onRampAddr, chain.Client)
+		if err != nil {
+			return seqtypes.OnChainOutput{}, fmt.Errorf("failed to bind on ramp contract at address %s on chain %s: %w", onRampAddr, chain.String(), err)
+		}
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			// OffRamp: tells the local OffRamp which source chains to accept messages from.
-			offRampArgs, err = maybeAddSourceChainConfigArgOnLocalChain(b, chain, input, remoteSelector, remoteConfig, offRampArgs)
+			offRampArgs, err = maybeAddSourceChainConfigArgOnLocalChain(b, chain, input, offRampContract, remoteSelector, remoteConfig, offRampArgs)
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("remote chain %d: %w", remoteSelector, err)
 			}
 			// OnRamp: tells the local OnRamp how to send messages to this remote chain.
-			onRampArgs, err = maybeAddOnRampDestChainConfigArgOnLocalChain(b, chain, input, remoteSelector, remoteConfig, onRampArgs)
+			onRampArgs, err = maybeAddOnRampDestChainConfigArgOnLocalChain(b, chain, input, onRampContract, remoteSelector, remoteConfig, onRampArgs)
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("remote chain %d: %w", remoteSelector, err)
 			}
 
 			if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas != nil {
-				gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       feeQuoterAddr,
-					Args:          remoteSelector,
+				gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.NewReadGetDestinationChainGasPrice(feeQContract), chain, ops2contract.FunctionInput[uint64]{
+					Args: remoteSelector,
 				})
 				if err != nil {
 					return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
 				}
 				if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
-					gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
+					gasPriceUpdates = append(gasPriceUpdates, fqc.InternalGasPriceUpdate{
 						DestChainSelector: remoteSelector,
 						UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
 					})
@@ -171,10 +194,11 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// proxy to group dest chains by their actual implementation, since multiple
 			// proxies may point to the same implementation.
 			defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
-			getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       defaultExecutor,
-			})
+			execProxyContract, err := proxybind.NewProxy(defaultExecutor, chain.Client)
+			if err != nil {
+				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to bind executor proxy at address %s on chain %s: %w", defaultExecutor.Hex(), chain.String(), err)
+			}
+			getTargetReport, err := cldf_ops.ExecuteOperation(b, evmproxyops.NewReadGetTarget(execProxyContract), chain, ops2contract.FunctionInput[struct{}]{})
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 			}
@@ -221,27 +245,23 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// ── Phase 3: Apply writes ────────────────────────────────────────────────
 		// Each block only emits a write when there are actual changes to apply.
 		if len(offRampArgs) > 0 {
-			offRampReport, err := cldf_ops.ExecuteOperation(b, offramp.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       offRampAddr,
-				Args:          offRampArgs,
+			offRampReport, err := cldf_ops.ExecuteOperation(b, offramp.NewWriteApplySourceChainConfigUpdates(offRampContract), chain, ops2contract.FunctionInput[[]offbind.OffRampSourceChainConfigArgs]{
+				Args: offRampArgs,
 			})
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates to OffRamp(%s) on chain %s: %w", offRampAddr, chain, err)
 			}
-			writes = append(writes, offRampReport.Output)
+			writes = append(writes, writeOutputOps2ToSeq(offRampReport.Output))
 		}
 
 		if len(onRampArgs) > 0 {
-			onRampReport, err := cldf_ops.ExecuteOperation(b, onramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       onRampAddr,
-				Args:          onRampArgs,
+			onRampReport, err := cldf_ops.ExecuteOperation(b, onramp.NewWriteApplyDestChainConfigUpdates(onRampContract), chain, ops2contract.FunctionInput[[]orbind.OnRampDestChainConfigArgs]{
+				Args: onRampArgs,
 			})
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to OnRamp(%s) on chain %s: %w", onRampAddr, chain, err)
 			}
-			writes = append(writes, onRampReport.Output)
+			writes = append(writes, writeOutputOps2ToSeq(onRampReport.Output))
 		}
 
 		for executorAddr, toAdd := range destChainSelectorsPerExecutor {
@@ -262,31 +282,27 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 
 		if len(feeQuoterArgs) > 0 {
-			feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       feeQuoterAddr,
-				Args:          feeQuoterArgs,
+			feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.NewWriteApplyDestChainConfigUpdates(feeQContract), chain, ops2contract.FunctionInput[[]fqc.FeeQuoterDestChainConfigArgs]{
+				Args: feeQuoterArgs,
 			})
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
 			}
-			writes = append(writes, feeQuoterReport.Output)
+			writes = append(writes, writeOutputOps2ToSeq(feeQuoterReport.Output))
 		}
 
 		// Gas price updates live in a separate on-chain mapping (not dest chain config),
 		// so they must be applied via FeeQuoter.UpdatePrices.
 		if len(gasPriceUpdates) > 0 {
-			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       feeQuoterAddr,
-				Args: fee_quoter.PriceUpdates{
+			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.NewWriteUpdatePrices(feeQContract), chain, ops2contract.FunctionInput[fqc.InternalPriceUpdates]{
+				Args: fqc.InternalPriceUpdates{
 					GasPriceUpdates: gasPriceUpdates,
 				},
 			})
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to update gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
 			}
-			writes = append(writes, gasPriceReport.Output)
+			writes = append(writes, writeOutputOps2ToSeq(gasPriceReport.Output))
 		}
 
 		// CommitteeVerifier: for each verifier contract, configure outbound settings
@@ -348,10 +364,11 @@ func maybeAddSourceChainConfigArgOnLocalChain(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input changesetadapters.ConfigureChainForLanesInput,
+	offRampContract *offbind.OffRamp,
 	remoteSelector uint64,
 	remoteConfig changesetadapters.RemoteChainConfig[[]byte, string],
-	offRampArgs []offramp.SourceChainConfigArgs,
-) ([]offramp.SourceChainConfigArgs, error) {
+	offRampArgs []offbind.OffRampSourceChainConfigArgs,
+) ([]offbind.OffRampSourceChainConfigArgs, error) {
 	defaultInboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultInboundCCVs))
 	for _, ccv := range remoteConfig.DefaultInboundCCVs {
 		defaultInboundCCVs = append(defaultInboundCCVs, common.HexToAddress(ccv))
@@ -366,10 +383,8 @@ func maybeAddSourceChainConfigArgOnLocalChain(
 	}
 
 	offRampAddr := common.BytesToAddress(input.OffRamp)
-	currentReport, err := cldf_ops.ExecuteOperation(b, offramp.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       offRampAddr,
-		Args:          remoteSelector,
+	currentReport, err := cldf_ops.ExecuteOperation(b, offramp.NewReadGetSourceChainConfig(offRampContract), chain, ops2contract.FunctionInput[uint64]{
+		Args: remoteSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source chain config for selector %d from OffRamp(%s) on chain %v: %w", remoteSelector, offRampAddr, chain, err)
@@ -381,7 +396,7 @@ func maybeAddSourceChainConfigArgOnLocalChain(
 		isEnabled = *remoteConfig.AllowTrafficFrom
 	}
 
-	desired := offramp.SourceChainConfigArgs{
+	desired := offbind.OffRampSourceChainConfigArgs{
 		Router:              common.BytesToAddress(input.Router),
 		SourceChainSelector: remoteSelector,
 		IsEnabled:           isEnabled,
@@ -416,10 +431,11 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input changesetadapters.ConfigureChainForLanesInput,
+	onRampContract *orbind.OnRamp,
 	remoteSelector uint64,
 	remoteConfig changesetadapters.RemoteChainConfig[[]byte, string],
-	onRampArgs []onramp.DestChainConfigArgs,
-) ([]onramp.DestChainConfigArgs, error) {
+	onRampArgs []orbind.OnRampDestChainConfigArgs,
+) ([]orbind.OnRampDestChainConfigArgs, error) {
 	defaultOutboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultOutboundCCVs))
 	for _, ccv := range remoteConfig.DefaultOutboundCCVs {
 		defaultOutboundCCVs = append(defaultOutboundCCVs, common.HexToAddress(ccv))
@@ -430,7 +446,7 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 	}
 
 	onRampAddr := common.BytesToAddress(input.OnRamp)
-	desired := onramp.DestChainConfigArgs{
+	desired := orbind.OnRampDestChainConfigArgs{
 		Router:                    common.BytesToAddress(input.Router),
 		DestChainSelector:         remoteSelector,
 		AddressBytesLength:        remoteConfig.AddressBytesLength,
@@ -442,10 +458,8 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 		DefaultExecutor:           common.HexToAddress(remoteConfig.DefaultExecutor),
 		OffRamp:                   remoteConfig.OffRamp,
 	}
-	currentReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       onRampAddr,
-		Args:          remoteSelector,
+	currentReport, err := cldf_ops.ExecuteOperation(b, onramp.NewReadGetDestChainConfig(onRampContract), chain, ops2contract.FunctionInput[uint64]{
+		Args: remoteSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dest chain config for selector %d from OnRamp(%s) on chain %v: %w", remoteSelector, onRampAddr, chain, err)
@@ -517,9 +531,9 @@ func maybeAddFeeQuoterDestChainConfigArgOnLocalChain(
 	chain evm.Chain,
 	remoteSelector uint64,
 	remoteConfig changesetadapters.RemoteChainConfig[[]byte, string],
-	feeQuoterArgs []fee_quoter.DestChainConfigArgs,
+	feeQuoterArgs []fqc.FeeQuoterDestChainConfigArgs,
 	prefetchedCur *fqc.FeeQuoterDestChainConfig,
-) ([]fee_quoter.DestChainConfigArgs, error) {
+) ([]fqc.FeeQuoterDestChainConfigArgs, error) {
 	var cur fqc.FeeQuoterDestChainConfig
 	if prefetchedCur != nil {
 		cur = *prefetchedCur
@@ -569,7 +583,7 @@ func maybeAddFeeQuoterDestChainConfigArgOnLocalChain(
 		return feeQuoterArgs, nil
 	}
 
-	return append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
+	return append(feeQuoterArgs, fqc.FeeQuoterDestChainConfigArgs{
 		DestChainSelector: remoteSelector,
 		DestChainConfig:   adapterDestChainConfigToFeeQuoterV2(desired),
 	}), nil
@@ -595,11 +609,16 @@ func configureCommitteeVerifierAsSource(
 		return nil, err
 	}
 
-	remoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(cv.RemoteChains))
-	allowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(cv.RemoteChains))
+	cvContract, err := cvbind.NewCommitteeVerifier(common.HexToAddress(cvAddr), chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("bind committee verifier at %s: %w", cvAddr, err)
+	}
+
+	remoteChainConfigArgs := make([]cvbind.BaseVerifierRemoteChainConfigArgs, 0, len(cv.RemoteChains))
+	allowlistArgs := make([]cvbind.BaseVerifierAllowlistConfigArgs, 0, len(cv.RemoteChains))
 
 	for remoteSelector, remoteConfig := range cv.RemoteChains {
-		desired := committee_verifier.RemoteChainConfigArgs{
+		desired := cvbind.BaseVerifierRemoteChainConfigArgs{
 			Router:              routerAddr,
 			RemoteChainSelector: remoteSelector,
 			AllowlistEnabled:    remoteConfig.AllowlistEnabled,
@@ -607,10 +626,8 @@ func configureCommitteeVerifierAsSource(
 			GasForVerification:  remoteConfig.GasForVerification,
 			PayloadSizeBytes:    remoteConfig.PayloadSizeBytes,
 		}
-		currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
-			Args:          remoteSelector,
+		currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewReadGetRemoteChainConfig(cvContract), chain, ops2contract.FunctionInput[uint64]{
+			Args: remoteSelector,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote chain config for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
@@ -620,11 +637,12 @@ func configureCommitteeVerifierAsSource(
 		if cur.RemoteChainConfig.Router != desired.Router || cur.RemoteChainConfig.AllowlistEnabled != desired.AllowlistEnabled {
 			remoteChainConfigArgs = append(remoteChainConfigArgs, desired)
 		} else {
-			getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(cvAddr),
+			getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewReadGetFee(cvContract), chain, ops2contract.FunctionInput[committee_verifier.GetFeeArgs]{
 				Args: committee_verifier.GetFeeArgs{
 					DestChainSelector: remoteSelector,
+					Arg1:              cvbind.ClientEVM2AnyMessage{},
+					Arg2:              []byte{},
+					RequestedFinality: [4]byte{},
 				},
 			})
 			if err != nil {
@@ -643,11 +661,11 @@ func configureCommitteeVerifierAsSource(
 			return nil, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
 		}
 		if len(toAdd) > 0 || len(toRemove) > 0 {
-			allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
+			allowlistArgs = append(allowlistArgs, cvbind.BaseVerifierAllowlistConfigArgs{
+				DestChainSelector:         remoteSelector,
 				AllowlistEnabled:          remoteConfig.AllowlistEnabled,
 				AddedAllowlistedSenders:   toAdd,
 				RemovedAllowlistedSenders: toRemove,
-				DestChainSelector:         remoteSelector,
 			})
 		}
 	}
@@ -677,27 +695,23 @@ func configureCommitteeVerifierAsSource(
 	var writes []contract.WriteOutput
 
 	if len(remoteChainConfigArgs) > 0 {
-		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
-			Args:          remoteChainConfigArgs,
+		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewWriteApplyRemoteChainConfigUpdates(cvContract), chain, ops2contract.FunctionInput[[]cvbind.BaseVerifierRemoteChainConfigArgs]{
+			Args: remoteChainConfigArgs,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply remote chain config updates to CommitteeVerifier on chain %s: %w", chain, err)
 		}
-		writes = append(writes, report.Output)
+		writes = append(writes, writeOutputOps2ToSeq(report.Output))
 	}
 
 	if len(allowlistArgs) > 0 {
-		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
-			Args:          allowlistArgs,
+		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewWriteApplyAllowlistUpdates(cvContract), chain, ops2contract.FunctionInput[[]cvbind.BaseVerifierAllowlistConfigArgs]{
+			Args: allowlistArgs,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier on chain %s: %w", chain, err)
 		}
-		writes = append(writes, report.Output)
+		writes = append(writes, writeOutputOps2ToSeq(report.Output))
 	}
 
 	if len(outboundArgs) > 0 {
@@ -714,23 +728,18 @@ func configureCommitteeVerifierAsSource(
 
 	if !cv.AllowedFinalityConfig.IsZero() {
 		desiredFinality := cv.AllowedFinalityConfig.Raw()
-		currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
-		})
+		currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewReadGetAllowedFinalityConfig(cvContract), chain, ops2contract.FunctionInput[struct{}]{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
 		}
 		if currentFinalityReport.Output != desiredFinality {
-			setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(cvAddr),
-				Args:          desiredFinality,
+			setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewWriteSetAllowedFinalityConfig(cvContract), chain, ops2contract.FunctionInput[[4]byte]{
+				Args: desiredFinality,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to set allowed finality config on CommitteeVerifier on chain %s: %w", chain, err)
 			}
-			writes = append(writes, setFinalityReport.Output)
+			writes = append(writes, writeOutputOps2ToSeq(setFinalityReport.Output))
 		}
 	}
 
@@ -754,21 +763,24 @@ func configureCommitteeVerifierAsDest(
 		return nil, err
 	}
 
-	signatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(cv.RemoteChains))
+	cvContract, err := cvbind.NewCommitteeVerifier(common.HexToAddress(cvAddr), chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("bind committee verifier at %s: %w", cvAddr, err)
+	}
+
+	signatureConfigs := make([]cvbind.SignatureQuorumValidatorSignatureConfig, 0, len(cv.RemoteChains))
 	for remoteSelector, remoteConfig := range cv.RemoteChains {
 		signers := make([]common.Address, 0, len(remoteConfig.SignatureConfig.Signers))
 		for _, signer := range remoteConfig.SignatureConfig.Signers {
 			signers = append(signers, common.HexToAddress(signer))
 		}
-		desired := committee_verifier.SignatureConfig{
+		desired := cvbind.SignatureQuorumValidatorSignatureConfig{
 			SourceChainSelector: remoteSelector,
 			Threshold:           remoteConfig.SignatureConfig.Threshold,
 			Signers:             signers,
 		}
-		currentSigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetSignatureConfig, chain, contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
-			Args:          remoteSelector,
+		currentSigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewReadGetSignatureConfig(cvContract), chain, ops2contract.FunctionInput[uint64]{
+			Args: remoteSelector,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get signature config for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
@@ -782,23 +794,19 @@ func configureCommitteeVerifierAsDest(
 	var writes []contract.WriteOutput
 
 	if len(signatureConfigs) > 0 {
-		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.ApplySignatureConfigsArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cvAddr),
+		report, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewWriteApplySignatureConfigs(cvContract), chain, ops2contract.FunctionInput[committee_verifier.ApplySignatureConfigsArgs]{
 			Args: committee_verifier.ApplySignatureConfigsArgs{
-				SignatureConfigs: signatureConfigs,
+				SourceChainSelectorsToRemove: []uint64{},
+				SignatureConfigs:             signatureConfigs,
 			},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply signature configs to CommitteeVerifier on chain %s: %w", chain, err)
 		}
-		writes = append(writes, report.Output)
+		writes = append(writes, writeOutputOps2ToSeq(report.Output))
 	}
 
-	versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.VersionTag, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(cvAddr),
-	})
+	versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.NewReadVersionTag(cvContract), chain, ops2contract.FunctionInput[struct{}]{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
 	}
@@ -835,8 +843,8 @@ func configureCommitteeVerifierAsDest(
 	return writes, nil
 }
 
-func adapterDestChainConfigToFeeQuoterV2(cfg changesetadapters.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig {
-	return fee_quoter.DestChainConfig{
+func adapterDestChainConfigToFeeQuoterV2(cfg changesetadapters.FeeQuoterDestChainConfig) fqc.FeeQuoterDestChainConfig {
+	return fqc.FeeQuoterDestChainConfig{
 		IsEnabled:                   cfg.IsEnabled,
 		MaxDataBytes:                cfg.MaxDataBytes,
 		MaxPerMsgGasLimit:           cfg.MaxPerMsgGasLimit,

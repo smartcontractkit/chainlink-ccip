@@ -17,7 +17,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -32,8 +31,8 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 const (
@@ -133,11 +132,9 @@ var (
 			gasPriceUpdateBatches := batches.GasPriceUpdateBatches
 			tokenPriceUpdateBatches := batches.TokenPriceUpdateBatches
 
-			// deploy fee quoter or fetch existing fee quoter address
-			feeQuoterRef, err := contract.MaybeDeployContract(
-				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
+			feeQuoterRef, err := ops2contract.MaybeDeployContract(
+				b, fqops.Deploy, chain, ops2contract.DeployInput[fqops.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
-					ChainSelector:  chain.Selector,
 					Args:           input.ConstructorArgs,
 				}, input.ExistingAddresses)
 			if err != nil {
@@ -147,17 +144,19 @@ var (
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy or "+
 					"fetch FeeQuoter on chain %s", chain.String())
 			}
-			writes := make([]contract.WriteOutput, 0)
+			writes := make([]ops2contract.WriteOutput, 0)
 			output.Addresses = append(output.Addresses, feeQuoterRef)
 			fqAddr := common.HexToAddress(feeQuoterRef.Address)
-			// ApplyDestChainConfigUpdates on FeeQuoter
+			fqContract, err := fqbind.NewFeeQuoter(fqAddr, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("bind fee quoter: %w", err)
+			}
+
 			for _, batch := range destChainConfigBatches {
 				feeQuoterReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyDestChainConfigUpdates, chain,
-					contract.FunctionInput[[]fqbind.FeeQuoterDestChainConfigArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args:          batch,
+					b, fqops.NewWriteApplyDestChainConfigUpdates(fqContract), chain,
+					ops2contract.FunctionInput[[]fqbind.FeeQuoterDestChainConfigArgs]{
+						Args: batch,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain "+
@@ -166,7 +165,6 @@ var (
 				writes = append(writes, feeQuoterReport.Output)
 			}
 
-			// update price (gas and token prices batched to avoid block gas limit; paired by step index)
 			priceUpdateSteps := len(gasPriceUpdateBatches)
 			if len(tokenPriceUpdateBatches) > priceUpdateSteps {
 				priceUpdateSteps = len(tokenPriceUpdateBatches)
@@ -184,9 +182,7 @@ var (
 					continue
 				}
 				feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.UpdatePrices, chain, contract.FunctionInput[fqbind.InternalPriceUpdates]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+					b, fqops.NewWriteUpdatePrices(fqContract), chain, ops2contract.FunctionInput[fqbind.InternalPriceUpdates]{
 						Args: fqbind.InternalPriceUpdates{
 							GasPriceUpdates:   gasBatch,
 							TokenPriceUpdates: tokenBatch,
@@ -200,7 +196,6 @@ var (
 			}
 			defaultFeeConfigApplied := false
 			for _, batch := range tokenTransferFeeConfigBatches {
-				// we consider that TokensToUseDefaultFeeConfigs will not have a lot of entries, so we can apply them in the first batch
 				var defaultFeeConfig []fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs
 				if !defaultFeeConfigApplied {
 					defaultFeeConfig = input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs
@@ -209,10 +204,8 @@ var (
 					defaultFeeConfig = make([]fqbind.FeeQuoterTokenTransferFeeConfigRemoveArgs, 0)
 				}
 				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
-					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+					b, fqops.NewWriteApplyTokenTransferFeeConfigUpdates(fqContract), chain,
+					ops2contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
 						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 							TokenTransferFeeConfigArgs:   batch,
 							TokensToUseDefaultFeeConfigs: defaultFeeConfig,
@@ -225,13 +218,10 @@ var (
 				writes = append(writes, feeQuoterTokenTransferFeeConfigReport.Output)
 			}
 
-			// in case there are still TokensToUseDefaultFeeConfigs that are not applied because they are not included in the batches, we apply them here
 			if len(input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs) > 0 && !defaultFeeConfigApplied {
 				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
-					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
+					b, fqops.NewWriteApplyTokenTransferFeeConfigUpdates(fqContract), chain,
+					ops2contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
 						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 							TokensToUseDefaultFeeConfigs: input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
 						},
@@ -242,15 +232,12 @@ var (
 				}
 				writes = append(writes, feeQuoterTokenTransferFeeConfigReport.Output)
 			}
-			// ApplyAuthorizedCallerUpdates on FeeQuoter
 			if len(input.AuthorizedCallerUpdates.AddedCallers) > 0 ||
 				len(input.AuthorizedCallerUpdates.RemovedCallers) > 0 {
 				feeQuoterAuthorizedCallerReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyAuthorizedCallerUpdates, chain,
-					contract.FunctionInput[fqbind.AuthorizedCallersAuthorizedCallerArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args:          input.AuthorizedCallerUpdates,
+					b, fqops.NewWriteApplyAuthorizedCallerUpdates(fqContract), chain,
+					ops2contract.FunctionInput[fqbind.AuthorizedCallersAuthorizedCallerArgs]{
+						Args: input.AuthorizedCallerUpdates,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller "+
@@ -258,7 +245,7 @@ var (
 				}
 				writes = append(writes, feeQuoterAuthorizedCallerReport.Output)
 			}
-			batch, err := contract.NewBatchOperationFromWrites(writes)
+			batch, err := ops2contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}
@@ -721,7 +708,7 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	}
 
 	// AuthorizedCallerUpdates: merge unique entries from both outputs
-	result.AuthorizedCallerUpdates = mergePriceUpdaters(result.AuthorizedCallerUpdates, output15.AuthorizedCallerUpdates)
+	result.AuthorizedCallerUpdates = mergeAuthorizedCallerUpdates(result.AuthorizedCallerUpdates, output15.AuthorizedCallerUpdates)
 
 	// PriceUpdates: merge by dest chain / token; v1.6.x (output16) takes precedence on duplicates
 	result.PriceUpdates = mergeFeeQuoterPriceUpdates(output16.PriceUpdates, output15.PriceUpdates)
@@ -778,7 +765,7 @@ func mergeTokenTransferFeeConfigArgs(args1, args2 []fqbind.FeeQuoterTokenTransfe
 	return result
 }
 
-func mergePriceUpdaters(updaters1, updaters2 fqbind.AuthorizedCallersAuthorizedCallerArgs) fqbind.AuthorizedCallersAuthorizedCallerArgs {
+func mergeAuthorizedCallerUpdates(updaters1, updaters2 fqbind.AuthorizedCallersAuthorizedCallerArgs) fqbind.AuthorizedCallersAuthorizedCallerArgs {
 	result := updaters1
 	// AddedCallers: merge unique addresses from both outputs
 	addedCallersMap := make(map[common.Address]bool)

@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	execbind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -158,7 +159,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			{
 				Version:       executor.Version,
 				MaxCCVsPerMsg: 10,
-				DynamicConfig: executor.DynamicConfig{
+				DynamicConfig: execbind.ExecutorDynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
 					AllowedFinalityConfig: finality.Config{BlockDepth: 1}.Raw(),
 					CcvAllowlistEnabled:   false,
@@ -168,7 +169,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			{
 				Version:       executor.Version,
 				MaxCCVsPerMsg: 10,
-				DynamicConfig: executor.DynamicConfig{
+				DynamicConfig: execbind.ExecutorDynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
 					AllowedFinalityConfig: finality.Config{BlockDepth: 1}.Raw(),
 					CcvAllowlistEnabled:   false,

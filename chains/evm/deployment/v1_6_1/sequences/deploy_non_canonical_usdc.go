@@ -11,12 +11,12 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 var DeployNonCanonicalUSDC = cldf_ops.NewSequence(
@@ -64,9 +64,8 @@ var DeployNonCanonicalUSDC = cldf_ops.NewSequence(
 		if len(existingPools) == 1 {
 			burnMintWithLockReleaseFlagTokenPoolRef = existingPools[0]
 		} else {
-			burnMintWithLockReleaseFlagTokenPoolReport, err := cldf_ops.ExecuteOperation(b, burn_mint_with_lock_release_flag_token_pool.Deploy, chain, contract_utils.DeployInput[burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
+			burnMintWithLockReleaseFlagTokenPoolReport, err := cldf_ops.ExecuteOperation(b, burn_mint_with_lock_release_flag_token_pool.Deploy, chain, ops2contract.DeployInput[burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_with_lock_release_flag_token_pool.ContractType, *burn_mint_with_lock_release_flag_token_pool.Version),
-				ChainSelector:  chain.Selector,
 				Args: burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
 					Token:              usdcTokenAddress,
 					LocalTokenDecimals: input.TokenDecimals,

@@ -19,8 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
+	erc20_lock_box_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
@@ -172,6 +174,18 @@ type migratePhaseCtx struct {
 	lockBoxes      map[uint64]common.Address
 }
 
+func writeOutputOps2ToLegacy(w ops2contract.WriteOutput) contract_utils.WriteOutput {
+	var ei *contract_utils.ExecInfo
+	if w.ExecInfo != nil {
+		ei = &contract_utils.ExecInfo{Hash: w.ExecInfo.Hash}
+	}
+	return contract_utils.WriteOutput{
+		ChainSelector: w.ChainSelector,
+		Tx:            w.Tx,
+		ExecInfo:      ei,
+	}
+}
+
 // authorizeLockboxCallers adds siloed pool, timelock, and LP as authorized callers on each lockbox.
 // This must run before the MCMS batch so the timelock can deposit and the LP has access post-migration.
 func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput, error) {
@@ -192,10 +206,13 @@ func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput
 		}
 		lp := lpReport.Output
 
-		callersReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.GetAllAuthorizedCallers, ctx.chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
-			Args:          struct{}{},
+		lockBoxBinding, err := erc20_lock_box_bindings.NewERC20LockBox(lockBoxAddr, ctx.chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("authorizeLockboxCallers: chain %d lockbox %s: bind lock box: %w", sel, lockBoxAddr.Hex(), err)
+		}
+
+		callersReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.NewReadGetAllAuthorizedCallers(lockBoxBinding), ctx.chain, ops2contract.FunctionInput[struct{}]{
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("authorizeLockboxCallers: chain %d lockbox %s: get authorized callers: %w", sel, lockBoxAddr.Hex(), err)
@@ -217,17 +234,15 @@ func authorizeLockboxCallers(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput
 		}
 
 		if len(callersToAdd) > 0 {
-			authReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.ApplyAuthorizedCallerUpdates, ctx.chain, contract_utils.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-				ChainSelector: ctx.input.ChainSelector,
-				Address:       lockBoxAddr,
-				Args: erc20_lock_box.AuthorizedCallerArgs{
+			authReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.NewWriteApplyAuthorizedCallerUpdates(lockBoxBinding), ctx.chain, ops2contract.FunctionInput[erc20_lock_box_bindings.AuthorizedCallersAuthorizedCallerArgs]{
+				Args: erc20_lock_box_bindings.AuthorizedCallersAuthorizedCallerArgs{
 					AddedCallers: callersToAdd,
 				},
 			})
 			if err != nil {
 				return nil, fmt.Errorf("authorizeLockboxCallers: chain %d lockbox %s: apply authorized caller updates: %w", sel, lockBoxAddr.Hex(), err)
 			}
-			writes = append(writes, authReport.Output)
+			writes = append(writes, writeOutputOps2ToLegacy(authReport.Output))
 		}
 	}
 
@@ -271,9 +286,12 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		}
 		writes = append(writes, approveReport.Output)
 
-		depositReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Deposit, ctx.chain, contract_utils.FunctionInput[erc20_lock_box.DepositArgs]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
+		lockBoxBinding, err := erc20_lock_box_bindings.NewERC20LockBox(lockBoxAddr, ctx.chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("migrateLiquidityToLockboxes: chain %d lockbox %s: bind lock box: %w", sel, lockBoxAddr.Hex(), err)
+		}
+
+		depositReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.NewWriteDeposit(lockBoxBinding), ctx.chain, ops2contract.FunctionInput[erc20_lock_box.DepositArgs]{
 			Args: erc20_lock_box.DepositArgs{
 				Token:               ctx.tokenAddr,
 				RemoteChainSelector: sel,
@@ -283,7 +301,7 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 		if err != nil {
 			return nil, fmt.Errorf("migrateLiquidityToLockboxes: chain %d lockbox %s amount %s: deposit: %w", sel, lockBoxAddr.Hex(), withdrawAmount.String(), err)
 		}
-		writes = append(writes, depositReport.Output)
+		writes = append(writes, writeOutputOps2ToLegacy(depositReport.Output))
 	}
 	return writes, nil
 }
@@ -312,10 +330,13 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 			continue
 		}
 
-		ownerReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Owner, ctx.chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
-			Args:          struct{}{},
+		lockBoxBinding, err := erc20_lock_box_bindings.NewERC20LockBox(lockBoxAddr, ctx.chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s: bind lock box: %w", sel, lockBoxAddr.Hex(), err)
+		}
+
+		ownerReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.NewReadOwner(lockBoxBinding), ctx.chain, ops2contract.FunctionInput[struct{}]{
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s: get owner: %w", sel, lockBoxAddr.Hex(), err)
@@ -324,15 +345,13 @@ func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.Write
 			continue
 		}
 
-		transferReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.TransferOwnership, ctx.chain, contract_utils.FunctionInput[common.Address]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
-			Args:          lp,
+		transferReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.NewWriteTransferOwnership(lockBoxBinding), ctx.chain, ops2contract.FunctionInput[common.Address]{
+			Args: lp,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s lp %s: transfer ownership: %w", sel, lockBoxAddr.Hex(), lp.Hex(), err)
 		}
-		writes = append(writes, transferReport.Output)
+		writes = append(writes, writeOutputOps2ToLegacy(transferReport.Output))
 	}
 	return writes, nil
 }

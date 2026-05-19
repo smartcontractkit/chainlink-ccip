@@ -8,6 +8,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -140,9 +141,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		switch typeAndVersion {
 		// v1.6.1 pools
 		case v1_6_1_burn_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_mint_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_burn_mint_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_burn_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -157,9 +157,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_from_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_from_mint_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_burn_from_mint_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_burn_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -174,9 +173,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_mint_with_lock_release_flag_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_mint_with_lock_release_flag_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_burn_mint_with_lock_release_flag_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_mint_with_lock_release_flag_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -191,9 +189,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_to_address_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_to_address_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_burn_to_address_mint_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_to_address_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -209,9 +206,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_with_from_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_with_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_burn_with_from_mint_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_with_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -226,9 +222,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_lock_release_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_lock_release_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_lock_release_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_lock_release_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_lock_release_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_lock_release_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
@@ -243,9 +238,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_siloed_lock_release_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_siloed_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_siloed_lock_release_token_pool.ConstructorArgs]{
+			poolRef, err = ops2contract.MaybeDeployContract(b, v1_6_1_siloed_lock_release_token_pool.Deploy, chain, ops2contract.DeployInput[v1_6_1_siloed_lock_release_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_siloed_lock_release_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_siloed_lock_release_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,

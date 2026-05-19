@@ -18,6 +18,7 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -70,13 +71,26 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 // poolOpsV161 implements PoolOps using v1.6.1 bindings.
 type poolOpsV161 struct{}
 
+func writeOutputOps2ToLegacy(w ops2contract.WriteOutput) evm_contract.WriteOutput {
+	var ei *evm_contract.ExecInfo
+	if w.ExecInfo != nil {
+		ei = &evm_contract.ExecInfo{Hash: w.ExecInfo.Hash}
+	}
+	return evm_contract.WriteOutput{
+		ChainSelector: w.ChainSelector,
+		Tx:            w.Tx,
+		ExecInfo:      ei,
+	}
+}
+
 func (p *poolOpsV161) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
+	pool, err := tpV1_6_1.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("GetToken v1.6.1: bind pool: %w", err)
+	}
 	res, err := cldf_ops.ExecuteOperation(b,
-		tpOpsV1_6_1.GetToken, chain,
-		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-		},
+		tpOpsV1_6_1.NewReadGetToken(pool), chain,
+		ops2contract.FunctionInput[struct{}]{},
 	)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("GetToken v1.6.1: %w", err)
@@ -109,18 +123,20 @@ func (p *poolOpsV161) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolA
 }
 
 func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error) {
+	pool, err := tpV1_6_1.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.6.1: bind pool: %w", err)
+	}
 	report, err := cldf_ops.ExecuteOperation(b,
-		tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
-		evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
+		tpOpsV1_6_1.NewWriteSetChainRateLimiterConfig(pool), chain,
+		ops2contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
 			Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
-				OutboundConfig: tpOpsV1_6_1.Config{
+				OutboundConfig: tpV1_6_1.RateLimiterConfig{
 					IsEnabled: outbound.IsEnabled,
 					Capacity:  outbound.Capacity,
 					Rate:      outbound.Rate,
 				},
-				InboundConfig: tpOpsV1_6_1.Config{
+				InboundConfig: tpV1_6_1.RateLimiterConfig{
 					IsEnabled: inbound.IsEnabled,
 					Capacity:  inbound.Capacity,
 					Rate:      inbound.Rate,
@@ -131,21 +147,23 @@ func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	if err != nil {
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.6.1: %w", err)
 	}
-	return report.Output, nil
+	return writeOutputOps2ToLegacy(report.Output), nil
 }
 
 func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {
+	pool, err := tpV1_6_1.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.6.1: bind pool: %w", err)
+	}
 	report, err := cldf_ops.ExecuteOperation(b,
-		tpOpsV1_6_1.SetRateLimitAdmin, chain,
-		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-			Args:          newAdmin,
+		tpOpsV1_6_1.NewWriteSetRateLimitAdmin(pool), chain,
+		ops2contract.FunctionInput[common.Address]{
+			Args: newAdmin,
 		})
 	if err != nil {
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.6.1: %w", err)
 	}
-	return report.Output, nil
+	return writeOutputOps2ToLegacy(report.Output), nil
 }
 
 func (p *poolOpsV161) Version() *semver.Version {
