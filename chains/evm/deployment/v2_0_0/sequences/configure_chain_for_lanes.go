@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"k8s.io/utils/ptr"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -20,13 +21,14 @@ import (
 	seqtypes "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
+	fqc "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	fqc "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 )
 
 // ConfigureChainForLanes is the canonical sequence for configuring an EVM chain to participate
@@ -185,7 +187,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 			// FeeQuoter dest chain config: when OverrideExistingConfig is false, we skip
 			// chains that already have an enabled config to avoid accidentally overwriting
-			// production parameters. When true, we always diff and update.
+			// production parameters. When true, we always update.
 			if !remoteConfig.FeeQuoterDestChainConfig.OverrideExistingConfig {
 				destChainCfg, err := feeQContract.GetDestChainConfig(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
 				if err != nil {
@@ -492,18 +494,55 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 
 // USDPerUnitGas is intentionally excluded because it is updated via a separate
 // FeeQuoter.UpdatePrices call (gas prices live in a different on-chain mapping).
-func feeQuoterDestChainConfigEqualTo(cur fqc.FeeQuoterDestChainConfig, desired changesetadapters.FeeQuoterDestChainConfig) bool {
-	return cur.IsEnabled == desired.IsEnabled &&
-		cur.MaxDataBytes == desired.MaxDataBytes &&
-		cur.MaxPerMsgGasLimit == desired.MaxPerMsgGasLimit &&
-		cur.DestGasOverhead == desired.DestGasOverhead &&
-		cur.DestGasPerPayloadByteBase == desired.DestGasPerPayloadByteBase &&
+func feeQuoterDestChainConfigEqualTo(cur fqc.FeeQuoterDestChainConfig, desired changesetadapters.FeeQuoterDestChainConfigOverrides) bool {
+	return cur.IsEnabled == *desired.IsEnabled &&
+		cur.MaxDataBytes == *desired.MaxDataBytes &&
+		cur.MaxPerMsgGasLimit == *desired.MaxPerMsgGasLimit &&
+		cur.DestGasOverhead == *desired.DestGasOverhead &&
+		cur.DestGasPerPayloadByteBase == *desired.DestGasPerPayloadByteBase &&
 		cur.ChainFamilySelector == desired.ChainFamilySelector &&
-		cur.DefaultTokenFeeUSDCents == desired.DefaultTokenFeeUSDCents &&
-		cur.DefaultTokenDestGasOverhead == desired.DefaultTokenDestGasOverhead &&
-		cur.DefaultTxGasLimit == desired.DefaultTxGasLimit &&
-		cur.NetworkFeeUSDCents == desired.NetworkFeeUSDCents &&
-		cur.LinkFeeMultiplierPercent == desired.LinkFeeMultiplierPercent
+		cur.DefaultTokenFeeUSDCents == *desired.DefaultTokenFeeUSDCents &&
+		cur.DefaultTokenDestGasOverhead == *desired.DefaultTokenDestGasOverhead &&
+		cur.DefaultTxGasLimit == *desired.DefaultTxGasLimit &&
+		cur.NetworkFeeUSDCents == *desired.NetworkFeeUSDCents &&
+		cur.LinkFeeMultiplierPercent == *desired.LinkFeeMultiplierPercent
+}
+
+func fillFeeQuoterDestChainConfigOverridesFromOnChain(
+	desired changesetadapters.FeeQuoterDestChainConfigOverrides,
+	cur fqc.FeeQuoterDestChainConfig,
+) changesetadapters.FeeQuoterDestChainConfigOverrides {
+	if desired.IsEnabled == nil {
+		desired.IsEnabled = ptr.To(cur.IsEnabled)
+	}
+	if desired.MaxDataBytes == nil {
+		desired.MaxDataBytes = ptr.To(cur.MaxDataBytes)
+	}
+	if desired.MaxPerMsgGasLimit == nil {
+		desired.MaxPerMsgGasLimit = ptr.To(cur.MaxPerMsgGasLimit)
+	}
+	if desired.DestGasOverhead == nil {
+		desired.DestGasOverhead = ptr.To(cur.DestGasOverhead)
+	}
+	if desired.DestGasPerPayloadByteBase == nil {
+		desired.DestGasPerPayloadByteBase = ptr.To(cur.DestGasPerPayloadByteBase)
+	}
+	if desired.DefaultTokenFeeUSDCents == nil {
+		desired.DefaultTokenFeeUSDCents = ptr.To(cur.DefaultTokenFeeUSDCents)
+	}
+	if desired.DefaultTokenDestGasOverhead == nil {
+		desired.DefaultTokenDestGasOverhead = ptr.To(cur.DefaultTokenDestGasOverhead)
+	}
+	if desired.DefaultTxGasLimit == nil {
+		desired.DefaultTxGasLimit = ptr.To(cur.DefaultTxGasLimit)
+	}
+	if desired.NetworkFeeUSDCents == nil {
+		desired.NetworkFeeUSDCents = ptr.To(cur.NetworkFeeUSDCents)
+	}
+	if desired.LinkFeeMultiplierPercent == nil {
+		desired.LinkFeeMultiplierPercent = ptr.To(cur.LinkFeeMultiplierPercent)
+	}
+	return desired
 }
 
 // maybeAddFeeQuoterDestChainConfigArgOnLocalChain compares the desired FeeQuoter dest chain
@@ -531,40 +570,7 @@ func maybeAddFeeQuoterDestChainConfigArgOnLocalChain(
 		cur = fetched
 	}
 
-	desired := remoteConfig.FeeQuoterDestChainConfig
-	if !desired.IsEnabled {
-		desired.IsEnabled = cur.IsEnabled
-	}
-	if desired.MaxDataBytes == 0 {
-		desired.MaxDataBytes = cur.MaxDataBytes
-	}
-	if desired.MaxPerMsgGasLimit == 0 {
-		desired.MaxPerMsgGasLimit = cur.MaxPerMsgGasLimit
-	}
-	if desired.DestGasOverhead == 0 {
-		desired.DestGasOverhead = cur.DestGasOverhead
-	}
-	if desired.DestGasPerPayloadByteBase == 0 {
-		desired.DestGasPerPayloadByteBase = cur.DestGasPerPayloadByteBase
-	}
-	if desired.ChainFamilySelector == [4]byte{} {
-		desired.ChainFamilySelector = cur.ChainFamilySelector
-	}
-	if desired.DefaultTokenFeeUSDCents == 0 {
-		desired.DefaultTokenFeeUSDCents = cur.DefaultTokenFeeUSDCents
-	}
-	if desired.DefaultTokenDestGasOverhead == 0 {
-		desired.DefaultTokenDestGasOverhead = cur.DefaultTokenDestGasOverhead
-	}
-	if desired.DefaultTxGasLimit == 0 {
-		desired.DefaultTxGasLimit = cur.DefaultTxGasLimit
-	}
-	if desired.NetworkFeeUSDCents == 0 {
-		desired.NetworkFeeUSDCents = cur.NetworkFeeUSDCents
-	}
-	if desired.LinkFeeMultiplierPercent == 0 {
-		desired.LinkFeeMultiplierPercent = cur.LinkFeeMultiplierPercent
-	}
+	desired := fillFeeQuoterDestChainConfigOverridesFromOnChain(remoteConfig.FeeQuoterDestChainConfig, cur)
 	if feeQuoterDestChainConfigEqualTo(cur, desired) {
 		return feeQuoterArgs, nil
 	}
@@ -835,19 +841,19 @@ func configureCommitteeVerifierAsDest(
 	return writes, nil
 }
 
-func adapterDestChainConfigToFeeQuoterV2(cfg changesetadapters.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig {
+func adapterDestChainConfigToFeeQuoterV2(cfg changesetadapters.FeeQuoterDestChainConfigOverrides) fee_quoter.DestChainConfig {
 	return fee_quoter.DestChainConfig{
-		IsEnabled:                   cfg.IsEnabled,
-		MaxDataBytes:                cfg.MaxDataBytes,
-		MaxPerMsgGasLimit:           cfg.MaxPerMsgGasLimit,
-		DestGasOverhead:             cfg.DestGasOverhead,
-		DestGasPerPayloadByteBase:   cfg.DestGasPerPayloadByteBase,
+		IsEnabled:                   *cfg.IsEnabled,
+		MaxDataBytes:                *cfg.MaxDataBytes,
+		MaxPerMsgGasLimit:           *cfg.MaxPerMsgGasLimit,
+		DestGasOverhead:             *cfg.DestGasOverhead,
+		DestGasPerPayloadByteBase:   *cfg.DestGasPerPayloadByteBase,
 		ChainFamilySelector:         cfg.ChainFamilySelector,
-		DefaultTokenFeeUSDCents:     cfg.DefaultTokenFeeUSDCents,
-		DefaultTokenDestGasOverhead: cfg.DefaultTokenDestGasOverhead,
-		DefaultTxGasLimit:           cfg.DefaultTxGasLimit,
-		NetworkFeeUSDCents:          cfg.NetworkFeeUSDCents,
-		LinkFeeMultiplierPercent:    cfg.LinkFeeMultiplierPercent,
+		DefaultTokenFeeUSDCents:     *cfg.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead: *cfg.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           *cfg.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          *cfg.NetworkFeeUSDCents,
+		LinkFeeMultiplierPercent:    *cfg.LinkFeeMultiplierPercent,
 	}
 }
 

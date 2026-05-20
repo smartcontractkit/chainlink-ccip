@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"k8s.io/utils/ptr"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -184,18 +185,18 @@ func (a *ChainFamilyAdapter) GetChainFamilySelector() [4]byte {
 	return evmFamilySelector
 }
 
-func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccvadapters.FeeQuoterDestChainConfig {
-	return ccvadapters.FeeQuoterDestChainConfig{
-		IsEnabled:                   true,
-		MaxDataBytes:                32_000,
-		MaxPerMsgGasLimit:           8_000_000,
-		DestGasPerPayloadByteBase:   20,
+func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccvadapters.FeeQuoterDestChainConfigOverrides {
+	return ccvadapters.FeeQuoterDestChainConfigOverrides{
+		IsEnabled:                   ptr.To(true),
+		MaxDataBytes:                ptr.To(uint32(32_000)),
+		MaxPerMsgGasLimit:           ptr.To(uint32(15_000_000)),
+		DestGasPerPayloadByteBase:   ptr.To(uint8(20)),
 		ChainFamilySelector:         evmFamilySelector,
-		DefaultTokenFeeUSDCents:     25,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		LinkFeeMultiplierPercent:    90,
+		DefaultTokenFeeUSDCents:     ptr.To(uint16(0)),
+		DefaultTokenDestGasOverhead: ptr.To(uint32(90_000)),
+		DefaultTxGasLimit:           ptr.To(uint32(200_000)),
+		NetworkFeeUSDCents:          ptr.To(uint16(10)),
+		LinkFeeMultiplierPercent:    ptr.To(uint8(90)),
 		// USDPerUnitGas is not set here to avoid doing a gas price update by default
 	}
 }
