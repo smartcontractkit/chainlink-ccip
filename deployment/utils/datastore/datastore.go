@@ -314,3 +314,24 @@ func MergeRefs(ref1, ref2 *datastore.AddressRef) (datastore.AddressRef, error) {
 
 	return merged, nil
 }
+
+func AddressRefToFilters(ref datastore.AddressRef) []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef] {
+	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
+	if ref.ChainSelector != 0 {
+		filters = append(filters, datastore.AddressRefByChainSelector(ref.ChainSelector))
+	}
+	if ref.Qualifier != "" {
+		filters = append(filters, datastore.AddressRefByQualifier(ref.Qualifier))
+	}
+	if ref.Version != nil {
+		filters = append(filters, datastore.AddressRefByVersion(ref.Version))
+	}
+	if ref.Address != "" {
+		filters = append(filters, datastore.AddressRefByAddress(ref.Address))
+	}
+	if ref.Type != "" {
+		filters = append(filters, datastore.AddressRefByType(ref.Type))
+	}
+
+	return filters
+}

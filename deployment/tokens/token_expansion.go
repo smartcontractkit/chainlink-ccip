@@ -437,8 +437,10 @@ func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
 
 // TryNormalizeAddressRef looks up AddressNormalizer registered for selector's chain family and canonicalizes ref.Address when set.
 func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
+	ref.ChainSelector = chainSelector
+
 	normalized := ref.Clone()
-	if ref.Address == "" {
+	if normalized.Address == "" {
 		return normalized, nil
 	}
 
@@ -506,8 +508,12 @@ func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
-	if cached, err := datastore_utils.FindAndFormatRef(e.DataStore, maybeNormalized, sel, datastore_utils.FullRef); err == nil {
-		return cached, nil
+	results := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(maybeNormalized)...)
+	if len(results) > 1 {
+		return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %v", datastore_utils.SprintRef(maybeNormalized), sel, results)
+	}
+	if len(results) == 1 {
+		return results[0], nil
 	}
 
 	// If the cache had no hits, then check if we have the capability to retrieve this info from the chain
@@ -539,8 +545,12 @@ func ResolveTokenRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, 
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
-	if cached, err := datastore_utils.FindAndFormatRef(e.DataStore, maybeNormalized, sel, datastore_utils.FullRef); err == nil {
-		return cached, nil
+	results := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(maybeNormalized)...)
+	if len(results) > 1 {
+		return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %v", datastore_utils.SprintRef(maybeNormalized), sel, results)
+	}
+	if len(results) == 1 {
+		return results[0], nil
 	}
 
 	// If the cache had no hits, then check if we have the capability to retrieve this info from the chain
