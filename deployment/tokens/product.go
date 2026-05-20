@@ -17,10 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-// ArtificialAddressRefLabel is a special label used by adapters that implement TokenRefResolver.
-// It allows adapters to mark reconstructed AddressRefs. The use of this is optional: if there is
-// no need to distinguish between these two types of AddressRefs in adapter logic, then feel free
-// to ignore this label.
+// ArtificialAddressRefLabel is a special label that can be used by adapters that implement
+// TokenRefResolver. Adapters can add this label to reconstructed `AddressRefs` to indicate
+// that the ref is artifical. It is not required to use this label - if there is no need to
+// mark these types of AddressRefs in adapter logic, then this label can be ignored.
 const ArtificialAddressRefLabel = "ArtificialAddressRef"
 
 type tokenAdapterID string
