@@ -155,6 +155,25 @@ func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return report.Output, nil
 }
 
+func (p *poolOpsV161) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
+	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
+	// reports by input hash, and earlier sequences in the same Apply run may have read this
+	// same lane while it was still uninitialized — caching that stale result.
+	tp, err := tpV1_6_1.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v1.6.1 token pool contract at %s: %w", poolAddr.Hex(), err)
+	}
+	bucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
+	}
+	return tokensapi.RateLimiterConfig{
+		IsEnabled: bucket.IsEnabled,
+		Capacity:  bucket.Capacity,
+		Rate:      bucket.Rate,
+	}, nil
+}
+
 func (p *poolOpsV161) Version() *semver.Version {
 	return tpOpsV1_6_1.Version
 }

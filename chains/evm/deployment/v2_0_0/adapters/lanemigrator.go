@@ -15,9 +15,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -27,6 +24,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
+	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -39,9 +39,9 @@ import (
 )
 
 const (
-	DefaultTxGasLimit        uint32 = 200_000
-	DefaultMaxPerMsgGasLimit uint32 = 8_000_000
-	DefaultMaxDataBytes      uint32 = 32_000
+	DefaultTxGasLimit       uint32 = 200_000
+	DefaultMaxDataBytes     uint32 = 32_000
+	DefaultTokenFeeUSDCents uint16 = 0
 )
 
 type LaneMigrator struct{}
@@ -399,11 +399,11 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:                   dstChainCfg.IsEnabled,
 						MaxDataBytes:                DefaultMaxDataBytes,
-						MaxPerMsgGasLimit:           DefaultMaxPerMsgGasLimit,
+						MaxPerMsgGasLimit:           seq1_7.GetMaxMsgPerGasLimit(remoteChainSelector), // differs based on destination chain
 						DestGasOverhead:             dstChainCfg.DestGasOverhead,
 						DestGasPerPayloadByteBase:   dstChainCfg.DestGasPerPayloadByteBase,
 						ChainFamilySelector:         dstChainCfg.ChainFamilySelector,
-						DefaultTokenFeeUSDCents:     dstChainCfg.DefaultTokenFeeUSDCents,
+						DefaultTokenFeeUSDCents:     DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: dstChainCfg.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           DefaultTxGasLimit,
 						NetworkFeeUSDCents:          dstChainCfg.NetworkFeeUSDCents,

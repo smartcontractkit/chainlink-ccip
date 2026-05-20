@@ -933,6 +933,36 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				}
 			}
 
+			// Demo OutboundOnly TPRL: disable the selector→dst outbound only. A disabled
+			// outbound short-circuits the changeset's 110% counterpart-inbound check, so this
+			// demo exercises the OutboundOnly flag plumbing (local pass-through inbound read
+			// on selector's pool) without depending on the counterpart's current state.
+			disabledOutbound := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
+			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+				Configs: map[uint64]tokensapi.TPRLConfig{
+					selector: {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            tokenRef,
+						TokenPoolRef:        tokenPoolRef,
+						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{dst.ChainSelector(): {
+							OutboundOnly: true,
+							RateLimit:    &disabledOutbound,
+						}},
+					},
+					// Counterpart still needs refs (used to resolve pool/decimals for the
+					// validation read) but no RemoteOutbounds entry for the local lane.
+					dst.ChainSelector(): {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            dstTokenRef,
+						TokenPoolRef:        dstTokenPoolRef,
+					},
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("OutboundOnly TPRL demo for selector %d to %d: %w",
+					selector, dst.ChainSelector(), err)
+			}
+
 		}
 
 	}
