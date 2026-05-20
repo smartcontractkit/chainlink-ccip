@@ -19,8 +19,9 @@ import (
 
 // ArtificialAddressRefLabel is a special label that can be used by adapters that implement
 // TokenRefResolver. Adapters can add this label to reconstructed `AddressRefs` to indicate
-// that the ref is artifical. It is not required to use this label - if there is no need to
-// mark these types of AddressRefs in adapter logic, then this label can be ignored.
+// that the ref is artificial. It's not required to use this label - if there is no need to
+// distinguish between artificial AddressRefs and datastore AddressRefs in the adapter then
+// this label can be ignored.
 const ArtificialAddressRefLabel = "ArtificialAddressRef"
 
 type tokenAdapterID string
