@@ -17,8 +17,8 @@ import (
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
-	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/sequences"
+	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
@@ -135,8 +135,9 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMN address cached for chain %d", chain.Selector)
 			}
 			seqOutput, err := cldf_ops.ExecuteSequence(b, rmnsequences.RmnCurse, chain, rmnsequences.SeqCurseInput{
-				RMNAddress: rmnAddr,
-				Subjects:   in.Subjects,
+				ChainSelector: chain.Selector,
+				RMNAddress:    rmnAddr,
+				Subjects:      in.Subjects,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to curse subjects on chain %d: %w", chain.Selector, err)
@@ -161,8 +162,9 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMN address cached for chain %d", chain.Selector)
 			}
 			seqOutput, err := cldf_ops.ExecuteSequence(b, rmnsequences.RmnUncurse, chain, rmnsequences.SeqUncurseInput{
-				RMNAddress: rmnAddr,
-				Subjects:   in.Subjects,
+				ChainSelector: chain.Selector,
+				RMNAddress:    rmnAddr,
+				Subjects:      in.Subjects,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse subjects on chain %d: %w", chain.Selector, err)

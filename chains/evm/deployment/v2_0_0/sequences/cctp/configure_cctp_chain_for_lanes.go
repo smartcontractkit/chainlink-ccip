@@ -493,8 +493,8 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 			RemotePool:                common.LeftPadBytes(remotePoolAddress, 32),
 			RemoteToken:               common.LeftPadBytes(remoteTokenAddress, 32),
 			TokenTransferFeeConfig:    remoteChain.TokenTransferFeeConfig,
-			OutboundRateLimiterConfig: remoteChain.OutboundRateLimiterConfig,
-			InboundRateLimiterConfig:  remoteChain.InboundRateLimiterConfig,
+			OutboundRateLimiterConfig: &remoteChain.OutboundRateLimiterConfig,
+			InboundRateLimiterConfig:  &remoteChain.InboundRateLimiterConfig,
 		}
 	}
 	return configs, nil

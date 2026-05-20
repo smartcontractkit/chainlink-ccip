@@ -63,6 +63,7 @@ var (
 
 func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterForkCCIPSendTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMForkCCIPSendTestAdapter)
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMTestAdapterForFamily)
 }
 
@@ -89,6 +90,10 @@ func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 		state: s,
 		Chain: c,
 	}
+}
+
+func NewSVMForkCCIPSendTestAdapter(env *deployment.Environment, selector uint64) testadapters.ForkCCIPSendTestAdapter {
+	return NewSVMAdapter(env, selector).(testadapters.ForkCCIPSendTestAdapter)
 }
 
 func NewSVMTestAdapterForFamily(ds datastore.DataStore, selector uint64) testadapters.TestAdapterForFamily {

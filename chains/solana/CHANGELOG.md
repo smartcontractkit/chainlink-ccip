@@ -6,6 +6,9 @@ This document describes the changes introduced in the different versions of the 
 
 ## [1.6.2]
 
+- Commit [`9546a59bd0a3cee4ddc8ae4042da533e62225b78`](https://github.com/smartcontractkit/chainlink-ccip/commit/9546a59bd0a3cee4ddc8ae4042da533e62225b78)
+- Git Tag: [solana-v1.6.2](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v1.6.2)
+
 ### Added
 
 - [BurnMintTokenPool] New `transfer_mint_authority_to_pda_signer` instruction to revert mint authority from a multisig back to the pool signer PDA during migration cleanup

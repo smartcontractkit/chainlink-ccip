@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,6 +16,7 @@ import (
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -156,7 +158,23 @@ func (p *poolOpsV151) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolA
 	return owner, rlAdmin, nil
 }
 
-func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelector uint64, outbound, inbound tokensapi.RateLimiterConfig) (evm_contract.WriteOutput, error) {
+func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error) {
+	bucket, ok := input.GetBucketForFinality(false)
+	if !ok {
+		b.Logger.Warnf("skipping rate limiter config for token pool (%s) on chain %d since no default bucket was provided", datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector)
+		return nil, nil
+	}
+
+	// NOTE: EVM v1.5.1 pools have slightly different rate limit validation rules than v1.6.1+ pools.
+	// See: https://basescan.org/address/0x5192Bd10f28A0206211CcBB66671118f85c2E539#code#F12#L119
+	outbound, inbound := bucket.OutboundRateLimiterConfig, bucket.InboundRateLimiterConfig
+	if outbound.IsEnabled && outbound.Capacity.Cmp(big.NewInt(0)) == 0 && outbound.Rate.Cmp(big.NewInt(0)) == 0 {
+		return nil, fmt.Errorf("outbound rate limiter config is enabled but rate and capacity are both zero")
+	}
+	if inbound.IsEnabled && inbound.Capacity.Cmp(big.NewInt(0)) == 0 && inbound.Rate.Cmp(big.NewInt(0)) == 0 {
+		return nil, fmt.Errorf("inbound rate limiter config is enabled but rate and capacity are both zero")
+	}
+
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOps.SetChainRateLimiterConfig, chain,
 		evm_contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
@@ -173,13 +191,13 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 					Capacity:  inbound.Capacity,
 					Rate:      inbound.Rate,
 				},
-				RemoteChainSelector: remoteChainSelector,
+				RemoteChainSelector: input.RemoteChainSelector,
 			},
 		})
 	if err != nil {
-		return evm_contract.WriteOutput{}, fmt.Errorf("SetChainRateLimiterConfig v1.5.1: %w", err)
+		return nil, fmt.Errorf("SetChainRateLimiterConfig v1.5.1: %w", err)
 	}
-	return report.Output, nil
+	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
 func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {
@@ -196,6 +214,22 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
 	}
 	return report.Output, nil
+}
+
+func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
+	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+	}
+	bucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
+	}
+	return tokensapi.RateLimiterConfig{
+		IsEnabled: bucket.IsEnabled,
+		Capacity:  bucket.Capacity,
+		Rate:      bucket.Rate,
+	}, nil
 }
 
 func (p *poolOpsV151) Version() *semver.Version {

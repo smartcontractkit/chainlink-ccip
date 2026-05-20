@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -24,6 +25,32 @@ type TokenFeeAdapter interface {
 	SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (TokenTransferFeeConfig, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
+}
+
+// RateLimitReaderAdapter is an optional interface that exposes on-chain rate limit reads
+// for a token pool's lane. The OutboundOnly TPRL path uses it twice: once on the local
+// adapter to read the current inbound and pass it through unchanged (when the on-chain
+// setter takes both directions atomically), and once on the counterpart adapter to
+// validate chain B's existing inbound against chain A's new outbound.
+type RateLimitReaderAdapter interface {
+	// GetOnchainInboundRateLimit returns the existing on-chain inbound RateLimiterConfig
+	// for the given lane (chainSelector, remoteSelector) and FastFinality bucket. Adapters
+	// that do not distinguish FastFinality buckets should return an error when called with
+	// fastFinality=true. If no bucket has been configured on-chain for the lane, the adapter
+	// should return a zero-value RateLimiterConfig (IsEnabled=false, Capacity=0, Rate=0) and
+	// no error so the caller can apply its own minimum-threshold checks.
+	//
+	// tokenRef is the resolved token reference for the pool on chainSelector. Some chain
+	// families (Solana) need the token mint to derive the PDA holding the inbound config;
+	// chain families keyed by pool address alone (EVM) may ignore it.
+	GetOnchainInboundRateLimit(
+		e deployment.Environment,
+		chainSelector uint64,
+		poolRef datastore.AddressRef,
+		tokenRef datastore.AddressRef,
+		remoteSelector uint64,
+		fastFinality bool,
+	) (RateLimiterConfig, error)
 }
 
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.
@@ -120,6 +147,29 @@ type RateLimiterConfigFloatInput struct {
 	Rate float64 `yaml:"rate" json:"rate"`
 }
 
+// Validate checks the validity of the RateLimiterConfigFloatInput.
+func (rl RateLimiterConfigFloatInput) Validate() error {
+	// NOTE: EVM v1.5.1 token pools reject IsEnabled=true,rate=0,capacity=0
+	// whereas v1.6+ pools (for most if not all chain families) treat it as
+	// a valid config. We intentionally enforce a more lenient check at the
+	// top-level so that an adapter can superimpose more strict checks at a
+	// lower level if needed.
+	if rl.IsEnabled {
+		if rl.Rate < 0 || rl.Capacity < 0 {
+			return errors.New("rate limiter config cannot have negative capacity or rate")
+		}
+		if rl.Rate > rl.Capacity {
+			return errors.New("rate limiter config has rate greater than capacity")
+		}
+	} else {
+		if rl.Capacity != 0 || rl.Rate != 0 {
+			return errors.New("rate limiter config is disabled but capacity or rate is non-zero")
+		}
+	}
+
+	return nil
+}
+
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
@@ -130,9 +180,19 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
 	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
 	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
-	InboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"inboundRateLimiterConfig" json:"inboundRateLimiterConfig"`
+	InboundRateLimiterConfig *RateLimiterConfigFloatInput `yaml:"inboundRateLimiterConfig,omitempty" json:"inboundRateLimiterConfig,omitempty"`
 	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
-	OutboundRateLimiterConfig RateLimiterConfigFloatInput `yaml:"outboundRateLimiterConfig" json:"outboundRateLimiterConfig"`
+	// This is a backwards compatible alias for the default rate limit bucket. If OutboundRateLimits is
+	// defined and it has a FastFinality=false bucket, then that bucket takes precedence as the default
+	// rate limit bucket and this config is ignored. Otherwise, this config is used.
+	OutboundRateLimiterConfig *RateLimiterConfigFloatInput `yaml:"outboundRateLimiterConfig,omitempty" json:"outboundRateLimiterConfig,omitempty"`
+	// InboundRateLimits is populated by ConfigureTokensForTransfers from the counterpart chain's outbound buckets.
+	// Do not set in YAML. Follows the same semantics as OutboundRateLimits, but for inbound traffic.
+	InboundRateLimits []RateLimitConfig `yaml:"inboundRateLimits" json:"inboundRateLimits"`
+	// OutboundRateLimits specifies outbound rate limits per bucket for token pools that distinguish default vs fast-finality.
+	// This has higher precedence than OutboundRateLimiterConfig when a FastFinality=false bucket is present. Only v2 adapters
+	// support FastFinality=true rate limits; older adapters will ignore the FastFinality field.
+	OutboundRateLimits []RateLimitConfig `yaml:"outboundRateLimits" json:"outboundRateLimits"`
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8 `yaml:"remoteDecimals,string" json:"remoteDecimals,string"`
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
@@ -145,6 +205,31 @@ type RemoteChainConfig[R any, CCV any] struct {
 	InboundCCVsToAddAboveThreshold []CCV `yaml:"inboundCCVsToAddAboveThreshold" json:"inboundCCVsToAddAboveThreshold"`
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig TokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
+}
+
+// GetOutboundRateLimitBuckets returns the outbound RL configuration as a RemoteOutbounds struct. The
+// methods on the RemoteOutbounds struct should be used to reconcile the rate limit buckets between V2
+// and older versions.
+func (c RemoteChainConfig[R, CCV]) GetOutboundRateLimitBuckets() RemoteOutbounds {
+	return RemoteOutbounds{RateLimit: c.OutboundRateLimiterConfig, Outbounds: c.OutboundRateLimits}
+}
+
+// GetInboundRateLimitBuckets returns the inbound RL configuration as a RemoteOutbounds struct. The
+// methods on the RemoteOutbounds struct should be used to reconcile the rate limit buckets between
+// V2 and older versions.
+func (c RemoteChainConfig[R, CCV]) GetInboundRateLimitBuckets() RemoteOutbounds {
+	return RemoteOutbounds{RateLimit: c.InboundRateLimiterConfig, Outbounds: c.InboundRateLimits}
+}
+
+// Validate checks the validity of the RemoteChainConfig, including its rate limiter configurations.
+func (c RemoteChainConfig[R, CCV]) Validate() error {
+	if err := c.GetOutboundRateLimitBuckets().Validate(); err != nil {
+		return fmt.Errorf("outbound rate limit config for remote chain: %w", err)
+	}
+	if err := c.GetInboundRateLimitBuckets().Validate(); err != nil {
+		return fmt.Errorf("inbound rate limit config for remote chain: %w", err)
+	}
+	return nil
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.

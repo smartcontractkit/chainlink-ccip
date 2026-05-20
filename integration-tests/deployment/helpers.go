@@ -10,14 +10,19 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	evmonrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
+	sequencesV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
@@ -439,4 +444,51 @@ func NewDefaultInputForMCMS(desc string, overrides ...func(*mcms.Input)) mcms.In
 		override(&in)
 	}
 	return in
+}
+
+func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cumulativeDS *datastore.MemoryDataStore, chainSel uint64) {
+	t.Helper()
+
+	create2FactoryRef, err := evm_contract.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel],
+		evm_contract.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: cldf_deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
+			ChainSelector:  chainSel,
+			Args: create2_factory.ConstructorArgs{
+				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+
+	chainReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequencesV2_0_0.DeployChainContracts,
+		e.BlockChains.EVMChains()[chainSel],
+		sequencesV2_0_0.DeployChainContractsInput{
+			ChainSelector:    chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:   testsetupV2_0_0.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+		},
+	)
+	require.NoError(t, err)
+
+	for _, addr := range chainReport.Output.Addresses {
+		require.NoError(t, cumulativeDS.Addresses().Add(addr))
+	}
+}
+
+func RequireBigIntsEqual(t *testing.T, want, got *big.Int, msg string) {
+	t.Helper()
+	w := want
+	if w == nil {
+		w = big.NewInt(0)
+	}
+	g := got
+	if g == nil {
+		g = big.NewInt(0)
+	}
+	require.Zero(t, w.Cmp(g), "%s: want %s got %s", msg, w.String(), g.String())
 }
