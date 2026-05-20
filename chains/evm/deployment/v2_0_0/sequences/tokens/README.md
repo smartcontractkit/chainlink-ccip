@@ -32,7 +32,7 @@ For the given **remote chain selector**, the importer reads from the active pool
 
 ### How imported config is used
 
-- **Rate limiters** – If the **input** does not supply default/custom finality rate limiter config (e.g. `IsEnabled: false` or omitted), the sequence uses the **imported** default outbound/inbound config for the new pool. So prior pool’s rate limits are carried over unless you override them in the config.
+- **Rate limiters** – If the **input** does not supply default finality rate limiter config (e.g. null or omitted), the sequence uses the **imported** default outbound/inbound config for the new pool. So prior pool’s rate limits are carried over by default unless you define a non-nil rate limit in the config.
 - **Remote pools** – When adding or updating the remote chain on the new pool, the sequence builds the remote pool list as: **active pool’s remote pools first** (from import), then the requested pool from config if not already present. That preserves existing remote pools during cutover (e.g. for in-flight messages) and adds the new pool’s counterpart.
 
 ### Version-specific import paths

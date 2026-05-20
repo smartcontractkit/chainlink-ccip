@@ -48,17 +48,8 @@ func revokeTokenAdminRoleVerify(tokenRegistry *TokenAdapterRegistry) func(cldf.E
 		}
 
 		for i, revocation := range cfg.Revocations {
-			if revocation.ChainSelector == 0 {
-				return fmt.Errorf("revocation[%d]: chain selector is required", i)
-			}
 			if !e.BlockChains.Exists(revocation.ChainSelector) {
 				return fmt.Errorf("revocation[%d]: chain selector %d not found in environment", i, revocation.ChainSelector)
-			}
-			if datastore_utils.IsAddressRefEmpty(revocation.TokenRef) {
-				return fmt.Errorf("revocation[%d]: token ref is required", i)
-			}
-			if revocation.TokenRef.ChainSelector != 0 && revocation.TokenRef.ChainSelector != revocation.ChainSelector {
-				return fmt.Errorf("revocation[%d]: token ref chain selector mismatch: expected %d, got %d", i, revocation.ChainSelector, revocation.TokenRef.ChainSelector)
 			}
 
 			family, err := chain_selectors.GetSelectorFamily(revocation.ChainSelector)
@@ -72,6 +63,7 @@ func revokeTokenAdminRoleVerify(tokenRegistry *TokenAdapterRegistry) func(cldf.E
 			if _, ok := adapter.(TokenAdminRoleAdapter); !ok {
 				return fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, cciputils.Version_1_0_0)
 			}
+
 			if _, err := resolveTokenAdminRoleRef(e, revocation); err != nil {
 				return fmt.Errorf("revocation[%d]: failed to resolve token ref: %w", i, err)
 			}
@@ -85,6 +77,8 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 	return func(e cldf.Environment, cfg RevokeTokenAdminRoleInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		// Repeated Apply calls must re-read on-chain admin state instead of replaying
+		// an earlier successful sequence report with the same input.
 		opsBundle := cldf_ops.NewBundle(
 			e.GetContext,
 			e.Logger,
@@ -115,18 +109,13 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			var timelockAddress string
 			if mcmsReader, ok := mcmsRegistry.GetMCMSReader(family); ok {
 				timelockRef, err := mcmsReader.GetTimelockRef(e, revocation.ChainSelector, cfg.MCMS)
-				if err != nil && revocation.AdminAddress == "" {
-					return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to resolve default admin address from timelock: %w", i, err)
-				}
 				if err != nil {
 					e.Logger.Warnf("failed to resolve timelock address for revocation[%d] on chain selector %d: %v", i, revocation.ChainSelector, err)
-				}
-				timelockAddress = timelockRef.Address
-				if (datastore_utils.IsAddressRefEmpty(timelockRef) || timelockRef.Address == "") && revocation.AdminAddress == "" {
-					return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: timelock ref is empty for chain selector %d", i, revocation.ChainSelector)
+				} else if !datastore_utils.IsAddressRefEmpty(timelockRef) {
+					timelockAddress = timelockRef.Address
 				}
 			} else if revocation.AdminAddress == "" {
-				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: no MCMS reader registered for chain family '%s'", i, family)
+				e.Logger.Warnf("no MCMS reader registered for chain family '%s'; revocation[%d] will use the adapter default admin address", family, i)
 			}
 
 			adminAddress := revocation.AdminAddress
@@ -156,6 +145,13 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 }
 
 func resolveTokenAdminRoleRef(e cldf.Environment, revocation RevokeTokenAdminRoleConfig) (datastore.AddressRef, error) {
+	if datastore_utils.IsAddressRefEmpty(revocation.TokenRef) {
+		return datastore.AddressRef{}, errors.New("token ref is required")
+	}
+	if revocation.TokenRef.ChainSelector != 0 && revocation.TokenRef.ChainSelector != revocation.ChainSelector {
+		return datastore.AddressRef{}, fmt.Errorf("token ref chain selector mismatch: expected %d, got %d", revocation.ChainSelector, revocation.TokenRef.ChainSelector)
+	}
+
 	tokenRef, err := TryNormalizeAddressRef(revocation.ChainSelector, revocation.TokenRef)
 	if err != nil {
 		return datastore.AddressRef{}, err

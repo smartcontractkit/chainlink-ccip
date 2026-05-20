@@ -10,7 +10,6 @@ import (
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -27,13 +26,13 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found among provided EVM chains", input.ChainSelector)
 		}
-		if input.AdminAddress == "" {
-			return sequences.OnChainOutput{}, fmt.Errorf("admin address is required")
+		adminAddress := chain.DeployerKey.From
+		if input.AdminAddress != "" {
+			if !common.IsHexAddress(input.AdminAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("admin address %q is not a valid hex address", input.AdminAddress)
+			}
+			adminAddress = common.HexToAddress(input.AdminAddress)
 		}
-		if !common.IsHexAddress(input.AdminAddress) {
-			return sequences.OnChainOutput{}, fmt.Errorf("admin address %q is not a valid hex address", input.AdminAddress)
-		}
-		adminAddress := common.HexToAddress(input.AdminAddress)
 		if adminAddress == (common.Address{}) {
 			return sequences.OnChainOutput{}, fmt.Errorf("admin address cannot be the zero address")
 		}
@@ -48,15 +47,11 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 
 		tokenImpl, ok := tokenimpl.Get(cldf_deployment.ContractType(input.TokenRef.Type))
 		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type %q for token ref %s", input.TokenRef.Type, datastore_utils.SprintRef(input.TokenRef))
-		}
-		adminRoleToken, ok := tokenImpl.(tokenimpl.AdminRoleToken)
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("token type %q does not support admin role checks", input.TokenRef.Type)
+			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type %q for token address %q on chain %d", input.TokenRef.Type, input.TokenRef.Address, input.TokenRef.ChainSelector)
 		}
 
 		ctx := b.GetContext()
-		hasAdminRole, err := adminRoleToken.HasAdminRole(ctx, chain, tokenAddress, adminAddress)
+		hasAdminRole, err := tokenImpl.HasAdminRole(ctx, chain, tokenAddress, adminAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for %s on token %s: %w", adminAddress.Hex(), tokenAddress.Hex(), err)
 		}
@@ -80,7 +75,7 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 			if candidate == (common.Address{}) || candidate == adminAddress {
 				continue
 			}
-			hasAdminRole, err := adminRoleToken.HasAdminRole(ctx, chain, tokenAddress, candidate)
+			hasAdminRole, err := tokenImpl.HasAdminRole(ctx, chain, tokenAddress, candidate)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for candidate %s on token %s: %w", candidate.Hex(), tokenAddress.Hex(), err)
 			}

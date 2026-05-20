@@ -205,6 +205,9 @@ func TestObservation_prices(t *testing.T) {
 
 			ccr.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(tc.onchainOcrSeqNum, tc.rpcErr).Maybe()
 
+			ccr.EXPECT().GetOffRampConfigDigest(mock.Anything, mock.AnythingOfType("uint8")).
+				Return([32]byte{}, nil).Maybe()
+
 			tokenPriceObs := tokenprice.Observation{}
 			if tc.expObservedPrices {
 				tokenPriceObs.FeedTokenPrices = map[ccipocr3.UnknownEncodedAddress]ccipocr3.BigInt{

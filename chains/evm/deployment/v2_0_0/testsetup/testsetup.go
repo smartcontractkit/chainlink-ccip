@@ -112,15 +112,15 @@ func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfi
 	}
 }
 
-func CreateRateLimiterConfigFloatInput(rate float64, capacity float64) tokens.RateLimiterConfigFloatInput {
+func CreateRateLimiterConfigFloatInput(rate float64, capacity float64) *tokens.RateLimiterConfigFloatInput {
 	if rate == 0 && capacity == 0 {
-		return tokens.RateLimiterConfigFloatInput{
+		return &tokens.RateLimiterConfigFloatInput{
 			IsEnabled: false,
 			Rate:      0,
 			Capacity:  0,
 		}
 	}
-	return tokens.RateLimiterConfigFloatInput{
+	return &tokens.RateLimiterConfigFloatInput{
 		IsEnabled: true,
 		Rate:      rate,
 		Capacity:  capacity,

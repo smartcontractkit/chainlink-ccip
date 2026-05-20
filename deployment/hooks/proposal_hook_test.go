@@ -203,6 +203,13 @@ func registerFactoryForVersion(t *testing.T, family string, version *semver.Vers
 			return lookupAdapter(selector)
 		},
 	)
+	testadapters.GetTestAdapterRegistry().RegisterForkCCIPSendTestAdapter(
+		family,
+		version,
+		func(_ *cldf.Environment, selector uint64) testadapters.ForkCCIPSendTestAdapter {
+			return lookupAdapter(selector)
+		},
+	)
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapterForFamily(
 		family,
 		version,

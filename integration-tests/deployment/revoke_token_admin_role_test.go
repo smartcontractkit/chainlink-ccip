@@ -27,6 +27,114 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 )
 
+func TestRevokeTokenAdminRoleVerifyPreconditions(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{chainSelector}))
+	require.NoError(t, err)
+
+	tokenRef := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress("0x00000000000000000000000000000000000000aa").Hex(),
+		Type:          datastore.ContractType(bnmERC20ops.ContractType),
+		Version:       cciputils.Version_1_0_0,
+		Qualifier:     "REVOKE_VERIFY",
+	}
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(tokenRef))
+	MergeAddresses(t, env, ds)
+
+	cs := tokensapi.RevokeTokenAdminRole()
+	tests := []struct {
+		name          string
+		input         tokensapi.RevokeTokenAdminRoleInput
+		errorContains string
+	}{
+		{
+			name:          "requires revocations",
+			input:         tokensapi.RevokeTokenAdminRoleInput{},
+			errorContains: "at least one token admin role revocation is required",
+		},
+		{
+			name: "requires chain in environment",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector + 1,
+					TokenRef:      tokenRef,
+				}},
+			},
+			errorContains: "not found in environment",
+		},
+		{
+			name: "requires token ref",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector,
+				}},
+			},
+			errorContains: "token ref is required",
+		},
+		{
+			name: "rejects token ref chain mismatch",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector,
+					TokenRef: datastore.AddressRef{
+						ChainSelector: chainSelector + 1,
+						Address:       tokenRef.Address,
+					},
+				}},
+			},
+			errorContains: "token ref chain selector mismatch",
+		},
+		{
+			name: "requires resolvable token ref",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector,
+					TokenRef: datastore.AddressRef{
+						Address: "0x00000000000000000000000000000000000000ee",
+					},
+				}},
+			},
+			errorContains: "token ref must resolve from datastore or include both address and type",
+		},
+		{
+			name: "accepts datastore token ref by address",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector,
+					TokenRef: datastore.AddressRef{
+						Address: tokenRef.Address,
+					},
+				}},
+			},
+		},
+		{
+			name: "accepts address and type without datastore version",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector,
+					TokenRef: datastore.AddressRef{
+						Address: "0x00000000000000000000000000000000000000ff",
+						Type:    tokenRef.Type,
+					},
+				}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cs.VerifyPreconditions(*env, tt.input)
+			if tt.errorContains != "" {
+				require.ErrorContains(t, err, tt.errorContains)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestRevokeTokenAdminRoleEVMBurnMint(t *testing.T) {
 	v1_6_0 := semver.MustParse("1.6.0")
 	v1_6_1 := semver.MustParse("1.6.1")
@@ -96,6 +204,34 @@ func TestRevokeTokenAdminRoleEVMBurnMint(t *testing.T) {
 	})
 }
 
+func TestRevokeTokenAdminRoleDefaultsToDeployer(t *testing.T) {
+	v1_6_1 := semver.MustParse("1.6.1")
+	chainSelector := chainsel.TEST_90000001.Selector
+
+	env, err := environment.New(t.Context(), environment.WithEVMSimulatedWithConfig(t, []uint64{chainSelector}, onchain.EVMSimLoaderConfig{
+		NumAdditionalAccounts: 1,
+	}))
+	require.NoError(t, err)
+
+	chain, ok := env.BlockChains.EVMChains()[chainSelector]
+	require.True(t, ok)
+	require.NotEmpty(t, chain.Users)
+
+	customerAdmin := chain.Users[0].From
+	token := deployBurnMintTokenOnlyForAdminRevocation(t, env, chainSelector, v1_6_1, "REVOKE_DEPLOYER", customerAdmin.Hex())
+	tokenContract, defaultAdminRole := loadBurnMintTokenAdminRole(t, chain.Client, token.Address)
+
+	requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, chain.DeployerKey.From, true)
+	requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, customerAdmin, true)
+
+	revokeOutput, err := revokeTokenAdminRoleForTest(t, env, chainSelector, token, "Revoke deployer token admin role")
+	require.NoError(t, err)
+	require.Empty(t, revokeOutput.MCMSTimelockProposals)
+
+	requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, chain.DeployerKey.From, false)
+	requireBurnMintAdminRole(t, tokenContract, defaultAdminRole, customerAdmin, true)
+}
+
 func revokeTokenAdminRoleForTest(t *testing.T, env *cldf_deployment.Environment, chainSelector uint64, token datastore.AddressRef, description string) (cldf_deployment.ChangesetOutput, error) {
 	t.Helper()
 
@@ -144,6 +280,38 @@ func deployBurnMintTokenForAdminRevocation(t *testing.T, env *cldf_deployment.En
 		},
 		ChainAdapterVersion: tokenPoolVersion,
 		MCMS:                NewDefaultInputForMCMS(fmt.Sprintf("Deploy %s", tokenSymbol)),
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
+
+	tokenRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Qualifier:     tokenSymbol,
+	}, chainSelector, datastore_utils.FullRef)
+	require.NoError(t, err)
+	return tokenRef
+}
+
+func deployBurnMintTokenOnlyForAdminRevocation(t *testing.T, env *cldf_deployment.Environment, chainSelector uint64, tokenVersion *semver.Version, tokenSymbol string, externalAdmin string) datastore.AddressRef {
+	t.Helper()
+
+	maxSupply := uint64(1e6)
+	output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			chainSelector: {
+				TokenPoolVersion: tokenVersion,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Decimals:      uint8(18),
+					Symbol:        tokenSymbol,
+					Name:          fmt.Sprintf("%s Token", tokenSymbol),
+					Type:          bnmERC20ops.ContractType,
+					Supply:        &maxSupply,
+					ExternalAdmin: externalAdmin,
+					CCIPAdmin:     externalAdmin,
+				},
+			},
+		},
+		ChainAdapterVersion: tokenVersion,
 	})
 	require.NoError(t, err)
 	MergeAddresses(t, env, output.DataStore)

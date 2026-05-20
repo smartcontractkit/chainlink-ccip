@@ -225,7 +225,7 @@ func runPostProposalCCIPSends(
 				}
 				destGroup.infof("verify-ccip-send: adapter version for src=%d dest=%d is %s", srcSel, destSel, adapterVer.String())
 
-				factory, ok := testadapters.GetTestAdapterRegistry().GetTestAdapter(family, adapterVer)
+				factory, ok := testadapters.GetTestAdapterRegistry().GetForkCCIPSendTestAdapter(family, adapterVer)
 				if !ok {
 					destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter for family %s version %s (src=%d dest=%d)",
 						family, adapterVer.String(), srcSel, destSel)
@@ -260,7 +260,7 @@ func runPostProposalCCIPSends(
 						destAdapter = factory(&env, destSel)
 					} else {
 						// Backward compatibility: fall back to full adapters when available.
-						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetTestAdapter(destFamily, adapterVer)
+						fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetForkCCIPSendTestAdapter(destFamily, adapterVer)
 						if !hasFullAdapter {
 							destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
 								destFamily, adapterVer.String(), srcSel, destSel)

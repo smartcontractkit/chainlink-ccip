@@ -101,6 +101,7 @@ func init() {
 		Indexer:                  &EVMCCVIndexerConfigAdapter{},
 		TokenVerifier:            &EVMCCVTokenVerifierConfigAdapter{},
 		CommitteeVerifierOnchain: &EVMCCVCommitteeVerifierOnchainAdapter{},
+		CommitteeVerifierDeploy:  &EVMCommitteeVerifierDeployAdapter{},
 	})
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
 	ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyEVM, &EVMExecutorConfigAdapter{})

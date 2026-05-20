@@ -148,7 +148,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 				tokenRegistry,
 				remoteChainSelector,
 				inCfg,
-				counterpartRemoteChainCfg.OutboundRateLimiterConfig,
+				counterpartRemoteChainCfg,
 			)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
@@ -204,15 +204,33 @@ func convertRemoteChainConfig(
 	tokenAdapterRegistry *TokenAdapterRegistry,
 	remoteChainSelector uint64,
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
-	chainSelectorOutboundTprl RateLimiterConfigFloatInput,
+	cpCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
 ) (RemoteChainConfig[[]byte, string], error) {
+	if err := inCfg.Validate(); err != nil {
+		return RemoteChainConfig[[]byte, string]{}, fmt.Errorf("invalid remote chain config (chain %d → %d): %w", chainSelector, remoteChainSelector, err)
+	}
+	if err := cpCfg.Validate(); err != nil {
+		return RemoteChainConfig[[]byte, string]{}, fmt.Errorf("invalid counterpart remote chain config (chain %d → %d): %w", remoteChainSelector, chainSelector, err)
+	}
+
+	var outbound, inbound *RateLimiterConfigFloatInput
+	if ob, inOk := inCfg.GetOutboundRateLimitBuckets().DefaultBucket(); inOk {
+		outbound = &ob.RateLimit
+	}
+	if ib, cpOk := cpCfg.GetOutboundRateLimitBuckets().DefaultBucket(); cpOk {
+		inbound = &ib.RateLimit
+	}
+
 	// a chain's inbound rate limiter config should be based on the remote chain's outbound rate limiter config
 	// to ensure that the remote chain is configured to allow the desired traffic from this chain.
 	// The values here should NOT be passed in decimal adjusted but rather the adapters should be responsible for performing
 	// any necessary decimal adjustments based on the token decimals on each chain.
 	outCfg := RemoteChainConfig[[]byte, string]{
-		InboundRateLimiterConfig:  chainSelectorOutboundTprl,
-		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
+		InboundRateLimiterConfig:  inbound,
+		OutboundRateLimiterConfig: outbound,
+		InboundRateLimits:         cpCfg.OutboundRateLimits,
+		OutboundRateLimits:        inCfg.OutboundRateLimits,
+		TokenTransferFeeConfig:    inCfg.TokenTransferFeeConfig,
 	}
 
 	if inCfg.RemotePool != nil {

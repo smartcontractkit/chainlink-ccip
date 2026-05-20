@@ -1215,6 +1215,10 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 		GetRmnCurseInfo(mock.Anything).
 		Return(cciptypes.CurseInfo{}, nil).Maybe()
 
+	mockCCIPReader.EXPECT().
+		GetOffRampConfigDigest(mock.Anything, mock.AnythingOfType("uint8")).
+		Return([32]byte{}, nil).Maybe()
+
 	// Create a simplified plugin structure that will test the eligibility failure
 	// This removes the dependency on actual cache implementations
 	p := &Plugin{
@@ -1223,6 +1227,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 		lggr:            lggr,
 		ocrTypeCodec:    ocrTypeCodec,
 		ccipReader:      mockCCIPReader,
+		observer:        &metrics.Noop{},
 		commitRootsCache: cache.NewCommitRootsCache(
 			lggr,
 			8*time.Hour,

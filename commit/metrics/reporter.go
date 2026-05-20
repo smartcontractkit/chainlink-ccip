@@ -27,11 +27,14 @@ type Reporter interface {
 
 	TrackProcessorLatency(processor string, method plugincommon.MethodType, latency time.Duration, err error)
 	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
+
+	TrackConfigDigestMismatch(mismatch bool)
 }
 
 type CommitPluginReporter interface {
 	TrackObservation(obs committypes.Observation, round uint64)
 	TrackOutcome(outcome committypes.Outcome, round uint64)
+	TrackConfigDigestMismatch(mismatch bool)
 }
 
 type Noop struct{}
@@ -47,6 +50,8 @@ func (n *Noop) TrackRmnRequest(string, float64, uint64, string) {}
 func (n *Noop) TrackProcessorLatency(string, plugincommon.MethodType, time.Duration, error) {}
 
 func (n *Noop) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
+
+func (n *Noop) TrackConfigDigestMismatch(bool) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}

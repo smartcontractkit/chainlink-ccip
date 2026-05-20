@@ -33,6 +33,7 @@ import (
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters" // register v1.5.1 token pool adapter
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters" // register v1.6.0/v1.6.1 token pool adapter
@@ -40,7 +41,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
@@ -805,7 +805,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					OutboundCCVs:              []datastore.AddressRef{}, // not needed for 1.6
 					InboundCCVs:               []datastore.AddressRef{}, // not needed for 1.6
-					OutboundRateLimiterConfig: disabledRL,
+					OutboundRateLimiterConfig: &disabledRL,
 					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
@@ -913,7 +913,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							TokenRef:            tokenRef,
 							TokenPoolRef:        tokenPoolRef,
 							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-								dst.ChainSelector(): {RateLimit: rl},
+								dst.ChainSelector(): {RateLimit: &rl},
 							},
 						},
 						dst.ChainSelector(): {
@@ -921,7 +921,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							TokenRef:            dstTokenRef,
 							TokenPoolRef:        dstTokenPoolRef,
 							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-								selector: {RateLimit: rl},
+								selector: {RateLimit: &rl},
 							},
 						},
 					},
@@ -931,6 +931,36 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 					return nil, fmt.Errorf("setting rate limiter for token %s on selector %d to selector %d: %w",
 						teConfig.DeployTokenInput.Symbol, selector, dst.ChainSelector(), err)
 				}
+			}
+
+			// Demo OutboundOnly TPRL: disable the selector→dst outbound only. A disabled
+			// outbound short-circuits the changeset's 110% counterpart-inbound check, so this
+			// demo exercises the OutboundOnly flag plumbing (local pass-through inbound read
+			// on selector's pool) without depending on the counterpart's current state.
+			disabledOutbound := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
+			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+				Configs: map[uint64]tokensapi.TPRLConfig{
+					selector: {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            tokenRef,
+						TokenPoolRef:        tokenPoolRef,
+						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{dst.ChainSelector(): {
+							OutboundOnly: true,
+							RateLimit:    &disabledOutbound,
+						}},
+					},
+					// Counterpart still needs refs (used to resolve pool/decimals for the
+					// validation read) but no RemoteOutbounds entry for the local lane.
+					dst.ChainSelector(): {
+						ChainAdapterVersion: v1_6_0,
+						TokenRef:            dstTokenRef,
+						TokenPoolRef:        dstTokenPoolRef,
+					},
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("OutboundOnly TPRL demo for selector %d to %d: %w",
+					selector, dst.ChainSelector(), err)
 			}
 
 		}
