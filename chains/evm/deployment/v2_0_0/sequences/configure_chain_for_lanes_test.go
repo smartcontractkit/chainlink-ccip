@@ -756,6 +756,7 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfigOverrides{
 					OverrideExistingConfig: true,
 					DestGasOverhead:        uint32Ptr(500_000),
+					ChainFamilySelector:    evmFamilySelector,
 				},
 				DefaultExecutor: local.executor,
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
