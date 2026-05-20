@@ -127,13 +127,13 @@ func buildConfigureChainForLanesInput(
 		},
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:    boolPtr(true),
-				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
-				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
-				DefaultExecutor:     local.executor,
-				DefaultInboundCCVs:  []string{local.committeeVerifier},
-				DefaultOutboundCCVs: []string{local.committeeVerifier},
-				FeeQuoterDestChainConfigOverrides: testsetup.CreateBasicFeeQuoterDestChainConfigOverrides(),
+				AllowTrafficFrom:         boolPtr(true),
+				OnRamps:                  [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OffRamp:                  common.HexToAddress(remote.offRamp).Bytes(),
+				DefaultExecutor:          local.executor,
+				DefaultInboundCCVs:       []string{local.committeeVerifier},
+				DefaultOutboundCCVs:      []string{local.committeeVerifier},
+				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfigOverrides(),
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
 					Enabled:     true,
@@ -542,7 +542,7 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 		DefaultExecutor:     local.executor,
 		DefaultInboundCCVs:  []string{local.committeeVerifier},
 		DefaultOutboundCCVs: []string{local.committeeVerifier},
-		FeeQuoterDestChainConfigOverrides: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
+		FeeQuoterDestChainConfig: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
 			cfg := testsetup.CreateBasicFeeQuoterDestChainConfigOverrides()
 			cfg.MaxDataBytes = uint32Ptr(50_000)
 			cfg.MaxPerMsgGasLimit = uint32Ptr(5_000_000)
@@ -753,7 +753,7 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 				DefaultInboundCCVs:   []string{local.committeeVerifier},
 				DefaultOutboundCCVs:  []string{local.committeeVerifier},
 				BaseExecutionGasCost: 120_000,
-				FeeQuoterDestChainConfigOverrides: changesetadapters.FeeQuoterDestChainConfigOverrides{
+				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfigOverrides{
 					OverrideExistingConfig: true,
 					DestGasOverhead:        uint32Ptr(500_000),
 				},
@@ -823,8 +823,8 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 
 	noOverrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
 	rc := noOverrideInput.RemoteChains[remoteSelector]
-	rc.FeeQuoterDestChainConfigOverrides.OverrideExistingConfig = false
-	rc.FeeQuoterDestChainConfigOverrides.MaxDataBytes = uint32Ptr(99_000)
+	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = false
+	rc.FeeQuoterDestChainConfig.MaxDataBytes = uint32Ptr(99_000)
 	noOverrideInput.RemoteChains[remoteSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -843,8 +843,8 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 
 	overrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
 	rc = overrideInput.RemoteChains[remoteSelector]
-	rc.FeeQuoterDestChainConfigOverrides.OverrideExistingConfig = true
-	rc.FeeQuoterDestChainConfigOverrides.MaxDataBytes = uint32Ptr(99_000)
+	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = true
+	rc.FeeQuoterDestChainConfig.MaxDataBytes = uint32Ptr(99_000)
 	overrideInput.RemoteChains[remoteSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -1176,7 +1176,7 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 
 	input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
 	rc := input.RemoteChains[remoteChainSelector]
-	rc.FeeQuoterDestChainConfigOverrides.USDPerUnitGas = big.NewInt(42_000)
+	rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(42_000)
 	input.RemoteChains[remoteChainSelector] = rc
 
 	report1, err := operations.ExecuteSequence(

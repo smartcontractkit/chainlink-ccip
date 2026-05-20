@@ -481,21 +481,21 @@ func resolveRemoteChainConfig(
 	}
 
 	return adapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:                  &allowTrafficFrom,
-		OnRamps:                           [][]byte{remoteOnRampBytes},
-		OffRamp:                           remoteOffRampBytes,
-		DefaultExecutor:                   executorAddr,
-		DefaultInboundCCVs:                defaultInboundCCVs,
-		LaneMandatedInboundCCVs:           laneMandatedInboundCCVs,
-		DefaultOutboundCCVs:               defaultOutboundCCVs,
-		LaneMandatedOutboundCCVs:          laneMandatedOutboundCCVs,
-		FeeQuoterDestChainConfigOverrides: fqConfig,
-		ExecutorDestChainConfig:           executorConfig,
-		AddressBytesLength:                remoteAdapter.GetAddressBytesLength(),
-		BaseExecutionGasCost:              baseExecutionGasCost,
-		TokenReceiverAllowed:              &tokenReceiverAllowed,
-		MessageNetworkFeeUSDCents:         messageNetworkFeeUSDCents,
-		TokenNetworkFeeUSDCents:           tokenNetworkFeeUSDCents,
+		AllowTrafficFrom:          &allowTrafficFrom,
+		OnRamps:                   [][]byte{remoteOnRampBytes},
+		OffRamp:                   remoteOffRampBytes,
+		DefaultExecutor:           executorAddr,
+		DefaultInboundCCVs:        defaultInboundCCVs,
+		LaneMandatedInboundCCVs:   laneMandatedInboundCCVs,
+		DefaultOutboundCCVs:       defaultOutboundCCVs,
+		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
+		FeeQuoterDestChainConfig:  fqConfig,
+		ExecutorDestChainConfig:   executorConfig,
+		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
+		BaseExecutionGasCost:      baseExecutionGasCost,
+		TokenReceiverAllowed:      &tokenReceiverAllowed,
+		MessageNetworkFeeUSDCents: messageNetworkFeeUSDCents,
+		TokenNetworkFeeUSDCents:   tokenNetworkFeeUSDCents,
 	}, nil
 }
 

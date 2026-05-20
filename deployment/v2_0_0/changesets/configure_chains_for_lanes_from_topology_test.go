@@ -625,11 +625,11 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 	}
 
 	inputA := inputsByChain[chainA]
-	assert.Equal(t, uint32(1000), *inputA.RemoteChains[sharedDest].FeeQuoterDestChainConfigOverrides.MaxDataBytes)
+	assert.Equal(t, uint32(1000), *inputA.RemoteChains[sharedDest].FeeQuoterDestChainConfig.MaxDataBytes)
 	assert.Equal(t, uint16(100), inputA.RemoteChains[sharedDest].ExecutorDestChainConfig.USDCentsFee)
 
 	inputB := inputsByChain[chainB]
-	assert.Equal(t, uint32(2000), *inputB.RemoteChains[sharedDest].FeeQuoterDestChainConfigOverrides.MaxDataBytes)
+	assert.Equal(t, uint32(2000), *inputB.RemoteChains[sharedDest].FeeQuoterDestChainConfig.MaxDataBytes)
 	assert.Equal(t, uint16(200), inputB.RemoteChains[sharedDest].ExecutorDestChainConfig.USDCentsFee)
 }
 

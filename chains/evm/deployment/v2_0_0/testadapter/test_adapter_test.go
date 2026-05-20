@@ -203,7 +203,7 @@ func buildConfigureChainForLanesInput(
 				DefaultExecutor:     local.executor,
 				DefaultInboundCCVs:  []string{local.committeeVerifier},
 				DefaultOutboundCCVs: []string{local.committeeVerifier},
-				FeeQuoterDestChainConfigOverrides: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
+				FeeQuoterDestChainConfig: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
 					cfg := testsetup.CreateBasicFeeQuoterDestChainConfigOverrides()
 					cfg.USDPerUnitGas = big.NewInt(20_000_000_000_000)
 					return cfg
