@@ -150,7 +150,7 @@ func TestLaneMigrator(t *testing.T) {
 			})
 			require.NoError(t, err)
 			destConfig := opOut.Output
-			require.Equal(t, 15_000_000, destConfig.MaxPerMsgGasLimit) // MaxPerMsgGasLimit should be 15 million for Arbitrum
+			require.Equal(t, uint32(15_000_000), destConfig.MaxPerMsgGasLimit) // MaxPerMsgGasLimit should be 15 million for Arbitrum
 			require.Equal(t, adapters1_7.DefaultMaxDataBytes, destConfig.MaxDataBytes)
 		})
 	}
