@@ -1091,6 +1091,100 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			routerAddr, err := solAdapter.GetRouterAddress(env.DataStore, solChainSel)
 			require.NoError(t, err)
 			require.NotEmpty(t, routerAddr, "Solana router should be deployed")
+
+			// Regression: SolanaAdapter.GetOnchainInboundRateLimit used to decode the on-chain
+			// ChainConfig PDA into a bare base_token_pool.BaseChain, ignoring the 8-byte Anchor
+			// discriminator. The decode would silently fail and the function would return a
+			// zero RateLimiterConfig, which in OutboundOnly mode then overwrote the bucket's
+			// InboundRateLimiterConfig with zeros — clobbering a previously-enabled inbound
+			// rate limit on chain. This subtest seeds an enabled inbound (via the symmetric
+			// apply above), runs an OutboundOnly apply on Solana, and verifies the Solana
+			// inbound is preserved by pass-through. Depends on the SetTokenPoolRateLimits
+			// subtest running first so the Solana inbound is in an enabled, non-zero state.
+			t.Run("SetTokenPoolRateLimits_OutboundOnly_PreservesSolanaInbound", func(t *testing.T) {
+				chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
+				require.NoError(t, err)
+
+				// Snapshot Solana's current rate limits — both directions should be enabled with
+				// non-zero values from the previous SetTokenPoolRateLimits subtest.
+				var preCfg lockrelease_token_pool.ChainConfig
+				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &preCfg))
+				require.True(t, preCfg.Base.InboundRateLimit.Cfg.Enabled, "seed: Solana inbound from EVM should be enabled before OutboundOnly apply")
+				require.NotZero(t, preCfg.Base.InboundRateLimit.Cfg.Capacity, "seed: Solana inbound capacity should be non-zero before OutboundOnly apply")
+				require.NotZero(t, preCfg.Base.InboundRateLimit.Cfg.Rate, "seed: Solana inbound rate should be non-zero before OutboundOnly apply")
+
+				// Snapshot EVM rate limits too so we can assert they're untouched without
+				// depending on which specific values the prior subtest left behind.
+				preOutboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+				require.NoError(t, err)
+				preInboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+				require.NoError(t, err)
+
+				// Pick a new outbound that's safely below the counterpart's existing inbound
+				// headroom: counterpart inbound (in svmDecimals) >= 1.10 * new_outbound. Use a
+				// small value relative to anything the previous subtests could have set.
+				newSVMOutbound := tokensapi.RemoteOutbounds{
+					OutboundOnly: true,
+					Outbounds: []tokensapi.RateLimitConfig{{
+						RateLimit: tokensapi.RateLimiterConfigFloatInput{Capacity: 50, Rate: 5, IsEnabled: true},
+					}},
+				}
+
+				tprlOut, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+					MCMS: NewDefaultInputForMCMS("Scenario 5 TPRL OutboundOnly"),
+					Configs: map[uint64]tokensapi.TPRLConfig{
+						solChainSel: {
+							ChainAdapterVersion: v1_6_0_scenarios,
+							TokenPoolRef:        datastore.AddressRef{Address: solPoolProgramID.String()},
+							TokenRef:            datastore.AddressRef{Address: solTokenMint.String()},
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								evmChainSel: newSVMOutbound,
+							},
+						},
+						// Counterpart EVM config is refs-only — no RemoteOutbounds entry — which is
+						// exactly the shape OutboundOnly is designed for.
+						evmChainSel: {
+							ChainAdapterVersion: v1_6_0_scenarios,
+							TokenPoolRef:        datastore.AddressRef{Address: evmPoolAddr.Hex()},
+							TokenRef:            datastore.AddressRef{Address: evmTokAddr.Hex()},
+						},
+					},
+				})
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, tprlOut.MCMSTimelockProposals, false)
+
+				// Re-read Solana's chain config.
+				var postCfg lockrelease_token_pool.ChainConfig
+				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &postCfg))
+
+				// Solana inbound must be preserved bit-for-bit (the OutboundOnly pass-through).
+				// Before the fix, GetOnchainInboundRateLimit silently returned a zero
+				// RateLimiterConfig, the bucket's InboundRateLimiterConfig was overwritten
+				// with zeros, and these three assertions failed.
+				require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Enabled, postCfg.Base.InboundRateLimit.Cfg.Enabled, "Solana inbound IsEnabled must be unchanged by OutboundOnly apply")
+				require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Capacity, postCfg.Base.InboundRateLimit.Cfg.Capacity, "Solana inbound capacity must be unchanged by OutboundOnly apply")
+				require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Rate, postCfg.Base.InboundRateLimit.Cfg.Rate, "Solana inbound rate must be unchanged by OutboundOnly apply")
+
+				// Solana outbound was rewritten to the new value.
+				expOutCap := tokensapi.ScaleFloatToBigInt(newSVMOutbound.Outbounds[0].RateLimit.Capacity, int(svmDecimals), 0)
+				expOutRate := tokensapi.ScaleFloatToBigInt(newSVMOutbound.Outbounds[0].RateLimit.Rate, int(svmDecimals), 0)
+				require.True(t, postCfg.Base.OutboundRateLimit.Cfg.Enabled)
+				require.Equal(t, expOutCap.Uint64(), postCfg.Base.OutboundRateLimit.Cfg.Capacity, "Solana outbound capacity after OutboundOnly apply")
+				require.Equal(t, expOutRate.Uint64(), postCfg.Base.OutboundRateLimit.Cfg.Rate, "Solana outbound rate after OutboundOnly apply")
+
+				// EVM pool was not touched by this OutboundOnly apply (no RemoteOutbounds entry
+				// for solChainSel was provided on the EVM side).
+				postOutboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+				require.NoError(t, err)
+				postInboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+				require.NoError(t, err)
+				require.Equal(t, preOutboundEVM.IsEnabled, postOutboundEVM.IsEnabled, "EVM outbound IsEnabled should be unchanged after OutboundOnly apply on Solana")
+				require.Zero(t, preOutboundEVM.Capacity.Cmp(postOutboundEVM.Capacity), "EVM outbound capacity should be unchanged after OutboundOnly apply on Solana")
+				require.Zero(t, preOutboundEVM.Rate.Cmp(postOutboundEVM.Rate), "EVM outbound rate should be unchanged after OutboundOnly apply on Solana")
+				require.Equal(t, preInboundEVM.IsEnabled, postInboundEVM.IsEnabled, "EVM inbound IsEnabled should be unchanged after OutboundOnly apply on Solana")
+				require.Zero(t, preInboundEVM.Capacity.Cmp(postInboundEVM.Capacity), "EVM inbound capacity should be unchanged after OutboundOnly apply on Solana")
+				require.Zero(t, preInboundEVM.Rate.Cmp(postInboundEVM.Rate), "EVM inbound rate should be unchanged after OutboundOnly apply on Solana")
+			})
 		})
 
 		// Test address ref inference
@@ -1331,100 +1425,6 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				require.True(t, chainCfg.Base.OutboundRateLimit.Cfg.Enabled)
 				require.True(t, chainCfg.Base.InboundRateLimit.Cfg.Enabled)
 			})
-		})
-
-		// Regression: SolanaAdapter.GetOnchainInboundRateLimit used to decode the on-chain
-		// ChainConfig PDA into a bare base_token_pool.BaseChain, ignoring the 8-byte Anchor
-		// discriminator. The decode would silently fail and the function would return a
-		// zero RateLimiterConfig, which in OutboundOnly mode then overwrote the bucket's
-		// InboundRateLimiterConfig with zeros — clobbering a previously-enabled inbound
-		// rate limit on chain. This subtest seeds an enabled inbound (via the symmetric
-		// apply above), runs an OutboundOnly apply on Solana, and verifies the Solana
-		// inbound is preserved by pass-through. Depends on the SetTokenPoolRateLimits
-		// subtest running first so the Solana inbound is in an enabled, non-zero state.
-		t.Run("SetTokenPoolRateLimits_OutboundOnly_PreservesSolanaInbound", func(t *testing.T) {
-			chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
-			require.NoError(t, err)
-
-			// Snapshot Solana's current rate limits — both directions should be enabled with
-			// non-zero values from the previous SetTokenPoolRateLimits subtest.
-			var preCfg lockrelease_token_pool.ChainConfig
-			require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &preCfg))
-			require.True(t, preCfg.Base.InboundRateLimit.Cfg.Enabled, "seed: Solana inbound from EVM should be enabled before OutboundOnly apply")
-			require.NotZero(t, preCfg.Base.InboundRateLimit.Cfg.Capacity, "seed: Solana inbound capacity should be non-zero before OutboundOnly apply")
-			require.NotZero(t, preCfg.Base.InboundRateLimit.Cfg.Rate, "seed: Solana inbound rate should be non-zero before OutboundOnly apply")
-
-			// Snapshot EVM rate limits too so we can assert they're untouched without
-			// depending on which specific values the prior subtest left behind.
-			preOutboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
-			require.NoError(t, err)
-			preInboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
-			require.NoError(t, err)
-
-			// Pick a new outbound that's safely below the counterpart's existing inbound
-			// headroom: counterpart inbound (in svmDecimals) >= 1.10 * new_outbound. Use a
-			// small value relative to anything the previous subtests could have set.
-			newSVMOutbound := tokensapi.RemoteOutbounds{
-				OutboundOnly: true,
-				Outbounds: []tokensapi.RateLimitConfig{{
-					RateLimit: tokensapi.RateLimiterConfigFloatInput{Capacity: 50, Rate: 5, IsEnabled: true},
-				}},
-			}
-
-			tprlOut, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
-				MCMS: NewDefaultInputForMCMS("Scenario 5 TPRL OutboundOnly"),
-				Configs: map[uint64]tokensapi.TPRLConfig{
-					solChainSel: {
-						ChainAdapterVersion: v1_6_0_scenarios,
-						TokenPoolRef:        datastore.AddressRef{Address: solPoolProgramID.String()},
-						TokenRef:            datastore.AddressRef{Address: solTokenMint.String()},
-						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-							evmChainSel: newSVMOutbound,
-						},
-					},
-					// Counterpart EVM config is refs-only — no RemoteOutbounds entry — which is
-					// exactly the shape OutboundOnly is designed for.
-					evmChainSel: {
-						ChainAdapterVersion: v1_6_0_scenarios,
-						TokenPoolRef:        datastore.AddressRef{Address: evmPoolAddr.Hex()},
-						TokenRef:            datastore.AddressRef{Address: evmTokAddr.Hex()},
-					},
-				},
-			})
-			require.NoError(t, err)
-			testhelpers.ProcessTimelockProposals(t, *env, tprlOut.MCMSTimelockProposals, false)
-
-			// Re-read Solana's chain config.
-			var postCfg lockrelease_token_pool.ChainConfig
-			require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &postCfg))
-
-			// Solana inbound must be preserved bit-for-bit (the OutboundOnly pass-through).
-			// Before the fix, GetOnchainInboundRateLimit silently returned a zero
-			// RateLimiterConfig, the bucket's InboundRateLimiterConfig was overwritten
-			// with zeros, and these three assertions failed.
-			require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Enabled, postCfg.Base.InboundRateLimit.Cfg.Enabled, "Solana inbound IsEnabled must be unchanged by OutboundOnly apply")
-			require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Capacity, postCfg.Base.InboundRateLimit.Cfg.Capacity, "Solana inbound capacity must be unchanged by OutboundOnly apply")
-			require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Rate, postCfg.Base.InboundRateLimit.Cfg.Rate, "Solana inbound rate must be unchanged by OutboundOnly apply")
-
-			// Solana outbound was rewritten to the new value.
-			expOutCap := tokensapi.ScaleFloatToBigInt(newSVMOutbound.Outbounds[0].RateLimit.Capacity, int(svmDecimals), 0)
-			expOutRate := tokensapi.ScaleFloatToBigInt(newSVMOutbound.Outbounds[0].RateLimit.Rate, int(svmDecimals), 0)
-			require.True(t, postCfg.Base.OutboundRateLimit.Cfg.Enabled)
-			require.Equal(t, expOutCap.Uint64(), postCfg.Base.OutboundRateLimit.Cfg.Capacity, "Solana outbound capacity after OutboundOnly apply")
-			require.Equal(t, expOutRate.Uint64(), postCfg.Base.OutboundRateLimit.Cfg.Rate, "Solana outbound rate after OutboundOnly apply")
-
-			// EVM pool was not touched by this OutboundOnly apply (no RemoteOutbounds entry
-			// for solChainSel was provided on the EVM side).
-			postOutboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
-			require.NoError(t, err)
-			postInboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
-			require.NoError(t, err)
-			require.Equal(t, preOutboundEVM.IsEnabled, postOutboundEVM.IsEnabled, "EVM outbound IsEnabled should be unchanged after OutboundOnly apply on Solana")
-			require.Zero(t, preOutboundEVM.Capacity.Cmp(postOutboundEVM.Capacity), "EVM outbound capacity should be unchanged after OutboundOnly apply on Solana")
-			require.Zero(t, preOutboundEVM.Rate.Cmp(postOutboundEVM.Rate), "EVM outbound rate should be unchanged after OutboundOnly apply on Solana")
-			require.Equal(t, preInboundEVM.IsEnabled, postInboundEVM.IsEnabled, "EVM inbound IsEnabled should be unchanged after OutboundOnly apply on Solana")
-			require.Zero(t, preInboundEVM.Capacity.Cmp(postInboundEVM.Capacity), "EVM inbound capacity should be unchanged after OutboundOnly apply on Solana")
-			require.Zero(t, preInboundEVM.Rate.Cmp(postInboundEVM.Rate), "EVM inbound rate should be unchanged after OutboundOnly apply on Solana")
 		})
 	})
 }
