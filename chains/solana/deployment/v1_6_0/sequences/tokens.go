@@ -266,6 +266,9 @@ func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelect
 			break
 		}
 	}
+	if poolPDA.IsZero() {
+		return "", fmt.Errorf("pool PDA could not be derived from pool ref: no valid PDA found in address field or labels")
+	}
 
 	// LockRelease and BurnMint v1.6 pool config accounts share the same state layout, so we
 	// can use the BurnMint config struct to decode the account data for both types of pools
