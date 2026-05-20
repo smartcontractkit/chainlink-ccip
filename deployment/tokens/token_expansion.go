@@ -562,6 +562,10 @@ func ResolveTokenRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, 
 
 // ResolveAdapter resolves the token adapter for the given chain selector and token pool version.
 func ResolveAdapter(reg *TokenAdapterRegistry, sel uint64, tokenPoolVersion *semver.Version) (TokenAdapter, string, error) {
+	if tokenPoolVersion == nil {
+		return nil, "", fmt.Errorf("token pool version is required to resolve adapter for chain selector %d", sel)
+	}
+
 	family, err := chain_selectors.GetSelectorFamily(sel)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", sel, err)
