@@ -507,11 +507,16 @@ func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint
 		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", sel, err)
 	}
 
-	// Check the cache first (i.e. datastore)
+	// Try to normalize ref.Address before doing any lookups
 	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
+	if datastore_utils.IsAddressRefEmpty(maybeNormalized) {
+		return datastore.AddressRef{}, fmt.Errorf("empty token pool ref provided for chain selector %d", sel)
+	}
+
+	// Check the cache first (i.e. datastore)
 	results := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(maybeNormalized)...)
 	if len(results) > 1 {
 		return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %v", datastore_utils.SprintRef(maybeNormalized), sel, results)
@@ -544,11 +549,16 @@ func ResolveTokenRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, 
 		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", sel, err)
 	}
 
-	// Check the cache first (i.e. datastore)
+	// Try to normalize ref.Address before doing any lookups
 	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
+	if datastore_utils.IsAddressRefEmpty(maybeNormalized) {
+		return datastore.AddressRef{}, fmt.Errorf("empty token ref provided for chain selector %d", sel)
+	}
+
+	// Check the cache first (i.e. datastore)
 	results := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(maybeNormalized)...)
 	if len(results) > 1 {
 		return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %v", datastore_utils.SprintRef(maybeNormalized), sel, results)
