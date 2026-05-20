@@ -216,6 +216,22 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return report.Output, nil
 }
 
+func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
+	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+	}
+	bucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
+	}
+	return tokensapi.RateLimiterConfig{
+		IsEnabled: bucket.IsEnabled,
+		Capacity:  bucket.Capacity,
+		Rate:      bucket.Rate,
+	}, nil
+}
+
 func (p *poolOpsV151) Version() *semver.Version {
 	return tpOps.Version
 }

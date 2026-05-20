@@ -207,11 +207,14 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
-		var remoteChainConfigAccount base_token_pool.BaseChain
+		// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain), not a bare
+		// BaseChain — decoding into BaseChain silently fails because the discriminator is parsed
+		// as the start of the payload.
+		var remoteChainConfigAccount burnmint_token_pool.ChainConfig
 		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
 			isSupportedChain = true
-			existingConfig = remoteChainConfigAccount
+			existingConfig = remoteChainConfigAccount.Base
 		}
 		batches := make([]types.BatchOperation, 0)
 		var ixns []solana.Instruction
@@ -375,7 +378,9 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 		// We have to setup dummy limits first and then update it.
 		// This workaround is only needed when enabling a rate limit that is currently disabled on-chain,
 		// not when updating already-enabled limits, to avoid resetting that direction's token bucket.
-		var remoteChainConfigAccount base_token_pool.BaseChain
+		// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain); decoding into a
+		// bare BaseChain silently fails on the discriminator and incorrectly forces needsDummy=true.
+		var remoteChainConfigAccount burnmint_token_pool.ChainConfig
 		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		// If the account doesn't exist yet (e.g. during token expansion where MCMS batches
 		// init_chain_remote_config and set_chain_rate_limit in a single proposal), we treat
@@ -384,8 +389,8 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 		if err != nil {
 			needsDummy = inbound.Enabled || outbound.Enabled
 		} else {
-			needsDummy = (inbound.Enabled && !remoteChainConfigAccount.InboundRateLimit.Cfg.Enabled) ||
-				(outbound.Enabled && !remoteChainConfigAccount.OutboundRateLimit.Cfg.Enabled)
+			needsDummy = (inbound.Enabled && !remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled) ||
+				(outbound.Enabled && !remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Enabled)
 		}
 		if needsDummy {
 			ixDummyRates, err := burnmint_token_pool.NewSetChainRateLimitInstruction(

@@ -39,6 +39,12 @@ type PoolOps interface {
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
 	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
+	// GetCurrentInboundRateLimit reads the on-chain inbound rate limiter state for the given remote
+	// chain selector from the token pool at poolAddr. Used by outbound-only TPRL writes to read and
+	// pass through the current inbound, and by RateLimitReaderAdapter for cross-chain validation.
+	// Returns a zero-value RateLimiterConfig (IsEnabled=false, Capacity=0, Rate=0) when the pool has
+	// no inbound configured for the lane.
+	GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error)
 	Version() *semver.Version
 }
 
@@ -140,6 +146,41 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 	} else {
 		return a.Ops.GetTokenDecimals(e.GetContext(), chain, poolAddr)
 	}
+}
+
+// GetOnchainInboundRateLimit reads the on-chain inbound rate limiter state on the token pool
+// referenced by poolRef on chainSelector, for the given remote selector. fastFinality=true is
+// not supported for v1.x EVM pools and returns an error. tokenRef is unused on EVM (pools are
+// keyed by pool address alone) and exists for parity with chain families that need the token
+// mint to resolve the read.
+func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(
+	e deployment.Environment,
+	chainSelector uint64,
+	poolRef datastore.AddressRef,
+	_ datastore.AddressRef,
+	remoteSelector uint64,
+	fastFinality bool,
+) (tokensapi.RateLimiterConfig, error) {
+	if fastFinality {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("v1.x EVM pools do not support fastFinality rate limit buckets")
+	}
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+	}
+	addrRaw, err := a.AddressRefToBytes(addrRef)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+	poolAddr := common.BytesToAddress(addrRaw)
+	if poolAddr == (common.Address{}) {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("token pool address for ref (%+v) is zero", addrRef)
+	}
+	return a.Ops.GetCurrentInboundRateLimit(e.OperationsBundle, chain, poolAddr, remoteSelector)
 }
 
 func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {

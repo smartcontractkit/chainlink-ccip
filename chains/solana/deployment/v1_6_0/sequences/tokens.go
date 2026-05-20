@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
-	solrpc "github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -538,6 +538,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenPool := solana.MustPublicKeyFromBase58(input.TokenPoolRef.Address)
+
 			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
 				tokenpoolops.RemoteChainConfig{
 					TokenPool:                 tokenPool,
@@ -555,6 +556,61 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 			}, nil
 		},
 	)
+}
+
+// GetOnchainInboundRateLimit implements tokenapi.RateLimitReaderAdapter. It needs the token
+// mint to derive the remote-chain config PDA, so tokenRef must resolve to the token (pool
+// qualifiers are independent from token qualifiers and may be empty). Solana pools have a
+// single bucket per remote lane; fastFinality=true is not supported.
+func (a *SolanaAdapter) GetOnchainInboundRateLimit(
+	e deployment.Environment,
+	chainSelector uint64,
+	poolRef datastore.AddressRef,
+	tokenRef datastore.AddressRef,
+	remoteSelector uint64,
+	fastFinality bool,
+) (tokenapi.RateLimiterConfig, error) {
+	if fastFinality {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("Solana token pools do not support fastFinality rate limit buckets")
+	}
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	tokenAddr, _, err := a.getTokenMintAndTokenProgram(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, tokenRef)
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for ref (%+v): %w", tokenRef, err)
+	}
+	tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+	tokenPool := solana.MustPublicKeyFromBase58(poolRef.Address)
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, tokenMint, tokenPool)
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
+	}
+	// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain), not a bare
+	// BaseChain. Decoding into BaseChain consumes the discriminator as the start of the
+	// payload and corrupts the parse. ChainConfig has the same discriminator and layout
+	// across burnmint/lockrelease pools, so either binding decodes any pool's account.
+	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
+	err = chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+	if errors.Is(err, rpc.ErrNotFound) {
+		// Pool/lane not configured yet on chain — return a zero RateLimiterConfig so the caller's
+		// 110% check rejects any positive new outbound (the documented behavior in
+		// RateLimitReaderAdapter).
+		return tokenapi.RateLimiterConfig{
+			IsEnabled: false,
+			Capacity:  big.NewInt(0),
+			Rate:      big.NewInt(0),
+		}, nil
+	}
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chainSelector, remoteSelector, err)
+	}
+	return tokenapi.RateLimiterConfig{
+		IsEnabled: remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled,
+		Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Capacity),
+		Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate),
+	}, nil
 }
 
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -878,7 +934,7 @@ func (a *SolanaAdapter) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("invalid pool address %q: %w", address, err)
 	}
-	acct, err := chain.Client.GetAccountInfoWithOpts(b.GetContext(), pubKey, &solrpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	acct, err := chain.Client.GetAccountInfoWithOpts(b.GetContext(), pubKey, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("get account info for %q: %w", address, err)
 	}
