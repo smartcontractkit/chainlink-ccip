@@ -189,10 +189,10 @@ func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccvadapters.Fe
 	return ccvadapters.FeeQuoterDestChainConfigOverrides{
 		IsEnabled:                   ptr.To(true),
 		MaxDataBytes:                ptr.To(uint32(32_000)),
-		MaxPerMsgGasLimit:           ptr.To(uint32(8_000_000)),
+		MaxPerMsgGasLimit:           ptr.To(uint32(15_000_000)),
 		DestGasPerPayloadByteBase:   ptr.To(uint8(20)),
 		ChainFamilySelector:         evmFamilySelector,
-		DefaultTokenFeeUSDCents:     ptr.To(uint16(25)),
+		DefaultTokenFeeUSDCents:     ptr.To(uint16(0)),
 		DefaultTokenDestGasOverhead: ptr.To(uint32(90_000)),
 		DefaultTxGasLimit:           ptr.To(uint32(200_000)),
 		NetworkFeeUSDCents:          ptr.To(uint16(10)),

@@ -527,9 +527,6 @@ func fillFeeQuoterDestChainConfigOverridesFromOnChain(
 	if desired.DestGasPerPayloadByteBase == nil {
 		desired.DestGasPerPayloadByteBase = ptr.To(cur.DestGasPerPayloadByteBase)
 	}
-	if desired.ChainFamilySelector == [4]byte{} {
-		desired.ChainFamilySelector = cur.ChainFamilySelector
-	}
 	if desired.DefaultTokenFeeUSDCents == nil {
 		desired.DefaultTokenFeeUSDCents = ptr.To(cur.DefaultTokenFeeUSDCents)
 	}

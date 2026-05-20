@@ -624,9 +624,6 @@ func mergeFeeQuoterDestChainConfig(
 	if overrides.DestGasPerPayloadByteBase != nil {
 		out.DestGasPerPayloadByteBase = overrides.DestGasPerPayloadByteBase
 	}
-	if overrides.ChainFamilySelector != [4]byte{} {
-		out.ChainFamilySelector = overrides.ChainFamilySelector
-	}
 	if overrides.DefaultTokenFeeUSDCents != nil {
 		out.DefaultTokenFeeUSDCents = overrides.DefaultTokenFeeUSDCents
 	}
