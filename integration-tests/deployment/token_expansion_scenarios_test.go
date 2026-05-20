@@ -1097,16 +1097,16 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			// discriminator. The decode would silently fail and the function would return a
 			// zero RateLimiterConfig, which in OutboundOnly mode then overwrote the bucket's
 			// InboundRateLimiterConfig with zeros — clobbering a previously-enabled inbound
-			// rate limit on chain. This subtest seeds an enabled inbound (via the symmetric
-			// apply above), runs an OutboundOnly apply on Solana, and verifies the Solana
-			// inbound is preserved by pass-through. Depends on the SetTokenPoolRateLimits
-			// subtest running first so the Solana inbound is in an enabled, non-zero state.
+			// rate limit on chain. Solana's inbound is already enabled and non-zero from the
+			// symmetric OutboundRateLimiterConfig on both sides in TokenExpansion().Apply above
+			// (BasicDeploymentAndConnection). This subtest runs an OutboundOnly apply on Solana
+			// and verifies that inbound is preserved by pass-through.
 			t.Run("SetTokenPoolRateLimits_OutboundOnly_PreservesSolanaInbound", func(t *testing.T) {
 				chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
 				require.NoError(t, err)
 
 				// Snapshot Solana's current rate limits — both directions should be enabled with
-				// non-zero values from the previous SetTokenPoolRateLimits subtest.
+				// non-zero values from the TokenExpansion lane setup above.
 				var preCfg lockrelease_token_pool.ChainConfig
 				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &preCfg))
 				require.True(t, preCfg.Base.InboundRateLimit.Cfg.Enabled, "seed: Solana inbound from EVM should be enabled before OutboundOnly apply")
@@ -1114,7 +1114,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				require.NotZero(t, preCfg.Base.InboundRateLimit.Cfg.Rate, "seed: Solana inbound rate should be non-zero before OutboundOnly apply")
 
 				// Snapshot EVM rate limits too so we can assert they're untouched without
-				// depending on which specific values the prior subtest left behind.
+				// depending on which specific values the TokenExpansion seed left on-chain.
 				preOutboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
 				require.NoError(t, err)
 				preInboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
@@ -1122,7 +1122,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 
 				// Pick a new outbound that's safely below the counterpart's existing inbound
 				// headroom: counterpart inbound (in svmDecimals) >= 1.10 * new_outbound. Use a
-				// small value relative to anything the previous subtests could have set.
+				// small value relative to anything the TokenExpansion seed could have set.
 				newSVMOutbound := tokensapi.RemoteOutbounds{
 					OutboundOnly: true,
 					Outbounds: []tokensapi.RateLimitConfig{{
