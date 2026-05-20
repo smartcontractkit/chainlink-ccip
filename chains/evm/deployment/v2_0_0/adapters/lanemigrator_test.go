@@ -24,7 +24,6 @@ import (
 	adapters1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	v2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 )
 
@@ -151,7 +150,7 @@ func TestLaneMigrator(t *testing.T) {
 			})
 			require.NoError(t, err)
 			destConfig := opOut.Output
-			require.Equal(t, seq1_7.GetMaxMsgPerGasLimit(chainB), destConfig.MaxPerMsgGasLimit)
+			require.Equal(t, 15_000_000, destConfig.MaxPerMsgGasLimit) // MaxPerMsgGasLimit should be 15 million for Arbitrum
 			require.Equal(t, adapters1_7.DefaultMaxDataBytes, destConfig.MaxDataBytes)
 		})
 	}
