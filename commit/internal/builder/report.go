@@ -249,8 +249,8 @@ func buildMultipleMerkleRootReports(
 		}
 	}
 
-	// check for final partial report.
-	if numRoots > 0 {
+	// check for final partial report, or a price-only outcome (no roots).
+	if numRoots > 0 || len(outcome.MerkleRootOutcome.RootsToReport) == 0 {
 		report := buildOneReport(
 			lggr,
 			outcome.MerkleRootOutcome.OutcomeType,
