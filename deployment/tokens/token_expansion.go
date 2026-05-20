@@ -437,7 +437,11 @@ func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
 
 // TryNormalizeAddressRef looks up AddressNormalizer registered for selector's chain family and canonicalizes ref.Address when set.
 func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
-	ref.ChainSelector = chainSelector
+	if datastore_utils.IsAddressRefEmpty(ref) {
+		return ref, nil
+	} else {
+		ref.ChainSelector = chainSelector
+	}
 
 	normalized := ref.Clone()
 	if normalized.Address == "" {
