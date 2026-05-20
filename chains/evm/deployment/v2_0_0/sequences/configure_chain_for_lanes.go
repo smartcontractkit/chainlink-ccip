@@ -128,7 +128,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				return seqtypes.OnChainOutput{}, fmt.Errorf("remote chain %d: %w", remoteSelector, err)
 			}
 
-			if remoteConfig.FeeQuoterDestChainConfigOverrides.USDPerUnitGas != nil {
+			if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas != nil {
 				gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
 					ChainSelector: chain.Selector,
 					Address:       feeQuoterAddr,
@@ -137,10 +137,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				if err != nil {
 					return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
 				}
-				if remoteConfig.FeeQuoterDestChainConfigOverrides.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
+				if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
 					gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
 						DestChainSelector: remoteSelector,
-						UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfigOverrides.USDPerUnitGas,
+						UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
 					})
 				}
 			}
@@ -188,7 +188,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// FeeQuoter dest chain config: when OverrideExistingConfig is false, we skip
 			// chains that already have an enabled config to avoid accidentally overwriting
 			// production parameters. When true, we always update.
-			if !remoteConfig.FeeQuoterDestChainConfigOverrides.OverrideExistingConfig {
+			if !remoteConfig.FeeQuoterDestChainConfig.OverrideExistingConfig {
 				destChainCfg, err := feeQContract.GetDestChainConfig(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
 				if err != nil {
 					return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get dest chain config for remote chain selector %d from fee quoter at address %s on chain %s: %w", remoteSelector, feeQuoterAddr, chain.String(), err)
@@ -573,7 +573,7 @@ func maybeAddFeeQuoterDestChainConfigArgOnLocalChain(
 		cur = fetched
 	}
 
-	desired := fillFeeQuoterDestChainConfigOverridesFromOnChain(remoteConfig.FeeQuoterDestChainConfigOverrides, cur)
+	desired := fillFeeQuoterDestChainConfigOverridesFromOnChain(remoteConfig.FeeQuoterDestChainConfig, cur)
 	if feeQuoterDestChainConfigEqualTo(cur, desired) {
 		return feeQuoterArgs, nil
 	}
