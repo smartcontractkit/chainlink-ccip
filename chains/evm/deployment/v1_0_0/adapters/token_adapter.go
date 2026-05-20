@@ -168,7 +168,7 @@ func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.De
 	return nil
 }
 
-func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
 	var poolAddress common.Address
 	if !common.IsHexAddress(address) {
 		return datastore.AddressRef{}, fmt.Errorf("pool address %q is not a valid hex address", address)
@@ -222,7 +222,7 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 	}, nil
 }
 
-func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
 	var tokenAddress common.Address
 	if !common.IsHexAddress(address) {
 		return datastore.AddressRef{}, fmt.Errorf("token address %q is not a valid hex address", address)

@@ -985,7 +985,7 @@ func (a *SolanaAdapter) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain
 // (for qualifier) associated with the mint address. If the token ref can't be resolved or
 // if on-chain lookups fail, it returns an error. The qualifier is set to the token symbol
 // if it can be found on-chain, otherwise a sensible placeholder is used.
-func (a *SolanaAdapter) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+func (a *SolanaAdapter) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
 	chain, ok := chains.SolanaChains()[chainSelector]
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
