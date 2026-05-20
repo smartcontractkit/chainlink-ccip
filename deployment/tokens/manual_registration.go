@@ -148,6 +148,9 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add address ref (%+v) from report output to datastore for registration index %d, address index %d: %w", addrRef, i, j, err)
 				}
 			}
+
+			// update environment datastore with new addresses for next iteration to use
+			e.DataStore = ds.Seal()
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
