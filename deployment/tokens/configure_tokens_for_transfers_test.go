@@ -117,7 +117,7 @@ func (r *transfersTest_MockTokenAdapter) ResolveTokenPoolRef(_ cldf_ops.Bundle, 
 }
 
 func (r *transfersTest_MockTokenAdapter) ResolveTokenRef(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
-	const derived = "0x1111111111111111111111111111111111111111"
+	const derived = "mocked-remote-token-address"
 
 	if address == derived {
 		return datastore.AddressRef{
@@ -132,6 +132,8 @@ func (r *transfersTest_MockTokenAdapter) ResolveTokenRef(_ cldf_ops.Bundle, _ cl
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
+	const derived = "mocked-remote-token-address"
+
 	if len(ma.deriveFailQualifiers) > 0 {
 		if _, blocked := ma.deriveFailQualifiers[poolRef.Qualifier]; blocked {
 			msg := ma.deriveTokenErrorMsg
@@ -140,13 +142,13 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 			}
 			return "", errors.New(msg)
 		}
-		return "0x1111111111111111111111111111111111111111", nil
+		return derived, nil
 	}
 	if ma.deriveTokenErrorMsg != "" {
 		return "", errors.New(ma.deriveTokenErrorMsg)
 	}
 
-	return "0x1111111111111111111111111111111111111111", nil
+	return derived, nil
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
@@ -848,7 +850,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				for _, op := range proposal.Operations {
 					// For derived remote token test, expect mocked address
 					if tt.shouldDeriveToken {
-						require.Equal(t, []byte("0x1111111111111111111111111111111111111111"), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte("mocked-remote-token-address"), 32), op.Transactions[0].Data)
 					} else {
 						require.Equal(t, common.LeftPadBytes([]byte(fmt.Sprintf("%d-token", op.ChainSelector)), 32), op.Transactions[0].Data)
 					}
