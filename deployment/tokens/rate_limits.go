@@ -347,7 +347,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 						counterPartAdapter,
 						counterpartFamily,
 						remoteTokenPool,
-						counterpart.TokenRef,
+						remoteToken,
 						remoteSelector,
 						remoteDecimals,
 						selector,
