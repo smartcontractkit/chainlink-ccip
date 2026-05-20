@@ -111,16 +111,16 @@ func (ma *transfersTest_MockTokenAdapter) ConfigureTokenForTransfersSequence() *
 	)
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
 	if poolRef.Address == "" {
 		// Address in pool ref MUST be populated before this adapter method gets called.
 		// Most implementations will require the pool address in order to fetch the token address.
-		return nil, errors.New("pool ref address is empty")
+		return "", errors.New("pool ref address is empty")
 	}
 	if ma.deriveTokenErrorMsg != "" {
-		return nil, errors.New(ma.deriveTokenErrorMsg)
+		return "", errors.New(ma.deriveTokenErrorMsg)
 	}
-	return []byte("mocked-remote-token-address"), nil
+	return "0x1111111111111111111111111111111111111111", nil
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {

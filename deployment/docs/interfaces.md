@@ -146,7 +146,7 @@ type TokenAdapter interface {
 
     // DeriveTokenAddress derives the token address from a token pool reference.
     // Used when the token address is stored on the pool contract.
-    DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+    DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error)
 
     // DeriveTokenDecimals derives the token's decimal count from a pool reference.
     DeriveTokenDecimals(e Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)

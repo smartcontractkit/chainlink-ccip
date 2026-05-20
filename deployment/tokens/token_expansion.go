@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -402,44 +401,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 
 		// finally, we update the authorities on the tokens if necessary
 		for selector, tokenConfig := range allTokenConfigs {
-			family, err := chain_selectors.GetSelectorFamily(selector)
+			tokenPoolAdapter, _, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, selector, tokenConfig.TokenPoolRef, tokenConfig.TokenRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, err
-			}
-			adapterVersion := cfg.TokenExpansionInputPerChain[selector].TokenPoolVersion
-			if adapterVersion == nil {
-				adapterVersion = cfg.ChainAdapterVersion
-			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, adapterVersion)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%s'", family, adapterVersion)
-			}
-			tokenConfig.TokenPoolRef, err = TryNormalizeAddressRef(selector, tokenConfig.TokenPoolRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token pool ref address for chain selector %d: %w", selector, err)
-			}
-			tokenConfig.TokenRef, err = TryNormalizeAddressRef(selector, tokenConfig.TokenRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref address for chain selector %d: %w", selector, err)
-			}
-			fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenPoolRef, selector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to find full token pool ref for chain selector %d: %w", selector, err)
-			}
-			fullTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenRef, selector, datastore_utils.FullRef)
-			if err != nil {
-				e.Logger.Warnf("failed to find full token ref for chain selector %d, will try to derive it: %v", selector, err)
-				tokenBytes, err := tokenPoolAdapter.DeriveTokenAddress(e, selector, tokenConfig.TokenPoolRef)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to derive token address for chain selector %d: %w", selector, err)
-				}
-				fullTokenRef = datastore.AddressRef{
-					ChainSelector: selector,
-					Type:          tokenConfig.TokenRef.Type,
-					Version:       tokenConfig.TokenRef.Version,
-					Qualifier:     tokenConfig.TokenRef.Qualifier,
-					Address:       common.Bytes2Hex(tokenBytes),
-				}
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve adapter and refs for chain selector %d: %w", selector, err)
 			}
 			if cfg.TokenExpansionInputPerChain[selector].SkipOwnershipTransfer {
 				e.Logger.Infof("skipping ownership transfer for token pool %s on chain with selector %d", fullPoolRef, selector)
@@ -466,6 +430,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 	}
 }
 
+// ScaleTokenAmount scales the given amount by 10^decimals and returns the result as a *big.Int
 func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
 	return new(big.Int).Mul(amount, new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil))
 }
@@ -493,4 +458,119 @@ func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (dat
 	}
 
 	return normalized, nil
+}
+
+// ResolveAdapterAndRefs resolves the token adapter, token pool ref, and token ref for the given
+// chain selector and input refs. It first resolves the token pool ref, then uses that to resolve
+// the adapter, and finally uses the adapter to derive the token address and resolve the token ref.
+// If deriving the token address fails, it falls back to resolving the token ref from the input.
+func ResolveAdapterAndRefs(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, poolRef, tokenRef datastore.AddressRef) (TokenAdapter, string, datastore.AddressRef, datastore.AddressRef, error) {
+	fullPoolRef, err := ResolveTokenPoolRef(e, reg, sel, poolRef)
+	if err != nil {
+		return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve token pool ref: %w", err)
+	}
+
+	adapter, family, err := ResolveAdapter(reg, sel, fullPoolRef.Version)
+	if err != nil {
+		return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve adapter: %w", err)
+	}
+
+	// If DeriveTokenAddress succeeds, then this has higher precedence than the token ref provided in the input since it is
+	// derived from on chain data (and hence more reliable). If it fails, then we fall back to using the token ref provided
+	// in the input and try to resolve it from the datastore first (to avoid RPC calls) then fall back to on chain data.
+	var fullTokenRef datastore.AddressRef
+	if derivedTokenAddr, deriveErr := adapter.DeriveTokenAddress(e, sel, fullPoolRef); deriveErr != nil {
+		fullTokenRef, err = ResolveTokenRef(e, reg, sel, tokenRef)
+		if err != nil {
+			return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref for chain selector %d: %w", sel, err)
+		}
+	} else {
+		fullTokenRef, err = ResolveTokenRef(e, reg, sel, datastore.AddressRef{ChainSelector: sel, Address: derivedTokenAddr})
+		if err != nil {
+			return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref for chain selector %d: %w", sel, err)
+		}
+	}
+
+	return adapter, family, fullPoolRef, fullTokenRef, nil
+}
+
+// ResolveTokenPoolRef resolves the token pool reference from the datastore, then on chain data if possible.
+func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
+	family, err := chain_selectors.GetSelectorFamily(sel)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", sel, err)
+	}
+
+	// Check the cache first (i.e. datastore)
+	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
+	}
+	if cached, err := datastore_utils.FindAndFormatRef(e.DataStore, maybeNormalized, sel, datastore_utils.FullRef); err == nil {
+		return cached, nil
+	}
+
+	// If the cache had no hits, then check if we have the capability to retrieve this info from the chain
+	resolver, ok := reg.GetTokenRefResolver(family)
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token pool ref for chain selector %d: datastore lookup failed for ref %s and no ref resolver registered for chain family '%s'", sel, datastore_utils.SprintRef(maybeNormalized), family)
+	}
+	if maybeNormalized.Address == "" {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token pool ref for chain selector %d: datastore lookup failed for ref %s and no address found in token pool ref", sel, datastore_utils.SprintRef(maybeNormalized))
+	}
+
+	// If the chain has all the data, then reconstruct the ref (otherwise hard error since we're out of options)
+	if tokenPoolRef, err := resolver.ResolveTokenPoolRef(e.OperationsBundle, e.BlockChains, e.DataStore, sel, maybeNormalized.Address); err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token pool ref (%s) for chain %d: %w", datastore_utils.SprintRef(maybeNormalized), sel, err)
+	} else {
+		return tokenPoolRef, nil
+	}
+}
+
+// ResolveTokenRef resolves the token reference from the datastore, then on chain data if possible.
+func ResolveTokenRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
+	family, err := chain_selectors.GetSelectorFamily(sel)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", sel, err)
+	}
+
+	// Check the cache first (i.e. datastore)
+	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
+	}
+	if cached, err := datastore_utils.FindAndFormatRef(e.DataStore, maybeNormalized, sel, datastore_utils.FullRef); err == nil {
+		return cached, nil
+	}
+
+	// If the cache had no hits, then check if we have the capability to retrieve this info from the chain
+	resolver, ok := reg.GetTokenRefResolver(family)
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref for chain selector %d: datastore lookup failed for ref %s and no ref resolver registered for chain family '%s'", sel, datastore_utils.SprintRef(maybeNormalized), family)
+	}
+	if maybeNormalized.Address == "" {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref for chain selector %d: datastore lookup failed for ref %s and no address found in token ref", sel, datastore_utils.SprintRef(maybeNormalized))
+	}
+
+	// If the chain has all the data, then reconstruct the ref (otherwise hard error since we're out of options)
+	if tokenRef, err := resolver.ResolveTokenRef(e.OperationsBundle, e.BlockChains, e.DataStore, sel, maybeNormalized.Address); err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref (%s) for chain %d: %w", datastore_utils.SprintRef(maybeNormalized), sel, err)
+	} else {
+		return tokenRef, nil
+	}
+}
+
+// ResolveAdapter resolves the token adapter for the given chain selector and token pool version.
+func ResolveAdapter(reg *TokenAdapterRegistry, sel uint64, tokenPoolVersion *semver.Version) (TokenAdapter, string, error) {
+	family, err := chain_selectors.GetSelectorFamily(sel)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", sel, err)
+	}
+
+	adapter, ok := reg.GetTokenAdapter(family, tokenPoolVersion)
+	if !ok {
+		return nil, "", fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPoolVersion.String())
+	}
+
+	return adapter, family, nil
 }

@@ -153,7 +153,7 @@ func (a *MyChainAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, er
     // EVM: hex decoding, Solana: base58 decoding
 }
 
-func (a *MyChainAdapter) DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+func (a *MyChainAdapter) DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
     // Read the token address from the pool contract on-chain
 }
 

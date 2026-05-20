@@ -17,6 +17,7 @@ import (
 
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	erc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	lrpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
@@ -24,6 +25,7 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -43,6 +45,9 @@ import (
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+
+	// Registers SolanaAddressNormalizer (v1_6_0 sequences do not import v1_0_0 adapters).
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
 )
 
 // ---------------------------------------------------------------------------
@@ -916,6 +921,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 // --------------------------------------------------------------------------------------------------
 
 func TestTokenExpansionScenariosSolana(t *testing.T) {
+	newChainSel := chainsel.TEST_90000002.Selector
 	evmChainSel := chainsel.TEST_90000001.Selector
 	solChainSel := chainsel.SOLANA_DEVNET.Selector
 
@@ -924,7 +930,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 
 	env, err := environment.New(t.Context(),
 		environment.WithSolanaContainer(t, []uint64{solChainSel}, programsPath, solanaProgramIDs),
-		environment.WithEVMSimulated(t, []uint64{evmChainSel}),
+		environment.WithEVMSimulated(t, []uint64{evmChainSel, newChainSel}),
 	)
 	require.NoError(t, err)
 	env.DataStore = ds.Seal()
@@ -946,6 +952,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 
 	// Deploy core contracts
 	deployInput := map[uint64]deployapi.ContractDeploymentConfigPerChain{
+		newChainSel: NewDefaultDeploymentConfigForEVM(v1_6_0_scenarios),
 		evmChainSel: NewDefaultDeploymentConfigForEVM(v1_6_0_scenarios),
 		solChainSel: NewDefaultDeploymentConfigForSolana(v1_6_0_scenarios),
 	}
@@ -953,15 +960,14 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 	require.NoError(t, err)
 	MergeAddresses(t, env, output.DataStore)
 
+	DeployMCMS(t, env, newChainSel, []string{cciputils.CLLQualifier})
 	DeployMCMS(t, env, evmChainSel, []string{cciputils.CLLQualifier})
 	DeployMCMS(t, env, solChainSel, []string{cciputils.CLLQualifier})
+	EVMTransferOwnership(t, env, newChainSel)
 	EVMTransferOwnership(t, env, evmChainSel)
 	SolanaTransferOwnership(t, env, solChainSel)
 
 	t.Run("Scenario5_SolanaLRToEVMBM", func(t *testing.T) {
-		evmTokenSymbol := "S5_EVM_TOK"
-		evmPoolQual := "S5_EVM_POOL"
-		solTokenSymbol := "S5_SOL_TOK"
 		defaultMaxSupply := uint64(1e6)
 		defaultPreMint := uint64(1e5)
 		evmDecimals := uint8(18)
@@ -973,183 +979,358 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			IsEnabled: true,
 		}
 
-		output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
-			ChainAdapterVersion: v1_6_0_scenarios,
-			MCMS:                NewDefaultInputForMCMS("Scenario 5"),
-			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
-				evmChainSel: {
-					TokenPoolVersion: v1_5_1_scenarios,
-					DeployTokenInput: &tokensapi.DeployTokenInput{
-						Name: "Scenario5 EVM Token", Symbol: evmTokenSymbol, Decimals: evmDecimals,
-						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply, PreMint: &defaultPreMint,
-					},
-					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
-						TokenPoolQualifier: evmPoolQual,
-						PoolType:           cciputils.BurnMintTokenPool.String(),
-					},
-					TokenTransferConfig: &tokensapi.TokenTransferConfig{
-						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							solChainSel: {OutboundRateLimiterConfig: &defaultRL},
-						},
-					},
-				},
-				solChainSel: {
-					TokenPoolVersion: v1_6_0_scenarios,
-					DeployTokenInput: &tokensapi.DeployTokenInput{
-						Name: "Scenario5 SOL Token", Symbol: solTokenSymbol, Decimals: svmDecimals,
-						Type:                   solanautils.SPLTokens,
-						ExternalAdmin:          solana.NewWallet().PublicKey().String(),
-						DisableFreezeAuthority: true,
-						Senders:                []string{solChain.DeployerKey.PublicKey().String()},
-						PreMint:                &defaultPreMint,
-					},
-					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
-						TokenPoolQualifier: "",
-						PoolType:           cciputils.LockReleaseTokenPool.String(),
-					},
-					TokenTransferConfig: &tokensapi.TokenTransferConfig{
-						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
-						},
-					},
-				},
-			},
-		})
-		require.NoError(t, err)
-		MergeAddresses(t, env, output.DataStore)
-		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+		t.Run("BasicDeploymentAndConnection", func(t *testing.T) {
+			const evmTokenSymbol = "S5_EVM_TOK"
+			const solTokenSymbol = "S5_SOL_TOK"
+			const evmPoolQual = "S5_EVM_POOL"
 
-		// ---- EVM assertions ----
-		evmTokAddr := assertTokenExists(t, env, evmChainSel, evmTokenSymbol, "Scenario5 EVM Token", 18)
-		evmPoolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
-			ChainSelector: evmChainSel,
-			Qualifier:     evmPoolQual,
-			Type:          datastore.ContractType(cciputils.BurnMintTokenPool),
-		})
-		require.NoError(t, err)
-		evmPool, err := bnmpool.NewBurnMintTokenPool(evmPoolAddr, evmChain.Client)
-		require.NoError(t, err)
-
-		gotTok, err := evmPool.GetToken(&bind.CallOpts{Context: t.Context()})
-		require.NoError(t, err)
-		require.Equal(t, evmTokAddr, gotTok)
-
-		supportedChains, err := evmPool.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
-		require.NoError(t, err)
-		require.Contains(t, supportedChains, solChainSel, "EVM pool should support Solana as remote chain")
-
-		assertBMRateLimitsEnabled(t, evmPool, solChainSel)
-
-		// ---- Solana assertions ----
-		solTokenRef, err := datastore_utils.FindAndFormatRef(
-			env.DataStore,
-			datastore.AddressRef{Qualifier: solTokenSymbol},
-			solChainSel,
-			datastore_utils.FullRef,
-		)
-		require.NoError(t, err)
-		require.NotEmpty(t, solTokenRef.Address, "Solana token should exist in datastore")
-
-		// Find the LockRelease pool program for Solana
-		solPoolRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			ChainSelector: solChainSel,
-			Type:          datastore.ContractType(cciputils.LockReleaseTokenPool),
-			Version:       v1_6_0_scenarios,
-		}, solChainSel, datastore_utils.FullRef)
-		require.NoError(t, err)
-		solPoolProgramID := solana.MustPublicKeyFromBase58(solPoolRef.Address)
-		solTokenMint := solana.MustPublicKeyFromBase58(solTokenRef.Address)
-
-		// Verify Solana pool PDA state
-		tokenPoolStatePDA, _ := tokens.TokenPoolConfigAddress(solTokenMint, solPoolProgramID)
-		var solPoolState lockrelease_token_pool.State
-		err = solChain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &solPoolState)
-		require.NoError(t, err, "Solana LockRelease pool state PDA should be initialized")
-		require.Equal(t, solTokenMint, solPoolState.Config.Mint,
-			fmt.Sprintf("Solana pool mint should match token %s", solTokenRef.Address))
-
-		timelockSigner := solanautils.GetTimelockSignerPDA(
-			env.DataStore.Addresses().Filter(),
-			solChainSel,
-			cciputils.CLLQualifier,
-		)
-		require.Equal(t, timelockSigner, solPoolState.Config.RateLimitAdmin,
-			"empty DeployTokenPoolInput.RateLimitAdmin should set RL admin to MCMS timelock signer PDA on Solana")
-
-		// Verify Solana router address is set
-		routerAddr, err := solAdapter.GetRouterAddress(env.DataStore, solChainSel)
-		require.NoError(t, err)
-		require.NotEmpty(t, routerAddr, "Solana router should be deployed")
-
-		// Now try updating the rate limits in both directions and verify on-chain state is updated accordingly
-		t.Run("SetTokenPoolRateLimits", func(t *testing.T) {
-			evmTowardSVM := tokensapi.RemoteOutbounds{RateLimit: &tokensapi.RateLimiterConfigFloatInput{Capacity: 111, Rate: 11, IsEnabled: true}}
-			svmTowardEVM := tokensapi.RemoteOutbounds{RateLimit: &tokensapi.RateLimiterConfigFloatInput{Capacity: 222, Rate: 22, IsEnabled: true}}
-			tprlOut, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
-				MCMS: NewDefaultInputForMCMS("Scenario 5 TPRL"),
-				Configs: map[uint64]tokensapi.TPRLConfig{
+			output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+				ChainAdapterVersion: v1_6_0_scenarios,
+				MCMS:                NewDefaultInputForMCMS("Scenario 5"),
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 					evmChainSel: {
-						ChainAdapterVersion: v1_6_0_scenarios,
-						TokenPoolRef:        datastore.AddressRef{Address: evmPoolAddr.Hex()},
-						TokenRef:            datastore.AddressRef{Address: evmTokAddr.Hex()},
-						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-							solChainSel: evmTowardSVM,
+						TokenPoolVersion: v1_5_1_scenarios,
+						DeployTokenInput: &tokensapi.DeployTokenInput{
+							Name: "Scenario5 EVM Token", Symbol: evmTokenSymbol, Decimals: evmDecimals,
+							Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply, PreMint: &defaultPreMint,
+						},
+						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+							TokenPoolQualifier: evmPoolQual,
+							PoolType:           cciputils.BurnMintTokenPool.String(),
+						},
+						TokenTransferConfig: &tokensapi.TokenTransferConfig{
+							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+								solChainSel: {OutboundRateLimiterConfig: &defaultRL},
+							},
 						},
 					},
 					solChainSel: {
-						ChainAdapterVersion: v1_6_0_scenarios,
-						TokenPoolRef:        datastore.AddressRef{Address: solPoolProgramID.String()},
-						TokenRef:            datastore.AddressRef{Address: solTokenMint.String()},
-						RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
-							evmChainSel: svmTowardEVM,
+						TokenPoolVersion: v1_6_0_scenarios,
+						DeployTokenInput: &tokensapi.DeployTokenInput{
+							Name: "Scenario5 SOL Token", Symbol: solTokenSymbol, Decimals: svmDecimals,
+							Type:                   solanautils.SPLTokens,
+							ExternalAdmin:          solana.NewWallet().PublicKey().String(),
+							DisableFreezeAuthority: true,
+							Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+							PreMint:                &defaultPreMint,
+						},
+						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+							TokenPoolQualifier: "",
+							PoolType:           cciputils.LockReleaseTokenPool.String(),
+						},
+						TokenTransferConfig: &tokensapi.TokenTransferConfig{
+							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+								evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
+							},
 						},
 					},
 				},
 			})
 			require.NoError(t, err)
-			testhelpers.ProcessTimelockProposals(t, *env, tprlOut.MCMSTimelockProposals, false)
+			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
-			// Read EVM rate limits from the chain
-			outboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+			// ---- EVM assertions ----
+			evmTokAddr := assertTokenExists(t, env, evmChainSel, evmTokenSymbol, "Scenario5 EVM Token", 18)
+			evmPoolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: evmChainSel,
+				Qualifier:     evmPoolQual,
+				Type:          datastore.ContractType(cciputils.BurnMintTokenPool),
+			})
 			require.NoError(t, err)
-			inboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+			evmPool, err := bnmpool.NewBurnMintTokenPool(evmPoolAddr, evmChain.Client)
 			require.NoError(t, err)
 
-			// Verify EVM rate limit state matches expected values (with correct scaling for decimals). The
-			// inbound on legacy EVM pools (<v1.6.1 non-external-minter) scales using remote token decimals
-			// (see tokensapi.GenerateTPRLConfigs); counterpart outbound is Solana -> use svmDecimals.
-			expInboundCapEVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Capacity, int(svmDecimals), 0.10)
-			expInboundRateEVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Rate, int(svmDecimals), 0.10)
-			expOutboundCapEVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Capacity, int(evmDecimals), 0)
-			expOutboundRateEVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Rate, int(evmDecimals), 0)
-			require.Zero(t, expOutboundCapEVM.Cmp(outboundEVM.Capacity), "EVM outbound capacity toward Solana should match TPRL input after scaling (want %s, got %s)", expOutboundCapEVM.String(), outboundEVM.Capacity.String())
-			require.Zero(t, expOutboundRateEVM.Cmp(outboundEVM.Rate), "EVM outbound rate toward Solana should match TPRL input after scaling (want %s, got %s)", expOutboundRateEVM.String(), outboundEVM.Rate.String())
-			require.Zero(t, expInboundCapEVM.Cmp(inboundEVM.Capacity), "EVM inbound capacity from Solana should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundCapEVM.String(), inboundEVM.Capacity.String())
-			require.Zero(t, expInboundRateEVM.Cmp(inboundEVM.Rate), "EVM inbound rate from Solana should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundRateEVM.String(), inboundEVM.Rate.String())
-			require.True(t, outboundEVM.IsEnabled)
-			require.True(t, inboundEVM.IsEnabled)
-
-			// Read Solana rate limits from the chain
-			chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
+			gotTok, err := evmPool.GetToken(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
-			var chainCfg lockrelease_token_pool.ChainConfig
-			require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &chainCfg))
-			outboundCapSVM := big.NewInt(0).SetUint64(chainCfg.Base.OutboundRateLimit.Cfg.Capacity)
-			outboundRateSVM := big.NewInt(0).SetUint64(chainCfg.Base.OutboundRateLimit.Cfg.Rate)
-			inboundCapSVM := big.NewInt(0).SetUint64(chainCfg.Base.InboundRateLimit.Cfg.Capacity)
-			inboundRateSVM := big.NewInt(0).SetUint64(chainCfg.Base.InboundRateLimit.Cfg.Rate)
+			require.Equal(t, evmTokAddr, gotTok)
 
-			// Verify Solana rate limit state matches expected values (with correct scaling for decimals)
-			expInboundCapSVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Capacity, int(svmDecimals), 0.10)
-			expInboundRateSVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Rate, int(svmDecimals), 0.10)
-			expOutboundCapSVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Capacity, int(svmDecimals), 0)
-			expOutboundRateSVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Rate, int(svmDecimals), 0)
-			require.Zero(t, expOutboundCapSVM.Cmp(outboundCapSVM), "Solana outbound capacity toward EVM should match TPRL input after scaling (want %s, got %s)", expOutboundCapSVM.String(), outboundCapSVM.String())
-			require.Zero(t, expOutboundRateSVM.Cmp(outboundRateSVM), "Solana outbound rate toward EVM should match TPRL input after scaling (want %s, got %s)", expOutboundRateSVM.String(), outboundRateSVM.String())
-			require.Zero(t, expInboundCapSVM.Cmp(inboundCapSVM), "Solana inbound capacity from EVM should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundCapSVM.String(), inboundCapSVM.String())
-			require.Zero(t, expInboundRateSVM.Cmp(inboundRateSVM), "Solana inbound rate from EVM should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundRateSVM.String(), inboundRateSVM.String())
-			require.True(t, chainCfg.Base.OutboundRateLimit.Cfg.Enabled)
-			require.True(t, chainCfg.Base.InboundRateLimit.Cfg.Enabled)
+			supportedChains, err := evmPool.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			require.Contains(t, supportedChains, solChainSel, "EVM pool should support Solana as remote chain")
+
+			assertBMRateLimitsEnabled(t, evmPool, solChainSel)
+
+			// ---- Solana assertions ----
+			solTokenRef, err := datastore_utils.FindAndFormatRef(
+				env.DataStore,
+				datastore.AddressRef{Qualifier: solTokenSymbol},
+				solChainSel,
+				datastore_utils.FullRef,
+			)
+			require.NoError(t, err)
+			require.NotEmpty(t, solTokenRef.Address, "Solana token should exist in datastore")
+
+			// Find the LockRelease pool program for Solana
+			solPoolRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solChainSel,
+				Type:          datastore.ContractType(cciputils.LockReleaseTokenPool),
+				Version:       v1_6_0_scenarios,
+			}, solChainSel, datastore_utils.FullRef)
+			require.NoError(t, err)
+			solPoolProgramID := solana.MustPublicKeyFromBase58(solPoolRef.Address)
+			solTokenMint := solana.MustPublicKeyFromBase58(solTokenRef.Address)
+
+			// Verify Solana pool PDA state
+			tokenPoolStatePDA, _ := tokens.TokenPoolConfigAddress(solTokenMint, solPoolProgramID)
+			var solPoolState lockrelease_token_pool.State
+			err = solChain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &solPoolState)
+			require.NoError(t, err, "Solana LockRelease pool state PDA should be initialized")
+			require.Equal(t, solTokenMint, solPoolState.Config.Mint,
+				fmt.Sprintf("Solana pool mint should match token %s", solTokenRef.Address))
+
+			timelockSigner := solanautils.GetTimelockSignerPDA(
+				env.DataStore.Addresses().Filter(),
+				solChainSel,
+				cciputils.CLLQualifier,
+			)
+			require.Equal(t, timelockSigner, solPoolState.Config.RateLimitAdmin,
+				"empty DeployTokenPoolInput.RateLimitAdmin should set RL admin to MCMS timelock signer PDA on Solana")
+
+			// Verify Solana router address is set
+			routerAddr, err := solAdapter.GetRouterAddress(env.DataStore, solChainSel)
+			require.NoError(t, err)
+			require.NotEmpty(t, routerAddr, "Solana router should be deployed")
+		})
+
+		// Test address ref inference
+		t.Run("TokenRefResolver", func(t *testing.T) {
+			// Helper vars
+			refReader := tokensapi.GetTokenAdapterRegistry()
+			svmSymbol := "S5_TR_SVM"
+			evmSymbol := "S5_TR_EVM"
+
+			// Make sure tokens aren't in the datastore yet
+			refs := env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(solChainSel), datastore.AddressRefByQualifier(svmSymbol))
+			require.Empty(t, refs, "SVM token symbol should not exist in env.DataStore before test")
+			refs = env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(evmChainSel), datastore.AddressRefByQualifier(evmSymbol))
+			require.Empty(t, refs, "EVM token symbol should not exist in env.DataStore before test")
+
+			// Deploy some tokens and pools
+			acceptLiquidity := true
+			teOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+				ChainAdapterVersion: v1_6_0_scenarios,
+				MCMS:                NewDefaultInputForMCMS("Scenario5 AddressRefInference"),
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+					evmChainSel: {
+						TokenPoolVersion: v1_5_1_scenarios,
+						DeployTokenInput: &tokensapi.DeployTokenInput{
+							Name: "Scenario5 try-resolve EVM token", Symbol: evmSymbol, Decimals: 18,
+							Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply, PreMint: &defaultPreMint,
+						},
+						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+							TokenPoolQualifier: "", // use sensible default
+							PoolType:           cciputils.LockReleaseTokenPool.String(),
+							AcceptLiquidity:    &acceptLiquidity,
+						},
+					},
+					solChainSel: {
+						TokenPoolVersion: v1_6_0_scenarios,
+						DeployTokenInput: &tokensapi.DeployTokenInput{
+							Name: "Scenario5 try-resolve SVM token", Symbol: svmSymbol, Decimals: svmDecimals,
+							Type: solanautils.SPLTokens, ExternalAdmin: solana.NewWallet().PublicKey().String(),
+							Senders: []string{solChain.DeployerKey.PublicKey().String()},
+						},
+						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+							TokenPoolQualifier: "",
+							PoolType:           cciputils.BurnMintTokenPool.String(),
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			testhelpers.ProcessTimelockProposals(t, *env, teOut.MCMSTimelockProposals, false)
+
+			// Get SVM token address from changeset output
+			svmTokRefs := teOut.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(solChainSel), datastore.AddressRefByQualifier(svmSymbol))
+			require.Len(t, svmTokRefs, 1, "token expansion output should record the new Solana token")
+			svmTokAddr := svmTokRefs[0].Address
+
+			// Get SVM pool address from environment datastore
+			svmPoolRefs := env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(solChainSel), datastore.AddressRefByType(datastore.ContractType(cciputils.BurnMintTokenPool)))
+			require.Len(t, svmPoolRefs, 1, "token expansion output should record the new Solana pool")
+			svmPoolAddr := svmPoolRefs[0].Address
+
+			// Get EVM token address from changeset output
+			evmTokRefs := teOut.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(evmChainSel), datastore.AddressRefByQualifier(evmSymbol))
+			require.Len(t, evmTokRefs, 1, "token expansion output should record the new EVM token")
+			evmTokAddr := evmTokRefs[0].Address
+
+			// Get EVM pool address from changeset output
+			evmPoolRefs := teOut.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(evmChainSel), datastore.AddressRefByQualifier(evmTokAddr))
+			require.Len(t, evmPoolRefs, 1, "token expansion output should record the new EVM pool")
+			evmPoolAddr := evmPoolRefs[0].Address
+
+			// We did not call MergeAddresses on teOut, so the environment datastore should NOT have the deployed tokens yet
+			refs = env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(solChainSel), datastore.AddressRefByQualifier(svmSymbol), datastore.AddressRefByAddress(svmTokAddr))
+			require.Empty(t, refs, "new SVM mint must not be in env.DataStore before ResolveTokenRef")
+			refs = env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(evmChainSel), datastore.AddressRefByQualifier(evmSymbol), datastore.AddressRefByAddress(evmTokAddr))
+			require.Empty(t, refs, "new EVM token address must not be in env.DataStore before ResolveTokenRef")
+
+			// Get the Solana pool PDA and verify it exists on chain
+			svmPoolProgID := solana.MustPublicKeyFromBase58(svmPoolAddr)
+			svmMintPubKey := solana.MustPublicKeyFromBase58(svmTokAddr)
+			svmPoolCfgPDA, _ := tokens.TokenPoolConfigAddress(svmMintPubKey, svmPoolProgID)
+			var solPoolStateBnM burnmint_token_pool.State
+			err = solChain.GetAccountDataBorshInto(t.Context(), svmPoolCfgPDA, &solPoolStateBnM)
+			require.NoError(t, err, "Solana BnM pool state PDA should be initialized for the new pool")
+
+			// Check that we can resolve the new pool and token refs even though they are not in the environment datastore
+			t.Run("ResolveRef", func(t *testing.T) {
+				// Token expansion for Solana now supports either the pool program ID or the pool PDA:
+				// (1) if the user provides a pool PDA, then the initial DS look up will fail -> code will check if it's a PDA and resolve its program ID from the chain -> datastore lookup is re-attempted
+				// (2) if the user provides a prog ID, then the ref must be in the datastore (no onchain resolution is possible)
+				resolvedSvmPool, err := tokensapi.ResolveTokenPoolRef(*env, refReader, solChainSel, datastore.AddressRef{Address: svmPoolCfgPDA.String()})
+				require.NoError(t, err)
+				require.Equal(t, datastore.ContractType(cciputils.BurnMintTokenPool), resolvedSvmPool.Type)
+				require.Equal(t, svmPoolProgID.String(), resolvedSvmPool.Address)
+				require.Equal(t, "", resolvedSvmPool.Qualifier)
+				require.True(t, v1_6_0_scenarios.Equal(resolvedSvmPool.Version))
+
+				// Since the SVM token does not exist in the environment datastore yet, ResolveTokenRef will resolve it from on chain data
+				resolvedSvmTok, err := tokensapi.ResolveTokenRef(*env, refReader, solChainSel, datastore.AddressRef{Address: svmTokAddr})
+				require.NoError(t, err)
+				require.Equal(t, svmTokAddr, resolvedSvmTok.Address)
+				require.Equal(t, fmt.Sprintf("%s-%s", svmTokAddr, solanautils.SPLTokens), resolvedSvmTok.Qualifier)
+				require.Equal(t, datastore.ContractType(solanautils.SPLTokens), resolvedSvmTok.Type)
+				require.True(t, v1_6_0_scenarios.Equal(resolvedSvmTok.Version))
+
+				// Since the EVM pool does not exist in the environment datastore yet, ResolveTokenPoolRef will resolve it from on chain data
+				resolvedEvmPool, err := tokensapi.ResolveTokenPoolRef(*env, refReader, evmChainSel, datastore.AddressRef{Address: evmPoolAddr})
+				require.NoError(t, err)
+				require.Equal(t, datastore.ContractType(cciputils.LockReleaseTokenPool), resolvedEvmPool.Type)
+				require.Equal(t, evmPoolAddr, resolvedEvmPool.Address)
+				require.Equal(t, evmTokAddr, resolvedEvmPool.Qualifier)
+				require.True(t, v1_5_1_scenarios.Equal(resolvedEvmPool.Version))
+
+				// Since the EVM token does not exist in the environment datastore yet, ResolveTokenRef will resolve it from on chain data
+				resolvedEvmTok, err := tokensapi.ResolveTokenRef(*env, refReader, evmChainSel, datastore.AddressRef{Address: evmTokAddr})
+				require.NoError(t, err)
+				require.Equal(t, common.HexToAddress(evmTokAddr).Hex(), resolvedEvmTok.Address)
+				require.Equal(t, evmSymbol, resolvedEvmTok.Qualifier)
+				require.Equal(t, datastore.ContractType(erc20ops.ContractType), resolvedEvmTok.Type)
+				require.True(t, cciputils.Version_1_0_0.Equal(resolvedEvmTok.Version))
+			})
+
+			// The deployed tokens are not in the datastore yet so calling TokenExpansion again would normally result in an error.
+			// However, the new TokenRefResolver interface allows us to source tokens and pools from the chain so now we no longer
+			// need to worry about the datastore containing these token/pool refs - the tooling is smart enough to infer them.
+			t.Run("TokenExpansionWithInferredRefs", func(t *testing.T) {
+				teOut, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+					ChainAdapterVersion: v1_6_0_scenarios,
+					MCMS:                NewDefaultInputForMCMS("Scenario5 AddressRefInference"),
+					TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+						newChainSel: {
+							TokenPoolVersion: cciputils.Version_1_6_1,
+							DeployTokenInput: &tokensapi.DeployTokenInput{
+								Name: "Scenario5 try-resolve EVM token", Symbol: evmSymbol, Decimals: 18,
+								Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply, PreMint: &defaultPreMint,
+							},
+							DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+								TokenPoolQualifier: "", // use sensible default
+								PoolType:           cciputils.BurnWithFromMintTokenPool.String(),
+							},
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
+									solChainSel: {OutboundRateLimiterConfig: &defaultRL},
+								},
+							},
+						},
+						evmChainSel: {
+							// TokenRef is not needed - DeriveTokenAddress can resolve the whole ref from the chain
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								TokenPoolRef: datastore.AddressRef{Address: evmPoolAddr},
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									newChainSel: {OutboundRateLimiterConfig: &defaultRL},
+									solChainSel: {OutboundRateLimiterConfig: &defaultRL},
+								},
+							},
+						},
+						solChainSel: {
+							// TokenRef is not needed - DeriveTokenAddress can resolve the whole ref from the chain since we're using the pool PDA
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								TokenPoolRef: datastore.AddressRef{Address: svmPoolCfgPDA.String()},
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									newChainSel: {OutboundRateLimiterConfig: &defaultRL},
+									evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
+								},
+							},
+						},
+					},
+				})
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, teOut.MCMSTimelockProposals, false)
+			})
+
+			// Next, we try updating the rate limits in both directions without providing the token refs (the ref resolver should be able to infer them)
+			t.Run("TPRLWithInferredRefs", func(t *testing.T) {
+				evmTowardSVM := tokensapi.RemoteOutbounds{RateLimit: &tokensapi.RateLimiterConfigFloatInput{Capacity: 111, Rate: 11, IsEnabled: true}}
+				svmTowardEVM := tokensapi.RemoteOutbounds{RateLimit: &tokensapi.RateLimiterConfigFloatInput{Capacity: 222, Rate: 22, IsEnabled: true}}
+				tprlOut, err := tokensapi.SetTokenPoolRateLimits().Apply(*env, tokensapi.TPRLInput{
+					MCMS: NewDefaultInputForMCMS("Scenario 5 TPRL"),
+					Configs: map[uint64]tokensapi.TPRLConfig{
+						evmChainSel: {
+							TokenPoolRef: datastore.AddressRef{Address: evmPoolAddr},
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								solChainSel: evmTowardSVM,
+							},
+						},
+						solChainSel: {
+							TokenPoolRef: datastore.AddressRef{Address: svmPoolCfgPDA.String()},
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								evmChainSel: svmTowardEVM,
+							},
+						},
+					},
+				})
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, tprlOut.MCMSTimelockProposals, false)
+
+				// Read EVM rate limits from the chain
+				evmPool, err := lrpool.NewLockReleaseTokenPool(common.HexToAddress(evmPoolAddr), evmChain.Client)
+				require.NoError(t, err)
+				outboundEVM, err := evmPool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+				require.NoError(t, err)
+				inboundEVM, err := evmPool.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel)
+				require.NoError(t, err)
+
+				// Verify EVM rate limit state matches expected values (with correct scaling for decimals). The
+				// inbound on legacy EVM pools (<v1.6.1 non-external-minter) scales using remote token decimals
+				// (see tokensapi.GenerateTPRLConfigs); counterpart outbound is Solana -> use svmDecimals.
+				expInboundCapEVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Capacity, int(svmDecimals), 0.10)
+				expInboundRateEVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Rate, int(svmDecimals), 0.10)
+				expOutboundCapEVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Capacity, int(evmDecimals), 0)
+				expOutboundRateEVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Rate, int(evmDecimals), 0)
+				require.Zero(t, expOutboundCapEVM.Cmp(outboundEVM.Capacity), "EVM outbound capacity toward Solana should match TPRL input after scaling (want %s, got %s)", expOutboundCapEVM.String(), outboundEVM.Capacity.String())
+				require.Zero(t, expOutboundRateEVM.Cmp(outboundEVM.Rate), "EVM outbound rate toward Solana should match TPRL input after scaling (want %s, got %s)", expOutboundRateEVM.String(), outboundEVM.Rate.String())
+				require.Zero(t, expInboundCapEVM.Cmp(inboundEVM.Capacity), "EVM inbound capacity from Solana should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundCapEVM.String(), inboundEVM.Capacity.String())
+				require.Zero(t, expInboundRateEVM.Cmp(inboundEVM.Rate), "EVM inbound rate from Solana should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundRateEVM.String(), inboundEVM.Rate.String())
+				require.True(t, outboundEVM.IsEnabled)
+				require.True(t, inboundEVM.IsEnabled)
+
+				// Read Solana rate limits from the chain
+				chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, svmMintPubKey, svmPoolProgID)
+				require.NoError(t, err)
+				var chainCfg lockrelease_token_pool.ChainConfig
+				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &chainCfg))
+				outboundCapSVM := big.NewInt(0).SetUint64(chainCfg.Base.OutboundRateLimit.Cfg.Capacity)
+				outboundRateSVM := big.NewInt(0).SetUint64(chainCfg.Base.OutboundRateLimit.Cfg.Rate)
+				inboundCapSVM := big.NewInt(0).SetUint64(chainCfg.Base.InboundRateLimit.Cfg.Capacity)
+				inboundRateSVM := big.NewInt(0).SetUint64(chainCfg.Base.InboundRateLimit.Cfg.Rate)
+
+				// Verify Solana rate limit state matches expected values (with correct scaling for decimals)
+				expInboundCapSVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Capacity, int(svmDecimals), 0.10)
+				expInboundRateSVM := tokensapi.ScaleFloatToBigInt(evmTowardSVM.RateLimit.Rate, int(svmDecimals), 0.10)
+				expOutboundCapSVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Capacity, int(svmDecimals), 0)
+				expOutboundRateSVM := tokensapi.ScaleFloatToBigInt(svmTowardEVM.RateLimit.Rate, int(svmDecimals), 0)
+				require.Zero(t, expOutboundCapSVM.Cmp(outboundCapSVM), "Solana outbound capacity toward EVM should match TPRL input after scaling (want %s, got %s)", expOutboundCapSVM.String(), outboundCapSVM.String())
+				require.Zero(t, expOutboundRateSVM.Cmp(outboundRateSVM), "Solana outbound rate toward EVM should match TPRL input after scaling (want %s, got %s)", expOutboundRateSVM.String(), outboundRateSVM.String())
+				require.Zero(t, expInboundCapSVM.Cmp(inboundCapSVM), "Solana inbound capacity from EVM should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundCapSVM.String(), inboundCapSVM.String())
+				require.Zero(t, expInboundRateSVM.Cmp(inboundRateSVM), "Solana inbound rate from EVM should match counterpart outbound TPRL input + inbound scaling (want %s, got %s)", expInboundRateSVM.String(), inboundRateSVM.String())
+				require.True(t, chainCfg.Base.OutboundRateLimit.Cfg.Enabled)
+				require.True(t, chainCfg.Base.InboundRateLimit.Cfg.Enabled)
+			})
 		})
 	})
 }
