@@ -16,6 +16,7 @@ import (
 	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -31,6 +32,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	bmtp_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
@@ -515,11 +517,13 @@ func importConfigFromActivePoolV150(
 ) (*activePoolImportedConfig, error) {
 	typeStr := string(tav.Type)
 	poolForRateLimits := activePool
+	proxyPool, err := bmtp_v150.NewBurnMintTokenPoolAndProxy(activePool, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate burn mint token pool and proxy: %w", err)
+	}
 	if strings.Contains(typeStr, "Proxy") {
-		prevReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetPreviousPool, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       activePool,
-			Args:          struct{}{},
+		prevReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.NewReadGetPreviousPool(proxyPool), chain, ops2contract.FunctionInput[struct{}]{
+			Args: struct{}{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get previous pool from proxy: %w", err)
@@ -558,26 +562,28 @@ func fetchRateLimitsAndRemotePoolV150(
 	poolForRateLimits, poolForRemotePool common.Address,
 	remoteChainSelector uint64,
 ) (*activePoolImportedConfig, error) {
-	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       poolForRateLimits,
-		Args:          remoteChainSelector,
+	ratePool, err := bmtp_v150.NewBurnMintTokenPoolAndProxy(poolForRateLimits, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate pool for rate limits: %w", err)
+	}
+	remotePoolContract, err := bmtp_v150.NewBurnMintTokenPoolAndProxy(poolForRemotePool, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate pool for remote pool: %w", err)
+	}
+	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.NewReadGetCurrentInboundRateLimiterState(ratePool), chain, ops2contract.FunctionInput[uint64]{
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inbound rate limiter state: %w", err)
 	}
-	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       poolForRateLimits,
-		Args:          remoteChainSelector,
+	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.NewReadGetCurrentOutboundRateLimiterState(ratePool), chain, ops2contract.FunctionInput[uint64]{
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get outbound rate limiter state: %w", err)
 	}
-	remotePoolReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetRemotePool, chain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: chainSelector,
-		Address:       poolForRemotePool,
-		Args:          remoteChainSelector,
+	remotePoolReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.NewReadGetRemotePool(remotePoolContract), chain, ops2contract.FunctionInput[uint64]{
+		Args: remoteChainSelector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote pool: %w", err)
@@ -663,7 +669,7 @@ func scaleDecimalsInt(amount *big.Int, fromDecimals, toDecimals uint8) *big.Int 
 }
 
 // tokenBucketV150ToRateLimiterConfig converts a 1.5.0 (proxy bindings) RateLimiterTokenBucket to tokens.RateLimiterConfig.
-func tokenBucketV150ToRateLimiterConfig(b token_pool_v150.TokenBucket) *tokens.RateLimiterConfig {
+func tokenBucketV150ToRateLimiterConfig(b bmtp_v150.RateLimiterTokenBucket) *tokens.RateLimiterConfig {
 	return &tokens.RateLimiterConfig{
 		IsEnabled: b.IsEnabled,
 		Capacity:  new(big.Int).Set(b.Capacity),

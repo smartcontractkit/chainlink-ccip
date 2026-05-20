@@ -21,6 +21,7 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	ops2contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -121,11 +122,14 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 type poolOpsV151 struct{}
 
 func (p *poolOpsV151) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
+	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+	}
 	res, err := cldf_ops.ExecuteOperation(b,
-		tpOps.GetToken, chain,
-		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
+		tpOps.NewReadGetToken(tp), chain,
+		ops2contract.FunctionInput[struct{}]{
+			Args: struct{}{},
 		},
 	)
 	if err != nil {
@@ -175,18 +179,20 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 		return nil, fmt.Errorf("inbound rate limiter config is enabled but rate and capacity are both zero")
 	}
 
+	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+	}
 	report, err := cldf_ops.ExecuteOperation(b,
-		tpOps.SetChainRateLimiterConfig, chain,
-		evm_contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
+		tpOps.NewWriteSetChainRateLimiterConfig(tp), chain,
+		ops2contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
 			Args: tpOps.SetChainRateLimiterConfigArgs{
-				OutboundRateLimitConfig: token_pool.RateLimiterConfig{
+				OutboundConfig: token_pool.RateLimiterConfig{
 					IsEnabled: outbound.IsEnabled,
 					Capacity:  outbound.Capacity,
 					Rate:      outbound.Rate,
 				},
-				InboundRateLimitConfig: token_pool.RateLimiterConfig{
+				InboundConfig: token_pool.RateLimiterConfig{
 					IsEnabled: inbound.IsEnabled,
 					Capacity:  inbound.Capacity,
 					Rate:      inbound.Rate,
@@ -197,23 +203,35 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	if err != nil {
 		return nil, fmt.Errorf("SetChainRateLimiterConfig v1.5.1: %w", err)
 	}
-	return []evm_contract.WriteOutput{report.Output}, nil
+	return []evm_contract.WriteOutput{writeOutputOps2ToOps(report.Output)}, nil
 }
 
 func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {
+	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return evm_contract.WriteOutput{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+	}
 	report, err := cldf_ops.ExecuteOperation(b,
-		tpOps.SetRateLimitAdmin, chain,
-		evm_contract.FunctionInput[tpOps.SetRateLimitAdminArgs]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-			Args: tpOps.SetRateLimitAdminArgs{
-				NewAdmin: newAdmin,
-			},
+		tpOps.NewWriteSetRateLimitAdmin(tp), chain,
+		ops2contract.FunctionInput[common.Address]{
+			Args: newAdmin,
 		})
 	if err != nil {
 		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
 	}
-	return report.Output, nil
+	return writeOutputOps2ToOps(report.Output), nil
+}
+
+func writeOutputOps2ToOps(out ops2contract.WriteOutput) evm_contract.WriteOutput {
+	var execInfo *evm_contract.ExecInfo
+	if out.ExecInfo != nil {
+		execInfo = &evm_contract.ExecInfo{Hash: out.ExecInfo.Hash}
+	}
+	return evm_contract.WriteOutput{
+		ChainSelector: out.ChainSelector,
+		Tx:            out.Tx,
+		ExecInfo:      execInfo,
+	}
 }
 
 func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
