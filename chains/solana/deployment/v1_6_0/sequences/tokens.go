@@ -1056,8 +1056,12 @@ func (a *SolanaAdapter) getTokenMintAndTokenProgram(b cldf_ops.Bundle, chains cl
 }
 
 func decodeArtificialPoolAddressRef(label string) (solana.PublicKey, bool) {
-	if parts := strings.Split(label, ":"); len(parts) == 2 && parts[0] == tokenapi.ArtificialAddressRefLabel {
-		return solana.MustPublicKeyFromBase58(parts[1]), true
+	if parts := strings.Split(label, ":"); len(parts) >= 2 && parts[0] == tokenapi.ArtificialAddressRefLabel {
+		if pubKey, err := solana.PublicKeyFromBase58(parts[1]); err != nil {
+			return solana.PublicKey{}, false
+		} else {
+			return pubKey, true
+		}
 	} else {
 		return solana.PublicKey{}, false
 	}
