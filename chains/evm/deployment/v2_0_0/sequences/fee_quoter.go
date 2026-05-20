@@ -82,7 +82,7 @@ func getDefaultTokenFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
 	if isEthChain(sourceChain) {
 		return 50
 	}
-	return 0
+	return 25
 }
 
 // GetMaxMsgPerGasLimit returns the max msg per gas limit based on the destination chain.
