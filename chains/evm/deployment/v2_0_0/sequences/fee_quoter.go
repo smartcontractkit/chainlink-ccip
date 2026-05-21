@@ -47,6 +47,24 @@ var (
 		chain_selectors.FamilyAptos: big.NewInt(15e11),
 		chain_selectors.FamilySui:   big.NewInt(15e11),
 	}
+
+	l2LowTrafficChain = map[uint64]struct{}{
+		chain_selectors.PLUME_MAINNET.Selector:                     {},
+		chain_selectors.PLUME_TESTNET_SEPOLIA.Selector:             {},
+		chain_selectors.ETHEREUM_MAINNET_MANTLE_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_MANTLE_1.Selector: {},
+		chain_selectors.INK_TESTNET_SEPOLIA.Selector:               {},
+		chain_selectors.ETHEREUM_MAINNET_INK_1.Selector:            {},
+	}
+
+	l2HighTrafficChain = map[uint64]struct{}{
+		chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: {},
+		chain_selectors.ETHEREUM_MAINNET_BASE_1.Selector:             {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     {},
+		chain_selectors.POLYGON_MAINNET.Selector:                     {},
+		chain_selectors.POLYGON_TESTNET_AMOY.Selector:                {},
+	}
 )
 
 func isEthChain(chainSelector uint64) bool {
@@ -83,6 +101,40 @@ func getDefaultTokenFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
 		return 50
 	}
 	return 25
+}
+
+// GetMaxMsgPerGasLimit returns the max msg per gas limit based on the destination chain.
+// This function will need to be updated as more defaults are defined.
+func GetMaxMsgPerGasLimit(destinationChain uint64) uint32 {
+	switch destinationChain {
+	case chain_selectors.ETHEREUM_MAINNET.Selector, chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector, chain_selectors.ETHEREUM_TESTNET_HOODI.Selector,
+		chain_selectors.AVALANCHE_MAINNET.Selector, chain_selectors.AVALANCHE_TESTNET_FUJI.Selector,
+		chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector, chain_selectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
+		chain_selectors.ETHEREUM_MAINNET_BASE_1.Selector, chain_selectors.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector,
+		chain_selectors.BINANCE_SMART_CHAIN_MAINNET.Selector, chain_selectors.BINANCE_SMART_CHAIN_TESTNET.Selector,
+		chain_selectors.POLYGON_MAINNET.Selector, chain_selectors.POLYGON_TESTNET_AMOY.Selector,
+		chain_selectors.ETHEREUM_MAINNET_MANTLE_1.Selector, chain_selectors.ETHEREUM_TESTNET_SEPOLIA_MANTLE_1.Selector,
+		chain_selectors.ETHEREUM_MAINNET_INK_1.Selector, chain_selectors.INK_TESTNET_SEPOLIA.Selector,
+		chain_selectors.PLASMA_MAINNET.Selector, chain_selectors.PLASMA_TESTNET.Selector,
+		chain_selectors.HYPERLIQUID_MAINNET.Selector, chain_selectors.HYPERLIQUID_TESTNET.Selector,
+		chain_selectors.TEST_0G_MAINNET.Selector, chain_selectors.ZERO_G_TESTNET_GALILEO.Selector,
+		chain_selectors.PLUME_MAINNET.Selector, chain_selectors.PLUME_TESTNET_SEPOLIA.Selector:
+		return 15_000_000
+	case chain_selectors.ETHEREUM_MAINNET_UNICHAIN_1.Selector, chain_selectors.ETHEREUM_TESTNET_SEPOLIA_UNICHAIN_1.Selector:
+		return 6_000_000
+	default:
+		return 8_000_000
+	}
+}
+
+func GetdestGasPerPayloadByteBase(destinationChain uint64) uint8 {
+	if _, exists := l2LowTrafficChain[destinationChain]; exists {
+		return 255
+	}
+	if _, exists := l2HighTrafficChain[destinationChain]; exists {
+		return 100
+	}
+	return 20
 }
 
 type FeeQuoterUpdate struct {

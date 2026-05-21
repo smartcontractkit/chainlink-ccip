@@ -44,6 +44,14 @@ type RemoteOutbounds struct {
 	// for all token pool versions. The slice should only contain up to two entries (one per finality
 	// flag). Pre-v2 adapters ignore fast-finality rows and only apply default buckets if they exist.
 	Outbounds []RateLimitConfig `yaml:"outbounds" json:"outbounds"`
+
+	// OutboundOnly, when true, configures only the outbound side of this lane on the local chain.
+	// The counterpart chain's TPRLConfig need not provide a matching RemoteOutbounds entry; the
+	// changeset will read the counterpart's on-chain inbound for the same lane and reject the
+	// update if it is not at least 110% of the new outbound (capacity AND rate). The counterpart
+	// chain's TPRLConfig must still exist with TokenPoolRef + TokenRef so the changeset can
+	// resolve the counterpart pool and its decimals for the validation read.
+	OutboundOnly bool `yaml:"outboundOnly,omitempty" json:"outboundOnly,omitempty"`
 }
 
 // DefaultBucket gets the default lane (FastFinality = false) RateLimitConfig from Outbounds
@@ -167,11 +175,31 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
 		for localSelector, config := range cfg.Configs {
 			for remoteSelector, localOutbound := range config.RemoteOutbounds {
-				// Counterpart must exist
+				if err := localOutbound.Validate(); err != nil {
+					return fmt.Errorf("outbound rate limiter config for remote chain %d: %w", remoteSelector, err)
+				}
+
+				// Counterpart config must always exist: when OutboundOnly is set we still need the
+				// counterpart's TokenPoolRef/TokenRef to resolve its pool address and decimals for
+				// the on-chain inbound validation.
 				remote, ok := cfg.Configs[remoteSelector]
 				if !ok {
 					return fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
 				}
+
+				if localOutbound.OutboundOnly {
+					// In OutboundOnly mode the counterpart's RemoteOutbounds[localSelector] is not
+					// required and symmetry checks do not apply: chain B is read-only for the
+					// changeset and its rate limit will be validated against on-chain state at
+					// apply time, not user input.
+					if _, ok := localOutbound.DefaultBucket(); !ok {
+						if _, ffOK := localOutbound.FastFinalityBucket(); !ffOK {
+							return fmt.Errorf("outbound-only lane from chain %d to %d has no outbound buckets", localSelector, remoteSelector)
+						}
+					}
+					continue
+				}
+
 				remoteOutbound, ok := remote.RemoteOutbounds[localSelector]
 				if !ok {
 					return fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", remoteSelector, localSelector)
@@ -180,9 +208,6 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 				// Rate limit must be valid on both sides
 				if err := remoteOutbound.Validate(); err != nil {
 					return fmt.Errorf("outbound rate limiter config from chain %d toward %d: %w", remoteSelector, localSelector, err)
-				}
-				if err := localOutbound.Validate(); err != nil {
-					return fmt.Errorf("outbound rate limiter config for remote chain %d: %w", remoteSelector, err)
 				}
 
 				// Fast-finality rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
@@ -273,10 +298,6 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, err
 				}
-				remoteInputs, ok := counterpart.RemoteOutbounds[selector]
-				if !ok {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
-				}
 
 				counterpart.TokenPoolRef, err = TryNormalizeAddressRef(remoteSelector, counterpart.TokenPoolRef)
 				if err != nil {
@@ -304,6 +325,18 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", remoteSelector, err)
 				}
 
+				// In OutboundOnly mode the counterpart's RemoteOutbounds[selector] is not required; we
+				// pass an empty RemoteOutbounds into the build so no inbound config is generated and
+				// then overwrite each bucket's InboundRateLimiterConfig with the local pool's current
+				// on-chain inbound below.
+				var remoteInputs RemoteOutbounds
+				if !inputs.OutboundOnly {
+					remoteInputs, ok = counterpart.RemoteOutbounds[selector]
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
+					}
+				}
+
 				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig, tprlRemote.RateLimitBuckets, err = buildTPRLRemotesForSetRateLimitsLane(
 					family,
 					tokenPool,
@@ -316,6 +349,42 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate TPRL configs for chain selector %d and remote selector %d: %w", selector, remoteSelector, err)
+				}
+
+				if inputs.OutboundOnly {
+					// The local pool setter is atomic over outbound+inbound, so we read the current
+					// on-chain inbound for each finality bucket and pass it through unchanged.
+					localReader, ok := tokenPoolAdapter.(RateLimitReaderAdapter)
+					if !ok {
+						return cldf.ChangesetOutput{}, fmt.Errorf(
+							"adapter for local chain selector %d (family %s, version %v) does not implement RateLimitReaderAdapter; outbound-only mode unsupported for this lane",
+							selector, family, tokenPool.Version,
+						)
+					}
+					for i, bucket := range tprlRemote.RateLimitBuckets {
+						current, err := localReader.GetOnchainInboundRateLimit(
+							e, selector, tokenPool, tokenFull, remoteSelector, bucket.FastFinality,
+						)
+						if err != nil {
+							return cldf.ChangesetOutput{}, fmt.Errorf("failed to read current inbound rate limit for pass-through on outbound-only update (chain %d, remote %d, fastFinality=%v): %w", selector, remoteSelector, bucket.FastFinality, err)
+						}
+						tprlRemote.RateLimitBuckets[i].InboundRateLimiterConfig = current
+					}
+
+					if err := validateOutboundOnlyAgainstCounterpartInbound(
+						e,
+						counterPartAdapter,
+						counterpartFamily,
+						remoteTokenPool,
+						counterpart.TokenRef,
+						remoteSelector,
+						remoteDecimals,
+						selector,
+						decimals,
+						inputs,
+					); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("outbound-only validation failed for chain selector %d and remote selector %d: %w", selector, remoteSelector, err)
+					}
 				}
 
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
@@ -352,31 +421,41 @@ func buildTPRLRemotesForSetRateLimitsLane(
 	remoteOutbounds RemoteOutbounds,
 ) (RateLimiterConfig, RateLimiterConfig, []TPRLRateLimitBucket, error) {
 	buckets := []TPRLRateLimitBucket{}
+	outboundOnly := localOutbounds.OutboundOnly
 
-	remoteFastFinalityBucket, remoteFastFinalityExists := remoteOutbounds.FastFinalityBucket()
 	localFastFinalityBucket, localFastFinalityExists := localOutbounds.FastFinalityBucket()
-	if localFastFinalityExists != remoteFastFinalityExists {
+	remoteFastFinalityBucket, remoteFastFinalityExists := remoteOutbounds.FastFinalityBucket()
+	if !outboundOnly && localFastFinalityExists != remoteFastFinalityExists {
 		return RateLimiterConfig{}, RateLimiterConfig{}, nil, fmt.Errorf(
 			"both local and remote buckets must be provided for fastFinality=true or neither can be provided for chain selector %d and remote selector %d",
 			localSelector, remoteSelector,
 		)
 	}
 
-	remoteDefaultBucket, remoteDefaultExists := remoteOutbounds.DefaultBucket()
 	localDefaultBucket, localDefaultExists := localOutbounds.DefaultBucket()
-	if localDefaultExists != remoteDefaultExists {
+	remoteDefaultBucket, remoteDefaultExists := remoteOutbounds.DefaultBucket()
+	if !outboundOnly && localDefaultExists != remoteDefaultExists {
 		return RateLimiterConfig{}, RateLimiterConfig{}, nil, fmt.Errorf(
 			"both local and remote buckets must be provided for fastFinality=false or neither can be provided for chain selector %d and remote selector %d",
 			localSelector, remoteSelector,
 		)
 	}
 
+	// When outboundOnly, inbound is left zero here; the changeset overwrites each bucket's
+	// InboundRateLimiterConfig with the local pool's current on-chain inbound before dispatch.
 	var fastFinalityOutboundRL, fastFinalityInboundRL RateLimiterConfig
-	if localFastFinalityExists && remoteFastFinalityExists {
-		fastFinalityOutboundRL, fastFinalityInboundRL = GenerateTPRLConfigs(
-			localFastFinalityBucket.RateLimit, remoteFastFinalityBucket.RateLimit, localDecimals, remoteDecimals,
-			chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
-		)
+	if localFastFinalityExists {
+		if outboundOnly {
+			fastFinalityOutboundRL, _ = GenerateTPRLConfigs(
+				localFastFinalityBucket.RateLimit, RateLimiterConfigFloatInput{}, localDecimals, remoteDecimals,
+				chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
+			)
+		} else {
+			fastFinalityOutboundRL, fastFinalityInboundRL = GenerateTPRLConfigs(
+				localFastFinalityBucket.RateLimit, remoteFastFinalityBucket.RateLimit, localDecimals, remoteDecimals,
+				chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
+			)
+		}
 		buckets = append(buckets, TPRLRateLimitBucket{
 			FastFinality:              true,
 			OutboundRateLimiterConfig: fastFinalityOutboundRL,
@@ -385,11 +464,18 @@ func buildTPRLRemotesForSetRateLimitsLane(
 	}
 
 	var defaultOutboundRL, defaultInboundRL RateLimiterConfig
-	if localDefaultExists && remoteDefaultExists {
-		defaultOutboundRL, defaultInboundRL = GenerateTPRLConfigs(
-			localDefaultBucket.RateLimit, remoteDefaultBucket.RateLimit, localDecimals, remoteDecimals,
-			chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
-		)
+	if localDefaultExists {
+		if outboundOnly {
+			defaultOutboundRL, _ = GenerateTPRLConfigs(
+				localDefaultBucket.RateLimit, RateLimiterConfigFloatInput{}, localDecimals, remoteDecimals,
+				chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
+			)
+		} else {
+			defaultOutboundRL, defaultInboundRL = GenerateTPRLConfigs(
+				localDefaultBucket.RateLimit, remoteDefaultBucket.RateLimit, localDecimals, remoteDecimals,
+				chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String(),
+			)
+		}
 		buckets = append(buckets, TPRLRateLimitBucket{
 			FastFinality:              false,
 			OutboundRateLimiterConfig: defaultOutboundRL,
@@ -398,6 +484,85 @@ func buildTPRLRemotesForSetRateLimitsLane(
 	}
 
 	return defaultOutboundRL, defaultInboundRL, buckets, nil
+}
+
+// validateOutboundOnlyAgainstCounterpartInbound reads the counterpart chain's on-chain
+// inbound rate limit (one per FastFinality bucket present in localOutbounds) and checks
+// that each is at least 110% of the new outbound being set on the local chain (both
+// Capacity and Rate). Per the design, IsEnabled is ignored when checking — adapters are
+// expected to return a zero RateLimiterConfig for unconfigured lanes, which will cause
+// the check to reject any positive outbound.
+func validateOutboundOnlyAgainstCounterpartInbound(
+	e cldf.Environment,
+	counterpartAdapter TokenAdapter,
+	counterpartFamily string,
+	counterpartPoolRef datastore.AddressRef,
+	counterpartTokenRef datastore.AddressRef,
+	counterpartSelector uint64,
+	counterpartDecimals uint8,
+	localSelector uint64,
+	localDecimals uint8,
+	localOutbounds RemoteOutbounds,
+) error {
+	reader, ok := counterpartAdapter.(RateLimitReaderAdapter)
+	if !ok {
+		return fmt.Errorf(
+			"adapter for counterpart chain selector %d (family %s, version %v) does not implement RateLimitReaderAdapter; outbound-only mode unsupported for this lane",
+			counterpartSelector, counterpartFamily, counterpartPoolRef.Version,
+		)
+	}
+
+	check := func(bucket RateLimitConfig) error {
+		// Compute what the counterpart's inbound would be if it were derived from the
+		// new outbound the normal way: GenerateTPRLConfigs scales inboundInput by the
+		// counterpart pool's decimals/scaling rules with +10% applied. We pass the
+		// counterpart's family / pool version / pool type because the inbound is being
+		// stored on the counterpart pool, and the legacy EVM pools (<1.6.1) scale by
+		// the source (here: local) decimals while newer pools scale by their own.
+		_, requiredInbound := GenerateTPRLConfigs(
+			RateLimiterConfigFloatInput{}, bucket.RateLimit,
+			counterpartDecimals, localDecimals,
+			counterpartFamily, counterpartPoolRef.Version, counterpartPoolRef.Type.String(),
+		)
+		// If the new outbound is disabled there is nothing to validate against.
+		if !bucket.RateLimit.IsEnabled {
+			return nil
+		}
+		onchainInbound, err := reader.GetOnchainInboundRateLimit(
+			e, counterpartSelector, counterpartPoolRef, counterpartTokenRef, localSelector, bucket.FastFinality,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to read on-chain inbound rate limit on counterpart chain selector %d (fastFinality=%v): %w", counterpartSelector, bucket.FastFinality, err)
+		}
+		if !onchainInbound.IsEnabled {
+			return nil // If the counterpart's on-chain inbound is disabled, we allow any outbound to be set since it won't be enforced
+		}
+		if onchainInbound.Capacity == nil || onchainInbound.Capacity.Cmp(requiredInbound.Capacity) < 0 {
+			return fmt.Errorf(
+				"on-chain inbound capacity (%v) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound capacity (%v) for fastFinality=%v",
+				onchainInbound.Capacity, counterpartSelector, localSelector, requiredInbound.Capacity, bucket.FastFinality,
+			)
+		}
+		if onchainInbound.Rate == nil || onchainInbound.Rate.Cmp(requiredInbound.Rate) < 0 {
+			return fmt.Errorf(
+				"on-chain inbound rate (%v) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound rate (%v) for fastFinality=%v",
+				onchainInbound.Rate, counterpartSelector, localSelector, requiredInbound.Rate, bucket.FastFinality,
+			)
+		}
+		return nil
+	}
+
+	if defaultBucket, ok := localOutbounds.DefaultBucket(); ok {
+		if err := check(defaultBucket); err != nil {
+			return err
+		}
+	}
+	if fastFinalityBucket, ok := localOutbounds.FastFinalityBucket(); ok {
+		if err := check(fastFinalityBucket); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AI generated code below
