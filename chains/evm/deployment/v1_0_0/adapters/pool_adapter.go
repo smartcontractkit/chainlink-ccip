@@ -459,8 +459,10 @@ func (a *EVMPoolAdapter) tidyTokenRoles(
 
 	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get timelock address for chain %d: %w", input.ChainSelector, err)
+		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
+		return nil, nil
 	}
+
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
