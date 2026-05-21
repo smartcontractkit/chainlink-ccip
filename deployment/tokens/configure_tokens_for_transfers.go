@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -97,24 +95,11 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 
 	var err error
 	for selector, token := range cfg {
-		token.TokenPoolRef, err = TryNormalizeAddressRef(selector, token.TokenPoolRef)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to normalize token pool ref address for chain selector %d: %w", selector, err)
-		}
-		token.TokenRef, err = TryNormalizeAddressRef(selector, token.TokenRef)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to normalize token ref address for chain selector %d: %w", selector, err)
-		}
 		token.RegistryRef, err = TryNormalizeAddressRef(selector, token.RegistryRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to normalize registry ref address for chain selector %d: %w", selector, err)
 		}
 		cfg[selector] = token
-
-		tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, selector, datastore_utils.FullRef)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", selector, err)
-		}
 
 		var registryAddr string
 		if datastore_utils.IsAddressRefEmpty(token.RegistryRef) {
@@ -127,9 +112,9 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			}
 		}
 
-		adapter, family, err := ResolveAdapter(tokenRegistry, selector, tokenPool.Version)
+		adapter, family, tokenPool, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, selector, token.TokenPoolRef, token.TokenRef)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to resolve adapter for chain selector %d: %w", selector, err)
+			return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for chain selector %d: %w", selector, err)
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
@@ -175,7 +160,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			RemoteChains:                  remoteChains,
 			ExternalAdmin:                 token.ExternalAdmin,
 			RegistryAddress:               registryAddr,
-			TokenRef:                      token.TokenRef,
+			TokenRef:                      fullTokenRef,
 			PoolType:                      tokenPool.Type.String(),
 			ExistingDataStore:             e.DataStore,
 			AllowedFinalityConfig:         token.AllowedFinalityConfig,
@@ -234,11 +219,7 @@ func convertRemoteChainConfig(
 	}
 
 	if inCfg.RemotePool != nil {
-		remotePoolRef, err := TryNormalizeAddressRef(remoteChainSelector, *inCfg.RemotePool)
-		if err != nil {
-			return outCfg, fmt.Errorf("failed to normalize remote pool ref address for remote chain selector %d: %w", remoteChainSelector, err)
-		}
-		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, remotePoolRef, remoteChainSelector, datastore_utils.FullRef)
+		fullRemotePoolRef, err := ResolveTokenPoolRef(e, tokenAdapterRegistry, remoteChainSelector, *inCfg.RemotePool)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
@@ -250,26 +231,36 @@ func convertRemoteChainConfig(
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to convert remote pool ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
-		// Can either provide the token reference directly or derive it from the pool reference.
-		if inCfg.RemoteToken != nil {
-			remoteTokenRef, normErr := TryNormalizeAddressRef(remoteChainSelector, *inCfg.RemoteToken)
-			if normErr != nil {
-				return outCfg, fmt.Errorf("failed to normalize remote token ref address for remote chain selector %d: %w", remoteChainSelector, normErr)
-			}
-			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, remoteTokenRef, remoteChainSelector, remoteAdapter.AddressRefToBytes)
+
+		// If DeriveTokenAddress succeeds, then this has higher precedence than the token ref provided in the input since it is
+		// derived from on chain data (and hence more reliable). If it fails, then we fall back to using the token ref provided
+		// in the input and try to resolve it from the datastore first (to avoid RPC calls) then fall back to on chain data.
+		derivedTokenAddr, deriveErr := remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
+		switch {
+		case deriveErr == nil:
+			e.Logger.Infof("Successfully derived remote token address %s for remote chain selector %d from remote pool ref %s", derivedTokenAddr, remoteChainSelector, datastore_utils.SprintRef(fullRemotePoolRef))
+			resolvedRef, err := ResolveTokenRef(e, tokenAdapterRegistry, remoteChainSelector, datastore.AddressRef{ChainSelector: remoteChainSelector, Address: derivedTokenAddr})
 			if err != nil {
-				e.Logger.Warnf("failed to resolve remote token ref %s: %v. Will attempt to derive remote token address from pool reference", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
-				outCfg.RemoteToken, err = remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
-				if err != nil {
-					return outCfg, fmt.Errorf("failed to resolve remote token ref via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
-				}
+				return outCfg, fmt.Errorf("failed to resolve remote token after derivation %s: %w", derivedTokenAddr, err)
 			}
-		} else {
-			outCfg.RemoteToken, err = remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
+			outCfg.RemoteToken, err = remoteAdapter.AddressRefToBytes(resolvedRef)
 			if err != nil {
-				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
+				return outCfg, fmt.Errorf("failed to convert resolved remote token to bytes %s: %w", derivedTokenAddr, err)
 			}
+		case inCfg.RemoteToken != nil:
+			e.Logger.Infof("Derivation of remote token address failed for remote chain selector %d (%s). Falling back to resolving remote token from provided token ref %s", remoteChainSelector, deriveErr.Error(), datastore_utils.SprintRef(*inCfg.RemoteToken))
+			resolvedRef, err := ResolveTokenRef(e, tokenAdapterRegistry, remoteChainSelector, *inCfg.RemoteToken)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+			}
+			outCfg.RemoteToken, err = remoteAdapter.AddressRefToBytes(resolvedRef)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to convert remote token ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+			}
+		default:
+			return outCfg, fmt.Errorf("failed to derive remote token address and no remote token ref provided for remote chain selector %d: %w", remoteChainSelector, deriveErr)
 		}
+
 		outCfg.RemoteToken = common.LeftPadBytes(outCfg.RemoteToken, 32)
 		outCfg.RemoteDecimals, err = remoteAdapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, outCfg.RemoteToken)
 		if err != nil {
@@ -325,17 +316,4 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	return outCfg, nil
-}
-
-func ResolveAdapter(registry *TokenAdapterRegistry, selector uint64, tokenPoolVersion *semver.Version) (TokenAdapter, string, error) {
-	family, err := chain_selectors.GetSelectorFamily(selector)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to get chain family for remote chain selector %d: %w", selector, err)
-	}
-	adapter, ok := registry.GetTokenAdapter(family, tokenPoolVersion)
-	if !ok {
-		return nil, "", fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, tokenPoolVersion.String())
-	}
-
-	return adapter, family, nil
 }

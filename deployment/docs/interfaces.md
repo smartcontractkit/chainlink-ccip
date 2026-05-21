@@ -34,6 +34,7 @@ These interfaces are optional depending on what the chain family supports:
 
 | Interface | Registry | Purpose | Source |
 |-----------|----------|---------|--------|
+| [TokenRefResolver](#tokenrefresolver) | `TokenAdapterRegistry` | Resolve token/pool refs from datastore or on-chain | [tokens/product.go](../tokens/product.go) |
 | [TokenPriceProvider](#tokenpriceprovider) | None (embedded) | Provide default fee token prices | [lanes/product.go](../lanes/product.go) |
 | [PingPongAdapter](#pingpongadapter) | `PingPongAdapterRegistry` | PingPong demo contract support | [lanes/pingpong.go](../lanes/pingpong.go) |
 | [ConfigImporter](#configimporter) | None | Import config from existing deployments | [deploy/product.go](../deploy/product.go) |
@@ -146,7 +147,7 @@ type TokenAdapter interface {
 
     // DeriveTokenAddress derives the token address from a token pool reference.
     // Used when the token address is stored on the pool contract.
-    DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+    DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error)
 
     // DeriveTokenDecimals derives the token's decimal count from a pool reference.
     DeriveTokenDecimals(e Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)
@@ -380,6 +381,56 @@ fastcurse.GetCurseRegistry().RegisterNewCurse(fastcurse.CurseRegistryInput{
 
 ## Optional Interfaces
 
+### TokenRefResolver
+
+Reconstructs `datastore.AddressRef` values for tokens and token pools when a changeset input only provides a partial ref (for example, an address string) or when the ref is not yet present in the environment datastore. Used by `ResolveTokenPoolRef`, `ResolveTokenRef`, and `ResolveAdapterAndRefs` in [tokens/token_expansion.go](../tokens/token_expansion.go).
+
+**Source:** [tokens/product.go](../tokens/product.go)
+**Registry:** `TokenAdapterRegistry` via `tokens.GetTokenAdapterRegistry()`
+**Key:** `chainFamily` only (version-agnostic — one resolver per chain family)
+
+```go
+type TokenRefResolver interface {
+    // ResolveTokenPoolRef reconstructs a token pool AddressRef from an on-chain address.
+    // Implementations typically read type/version (and related metadata) from chain state.
+    ResolveTokenPoolRef(b Bundle, chains BlockChains, ds DataStore, chainSelector uint64, address string) (AddressRef, error)
+
+    // ResolveTokenRef reconstructs a token AddressRef from an on-chain address (for example, a mint or ERC20).
+    ResolveTokenRef(b Bundle, chains BlockChains, ds DataStore, chainSelector uint64, address string) (AddressRef, error)
+}
+```
+
+**Registration** (alongside `RegisterTokenAdapter` in the same `init()`):
+
+```go
+tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilyEVM, &EVMTokenBase{})
+tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilySolana, &SolanaAdapter{})
+```
+
+First registration wins; a second `RegisterTokenRefResolver` for the same family is ignored.
+
+**Resolution order** (package helpers, not part of the interface):
+
+1. `TryNormalizeAddressRef` canonicalizes `ref.Address` when set (via `deploy.AddressNormalizer` for the chain family).
+2. Datastore lookup with `AddressRefToFilters` — exactly one match returns that row; zero matches fall through to the resolver; more than one match is an error.
+3. If no datastore row and `address` is set, `TokenRefResolver.ResolveTokenPoolRef` / `ResolveTokenRef` rebuild the ref from chain state.
+
+**`ResolveAdapterAndRefs`** (used by token expansion, configure-for-transfers, rate limits):
+
+1. `ResolveTokenPoolRef` → pick `TokenAdapter` from the resolved pool’s version.
+2. `DeriveTokenAddress` on the resolved pool ref when the token address is stored on the pool (preferred).
+3. If derivation fails, `ResolveTokenRef` on the input token ref (datastore, then resolver).
+
+**Semantics by chain family:**
+
+- **EVM:** Resolver reads pool `typeAndVersion` and token `symbol` via RPC. Reconstructed pool refs use the token address as `Qualifier` when `getToken()` succeeds.
+- **Solana:** `ResolveTokenPoolRef` accepts either the **pool program ID** or the **pool config PDA**. For a PDA, the adapter loads the program ID from chain state, looks up the program in the datastore, and may attach an [`ArtificialAddressRefLabel`](../tokens/product.go) label so `DeriveTokenAddress` can read the mint from that PDA. `ResolveTokenRef` reads the mint’s token program and symbol (or a `{mint}-{programType}` placeholder qualifier).
+- **`ArtificialAddressRefLabel`:** Optional label format `ArtificialAddressRef:<poolPDA>` on pool refs. Not required for all adapters; Solana uses it when resolving from a config PDA.
+
+Implement `TokenRefResolver` on the same struct as `TokenAdapter` when the family should support address-only inputs (EVM and Solana in this repo register both on one adapter type).
+
+---
+
 ### TokenPriceProvider
 
 An optional interface that `LaneAdapter` implementations can also satisfy to provide default fee token prices. Primarily used by EVM chains.
@@ -548,7 +599,7 @@ type TestAdapterFactory = func(env *Environment, selector uint64) TestAdapter
 | `TransferOwnershipAdapterRegistry` | `deploy.GetTransferOwnershipRegistry()` | `chainFamily-version` |
 | `LaneAdapterRegistry` | `lanes.GetLaneAdapterRegistry()` | `chainFamily-version` |
 | `PingPongAdapterRegistry` | `lanes.GetPingPongAdapterRegistry()` | `chainFamily-version` |
-| `TokenAdapterRegistry` | `tokens.GetTokenAdapterRegistry()` | `chainFamily-version` |
+| `TokenAdapterRegistry` | `tokens.GetTokenAdapterRegistry()` | `chainFamily-version` (adapters); `chainFamily` (`TokenRefResolver`) |
 | `FeeAdapterRegistry` | `fees.GetRegistry()` | `chainFamily-version` |
 | `FeeAggregatorAdapterRegistry` | `fees.GetFeeAggregatorRegistry()` | `chainFamily-version` |
 | `MCMSReaderRegistry` | `changesets.GetRegistry()` | `chainFamily` |
