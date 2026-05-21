@@ -133,7 +133,7 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 		if !common.IsHexAddress(poolRef.Address) {
 			return 0, fmt.Errorf("token pool address %q in ref is not a valid hex address", poolRef.Address)
 		} else {
-			return a.Ops.GetTokenDecimals(e.GetContext(), chain, common.HexToAddress(poolRef.Address))
+			return a.Ops.GetTokenDecimals(e.OperationsBundle, chain, common.HexToAddress(poolRef.Address))
 		}
 	}
 
@@ -143,7 +143,7 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 	if err != nil {
 		return 0, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	} else {
-		return a.Ops.GetTokenDecimals(e.GetContext(), chain, poolAddr)
+		return a.Ops.GetTokenDecimals(e.OperationsBundle, chain, poolAddr)
 	}
 }
 
