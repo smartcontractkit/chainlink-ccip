@@ -1242,7 +1242,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 
 			// Get SVM pool address from environment datastore
 			svmPoolRefs := env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(solChainSel), datastore.AddressRefByType(datastore.ContractType(cciputils.BurnMintTokenPool)))
-			require.Len(t, svmPoolRefs, 1, "token expansion output should record the new Solana pool")
+			require.Len(t, svmPoolRefs, 1, "preloaded BurnMint token pool program should exist in env.DataStore on Solana (TokenExpansion registers tokens under existing programs, not new pool programs)")
 			svmPoolAddr := svmPoolRefs[0].Address
 
 			// Get EVM token address from changeset output
