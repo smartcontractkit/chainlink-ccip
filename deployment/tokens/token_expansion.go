@@ -444,6 +444,8 @@ func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (dat
 	if datastore_utils.IsAddressRefEmpty(ref) {
 		return ref, nil
 	} else {
+		// NOTE: `ref.ChainSelector` is intentionally ignored in favor of `chainSelector`
+		// which comes from the keys of `TokenExpansionInput.TokenExpansionInputPerChain`
 		ref.ChainSelector = chainSelector
 	}
 
