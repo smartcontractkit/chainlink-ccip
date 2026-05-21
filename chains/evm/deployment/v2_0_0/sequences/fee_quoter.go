@@ -47,6 +47,24 @@ var (
 		chain_selectors.FamilyAptos: big.NewInt(15e11),
 		chain_selectors.FamilySui:   big.NewInt(15e11),
 	}
+
+	l2LowTrafficChain = map[uint64]struct{}{
+		chain_selectors.PLUME_MAINNET.Selector:                     {},
+		chain_selectors.PLUME_TESTNET_SEPOLIA.Selector:             {},
+		chain_selectors.ETHEREUM_MAINNET_MANTLE_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_MANTLE_1.Selector: {},
+		chain_selectors.INK_TESTNET_SEPOLIA.Selector:               {},
+		chain_selectors.ETHEREUM_MAINNET_INK_1.Selector:            {},
+	}
+
+	l2HighTrafficChain = map[uint64]struct{}{
+		chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: {},
+		chain_selectors.ETHEREUM_MAINNET_BASE_1.Selector:             {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     {},
+		chain_selectors.POLYGON_MAINNET.Selector:                     {},
+		chain_selectors.POLYGON_TESTNET_AMOY.Selector:                {},
+	}
 )
 
 func isEthChain(chainSelector uint64) bool {
@@ -107,6 +125,16 @@ func GetMaxMsgPerGasLimit(destinationChain uint64) uint32 {
 	default:
 		return 8_000_000
 	}
+}
+
+func GetdestGasPerPayloadByteBase(destinationChain uint64) uint8 {
+	if _, exists := l2LowTrafficChain[destinationChain]; exists {
+		return 255
+	}
+	if _, exists := l2HighTrafficChain[destinationChain]; exists {
+		return 100
+	}
+	return 20
 }
 
 type FeeQuoterUpdate struct {
