@@ -278,7 +278,7 @@ func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelect
 	if err != nil {
 		return "", fmt.Errorf("failed to get account info for %s: %w", poolPDA.String(), err)
 	}
-	if resp == nil || resp.Value == nil {
+	if resp == nil || resp.Value == nil || resp.Value.Data == nil {
 		return "", fmt.Errorf("failed to get account info for: %s", poolPDA.String())
 	}
 	if resp.Value.Executable {
