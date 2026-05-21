@@ -679,8 +679,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				tokenPoolStatePDA, err := tokens.TokenPoolConfigAddress(tokenAddr, tokenPoolProgramID)
 				require.NoError(t, err)
 
-				// NOTE: BnM and LnR pools have the same pool state format
-				// so we can either type for decoding the pool state here.
+				// NOTE: BnM & LnR pools have the same pool state format so
+				// we can use either type for decoding the pool state here.
 				var poolState burnmint_token_pool.State
 				require.NoError(t, data.Chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &poolState))
 
