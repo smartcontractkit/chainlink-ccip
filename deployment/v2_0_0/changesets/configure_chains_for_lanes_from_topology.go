@@ -27,49 +27,93 @@ const defaultQualifier = "default"
 // CommitteeVerifier. It intentionally omits SignatureConfig because signers and threshold are
 // derived automatically from the topology (NOPs × committee × chain) — the caller should never
 // have to specify them manually.
+//
+// All pointer fields are optional; nil falls back to the remote chain adapter's
+// GetDefaultCommitteeVerifierRemoteChainConfig() values.
 type CommitteeVerifierRemoteChainConfig struct {
+	// AllowlistEnabled toggles the sender allowlist on this remote chain.
+	// nil = adapter default (false for EVM).
 	AllowlistEnabled          *bool
 	AddedAllowlistedSenders   []string
 	RemovedAllowlistedSenders []string
-	FeeUSDCents               *uint16
-	GasForVerification        *uint32
-	PayloadSizeBytes          *uint16
+	// FeeUSDCents is the flat verification fee charged in USD cents.
+	// nil = adapter default (0 for EVM).
+	FeeUSDCents *uint16
+	// GasForVerification is the gas limit allocated for signature verification.
+	// nil = adapter default (60_000 for EVM).
+	GasForVerification *uint32
+	// PayloadSizeBytes is the maximum accepted payload size in bytes.
+	// nil = adapter default (390 for EVM).
+	PayloadSizeBytes *uint16
 }
 
+// CommitteeVerifierInputConfig configures a single CommitteeVerifier contract on a local chain.
 type CommitteeVerifierInputConfig struct {
-	CommitteeQualifier    string
-	RemoteChains          map[uint64]CommitteeVerifierRemoteChainConfig
+	// CommitteeQualifier must match a committee key in the NOPTopology. Required.
+	CommitteeQualifier string
+	// RemoteChains maps remote chain selectors to their per-lane CommitteeVerifier overrides.
+	// An empty entry (CommitteeVerifierRemoteChainConfig{}) uses all adapter defaults.
+	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfig
+	// AllowedFinalityConfig specifies the finality conditions the verifier will enforce.
+	// nil = use the local chain adapter's GetDefaultFinalityConfig().
 	AllowedFinalityConfig *finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
 }
 
 // PartialRemoteChainConfig is the user-facing input for a single remote chain. All fields
-// are optional, but their empty values are resolved from different sources:
-//   - adapter-backed remote-chain settings fall back to the remote chain family adapter's
-//     defaults (via GetDefaultRemoteChainConfig and GetDefaultFeeQuoterDestChainConfig);
+// are optional; their zero/nil values resolve from different sources:
+//   - adapter-backed fields fall back to the remote chain family adapter's defaults
+//     (GetDefaultRemoteChainConfig and GetDefaultFeeQuoterDestChainConfig);
 //   - contract addresses (OnRamp, OffRamp, Executor) are resolved automatically from the
 //     datastore; and
-//   - empty DefaultInboundCCVs / DefaultOutboundCCVs do not use adapter defaults and instead
-//     auto-resolve via the committee verifier contract registry.
+//   - empty DefaultInboundCCVs / DefaultOutboundCCVs auto-resolve via the committee verifier
+//     contract registry (using the "default" qualifier).
 //
-// An empty DefaultInboundCCVs or DefaultOutboundCCVs slice means "use the auto-resolved CCV
-// set for this lane". LaneMandatedInboundCCVs / LaneMandatedOutboundCCVs are additional
-// caller-specified CCVs that are enforced on top of that default resolution.
+// LaneMandatedInboundCCVs / LaneMandatedOutboundCCVs are additional caller-specified CCVs
+// enforced on top of that default resolution.
 //
-// Minimal usage: `remoteChainSelector: {}` — adapter-backed fields use their defaults,
+// Minimal usage: `remoteChainSelector: {}` — all adapter defaults apply,
 // contracts are datastore-resolved, and CCVs are auto-resolved.
 type PartialRemoteChainConfig struct {
-	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  string // defaults to "default" if empty
-	DefaultInboundCCVs        []datastore.AddressRef
-	LaneMandatedInboundCCVs   []datastore.AddressRef
-	DefaultOutboundCCVs       []datastore.AddressRef
-	LaneMandatedOutboundCCVs  []datastore.AddressRef
-	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides
-	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig // nil = use adapter default
-	BaseExecutionGasCost      *uint32                           // nil = use adapter default
-	TokenReceiverAllowed      *bool
-	MessageNetworkFeeUSDCents *uint16 // nil = use adapter default
-	TokenNetworkFeeUSDCents   *uint16 // nil = use adapter default
+	// AllowTrafficFrom controls whether inbound traffic from this remote chain is accepted.
+	// nil = adapter default (true for EVM).
+	AllowTrafficFrom *bool
+	// DefaultExecutorQualifier selects the Executor proxy contract used for this lane.
+	// Empty string defaults to "default".
+	DefaultExecutorQualifier string
+	// DefaultInboundCCVs is the default set of CommitteeVerifier addresses used to verify
+	// inbound messages from this remote chain.
+	// Empty = auto-resolved from the "default" qualifier via CommitteeVerifierContractRegistry.
+	DefaultInboundCCVs []datastore.AddressRef
+	// LaneMandatedInboundCCVs are additional inbound CCVs always required on top of
+	// DefaultInboundCCVs. Empty = none.
+	LaneMandatedInboundCCVs []datastore.AddressRef
+	// DefaultOutboundCCVs is the default set of CommitteeVerifier addresses used to verify
+	// outbound messages to this remote chain.
+	// Empty = auto-resolved from the "default" qualifier via CommitteeVerifierContractRegistry.
+	DefaultOutboundCCVs []datastore.AddressRef
+	// LaneMandatedOutboundCCVs are additional outbound CCVs always required on top of
+	// DefaultOutboundCCVs. Empty = none.
+	LaneMandatedOutboundCCVs []datastore.AddressRef
+	// FeeQuoterDestChainConfig overrides individual FeeQuoter destination-chain parameters.
+	// Only non-nil pointer fields take effect; nil fields fall back to the remote adapter's
+	// GetDefaultFeeQuoterDestChainConfig(). ChainFamilySelector is always derived from the
+	// remote chain adapter and cannot be overridden here.
+	FeeQuoterDestChainConfig adapters.FeeQuoterDestChainConfigOverrides
+	// ExecutorDestChainConfig sets the Executor fee and enabled flag for this lane.
+	// nil = adapter default.
+	ExecutorDestChainConfig *adapters.ExecutorDestChainConfig
+	// BaseExecutionGasCost is the base gas cost for executing a message from this remote chain.
+	// nil = adapter default (175_000 for EVM).
+	BaseExecutionGasCost *uint32
+	// TokenReceiverAllowed controls whether token-transfer messages are accepted from this
+	// remote chain. nil = adapter default (false for EVM).
+	TokenReceiverAllowed *bool
+	// MessageNetworkFeeUSDCents is the flat fee (in USD cents) charged per non-token message.
+	// nil = adapter default (10 for EVM).
+	MessageNetworkFeeUSDCents *uint16
+	// TokenNetworkFeeUSDCents is the flat fee (in USD cents) charged per token-transfer message.
+	// nil = adapter default (25 for EVM).
+	TokenNetworkFeeUSDCents *uint16
 }
 
 // PartialChainConfig describes the desired state for a single local chain. Well-known contract
@@ -78,9 +122,16 @@ type PartialRemoteChainConfig struct {
 // chains, so per-source/dest configuration (e.g. different fee quoter parameters per
 // destination) is supported naturally.
 type PartialChainConfig struct {
-	ChainSelector      uint64
+	// ChainSelector identifies the chain to configure. Required; must exist in the environment's BlockChains.
+	ChainSelector uint64
+	// CommitteeVerifiers is the list of CommitteeVerifier contracts to configure on this chain.
+	// Each entry maps to one CommitteeVerifier contract (identified by CommitteeQualifier).
+	// Empty slice = no CommitteeVerifier configuration is applied for this chain.
 	CommitteeVerifiers []CommitteeVerifierInputConfig
-	RemoteChains       map[uint64]PartialRemoteChainConfig
+	// RemoteChains maps remote chain selectors to their per-lane configuration.
+	// An empty entry (PartialRemoteChainConfig{}) relies entirely on adapter defaults.
+	// Empty map = no remote-chain lane configuration is applied for this chain.
+	RemoteChains map[uint64]PartialRemoteChainConfig
 	// FamilyExtras holds chain-family-specific configuration that the generic
 	// changeset passes through opaquely to the family adapter's sequence.
 	// All values must be serializable.
@@ -446,39 +497,16 @@ func resolveRemoteChainConfig(
 		remoteAdapter.GetDefaultFeeQuoterDestChainConfig(),
 		inCfg.FeeQuoterDestChainConfig,
 	)
+	// ChainFamilySelector is always authoritative from the remote adapter, regardless of
+	// what the defaults or user-supplied overrides contain.
 	fqConfig.ChainFamilySelector = remoteAdapter.GetChainFamilySelector()
 
 	defaults := remoteAdapter.GetDefaultRemoteChainConfig()
 
-	allowTrafficFrom := defaults.AllowTrafficFrom
-	if inCfg.AllowTrafficFrom != nil {
-		allowTrafficFrom = *inCfg.AllowTrafficFrom
-	}
-
-	executorConfig := defaults.ExecutorDestChainConfig
-	if inCfg.ExecutorDestChainConfig != nil {
-		executorConfig = *inCfg.ExecutorDestChainConfig
-	}
-
-	baseExecutionGasCost := defaults.BaseExecutionGasCost
-	if inCfg.BaseExecutionGasCost != nil {
-		baseExecutionGasCost = *inCfg.BaseExecutionGasCost
-	}
-
-	tokenReceiverAllowed := defaults.TokenReceiverAllowed
-	if inCfg.TokenReceiverAllowed != nil {
-		tokenReceiverAllowed = *inCfg.TokenReceiverAllowed
-	}
-
-	messageNetworkFeeUSDCents := defaults.MessageNetworkFeeUSDCents
-	if inCfg.MessageNetworkFeeUSDCents != nil {
-		messageNetworkFeeUSDCents = *inCfg.MessageNetworkFeeUSDCents
-	}
-
-	tokenNetworkFeeUSDCents := defaults.TokenNetworkFeeUSDCents
-	if inCfg.TokenNetworkFeeUSDCents != nil {
-		tokenNetworkFeeUSDCents = *inCfg.TokenNetworkFeeUSDCents
-	}
+	// Apply per-field user overrides on top of adapter defaults via coalesce.
+	// Pointer fields: nil = keep adapter default; non-nil = use caller value.
+	allowTrafficFrom := coalesce(inCfg.AllowTrafficFrom, defaults.AllowTrafficFrom)
+	tokenReceiverAllowed := coalesce(inCfg.TokenReceiverAllowed, defaults.TokenReceiverAllowed)
 
 	return adapters.RemoteChainConfig[[]byte, string]{
 		AllowTrafficFrom:          &allowTrafficFrom,
@@ -490,12 +518,12 @@ func resolveRemoteChainConfig(
 		DefaultOutboundCCVs:       defaultOutboundCCVs,
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  fqConfig,
-		ExecutorDestChainConfig:   executorConfig,
+		ExecutorDestChainConfig:   coalesce(inCfg.ExecutorDestChainConfig, defaults.ExecutorDestChainConfig),
 		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
-		BaseExecutionGasCost:      baseExecutionGasCost,
+		BaseExecutionGasCost:      coalesce(inCfg.BaseExecutionGasCost, defaults.BaseExecutionGasCost),
 		TokenReceiverAllowed:      &tokenReceiverAllowed,
-		MessageNetworkFeeUSDCents: messageNetworkFeeUSDCents,
-		TokenNetworkFeeUSDCents:   tokenNetworkFeeUSDCents,
+		MessageNetworkFeeUSDCents: coalesce(inCfg.MessageNetworkFeeUSDCents, defaults.MessageNetworkFeeUSDCents),
+		TokenNetworkFeeUSDCents:   coalesce(inCfg.TokenNetworkFeeUSDCents, defaults.TokenNetworkFeeUSDCents),
 	}, nil
 }
 
@@ -579,29 +607,13 @@ func mergeCommitteeVerifierRemoteChainConfig(
 	overrides CommitteeVerifierRemoteChainConfig,
 	signatureConfig adapters.CommitteeVerifierSignatureQuorumConfig,
 ) adapters.CommitteeVerifierRemoteChainConfig {
-	allowlistEnabled := defaults.AllowlistEnabled
-	if overrides.AllowlistEnabled != nil {
-		allowlistEnabled = *overrides.AllowlistEnabled
-	}
-	feeUSDCents := defaults.FeeUSDCents
-	if overrides.FeeUSDCents != nil {
-		feeUSDCents = *overrides.FeeUSDCents
-	}
-	gasForVerification := defaults.GasForVerification
-	if overrides.GasForVerification != nil {
-		gasForVerification = *overrides.GasForVerification
-	}
-	payloadSizeBytes := defaults.PayloadSizeBytes
-	if overrides.PayloadSizeBytes != nil {
-		payloadSizeBytes = *overrides.PayloadSizeBytes
-	}
 	return adapters.CommitteeVerifierRemoteChainConfig{
-		AllowlistEnabled:          allowlistEnabled,
+		AllowlistEnabled:          coalesce(overrides.AllowlistEnabled, defaults.AllowlistEnabled),
 		AddedAllowlistedSenders:   overrides.AddedAllowlistedSenders,
 		RemovedAllowlistedSenders: overrides.RemovedAllowlistedSenders,
-		FeeUSDCents:               feeUSDCents,
-		GasForVerification:        gasForVerification,
-		PayloadSizeBytes:          payloadSizeBytes,
+		FeeUSDCents:               coalesce(overrides.FeeUSDCents, defaults.FeeUSDCents),
+		GasForVerification:        coalesce(overrides.GasForVerification, defaults.GasForVerification),
+		PayloadSizeBytes:          coalesce(overrides.PayloadSizeBytes, defaults.PayloadSizeBytes),
 		SignatureConfig:           signatureConfig,
 	}
 }
@@ -681,4 +693,14 @@ func deriveFamiliesFromChains(chains []PartialChainConfig) []string {
 		selectors = append(selectors, c.ChainSelector)
 	}
 	return deriveFamiliesFromSelectors(selectors)
+}
+
+// coalesce returns the dereferenced override if non-nil, otherwise returns def.
+// It is the canonical way to apply a user-supplied optional override on top of an
+// adapter-supplied default throughout this changeset.
+func coalesce[T any](override *T, def T) T {
+	if override != nil {
+		return *override
+	}
+	return def
 }
