@@ -5,7 +5,7 @@ import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../../../libraries/Pool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
+import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
