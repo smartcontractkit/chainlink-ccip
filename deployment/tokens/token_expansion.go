@@ -492,7 +492,7 @@ func ResolveAdapterAndRefs(e cldf.Environment, reg *TokenAdapterRegistry, sel ui
 	if derivedTokenAddr, deriveErr := adapter.DeriveTokenAddress(e, sel, fullPoolRef); deriveErr != nil {
 		fullTokenRef, err = ResolveTokenRef(e, reg, sel, tokenRef)
 		if err != nil {
-			return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref for chain selector %d: %w", sel, err)
+			return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("token derivation failed (%w) and fallback token ref resolution was unsuccessful for chain selector %d: %w", deriveErr, sel, err)
 		}
 	} else {
 		fullTokenRef, err = ResolveTokenRef(e, reg, sel, datastore.AddressRef{ChainSelector: sel, Address: derivedTokenAddr})

@@ -238,6 +238,7 @@ func convertRemoteChainConfig(
 		derivedTokenAddr, deriveErr := remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
 		switch {
 		case deriveErr == nil:
+			e.Logger.Infof("Successfully derived remote token address %s for remote chain selector %d from remote pool ref %s", derivedTokenAddr, remoteChainSelector, datastore_utils.SprintRef(*inCfg.RemotePool))
 			resolvedRef, err := ResolveTokenRef(e, tokenAdapterRegistry, remoteChainSelector, datastore.AddressRef{ChainSelector: remoteChainSelector, Address: derivedTokenAddr})
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to resolve remote token after derivation %s: %w", derivedTokenAddr, err)
@@ -247,6 +248,7 @@ func convertRemoteChainConfig(
 				return outCfg, fmt.Errorf("failed to convert resolved remote token to bytes %s: %w", derivedTokenAddr, err)
 			}
 		case inCfg.RemoteToken != nil:
+			e.Logger.Infof("Derivation of remote token address failed for remote chain selector %d (%s). Falling back to resolving remote token from provided token ref %s", remoteChainSelector, deriveErr.Error(), datastore_utils.SprintRef(*inCfg.RemoteToken))
 			resolvedRef, err := ResolveTokenRef(e, tokenAdapterRegistry, remoteChainSelector, *inCfg.RemoteToken)
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
@@ -256,7 +258,7 @@ func convertRemoteChainConfig(
 				return outCfg, fmt.Errorf("failed to convert remote token ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
 			}
 		default:
-			return outCfg, fmt.Errorf("failed to derive remote token address and no remote token ref provided for remote chain selector %d", remoteChainSelector)
+			return outCfg, fmt.Errorf("failed to derive remote token address and no remote token ref provided for remote chain selector %d: %w", remoteChainSelector, deriveErr)
 		}
 
 		outCfg.RemoteToken = common.LeftPadBytes(outCfg.RemoteToken, 32)
