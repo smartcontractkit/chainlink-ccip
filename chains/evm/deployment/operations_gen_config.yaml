@@ -440,6 +440,16 @@ contracts:
       - name: getPath
         access: public
 
+  - contract_name: TokenPoolFactory
+    version: "2.0.0"
+    functions:
+      - name: deployTokenAndTokenPool
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: deployTokenPoolWithExistingToken
+        access: public
+
   - contract_name: CCTPThroughCCVTokenPool
     version: "2.0.0"
     functions:

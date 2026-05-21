@@ -37,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool_factory"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -348,6 +349,25 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if hasOnchainDiff {
 			writes = append(writes, addRegistryModuleReport)
 		}
+
+		// deploy TokenPoolFactory
+		tokenPoolFactoryRef, err := contract_utils.MaybeDeployContract(
+			b, token_pool_factory.Deploy, chain,
+			upstream.DeployInput[token_pool_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(token_pool_factory.ContractType, *token_pool_factory.Version),
+				ChainSelector:  chain.Selector,
+				Args: token_pool_factory.ConstructorArgs{
+					TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
+					TokenAdminModule:   common.HexToAddress(registryModuleOwnerCustomRef.Address),
+					RmnProxy:           common.HexToAddress(rmnProxyRef.Address),
+					CcipRouter:         common.HexToAddress(routerRef.Address),
+				},
+			}, input.ExistingAddresses)
+		if err != nil {
+			return output, err
+		}
+
+		addresses = append(addresses, tokenPoolFactoryRef)
 
 		// Deploy FeeQuoter
 		priceUpdaters := []common.Address{chain.DeployerKey.From}
