@@ -299,8 +299,8 @@ func MergeRefs(ref1, ref2 *datastore.AddressRef) (datastore.AddressRef, error) {
 
 func AddressRefToFilters(ref datastore.AddressRef) []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef] {
 	// NOTE: filters are applied sequentially, so it is more efficient to order
-	// to place the more selective filters first so that each subsequent filter
-	// iteration is working with a smaller set of refs.
+	// the more selective filters first so that each subsequent filter operates
+	// on a smaller set of refs.
 	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
 	if ref.ChainSelector != 0 {
 		filters = append(filters, datastore.AddressRefByChainSelector(ref.ChainSelector))
