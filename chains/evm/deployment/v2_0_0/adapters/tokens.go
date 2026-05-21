@@ -12,7 +12,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -20,11 +19,8 @@ import (
 	tpBindingsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 
 	bnmOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	bnmDripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	bnmERC677Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	bnmDripOps150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -63,7 +59,6 @@ func NewTokenAdapter() *TokenAdapter {
 	}
 }
 
-// ConfigureTokenForTransfersSequence returns the sequence for configuring an EVM token with a 2.0.0 token pool.
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.ConfigureTokenForTransfers
 }
@@ -136,7 +131,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			poolType := deployment.ContractType(input.PoolType)
 
 			grantMintBurnRoles := func(poolRef datastore.AddressRef) (*mcms_types.BatchOperation, error) {
-				if !isBurnMintPoolType(poolType) {
+				if !t.EVMTokenBase.IsBurnMintPoolType(poolType.String()) {
 					return nil, nil
 				}
 
@@ -144,7 +139,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 					ChainSelector: input.ChainSelector,
 					Address:       tokenAddr,
 				}, input.ChainSelector, datastore_utils.FullRef)
-				if lookupErr != nil || !isBurnMintTokenType(tokenRef.Type) {
+				if lookupErr != nil || !t.EVMTokenBase.IsBurnMintTokenType(tokenRef.Type.String()) {
 					return nil, nil
 				}
 
@@ -159,7 +154,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 					Args:          poolAddr,
 				}
 				var writes []contract.WriteOutput
-				if isBurnMintERC677TokenType(tokenRef.Type) {
+				if t.EVMTokenBase.IsBurnMintERC677TokenType(tokenRef.Type.String()) {
 					var grantErr error
 					writes, grantErr = bnmERC677Ops.PrepareGrantMintAndBurnRoles(
 						b,
@@ -226,7 +221,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 						FeeAggregator:    feeAggregator,
 					}
 					if input.RouterRef != nil {
-						resolved, err := resolveRouterAddress(input.ExistingDataStore, input.ChainSelector, input.RouterRef)
+						resolved, err := t.EVMTokenBase.ResolveRouterAddress(input.ExistingDataStore, input.ChainSelector, input.RouterRef)
 						if err != nil {
 							return sequences.OnChainOutput{}, err
 						}
@@ -262,7 +257,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get decimals for token at %s: %w", tokenAddr, err)
 			}
 
-			resolvedRouter, err := resolveRouterAddress(input.ExistingDataStore, input.ChainSelector, input.RouterRef)
+			resolvedRouter, err := t.EVMTokenBase.ResolveRouterAddress(input.ExistingDataStore, input.ChainSelector, input.RouterRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -304,13 +299,13 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			var deployOutput sequences.OnChainOutput
 
 			switch {
-			case isBurnMintPoolType(poolType):
+			case t.EVMTokenBase.IsBurnMintPoolType(poolType.String()):
 				report, execErr := cldf_ops.ExecuteSequence(b, evm_tokens.DeployBurnMintTokenPool, evmChain, internalInput)
 				if execErr != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool on chain %d: %w", input.ChainSelector, execErr)
 				}
 				deployOutput = report.Output
-			case isLockReleasePoolType(poolType):
+			case t.EVMTokenBase.IsLockReleasePoolType(poolType.String()):
 				report, execErr := cldf_ops.ExecuteSequence(b, evm_tokens.DeployLockReleaseTokenPool, evmChain, internalInput)
 				if execErr != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool on chain %d: %w", input.ChainSelector, execErr)
@@ -324,7 +319,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			result.Addresses = append(result.Addresses, deployOutput.Addresses...)
 			result.BatchOps = append(result.BatchOps, deployOutput.BatchOps...)
 
-			if isBurnMintPoolType(poolType) && len(deployOutput.Addresses) >= 1 {
+			if t.EVMTokenBase.IsBurnMintPoolType(poolType.String()) && len(deployOutput.Addresses) >= 1 {
 				batchOp, err := grantMintBurnRoles(deployOutput.Addresses[0])
 				if err != nil {
 					return sequences.OnChainOutput{}, err
@@ -337,177 +332,6 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 			return result, nil
 		},
 	)
-}
-
-// DeriveTokenDecimals has v2.0.0-specific logic: it falls back to ERC20.Decimals()
-// when the pool's GetTokenDecimals fails (e.g., proxy pools like USDCTokenPoolProxy).
-func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, tokenBytes []byte) (uint8, error) {
-	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-	if !ok {
-		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
-	}
-	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       common.HexToAddress(poolRef.Address),
-	})
-	if err == nil {
-		return getTokenDecimalsReport.Output, nil
-	}
-	poolErr := err
-
-	tokenAddr := common.BytesToAddress(tokenBytes)
-	if tokenAddr.Cmp(common.Address{}) == 0 {
-		getTokenReport, getTokErr := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(poolRef.Address),
-		})
-		if getTokErr != nil {
-			return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w", poolRef.Address, evmChain, poolErr)
-		}
-		tokenAddr = getTokenReport.Output
-	}
-
-	tokenContract, newErr := erc20.NewERC20(tokenAddr, evmChain.Client)
-	if newErr != nil {
-		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w; failed to bind erc20 at token %s: %w", poolRef.Address, evmChain, poolErr, tokenAddr.Hex(), newErr)
-	}
-	decimals, erc20Err := tokenContract.Decimals(&bind.CallOpts{Context: e.GetContext()})
-	if erc20Err != nil {
-		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w; erc20.decimals on token %s also failed: %w", poolRef.Address, evmChain, poolErr, tokenAddr.Hex(), erc20Err)
-	}
-	return decimals, nil
-}
-
-// SetTokenPoolRateLimits applies one or more rate limit buckets (default and/or fast-finality) in a single
-// setRateLimitConfig call. Optional AllowedFinalityConfig is applied first when non-zero.
-func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"evm-2.0-adapter:set-token-pool-rate-limits",
-		cciputils.Version_2_0_0,
-		"Set rate limits for a 2.0.0 token pool on an EVM chain",
-		func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.TPRLRemotes) (sequences.OnChainOutput, error) {
-			evmChain, ok := chains.EVMChains()[input.ChainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-			}
-
-			tokenPoolAddrBytes, err := t.AddressRefToBytes(input.TokenPoolRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref: %w", err)
-			}
-			tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
-			if tokenPoolAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref %+v is zero", input.TokenPoolRef)
-			}
-
-			var writes []contract.WriteOutput
-			if !input.AllowedFinalityConfig.IsZero() {
-				currentFinalityConfig, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       tokenPoolAddr,
-					Args:          struct{}{},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config for token pool at %s on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
-				}
-				if input.AllowedFinalityConfig.Raw() != currentFinalityConfig.Output {
-					setFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, contract.FunctionInput[[4]byte]{
-						ChainSelector: input.ChainSelector,
-						Address:       tokenPoolAddr,
-						Args:          input.AllowedFinalityConfig.Raw(),
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config on token pool at %s on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
-					}
-					writes = append(writes, setFinalityReport.Output)
-				}
-			}
-
-			args := make([]token_pool.RateLimitConfigArgs, 0, len(input.RateLimitBuckets))
-			for _, bucket := range input.RateLimitBuckets {
-				args = append(args, token_pool.RateLimitConfigArgs{
-					RemoteChainSelector: input.RemoteChainSelector,
-					FastFinality:        bucket.FastFinality,
-					OutboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: bucket.OutboundRateLimiterConfig.IsEnabled,
-						Capacity:  bucket.OutboundRateLimiterConfig.Capacity,
-						Rate:      bucket.OutboundRateLimiterConfig.Rate,
-					},
-					InboundRateLimiterConfig: token_pool.Config{
-						IsEnabled: bucket.InboundRateLimiterConfig.IsEnabled,
-						Capacity:  bucket.InboundRateLimiterConfig.Capacity,
-						Rate:      bucket.InboundRateLimiterConfig.Rate,
-					},
-				})
-			}
-
-			if len(args) > 0 {
-				rateLimitsReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, evmChain, contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       tokenPoolAddr,
-					Args:          args,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit config on pool %s: %w", tokenPoolAddr, err)
-				}
-				writes = append(writes, rateLimitsReport.Output)
-			}
-
-			if len(writes) == 0 {
-				return sequences.OnChainOutput{}, nil
-			}
-
-			batchOp, err := contract.NewBatchOperationFromWrites(writes)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
-			}
-			return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
-		})
-}
-
-// GetOnchainInboundRateLimit overrides the v1.x EVMPoolAdapter implementation so v2.0.0 pools
-// can be read via getCurrentRateLimiterState(remoteChainSelector, fastFinality), which supports
-// both default and fast-finality buckets. tokenRef is unused on EVM (pool address suffices).
-func (t *TokenAdapter) GetOnchainInboundRateLimit(
-	e deployment.Environment,
-	chainSelector uint64,
-	poolRef datastore.AddressRef,
-	_ datastore.AddressRef,
-	remoteSelector uint64,
-	fastFinality bool,
-) (tokens.RateLimiterConfig, error) {
-	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-	if !ok {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
-	}
-	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
-	}
-	addrBytes, err := t.AddressRefToBytes(addrRef)
-	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to convert pool address ref to bytes: %w", err)
-	}
-	poolAddr := common.BytesToAddress(addrBytes)
-	if poolAddr == (common.Address{}) {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("token pool address for ref (%+v) is zero", addrRef)
-	}
-	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
-	// reports by input hash, and earlier sequences in the same Apply run may have read this
-	// same lane while it was still uninitialized — caching that stale result.
-	tp, err := tpBindingsV2_0_0.NewTokenPool(poolAddr, evmChain.Client)
-	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v2.0.0 token pool contract at %s: %w", poolAddr.Hex(), err)
-	}
-	state, err := tp.GetCurrentRateLimiterState(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, remoteSelector, fastFinality)
-	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d (fastFinality=%v): %w", remoteSelector, fastFinality, err)
-	}
-	return tokens.RateLimiterConfig{
-		IsEnabled: state.InboundRateLimiterState.IsEnabled,
-		Capacity:  state.InboundRateLimiterState.Capacity,
-		Rate:      state.InboundRateLimiterState.Rate,
-	}, nil
 }
 
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -573,11 +397,11 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 // stubs because the v2.0.0 adapter overrides the methods that use them.
 type poolOpsV200 struct{}
 
-func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.Address) (common.Address, error) {
+func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
 	res, err := cldf_ops.ExecuteOperation(b,
-		token_pool.GetToken, ch,
+		token_pool.GetToken, chain,
 		contract.FunctionInput[struct{}]{
-			ChainSelector: ch.Selector,
+			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 		},
 	)
@@ -587,88 +411,149 @@ func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, ch evm.Chain, poolAddr common.
 	return res.Output, nil
 }
 
-func (p *poolOpsV200) GetTokenDecimals(_ context.Context, _ evm.Chain, _ common.Address) (uint8, error) {
-	return 0, errors.New("poolOpsV200.GetTokenDecimals: not used; v2.0.0 adapter overrides DeriveTokenDecimals")
+func (p *poolOpsV200) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error) {
+	res, err := cldf_ops.ExecuteOperation(b,
+		token_pool.GetTokenDecimals, chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+		},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("GetTokenDecimals v2.0.0: %w", err)
+	}
+	return res.Output, nil
 }
 
-func (p *poolOpsV200) GetPoolAdmins(_ context.Context, _ *evm.Chain, _ common.Address) (common.Address, common.Address, error) {
-	return common.Address{}, common.Address{}, errors.New("poolOpsV200.GetPoolAdmins: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+func (p *poolOpsV200) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (common.Address, common.Address, error) {
+	pool, err := token_pool.NewTokenPoolContract(poolAddr, chain.Client)
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	owner, err := pool.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to get owner of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	cfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to get dynamic config of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	return owner, cfg.RateLimitAdmin, nil
 }
 
 func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokens.TPRLRemotes) ([]contract.WriteOutput, error) {
-	return nil, errors.New("poolOpsV200.SetRateLimiterConfig: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits")
+	var writes []contract.WriteOutput
+	if !input.AllowedFinalityConfig.IsZero() {
+		currentFinalityConfig, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get allowed finality config for token pool at %s on chain %d: %w", poolAddr.Hex(), input.ChainSelector, err)
+		}
+		if input.AllowedFinalityConfig.Raw() != currentFinalityConfig.Output {
+			setFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
+				ChainSelector: input.ChainSelector,
+				Address:       poolAddr,
+				Args:          input.AllowedFinalityConfig.Raw(),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to set allowed finality config on token pool at %s on chain %d: %w", poolAddr.Hex(), input.ChainSelector, err)
+			}
+			writes = append(writes, setFinalityReport.Output)
+		}
+	}
+
+	args := make([]token_pool.RateLimitConfigArgs, 0, len(input.RateLimitBuckets))
+	for _, bucket := range input.RateLimitBuckets {
+		args = append(args, token_pool.RateLimitConfigArgs{
+			RemoteChainSelector: input.RemoteChainSelector,
+			FastFinality:        bucket.FastFinality,
+			OutboundRateLimiterConfig: token_pool.Config{
+				IsEnabled: bucket.OutboundRateLimiterConfig.IsEnabled,
+				Capacity:  bucket.OutboundRateLimiterConfig.Capacity,
+				Rate:      bucket.OutboundRateLimiterConfig.Rate,
+			},
+			InboundRateLimiterConfig: token_pool.Config{
+				IsEnabled: bucket.InboundRateLimiterConfig.IsEnabled,
+				Capacity:  bucket.InboundRateLimiterConfig.Capacity,
+				Rate:      bucket.InboundRateLimiterConfig.Rate,
+			},
+		})
+	}
+
+	if len(args) > 0 {
+		rateLimitsReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args:          args,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set rate limit config on pool %s: %w", poolAddr, err)
+		}
+		writes = append(writes, rateLimitsReport.Output)
+	}
+
+	if len(writes) == 0 {
+		return nil, nil
+	}
+
+	return writes, nil
 }
 
 func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (contract.WriteOutput, error) {
-	return contract.WriteOutput{}, errors.New("poolOpsV200.SetRateLimitAdmin: not used; v2.0.0 adapter overrides SetRateLimitAdmin")
+	pool, err := token_pool.NewTokenPoolContract(poolAddr, chain.Client)
+	if err != nil {
+		return contract.WriteOutput{}, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	cfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: b.GetContext()})
+	if err != nil {
+		return contract.WriteOutput{}, fmt.Errorf("failed to get dynamic config of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	if newAdmin == cfg.RateLimitAdmin {
+		b.Logger.Info("Rate limit admin is already set to the desired address; no update needed")
+		return contract.WriteOutput{}, nil
+	}
+
+	res, err := cldf_ops.ExecuteOperation(b,
+		token_pool.SetDynamicConfig, chain,
+		contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args: token_pool.SetDynamicConfigArgs{
+				RateLimitAdmin: newAdmin,
+				FeeAdmin:       cfg.FeeAdmin,
+				Router:         cfg.Router,
+			},
+		},
+	)
+	if err != nil {
+		return contract.WriteOutput{}, fmt.Errorf("SetDynamicConfig v2.0.0: %w", err)
+	}
+
+	return res.Output, nil
 }
 
-func (p *poolOpsV200) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokens.RateLimiterConfig, error) {
-	return tokens.RateLimiterConfig{}, errors.New("poolOpsV200.GetCurrentInboundRateLimit: not used; v2.0.0 adapter overrides SetTokenPoolRateLimits and implements RateLimitReaderAdapter directly")
+func (p *poolOpsV200) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.RateLimiterConfig, error) {
+	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
+	// reports by input hash, and earlier sequences in the same Apply run may have read this
+	// same lane while it was still uninitialized — caching that stale result.
+	tp, err := tpBindingsV2_0_0.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v2.0.0 token pool contract at %s: %w", poolAddr.Hex(), err)
+	}
+	state, err := tp.GetCurrentRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector, ff)
+	if err != nil {
+		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d (fastFinality=%v): %w", remoteSelector, ff, err)
+	}
+	return tokens.RateLimiterConfig{
+		IsEnabled: state.InboundRateLimiterState.IsEnabled,
+		Capacity:  state.InboundRateLimiterState.Capacity,
+		Rate:      state.InboundRateLimiterState.Rate,
+	}, nil
 }
 
 func (p *poolOpsV200) Version() *semver.Version {
 	return cciputils.Version_2_0_0
-}
-
-func isBurnMintPoolType(poolType deployment.ContractType) bool {
-	return poolType == cciputils.BurnMintTokenPool ||
-		poolType == cciputils.BurnFromMintTokenPool ||
-		poolType == cciputils.BurnWithFromMintTokenPool
-}
-
-func isLockReleasePoolType(poolType deployment.ContractType) bool {
-	return poolType == cciputils.LockReleaseTokenPool ||
-		poolType == siloed_lock_release_token_pool.ContractType
-}
-
-func isBurnMintTokenType(typ datastore.ContractType) bool {
-	return typ.String() == bnmOps.ContractType.String() ||
-		typ.String() == bnmDripOps.ContractType.String() ||
-		typ.String() == bnmDripOps150.ContractType.String() ||
-		isBurnMintERC677TokenType(typ)
-}
-
-func isBurnMintERC677TokenType(typ datastore.ContractType) bool {
-	return typ.String() == cciputils.BurnMintToken.String() ||
-		typ.String() == cciputils.ERC677TokenHelper.String()
-}
-
-// resolveRouterAddress returns the router address to wire into the pool.
-// If routerRef is nil, the chain's production Router is looked up in the datastore.
-// If routerRef.Address is non-empty, it is used directly (no datastore lookup).
-// Otherwise the ref is resolved against the datastore; ChainSelector is forced to
-// the target chain and Type defaults to the production Router when unset, so callers
-// targeting the TestRouter only need to set Type=router.TestRouterContractType.
-func resolveRouterAddress(
-	ds datastore.DataStore,
-	chainSelector uint64,
-	routerRef *datastore.AddressRef,
-) (common.Address, error) {
-	ref := datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(router.ContractType),
-	}
-	if routerRef != nil {
-		if routerRef.Address != "" {
-			if !common.IsHexAddress(routerRef.Address) {
-				return common.Address{}, fmt.Errorf("invalid RouterRef.Address %q: not a hex address", routerRef.Address)
-			}
-			addr := common.HexToAddress(routerRef.Address)
-			if addr == (common.Address{}) {
-				return common.Address{}, errors.New("RouterRef.Address resolves to the zero address")
-			}
-			return addr, nil
-		}
-		ref = *routerRef
-		ref.ChainSelector = chainSelector
-		if ref.Type == "" {
-			ref.Type = datastore.ContractType(router.ContractType)
-		}
-	}
-	resolved, err := datastore_utils.FindAndFormatRef(ds, ref, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find router (type=%q qualifier=%q) in datastore for chain %d: %w", ref.Type, ref.Qualifier, chainSelector, err)
-	}
-	return common.HexToAddress(resolved.Address), nil
 }

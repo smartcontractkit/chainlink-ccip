@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -35,7 +34,7 @@ var (
 // that wires into its own bindings/operations.
 type PoolOps interface {
 	GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error)
-	GetTokenDecimals(ctx context.Context, chain evm.Chain, poolAddr common.Address) (uint8, error)
+	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
 	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
@@ -44,7 +43,7 @@ type PoolOps interface {
 	// pass through the current inbound, and by RateLimitReaderAdapter for cross-chain validation.
 	// Returns a zero-value RateLimiterConfig (IsEnabled=false, Capacity=0, Rate=0) when the pool has
 	// no inbound configured for the lane.
-	GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error)
+	GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.RateLimiterConfig, error)
 	Version() *semver.Version
 }
 
@@ -153,17 +152,7 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 // not supported for v1.x EVM pools and returns an error. tokenRef is unused on EVM (pools are
 // keyed by pool address alone) and exists for parity with chain families that need the token
 // mint to resolve the read.
-func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(
-	e deployment.Environment,
-	chainSelector uint64,
-	poolRef datastore.AddressRef,
-	_ datastore.AddressRef,
-	remoteSelector uint64,
-	fastFinality bool,
-) (tokensapi.RateLimiterConfig, error) {
-	if fastFinality {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("v1.x EVM pools do not support fastFinality rate limit buckets")
-	}
+func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, _ datastore.AddressRef, remoteSelector uint64, fastFinality bool) (tokensapi.RateLimiterConfig, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
@@ -180,7 +169,7 @@ func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(
 	if poolAddr == (common.Address{}) {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("token pool address for ref (%+v) is zero", addrRef)
 	}
-	return a.Ops.GetCurrentInboundRateLimit(e.OperationsBundle, chain, poolAddr, remoteSelector)
+	return a.Ops.GetCurrentInboundRateLimit(e.OperationsBundle, chain, poolAddr, remoteSelector, fastFinality)
 }
 
 func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -253,7 +242,7 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			tarAddress, err := GetTokenAdminRegistryAddress(input.ExistingDataStore, chain.Selector, &a.EVMTokenBase)
+			tarAddress, err := a.EVMTokenBase.GetTokenAdminRegistryAddress(input.ExistingDataStore, chain.Selector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", chain.Selector, err)
 			}
@@ -385,7 +374,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			}
 
 			if !datastore_utils.IsAddressRefEmpty(poolRef) {
-				if tokenPoolRolesWrites, err := tidyTokenPoolRoles(b, chain, input, poolRef, toknRef); err != nil {
+				if tokenPoolRolesWrites, err := a.tidyTokenPoolRoles(b, chain, input, poolRef, toknRef); err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token pool roles: %w", err)
 				} else {
 					writes = append(writes, tokenPoolRolesWrites...)
@@ -414,7 +403,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				}
 			}
 
-			if tokenRolesWrites, err := tidyTokenRoles(b, chain, input, toknRef); err != nil {
+			if tokenRolesWrites, err := a.tidyTokenRoles(b, chain, input, toknRef); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token roles: %w", err)
 			} else {
 				writes = append(writes, tokenRolesWrites...)
@@ -436,7 +425,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 // tidyTokenPoolRoles grants a token pool the token-side roles required for its
 // pool type. Burn/mint pools delegate role selection to the registered token
 // strategy because token contracts expose different role APIs.
-func tidyTokenPoolRoles(
+func (a *EVMPoolAdapter) tidyTokenPoolRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
@@ -452,7 +441,7 @@ func tidyTokenPoolRoles(
 		return nil, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
 
-	if input.PoolType == cciputils.BurnMintTokenPool.String() {
+	if a.IsBurnMintPoolType(input.PoolType) {
 		tokenImpl, ok := tokenimpl.Get(deployment.ContractType(tokenRef.Type))
 		if !ok {
 			b.Logger.Warnf(
@@ -486,7 +475,7 @@ func tidyTokenPoolRoles(
 // (i.e. not deployed/not applicable which can be the case in test cases),
 // then it leaves the deployer account as an admin so the token isn't left
 // without an operator.
-func tidyTokenRoles(
+func (a *EVMPoolAdapter) tidyTokenRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
@@ -540,22 +529,4 @@ func tidyTokenRoles(
 	}
 
 	return append(grantWrites, revokeWrites...), nil
-}
-
-// GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.
-func GetTokenAdminRegistryAddress(ds datastore.DataStore, selector uint64, base *EVMTokenBase) (common.Address, error) {
-	filters := datastore.AddressRef{
-		Type:          datastore.ContractType(tarops.ContractType),
-		ChainSelector: selector,
-		Version:       tarops.Version,
-	}
-	ref, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils.FullRef)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
-	}
-	addr, err := base.AddressRefToBytes(ref)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-	return common.BytesToAddress(addr), nil
 }

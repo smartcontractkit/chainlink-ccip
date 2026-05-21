@@ -1,14 +1,20 @@
 package adapters
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	bnmERC20Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	bnmDripOpsV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	v1_0_0_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	bnmDripOpsV1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -47,13 +53,17 @@ func (a *EVMTokenBase) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInp
 }
 
 func (a *EVMTokenBase) DeployTokenVerify(e deployment.Environment, input tokensapi.DeployTokenInput) error {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-		ChainSelector: input.ChainSelector,
-		Type:          datastore.ContractType(input.Type),
-		Qualifier:     input.Symbol,
-	}, input.ChainSelector, datastore_utils.FullRef)
+	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore,
+		datastore.AddressRef{
+			ChainSelector: input.ChainSelector,
+			Type:          datastore.ContractType(input.Type),
+			Qualifier:     input.Symbol,
+		},
+		input.ChainSelector,
+		datastore_utils.FullRef,
+	)
 	if err == nil {
-		e.OperationsBundle.Logger.Info("Token already deployed at address:", tokenAddr.Address)
+		e.Logger.Info("Token already deployed at address:", tokenAddr.Address)
 		return nil
 	}
 
@@ -136,13 +146,13 @@ func (a *EVMTokenBase) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAu
 		})
 }
 
-func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}
-
 // Pool-specific stubs -- these are overridden by per-version adapters (v1.5.1, v1.6.1, v2.0.0).
 // EVMTokenBase is registered at v1.0.0 so callers that only need token deployment (DeployToken,
 // DeployTokenVerify) can obtain a valid adapter without importing a pool-version package.
+
+func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
 
 func (a *EVMTokenBase) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
@@ -256,4 +266,88 @@ func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.Bloc
 		Qualifier:     symbolReport.Output,
 		Address:       tokenAddress.Hex(),
 	}, nil
+}
+
+// ================================================================
+// === Version-agnostic helpers for all EVM token/pool versions ===
+// ================================================================
+
+// IsBurnMintPoolType returns true if the pool type is one of the burn-mint variants (standard or with from-mint).
+func (a *EVMTokenBase) IsBurnMintPoolType(poolType string) bool {
+	return poolType == cciputils.BurnMintTokenPool.String() ||
+		poolType == cciputils.BurnFromMintTokenPool.String() ||
+		poolType == cciputils.BurnWithFromMintTokenPool.String()
+}
+
+// IsLockReleasePoolType returns true if the pool type is one of the lock-release variants (standard or siloed).
+func (a *EVMTokenBase) IsLockReleasePoolType(poolType string) bool {
+	return poolType == cciputils.LockReleaseTokenPool.String() ||
+		poolType == cciputils.SiloedLockReleaseTokenPool.String()
+}
+
+// IsBurnMintTokenType returns true if the token type is one of the burn-mint variants (ERC20 or ERC677).
+func (a *EVMTokenBase) IsBurnMintTokenType(tokenType string) bool {
+	return tokenType == bnmERC20Ops.ContractType.String() ||
+		tokenType == bnmDripOpsV1_0_0.ContractType.String() ||
+		tokenType == bnmDripOpsV1_5_0.ContractType.String() ||
+		a.IsBurnMintERC677TokenType(tokenType)
+}
+
+// IsBurnMintERC677TokenType returns true if the token type is one of the burn-mint ERC677 variants.
+func (a *EVMTokenBase) IsBurnMintERC677TokenType(tokenType string) bool {
+	return tokenType == cciputils.BurnMintToken.String() ||
+		tokenType == cciputils.ERC677TokenHelper.String()
+}
+
+// resolveRouterAddress returns the router address to wire into the pool.
+// If routerRef is nil, the chain's production Router is looked up in the datastore.
+// If routerRef.Address is non-empty, it is used directly (no datastore lookup).
+// Otherwise the ref is resolved against the datastore; ChainSelector is forced to
+// the target chain and Type defaults to the production Router when unset, so callers
+// targeting the TestRouter only need to set Type=router.TestRouterContractType.
+func (a *EVMTokenBase) ResolveRouterAddress(ds datastore.DataStore, chainSelector uint64, routerRef *datastore.AddressRef) (common.Address, error) {
+	ref := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.ContractType),
+	}
+	if routerRef != nil {
+		if routerRef.Address != "" {
+			if !common.IsHexAddress(routerRef.Address) {
+				return common.Address{}, fmt.Errorf("invalid RouterRef.Address %q: not a hex address", routerRef.Address)
+			}
+			addr := common.HexToAddress(routerRef.Address)
+			if addr == (common.Address{}) {
+				return common.Address{}, errors.New("RouterRef.Address resolves to the zero address")
+			}
+			return addr, nil
+		}
+		ref = *routerRef
+		ref.ChainSelector = chainSelector
+		if ref.Type == "" {
+			ref.Type = datastore.ContractType(router.ContractType)
+		}
+	}
+	resolved, err := datastore_utils.FindAndFormatRef(ds, ref, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find router (type=%q qualifier=%q) in datastore for chain %d: %w", ref.Type, ref.Qualifier, chainSelector, err)
+	}
+	return common.HexToAddress(resolved.Address), nil
+}
+
+// GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.
+func (a *EVMTokenBase) GetTokenAdminRegistryAddress(ds datastore.DataStore, selector uint64) (common.Address, error) {
+	filters := datastore.AddressRef{
+		Type:          datastore.ContractType(tarops.ContractType),
+		ChainSelector: selector,
+		Version:       tarops.Version,
+	}
+	ref, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
+	}
+	addr, err := a.AddressRefToBytes(ref)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+	return common.BytesToAddress(addr), nil
 }

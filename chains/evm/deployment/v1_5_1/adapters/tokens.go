@@ -12,7 +12,7 @@ import (
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
-	v1_5_1_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
+	seqV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -40,7 +40,7 @@ func NewTokenAdapter() *TokenAdapter {
 	return &TokenAdapter{
 		EVMPoolAdapter: evm1_0_0.EVMPoolAdapter{
 			Ops:                &poolOpsV151{},
-			DeployTokenPoolSeq: v1_5_1_seq.DeployTokenPool,
+			DeployTokenPoolSeq: seqV1_5_1.DeployTokenPool,
 		},
 	}
 }
@@ -73,7 +73,7 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 				externalAdmin = common.HexToAddress(input.ExternalAdmin)
 			}
 
-			tarAddress, err := evm1_0_0.GetTokenAdminRegistryAddress(input.ExistingDataStore, input.ChainSelector, &t.EVMTokenBase)
+			tarAddress, err := t.EVMTokenBase.GetTokenAdminRegistryAddress(input.ExistingDataStore, input.ChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
@@ -134,12 +134,18 @@ func (p *poolOpsV151) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr comm
 	return res.Output, nil
 }
 
-func (p *poolOpsV151) GetTokenDecimals(ctx context.Context, chain evm.Chain, poolAddr common.Address) (uint8, error) {
-	pool, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+func (p *poolOpsV151) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error) {
+	res, err := cldf_ops.ExecuteOperation(b,
+		tpOps.GetTokenDecimals, chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+		},
+	)
 	if err != nil {
-		return 0, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+		return 0, fmt.Errorf("GetTokenDecimals v1.5.1: %w", err)
 	}
-	return pool.GetTokenDecimals(&bind.CallOpts{Context: ctx})
+	return res.Output, nil
 }
 
 func (p *poolOpsV151) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error) {
@@ -216,7 +222,7 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return report.Output, nil
 }
 
-func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error) {
+func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, _ bool) (tokensapi.RateLimiterConfig, error) {
 	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 	if err != nil {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
