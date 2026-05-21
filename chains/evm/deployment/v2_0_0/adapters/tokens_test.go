@@ -44,9 +44,6 @@ import (
 	burn_mint_erc677_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 
 	drip_v150_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-
-	// Enable token API address ref inference (token and pool refs will be sourced from the chain if they aren't present in the datastore)
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 )
 
 const (

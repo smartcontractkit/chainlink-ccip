@@ -302,22 +302,24 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token pool on chain %d: %w", input.ChainSelector, err)
 			}
+
 			result.Addresses = append(result.Addresses, out.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
-
-			var tokenRef datastore.AddressRef
 			if input.TokenRef == nil {
 				return sequences.OnChainOutput{}, errors.New("token ref must be provided in input to DeployTokenPoolForToken sequence for EVM pools")
-			} else {
-				tokenRef = input.TokenRef.Clone()
 			}
 
-			toknAddr, err := a.EVMTokenBase.ParseAddressRef(input.ExistingDataStore, tokenRef, input.ChainSelector)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for ref (%s): %w", datastore_utils.SprintRef(tokenRef), err)
-			}
-			if toknAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token address for ref (%s) is zero address", datastore_utils.SprintRef(tokenRef))
+			// NOTE: the token ref may be fully populated, but might not exist in the datastore
+			// (this can happen when using token address ref resolvers). In these situations we
+			// should avoid the datastore lookup altogether since it is doomed to fail and just
+			// use the input address ref directly. Failure to do this would cause this sequence
+			// to fail unnecessarily even when it has all the data it needs to succeed.
+			tokenRef := input.TokenRef.Clone()
+			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
+				tokenRef, err = datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenRef.Clone(), input.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token address for ref (%s) from datastore after token pool deployment: %w", datastore_utils.SprintRef(tokenRef), err)
+				}
 			}
 
 			var poolRef datastore.AddressRef
@@ -382,10 +384,10 @@ func (a *EVMPoolAdapter) tidyTokenPoolRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
-	poolRef datastore.AddressRef,
+	tokenPoolRef datastore.AddressRef,
 	tokenRef datastore.AddressRef,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenPoolAddr, err := datastore_utils_evm.ToEVMAddress(poolRef)
+	tokenPoolAddr, err := datastore_utils_evm.ToEVMAddress(tokenPoolRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
