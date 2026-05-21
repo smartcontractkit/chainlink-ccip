@@ -14,7 +14,7 @@ snapshot-diff: ## Make a snapshot for a specific product.
 
 .PHONY: foundry
 foundry: ## Install foundry.
-	foundryup --install v1.5.1
+	foundryup --install v1.7.1
 
 # it may be necessary to install libusb on your machine as a dependency for this script to work
 .PHONY: foundry-zksync

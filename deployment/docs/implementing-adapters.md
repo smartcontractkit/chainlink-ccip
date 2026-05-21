@@ -167,6 +167,51 @@ func (a *MyChainAdapter) DeriveTokenPoolCounterpart(e Environment, chainSelector
 }
 ```
 
+#### TokenRefResolver (optional)
+
+Register a `TokenRefResolver` when callers may supply **partial** token or pool refs (address only, or qualifier/type without a datastore row yet). The shared helpers `ResolveTokenPoolRef`, `ResolveTokenRef`, and `ResolveAdapterAndRefs` in `deployment/tokens` call into this interface after a datastore miss.
+
+**When to implement:** Same chain families that implement `TokenAdapter` and need address inference in changesets (token expansion with inferred refs, configure-for-transfers remote edges, rate limits with address-only pool refs).
+
+**Interface** ([tokens/product.go](../tokens/product.go)):
+
+```go
+type TokenRefResolver interface {
+    ResolveTokenPoolRef(b Bundle, chains BlockChains, ds DataStore, chainSelector uint64, address string) (AddressRef, error)
+    ResolveTokenRef(b Bundle, chains BlockChains, ds DataStore, chainSelector uint64, address string) (AddressRef, error)
+}
+```
+
+**Registration** (same `init()` as `RegisterTokenAdapter`; keyed by **chain family only**):
+
+```go
+tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilyMyChain, &MyChainAdapter{})
+```
+
+Often the same struct implements both `TokenAdapter` and `TokenRefResolver` (see EVM `EVMTokenBase`, Solana `SolanaAdapter`).
+
+**How it interacts with `DeriveTokenAddress`:**
+
+`ResolveAdapterAndRefs` (used by several token changesets) does the following:
+
+1. Resolve the pool ref (datastore → else `ResolveTokenPoolRef`).
+2. Load the versioned `TokenAdapter`.
+3. Call `DeriveTokenAddress` on the **resolved** pool ref (on-chain mint/token address when the pool stores it).
+4. If derivation fails, fall back to `ResolveTokenRef` on the user’s token ref.
+
+So `TokenRefResolver` answers “what is the full `AddressRef` for this address?” while `DeriveTokenAddress` answers “what token does this **already resolved** pool point at?” Implement both when your pools expose token addresses on-chain.
+
+**Solana-specific notes:**
+
+- Pool refs in the datastore are usually the **token pool program ID**, not the per-mint config PDA. `DeployTokenPoolForToken` initializes state for a mint under an existing program; it does not deploy a new program per token.
+- `ResolveTokenPoolRef` may receive a **config PDA** in user input. The adapter resolves the program ID, re-loads the program ref from the datastore, and can set [`ArtificialAddressRefLabel`](../tokens/product.go) (`ArtificialAddressRef:<pda>`) so a later `DeriveTokenAddress` can decode mint data from that PDA.
+- `DeriveTokenAddress` must reject **executable** accounts (program IDs) and only decode **pool config** account data.
+
+**EVM-specific notes:**
+
+- `ResolveTokenPoolRef` / `ResolveTokenRef` use RPC (`typeAndVersion`, `getToken`, ERC20 `symbol`) to build refs that are not in the datastore yet.
+- Reconstructed refs are suitable for subsequent datastore lookups and for `DeriveTokenAddress` when the pool contract implements `getToken()`.
+
 #### AddressNormalizer (config and datastore addresses)
 
 Some changesets normalize user-supplied address strings before datastore lookups. That logic lives on **`deploy.AddressNormalizer`** in **`deployment/deploy`**, registered on **`deploy.GetAddressNormalizerRegistry()`** and keyed **only by chain family** (not by token adapter semver).
@@ -251,6 +296,7 @@ func init() {
     deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyMyChain, v, &MyChainAdapter{})
     mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilyMyChain, &MyChainAdapter{})
     tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyMyChain, v, &MyChainAdapter{})
+    tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilyMyChain, &MyChainAdapter{})
 }
 ```
 
