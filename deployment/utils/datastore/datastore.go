@@ -112,8 +112,7 @@ func GetAddressRef(
 	selector uint64,
 	contractType cldf.ContractType,
 	contractVersion *semver.Version,
-	contractQualifier string,
-) datastore.AddressRef {
+	contractQualifier string) datastore.AddressRef {
 	for _, ref := range input {
 		if ref.ChainSelector == selector &&
 			ref.Type == datastore.ContractType(contractType) &&
