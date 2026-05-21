@@ -398,6 +398,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		batchOps = append(batchOps, transferOps...)
 		reports = append(reports, transferReports...)
 		ds.Merge(tokends.Seal())
+		mergedDS := datastore.NewMemoryDataStore()
+		mergedDS.Merge(e.DataStore)
+		mergedDS.Merge(ds.Seal())
+		e.DataStore = mergedDS.Seal()
 
 		// finally, we update the authorities on the tokens if necessary
 		for selector, tokenConfig := range allTokenConfigs {
