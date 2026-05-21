@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
@@ -270,11 +271,25 @@ func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelect
 		return "", fmt.Errorf("pool PDA could not be derived from pool ref: no valid PDA found in address field or labels")
 	}
 
+	// Optimization: we avoid unnecessary decoding if we weren't actually given the pool
+	// PDA. If the account is executable, then the input address is most likely the pool
+	// program ID and not a PDA.
+	resp, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), poolPDA, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	if err != nil {
+		return "", fmt.Errorf("failed to get account info for %s: %w", poolPDA.String(), err)
+	}
+	if resp == nil || resp.Value == nil {
+		return "", fmt.Errorf("failed to get account info for: %s", poolPDA.String())
+	}
+	if resp.Value.Executable {
+		return "", fmt.Errorf("token derivation is only possible if a pool PDA is provided - got an executable account: %s", poolPDA.String())
+	}
+
 	// LockRelease and BurnMint v1.6 pool config accounts share the same state layout, so we
 	// can use the BurnMint config struct to decode the account data for both types of pools
 	var state burnmint_token_pool.State
-	if err := chain.GetAccountDataBorshInto(e.GetContext(), poolPDA, &state); err != nil {
-		return "", fmt.Errorf("failed to get account data for pool config PDA %s: %w", poolPDA.String(), err)
+	if err = bin.NewBorshDecoder(resp.Value.Data.GetBinary()).Decode(&state); err != nil {
+		return "", fmt.Errorf("failed to decode account data for pool config PDA %s: %w", poolPDA.String(), err)
 	}
 
 	return state.Config.Mint.String(), nil
@@ -941,7 +956,7 @@ func (a *SolanaAdapter) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("get account info for %q: %w", address, err)
 	}
-	if acct.Value == nil {
+	if acct == nil || acct.Value == nil {
 		return datastore.AddressRef{}, fmt.Errorf("account %q not found", address)
 	}
 
