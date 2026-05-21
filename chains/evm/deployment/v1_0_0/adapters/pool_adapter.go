@@ -316,9 +316,10 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			// to fail unnecessarily even when it has all the data it needs to succeed.
 			tokenRef := input.TokenRef.Clone()
 			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
-				tokenRef, err = datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenRef.Clone(), input.ChainSelector, datastore_utils.FullRef)
-				if err != nil {
+				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token address for ref (%s) from datastore after token pool deployment: %w", datastore_utils.SprintRef(tokenRef), err)
+				} else {
+					tokenRef = ref
 				}
 			}
 
