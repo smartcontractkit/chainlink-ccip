@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOpsV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
@@ -85,10 +86,6 @@ func (a *EVMTokenBase) DeployTokenVerify(e deployment.Environment, input tokensa
 	return nil
 }
 
-func (a *EVMTokenBase) DeriveTokenPoolCounterpart(_ deployment.Environment, _ uint64, tokenPool []byte, _ []byte) ([]byte, error) {
-	return tokenPool, nil
-}
-
 // UpdateAuthorities transfers token pool ownership to the timelock via MCMS.
 // It creates a self-contained EVMTransferOwnershipAdapter within the sequence
 // closure so it works correctly regardless of how the embedding struct is initialized.
@@ -103,79 +100,34 @@ func (a *EVMTokenBase) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAu
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			timelockRef, err := datastore_utils.FindAndFormatRef(
-				e.DataStore,
-				datastore.AddressRef{
-					Type:          datastore.ContractType(cciputils.RBACTimelock),
-					ChainSelector: chain.Selector,
-					Qualifier:     cciputils.CLLQualifier,
-				},
-				chain.Selector,
-				datastore_utils.FullRef,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
-			}
-
 			adapter := &EVMTransferOwnershipAdapter{}
 			if err := adapter.InitializeTimelockAddress(*e, mcms.Input{Qualifier: cciputils.CLLQualifier}); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize timelock address for chain %d: %w", input.ChainSelector, err)
+			}
+			timelockAddr, err := a.GetTimelockAddressCLL(e.DataStore, chain.Selector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get timelock address for chain %d: %w", input.ChainSelector, err)
 			}
 
 			ownershipInput := deployops.TransferOwnershipPerChainInput{
 				ChainSelector: chain.Selector,
 				CurrentOwner:  chain.DeployerKey.From.Hex(),
-				ProposedOwner: timelockRef.Address,
+				ProposedOwner: timelockAddr.Hex(),
 				ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
 			}
 
 			var result sequences.OnChainOutput
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				adapter.SequenceTransferOwnershipViaMCMS(), ownershipInput, result)
+			result, err = sequences.RunAndMergeSequence(b, e.BlockChains, adapter.SequenceTransferOwnershipViaMCMS(), ownershipInput, result)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership on chain %d: %w", input.ChainSelector, err)
 			}
-
-			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
-				adapter.SequenceAcceptOwnership(), ownershipInput, result)
+			result, err = sequences.RunAndMergeSequence(b, e.BlockChains, adapter.SequenceAcceptOwnership(), ownershipInput, result)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership on chain %d: %w", input.ChainSelector, err)
 			}
 
 			return result, nil
 		})
-}
-
-// Pool-specific stubs -- these are overridden by per-version adapters (v1.5.1, v1.6.1, v2.0.0).
-// EVMTokenBase is registered at v1.0.0 so callers that only need token deployment (DeployToken,
-// DeployTokenVerify) can obtain a valid adapter without importing a pool-version package.
-
-func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}
-
-func (a *EVMTokenBase) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}
-
-func (a *EVMTokenBase) DeriveTokenAddress(_ deployment.Environment, _ uint64, _ datastore.AddressRef) (string, error) {
-	return "", fmt.Errorf("DeriveTokenAddress is not implemented on EVMTokenBase; use a pool-version adapter")
-}
-
-func (a *EVMTokenBase) DeriveTokenDecimals(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ []byte) (uint8, error) {
-	return 0, fmt.Errorf("DeriveTokenDecimals is not implemented on EVMTokenBase; use a pool-version adapter")
-}
-
-func (a *EVMTokenBase) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}
-
-func (a *EVMTokenBase) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
-}
-
-func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
 }
 
 func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
@@ -268,6 +220,42 @@ func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.Bloc
 	}, nil
 }
 
+// Pool-specific stubs -- these are overridden by per-version adapters (v1.5.1, v1.6.1, v2.0.0).
+// EVMTokenBase is registered at v1.0.0 so callers that only need token deployment (DeployToken,
+// DeployTokenVerify) can obtain a valid adapter without importing a pool-version package.
+
+func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) DeriveTokenPoolCounterpart(_ deployment.Environment, _ uint64, tokenPool []byte, _ []byte) ([]byte, error) {
+	return tokenPool, nil
+}
+
+func (a *EVMTokenBase) DeriveTokenAddress(_ deployment.Environment, _ uint64, _ datastore.AddressRef) (string, error) {
+	return "", fmt.Errorf("DeriveTokenAddress is not implemented on EVMTokenBase; use a pool-version adapter")
+}
+
+func (a *EVMTokenBase) DeriveTokenDecimals(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ []byte) (uint8, error) {
+	return 0, fmt.Errorf("DeriveTokenDecimals is not implemented on EVMTokenBase; use a pool-version adapter")
+}
+
+func (a *EVMTokenBase) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
 // ================================================================
 // === Version-agnostic helpers for all EVM token/pool versions ===
 // ================================================================
@@ -327,11 +315,11 @@ func (a *EVMTokenBase) ResolveRouterAddress(ds datastore.DataStore, chainSelecto
 			ref.Type = datastore.ContractType(router.ContractType)
 		}
 	}
-	resolved, err := datastore_utils.FindAndFormatRef(ds, ref, chainSelector, datastore_utils.FullRef)
+	resolved, err := datastore_utils.FindAndFormatRef(ds, ref, chainSelector, datastore_utils_evm.ToEVMAddress)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find router (type=%q qualifier=%q) in datastore for chain %d: %w", ref.Type, ref.Qualifier, chainSelector, err)
 	}
-	return common.HexToAddress(resolved.Address), nil
+	return resolved, nil
 }
 
 // GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.
@@ -341,13 +329,45 @@ func (a *EVMTokenBase) GetTokenAdminRegistryAddress(ds datastore.DataStore, sele
 		ChainSelector: selector,
 		Version:       tarops.Version,
 	}
-	ref, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils.FullRef)
+	addr, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils_evm.ToEVMAddress)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
 	}
-	addr, err := a.AddressRefToBytes(ref)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	return addr, nil
+}
+
+// GetTimelockAddressCLL looks up the timelock (RBACTimelock) address from the datastore using the CLL qualifier.
+func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector uint64) (common.Address, error) {
+	filters := datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(cciputils.RBACTimelock),
+		Version:       cciputils.Version_1_0_0,
+		Qualifier:     cciputils.CLLQualifier,
 	}
-	return common.BytesToAddress(addr), nil
+	addr, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils_evm.ToEVMAddress)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find timelock address on chain %d: %w", selector, err)
+	}
+	return addr, nil
+}
+
+// ParseAddressRef attempts to parse an address from the given ref. If ref.Address is non-empty, then the datastore
+// lookup is skipped and the provided address is parsed as an EVM address and returned directly. Otherwise, the ref
+// is resolved against the datastore and parsed as a hex address.
+func (a *EVMTokenBase) ParseAddressRef(ds datastore.DataStore, ref datastore.AddressRef, sel uint64) (common.Address, error) {
+	refAddr := ref.Address
+	if refAddr != "" {
+		if !common.IsHexAddress(refAddr) {
+			return common.Address{}, fmt.Errorf("invalid address %q: not a hex address", refAddr)
+		} else {
+			return common.HexToAddress(refAddr), nil
+		}
+	}
+
+	evmAddr, err := datastore_utils.FindAndFormatRef(ds, ref, sel, datastore_utils_evm.ToEVMAddress)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to resolve address ref (type=%q qualifier=%q) for chain %d: %w", ref.Type, ref.Qualifier, ref.ChainSelector, err)
+	}
+
+	return evmAddr, nil
 }
