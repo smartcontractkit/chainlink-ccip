@@ -272,18 +272,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if !ok {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
 				}
-
-				counterpartFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
-				if err != nil {
-					return cldf.ChangesetOutput{}, err
-				}
-
-				counterpart.TokenPoolRef, err = TryNormalizeAddressRef(remoteSelector, counterpart.TokenPoolRef)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token pool ref on chain with selector %d: %w", remoteSelector, err)
-				}
-
-				counterPartAdapter, _, remoteTokenPool, remoteToken, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, remoteSelector, counterpart.TokenPoolRef, counterpart.TokenRef)
+				counterPartAdapter, counterpartFamily, remoteTokenPool, remoteToken, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, remoteSelector, counterpart.TokenPoolRef, counterpart.TokenRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool and token refs on chain with selector %d: %w", remoteSelector, err)
 				}
