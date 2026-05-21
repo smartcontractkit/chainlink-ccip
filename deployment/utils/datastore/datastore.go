@@ -302,11 +302,11 @@ func AddressRefToFilters(ref datastore.AddressRef) []datastore.FilterFunc[datast
 	// the more selective filters first so that each subsequent filter operates
 	// on a smaller set of refs.
 	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
-	if ref.ChainSelector != 0 {
-		filters = append(filters, datastore.AddressRefByChainSelector(ref.ChainSelector))
-	}
 	if ref.Address != "" {
 		filters = append(filters, datastore.AddressRefByAddress(ref.Address))
+	}
+	if ref.ChainSelector != 0 {
+		filters = append(filters, datastore.AddressRefByChainSelector(ref.ChainSelector))
 	}
 	if ref.Qualifier != "" {
 		filters = append(filters, datastore.AddressRefByQualifier(ref.Qualifier))
