@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
@@ -12,7 +14,7 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -46,7 +48,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get router address: %w", err)
 			}
 
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
+			tokenAddr, tokenProgramId, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -235,8 +237,62 @@ func (a *SolanaAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, err
 	return solana.MustPublicKeyFromBase58(ref.Address).Bytes(), nil
 }
 
-func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
-	return nil, fmt.Errorf("DeriveTokenAddress not implemented for Solana")
+func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return "", fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	// Optimization: if there's no artificial pool PDA label present in the input pool ref,
+	// then we can try to see if the Address field of the pool ref is the pool PDA. This is
+	// useful in situations where this function is called with an unresolved pool ref where
+	// the user has intentionally provided the pool PDA in the Address field instead of the
+	// token pool program ID in case they already know it. In this situation we can perform
+	// a token derivation.
+	poolPDA := solana.PublicKey{}
+	if poolRef.Address != "" {
+		if pda, err := solana.PublicKeyFromBase58(poolRef.Address); err != nil {
+			return "", fmt.Errorf("failed to parse pool PDA from address field of pool ref: %w", err)
+		} else {
+			poolPDA = pda
+		}
+	}
+
+	// If the ArtificialAddressRefLabel exists in the labels, then we prefer this over
+	// the Address field in the pool ref since this is a more explicit indication that
+	// the pool PDA is being provided instead of the token pool program ID.
+	for _, label := range poolRef.Labels.List() {
+		if pda, ok := decodeArtificialPoolAddressRef(label); ok {
+			poolPDA = pda
+			break
+		}
+	}
+	if poolPDA.IsZero() {
+		return "", fmt.Errorf("pool PDA could not be derived from pool ref: no valid PDA found in address field or labels")
+	}
+
+	// Optimization: we avoid unnecessary decoding if we weren't actually given the pool
+	// PDA. If the account is executable, then the input address is most likely the pool
+	// program ID and not a PDA.
+	resp, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), poolPDA, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	if err != nil {
+		return "", fmt.Errorf("failed to get account info for %s: %w", poolPDA.String(), err)
+	}
+	if resp == nil || resp.Value == nil || resp.Value.Data == nil {
+		return "", fmt.Errorf("failed to get account info for: %s", poolPDA.String())
+	}
+	if resp.Value.Executable {
+		return "", fmt.Errorf("token derivation is only possible if a pool PDA is provided - got an executable account: %s", poolPDA.String())
+	}
+
+	// LockRelease and BurnMint v1.6 pool config accounts share the same state layout, so we
+	// can use the BurnMint config struct to decode the account data for both types of pools
+	var state burnmint_token_pool.State
+	if err = bin.NewBorshDecoder(resp.Value.Data.GetBinary()).Decode(&state); err != nil {
+		return "", fmt.Errorf("failed to decode account data for pool config PDA %s: %w", poolPDA.String(), err)
+	}
+
+	return state.Config.Mint.String(), nil
 }
 
 func (a *SolanaAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
@@ -285,7 +341,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			// to proceed.
 			var tokenProg solana.PublicKey
 			var tokenMint solana.PublicKey
-			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
+			if tokRef, tokProgramID, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, input.TokenRef); err != nil {
 				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
 				if input.TokenRef.Address == "" {
 					return sequences.OnChainOutput{}, errors.New("token information could not be resolved from datastore and token reference does not include an address to attempt on-chain resolution")
@@ -493,7 +549,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
+			tokenAddr, tokenProgramId, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -539,7 +595,7 @@ func (a *SolanaAdapter) GetOnchainInboundRateLimit(
 	if !ok {
 		return tokenapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
-	tokenAddr, _, err := getTokenMintAndTokenProgram(e.DataStore, tokenRef, chain)
+	tokenAddr, _, err := a.getTokenMintAndTokenProgram(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, tokenRef)
 	if err != nil {
 		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for ref (%+v): %w", tokenRef, err)
 	}
@@ -670,7 +726,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, *input.TokenRef, chain)
+			tokenAddr, tokenProgramId, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, *input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -807,18 +863,6 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 	)
 }
 
-func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.AddressRef, chain cldf_solana.Chain) (datastore.AddressRef, solana.PublicKey, error) {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(store, tokenRef, chain.Selector, datastore_utils.FullRef)
-	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", tokenRef, err)
-	}
-	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
-	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to get token program ID for token type '%s': %w", tokenAddr.Type, err)
-	}
-	return tokenAddr, tokenProgramId, nil
-}
-
 func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	return cldf_ops.NewSequence(
 		"svm-adapter:update-authorities",
@@ -831,7 +875,7 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			ds := e.DataStore
-			tokenRef, _, err := getTokenMintAndTokenProgram(ds, input.TokenRef, chain)
+			tokenRef, _, err := a.getTokenMintAndTokenProgram(b, e.BlockChains, ds, chain.Selector, input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
 			}
@@ -891,4 +935,156 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokenapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
+}
+
+// ResolveTokenPoolRef accepts either the token pool programID or the token pool PDA address
+// and resolves it to the token pool program AddressRef in the datastore. If a PDA is given,
+// then the associated programID is queried from the chain and used to find a matching token
+// pool ref in the datastore. If a programID is provided, then we use it to look up the pool
+// in the datastore. In either case, it returns an error if the token pool can't be found or
+// if on-chain lookups fail.
+func (a *SolanaAdapter) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	chain, ok := chains.SolanaChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	pubKey, err := solana.PublicKeyFromBase58(address)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid pool address %q: %w", address, err)
+	}
+	acct, err := chain.Client.GetAccountInfoWithOpts(b.GetContext(), pubKey, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("get account info for %q: %w", address, err)
+	}
+	if acct == nil || acct.Value == nil {
+		return datastore.AddressRef{}, fmt.Errorf("account %q not found", address)
+	}
+
+	var poolProgramID solana.PublicKey
+	var poolPDA *solana.PublicKey
+	if !acct.Value.Executable {
+		// Case 1: the `pubKey` is the pool config PDA - in this case, DeriveTokenAddress
+		// can use the PDA to get the associated mint for the pool
+		poolProgramID = acct.Value.Owner
+		poolPDA = &pubKey
+	} else {
+		// Case 2: the `pubKey` is the pool program ID - in this case, DeriveTokenAddress
+		// doesn't have enough info to derive the associated mint
+		poolProgramID = pubKey
+		poolPDA = nil
+	}
+
+	// If we were given the PDA, then we re-query the datastore with the derived token pool
+	// program ID - if this still fails, then we have no more resolution options to try and
+	// we raise an error
+	poolRef, err := datastore_utils.FindAndFormatRef(ds,
+		datastore.AddressRef{ChainSelector: chainSelector, Address: poolProgramID.String()},
+		chainSelector,
+		datastore_utils.FullRef,
+	)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find token pool program ref for program id %s: %w", poolProgramID.String(), err)
+	}
+
+	// If we have a datastore match and we have the pool PDA, then we encode this info as a
+	// single label so that DeriveTokenAddress can use it
+	if poolPDA != nil {
+		poolRef.Labels.Add(encodeArtificialPoolAddressRefLabel(*poolPDA))
+	}
+
+	return poolRef, nil
+}
+
+// ResolveTokenRef accepts a token mint public key and resolves it to an AddressRef in the
+// datastore. It performs on-chain lookups to determine the token program and token symbol
+// (for qualifier) associated with the mint address. If the token ref can't be resolved or
+// if on-chain lookups fail, it returns an error. The qualifier is set to the token symbol
+// if it can be found on-chain, otherwise a sensible placeholder is used.
+func (a *SolanaAdapter) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	chain, ok := chains.SolanaChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	tokenMintPubKey, err := solana.PublicKeyFromBase58(address)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid mint address %q: %w", address, err)
+	}
+	tokenProgramID, err := utils.FetchTokenProgramID(b.GetContext(), chain, tokenMintPubKey)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token program for mint %s: %w", address, err)
+	}
+	programType, err := utils.GetTokenProgramType(tokenProgramID)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("mint %s: %w", address, err)
+	}
+
+	// NOTE: the token symbol is not strictly required for most Solana operations (some tokens may not have
+	// metadata uploaded via Metaplex). With that in mind, we only perform a best-effort fetch of the token
+	// symbol instead of hard crashing if it isn't on chain. If we can't get this info from the chain, then
+	// we will use a placeholder instead.
+	qualifier := fmt.Sprintf("%s-%s", address, programType)
+	if meta, _, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMintPubKey); err != nil {
+		b.Logger.Warnf("failed to get Metaplex token metadata for mint %s falling back to default qualifier (%s): %v", address, qualifier, err)
+	} else {
+		data := tokens.GetTokenDataV2(meta)
+		if symbol := strings.TrimSpace(data.Symbol); symbol == "" {
+			b.Logger.Warnf("token metadata for mint %s does not include a symbol, falling back to default qualifier (%s): %+v", address, qualifier, data)
+		} else {
+			qualifier = symbol
+		}
+	}
+
+	return datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(programType),
+		Version:       common_utils.Version_1_6_0,
+		Qualifier:     qualifier,
+		Address:       tokenMintPubKey.String(),
+	}, nil
+}
+
+func (a *SolanaAdapter) getTokenMintAndTokenProgram(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, tokenRef datastore.AddressRef) (datastore.AddressRef, solana.PublicKey, error) {
+	chain, ok := chains.SolanaChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	// Try to resolve the token ref from the datastore first to avoid RPC
+	// calls and if that fails, then fall back to onchain ref resolution.
+	var resolvedTokenRef datastore.AddressRef
+	if fullTokenRef, err := datastore_utils.FindAndFormatRef(ds, tokenRef, chain.Selector, datastore_utils.FullRef); err == nil {
+		resolvedTokenRef = fullTokenRef
+	} else {
+		if tokenRef.Address == "" {
+			return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("token reference %q could not be resolved from the datastore and does not include an address to attempt on-chain resolution: %w", datastore_utils.SprintRef(tokenRef), err)
+		} else {
+			resolvedTokenRef, err = a.ResolveTokenRef(b, chains, ds, chainSelector, tokenRef.Address)
+			if err != nil {
+				return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to resolve token reference %s on-chain: %w", datastore_utils.SprintRef(tokenRef), err)
+			}
+		}
+	}
+
+	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(resolvedTokenRef.Type))
+	if err != nil {
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to get token program ID for token type '%s': %w", resolvedTokenRef.Type, err)
+	}
+
+	return resolvedTokenRef, tokenProgramId, nil
+}
+
+func decodeArtificialPoolAddressRef(label string) (solana.PublicKey, bool) {
+	if parts := strings.Split(label, ":"); len(parts) >= 2 && parts[0] == tokenapi.ArtificialAddressRefLabel {
+		if pubKey, err := solana.PublicKeyFromBase58(parts[1]); err != nil {
+			return solana.PublicKey{}, false
+		} else {
+			return pubKey, true
+		}
+	} else {
+		return solana.PublicKey{}, false
+	}
+}
+
+func encodeArtificialPoolAddressRefLabel(poolPDA solana.PublicKey) string {
+	return tokenapi.ArtificialAddressRefLabel + ":" + poolPDA.String()
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -22,6 +23,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+)
+
+var (
+	_ tokensapi.TokenRefResolver = &EVMPoolAdapter{}
+	_ tokensapi.TokenAdapter     = &EVMPoolAdapter{}
 )
 
 // PoolOps abstracts the version-specific token pool contract calls.
@@ -57,57 +63,89 @@ type EVMPoolAdapter struct {
 	DeployTokenPoolSeq *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
-func (a *EVMPoolAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+func (a *EVMPoolAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
-		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
+		return "", fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	// If the ref has the pool address already, then skip the datastore lookup altogether
+	if poolRef.Address != "" {
+		tokenPoolAddr := poolRef.Address
+		if !common.IsHexAddress(tokenPoolAddr) {
+			return "", fmt.Errorf("token pool address %q in ref is not a valid hex address", tokenPoolAddr)
+		}
+		tokenAddr, err := a.Ops.GetToken(e.OperationsBundle, chain, common.HexToAddress(tokenPoolAddr))
+		if err != nil {
+			return "", fmt.Errorf("failed to get token address from token pool (%s): %w", datastore_utils.SprintRef(poolRef), err)
+		}
+		return tokenAddr.Hex(), nil
+	}
+
+	// If the pool address isn't in the ref, then look it up in the datastore
+	tokenPoolAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+		return "", fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
 	}
-
-	addrRaw, err := a.AddressRefToBytes(addrRef)
+	tokenPoolAddrBytes, err := a.AddressRefToBytes(tokenPoolAddrRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+		return "", fmt.Errorf("failed to convert address ref to bytes: %w", err)
 	}
-
-	tpAddr := common.BytesToAddress(addrRaw)
-	if tpAddr == (common.Address{}) {
-		return nil, errors.New("token pool address is zero address")
+	tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
+	if tokenPoolAddr == (common.Address{}) {
+		return "", errors.New("token pool address is zero address")
 	}
-
-	tokenAddr, err := a.Ops.GetToken(e.OperationsBundle, chain, tpAddr)
+	tokenAddr, err := a.Ops.GetToken(e.OperationsBundle, chain, tokenPoolAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token address from token pool ref (%+v): %w", addrRef, err)
+		return "", fmt.Errorf("failed to get token address from token pool ref (%+v): %w", tokenPoolAddrRef, err)
 	}
-
-	return tokenAddr.Bytes(), nil
+	return tokenAddr.Hex(), nil
 }
 
-func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, _ []byte) (uint8, error) {
+func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return 0, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	// Optimization: most tokens are ERC20s, so try to get the decimals directly from
+	// the token contract first instead of going through the datastore and token pool
+	// contract.
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle, erc20.GetDecimals, chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       common.BytesToAddress(token),
+		},
+	)
+	if err == nil {
+		return report.Output, nil
+	} else {
+		e.Logger.Warnf(
+			"failed to get token decimals directly from token contract at address %s - trying token pool at %s: %v",
+			common.BytesToAddress(token).Hex(), datastore_utils.SprintRef(poolRef), err,
+		)
+	}
+
+	// If we can't source the decimals directly from the token then check if the pool
+	// address is directly available in the ref. If so, we can skip the datastore and
+	// go straight to the pool contract for decimals.
+	if poolRef.Address != "" {
+		if !common.IsHexAddress(poolRef.Address) {
+			return 0, fmt.Errorf("token pool address %q in ref is not a valid hex address", poolRef.Address)
+		} else {
+			return a.Ops.GetTokenDecimals(e.GetContext(), chain, common.HexToAddress(poolRef.Address))
+		}
+	}
+
+	// If the ref doesn't have the pool address, then we need to hit the datastore for
+	// the full pool ref, then get the decimals from the pool contract.
+	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils_evm.ToEVMAddress)
 	if err != nil {
-		return 0, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+		return 0, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
+	} else {
+		return a.Ops.GetTokenDecimals(e.GetContext(), chain, poolAddr)
 	}
-
-	addrRaw, err := a.AddressRefToBytes(addrRef)
-	if err != nil {
-		return 0, fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-
-	tpAddr := common.BytesToAddress(addrRaw)
-	if tpAddr == (common.Address{}) {
-		return 0, errors.New("token pool address is zero address")
-	}
-
-	return a.Ops.GetTokenDecimals(e.GetContext(), chain, tpAddr)
 }
 
 // GetOnchainInboundRateLimit reads the on-chain inbound rate limiter state on the token pool

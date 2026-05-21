@@ -17,6 +17,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
+// ArtificialAddressRefLabel is a special label that can be used by adapters that implement
+// TokenRefResolver. Adapters can add this label to reconstructed `AddressRefs` to indicate
+// that the ref is artificial. It's not required to use this label - if there is no need to
+// distinguish between artificial AddressRefs and datastore AddressRefs in the adapter then
+// this label can be ignored.
+const ArtificialAddressRefLabel = "ArtificialAddressRef"
+
 type tokenAdapterID string
 
 // TokenFeeAdapter is an optional interface that can be implemented by TokenAdapters to support setting token transfer fee configurations.
@@ -25,6 +32,14 @@ type TokenFeeAdapter interface {
 	SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (TokenTransferFeeConfig, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
+}
+
+// TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
+// and pool references to be resolved in a particular way before they are passed into the adapter logic. For example, a ref resolver can
+// reconstruct refs from onchain data, normalize addresses, apply transformations on the raw input ref, etc.
+type TokenRefResolver interface {
+	ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error)
+	ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error)
 }
 
 // RateLimitReaderAdapter is an optional interface that exposes on-chain rate limit reads
@@ -62,9 +77,9 @@ type TokenAdapter interface {
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
-	// DeriveTokenAddress derives the token address (in bytes) from the given token pool reference.
+	// DeriveTokenAddress derives the token address (as a string) from the given token pool reference.
 	// For example, if this address is stored on the pool, this method should fetch it.
-	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error)
 	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
 	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)
 	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
@@ -287,14 +302,34 @@ type SetTokenTransferFeeSequenceInput struct {
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
-	mu sync.Mutex
-	m  map[tokenAdapterID]TokenAdapter
+	tokenRefResolverReg map[string]TokenRefResolver
+	tokenAdapterReg     map[tokenAdapterID]TokenAdapter
+	tokenRefResolverMu  sync.Mutex
+	tokenAdapterMu      sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
-		m: make(map[tokenAdapterID]TokenAdapter),
+		tokenRefResolverReg: make(map[string]TokenRefResolver),
+		tokenAdapterReg:     make(map[tokenAdapterID]TokenAdapter),
 	}
+}
+
+// Given a chain family, RegisterTokenRefResolver registers a TokenRefResolver that can resolve token and pool references for that chain family.
+func (r *TokenAdapterRegistry) RegisterTokenRefResolver(chainFamily string, resolver TokenRefResolver) {
+	r.tokenRefResolverMu.Lock()
+	defer r.tokenRefResolverMu.Unlock()
+	if _, exists := r.tokenRefResolverReg[chainFamily]; !exists {
+		r.tokenRefResolverReg[chainFamily] = resolver
+	}
+}
+
+// GetTokenRefResolver retrieves a registered TokenRefResolver for the given chain family.
+func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRefResolver, bool) {
+	r.tokenRefResolverMu.Lock()
+	defer r.tokenRefResolverMu.Unlock()
+	resolver, ok := r.tokenRefResolverReg[chainFamily]
+	return resolver, ok
 }
 
 // RegisterTokenAdapter allows chains to register their changeset logic.
@@ -304,10 +339,10 @@ func newTokenAdapterRegistry() *TokenAdapterRegistry {
 // Thus each version of a token pool on a chain family should have its own adapter implementation.
 func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version *semver.Version, adapter TokenAdapter) {
 	id := newTokenAdapterID(chainFamily, version)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.m[id]; !exists {
-		r.m[id] = adapter
+	r.tokenAdapterMu.Lock()
+	defer r.tokenAdapterMu.Unlock()
+	if _, exists := r.tokenAdapterReg[id]; !exists {
+		r.tokenAdapterReg[id] = adapter
 	}
 }
 
@@ -319,9 +354,9 @@ func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semv
 		return nil, false
 	}
 	id := newTokenAdapterID(chainFamily, version)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	adapter, ok := r.m[id]
+	r.tokenAdapterMu.Lock()
+	defer r.tokenAdapterMu.Unlock()
+	adapter, ok := r.tokenAdapterReg[id]
 	return adapter, ok
 }
 
