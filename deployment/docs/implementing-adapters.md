@@ -173,7 +173,7 @@ Register a `TokenRefResolver` when callers may supply **partial** token or pool 
 
 **When to implement:** Same chain families that implement `TokenAdapter` and need address inference in changesets (token expansion with inferred refs, configure-for-transfers remote edges, rate limits with address-only pool refs).
 
-**Interface** ([tokens/product.go](../../tokens/product.go)):
+**Interface** ([tokens/product.go](../tokens/product.go)):
 
 ```go
 type TokenRefResolver interface {
@@ -204,7 +204,7 @@ So `TokenRefResolver` answers “what is the full `AddressRef` for this address?
 **Solana-specific notes:**
 
 - Pool refs in the datastore are usually the **token pool program ID**, not the per-mint config PDA. `DeployTokenPoolForToken` initializes state for a mint under an existing program; it does not deploy a new program per token.
-- `ResolveTokenPoolRef` may receive a **config PDA** in user input. The adapter resolves the program ID, re-loads the program ref from the datastore, and can set [`ArtificialAddressRefLabel`](../../tokens/product.go) (`ArtificialAddressRef:<pda>`) so a later `DeriveTokenAddress` can decode mint data from that PDA.
+- `ResolveTokenPoolRef` may receive a **config PDA** in user input. The adapter resolves the program ID, re-loads the program ref from the datastore, and can set [`ArtificialAddressRefLabel`](../tokens/product.go) (`ArtificialAddressRef:<pda>`) so a later `DeriveTokenAddress` can decode mint data from that PDA.
 - `DeriveTokenAddress` must reject **executable** accounts (program IDs) and only decode **pool config** account data.
 
 **EVM-specific notes:**
