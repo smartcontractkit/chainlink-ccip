@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +10,7 @@ import (
 	bnmERC20Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOpsV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	v1_0_0_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -24,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -294,60 +296,67 @@ func (a *EVMTokenBase) IsBurnMintERC677TokenType(tokenType string) bool {
 // the target chain and Type defaults to the production Router when unset, so callers
 // targeting the TestRouter only need to set Type=router.TestRouterContractType.
 func (a *EVMTokenBase) ResolveRouterAddress(ds datastore.DataStore, chainSelector uint64, routerRef *datastore.AddressRef) (common.Address, error) {
-	ref := datastore.AddressRef{
+	filter := datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 	}
 	if routerRef != nil {
-		if routerRef.Address != "" {
-			if !common.IsHexAddress(routerRef.Address) {
-				return common.Address{}, fmt.Errorf("invalid RouterRef.Address %q: not a hex address", routerRef.Address)
-			}
-			addr := common.HexToAddress(routerRef.Address)
-			if addr == (common.Address{}) {
-				return common.Address{}, errors.New("RouterRef.Address resolves to the zero address")
-			}
-			return addr, nil
-		}
-		ref = *routerRef
-		ref.ChainSelector = chainSelector
-		if ref.Type == "" {
-			ref.Type = datastore.ContractType(router.ContractType)
-		}
+		filter = *routerRef
 	}
-	resolved, err := datastore_utils.FindAndFormatRef(ds, ref, chainSelector, datastore_utils_evm.ToEVMAddress)
+
+	addr, err := a.ParseAddressRef(ds, filter, chainSelector)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find router (type=%q qualifier=%q) in datastore for chain %d: %w", ref.Type, ref.Qualifier, chainSelector, err)
+		return common.Address{}, fmt.Errorf("failed to resolve router address for chain %d: %w", chainSelector, err)
 	}
-	return resolved, nil
+
+	return addr, nil
+}
+
+// GetRMNProxyAddress looks up the RMNProxy address from the datastore using the provided selector and the RMNProxy contract type.
+func (a *EVMTokenBase) GetRMNProxyAddress(ds datastore.DataStore, selector uint64) (common.Address, error) {
+	filter := datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(rmnproxyops.ContractType),
+	}
+
+	addr, err := a.ParseAddressRef(ds, filter, selector)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find RMNProxy address on chain %d: %w", selector, err)
+	}
+
+	return addr, nil
 }
 
 // GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.
 func (a *EVMTokenBase) GetTokenAdminRegistryAddress(ds datastore.DataStore, selector uint64) (common.Address, error) {
-	filters := datastore.AddressRef{
-		Type:          datastore.ContractType(tarops.ContractType),
+	filter := datastore.AddressRef{
 		ChainSelector: selector,
+		Type:          datastore.ContractType(tarops.ContractType),
 		Version:       tarops.Version,
 	}
-	addr, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils_evm.ToEVMAddress)
+
+	addr, err := a.ParseAddressRef(ds, filter, selector)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
 	}
+
 	return addr, nil
 }
 
 // GetTimelockAddressCLL looks up the timelock (RBACTimelock) address from the datastore using the CLL qualifier.
 func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector uint64) (common.Address, error) {
-	filters := datastore.AddressRef{
+	filter := datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType(cciputils.RBACTimelock),
 		Version:       cciputils.Version_1_0_0,
 		Qualifier:     cciputils.CLLQualifier,
 	}
-	addr, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils_evm.ToEVMAddress)
+
+	addr, err := a.ParseAddressRef(ds, filter, selector)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find timelock address on chain %d: %w", selector, err)
 	}
+
 	return addr, nil
 }
 
@@ -370,4 +379,34 @@ func (a *EVMTokenBase) ParseAddressRef(ds datastore.DataStore, ref datastore.Add
 	}
 
 	return evmAddr, nil
+}
+
+// ParseAllowList parses a list of hex address strings into a slice of common.Address, validating each address in the process.
+func (a *EVMTokenBase) ParseAllowList(allowed []string) ([]common.Address, error) {
+	addresses := make([]common.Address, 0, len(allowed))
+	for _, addrStr := range allowed {
+		if !common.IsHexAddress(addrStr) {
+			return nil, fmt.Errorf("invalid address %q in allow list: not a hex address", addrStr)
+		} else {
+			addresses = append(addresses, common.HexToAddress(addrStr))
+		}
+	}
+	return addresses, nil
+}
+
+// TokenInfo returns the token address and decimals for a given EVM token address string.
+func (a *EVMTokenBase) TokenInfo(b cldf_ops.Bundle, ds datastore.DataStore, chain evm.Chain, tokenAddress common.Address) (uint8, error) {
+	decimals, err := cldf_ops.ExecuteOperation(
+		b, erc20.GetDecimals, chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       tokenAddress,
+			Args:          struct{}{},
+		},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read ERC20 decimals for token at address %s: %w", tokenAddress, err)
+	}
+
+	return decimals.Output, nil
 }
