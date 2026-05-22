@@ -364,13 +364,16 @@ func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector ui
 // lookup is skipped and the provided address is parsed as an EVM address and returned directly. Otherwise, the ref
 // is resolved against the datastore and parsed as a hex address.
 func (a *EVMTokenBase) ParseNonZeroAddressRef(ds datastore.DataStore, ref datastore.AddressRef, sel uint64) (common.Address, error) {
-	refAddr := ref.Address
-	if refAddr != "" {
+	if ref.Address != "" {
+		refAddr := ref.Address
 		if !common.IsHexAddress(refAddr) {
 			return common.Address{}, fmt.Errorf("invalid address %q: not a hex address", refAddr)
-		} else {
-			return common.HexToAddress(refAddr), nil
 		}
+		evmAddr := common.HexToAddress(refAddr)
+		if evmAddr == (common.Address{}) {
+			return common.Address{}, fmt.Errorf("invalid address %q: zero address is not allowed", refAddr)
+		}
+		return evmAddr, nil
 	}
 
 	evmAddr, err := datastore_utils.FindAndFormatRef(ds, ref, sel, datastore_utils_evm.ToNonZeroEVMAddress)
