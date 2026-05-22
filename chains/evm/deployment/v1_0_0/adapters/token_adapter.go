@@ -366,7 +366,7 @@ func (a *EVMTokenBase) ParseAddressRef(ds datastore.DataStore, ref datastore.Add
 
 	evmAddr, err := datastore_utils.FindAndFormatRef(ds, ref, sel, datastore_utils_evm.ToEVMAddress)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to resolve address ref (type=%q qualifier=%q) for chain %d: %w", ref.Type, ref.Qualifier, ref.ChainSelector, err)
+		return common.Address{}, fmt.Errorf("failed to resolve address from datastore using ref filter (%s): %w", sel, datastore_utils.SprintRef(ref), err)
 	}
 
 	return evmAddr, nil
