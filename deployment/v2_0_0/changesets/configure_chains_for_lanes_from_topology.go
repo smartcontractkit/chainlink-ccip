@@ -23,141 +23,57 @@ import (
 
 const defaultQualifier = "default"
 
-// CommitteeVerifierRemoteChainConfig is the user-facing input for a single remote chain on a
-// CommitteeVerifier. It intentionally omits SignatureConfig because signers and threshold are
-// derived automatically from the topology (NOPs × committee × chain) — the caller should never
-// have to specify them manually.
-//
-// All pointer fields are optional; nil falls back to the remote chain adapter's
-// GetDefaultCommitteeVerifierRemoteChainConfig() values.
-type CommitteeVerifierRemoteChainConfig struct {
-	// AllowlistEnabled toggles the sender allowlist on this remote chain.
-	// nil = adapter default (false for EVM).
+// committeeVerifierRemoteChainInput is the internal per-remote CommitteeVerifier input before
+// topology enrichment fills SignatureConfig.
+type committeeVerifierRemoteChainInput struct {
 	AllowlistEnabled          *bool
 	AddedAllowlistedSenders   []string
 	RemovedAllowlistedSenders []string
-	// FeeUSDCents is the flat verification fee charged in USD cents.
-	// nil = adapter default (0 for EVM).
-	FeeUSDCents *uint16
-	// GasForVerification is the gas limit allocated for signature verification.
-	// nil = adapter default (60_000 for EVM).
-	GasForVerification *uint32
-	// PayloadSizeBytes is the maximum accepted payload size in bytes.
-	// nil = adapter default (390 for EVM).
-	PayloadSizeBytes *uint16
+	FeeUSDCents               *uint16
+	GasForVerification        *uint32
+	PayloadSizeBytes          *uint16
 }
 
-// CommitteeVerifierInputConfig configures a single CommitteeVerifier contract on a local chain.
-type CommitteeVerifierInputConfig struct {
-	// CommitteeQualifier must match a committee key in the NOPTopology. Required.
-	CommitteeQualifier string
-	// RemoteChains maps remote chain selectors to their per-lane CommitteeVerifier overrides.
-	// An empty entry (CommitteeVerifierRemoteChainConfig{}) uses all adapter defaults.
-	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfig
-	// AllowedFinalityConfig specifies the finality conditions the verifier will enforce.
-	// nil = use the local chain adapter's GetDefaultFinalityConfig().
-	AllowedFinalityConfig *finality.Config `json:"allowedFinalityConfig" yaml:"allowedFinalityConfig"`
+type committeeVerifierInputConfig struct {
+	CommitteeQualifier    string
+	RemoteChains          map[uint64]committeeVerifierRemoteChainInput
+	AllowedFinalityConfig *finality.Config
 }
 
-// PartialRemoteChainConfig is the user-facing input for a single remote chain. All fields
-// are optional; their zero/nil values resolve from different sources:
-//   - adapter-backed fields fall back to the remote chain family adapter's defaults
-//     (GetDefaultRemoteChainConfig and GetDefaultFeeQuoterDestChainConfig);
-//   - contract addresses (OnRamp, OffRamp, Executor) are resolved automatically from the
-//     datastore; and
-//   - empty DefaultInboundCCVs / DefaultOutboundCCVs auto-resolve via the committee verifier
-//     contract registry (using the "default" qualifier).
-//
-// LaneMandatedInboundCCVs / LaneMandatedOutboundCCVs are additional caller-specified CCVs
-// enforced on top of that default resolution.
-//
-// Minimal usage: `remoteChainSelector: {}` — all adapter defaults apply,
-// contracts are datastore-resolved, and CCVs are auto-resolved.
-type PartialRemoteChainConfig struct {
-	// AllowTrafficFrom controls whether inbound traffic from this remote chain is accepted.
-	// nil = adapter default (true for EVM).
-	AllowTrafficFrom *bool
-	// DefaultExecutorQualifier selects the Executor proxy contract used for this lane.
-	// Empty string defaults to "default".
-	DefaultExecutorQualifier string
-	// DefaultInboundCCVs is the default set of CommitteeVerifier addresses used to verify
-	// inbound messages from this remote chain.
-	// Empty = auto-resolved from the "default" qualifier via CommitteeVerifierContractRegistry.
-	DefaultInboundCCVs []datastore.AddressRef
-	// LaneMandatedInboundCCVs are additional inbound CCVs always required on top of
-	// DefaultInboundCCVs. Empty = none.
-	LaneMandatedInboundCCVs []datastore.AddressRef
-	// DefaultOutboundCCVs is the default set of CommitteeVerifier addresses used to verify
-	// outbound messages to this remote chain.
-	// Empty = auto-resolved from the "default" qualifier via CommitteeVerifierContractRegistry.
-	DefaultOutboundCCVs []datastore.AddressRef
-	// LaneMandatedOutboundCCVs are additional outbound CCVs always required on top of
-	// DefaultOutboundCCVs. Empty = none.
-	LaneMandatedOutboundCCVs []datastore.AddressRef
-	// FeeQuoterDestChainConfig overrides individual FeeQuoter destination-chain parameters.
-	// Only non-nil pointer fields take effect; nil fields fall back to the remote adapter's
-	// GetDefaultFeeQuoterDestChainConfig(). ChainFamilySelector is always derived from the
-	// remote chain adapter and cannot be overridden here.
-	FeeQuoterDestChainConfig adapters.FeeQuoterDestChainConfigOverrides
-	// ExecutorDestChainConfig sets the Executor fee and enabled flag for this lane.
-	// nil = adapter default.
-	ExecutorDestChainConfig *adapters.ExecutorDestChainConfig
-	// BaseExecutionGasCost is the base gas cost for executing a message from this remote chain.
-	// nil = adapter default (175_000 for EVM).
-	BaseExecutionGasCost *uint32
-	// TokenReceiverAllowed controls whether token-transfer messages are accepted from this
-	// remote chain. nil = adapter default (false for EVM).
-	TokenReceiverAllowed *bool
-	// MessageNetworkFeeUSDCents is the flat fee (in USD cents) charged per non-token message.
-	// nil = adapter default (10 for EVM).
+// partialRemoteChainConfig is the internal per-remote chain input after lane expansion.
+// Unset fields use adapter defaults, datastore resolution, or CCV auto-resolution.
+type partialRemoteChainConfig struct {
+	AllowTrafficFrom          *bool
+	DefaultExecutorQualifier  string
+	DefaultInboundCCVs        []datastore.AddressRef
+	LaneMandatedInboundCCVs   []datastore.AddressRef
+	DefaultOutboundCCVs       []datastore.AddressRef
+	LaneMandatedOutboundCCVs  []datastore.AddressRef
+	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides
+	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig
+	BaseExecutionGasCost      *uint32
+	TokenReceiverAllowed      *bool
 	MessageNetworkFeeUSDCents *uint16
-	// TokenNetworkFeeUSDCents is the flat fee (in USD cents) charged per token-transfer message.
-	// nil = adapter default (25 for EVM).
-	TokenNetworkFeeUSDCents *uint16
+	TokenNetworkFeeUSDCents   *uint16
 }
 
-// PartialChainConfig describes the desired state for a single local chain. Well-known contract
-// addresses (Router, OnRamp, FeeQuoter, OffRamp) are resolved automatically from the
-// datastore via the chain family adapter. Each chain can reference a different set of remote
-// chains, so per-source/dest configuration (e.g. different fee quoter parameters per
-// destination) is supported naturally.
-type PartialChainConfig struct {
-	// ChainSelector identifies the chain to configure. Required; must exist in the environment's BlockChains.
-	ChainSelector uint64
-	// CommitteeVerifiers is the list of CommitteeVerifier contracts to configure on this chain.
-	// Each entry maps to one CommitteeVerifier contract (identified by CommitteeQualifier).
-	// Empty slice = no CommitteeVerifier configuration is applied for this chain.
-	CommitteeVerifiers []CommitteeVerifierInputConfig
-	// RemoteChains maps remote chain selectors to their per-lane configuration.
-	// An empty entry (PartialRemoteChainConfig{}) relies entirely on adapter defaults.
-	// Empty map = no remote-chain lane configuration is applied for this chain.
-	RemoteChains map[uint64]PartialRemoteChainConfig
-	// FamilyExtras holds chain-family-specific configuration that the generic
-	// changeset passes through opaquely to the family adapter's sequence.
-	// All values must be serializable.
-	FamilyExtras map[string]any
+type partialChainConfig struct {
+	ChainSelector      uint64
+	CommitteeVerifiers []committeeVerifierInputConfig
+	RemoteChains       map[uint64]partialRemoteChainConfig
+	FamilyExtras       map[string]any
 }
 
-type ConfigureChainsForLanesFromTopologyConfig struct {
-	Topology      *offchain.EnvironmentTopology
-	Chains        []PartialChainConfig
-	MCMS          mcms.Input
-	UseTestRouter bool
-}
-
-// enrichedChainConfig is the internal representation of a chain config after the
-// topology-level enrichment (signing keys, contract resolution). It mirrors PartialChainConfig
-// but carries fully populated CommitteeVerifierConfig (with signers/threshold filled in).
+// enrichedChainConfig is the internal representation after topology enrichment.
 type enrichedChainConfig struct {
 	ChainSelector      uint64
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
-	RemoteChains       map[uint64]PartialRemoteChainConfig
+	RemoteChains       map[uint64]partialRemoteChainConfig
 	FamilyExtras       map[string]any
 }
 
 // ConfigureChainsForLanesFromTopology is the canonical changeset for configuring CCIP 2.0
-// lanes. It is chain-centric: each entry in cfg.Chains describes one local chain and the set
-// of remote chains it should communicate with.
+// lanes from bidirectional lane pairs and topology.
 //
 // The changeset has three phases:
 //  1. Enrichment — for each chain, fetch signing keys from JD (if missing in topology),
@@ -197,10 +113,15 @@ func ConfigureChainsForLanesFromTopology(
 		if cfg.Topology.NOPTopology == nil || len(cfg.Topology.NOPTopology.Committees) == 0 {
 			return fmt.Errorf("no committees defined in topology")
 		}
-		if len(cfg.Chains) == 0 {
-			return fmt.Errorf("at least one chain must be specified")
+		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes)
+		if err != nil {
+			return err
 		}
-		for _, chainCfg := range cfg.Chains {
+		chains = filterPartialChainsToEnvironment(e.BlockChains, chains)
+		if len(chains) == 0 {
+			return fmt.Errorf("no lane chains are available in environment")
+		}
+		for _, chainCfg := range chains {
 			if !slices.Contains(e.BlockChains.ListChainSelectors(), chainCfg.ChainSelector) {
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
 			}
@@ -219,12 +140,21 @@ func ConfigureChainsForLanesFromTopology(
 	}
 
 	apply := func(e deployment.Environment, cfg ConfigureChainsForLanesFromTopologyConfig) (deployment.ChangesetOutput, error) {
+		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+		chains = filterPartialChainsToEnvironment(e.BlockChains, chains)
+		if len(chains) == 0 {
+			return deployment.ChangesetOutput{}, fmt.Errorf("no lane chains are available in environment")
+		}
+
 		// ── Phase 1: Enrichment ──────────────────────────────────────────────────
 		// Pre-fetch signing keys only for NOPs that are actually referenced as
 		// committee signers. Executor-only NOPs are excluded to avoid unnecessary
 		// JD calls that could fail if those NOPs don't exist in the node registry.
-		targetFamilies := deriveFamiliesFromChains(cfg.Chains)
-		committeeNOPs := filterNOPsToCommitteeMembers(cfg.Topology.NOPTopology, cfg.Chains)
+		targetFamilies := deriveFamiliesFromChains(chains)
+		committeeNOPs := filterNOPsToCommitteeMembers(cfg.Topology.NOPTopology, chains)
 		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, targetFamilies)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
@@ -232,8 +162,8 @@ func ConfigureChainsForLanesFromTopology(
 
 		// For each chain, populate the CommitteeVerifier config with signers/threshold
 		// derived from the topology and resolve the verifier contract addresses.
-		chains := make([]enrichedChainConfig, 0, len(cfg.Chains))
-		for _, chainCfg := range cfg.Chains {
+		enriched := make([]enrichedChainConfig, 0, len(chains))
+		for _, chainCfg := range chains {
 			localFamily, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for local chain %d: %w", chainCfg.ChainSelector, err)
@@ -299,7 +229,7 @@ func ConfigureChainsForLanesFromTopology(
 				})
 			}
 
-			chains = append(chains, enrichedChainConfig{
+			enriched = append(enriched, enrichedChainConfig{
 				ChainSelector:      chainCfg.ChainSelector,
 				CommitteeVerifiers: committeeVerifiers,
 				RemoteChains:       chainCfg.RemoteChains,
@@ -307,7 +237,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, chains, cfg.MCMS, cfg.UseTestRouter)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter())
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -455,7 +385,7 @@ func resolveRemoteChainConfig(
 	remoteAdapter adapters.ChainFamily,
 	localChainSelector uint64,
 	remoteChainSelector uint64,
-	inCfg PartialRemoteChainConfig,
+	inCfg partialRemoteChainConfig,
 	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	remoteOnRampBytes, err := remoteAdapter.GetOnRampAddress(e.DataStore, remoteChainSelector)
@@ -494,14 +424,14 @@ func resolveRemoteChainConfig(
 	}
 
 	fqConfig := mergeFeeQuoterDestChainConfig(
-		remoteAdapter.GetDefaultFeeQuoterDestChainConfig(),
+		remoteAdapter.GetDefaultFeeQuoterDestChainConfig(localChainSelector, remoteChainSelector, remoteAdapter.GetChainFamilySelector()),
 		inCfg.FeeQuoterDestChainConfig,
 	)
 	// ChainFamilySelector is always authoritative from the remote adapter, regardless of
 	// what the defaults or user-supplied overrides contain.
 	fqConfig.ChainFamilySelector = remoteAdapter.GetChainFamilySelector()
 
-	defaults := remoteAdapter.GetDefaultRemoteChainConfig()
+	defaults := remoteAdapter.GetDefaultRemoteChainConfig(localChainSelector, remoteChainSelector)
 
 	// Apply per-field user overrides on top of adapter defaults via coalesce.
 	// Pointer fields: nil = keep adapter default; non-nil = use caller value.
@@ -555,7 +485,7 @@ func resolveDefaultCCVs(
 // CommitteeVerifierContractAdapter (typically the verifier resolver only).
 // This fails early in validation rather than silently producing a lane with no verifiers.
 func validateDefaultCCVsResolvable(
-	chainCfg PartialChainConfig,
+	chainCfg partialChainConfig,
 	registry *adapters.CommitteeVerifierContractRegistry,
 	e deployment.Environment,
 ) error {
@@ -604,7 +534,7 @@ func resolveLocalContractsForTopologyChangeset(
 
 func mergeCommitteeVerifierRemoteChainConfig(
 	defaults adapters.CommitteeVerifierRemoteChainDefaults,
-	overrides CommitteeVerifierRemoteChainConfig,
+	overrides committeeVerifierRemoteChainInput,
 	signatureConfig adapters.CommitteeVerifierSignatureQuorumConfig,
 ) adapters.CommitteeVerifierRemoteChainConfig {
 	return adapters.CommitteeVerifierRemoteChainConfig{
@@ -660,7 +590,7 @@ func mergeFeeQuoterDestChainConfig(
 // filterNOPsToCommitteeMembers returns only the NOPs whose aliases appear in at least one
 // committee ChainConfig referenced by the input chains' CommitteeVerifiers. This prevents
 // fetching signing keys for executor-only NOPs that will never be used as committee signers.
-func filterNOPsToCommitteeMembers(nopTopology *offchain.NOPTopology, chains []PartialChainConfig) []offchain.NOPConfig {
+func filterNOPsToCommitteeMembers(nopTopology *offchain.NOPTopology, chains []partialChainConfig) []offchain.NOPConfig {
 	committeeAliases := make(map[string]struct{})
 	for _, chainCfg := range chains {
 		for _, cv := range chainCfg.CommitteeVerifiers {
@@ -687,7 +617,7 @@ func filterNOPsToCommitteeMembers(nopTopology *offchain.NOPTopology, chains []Pa
 	return filtered
 }
 
-func deriveFamiliesFromChains(chains []PartialChainConfig) []string {
+func deriveFamiliesFromChains(chains []partialChainConfig) []string {
 	selectors := make([]uint64, 0, len(chains))
 	for _, c := range chains {
 		selectors = append(selectors, c.ChainSelector)
