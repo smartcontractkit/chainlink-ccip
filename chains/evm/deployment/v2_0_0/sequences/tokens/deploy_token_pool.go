@@ -181,7 +181,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 		thresholdCCV := big.NewInt(0)
 		if input.ThresholdAmountForAdditionalCCVs != "" {
-			if threshold, ok := new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10); ok {
+			if threshold, ok := new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10); !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs '%s': must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
 			} else {
 				thresholdCCV = threshold
