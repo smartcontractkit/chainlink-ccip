@@ -290,11 +290,15 @@ func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (common.Address, er
 	// If the token governor address is provided directly, then
 	// skip the datastore lookup and use the provided address.
 	if input.TokenGovernor != "" {
+		govStrn := input.TokenGovernor
 		if !common.IsHexAddress(input.TokenGovernor) {
 			return common.Address{}, fmt.Errorf("provided token governor address '%s' is not a valid hex address", input.TokenGovernor)
-		} else {
-			return common.HexToAddress(input.TokenGovernor), nil
 		}
+		govAddr := common.HexToAddress(govStrn)
+		if govAddr == (common.Address{}) {
+			return common.Address{}, fmt.Errorf("provided token governor address '%s' is the zero address", input.TokenGovernor)
+		}
+		return govAddr, nil
 	}
 
 	// If the token governor address isn't provided, then try
@@ -307,7 +311,7 @@ func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (common.Address, er
 			Qualifier:     input.TokenRef.Qualifier,
 		},
 		input.ChainSelector,
-		datastore_utils_evm.ToEVMAddress,
+		datastore_utils_evm.ToNonZeroEVMAddress,
 	)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find token governor address in datastore: %w", err)
