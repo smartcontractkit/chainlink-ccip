@@ -48,7 +48,7 @@ func TestGetDefaultTokenFeeUSDCents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getDefaultTokenFeeUSDCents(tt.sourceChain, tt.remoteChain)
+			got := GetDefaultTokenFeeUSDCentsFor1_6Lane(tt.sourceChain, tt.remoteChain)
 			require.Equal(t, tt.want, got)
 		})
 	}

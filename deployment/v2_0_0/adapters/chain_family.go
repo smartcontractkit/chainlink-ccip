@@ -54,7 +54,7 @@ type CommitteeVerifierRemoteChainDefaults struct {
 
 // RemoteChainDefaults provides sensible defaults for remote chain configuration
 // fields that are chain-family-specific. Each ChainFamily adapter returns its own
-// defaults; callers override individual fields as needed for lane-pair-specific values.
+// defaults for a source→remote lane pair; callers override individual fields as needed.
 type RemoteChainDefaults struct {
 	AllowTrafficFrom          bool
 	ExecutorDestChainConfig   ExecutorDestChainConfig
@@ -114,8 +114,8 @@ type ChainFamily interface {
 	ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error)
 	GetAddressBytesLength() uint8
 	GetChainFamilySelector() [4]byte
-	GetDefaultFeeQuoterDestChainConfig() FeeQuoterDestChainConfigOverrides
-	GetDefaultRemoteChainConfig() RemoteChainDefaults
+	GetDefaultFeeQuoterDestChainConfig(chainSelector, remoteChainSelector uint64, chainFamilySelector [4]byte) FeeQuoterDestChainConfigOverrides
+	GetDefaultRemoteChainConfig(sourceChainSelector, remoteChainSelector uint64) RemoteChainDefaults
 	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
 	GetDefaultFinalityConfig() finality.Config
 }

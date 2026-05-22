@@ -66,11 +66,11 @@ func (m *mockChainFamily) GetChainFamilySelector() [4]byte {
 	return [4]byte{}
 }
 
-func (m *mockChainFamily) GetDefaultFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfigOverrides {
+func (m *mockChainFamily) GetDefaultFeeQuoterDestChainConfig(_, _ uint64, _ [4]byte) adapters.FeeQuoterDestChainConfigOverrides {
 	return adapters.FeeQuoterDestChainConfigOverrides{}
 }
 
-func (m *mockChainFamily) GetDefaultRemoteChainConfig() adapters.RemoteChainDefaults {
+func (m *mockChainFamily) GetDefaultRemoteChainConfig(_, _ uint64) adapters.RemoteChainDefaults {
 	return adapters.RemoteChainDefaults{}
 }
 
