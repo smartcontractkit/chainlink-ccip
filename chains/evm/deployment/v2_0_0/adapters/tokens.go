@@ -391,10 +391,7 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 	}, nil
 }
 
-// poolOpsV200 implements PoolOps using v2.0.0 token pool bindings.
-// Only GetToken and Version are called at runtime (by the inherited
-// DeriveTokenAddress and ManualRegistration); the other methods are
-// stubs because the v2.0.0 adapter overrides the methods that use them.
+// poolOpsV200 implements PoolOps using v2.0.0 bindings.
 type poolOpsV200 struct{}
 
 func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
