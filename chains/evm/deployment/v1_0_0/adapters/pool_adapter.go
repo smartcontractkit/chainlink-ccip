@@ -156,7 +156,7 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 
 			if input.SkipIfMissingPermissions {
 				timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
-				timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
+				timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToNonZeroEVMAddress)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chain.Selector, err)
 				}
@@ -334,12 +334,9 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					if rlAdminAddr == (common.Address{}) {
 						return sequences.OnChainOutput{}, errors.New("rate limit admin address cannot be the zero address")
 					}
-					poolAddr, err := datastore_utils_evm.ToEVMAddress(poolRef)
+					poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
-					}
-					if poolAddr == (common.Address{}) {
-						return sequences.OnChainOutput{}, errors.New("deployed token pool address cannot be the zero address")
 					}
 					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, rlAdminAddr)
 					if err != nil {
@@ -378,11 +375,11 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 	tokenPoolRef datastore.AddressRef,
 	tokenRef datastore.AddressRef,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenPoolAddr, err := datastore_utils_evm.ToEVMAddress(tokenPoolRef)
+	tokenPoolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenPoolRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
-	tokenAddr, err := datastore_utils_evm.ToEVMAddress(tokenRef)
+	tokenAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
@@ -427,7 +424,7 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	input tokensapi.DeployTokenPoolInput,
 	tokenRef datastore.AddressRef,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenAddr, err := datastore_utils_evm.ToEVMAddress(tokenRef)
+	tokenAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
