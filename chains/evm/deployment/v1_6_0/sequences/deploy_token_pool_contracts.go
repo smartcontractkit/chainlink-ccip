@@ -288,7 +288,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (common.Address, error) {
 	// If the token governor address is provided directly, then
-	// skip the daastore lookup and use the provided address.
+	// skip the datastore lookup and use the provided address.
 	if input.TokenGovernor != "" {
 		if !common.IsHexAddress(input.TokenGovernor) {
 			return common.Address{}, fmt.Errorf("provided token governor address '%s' is not a valid hex address", input.TokenGovernor)
