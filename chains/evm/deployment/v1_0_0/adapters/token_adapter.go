@@ -26,7 +26,6 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -147,7 +146,7 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 
 	tv, err := cldf_ops.ExecuteOperation(b,
 		type_and_version.GetTypeAndVersion, chain,
-		evm_contract.FunctionInput[struct{}]{
+		contract.FunctionInput[struct{}]{
 			ChainSelector: chainSelector,
 			Address:       poolAddress,
 		},
@@ -167,7 +166,7 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 	qualifier := fmt.Sprintf("%s-%s", poolAddress, tv.Output.Type)
 	if token, err := cldf_ops.ExecuteOperation(b,
 		token_pool.GetToken, chain,
-		evm_contract.FunctionInput[any]{
+		contract.FunctionInput[any]{
 			ChainSelector: chainSelector,
 			Address:       poolAddress,
 		},
@@ -201,7 +200,7 @@ func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.Bloc
 
 	symbolReport, err := cldf_ops.ExecuteOperation(b,
 		erc20.GetSymbol, chain,
-		evm_contract.FunctionInput[struct{}]{
+		contract.FunctionInput[struct{}]{
 			ChainSelector: chainSelector,
 			Address:       tokenAddress,
 		},
