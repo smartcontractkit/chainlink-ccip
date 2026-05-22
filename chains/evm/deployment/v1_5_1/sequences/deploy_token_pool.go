@@ -79,7 +79,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Infer pool deployment inputs
-		tokenDecimals, err := poolutil.TokenInfo(b, input.ExistingDataStore, chain, tokenAddress)
+		tokenDecimals, err := poolutil.ERC20Decimals(b, input.ExistingDataStore, chain, tokenAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token at address '%s': %w", tokenAddress, err)
 		}

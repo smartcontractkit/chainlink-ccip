@@ -394,8 +394,8 @@ func (a *EVMTokenBase) ParseAddressStrings(allowed []string) ([]common.Address, 
 	return addresses, nil
 }
 
-// TokenInfo returns the token address and decimals for a given EVM token address string.
-func (a *EVMTokenBase) TokenInfo(b cldf_ops.Bundle, ds datastore.DataStore, chain evm.Chain, tokenAddress common.Address) (uint8, error) {
+// ERC20Decimals returns the decimals of an ERC20 token by calling the getDecimals operation.
+func (a *EVMTokenBase) ERC20Decimals(b cldf_ops.Bundle, ds datastore.DataStore, chain evm.Chain, tokenAddress common.Address) (uint8, error) {
 	decimals, err := cldf_ops.ExecuteOperation(
 		b, erc20.GetDecimals, chain,
 		contract.FunctionInput[struct{}]{
