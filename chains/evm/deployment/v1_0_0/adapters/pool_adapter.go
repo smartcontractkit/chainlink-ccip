@@ -330,15 +330,11 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					if !common.IsHexAddress(rlAdminHex) {
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
 					}
-					rlAdminAddr := common.HexToAddress(rlAdminHex)
-					if rlAdminAddr == (common.Address{}) {
-						return sequences.OnChainOutput{}, errors.New("rate limit admin address cannot be the zero address")
-					}
 					poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 					}
-					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, rlAdminAddr)
+					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, common.HexToAddress(rlAdminHex))
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}
