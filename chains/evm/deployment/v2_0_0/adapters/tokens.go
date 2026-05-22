@@ -220,21 +220,21 @@ func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return writes, nil
 }
 
-func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (contract.WriteOutput, error) {
+func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]contract.WriteOutput, error) {
 	pool, err := token_pool.NewTokenPoolContract(poolAddr, chain.Client)
 	if err != nil {
-		return contract.WriteOutput{}, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+		return nil, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 	}
 	cfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: b.GetContext()})
 	if err != nil {
-		return contract.WriteOutput{}, fmt.Errorf("failed to get dynamic config of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+		return nil, fmt.Errorf("failed to get dynamic config of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 	}
 	if newAdmin == cfg.RateLimitAdmin {
 		b.Logger.Info("Rate limit admin is already set to the desired address; no update needed")
-		return contract.WriteOutput{}, nil
+		return nil, nil
 	}
 
-	res, err := cldf_ops.ExecuteOperation(b,
+	report, err := cldf_ops.ExecuteOperation(b,
 		token_pool.SetDynamicConfig, chain,
 		contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
 			ChainSelector: chain.Selector,
@@ -247,10 +247,10 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 		},
 	)
 	if err != nil {
-		return contract.WriteOutput{}, fmt.Errorf("SetDynamicConfig v2.0.0: %w", err)
+		return nil, fmt.Errorf("SetDynamicConfig v2.0.0: %w", err)
 	}
 
-	return res.Output, nil
+	return []contract.WriteOutput{report.Output}, nil
 }
 
 func (p *poolOpsV200) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.RateLimiterConfig, error) {

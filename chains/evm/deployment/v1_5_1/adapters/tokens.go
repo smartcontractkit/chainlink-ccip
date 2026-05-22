@@ -206,7 +206,7 @@ func (p *poolOpsV151) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error) {
+func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOps.SetRateLimitAdmin, chain,
 		evm_contract.FunctionInput[tpOps.SetRateLimitAdminArgs]{
@@ -217,9 +217,9 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 			},
 		})
 	if err != nil {
-		return evm_contract.WriteOutput{}, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
+		return nil, fmt.Errorf("SetRateLimitAdmin v1.5.1: %w", err)
 	}
-	return report.Output, nil
+	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
 func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.RateLimiterConfig, error) {

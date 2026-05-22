@@ -37,7 +37,7 @@ type PoolOps interface {
 	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
+	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error)
 	// GetCurrentInboundRateLimit reads the on-chain inbound rate limiter state for the given remote
 	// chain selector from the token pool at poolAddr. Used by outbound-only TPRL writes to read and
 	// pass through the current inbound, and by RateLimitReaderAdapter for cross-chain validation.
@@ -342,7 +342,9 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}
-					writes = append(writes, output)
+					if len(output) > 0 {
+						writes = append(writes, output...)
+					}
 				}
 			}
 
