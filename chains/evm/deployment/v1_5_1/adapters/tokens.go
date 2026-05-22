@@ -222,7 +222,11 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return report.Output, nil
 }
 
-func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, _ bool) (tokensapi.RateLimiterConfig, error) {
+func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.RateLimiterConfig, error) {
+	if ff {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("fast finality buckets are not supported on v1.5.x token pools")
+	}
+
 	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 	if err != nil {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
@@ -231,6 +235,7 @@ func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Ch
 	if err != nil {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
+
 	return tokensapi.RateLimiterConfig{
 		IsEnabled: bucket.IsEnabled,
 		Capacity:  bucket.Capacity,

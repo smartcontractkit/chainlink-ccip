@@ -161,7 +161,11 @@ func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return report.Output, nil
 }
 
-func (p *poolOpsV161) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, _ bool) (tokensapi.RateLimiterConfig, error) {
+func (p *poolOpsV161) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.RateLimiterConfig, error) {
+	if ff {
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("fast finality buckets are not supported on v1.6.x token pools")
+	}
+
 	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
 	// reports by input hash, and earlier sequences in the same Apply run may have read this
 	// same lane while it was still uninitialized — caching that stale result.
@@ -173,6 +177,7 @@ func (p *poolOpsV161) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Ch
 	if err != nil {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
+
 	return tokensapi.RateLimiterConfig{
 		IsEnabled: bucket.IsEnabled,
 		Capacity:  bucket.Capacity,
