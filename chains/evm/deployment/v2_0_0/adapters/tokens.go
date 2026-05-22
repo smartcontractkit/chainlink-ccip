@@ -33,9 +33,9 @@ var (
 // TokenAdapter handles EVM token pools at version 2.0.0.
 // It embeds EVMPoolAdapter for shared methods (DeriveTokenAddress,
 // ManualRegistration) and overrides the methods that have genuinely
-// different v2.0.0 logic (DeriveTokenDecimals with ERC20 fallback,
-// SetTokenPoolRateLimits with batched default + fast-finality TPRL buckets,
-// DeployTokenPoolForToken with its own deploy sequences).
+// different v2.0.0 logic (SetTokenPoolRateLimits with batched default
+// + fast-finality TPRL buckets, ConfigureTokenForTransfersSequence with
+// its own sequences).
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
