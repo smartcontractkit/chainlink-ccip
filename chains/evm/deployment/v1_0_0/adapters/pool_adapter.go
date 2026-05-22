@@ -330,7 +330,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 
 			var writes []evm_contract.WriteOutput
 			if !datastore_utils.IsAddressRefEmpty(poolRef) {
-				if tokenPoolRolesWrites, err := a.tidyTokenPoolRoles(b, chain, input, poolRef, tokenRef); err != nil {
+				if tokenPoolRolesWrites, err := a.TidyTokenPoolRoles(b, chain, input, poolRef, tokenRef); err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token pool roles: %w", err)
 				} else {
 					writes = append(writes, tokenPoolRolesWrites...)
@@ -359,7 +359,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				}
 			}
 
-			if tokenRolesWrites, err := a.tidyTokenRoles(b, chain, input, tokenRef); err != nil {
+			if tokenRolesWrites, err := a.TidyTokenRoles(b, chain, input, tokenRef); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token roles: %w", err)
 			} else {
 				writes = append(writes, tokenRolesWrites...)
@@ -381,7 +381,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 // tidyTokenPoolRoles grants a token pool the token-side roles required for its
 // pool type. Burn/mint pools delegate role selection to the registered token
 // strategy because token contracts expose different role APIs.
-func (a *EVMPoolAdapter) tidyTokenPoolRoles(
+func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
@@ -431,7 +431,7 @@ func (a *EVMPoolAdapter) tidyTokenPoolRoles(
 // (i.e. not deployed/not applicable which can be the case in test cases),
 // then it leaves the deployer account as an admin so the token isn't left
 // without an operator.
-func (a *EVMPoolAdapter) tidyTokenRoles(
+func (a *EVMPoolAdapter) TidyTokenRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,

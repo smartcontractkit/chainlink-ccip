@@ -109,7 +109,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				tokenAddr = input.TokenRef.Address
 			}
 			if input.TokenRef != nil && input.TokenRef.Qualifier != "" {
-				storedRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, *input.TokenRef, input.ChainSelector, datastore_utils.FullRef)
+				storedRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, *input.TokenRef, evmChain.Selector, datastore_utils.FullRef)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("token with ref %+v not found in datastore: %w", *input.TokenRef, err)
 				}
@@ -136,7 +136,7 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 				}
 
 				tokenRef, lookupErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
+					ChainSelector: evmChain.Selector,
 					Address:       tokenAddr,
 				}, input.ChainSelector, datastore_utils.FullRef)
 				if lookupErr != nil || !t.EVMTokenBase.IsBurnMintTokenType(tokenRef.Type.String()) {
@@ -450,16 +450,16 @@ func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 			Args:          struct{}{},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to get allowed finality config for token pool at %s on chain %d: %w", poolAddr.Hex(), input.ChainSelector, err)
+			return nil, fmt.Errorf("failed to get allowed finality config for token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 		}
 		if input.AllowedFinalityConfig.Raw() != currentFinalityConfig.Output {
 			setFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-				ChainSelector: input.ChainSelector,
+				ChainSelector: chain.Selector,
 				Address:       poolAddr,
 				Args:          input.AllowedFinalityConfig.Raw(),
 			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to set allowed finality config on token pool at %s on chain %d: %w", poolAddr.Hex(), input.ChainSelector, err)
+				return nil, fmt.Errorf("failed to set allowed finality config on token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 			}
 			writes = append(writes, setFinalityReport.Output)
 		}
