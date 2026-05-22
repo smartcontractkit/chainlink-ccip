@@ -39,7 +39,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Parse the token ref as an EVM address
-		tokenAddress, err := poolutil.ParseAddressRef(input.ExistingDataStore, input.TokenRef.Clone(), chain.Selector)
+		tokenAddress, err := poolutil.ParseNonZeroAddressRef(input.ExistingDataStore, input.TokenRef.Clone(), chain.Selector)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token address from ref: %w", err)
 		}

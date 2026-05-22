@@ -9,6 +9,18 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
+// ToNonZeroEVMAddress formats a datastore.AddressRef into an ethereum common.Address, ensuring the address is not the zero address.
+func ToNonZeroEVMAddress(ref datastore.AddressRef) (commonAddress common.Address, err error) {
+	addr, err := ToEVMAddress(ref)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to convert address ref to EVM address: %w", err)
+	}
+	if addr == (common.Address{}) {
+		return common.Address{}, fmt.Errorf("address is the zero address in ref: %s", datastore_utils.SprintRef(ref))
+	}
+	return addr, nil
+}
+
 // ToEVMAddress formats a datastore.AddressRef into an ethereum common.Address.
 func ToEVMAddress(ref datastore.AddressRef) (commonAddress common.Address, err error) {
 	if ref.Address == "" {

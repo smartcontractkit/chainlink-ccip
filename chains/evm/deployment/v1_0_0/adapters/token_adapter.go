@@ -304,7 +304,7 @@ func (a *EVMTokenBase) ResolveRouterAddress(ds datastore.DataStore, chainSelecto
 		filter = *routerRef
 	}
 
-	addr, err := a.ParseAddressRef(ds, filter, chainSelector)
+	addr, err := a.ParseNonZeroAddressRef(ds, filter, chainSelector)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to resolve router address for chain %d: %w", chainSelector, err)
 	}
@@ -319,7 +319,7 @@ func (a *EVMTokenBase) GetRMNProxyAddress(ds datastore.DataStore, selector uint6
 		Type:          datastore.ContractType(rmnproxyops.ContractType),
 	}
 
-	addr, err := a.ParseAddressRef(ds, filter, selector)
+	addr, err := a.ParseNonZeroAddressRef(ds, filter, selector)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find RMNProxy address on chain %d: %w", selector, err)
 	}
@@ -335,7 +335,7 @@ func (a *EVMTokenBase) GetTokenAdminRegistryAddress(ds datastore.DataStore, sele
 		Version:       tarops.Version,
 	}
 
-	addr, err := a.ParseAddressRef(ds, filter, selector)
+	addr, err := a.ParseNonZeroAddressRef(ds, filter, selector)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
 	}
@@ -352,7 +352,7 @@ func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector ui
 		Qualifier:     cciputils.CLLQualifier,
 	}
 
-	addr, err := a.ParseAddressRef(ds, filter, selector)
+	addr, err := a.ParseNonZeroAddressRef(ds, filter, selector)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find timelock address on chain %d: %w", selector, err)
 	}
@@ -360,10 +360,10 @@ func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector ui
 	return addr, nil
 }
 
-// ParseAddressRef attempts to parse an address from the given ref. If ref.Address is non-empty, then the datastore
+// ParseNonZeroAddressRef attempts to parse an address from the given ref. If ref.Address is non-empty, then the datastore
 // lookup is skipped and the provided address is parsed as an EVM address and returned directly. Otherwise, the ref
 // is resolved against the datastore and parsed as a hex address.
-func (a *EVMTokenBase) ParseAddressRef(ds datastore.DataStore, ref datastore.AddressRef, sel uint64) (common.Address, error) {
+func (a *EVMTokenBase) ParseNonZeroAddressRef(ds datastore.DataStore, ref datastore.AddressRef, sel uint64) (common.Address, error) {
 	refAddr := ref.Address
 	if refAddr != "" {
 		if !common.IsHexAddress(refAddr) {
@@ -373,7 +373,7 @@ func (a *EVMTokenBase) ParseAddressRef(ds datastore.DataStore, ref datastore.Add
 		}
 	}
 
-	evmAddr, err := datastore_utils.FindAndFormatRef(ds, ref, sel, datastore_utils_evm.ToEVMAddress)
+	evmAddr, err := datastore_utils.FindAndFormatRef(ds, ref, sel, datastore_utils_evm.ToNonZeroEVMAddress)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to resolve address from datastore using ref filter (%s): %w", datastore_utils.SprintRef(ref), err)
 	}

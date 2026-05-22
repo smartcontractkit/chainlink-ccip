@@ -71,12 +71,9 @@ func (a *EVMPoolAdapter) DeriveTokenAddress(e deployment.Environment, chainSelec
 	// If the ref already has the pool address, then skip the datastore lookup altogether
 	// and use it to get the token. If the pool address is NOT in the ref, then fall back
 	// to resolving it from the datastore first.
-	tokenPoolAddr, err := a.EVMTokenBase.ParseAddressRef(e.DataStore, poolRef, chainSelector)
+	tokenPoolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse token pool address from ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
-	}
-	if tokenPoolAddr == (common.Address{}) {
-		return "", errors.New("token pool address is zero address")
 	}
 	tokenAddr, err := a.Ops.GetToken(e.OperationsBundle, chain, tokenPoolAddr)
 	if err != nil {
@@ -116,7 +113,7 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 	// go straight to the pool contract for the decimals. If the ref doesn't have the
 	// pool address, then we need to hit the datastore for the full pool ref then get
 	// the token decimals from the pool contract.
-	poolAddr, err := a.EVMTokenBase.ParseAddressRef(e.DataStore, poolRef, chainSelector)
+	poolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
 	if err != nil {
 		return 0, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	} else {
@@ -134,12 +131,9 @@ func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(e deployment.Environment, ch
 	if !ok {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
-	poolAddr, err := a.EVMTokenBase.ParseAddressRef(e.DataStore, poolRef, chainSelector)
+	poolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
 	if err != nil {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
-	}
-	if poolAddr == (common.Address{}) {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("token pool address for ref (%s) is zero address", datastore_utils.SprintRef(poolRef))
 	}
 	return a.Ops.GetCurrentInboundRateLimit(e.OperationsBundle, chain, poolAddr, remoteSelector, fastFinality)
 }
@@ -155,13 +149,9 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-
-			tokenPoolAddr, err := a.EVMTokenBase.ParseAddressRef(input.ExistingDataStore, input.TokenPoolRef, input.ChainSelector)
+			tokenPoolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(input.ExistingDataStore, input.TokenPoolRef, input.ChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(input.TokenPoolRef), err)
-			}
-			if tokenPoolAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%s) is zero address", datastore_utils.SprintRef(input.TokenPoolRef))
 			}
 
 			if input.SkipIfMissingPermissions {
@@ -229,7 +219,7 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 				if tokRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, chain.Selector, datastore_utils.FullRef); err != nil {
 					b.Logger.Warnf("token address could not be resolved using TokenRef (%s): %v", datastore_utils.SprintRef(tokenRef), err)
 					b.Logger.Warnf("attempting to resolve token address using TokenPoolRef instead: (%s)", datastore_utils.SprintRef(input.TokenPoolRef))
-					tokenPoolAddr, err := a.EVMTokenBase.ParseAddressRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector)
+					tokenPoolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(input.TokenPoolRef), err)
 					}
