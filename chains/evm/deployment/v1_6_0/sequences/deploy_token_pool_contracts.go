@@ -301,20 +301,23 @@ func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (common.Address, er
 		return govAddr, nil
 	}
 
+	// Define token governor datastore filter
+	filter := datastore.AddressRef{
+		ChainSelector: input.ChainSelector,
+		Qualifier:     input.TokenRef.Qualifier,
+		Type:          datastore.ContractType(token_governor.ContractType),
+	}
+
 	// If the token governor address isn't provided, then try
 	// to find it in the datastore.
 	tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(
 		input.ExistingDataStore,
-		datastore.AddressRef{
-			ChainSelector: input.ChainSelector,
-			Type:          datastore.ContractType(token_governor.ContractType),
-			Qualifier:     input.TokenRef.Qualifier,
-		},
+		filter,
 		input.ChainSelector,
 		datastore_utils_evm.ToNonZeroEVMAddress,
 	)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find token governor address in datastore: %w", err)
+		return common.Address{}, fmt.Errorf("failed to find token governor address in datastore using filter (%s): %w", datastore_utils.SprintRef(filter), err)
 	}
 
 	return tokenGovernorAddr, nil
