@@ -300,7 +300,11 @@ func (a *EVMTokenBase) ResolveRouterAddress(ds datastore.DataStore, chainSelecto
 		Type:          datastore.ContractType(router.ContractType),
 	}
 	if routerRef != nil {
-		filter = *routerRef
+		filter = routerRef.Clone()
+		filter.ChainSelector = chainSelector
+		if filter.Type == "" {
+			filter.Type = datastore.ContractType(router.ContractType)
+		}
 	}
 
 	addr, err := a.ParseNonZeroAddressRef(ds, filter, chainSelector)
