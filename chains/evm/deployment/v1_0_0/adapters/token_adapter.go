@@ -381,8 +381,8 @@ func (a *EVMTokenBase) ParseAddressRef(ds datastore.DataStore, ref datastore.Add
 	return evmAddr, nil
 }
 
-// ParseAllowList parses a list of hex address strings into a slice of common.Address, validating each address in the process.
-func (a *EVMTokenBase) ParseAllowList(allowed []string) ([]common.Address, error) {
+// ParseAddressStrings parses a list of hex address strings into a slice of common.Address, validating each address in the process.
+func (a *EVMTokenBase) ParseAddressStrings(allowed []string) ([]common.Address, error) {
 	addresses := make([]common.Address, 0, len(allowed))
 	for _, addrStr := range allowed {
 		if !common.IsHexAddress(addrStr) {

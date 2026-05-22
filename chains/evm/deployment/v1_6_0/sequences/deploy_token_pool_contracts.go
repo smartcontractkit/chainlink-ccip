@@ -97,7 +97,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve router address for chain selector %d: %w", chain.Selector, err)
 		}
-		allowlist, err := poolutil.ParseAllowList(input.Allowlist)
+		allowlist, err := poolutil.ParseAddressStrings(input.Allowlist)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse allowlist: %w", err)
 		}
