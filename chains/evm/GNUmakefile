@@ -67,10 +67,18 @@ mockery: $(mockery) ## Install mockery.
 extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to bytecode and abi directories
 	cd gobindings && go run ./cmd/extract_bytecode/main.go
 
-.PHONY: operations
-operations: pnpmdep wrappers
+OPERATIONS_GEN_V2 := github.com/smartcontractkit/chainlink-deployments-framework/tools/operations-gen@v0.0.2-0.20260515181606-62d38f5a89b0
+
+.PHONY: operations-legacy
+operations-legacy:
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
 
+.PHONY: operations-1-5
+operations-1-5:
+	go run $(OPERATIONS_GEN_V2) -config deployment/operations_gen_config_1_5.yaml
+
+.PHONY: operations
+operations: pnpmdep wrappers operations-legacy operations-1-5
+
 .PHONY: operations-fast
-operations-fast:
-	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
+operations-fast: operations-legacy operations-1-5
