@@ -1303,7 +1303,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			// Check all fee configs
 			for _, src := range cfgs {
 				for _, dst := range cfgs {
-					if src == dst {
+					if src.sel == dst.sel {
 						continue
 					}
 
