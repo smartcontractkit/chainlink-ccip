@@ -10,7 +10,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -212,9 +211,9 @@ func maybeApplyTokenTransferFeeConfig(
 	src, dst uint64,
 	srcTokRef datastore.AddressRef,
 	srcConfig RemoteChainConfig[[]byte, string],
-) (operations.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput], error) {
+) (cldf_ops.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput], error) {
 	// Helper vars
-	emptyReport := operations.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput]{}
+	emptyReport := cldf_ops.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput]{}
 	feeRegistry := fees.GetRegistry()
 
 	// NOTE: for pre-v2 pools, token transfer fees can only be set on the fee quoter. For
