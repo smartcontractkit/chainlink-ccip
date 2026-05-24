@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
@@ -127,7 +126,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(10)),      // this will be mapped to minFeeUSDCents
 				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(50)),      // custom finality not applicable on v1.6.x, but specifying it should not cause an error
 				DestBytesOverhead:          cciputils.NewOptional(uint32(200_000)), // override default value
-				DestGasOverhead:            utils.Optional[uint32]{},               // let adapter choose a sensible default
+				DestGasOverhead:            cciputils.Optional[uint32]{},           // let adapter choose a sensible default
 			},
 			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(9),
@@ -152,7 +151,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			FeeConfig: tokensapi.PartialTokenTransferFeeConfig{
 				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(50)),     // this will be mapped to minFeeUSDCents
 				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(10)),     // custom finality not applicable on v1.6.x, but specifying it should not cause an error
-				DestBytesOverhead:          utils.Optional[uint32]{},              // let adapter choose a sensible default
+				DestBytesOverhead:          cciputils.Optional[uint32]{},          // let adapter choose a sensible default
 				DestGasOverhead:            cciputils.NewOptional(uint32(50_000)), // override default value
 			},
 			Token: &tokensapi.DeployTokenInput{
@@ -176,8 +175,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// between token pools for different tokens, a qualifier is needed.
 	//
 	// Define testing data for EVM
-	evmInitDeciBpsA := utils.NewOptional(uint16(50))
-	evmInitDeciBpsB := utils.NewOptional(uint16(75))
+	evmInitDeciBpsA := cciputils.NewOptional(uint16(50))
+	evmInitDeciBpsB := cciputils.NewOptional(uint16(75))
 	evmTestData := []struct {
 		TokenPoolQualifier string
 		Token              *tokensapi.DeployTokenInput
@@ -199,7 +198,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(10)),      // this will be mapped to minFeeUSDCents
 				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(50)),      // custom finality not applicable on v1.6.x, but specifying it should not cause an error
 				DestBytesOverhead:          cciputils.NewOptional(uint32(200_000)), // override default value
-				DestGasOverhead:            utils.Optional[uint32]{},               // let adapter choose a sensible default
+				DestGasOverhead:            cciputils.Optional[uint32]{},           // let adapter choose a sensible default
 			},
 			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(18),
@@ -225,7 +224,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			FeeConfig: tokensapi.PartialTokenTransferFeeConfig{
 				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(50)),     // this will be mapped to minFeeUSDCents
 				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(10)),     // custom finality not applicable on v1.6.x, but specifying it should not cause an error
-				DestBytesOverhead:          utils.Optional[uint32]{},              // let adapter choose a sensible default
+				DestBytesOverhead:          cciputils.Optional[uint32]{},          // let adapter choose a sensible default
 				DestGasOverhead:            cciputils.NewOptional(uint32(50_000)), // override default value
 			},
 			Token: &tokensapi.DeployTokenInput{
@@ -624,7 +623,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			// Get the fee quoter contract on EVM chain B
 			onRampB, err := feeResolver.GetOnRampRef(*env, evmB.Chain.Selector, evmA.Chain.Selector)
 			require.NoError(t, err)
-			feeAdapterB, ok := feesRegistry.GetFeeAdapter(chainsel.FamilyEVM, onRampA.Version)
+			feeAdapterB, ok := feesRegistry.GetFeeAdapter(chainsel.FamilyEVM, onRampB.Version)
 			require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampB.Version))
 			fqB, err := feeAdapterB.GetFeeContractRef(*env, onRampB, evmB.Chain.Selector, evmA.Chain.Selector)
 			require.NoError(t, err)
