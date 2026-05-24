@@ -2,20 +2,27 @@ package tokens
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 // TokenTransferConfig specifies configuration for a token on one chain to enable transfers with other chains.
@@ -171,7 +178,6 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
 		}
-
 		batchOps = append(batchOps, configureTokenReport.Output.BatchOps...)
 		reports = append(reports, configureTokenReport.ExecutionReports...)
 		for _, r := range configureTokenReport.Output.Addresses {
@@ -179,8 +185,157 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 				return nil, nil, nil, fmt.Errorf("failed to add address %s to datastore: %w", r.Address, err)
 			}
 		}
+
+		for remoteSelector, inCfg := range remoteChains {
+			dstSelector := remoteSelector
+			srcPoolVers := tokenPool.Version
+			srcTokenRef := fullTokenRef
+			srcSelector := selector
+			output, err := maybeApplyTokenTransferFeeConfig(e,
+				srcPoolVers,
+				srcSelector,
+				dstSelector,
+				srcTokenRef,
+				inCfg,
+			)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to apply token transfer fee config for remote chain selector %d: %w", remoteSelector, err)
+			}
+			batchOps = append(batchOps, output.Output.BatchOps...)
+			reports = append(reports, output.ExecutionReports...)
+		}
 	}
 	return batchOps, reports, ds, nil
+}
+
+func maybeApplyTokenTransferFeeConfig(
+	e cldf.Environment,
+	poolVersion *semver.Version,
+	src, dst uint64,
+	srcTokRef datastore.AddressRef,
+	srcConfig RemoteChainConfig[[]byte, string],
+) (operations.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput], error) {
+	// Helper vars
+	emptyReport := operations.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput]{}
+	feeRegistry := fees.GetRegistry()
+
+	// NOTE: for pre-v2 pools, token transfer fees can only be set on the fee quoter. For
+	// v2 pools, token transfer fees can be set on both the fee quoter or the token pool.
+	// In this changeset, the behavior is: for pre-v2 pools the token transfer fee config
+	// will be set on the fee quoter, and for v2 pools the token transfer fee config will
+	// be set on the token pool in the ConfigureTokensForTransfers sequence.
+	if poolVersion == nil || poolVersion.GreaterThanEqual(utils.Version_2_0_0) || srcConfig.TokenTransferFeeConfig == nil {
+		return emptyReport, nil
+	}
+	if srcTokRef.Address == "" {
+		return emptyReport, fmt.Errorf("source token address is required to apply token transfer fee config for remote chain selector %d", dst)
+	}
+
+	// Get source chain family
+	fam, err := chain_selectors.GetSelectorFamily(src)
+	if err != nil {
+		return emptyReport, fmt.Errorf("failed to get chain selector family for selector %d: %w", src, err)
+	}
+
+	// Fee Quoter resolution part 1: get the current on ramp from the router
+	resolver, ok := feeRegistry.GetFeeResolver(fam)
+	if !ok {
+		e.Logger.Warnf("No fee resolver found for chain selector %d, skipping token transfer fee config for remote chain selector %d", src, dst)
+		return emptyReport, nil
+	}
+	onRampRef, err := resolver.GetOnRampRef(e, src, dst)
+	if err != nil {
+		return emptyReport, fmt.Errorf("failed to resolve fee ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+
+	// Fee Quoter resolution part 2: get the current fee quoter from the on ramp
+	adapter, ok := feeRegistry.GetFeeAdapter(fam, onRampRef.Version)
+	if !ok {
+		e.Logger.Warnf("No fee adapter found for chain selector %d, version %s, skipping token transfer fee config for remote chain selector %d", src, onRampRef.Version, dst)
+		return emptyReport, nil
+	}
+	feeRef, err := adapter.GetFeeContractRef(e, onRampRef, src, dst)
+	if err != nil {
+		return emptyReport, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+
+	// Get the on chain config and fallback config
+	onChainConfig, err := adapter.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
+	if err != nil {
+		return emptyReport, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+	defaultConfig := GetDefaultChainAgnosticTokenTransferFeeConfig(
+		src,
+		dst,
+	)
+	currentConfig := TokenTransferFeeConfig{
+		CustomFinalityTransferFeeBps:  0, // not applicable for fee quoter
+		CustomFinalityFeeUSDCents:     0, // not applicable for fee quoter
+		DefaultFinalityTransferFeeBps: onChainConfig.DeciBps,
+		DefaultFinalityFeeUSDCents:    onChainConfig.MinFeeUSDCents,
+		DestBytesOverhead:             onChainConfig.DestBytesOverhead,
+		DestGasOverhead:               onChainConfig.DestGasOverhead,
+		IsEnabled:                     onChainConfig.IsEnabled,
+	}
+
+	// Resolution strategy:
+	// (1) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)
+	// (2) Fall back to sensible defaults merged with user's provided config (giving precedence to user's config)
+	mergedConfig := TokenTransferFeeConfig{}
+	if currentConfig.IsEnabled {
+		mergedConfig = srcConfig.TokenTransferFeeConfig.MergeWith(currentConfig)
+	} else {
+		mergedConfig = srcConfig.TokenTransferFeeConfig.MergeWith(defaultConfig)
+	}
+
+	// Set non-applicable fields to 0 to ensure accurate comparison between current on-chain config and desired config
+	// since the TokenPool does not support custom finality fees but the tokens.TokenTransferFeeConfig struct includes
+	// these fields for compatibility with other chains that do support custom finality fees
+	translatedConfig := fees.TokenTransferFeeArgs{}
+	currentConfig.CustomFinalityTransferFeeBps = 0
+	mergedConfig.CustomFinalityTransferFeeBps = 0
+	currentConfig.CustomFinalityFeeUSDCents = 0
+	mergedConfig.CustomFinalityFeeUSDCents = 0
+
+	// Skip applying fees if the desired config is the same as the current on-chain config to avoid unnecessary work
+	if mergedConfig == currentConfig {
+		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
+		return emptyReport, nil
+	} else {
+		translatedConfig = fees.TokenTransferFeeArgs{
+			DeciBps:           mergedConfig.DefaultFinalityTransferFeeBps,
+			MinFeeUSDCents:    mergedConfig.DefaultFinalityFeeUSDCents,
+			DestBytesOverhead: mergedConfig.DestBytesOverhead,
+			DestGasOverhead:   mergedConfig.DestGasOverhead,
+			IsEnabled:         mergedConfig.IsEnabled,
+
+			// NOTE: the TokenTransferFeeConfig for token pools is V2-focused and
+			// does NOT have MaxFeeUSDCents fields. As a result there's no direct
+			// translation available. However this config has historically always
+			// been set to MaxUint32 and we have never had the need to change it,
+			// so we will simplify things by simply using MaxUint32 here.
+			MaxFeeUSDCents: math.MaxUint32,
+		}
+	}
+
+	// Apply the token transfer fee config
+	result, err := cldf_ops.ExecuteSequence(e.OperationsBundle,
+		adapter.SetTokenTransferFee(e, feeRef),
+		e.BlockChains,
+		fees.SetTokenTransferFeeSequenceInput{
+			Selector: src,
+			Settings: map[uint64]map[string]*fees.TokenTransferFeeArgs{
+				dst: {
+					srcTokRef.Address: &translatedConfig,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return emptyReport, fmt.Errorf("failed to execute set token transfer fee sequence for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+
+	return result, nil
 }
 
 func convertRemoteChainConfig(

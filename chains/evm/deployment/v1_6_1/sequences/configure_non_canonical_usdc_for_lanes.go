@@ -58,8 +58,9 @@ var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
 			remoteToken = common.LeftPadBytes(remoteToken, 32)
 			remotePool = common.LeftPadBytes(remotePool, 32)
 
+			feeConfig := tokens.PartialTokenTransferFeeConfig{}.Populate(remoteChainConfig.TokenTransferFeeConfig)
 			remoteChains[remoteChainSelector] = tokens.RemoteChainConfig[[]byte, string]{
-				TokenTransferFeeConfig:    remoteChainConfig.TokenTransferFeeConfig,
+				TokenTransferFeeConfig:    &feeConfig,
 				RemoteToken:               remoteToken,
 				RemotePool:                remotePool,
 				InboundRateLimiterConfig:  &remoteChainConfig.InboundRateLimiterConfig,

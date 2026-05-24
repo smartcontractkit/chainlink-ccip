@@ -14,6 +14,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -133,22 +134,56 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// PartialTokenTransferFeeConfig is a version of TokenTransferFeeConfig where all fields are optional. This
+// is used for user input, where the user may only want to specify a subset of the fields and have the rest
+// be filled in with defaults or existing on-chain values.
+type PartialTokenTransferFeeConfig struct {
+	DefaultFinalityTransferFeeBps utils.Optional[uint16] `yaml:"defaultFinalityTransferFeeBps" json:"defaultFinalityTransferFeeBps"`
+	CustomFinalityTransferFeeBps  utils.Optional[uint16] `yaml:"customFinalityTransferFeeBps" json:"customFinalityTransferFeeBps"`
+	DefaultFinalityFeeUSDCents    utils.Optional[uint32] `yaml:"defaultFinalityFeeUSDCents" json:"defaultFinalityFeeUSDCents"`
+	CustomFinalityFeeUSDCents     utils.Optional[uint32] `yaml:"customFinalityFeeUSDCents" json:"customFinalityFeeUSDCents"`
+	DestBytesOverhead             utils.Optional[uint32] `yaml:"destBytesOverhead" json:"destBytesOverhead"`
+	DestGasOverhead               utils.Optional[uint32] `yaml:"destGasOverhead" json:"destGasOverhead"`
+	IsEnabled                     utils.Optional[bool]   `yaml:"isEnabled" json:"isEnabled"`
+}
+
+// Populate fills in the fields of the PartialTokenTransferFeeConfig with values from the provided TokenTransferFeeConfig
+// and returns a new PartialTokenTransferFeeConfig.
+func (cfg PartialTokenTransferFeeConfig) Populate(input TokenTransferFeeConfig) PartialTokenTransferFeeConfig {
+	return PartialTokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: utils.NewOptional(input.DefaultFinalityTransferFeeBps),
+		CustomFinalityTransferFeeBps:  utils.NewOptional(input.CustomFinalityTransferFeeBps),
+		DefaultFinalityFeeUSDCents:    utils.NewOptional(input.DefaultFinalityFeeUSDCents),
+		CustomFinalityFeeUSDCents:     utils.NewOptional(input.CustomFinalityFeeUSDCents),
+		DestBytesOverhead:             utils.NewOptional(input.DestBytesOverhead),
+		DestGasOverhead:               utils.NewOptional(input.DestGasOverhead),
+		IsEnabled:                     utils.NewOptional(input.IsEnabled),
+	}
+}
+
+// MergeWith fills in the missing fields in the PartialTokenTransferFeeConfig with values from
+// the provided fallbacks TokenTransferFeeConfig and returns a complete TokenTransferFeeConfig.
+func (cfg PartialTokenTransferFeeConfig) MergeWith(fallbacks TokenTransferFeeConfig) TokenTransferFeeConfig {
+	return TokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: cfg.DefaultFinalityTransferFeeBps.GetOrDefault(fallbacks.DefaultFinalityTransferFeeBps),
+		CustomFinalityTransferFeeBps:  cfg.CustomFinalityTransferFeeBps.GetOrDefault(fallbacks.CustomFinalityTransferFeeBps),
+		DefaultFinalityFeeUSDCents:    cfg.DefaultFinalityFeeUSDCents.GetOrDefault(fallbacks.DefaultFinalityFeeUSDCents),
+		CustomFinalityFeeUSDCents:     cfg.CustomFinalityFeeUSDCents.GetOrDefault(fallbacks.CustomFinalityFeeUSDCents),
+		DestBytesOverhead:             cfg.DestBytesOverhead.GetOrDefault(fallbacks.DestBytesOverhead),
+		DestGasOverhead:               cfg.DestGasOverhead.GetOrDefault(fallbacks.DestGasOverhead),
+		IsEnabled:                     cfg.IsEnabled.GetOrDefault(fallbacks.IsEnabled),
+	}
+}
+
 // TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
 type TokenTransferFeeConfig struct {
-	// DestGasOverhead is the gas overhead for the token transfer.
-	DestGasOverhead uint32
-	// DestBytesOverhead is the bytes overhead for the token transfer.
-	DestBytesOverhead uint32
-	// DefaultFinalityFeeUSDCents is the flat fee for a default finality transfer.
-	DefaultFinalityFeeUSDCents uint32
-	// CustomFinalityFeeUSDCents is the flat fee for a custom finality transfer.
-	CustomFinalityFeeUSDCents uint32
-	// DefaultFinalityTransferFeeBps is the bps fee for a default finality transfer.
-	DefaultFinalityTransferFeeBps uint16
-	// CustomFinalityTransferFeeBps is the bps fee for a custom finality transfer.
-	CustomFinalityTransferFeeBps uint16
-	// IsEnabled is whether the token transfer fee config is enabled.
-	IsEnabled bool
+	DefaultFinalityTransferFeeBps uint16 `yaml:"defaultFinalityTransferFeeBps" json:"defaultFinalityTransferFeeBps"`
+	CustomFinalityTransferFeeBps  uint16 `yaml:"customFinalityTransferFeeBps" json:"customFinalityTransferFeeBps"`
+	DefaultFinalityFeeUSDCents    uint32 `yaml:"defaultFinalityFeeUSDCents" json:"defaultFinalityFeeUSDCents"`
+	CustomFinalityFeeUSDCents     uint32 `yaml:"customFinalityFeeUSDCents" json:"customFinalityFeeUSDCents"`
+	DestBytesOverhead             uint32 `yaml:"destBytesOverhead" json:"destBytesOverhead"`
+	DestGasOverhead               uint32 `yaml:"destGasOverhead" json:"destGasOverhead"`
+	IsEnabled                     bool   `yaml:"isEnabled" json:"isEnabled"`
 }
 
 // RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts
@@ -219,7 +254,7 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
 	InboundCCVsToAddAboveThreshold []CCV `yaml:"inboundCCVsToAddAboveThreshold" json:"inboundCCVsToAddAboveThreshold"`
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
-	TokenTransferFeeConfig TokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
+	TokenTransferFeeConfig *PartialTokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
 }
 
 // GetOutboundRateLimitBuckets returns the outbound RL configuration as a RemoteOutbounds struct. The

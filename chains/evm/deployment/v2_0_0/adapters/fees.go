@@ -167,7 +167,7 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment, feeRef datastore.A
 						token = common.HexToAddress(rawTokenAddress)
 					}
 
-					if feeCfg == nil {
+					if feeCfg == nil || !feeCfg.IsEnabled {
 						val.TokensToUseDefaultFeeConfigs = append(
 							val.TokensToUseDefaultFeeConfigs,
 							fqops.TokenTransferFeeConfigRemoveArgs{
