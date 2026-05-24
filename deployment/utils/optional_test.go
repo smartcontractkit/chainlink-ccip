@@ -3,6 +3,7 @@ package utils
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,18 +29,23 @@ func TestOptionalUnmarshalYAML(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var opt Optional[int]
 			err := yaml.Unmarshal([]byte(tt.yaml), &opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Unmarshal error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
-			if opt.Value != tt.wantValue {
-				t.Errorf("Value = %v, want %v", opt.Value, tt.wantValue)
-			}
-			if opt.Valid != tt.wantValid {
-				t.Errorf("Valid = %v, want %v", opt.Valid, tt.wantValid)
-			}
+			require.Equal(t, tt.wantValue, opt.Value)
+			require.Equal(t, tt.wantValid, opt.Valid)
 		})
 	}
+}
+
+func TestOptionalUnmarshalYAMLResetsExistingValue(t *testing.T) {
+	opt := Optional[int]{Value: 42, Valid: true}
+	err := yaml.Unmarshal([]byte("~"), &opt)
+	require.NoError(t, err)
+	require.Equal(t, 0, opt.Value)
+	require.Equal(t, false, opt.Valid)
 }
 
 func TestOptionalUnmarshalYAMLWithString(t *testing.T) {
@@ -57,16 +63,9 @@ func TestOptionalUnmarshalYAMLWithString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var opt Optional[string]
 			err := yaml.Unmarshal([]byte(tt.yaml), &opt)
-			if err != nil {
-				t.Errorf("Unmarshal error = %v", err)
-				return
-			}
-			if opt.Value != tt.wantValue {
-				t.Errorf("Value = %v, want %v", opt.Value, tt.wantValue)
-			}
-			if opt.Valid != tt.wantValid {
-				t.Errorf("Valid = %v, want %v", opt.Valid, tt.wantValid)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantValue, opt.Value)
+			require.Equal(t, tt.wantValid, opt.Valid)
 		})
 	}
 }
@@ -87,16 +86,9 @@ func TestOptionalUnmarshalYAMLWithBool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var opt Optional[bool]
 			err := yaml.Unmarshal([]byte(tt.yaml), &opt)
-			if err != nil {
-				t.Errorf("Unmarshal error = %v", err)
-				return
-			}
-			if opt.Value != tt.wantValue {
-				t.Errorf("Value = %v, want %v", opt.Value, tt.wantValue)
-			}
-			if opt.Valid != tt.wantValid {
-				t.Errorf("Valid = %v, want %v", opt.Valid, tt.wantValid)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantValue, opt.Value)
+			require.Equal(t, tt.wantValid, opt.Valid)
 		})
 	}
 }
