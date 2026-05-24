@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -259,63 +258,50 @@ func maybeApplyTokenTransferFeeConfig(
 		return emptyReport, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 
-	// Get the on chain config and fallback config
+	// NOTE: the TokenTransferFeeConfig for token pools is V2-focused and
+	// does NOT have MaxFeeUSDCents fields. As a result we will reuse the
+	// existing value from the chain or fallback to a sensible default if
+	// it isn't set on chain. It can't be configured directly by the user
+	// at the moment, but realistically speaking this should not an issue
+	// since we've never had the need to modify it after we initially set
+	// it to MaxUint32.
 	onChainConfig, err := adapter.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
-	defaultConfig := GetDefaultChainAgnosticTokenTransferFeeConfig(
+	defaultConfig := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(
 		src,
 		dst,
 	)
-	currentConfig := TokenTransferFeeConfig{
-		CustomFinalityTransferFeeBps:  0, // not applicable for fee quoter
-		CustomFinalityFeeUSDCents:     0, // not applicable for fee quoter
-		DefaultFinalityTransferFeeBps: onChainConfig.DeciBps,
-		DefaultFinalityFeeUSDCents:    onChainConfig.MinFeeUSDCents,
-		DestBytesOverhead:             onChainConfig.DestBytesOverhead,
-		DestGasOverhead:               onChainConfig.DestGasOverhead,
-		IsEnabled:                     onChainConfig.IsEnabled,
-	}
 
 	// Resolution strategy:
 	// (1) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)
 	// (2) Fall back to sensible defaults merged with user's provided config (giving precedence to user's config)
-	mergedConfig := TokenTransferFeeConfig{}
-	if currentConfig.IsEnabled {
-		mergedConfig = srcConfig.TokenTransferFeeConfig.MergeWith(currentConfig)
+	var requestedConfig fees.TokenTransferFeeArgs
+	if onChainConfig.IsEnabled {
+		requestedConfig = fees.TokenTransferFeeArgs{
+			MinFeeUSDCents:    srcConfig.TokenTransferFeeConfig.DefaultFinalityFeeUSDCents.GetOrDefault(onChainConfig.MinFeeUSDCents),
+			DeciBps:           srcConfig.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps.GetOrDefault(onChainConfig.DeciBps),
+			DestBytesOverhead: srcConfig.TokenTransferFeeConfig.DestBytesOverhead.GetOrDefault(onChainConfig.DestBytesOverhead),
+			DestGasOverhead:   srcConfig.TokenTransferFeeConfig.DestGasOverhead.GetOrDefault(onChainConfig.DestGasOverhead),
+			IsEnabled:         srcConfig.TokenTransferFeeConfig.IsEnabled.GetOrDefault(onChainConfig.IsEnabled),
+			MaxFeeUSDCents:    onChainConfig.MaxFeeUSDCents,
+		}
 	} else {
-		mergedConfig = srcConfig.TokenTransferFeeConfig.MergeWith(defaultConfig)
+		requestedConfig = fees.TokenTransferFeeArgs{
+			MinFeeUSDCents:    srcConfig.TokenTransferFeeConfig.DefaultFinalityFeeUSDCents.GetOrDefault(defaultConfig.MinFeeUSDCents),
+			DeciBps:           srcConfig.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps.GetOrDefault(defaultConfig.DeciBps),
+			DestBytesOverhead: srcConfig.TokenTransferFeeConfig.DestBytesOverhead.GetOrDefault(defaultConfig.DestBytesOverhead),
+			DestGasOverhead:   srcConfig.TokenTransferFeeConfig.DestGasOverhead.GetOrDefault(defaultConfig.DestGasOverhead),
+			IsEnabled:         srcConfig.TokenTransferFeeConfig.IsEnabled.GetOrDefault(defaultConfig.IsEnabled),
+			MaxFeeUSDCents:    defaultConfig.MaxFeeUSDCents,
+		}
 	}
 
-	// Set non-applicable fields to 0 to ensure accurate comparison between current on-chain config and desired config
-	// since the TokenPool does not support custom finality fees but the tokens.TokenTransferFeeConfig struct includes
-	// these fields for compatibility with other chains that do support custom finality fees
-	translatedConfig := fees.TokenTransferFeeArgs{}
-	currentConfig.CustomFinalityTransferFeeBps = 0
-	mergedConfig.CustomFinalityTransferFeeBps = 0
-	currentConfig.CustomFinalityFeeUSDCents = 0
-	mergedConfig.CustomFinalityFeeUSDCents = 0
-
 	// Skip applying fees if the desired config is the same as the current on-chain config to avoid unnecessary work
-	if mergedConfig == currentConfig {
+	if requestedConfig == onChainConfig {
 		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
 		return emptyReport, nil
-	} else {
-		translatedConfig = fees.TokenTransferFeeArgs{
-			DeciBps:           mergedConfig.DefaultFinalityTransferFeeBps,
-			MinFeeUSDCents:    mergedConfig.DefaultFinalityFeeUSDCents,
-			DestBytesOverhead: mergedConfig.DestBytesOverhead,
-			DestGasOverhead:   mergedConfig.DestGasOverhead,
-			IsEnabled:         mergedConfig.IsEnabled,
-
-			// NOTE: the TokenTransferFeeConfig for token pools is V2-focused and
-			// does NOT have MaxFeeUSDCents fields. As a result there's no direct
-			// translation available. However this config has historically always
-			// been set to MaxUint32 and we have never had the need to change it,
-			// so we will simplify things by simply using MaxUint32 here.
-			MaxFeeUSDCents: math.MaxUint32,
-		}
 	}
 
 	// Apply the token transfer fee config
@@ -326,7 +312,7 @@ func maybeApplyTokenTransferFeeConfig(
 			Selector: src,
 			Settings: map[uint64]map[string]*fees.TokenTransferFeeArgs{
 				dst: {
-					srcTokRef.Address: &translatedConfig,
+					srcTokRef.Address: &requestedConfig,
 				},
 			},
 		},
