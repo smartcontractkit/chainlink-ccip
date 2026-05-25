@@ -92,6 +92,15 @@ func findRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.Addres
 	return refs[0], 1, nil
 }
 
+// IsAddressRefFullyPopulated checks if an AddressRef has all fields populated (except Labels).
+func IsAddressRefFullyPopulated(ref datastore.AddressRef) bool {
+	return ref.Address != "" &&
+		ref.Type != "" &&
+		ref.Version != nil &&
+		ref.Qualifier != "" &&
+		ref.ChainSelector != 0
+}
+
 // IsAddressRefEmpty checks if an AddressRef is empty.
 func IsAddressRefEmpty(ref datastore.AddressRef) bool {
 	return ref.Address == "" &&

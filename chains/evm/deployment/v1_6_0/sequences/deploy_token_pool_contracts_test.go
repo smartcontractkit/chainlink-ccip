@@ -315,8 +315,8 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	require.NoError(t, err, "Should not error when pool already exists")
 	require.NotNil(t, report, "Report should not be nil")
 
-	// Verify no new addresses were deployed
-	require.Equal(t, 0, len(report.Output.Addresses), "Should not deploy any new addresses when pool already exists")
+	// Verify existing pool address was returned
+	require.Equal(t, 1, len(report.Output.Addresses), "Expected exactly one address in output (existing pool address)")
 }
 
 // TestDeployTokenPool_MissingTokenPoolVersion verifies that the sequence fails
@@ -460,11 +460,12 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 		TokenPoolVersion:   utils.Version_1_6_1,
 		ChainSelector:      chainSelector,
 		ExistingDataStore:  e.DataStore,
+		TokenRef:           &datastore.AddressRef{Address: tokenAddr.Hex()},
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
 	require.Error(t, err, "Should error when router is not found in datastore")
-	require.Contains(t, err.Error(), "token address must be provided either directly or via a datastore reference", "Error message should mention not found in datastore")
+	require.Contains(t, err.Error(), "failed to resolve router address")
 }
 
 // TestDeployTokenPool_MissingRMNProxy verifies that the sequence fails
@@ -516,11 +517,12 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 		TokenPoolVersion:   utils.Version_1_6_1,
 		ChainSelector:      chainSelector,
 		ExistingDataStore:  e.DataStore,
+		TokenRef:           &datastore.AddressRef{Address: tokenAddr.Hex()},
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
 	require.Error(t, err, "Should error when RMN proxy is not found in datastore")
-	require.Contains(t, err.Error(), "token address must be provided either directly or via a datastore reference", "Error message should mention not found in datastore")
+	require.Contains(t, err.Error(), "failed to resolve rmn proxy address")
 }
 
 // TestDeployTokenPool_MissingToken verifies that the sequence fails
@@ -566,11 +568,12 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 		TokenPoolVersion:   utils.Version_1_6_1,
 		ChainSelector:      chainSelector,
 		ExistingDataStore:  e.DataStore,
+		TokenRef:           nil,
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
 	require.Error(t, err, "Should error when token is not found in datastore")
-	require.Contains(t, err.Error(), "token address must be provided either directly or via a datastore reference", "Error message should mention token not found")
+	require.Contains(t, err.Error(), "TokenRef is required")
 }
 
 // deployTestToken deploys a BurnMintERC20 token for testing purposes and returns its address.
