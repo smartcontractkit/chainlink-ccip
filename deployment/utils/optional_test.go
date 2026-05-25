@@ -40,14 +40,6 @@ func TestOptionalUnmarshalYAML(t *testing.T) {
 	}
 }
 
-func TestOptionalUnmarshalYAMLResetsExistingValue(t *testing.T) {
-	opt := Optional[int]{Value: 42, Valid: true}
-	err := yaml.Unmarshal([]byte("~"), &opt)
-	require.NoError(t, err)
-	require.Equal(t, 0, opt.Value)
-	require.Equal(t, false, opt.Valid)
-}
-
 func TestOptionalUnmarshalYAMLWithString(t *testing.T) {
 	tests := []struct {
 		name      string

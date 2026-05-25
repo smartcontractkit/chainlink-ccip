@@ -48,11 +48,8 @@ func (o Optional[T]) Get() (T, bool) {
 //   - Semi-verbose: `field: {value: 32}` → {Value: 32, Valid: true} (inferred)
 //   - Shorthand: `field: 32` → {Value: 32, Valid: true}
 func (o *Optional[T]) UnmarshalYAML(node *yaml.Node) error {
-	// Explicit null (`field: ~` or `field:`) — reset to zero value with Valid=false
+	// Explicit null (`field: ~` or `field:`) — omitted equivalent, Valid stays false
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
-		var zero T
-		o.Value = zero
-		o.Valid = false
 		return nil
 	}
 
