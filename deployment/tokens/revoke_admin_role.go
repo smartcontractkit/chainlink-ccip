@@ -22,15 +22,41 @@ type RevokeTokenAdminRoleInput struct {
 }
 
 type RevokeTokenAdminRoleConfig struct {
-	ChainSelector uint64               `yaml:"chainSelector" json:"chainSelector"`
-	TokenRef      datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
-	AdminAddress  string               `yaml:"adminAddress,omitempty" json:"adminAddress,omitempty"`
+	// ChainSelector identifies the chain that the token exists on
+	ChainSelector uint64 `yaml:"chainSelector" json:"chainSelector"`
+
+	// TokenRef is a reference to the token in the datastore. It is
+	// expected that the token supports role-based access control.
+	TokenRef datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+
+	// AdminAddress is the address that currently has the admin role
+	// on the token and from which the role will be revoked. If this
+	// is empty, then the changeset will fallback to revoking access
+	// from timelock. If timelock is not deployed on the chain, then
+	// the changeset will fallback to the deployer key. If the final
+	// account does not have admin role, then this changeset becomes
+	// a no-op.
+	AdminAddress string `yaml:"adminAddress,omitempty" json:"adminAddress,omitempty"`
+
+	// FallbackAddress is a defensive input that prevents the token
+	// from being put into a state where it has no remaining admins
+	// after the revocation. If the FallbackAddress doesn't have an
+	// admin role on the token, then the changeset will grant it to
+	// the account BEFORE it revokes access from AdminAddress. This
+	// field is optional - if it is unspecified, then the changeset
+	// will only perform the revocation. If the value of this field
+	// is the same as AdminAddress then only the revocation will be
+	// performed. It's strongly recommended to use this field as it
+	// can help avoid scenarios where the token contract is left in
+	// a state with no admins.
+	FallbackAddress string `yaml:"fallbackAddress,omitempty" json:"fallbackAddress,omitempty"`
 }
 
 type RevokeTokenAdminRoleSequenceInput struct {
 	ChainSelector   uint64
 	TokenRef        datastore.AddressRef
 	AdminAddress    string
+	FallbackAddress string
 	TimelockAddress string
 }
 
@@ -118,12 +144,13 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			if adminAddress == "" {
 				adminAddress = timelockAddress
 			}
-			if revocation.AdminAddress == "" {
-				e.Logger.Warnf("no MCMS reader registered for chain family '%s'; revocation[%d] will choose a sensible default", family, i)
+			if adminAddress == "" {
+				e.Logger.Warnf("admin address not provided for revocation[%d] on chain selector %d, and timelock address could not be resolved. This changeset will attempt to fall back to the deployer key.", i, selector)
 			}
 
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, roleAdapter.RevokeTokenAdminRole(), e.BlockChains, RevokeTokenAdminRoleSequenceInput{
 				ChainSelector:   revocation.ChainSelector,
+				FallbackAddress: revocation.FallbackAddress,
 				TimelockAddress: timelockAddress,
 				AdminAddress:    adminAddress,
 				TokenRef:        tokenRef,
