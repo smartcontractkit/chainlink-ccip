@@ -34,7 +34,7 @@ type TokenFeeAdapter interface {
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
 }
 
-// TokenAdminRoleAdapter is an optional interface for chain families that support token admin role revocation.
+// TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.
 type TokenAdminRoleAdapter interface {
 	RevokeTokenAdminRole() *cldf_ops.Sequence[RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
