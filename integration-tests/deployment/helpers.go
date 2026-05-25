@@ -500,7 +500,7 @@ func RequireBigIntsEqual(t *testing.T, want, got *big.Int, msg string) {
 
 func NewRandHex(t *testing.T, nBytes int) string {
 	t.Helper()
-	data := make([]byte, 32)
+	data := make([]byte, nBytes)
 	_, err := rand.Read(data)
 	require.NoError(t, err)
 	return hex.EncodeToString(data)

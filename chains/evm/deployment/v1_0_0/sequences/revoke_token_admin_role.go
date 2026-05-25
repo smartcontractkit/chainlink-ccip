@@ -108,10 +108,10 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 
 		// If the fallback address is unspecified OR the fallback and revoke addresses are the
 		// same, then we skip the grant operation and assume the user wants to bypass all role
-		// protections. If the fallback and revoke addresses differ, then we the admin role is
-		// granted to the fallback address (if needed), and we proceed with revoking the admin
-		// role from the revoke address. The fallback address is a safety measure that ensures
-		// there is at least one account with the admin role on the token contract.
+		// protections. If the fallback and revoke addresses differ, then the token admin role
+		// is granted to the fallback address (if applicable) and we proceed with revoking the
+		// admin role from the revoke address. The fallback address is an extra safety measure
+		// that ensures there's at least one account with the admin role on the token contract
 		var writes []evm_contract.WriteOutput
 		if fallbackAddress != (common.Address{}) && fallbackAddress != revokeAddress {
 			fallbackAccountHasAdminRole, err := tokenImpl.HasAdminRole(b.GetContext(), chain, tokenAddress, fallbackAddress)
