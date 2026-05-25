@@ -218,7 +218,7 @@ func TestRevokeTokenAdminRoleTimelock(t *testing.T) {
 		require.NoError(t, err)
 		testhelpers.ProcessTimelockProposals(t, *env, revokeOutput.MCMSTimelockProposals, false)
 
-		// Verify token roles (Neither timelock nor customer should be admins)
+		// Verify token roles (neither timelock nor customer should be admins)
 		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
 		require.NoError(t, err)
 		require.False(t, hasRole)
