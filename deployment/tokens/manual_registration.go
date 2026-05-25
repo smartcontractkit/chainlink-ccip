@@ -7,7 +7,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -108,17 +107,8 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenRef.ChainSelector)
 			}
 
-			registration.TokenPoolRef, err = TryNormalizeAddressRef(registration.ChainSelector, registration.TokenPoolRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token pool ref for registration index %d: %w", i, err)
-			}
-			registration.TokenRef, err = TryNormalizeAddressRef(registration.ChainSelector, registration.TokenRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref for registration index %d: %w", i, err)
-			}
-
 			var adapterVersion *semver.Version
-			fullPool, findErr := datastore_utils.FindAndFormatRef(ds.Seal(), registration.TokenPoolRef, registration.ChainSelector, datastore_utils.FullRef)
+			fullPool, findErr := ResolveTokenPoolRef(e, tokenPoolRegistry, registration.ChainSelector, registration.TokenPoolRef)
 			if findErr == nil {
 				adapterVersion = fullPool.Version
 			}
@@ -158,6 +148,9 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add address ref (%+v) from report output to datastore for registration index %d, address index %d: %w", addrRef, i, j, err)
 				}
 			}
+
+			// update environment datastore with new addresses for next iteration to use
+			e.DataStore = ds.Seal()
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).

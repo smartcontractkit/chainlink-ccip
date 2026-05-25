@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
@@ -55,5 +55,27 @@ var Transfer = contract.NewWrite(contract.WriteParams[TransferArgs, *erc20.ERC20
 	},
 	CallContract: func(token *erc20.ERC20, opts *bind.TransactOpts, args TransferArgs) (*types.Transaction, error) {
 		return token.Transfer(opts, args.Receiver, args.Amount)
+	},
+})
+
+var GetSymbol = contract.NewRead(contract.ReadParams[struct{}, string, *erc20.ERC20]{
+	Name:         "erc20:get-symbol",
+	Version:      utils.Version_1_0_0,
+	Description:  "Gets the ERC20 token symbol",
+	ContractType: ContractType,
+	NewContract:  erc20.NewERC20,
+	CallContract: func(token *erc20.ERC20, opts *bind.CallOpts, _ struct{}) (string, error) {
+		return token.Symbol(opts)
+	},
+})
+
+var GetDecimals = contract.NewRead(contract.ReadParams[struct{}, uint8, *erc20.ERC20]{
+	Name:         "erc20:get-decimals",
+	Version:      utils.Version_1_0_0,
+	Description:  "Gets the ERC20 token decimals",
+	ContractType: ContractType,
+	NewContract:  erc20.NewERC20,
+	CallContract: func(token *erc20.ERC20, opts *bind.CallOpts, _ struct{}) (uint8, error) {
+		return token.Decimals(opts)
 	},
 })

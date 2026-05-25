@@ -9,8 +9,8 @@ import (
 )
 
 func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *testing.T) {
-	sixteenAliases := testNOPAliases(16)
 	fifteenAliases := testNOPAliases(15)
+	fourteenAliases := testNOPAliases(14)
 
 	tests := []struct {
 		name             string
@@ -22,31 +22,31 @@ func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *test
 		{
 			name:             "prod committee chain with fifteen unique NOPs fails",
 			envName:          "prod_mainnet",
-			committeeAliases: fifteenAliases,
-			poolAliases:      sixteenAliases,
-			wantErr:          `committee "default" chain "1" requires at least 16 unique NOPs`,
+			committeeAliases: fourteenAliases,
+			poolAliases:      fifteenAliases,
+			wantErr:          `committee "default" chain "1" requires at least 15 unique NOPs`,
 		},
 		{
-			name:             "prod committee chain with sixteen unique NOPs passes",
+			name:             "prod committee chain with fifteen unique NOPs passes",
 			envName:          "prod_mainnet",
-			committeeAliases: sixteenAliases,
-			poolAliases:      sixteenAliases,
+			committeeAliases: fifteenAliases,
+			poolAliases:      fifteenAliases,
 		},
 		{
 			name:             "prod executor pool chain with fifteen unique NOPs fails",
 			envName:          "prod_testnet",
-			committeeAliases: sixteenAliases,
-			poolAliases:      fifteenAliases,
-			wantErr:          `executor pool "default" chain "1" requires at least 16 unique NOPs`,
+			committeeAliases: fifteenAliases,
+			poolAliases:      fourteenAliases,
+			wantErr:          `executor pool "default" chain "1" requires at least 15 unique NOPs`,
 		},
 		{
-			name:             "prod executor pool chain with sixteen unique NOPs passes",
+			name:             "prod executor pool chain with fifteen unique NOPs passes",
 			envName:          "prod_testnet",
-			committeeAliases: sixteenAliases,
-			poolAliases:      sixteenAliases,
+			committeeAliases: fifteenAliases,
+			poolAliases:      fifteenAliases,
 		},
 		{
-			name:             "non prod chain with fewer than sixteen NOPs passes",
+			name:             "non prod chain with fewer than fifteen NOPs passes",
 			envName:          "test",
 			committeeAliases: []string{"nop-1"},
 			poolAliases:      []string{"nop-1"},
@@ -54,9 +54,9 @@ func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *test
 		{
 			name:             "duplicate committee aliases do not count toward minimum",
 			envName:          "prod_mainnet",
-			committeeAliases: append(testNOPAliases(15), "nop-1"),
-			poolAliases:      sixteenAliases,
-			wantErr:          `committee "default" chain "1" requires at least 16 unique NOPs`,
+			committeeAliases: append(testNOPAliases(14), "nop-1"),
+			poolAliases:      fifteenAliases,
+			wantErr:          `committee "default" chain "1" requires at least 15 unique NOPs`,
 		},
 	}
 

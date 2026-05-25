@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
-import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
+import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.t.sol";
 
 contract SiloedUSDCTokenPool_proposeCCTPMigration is SiloedUSDCTokenPoolSetup {
   function test_proposeCCTPMigration() public {

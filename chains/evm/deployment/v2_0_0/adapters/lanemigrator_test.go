@@ -5,14 +5,16 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -37,8 +39,8 @@ func TestLaneMigrator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			chainA := uint64(5009297550715157269)
-			chainB := uint64(4949039107694359620)
+			chainA := chainsel.ETHEREUM_MAINNET.Selector
+			chainB := chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector
 			e, err := environment.New(t.Context(),
 				environment.WithEVMSimulated(t, []uint64{chainA, chainB}),
 			)
@@ -152,6 +154,7 @@ func TestLaneMigrator(t *testing.T) {
 			destConfig := opOut.Output
 			require.Equal(t, uint32(15_000_000), destConfig.MaxPerMsgGasLimit) // MaxPerMsgGasLimit should be 15 million for Arbitrum
 			require.Equal(t, adapters1_7.DefaultMaxDataBytes, destConfig.MaxDataBytes)
+			require.Equal(t, uint8(100), destConfig.DestGasPerPayloadByteBase)
 		})
 	}
 }

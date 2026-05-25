@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
-import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
+import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SiloedUSDCTokenPool_configureLockBoxes is SiloedUSDCTokenPoolSetup {

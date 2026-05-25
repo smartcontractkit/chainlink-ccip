@@ -54,8 +54,9 @@ func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcm
 var transfersTest_NewTokenAdapterRegistry = tokens.GetTokenAdapterRegistry()
 
 type transfersTest_MockTokenAdapter struct {
-	deriveTokenErrorMsg string
-	sequenceErrorMsg    string
+	deriveTokenErrorMsg  string
+	sequenceErrorMsg     string
+	deriveFailQualifiers map[string]struct{}
 }
 
 func (ma *transfersTest_MockTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
@@ -111,16 +112,43 @@ func (ma *transfersTest_MockTokenAdapter) ConfigureTokenForTransfersSequence() *
 	)
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
-	if poolRef.Address == "" {
-		// Address in pool ref MUST be populated before this adapter method gets called.
-		// Most implementations will require the pool address in order to fetch the token address.
-		return nil, errors.New("pool ref address is empty")
+func (r *transfersTest_MockTokenAdapter) ResolveTokenPoolRef(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, _ uint64, _ string) (datastore.AddressRef, error) {
+	return datastore.AddressRef{}, errors.New("unexpected pool resolve in transfers test")
+}
+
+func (r *transfersTest_MockTokenAdapter) ResolveTokenRef(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	const derived = "mocked-remote-token-address"
+
+	if address == derived {
+		return datastore.AddressRef{
+			ChainSelector: chainSelector,
+			Address:       address,
+			Type:          datastore.ContractType("Token"),
+			Version:       semver.MustParse("1.0.0"),
+		}, nil
+	}
+
+	return datastore.AddressRef{}, fmt.Errorf("unexpected address: %s", address)
+}
+
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
+	const derived = "mocked-remote-token-address"
+
+	if len(ma.deriveFailQualifiers) > 0 {
+		if _, blocked := ma.deriveFailQualifiers[poolRef.Qualifier]; blocked {
+			msg := ma.deriveTokenErrorMsg
+			if msg == "" {
+				msg = "failed to derive remote token address"
+			}
+			return "", errors.New(msg)
+		}
+		return derived, nil
 	}
 	if ma.deriveTokenErrorMsg != "" {
-		return nil, errors.New(ma.deriveTokenErrorMsg)
+		return "", errors.New(ma.deriveTokenErrorMsg)
 	}
-	return []byte("mocked-remote-token-address"), nil
+
+	return derived, nil
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
@@ -175,6 +203,7 @@ func makeBaseDataStore(t *testing.T, chains []uint64) *datastore.MemoryDataStore
 			Address:       fmt.Sprintf("%d-token-pool", chain),
 			Type:          datastore.ContractType("TokenPool"),
 			Version:       semver.MustParse("1.0.0"),
+			Qualifier:     "default",
 		})
 		require.NoError(t, err)
 		ds.Addresses().Add(datastore.AddressRef{
@@ -209,6 +238,28 @@ func makeBaseDataStore(t *testing.T, chains []uint64) *datastore.MemoryDataStore
 	return ds
 }
 
+// makeTwoChainDSWithRemoteEdgePools is like makeBaseDataStore for the two standard test chains but adds
+// a second TokenPool per chain (Address "%d-remote-token-pool", Qualifier "remote-edge").
+func makeTwoChainDSWithRemoteEdgePools(t *testing.T) *datastore.MemoryDataStore {
+	t.Helper()
+	const (
+		chainA = 5009297550715157269
+		chainB = 15971525489660198786
+	)
+	ds := makeBaseDataStore(t, []uint64{chainA, chainB})
+	for _, chain := range []uint64{chainA, chainB} {
+		err := ds.Addresses().Add(datastore.AddressRef{
+			ChainSelector: chain,
+			Address:       fmt.Sprintf("%d-remote-token-pool", chain),
+			Type:          datastore.ContractType("TokenPool"),
+			Version:       semver.MustParse("1.0.0"),
+			Qualifier:     "remote-edge",
+		})
+		require.NoError(t, err)
+	}
+	return ds
+}
+
 func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 	tests := []struct {
 		desc                            string
@@ -217,11 +268,12 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 		shouldDeriveToken               bool
 		expectedSequenceErrorMsg        string
 		expectedTokenDerivationErrorMsg string
+		tokenPoolDeriveFailQualifiers   map[string]struct{}
 	}{
 		{
 			desc: "success - inputted remote token",
 			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
-				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
+				return makeTwoChainDSWithRemoteEdgePools(t)
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
 				Tokens: []tokens.TokenTransferConfig{
@@ -231,6 +283,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
+							Qualifier:     "default",
 						},
 						RegistryRef: datastore.AddressRef{
 							Type:          "Registry",
@@ -248,6 +301,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
+									Address:       "15971525489660198786-remote-token-pool",
+									Qualifier:     "remote-edge",
 								},
 								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
@@ -263,6 +318,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
+							Qualifier:     "default",
 						},
 						RegistryRef: datastore.AddressRef{
 							Type:          "Registry",
@@ -280,6 +336,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
+									Address:       "5009297550715157269-remote-token-pool",
+									Qualifier:     "remote-edge",
 								},
 								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
@@ -292,6 +350,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				},
 				MCMS: basicMCMSInput,
 			},
+			tokenPoolDeriveFailQualifiers: map[string]struct{}{"remote-edge": {}},
 		},
 		{
 			desc: "success - derived remote token",
@@ -595,12 +654,12 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				},
 				MCMS: basicMCMSInput,
 			},
-			expectedSequenceErrorMsg: "failed to resolve remote token ref",
+			expectedSequenceErrorMsg: "failed to resolve remote token after derivation",
 		},
 		{
 			desc: "failure to derive remote token address",
 			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
-				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
+				return makeTwoChainDSWithRemoteEdgePools(t)
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
 				Tokens: []tokens.TokenTransferConfig{
@@ -610,6 +669,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
+							Qualifier:     "default",
 						},
 						RegistryRef: datastore.AddressRef{
 							Type:          "Registry",
@@ -623,6 +683,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
+									Address:       "15971525489660198786-remote-token-pool",
+									Qualifier:     "remote-edge",
 								},
 								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
@@ -634,6 +696,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
+							Qualifier:     "default",
 						},
 						RegistryRef: datastore.AddressRef{
 							Type:          "Registry",
@@ -647,6 +710,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 5009297550715157269,
+									Address:       "5009297550715157269-remote-token-pool",
+									Qualifier:     "remote-edge",
 								},
 								OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
@@ -656,6 +721,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				MCMS: basicMCMSInput,
 			},
 			expectedTokenDerivationErrorMsg: "failed to derive remote token address",
+			tokenPoolDeriveFailQualifiers:   map[string]struct{}{"remote-edge": {}},
 		},
 		{
 			desc: "failure to execute sequence",
@@ -732,6 +798,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
 	mockAdapter := &transfersTest_MockTokenAdapter{}
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.0.0"), mockAdapter)
+	tokenAdapterRegistry.RegisterTokenRefResolver("evm", mockAdapter)
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
@@ -740,6 +807,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			// Set error conditions for specific test cases
 			mockAdapter.deriveTokenErrorMsg = tt.expectedTokenDerivationErrorMsg
 			mockAdapter.sequenceErrorMsg = tt.expectedSequenceErrorMsg
+			mockAdapter.deriveFailQualifiers = tt.tokenPoolDeriveFailQualifiers
 
 			// Create environment with datastore
 			ds := tt.makeDataStore(t)
@@ -786,7 +854,11 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 					} else {
 						require.Equal(t, common.LeftPadBytes([]byte(fmt.Sprintf("%d-token", op.ChainSelector)), 32), op.Transactions[0].Data)
 					}
-					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
+					if len(tt.tokenPoolDeriveFailQualifiers) > 0 {
+						require.Equal(t, fmt.Sprintf("%d-remote-token-pool", op.ChainSelector), op.Transactions[0].To)
+					} else {
+						require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
+					}
 				}
 			}
 		})

@@ -199,12 +199,13 @@ func GetTokenDecimals(chain cldf_solana.Chain, tokenMint solana.PublicKey) (uint
 }
 
 func FetchTokenProgramID(ctx context.Context, chain cldf_solana.Chain, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
-	tokenAcctInfo, err := chain.Client.GetAccountInfo(ctx, tokenPubKey)
+	// Fetch the token account info
+	tokenAcctInfo, err := chain.Client.GetAccountInfoWithOpts(ctx, tokenPubKey, &solrpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to get account info for token %s: %w", tokenPubKey.String(), err)
 	}
 
-	// Best-effort safeguard: if this truly is a token, then we should be able to fetch its decimals
+	// Safeguard: if this truly is a token, then we should be able to fetch its decimals
 	_, err = GetTokenDecimals(chain, tokenPubKey)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to get token decimals for token %s: %w", tokenPubKey.String(), err)

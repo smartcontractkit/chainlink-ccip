@@ -6,7 +6,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	v1_0_0_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -14,14 +17,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var (
-	_ tokensapi.TokenAdapter          = &EVMTokenBase{}
 	_ tokensapi.TokenAdminRoleAdapter = &EVMTokenBase{}
+	_ tokensapi.TokenRefResolver      = &EVMTokenBase{}
+	_ tokensapi.TokenAdapter          = &EVMTokenBase{}
 )
 
 // EVMTokenBase provides version-agnostic EVM token adapter methods that are
@@ -148,8 +153,8 @@ func (a *EVMTokenBase) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 	return nil
 }
 
-func (a *EVMTokenBase) DeriveTokenAddress(_ deployment.Environment, _ uint64, _ datastore.AddressRef) ([]byte, error) {
-	return nil, fmt.Errorf("DeriveTokenAddress is not implemented on EVMTokenBase; use a pool-version adapter")
+func (a *EVMTokenBase) DeriveTokenAddress(_ deployment.Environment, _ uint64, _ datastore.AddressRef) (string, error) {
+	return "", fmt.Errorf("DeriveTokenAddress is not implemented on EVMTokenBase; use a pool-version adapter")
 }
 
 func (a *EVMTokenBase) DeriveTokenDecimals(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ []byte) (uint8, error) {
@@ -166,4 +171,94 @@ func (a *EVMTokenBase) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualR
 
 func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
+}
+
+func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	var poolAddress common.Address
+	if !common.IsHexAddress(address) {
+		return datastore.AddressRef{}, fmt.Errorf("pool address %q is not a valid hex address", address)
+	} else {
+		poolAddress = common.HexToAddress(address)
+	}
+
+	chain, ok := chains.EVMChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	tv, err := cldf_ops.ExecuteOperation(b,
+		type_and_version.GetTypeAndVersion, chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       poolAddress,
+		},
+	)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to get typeAndVersion for pool %s: %w", address, err)
+	}
+
+	// NOTE: for EVM, the token pool qualifier is typically set to the token address
+	// although this is not a hard requirement. We attempt to pull the token address
+	// from the token pool on a best-effort basis, but if this fails for any reason,
+	// then we will fallback to a placeholder qualifier. At the time of this writing
+	// every token pool contract has a getToken( ) function with the same ABI across
+	// all versions (v1.5.x, v1.6.x, v2.x.x) so we use the v1.5.x generated bindings
+	// here for simplicity instead of overcomplicating the code with a switch on the
+	// pool version.
+	qualifier := fmt.Sprintf("%s-%s", poolAddress, tv.Output.Type)
+	if token, err := cldf_ops.ExecuteOperation(b,
+		token_pool.GetToken, chain,
+		evm_contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       poolAddress,
+		},
+	); err != nil {
+		b.Logger.Warnf("failed to get token address from pool at %s: %v; using fallback qualifier %s", poolAddress, err, qualifier)
+	} else {
+		qualifier = token.Output.Hex()
+	}
+
+	return datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(tv.Output.Type),
+		Qualifier:     qualifier,
+		Version:       tv.Output.Version,
+		Address:       poolAddress.Hex(),
+	}, nil
+}
+
+func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	var tokenAddress common.Address
+	if !common.IsHexAddress(address) {
+		return datastore.AddressRef{}, fmt.Errorf("token address %q is not a valid hex address", address)
+	} else {
+		tokenAddress = common.HexToAddress(address)
+	}
+
+	chain, ok := chains.EVMChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	symbolReport, err := cldf_ops.ExecuteOperation(b,
+		erc20.GetSymbol, chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddress,
+		},
+	)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to read ERC20 symbol for token %s: %w", address, err)
+	}
+
+	// NOTE: at the moment, there's currently not an easy way to determine the exact
+	// token type. For now, we simply return `ERC20Token` as the type for all tokens
+	// but if needed we can add more specific logic here in the future.
+	return datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(erc20.ContractType),
+		Version:       cciputils.Version_1_0_0,
+		Qualifier:     symbolReport.Output,
+		Address:       tokenAddress.Hex(),
+	}, nil
 }

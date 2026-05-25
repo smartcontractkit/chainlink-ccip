@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -243,32 +242,11 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 		mcmsRegistry := changesets.GetRegistry()
 
 		for selector, config := range cfg.Configs {
-			family, err := chain_selectors.GetSelectorFamily(selector)
+			tokenPoolAdapter, family, tokenPool, tokenFull, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, selector, config.TokenPoolRef, config.TokenRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool and token refs on chain with selector %d: %w", selector, err)
 			}
-
-			config.TokenPoolRef, err = TryNormalizeAddressRef(selector, config.TokenPoolRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token pool ref address on chain selector %d: %w", selector, err)
-			}
-			config.TokenRef, err = TryNormalizeAddressRef(selector, config.TokenRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref address on chain selector %d: %w", selector, err)
-			}
-			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenPoolRef, selector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", selector, err)
-			}
-			tokenFull, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
-			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, tokenPool.Version)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", family, tokenPool.Version)
-			}
-			tokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, tokenPoolAdapter.AddressRefToBytes)
+			tokenBytes, err := tokenPoolAdapter.AddressRefToBytes(tokenFull)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
 			}
@@ -294,29 +272,11 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if !ok {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
 				}
-				counterpartFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
+				counterPartAdapter, counterpartFamily, remoteTokenPool, remoteToken, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, remoteSelector, counterpart.TokenPoolRef, counterpart.TokenRef)
 				if err != nil {
-					return cldf.ChangesetOutput{}, err
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool and token refs on chain with selector %d: %w", remoteSelector, err)
 				}
-
-				counterpart.TokenPoolRef, err = TryNormalizeAddressRef(remoteSelector, counterpart.TokenPoolRef)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize counterpart token pool ref address on chain selector %d: %w", remoteSelector, err)
-				}
-				counterpart.TokenRef, err = TryNormalizeAddressRef(remoteSelector, counterpart.TokenRef)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize counterpart token ref address on chain selector %d: %w", remoteSelector, err)
-				}
-
-				remoteTokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenPoolRef, remoteSelector, datastore_utils.FullRef)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", remoteSelector, err)
-				}
-				counterPartAdapter, exists := tokenPoolRegistry.GetTokenAdapter(counterpartFamily, remoteTokenPool.Version)
-				if !exists {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", counterpartFamily, remoteTokenPool.Version)
-				}
-				remoteTokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, counterPartAdapter.AddressRefToBytes)
+				remoteTokenBytes, err := counterPartAdapter.AddressRefToBytes(remoteToken)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", remoteSelector, err)
 				}
@@ -376,7 +336,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 						counterPartAdapter,
 						counterpartFamily,
 						remoteTokenPool,
-						counterpart.TokenRef,
+						remoteToken,
 						remoteSelector,
 						remoteDecimals,
 						selector,
