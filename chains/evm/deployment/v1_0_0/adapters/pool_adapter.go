@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -35,16 +34,16 @@ var (
 // that wires into its own bindings/operations.
 type PoolOps interface {
 	GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error)
-	GetTokenDecimals(ctx context.Context, chain evm.Chain, poolAddr common.Address) (uint8, error)
+	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) (evm_contract.WriteOutput, error)
+	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error)
 	// GetCurrentInboundRateLimit reads the on-chain inbound rate limiter state for the given remote
 	// chain selector from the token pool at poolAddr. Used by outbound-only TPRL writes to read and
 	// pass through the current inbound, and by RateLimitReaderAdapter for cross-chain validation.
 	// Returns a zero-value RateLimiterConfig (IsEnabled=false, Capacity=0, Rate=0) when the pool has
 	// no inbound configured for the lane.
-	GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64) (tokensapi.RateLimiterConfig, error)
+	GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.RateLimiterConfig, error)
 	Version() *semver.Version
 }
 
@@ -69,36 +68,18 @@ func (a *EVMPoolAdapter) DeriveTokenAddress(e deployment.Environment, chainSelec
 		return "", fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	// If the ref has the pool address already, then skip the datastore lookup altogether
-	if poolRef.Address != "" {
-		tokenPoolAddr := poolRef.Address
-		if !common.IsHexAddress(tokenPoolAddr) {
-			return "", fmt.Errorf("token pool address %q in ref is not a valid hex address", tokenPoolAddr)
-		}
-		tokenAddr, err := a.Ops.GetToken(e.OperationsBundle, chain, common.HexToAddress(tokenPoolAddr))
-		if err != nil {
-			return "", fmt.Errorf("failed to get token address from token pool (%s): %w", datastore_utils.SprintRef(poolRef), err)
-		}
-		return tokenAddr.Hex(), nil
-	}
-
-	// If the pool address isn't in the ref, then look it up in the datastore
-	tokenPoolAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	// If the ref already has the pool address, then skip the datastore lookup altogether
+	// and use it to get the token. If the pool address is NOT in the ref, then fall back
+	// to resolving it from the datastore first.
+	tokenPoolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
 	if err != nil {
-		return "", fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
-	}
-	tokenPoolAddrBytes, err := a.AddressRefToBytes(tokenPoolAddrRef)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-	tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
-	if tokenPoolAddr == (common.Address{}) {
-		return "", errors.New("token pool address is zero address")
+		return "", fmt.Errorf("failed to parse token pool address from ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	}
 	tokenAddr, err := a.Ops.GetToken(e.OperationsBundle, chain, tokenPoolAddr)
 	if err != nil {
-		return "", fmt.Errorf("failed to get token address from token pool ref (%+v): %w", tokenPoolAddrRef, err)
+		return "", fmt.Errorf("failed to get token address from token pool ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	}
+
 	return tokenAddr.Hex(), nil
 }
 
@@ -129,22 +110,14 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 
 	// If we can't source the decimals directly from the token then check if the pool
 	// address is directly available in the ref. If so, we can skip the datastore and
-	// go straight to the pool contract for decimals.
-	if poolRef.Address != "" {
-		if !common.IsHexAddress(poolRef.Address) {
-			return 0, fmt.Errorf("token pool address %q in ref is not a valid hex address", poolRef.Address)
-		} else {
-			return a.Ops.GetTokenDecimals(e.GetContext(), chain, common.HexToAddress(poolRef.Address))
-		}
-	}
-
-	// If the ref doesn't have the pool address, then we need to hit the datastore for
-	// the full pool ref, then get the decimals from the pool contract.
-	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils_evm.ToEVMAddress)
+	// go straight to the pool contract for the decimals. If the ref doesn't have the
+	// pool address, then we need to hit the datastore for the full pool ref then get
+	// the token decimals from the pool contract.
+	poolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
 	if err != nil {
 		return 0, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	} else {
-		return a.Ops.GetTokenDecimals(e.GetContext(), chain, poolAddr)
+		return a.Ops.GetTokenDecimals(e.OperationsBundle, chain, poolAddr)
 	}
 }
 
@@ -153,34 +126,16 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 // not supported for v1.x EVM pools and returns an error. tokenRef is unused on EVM (pools are
 // keyed by pool address alone) and exists for parity with chain families that need the token
 // mint to resolve the read.
-func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(
-	e deployment.Environment,
-	chainSelector uint64,
-	poolRef datastore.AddressRef,
-	_ datastore.AddressRef,
-	remoteSelector uint64,
-	fastFinality bool,
-) (tokensapi.RateLimiterConfig, error) {
-	if fastFinality {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("v1.x EVM pools do not support fastFinality rate limit buckets")
-	}
+func (a *EVMPoolAdapter) GetOnchainInboundRateLimit(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, _ datastore.AddressRef, remoteSelector uint64, fastFinality bool) (tokensapi.RateLimiterConfig, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return tokensapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
-	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	poolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
 	if err != nil {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	}
-	addrRaw, err := a.AddressRefToBytes(addrRef)
-	if err != nil {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-	poolAddr := common.BytesToAddress(addrRaw)
-	if poolAddr == (common.Address{}) {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("token pool address for ref (%+v) is zero", addrRef)
-	}
-	return a.Ops.GetCurrentInboundRateLimit(e.OperationsBundle, chain, poolAddr, remoteSelector)
+	return a.Ops.GetCurrentInboundRateLimit(e.OperationsBundle, chain, poolAddr, remoteSelector, fastFinality)
 }
 
 func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -194,19 +149,14 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-
-			tokenPoolAddrBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
+			tokenPoolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(input.ExistingDataStore, input.TokenPoolRef, input.ChainSelector)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
-			}
-			tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
-			if tokenPoolAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(input.TokenPoolRef), err)
 			}
 
 			if input.SkipIfMissingPermissions {
 				timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
-				timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
+				timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToNonZeroEVMAddress)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chain.Selector, err)
 				}
@@ -253,7 +203,7 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			tarAddress, err := GetTokenAdminRegistryAddress(input.ExistingDataStore, chain.Selector, &a.EVMTokenBase)
+			tarAddress, err := a.EVMTokenBase.GetTokenAdminRegistryAddress(input.ExistingDataStore, chain.Selector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", chain.Selector, err)
 			}
@@ -267,26 +217,16 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 			tokenRef := input.TokenRef
 			if tokenRef.Address == "" {
 				if tokRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, chain.Selector, datastore_utils.FullRef); err != nil {
-					b.Logger.Warnf("token address could not be resolved using TokenRef (%+v): %v", tokenRef, err)
-					b.Logger.Warnf("attempting to resolve token address using TokenPoolRef instead: (%+v)", input.TokenPoolRef)
-
-					tokenPoolRef, poolErr := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
-					if poolErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("token pool could not be resolved using TokenPoolRef (%+v): %w", input.TokenPoolRef, poolErr)
+					b.Logger.Warnf("token address could not be resolved using TokenRef (%s): %v", datastore_utils.SprintRef(tokenRef), err)
+					b.Logger.Warnf("attempting to resolve token address using TokenPoolRef instead: (%s)", datastore_utils.SprintRef(input.TokenPoolRef))
+					tokenPoolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(input.TokenPoolRef), err)
 					}
-					tokenPoolAddrBytes, addrErr := a.AddressRefToBytes(tokenPoolRef)
-					if addrErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", addrErr)
+					tokenAddr, err := a.Ops.GetToken(b, chain, tokenPoolAddr)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool at ref (%s): %w", datastore_utils.SprintRef(input.TokenPoolRef), err)
 					}
-					tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
-					if tokenPoolAddr == (common.Address{}) {
-						return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", tokenPoolRef)
-					}
-					tokenAddr, getErr := a.Ops.GetToken(b, chain, tokenPoolAddr)
-					if getErr != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool ref (%+v): %w", tokenPoolRef, getErr)
-					}
-
 					tokenRef = datastore.AddressRef{
 						ChainSelector: chain.Selector,
 						Address:       tokenAddr.Hex(),
@@ -338,45 +278,39 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 		a.Ops.Version(),
 		"Deploy a token pool for a token on an EVM chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
-			var writes []evm_contract.WriteOutput
-
+			var result sequences.OnChainOutput
 			if a.DeployTokenPoolSeq == nil {
 				return sequences.OnChainOutput{}, errors.New("DeployTokenPoolSeq is not set on EVMPoolAdapter")
 			}
+
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
+
 			out, err := cldf_ops.ExecuteSequence(b, a.DeployTokenPoolSeq, chains, input)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token pool on chain %d: %w", input.ChainSelector, err)
 			}
 
-			var result sequences.OnChainOutput
 			result.Addresses = append(result.Addresses, out.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
-
-			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector}
-			if input.TokenRef.Address != "" {
-				toknFilterDS.Address = input.TokenRef.Address
-			}
-			if input.TokenRef.Qualifier != "" {
-				toknFilterDS.Qualifier = input.TokenRef.Qualifier
-			}
-			if input.TokenRef.Type != "" {
-				toknFilterDS.Type = input.TokenRef.Type
+			if input.TokenRef == nil {
+				return sequences.OnChainOutput{}, errors.New("token ref must be provided in input to DeployTokenPoolForToken sequence for EVM pools")
 			}
 
-			toknRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, toknFilterDS, input.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
-			}
-			toknAddr, err := datastore_utils_evm.ToEVMAddress(toknRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
-			}
-			if toknAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenRef.Qualifier)
+			// NOTE: the token ref may be fully populated, but might not exist in the datastore
+			// (this can happen when using token address ref resolvers). In these situations we
+			// should avoid the datastore lookup altogether since it is doomed to fail and just
+			// use the input address ref directly. Failure to do this would cause this sequence
+			// to fail unnecessarily even when it has all the data it needs to succeed.
+			tokenRef := input.TokenRef.Clone()
+			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
+				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token address for ref (%s) from datastore after token pool deployment: %w", datastore_utils.SprintRef(tokenRef), err)
+				} else {
+					tokenRef = ref
+				}
 			}
 
 			var poolRef datastore.AddressRef
@@ -384,8 +318,9 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				poolRef = out.Output.Addresses[0]
 			}
 
+			var writes []evm_contract.WriteOutput
 			if !datastore_utils.IsAddressRefEmpty(poolRef) {
-				if tokenPoolRolesWrites, err := tidyTokenPoolRoles(b, chain, input, poolRef, toknRef); err != nil {
+				if tokenPoolRolesWrites, err := a.TidyTokenPoolRoles(b, chain, input, poolRef, tokenRef); err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token pool roles: %w", err)
 				} else {
 					writes = append(writes, tokenPoolRolesWrites...)
@@ -395,26 +330,21 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					if !common.IsHexAddress(rlAdminHex) {
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
 					}
-					rlAdminAddr := common.HexToAddress(rlAdminHex)
-					if rlAdminAddr == (common.Address{}) {
-						return sequences.OnChainOutput{}, errors.New("rate limit admin address cannot be the zero address")
-					}
-					poolAddr, err := datastore_utils_evm.ToEVMAddress(poolRef)
+					poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 					}
-					if poolAddr == (common.Address{}) {
-						return sequences.OnChainOutput{}, errors.New("deployed token pool address cannot be the zero address")
-					}
-					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, rlAdminAddr)
+					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, common.HexToAddress(rlAdminHex))
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}
-					writes = append(writes, output)
+					if len(output) > 0 {
+						writes = append(writes, output...)
+					}
 				}
 			}
 
-			if tokenRolesWrites, err := tidyTokenRoles(b, chain, input, toknRef); err != nil {
+			if tokenRolesWrites, err := a.TidyTokenRoles(b, chain, input, tokenRef); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token roles: %w", err)
 			} else {
 				writes = append(writes, tokenRolesWrites...)
@@ -436,23 +366,23 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 // tidyTokenPoolRoles grants a token pool the token-side roles required for its
 // pool type. Burn/mint pools delegate role selection to the registered token
 // strategy because token contracts expose different role APIs.
-func tidyTokenPoolRoles(
+func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
-	poolRef datastore.AddressRef,
+	tokenPoolRef datastore.AddressRef,
 	tokenRef datastore.AddressRef,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenAddr, err := datastore_utils_evm.ToEVMAddress(tokenRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
-	}
-	poolAddress, err := datastore_utils_evm.ToEVMAddress(poolRef)
+	tokenPoolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenPoolRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
+	tokenAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
+	}
 
-	if input.PoolType == cciputils.BurnMintTokenPool.String() {
+	if a.IsBurnMintPoolType(input.PoolType) {
 		tokenImpl, ok := tokenimpl.Get(deployment.ContractType(tokenRef.Type))
 		if !ok {
 			b.Logger.Warnf(
@@ -466,13 +396,13 @@ func tidyTokenPoolRoles(
 		if !tokenCaps.ParticipatesInPoolRoleGrant {
 			b.Logger.Warnf(
 				"token type %q has no pool role grant strategy registered, skipping grant for token pool %q on token %q on chain %d",
-				tokenRef.Type.String(), poolAddress.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
+				tokenRef.Type.String(), tokenPoolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
 			)
 			return nil, nil
 		}
 
-		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddress, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
-			return nil, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", tokenRef.Type, input.TokenRef.Qualifier, poolAddress.Hex(), input.ChainSelector, grantErr)
+		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, tokenPoolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
+			return nil, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", tokenRef.Type, input.TokenRef.Qualifier, tokenPoolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
 		}
@@ -486,13 +416,13 @@ func tidyTokenPoolRoles(
 // (i.e. not deployed/not applicable which can be the case in test cases),
 // then it leaves the deployer account as an admin so the token isn't left
 // without an operator.
-func tidyTokenRoles(
+func (a *EVMPoolAdapter) TidyTokenRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
 	tokenRef datastore.AddressRef,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenAddr, err := datastore_utils_evm.ToEVMAddress(tokenRef)
+	tokenAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
 	}
@@ -515,21 +445,12 @@ func tidyTokenRoles(
 		return nil, nil
 	}
 
-	timelockRef := datastore_utils.GetAddressRef(
-		input.ExistingDataStore.Addresses().Filter(),
-		input.ChainSelector,
-		cciputils.RBACTimelock,
-		cciputils.Version_1_0_0,
-		cciputils.CLLQualifier,
-	)
-	if datastore_utils.IsAddressRefEmpty(timelockRef) {
-		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin", input.ChainSelector)
+	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
+	if err != nil {
+		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
 		return nil, nil
 	}
-	timelockAddr, err := datastore_utils_evm.ToEVMAddress(timelockRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert timelock ref to EVM address for chain %d: %w", input.ChainSelector, err)
-	}
+
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
@@ -540,22 +461,4 @@ func tidyTokenRoles(
 	}
 
 	return append(grantWrites, revokeWrites...), nil
-}
-
-// GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.
-func GetTokenAdminRegistryAddress(ds datastore.DataStore, selector uint64, base *EVMTokenBase) (common.Address, error) {
-	filters := datastore.AddressRef{
-		Type:          datastore.ContractType(tarops.ContractType),
-		ChainSelector: selector,
-		Version:       tarops.Version,
-	}
-	ref, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils.FullRef)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
-	}
-	addr, err := base.AddressRefToBytes(ref)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-	return common.BytesToAddress(addr), nil
 }

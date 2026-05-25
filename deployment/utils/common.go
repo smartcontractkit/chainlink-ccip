@@ -42,6 +42,7 @@ const (
 	ERC677TokenHelper                   cldf.ContractType = "ERC677TokenHelper"
 	USDCTokenPool                       cldf.ContractType = "USDCTokenPool"
 	CCTPMessageTransmitterProxy         cldf.ContractType = "CCTPMessageTransmitterProxy"
+	SiloedLockReleaseTokenPool          cldf.ContractType = "SiloedLockReleaseTokenPool"
 	HybridLockReleaseUSDCTokenPool      cldf.ContractType = "HybridLockReleaseUSDCTokenPool"
 	BurnMintWithExternalMinterTokenPool cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
 	HybridWithExternalMinterTokenPool   cldf.ContractType = "HybridWithExternalMinterTokenPool"
