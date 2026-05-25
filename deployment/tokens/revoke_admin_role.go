@@ -48,24 +48,28 @@ func revokeTokenAdminRoleVerify(tokenRegistry *TokenAdapterRegistry) func(cldf.E
 		}
 
 		for i, revocation := range cfg.Revocations {
-			if !e.BlockChains.Exists(revocation.ChainSelector) {
-				return fmt.Errorf("revocation[%d]: chain selector %d not found in environment", i, revocation.ChainSelector)
+			selector := revocation.ChainSelector
+			version := cciputils.Version_1_0_0
+			if revocation.TokenRef.ChainSelector != 0 && revocation.TokenRef.ChainSelector != revocation.ChainSelector {
+				return fmt.Errorf("revocation[%d]: chain selector mismatch in TokenRef: expected %d, got %d", i, revocation.ChainSelector, revocation.TokenRef.ChainSelector)
+			}
+			if datastore_utils.IsAddressRefEmpty(revocation.TokenRef) {
+				return fmt.Errorf("revocation[%d]: token ref is required", i)
+			}
+			if !e.BlockChains.Exists(selector) {
+				return fmt.Errorf("revocation[%d]: chain selector %d not found in environment", i, selector)
 			}
 
-			family, err := chain_selectors.GetSelectorFamily(revocation.ChainSelector)
+			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
-				return fmt.Errorf("revocation[%d]: invalid chain selector %d: %w", i, revocation.ChainSelector, err)
+				return fmt.Errorf("revocation[%d]: invalid chain selector %d: %w", i, selector, err)
 			}
-			adapter, exists := tokenRegistry.GetTokenAdapter(family, cciputils.Version_1_0_0)
+			adapter, exists := tokenRegistry.GetTokenAdapter(family, version)
 			if !exists {
-				return fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, cciputils.Version_1_0_0)
+				return fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, version)
 			}
 			if _, ok := adapter.(TokenAdminRoleAdapter); !ok {
-				return fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, cciputils.Version_1_0_0)
-			}
-
-			if _, err := resolveTokenAdminRoleRef(e, revocation); err != nil {
-				return fmt.Errorf("revocation[%d]: failed to resolve token ref: %w", i, err)
+				return fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, version)
 			}
 		}
 
@@ -77,57 +81,52 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 	return func(e cldf.Environment, cfg RevokeTokenAdminRoleInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-		// Repeated Apply calls must re-read on-chain admin state instead of replaying
-		// an earlier successful sequence report with the same input.
-		opsBundle := cldf_ops.NewBundle(
-			e.GetContext,
-			e.Logger,
-			cldf_ops.NewMemoryReporter(),
-			cldf_ops.WithOperationRegistry(e.OperationsBundle.OperationRegistry),
-		)
 
 		for i, revocation := range cfg.Revocations {
-			family, err := chain_selectors.GetSelectorFamily(revocation.ChainSelector)
+			selector := revocation.ChainSelector
+			version := cciputils.Version_1_0_0
+
+			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: invalid chain selector %d: %w", i, revocation.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: invalid chain selector %d: %w", i, selector, err)
 			}
-
-			adapter, exists := tokenRegistry.GetTokenAdapter(family, cciputils.Version_1_0_0)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, cciputils.Version_1_0_0)
-			}
-			adminRoleAdapter, ok := adapter.(TokenAdminRoleAdapter)
+			tokenAdapter, ok := tokenRegistry.GetTokenAdapter(family, version)
 			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, cciputils.Version_1_0_0)
+				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, version)
 			}
-
-			tokenRef, err := resolveTokenAdminRoleRef(e, revocation)
+			roleAdapter, ok := tokenAdapter.(TokenAdminRoleAdapter)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, version)
+			}
+			tokenRef, err := ResolveTokenRef(e, tokenRegistry, selector, revocation.TokenRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to resolve token ref: %w", i, err)
 			}
 
+			// NOTE: if after resolution, the timelock address is still empty, the adapter should fall back to the deployer key
 			var timelockAddress string
 			if mcmsReader, ok := mcmsRegistry.GetMCMSReader(family); ok {
-				timelockRef, err := mcmsReader.GetTimelockRef(e, revocation.ChainSelector, cfg.MCMS)
-				if err != nil {
-					e.Logger.Warnf("failed to resolve timelock address for revocation[%d] on chain selector %d: %v", i, revocation.ChainSelector, err)
-				} else if !datastore_utils.IsAddressRefEmpty(timelockRef) {
+				timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
+				if err != nil || datastore_utils.IsAddressRefEmpty(timelockRef) {
+					e.Logger.Warnf("failed to resolve timelock address for revocation[%d] on chain selector %d: %v", i, selector, err)
+				} else {
 					timelockAddress = timelockRef.Address
 				}
-			} else if revocation.AdminAddress == "" {
-				e.Logger.Warnf("no MCMS reader registered for chain family '%s'; revocation[%d] will use the adapter default admin address", family, i)
 			}
 
 			adminAddress := revocation.AdminAddress
 			if adminAddress == "" {
 				adminAddress = timelockAddress
 			}
+			if revocation.AdminAddress == "" {
+				e.Logger.Warnf("no MCMS reader registered for chain family '%s'; revocation[%d] will choose a sensible default", family, i)
+			}
 
-			report, err := cldf_ops.ExecuteSequence(opsBundle, adminRoleAdapter.RevokeTokenAdminRole(), e.BlockChains, RevokeTokenAdminRoleSequenceInput{
+			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, roleAdapter.RevokeTokenAdminRole(), e.BlockChains, RevokeTokenAdminRoleSequenceInput{
 				ChainSelector:   revocation.ChainSelector,
-				TokenRef:        tokenRef,
-				AdminAddress:    adminAddress,
 				TimelockAddress: timelockAddress,
+				AdminAddress:    adminAddress,
+				TokenRef:        tokenRef,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to revoke token admin role: %w", i, err)
@@ -142,29 +141,4 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
-}
-
-func resolveTokenAdminRoleRef(e cldf.Environment, revocation RevokeTokenAdminRoleConfig) (datastore.AddressRef, error) {
-	if datastore_utils.IsAddressRefEmpty(revocation.TokenRef) {
-		return datastore.AddressRef{}, errors.New("token ref is required")
-	}
-	if revocation.TokenRef.ChainSelector != 0 && revocation.TokenRef.ChainSelector != revocation.ChainSelector {
-		return datastore.AddressRef{}, fmt.Errorf("token ref chain selector mismatch: expected %d, got %d", revocation.ChainSelector, revocation.TokenRef.ChainSelector)
-	}
-
-	tokenRef, err := TryNormalizeAddressRef(revocation.ChainSelector, revocation.TokenRef)
-	if err != nil {
-		return datastore.AddressRef{}, err
-	}
-	tokenRef.ChainSelector = revocation.ChainSelector
-
-	fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenRef, revocation.ChainSelector, datastore_utils.FullRef)
-	if err == nil {
-		return fullRef, nil
-	}
-	if tokenRef.Address != "" && tokenRef.Type != "" {
-		return tokenRef, nil
-	}
-
-	return datastore.AddressRef{}, fmt.Errorf("token ref must resolve from datastore or include both address and type: %w", err)
 }

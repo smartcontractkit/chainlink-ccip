@@ -1,6 +1,9 @@
 package deployment
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
@@ -16,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
+	bnmERC20Operations "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	evmonrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
@@ -28,11 +32,12 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	bnmERC20Bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -406,8 +411,8 @@ func MergeAddresses(t *testing.T, env *cldf_deployment.Environment, ds datastore
 	}
 }
 
-func NewDefaultDeploymentConfigForSolana(version *semver.Version) deploy.ContractDeploymentConfigPerChain {
-	return deploy.ContractDeploymentConfigPerChain{
+func NewDefaultDeploymentConfigForSolana(version *semver.Version) mcmsapi.ContractDeploymentConfigPerChain {
+	return mcmsapi.ContractDeploymentConfigPerChain{
 		Version:                      version,
 		MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 		TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
@@ -418,8 +423,8 @@ func NewDefaultDeploymentConfigForSolana(version *semver.Version) deploy.Contrac
 	}
 }
 
-func NewDefaultDeploymentConfigForEVM(version *semver.Version) deploy.ContractDeploymentConfigPerChain {
-	return deploy.ContractDeploymentConfigPerChain{
+func NewDefaultDeploymentConfigForEVM(version *semver.Version) mcmsapi.ContractDeploymentConfigPerChain {
+	return mcmsapi.ContractDeploymentConfigPerChain{
 		Version:                                 version,
 		MaxFeeJuelsPerMsg:                       big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 		TokenPriceStalenessThreshold:            uint32(24 * 60 * 60),
@@ -491,4 +496,82 @@ func RequireBigIntsEqual(t *testing.T, want, got *big.Int, msg string) {
 		g = big.NewInt(0)
 	}
 	require.Zero(t, w.Cmp(g), "%s: want %s got %s", msg, w.String(), g.String())
+}
+
+func NewRandHex(t *testing.T, nBytes int) string {
+	t.Helper()
+	data := make([]byte, 32)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
+	return hex.EncodeToString(data)
+}
+
+func DeployBurnMintPoolEVM(t *testing.T, env *cldf_deployment.Environment, selector uint64, version *semver.Version, token common.Address) datastore.AddressRef {
+	t.Helper()
+
+	poolQualifier := "Pool-" + NewRandHex(t, 32)
+	poolType := common_utils.BurnMintTokenPool.String()
+
+	output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: version,
+		MCMS:                NewDefaultInputForMCMS(fmt.Sprintf("Deploy %s", poolQualifier)),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selector: {
+				TokenPoolVersion: version,
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenRef:           &datastore.AddressRef{Address: token.Hex()},
+					TokenPoolQualifier: poolQualifier,
+					PoolType:           poolType,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	dsFilter := datastore.AddressRef{ChainSelector: selector, Qualifier: poolQualifier, Type: datastore.ContractType(poolType)}
+	ref, err := datastore_utils.FindAndFormatRef(env.DataStore, dsFilter, selector, datastore_utils.FullRef)
+	require.NoError(t, err)
+
+	return ref
+}
+
+func DeployBurnMintTokenEVM(t *testing.T, env *cldf_deployment.Environment, selector uint64, admin string) *bnmERC20Bindings.BurnMintERC20 {
+	t.Helper()
+
+	chain, ok := env.BlockChains.EVMChains()[selector]
+	require.True(t, ok)
+
+	symbol := "Token-" + NewRandHex(t, 32)
+	output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: common_utils.Version_1_0_0,
+		MCMS:                NewDefaultInputForMCMS(fmt.Sprintf("Deploy %s", symbol)),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selector: {
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					ExternalAdmin: admin,
+					CCIPAdmin:     admin,
+					Decimals:      uint8(18),
+					Supply:        nil, // unlimited supply
+					Symbol:        symbol,
+					Name:          symbol + " Token",
+					Type:          bnmERC20Operations.ContractType,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, output.DataStore)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	dsFilter := datastore.AddressRef{ChainSelector: selector, Qualifier: symbol, Type: datastore.ContractType(bnmERC20Operations.ContractType)}
+	ref, err := datastore_utils.FindAndFormatRef(env.DataStore, dsFilter, selector, datastore_utils.FullRef)
+	require.NoError(t, err)
+
+	require.True(t, common.IsHexAddress(ref.Address))
+	token, err := bnmERC20Bindings.NewBurnMintERC20(common.HexToAddress(ref.Address), chain.Client)
+	require.NoError(t, err)
+
+	return token
 }
