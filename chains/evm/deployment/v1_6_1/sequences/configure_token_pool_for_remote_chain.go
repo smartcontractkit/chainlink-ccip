@@ -82,6 +82,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// Get outbound and inbound rate limits from the input
 		outboundRL, outboundOk := input.RemoteChainConfig.GetOutboundRateLimitBuckets().DefaultBucket()
 		inboundRL, inboundOk := input.RemoteChainConfig.GetInboundRateLimitBuckets().DefaultBucket()
+		paddedPool := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
 
 		// Resolve the outbound and inbound rate limits
 		var outboundConfig, inboundConfig tokens.RateLimiterConfig
@@ -186,7 +187,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pools: %w", err)
 				}
 				if !slices.ContainsFunc(getRemotePoolsReport.Output, func(addr []byte) bool {
-					return bytes.Equal(addr, input.RemoteChainConfig.RemotePool)
+					return bytes.Equal(addr, paddedPool)
 				}) {
 					// Add the requested remote pool
 					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
@@ -194,7 +195,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						Address:       input.TokenPoolAddress,
 						Args: token_pool.AddRemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
-							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
+							RemotePoolAddress:   paddedPool,
 						},
 					})
 					if err != nil {
@@ -222,10 +223,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				ChainsToAdd: []token_pool.ChainUpdate{
 					{
 						RemoteChainSelector: input.RemoteChainSelector,
-						RemotePoolAddresses: [][]byte{
-							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
-						},
-						RemoteTokenAddress: common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
+						RemotePoolAddresses: [][]byte{paddedPool},
+						RemoteTokenAddress:  common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
 						OutboundRateLimiterConfig: token_pool.Config{
 							IsEnabled: outboundConfig.IsEnabled,
 							Capacity:  outboundConfig.Capacity,

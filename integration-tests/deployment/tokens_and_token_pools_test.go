@@ -3,6 +3,7 @@ package deployment
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -10,11 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -34,16 +36,19 @@ import (
 	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/stretchr/testify/require"
 
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
+
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
-
-	// Registers SolanaAddressNormalizer on deployapi (v1_6_0 sequences do not import v1_0_0 adapters).
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 )
 
 func TestTokensAndTokenPools(t *testing.T) {
@@ -83,14 +88,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 	solAdapter := solseqV1_6_0.SolanaAdapter{}
 	evmAdapter := evmseqV1_6_0.EVMAdapter{}
 
-	// Configure deployment registry
+	// Get registries
 	deployRegistry := deployapi.GetRegistry()
-	deployRegistry.RegisterDeployer(chainsel.FamilyEVM, deployapi.MCMSVersion, &evmadapters.EVMDeployer{})
-	deployRegistry.RegisterDeployer(chainsel.FamilySolana, deployapi.MCMSVersion, &solAdapter)
-
-	// Configure MCMS registry
+	lanesRegistry := lanes.GetLaneAdapterRegistry()
 	mcmsRegistry := changesets.GetRegistry()
-	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &evmadapters.EVMMCMSReader{})
+	feesRegistry := fees.GetRegistry()
 
 	// Registration happens automatically, so the `Register...`
 	// calls below aren't needed, but are left here for clarity
@@ -110,8 +112,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 		Deployer           *solana.PrivateKey
 		Chain              solchain.Chain
 		Deploy             deployapi.ContractDeploymentConfigPerChain
-		// RateLimitAdmin is optional; when set on BurnMint, DeployTokenPoolForToken should set it on-chain.
-		RateLimitAdmin string
+		FeeConfig          tokensapi.PartialTokenTransferFeeConfig
+		RateLimitAdmin     string
 	}{
 		{
 			TokenPoolQualifier: "",
@@ -120,6 +122,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Deployer:           solChain.DeployerKey,
 			Chain:              solChain,
 			Deploy:             NewDefaultDeploymentConfigForSolana(cciputils.Version_1_6_0),
+			FeeConfig: tokensapi.PartialTokenTransferFeeConfig{
+				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(10)),      // this will be mapped to minFeeUSDCents
+				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(50)),      // custom finality not applicable on v1.6.x, but specifying it should not cause an error
+				DestBytesOverhead:          cciputils.NewOptional(uint32(200_000)), // override default value
+				DestGasOverhead:            cciputils.Optional[uint32]{},           // let adapter choose a sensible default
+			},
 			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(9),
 				Symbol:                 "SOL_TEST",
@@ -140,6 +148,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Deployer:           solChain.DeployerKey,
 			Chain:              solChain,
 			Deploy:             NewDefaultDeploymentConfigForSolana(cciputils.Version_1_6_0),
+			FeeConfig: tokensapi.PartialTokenTransferFeeConfig{
+				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(50)),     // this will be mapped to minFeeUSDCents
+				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(10)),     // custom finality not applicable on v1.6.x, but specifying it should not cause an error
+				DestBytesOverhead:          cciputils.Optional[uint32]{},          // let adapter choose a sensible default
+				DestGasOverhead:            cciputils.NewOptional(uint32(50_000)), // override default value
+			},
 			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(9),
 				Symbol:                 "SOL_TEST2",
@@ -161,6 +175,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// between token pools for different tokens, a qualifier is needed.
 	//
 	// Define testing data for EVM
+	evmInitDeciBpsA := cciputils.NewOptional(uint16(50))
+	evmInitDeciBpsB := cciputils.NewOptional(uint16(75))
 	evmTestData := []struct {
 		TokenPoolQualifier string
 		Token              *tokensapi.DeployTokenInput
@@ -168,6 +184,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		TAR                *tarbindings.TokenAdminRegistry
 		Chain              evmchain.Chain
 		Deploy             deployapi.ContractDeploymentConfigPerChain
+		FeeConfig          tokensapi.PartialTokenTransferFeeConfig
 		RateLimitAdmin     string
 	}{
 		{
@@ -177,6 +194,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Chain:              evmChainA,
 			TAR:                nil, // populated later
 			Deploy:             NewDefaultDeploymentConfigForEVM(cciputils.Version_1_6_0),
+			FeeConfig: tokensapi.PartialTokenTransferFeeConfig{
+				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(10)),      // this will be mapped to minFeeUSDCents
+				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(50)),      // custom finality not applicable on v1.6.x, but specifying it should not cause an error
+				DestBytesOverhead:          cciputils.NewOptional(uint32(200_000)), // override default value
+				DestGasOverhead:            cciputils.Optional[uint32]{},           // let adapter choose a sensible default
+			},
 			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(18),
 				Symbol:                 "EVM_TEST_A",
@@ -198,6 +221,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Chain:              evmChainB,
 			TAR:                nil, // populated later
 			Deploy:             NewDefaultDeploymentConfigForEVM(cciputils.Version_1_6_0),
+			FeeConfig: tokensapi.PartialTokenTransferFeeConfig{
+				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(50)),     // this will be mapped to minFeeUSDCents
+				CustomFinalityFeeUSDCents:  cciputils.NewOptional(uint32(10)),     // custom finality not applicable on v1.6.x, but specifying it should not cause an error
+				DestBytesOverhead:          cciputils.Optional[uint32]{},          // let adapter choose a sensible default
+				DestGasOverhead:            cciputils.NewOptional(uint32(50_000)), // override default value
+			},
 			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(18),
 				Symbol:                 "EVM_TEST_B",
@@ -230,6 +259,29 @@ func TestTokensAndTokenPools(t *testing.T) {
 	for _, data := range evmTestData {
 		DeployMCMS(t, env, data.Chain.Selector, []string{cciputils.CLLQualifier})
 	}
+
+	// Connect all chains
+	connectOut, err := lanes.ConnectChains(lanesRegistry, mcmsRegistry).Apply(*env, lanes.ConnectChainsConfig{
+		Lanes: []lanes.LaneConfig{
+			{
+				Version: cciputils.Version_1_6_0,
+				ChainA:  lanes.ChainDefinition{Selector: evmChainSelA},
+				ChainB:  lanes.ChainDefinition{Selector: evmChainSelB},
+			},
+			{
+				Version: cciputils.Version_1_6_0,
+				ChainA:  lanes.ChainDefinition{Selector: solChainSel},
+				ChainB:  lanes.ChainDefinition{Selector: evmChainSelA},
+			},
+			{
+				Version: cciputils.Version_1_6_0,
+				ChainA:  lanes.ChainDefinition{Selector: solChainSel},
+				ChainB:  lanes.ChainDefinition{Selector: evmChainSelB},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, connectOut.DataStore)
 
 	// NOTE: calling TransferOwnership immediately after DeployMCMS for each chain
 	// leads to an issue where TransferOwnership cannot find any MCMS contracts in
@@ -300,6 +352,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 		require.NoError(t, err)
 		MergeAddresses(t, env, output.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 		// Run token expansion for lnr
 		input = make(map[uint64]tokensapi.TokenExpansionInputPerChain)
@@ -320,6 +373,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 		require.NoError(t, err)
 		MergeAddresses(t, env, output.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 	})
 
 	t.Run("EVM Token Adapter", func(t *testing.T) {
@@ -500,6 +554,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, err)
 			tokA, err := poolA.GetToken(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
+			poolB, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: evmB.Chain.Selector, Qualifier: evmB.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
+			require.NoError(t, err)
+			tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, &datastore.AddressRef{Qualifier: evmB.Token.Symbol})
+			require.NoError(t, err)
 			outboundRateLimitAB, err := poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
 			require.NoError(t, err)
 			inboundRateLimitAB, err := poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
@@ -517,6 +575,82 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.Empty(t, supportedChainsOnA)
 			require.Empty(t, remotePoolsAB)
 			require.Empty(t, remoteTokenAB)
+
+			// To test partial updates, seed an initial deci bps
+			out, err := fees.SetTokenTransferFee().Apply(*env, fees.SetTokenTransferFeeInput{
+				Version: nil, // inferred
+				MCMS:    NewDefaultInputForMCMS("Set Token Transfer Fee"),
+				Args: []fees.TokenTransferFeeForSrc{
+					{
+						Selector: evmChainSelA,
+						Settings: []fees.TokenTransferFeeForDst{
+							{
+								Selector: evmChainSelB,
+								Settings: []fees.TokenTransferFee{
+									{Address: tokA.Hex(), FeeArgs: fees.UnresolvedTokenTransferFeeArgs{DeciBps: evmInitDeciBpsA}},
+								},
+							},
+						},
+					},
+					{
+						Selector: evmChainSelB,
+						Settings: []fees.TokenTransferFeeForDst{
+							{
+								Selector: evmChainSelA,
+								Settings: []fees.TokenTransferFee{
+									{Address: tokB.Hex(), FeeArgs: fees.UnresolvedTokenTransferFeeArgs{DeciBps: evmInitDeciBpsB}},
+								},
+							},
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+			// Get fee resolver
+			feeResolver, ok := feesRegistry.GetFeeResolver(chainsel.FamilyEVM)
+			require.True(t, ok, "EVM fee resolver should be registered")
+
+			// Get the fee quoter contract on EVM chain A
+			onRampA, err := feeResolver.GetOnRampRef(*env, evmA.Chain.Selector, evmB.Chain.Selector)
+			require.NoError(t, err)
+			feeAdapterA, ok := feesRegistry.GetFeeAdapter(chainsel.FamilyEVM, onRampA.Version)
+			require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampA.Version))
+			fqA, err := feeAdapterA.GetFeeContractRef(*env, onRampA, evmA.Chain.Selector, evmB.Chain.Selector)
+			require.NoError(t, err)
+
+			// Get the fee quoter contract on EVM chain B
+			onRampB, err := feeResolver.GetOnRampRef(*env, evmB.Chain.Selector, evmA.Chain.Selector)
+			require.NoError(t, err)
+			feeAdapterB, ok := feesRegistry.GetFeeAdapter(chainsel.FamilyEVM, onRampB.Version)
+			require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampB.Version))
+			fqB, err := feeAdapterB.GetFeeContractRef(*env, onRampB, evmB.Chain.Selector, evmA.Chain.Selector)
+			require.NoError(t, err)
+
+			// Make sure EVM chain A was set
+			feeA, err := feeAdapterA.GetOnchainTokenTransferFeeConfig(*env, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
+			require.NoError(t, err)
+			expectedFeeA := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(evmA.Chain.Selector, evmB.Chain.Selector)
+			expectedFeeA.DeciBps = evmInitDeciBpsA.Value
+			require.Equal(t, expectedFeeA.DestBytesOverhead, feeA.DestBytesOverhead)
+			require.Equal(t, expectedFeeA.DestGasOverhead, feeA.DestGasOverhead)
+			require.Equal(t, expectedFeeA.MinFeeUSDCents, feeA.MinFeeUSDCents)
+			require.Equal(t, expectedFeeA.MaxFeeUSDCents, feeA.MaxFeeUSDCents)
+			require.Equal(t, expectedFeeA.IsEnabled, feeA.IsEnabled)
+			require.Equal(t, expectedFeeA.DeciBps, feeA.DeciBps)
+
+			// Make sure EVM chain B fee config was set
+			feeB, err := feeAdapterB.GetOnchainTokenTransferFeeConfig(*env, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
+			require.NoError(t, err)
+			expectedFeeB := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(evmB.Chain.Selector, evmA.Chain.Selector)
+			expectedFeeB.DeciBps = evmInitDeciBpsB.Value
+			require.Equal(t, expectedFeeB.DestBytesOverhead, feeB.DestBytesOverhead)
+			require.Equal(t, expectedFeeB.DestGasOverhead, feeB.DestGasOverhead)
+			require.Equal(t, expectedFeeB.MinFeeUSDCents, feeB.MinFeeUSDCents)
+			require.Equal(t, expectedFeeB.MaxFeeUSDCents, feeB.MaxFeeUSDCents)
+			require.Equal(t, expectedFeeB.IsEnabled, feeB.IsEnabled)
+			require.Equal(t, expectedFeeB.DeciBps, feeB.DeciBps)
 
 			// For the first iteration, there are no remote chains configured on token pool A so
 			// ApplyChainUpdates should be called directly. On the second iteration the "update"
@@ -539,6 +673,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmB.Chain.Selector: {
 										OutboundRateLimiterConfig: &defaultRL,
+										TokenTransferFeeConfig:    &evmA.FeeConfig,
 										OutboundCCVs:              []datastore.AddressRef{},
 										InboundCCVs:               []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
@@ -571,6 +706,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 									evmA.Chain.Selector: {
 										OutboundRateLimiterConfig: &defaultRL,
+										TokenTransferFeeConfig:    &evmB.FeeConfig,
 										OutboundCCVs:              []datastore.AddressRef{},
 										InboundCCVs:               []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
@@ -620,15 +756,77 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, inboundRateLimitAB.IsEnabled)
 
 				// Verify that the remote token pool was set correctly
-				poolB, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: evmB.Chain.Selector, Qualifier: evmB.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
-				require.NoError(t, err)
 				require.Len(t, remotePoolsAB, 1)
 				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
 
 				// Verify that the remote token was set correctly
-				tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, &datastore.AddressRef{Qualifier: evmB.Token.Symbol})
-				require.NoError(t, err)
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
+
+				// Verify that the fee config on chain A for transfers to chain B matches what we set in the input, merged with any defaults from the adapter
+				feeA, err = feeAdapterA.GetOnchainTokenTransferFeeConfig(*env, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
+				require.NoError(t, err)
+				feeDefaultsA := tokensapi.GetDefaultChainAgnosticTokenTransferFeeConfig(evmA.Chain.Selector, evmB.Chain.Selector)
+				evmA.FeeConfig.DefaultFinalityTransferFeeBps = evmInitDeciBpsA // seed value should still be present
+				expectedFeeA := evmA.FeeConfig.MergeWith(feeDefaultsA)
+				require.Equal(t, expectedFeeA.DefaultFinalityTransferFeeBps, feeA.DeciBps)
+				require.Equal(t, expectedFeeA.DefaultFinalityFeeUSDCents, feeA.MinFeeUSDCents)
+				require.Equal(t, expectedFeeA.DestBytesOverhead, feeA.DestBytesOverhead)
+				require.Equal(t, expectedFeeA.DestGasOverhead, feeA.DestGasOverhead)
+				require.Equal(t, expectedFeeA.IsEnabled, feeA.IsEnabled)
+				require.Equal(t, uint32(math.MaxUint32), feeA.MaxFeeUSDCents)
+
+				// Verify that the fee config on chain B for transfers to chain A matches what we set in the input, merged with any defaults from the adapter
+				feeB, err = feeAdapterB.GetOnchainTokenTransferFeeConfig(*env, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
+				require.NoError(t, err)
+				feeDefaultsB := tokensapi.GetDefaultChainAgnosticTokenTransferFeeConfig(evmB.Chain.Selector, evmA.Chain.Selector)
+				evmB.FeeConfig.DefaultFinalityTransferFeeBps = evmInitDeciBpsB // seed value should still be present
+				expectedFeeB := evmB.FeeConfig.MergeWith(feeDefaultsB)
+				require.Equal(t, expectedFeeB.DefaultFinalityTransferFeeBps, feeB.DeciBps)
+				require.Equal(t, expectedFeeB.DefaultFinalityFeeUSDCents, feeB.MinFeeUSDCents)
+				require.Equal(t, expectedFeeB.DestBytesOverhead, feeB.DestBytesOverhead)
+				require.Equal(t, expectedFeeB.DestGasOverhead, feeB.DestGasOverhead)
+				require.Equal(t, expectedFeeB.IsEnabled, feeB.IsEnabled)
+				require.Equal(t, uint32(math.MaxUint32), feeB.MaxFeeUSDCents)
+
+				// Now reset
+				out, err := fees.SetTokenTransferFee().Apply(*env, fees.SetTokenTransferFeeInput{
+					Version: nil, // inferred
+					MCMS:    NewDefaultInputForMCMS("Set Token Transfer Fee"),
+					Args: []fees.TokenTransferFeeForSrc{
+						{
+							Selector: evmChainSelA,
+							Settings: []fees.TokenTransferFeeForDst{
+								{
+									Selector: evmChainSelB,
+									Settings: []fees.TokenTransferFee{
+										{Address: tokA.Hex(), FeeArgs: fees.UnresolvedTokenTransferFeeArgs{IsEnabled: cciputils.NewOptional(false)}},
+									},
+								},
+							},
+						},
+						{
+							Selector: evmChainSelB,
+							Settings: []fees.TokenTransferFeeForDst{
+								{
+									Selector: evmChainSelA,
+									Settings: []fees.TokenTransferFee{
+										{Address: tokB.Hex(), FeeArgs: fees.UnresolvedTokenTransferFeeArgs{IsEnabled: cciputils.NewOptional(false)}},
+									},
+								},
+							},
+						},
+					},
+				})
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+				// Verify configs were reset
+				feeA, err = feeAdapterA.GetOnchainTokenTransferFeeConfig(*env, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
+				require.NoError(t, err)
+				require.False(t, feeA.IsEnabled, "fee should be disabled after reset")
+				feeB, err = feeAdapterB.GetOnchainTokenTransferFeeConfig(*env, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
+				require.NoError(t, err)
+				require.False(t, feeB.IsEnabled, "fee should be disabled after reset")
 			}
 		})
 	})
@@ -734,6 +932,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			})
 			require.NoError(t, err)
 			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 			// Verify that the token exists in datastore
 			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
@@ -871,6 +1070,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
+			// Reset the operation cache
+			env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
+
 			evmA, evmB := evmTestData[0], evmTestData[1]
 			solbnm, _ := solTestData[0], solTestData[1]
 			defaultRL := tokensapi.RateLimiterConfigFloatInput{
@@ -933,6 +1135,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								evmA.Chain.Selector: {
+									TokenTransferFeeConfig:    &solbnm.FeeConfig,
 									OutboundRateLimiterConfig: &defaultRL,
 									OutboundCCVs:              []datastore.AddressRef{},
 									InboundCCVs:               []datastore.AddressRef{},
@@ -949,6 +1152,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 									},
 								},
 								evmB.Chain.Selector: {
+									TokenTransferFeeConfig:    &solbnm.FeeConfig,
 									OutboundRateLimiterConfig: &defaultRL,
 									OutboundCCVs:              []datastore.AddressRef{},
 									InboundCCVs:               []datastore.AddressRef{},
@@ -981,6 +1185,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
+									TokenTransferFeeConfig:    &evmA.FeeConfig,
 									OutboundRateLimiterConfig: &defaultRL,
 									OutboundCCVs:              []datastore.AddressRef{},
 									InboundCCVs:               []datastore.AddressRef{},
@@ -994,6 +1199,15 @@ func TestTokensAndTokenPools(t *testing.T) {
 										Qualifier:     solbnm.TokenPoolQualifier,
 										Type:          datastore.ContractType(solbnm.TokenPoolType),
 										Version:       cciputils.Version_1_6_0,
+									},
+								},
+								evmB.Chain.Selector: {
+									TokenTransferFeeConfig:    &evmA.FeeConfig,
+									OutboundRateLimiterConfig: &defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
+									RemotePool: &datastore.AddressRef{
+										Qualifier: evmB.TokenPoolQualifier,
 									},
 								},
 							},
@@ -1013,6 +1227,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 							RegistryRef: datastore.AddressRef{}, // inferred
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								solbnm.Chain.Selector: {
+									TokenTransferFeeConfig:    &evmB.FeeConfig,
 									OutboundRateLimiterConfig: &defaultRL,
 									OutboundCCVs:              []datastore.AddressRef{},
 									InboundCCVs:               []datastore.AddressRef{},
@@ -1026,6 +1241,15 @@ func TestTokensAndTokenPools(t *testing.T) {
 										Qualifier:     solbnm.TokenPoolQualifier,
 										Type:          datastore.ContractType(solbnm.TokenPoolType),
 										Version:       cciputils.Version_1_6_0,
+									},
+								},
+								evmA.Chain.Selector: {
+									OutboundRateLimiterConfig: &defaultRL,
+									TokenTransferFeeConfig:    &evmB.FeeConfig,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
+									RemotePool: &datastore.AddressRef{
+										Qualifier: evmA.TokenPoolQualifier,
 									},
 								},
 							},
@@ -1064,6 +1288,57 @@ func TestTokensAndTokenPools(t *testing.T) {
 				expectedRLA = pk
 			}
 			require.Equal(t, expectedRLA, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+
+			// Define token transfer fee configs to check, along with their corresponding token info and chain selectors
+			cfgs := []struct {
+				fee tokensapi.PartialTokenTransferFeeConfig
+				tok *tokensapi.DeployTokenInput
+				sel uint64
+			}{
+				{sel: solbnm.Chain.Selector, fee: solbnm.FeeConfig, tok: solbnm.Token},
+				{sel: evmA.Chain.Selector, fee: evmA.FeeConfig, tok: evmA.Token},
+				{sel: evmB.Chain.Selector, fee: evmB.FeeConfig, tok: evmB.Token},
+			}
+
+			// Check all fee configs
+			for _, src := range cfgs {
+				for _, dst := range cfgs {
+					if src.sel == dst.sel {
+						continue
+					}
+
+					// Get the fee token on the source chain
+					filters := datastore_utils.AddressRefToFilters(datastore.AddressRef{ChainSelector: src.sel, Qualifier: src.tok.Symbol})
+					results := env.DataStore.Addresses().Filter(filters...)
+					require.Len(t, results, 1, fmt.Sprintf("token address for symbol %q on chain selector %d should be found in datastore", src.tok.Symbol, src.sel))
+					token := results[0].Address
+					fam, err := chainsel.GetSelectorFamily(src.sel)
+					require.NoError(t, err)
+
+					// Get the on ramp contract on the source chain
+					feeResolver, ok := feesRegistry.GetFeeResolver(fam)
+					require.True(t, ok, "EVM fee resolver should be registered")
+					onRampSrc, err := feeResolver.GetOnRampRef(*env, src.sel, dst.sel)
+					require.NoError(t, err)
+
+					// Get the fee contract on the source chain
+					feeAdapter, ok := feesRegistry.GetFeeAdapter(fam, onRampSrc.Version)
+					require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampSrc.Version))
+					fqSrc, err := feeAdapter.GetFeeContractRef(*env, onRampSrc, src.sel, dst.sel)
+					require.NoError(t, err)
+
+					// Verify token transfer fee config is correct
+					expectedFee := src.fee.MergeWith(tokensapi.GetDefaultChainAgnosticTokenTransferFeeConfig(src.sel, dst.sel))
+					actualFee, err := feeAdapter.GetOnchainTokenTransferFeeConfig(*env, fqSrc, src.sel, dst.sel, token)
+					require.NoError(t, err)
+					require.Equal(t, expectedFee.DefaultFinalityTransferFeeBps, actualFee.DeciBps)
+					require.Equal(t, expectedFee.DefaultFinalityFeeUSDCents, actualFee.MinFeeUSDCents)
+					require.Equal(t, expectedFee.DestBytesOverhead, actualFee.DestBytesOverhead)
+					require.Equal(t, expectedFee.DestGasOverhead, actualFee.DestGasOverhead)
+					require.Equal(t, expectedFee.IsEnabled, actualFee.IsEnabled)
+					require.Equal(t, uint32(math.MaxUint32), actualFee.MaxFeeUSDCents)
+				}
+			}
 		})
 	})
 }
