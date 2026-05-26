@@ -36,7 +36,8 @@ type RevokeTokenAdminRoleConfig struct {
 	// from timelock. If timelock is not deployed on the chain, then
 	// the changeset will fallback to the deployer key. If the final
 	// account does not have admin role, then this changeset becomes
-	// a no-op.
+	// a no-op, though other configured actions (such as granting an
+	// admin role to FallbackAddress) may still be performed.
 	AdminAddress string `yaml:"adminAddress,omitempty" json:"adminAddress,omitempty"`
 
 	// FallbackAddress is a defensive input that prevents the token
@@ -142,9 +143,12 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			var timelockAddress string
 			if mcmsReader, ok := mcmsRegistry.GetMCMSReader(family); ok {
 				timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
-				if err != nil || datastore_utils.IsAddressRefEmpty(timelockRef) {
+				switch {
+				case err != nil:
 					e.Logger.Warnf("failed to resolve timelock address for revocation[%d] on chain selector %d: %v", i, selector, err)
-				} else {
+				case datastore_utils.IsAddressRefEmpty(timelockRef):
+					e.Logger.Warnf("timelock ref is empty for revocation[%d] on chain selector %d", i, selector)
+				default:
 					timelockAddress = timelockRef.Address
 				}
 			}
