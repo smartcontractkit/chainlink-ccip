@@ -42,9 +42,14 @@ type DeployTokenPoolInput struct {
 	TokenPoolType datastore.ContractType
 	// TokenPoolVersion is the version of the token pool to deploy.
 	TokenPoolVersion *semver.Version
+
 	// TokenSymbol is the symbol of the token to be configured.
 	// This symbol will be stored in the returned AddressRef.
+	//
+	// TODO: this field is not named correctly - it should be renamed to `TokenPoolQualifier`.
+	//
 	TokenSymbol string
+
 	// RateLimitAdmin is an additional address allowed to set rate limiters.
 	// If left empty, setRateLimitAdmin will not be attempted.
 	RateLimitAdmin common.Address

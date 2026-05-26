@@ -16,6 +16,8 @@ func TestResolveRouterAddress(t *testing.T) {
 	testRouter := common.HexToAddress("0x2222222222222222222222222222222222222222")
 	override := common.HexToAddress("0x3333333333333333333333333333333333333333")
 
+	evmTokenBase := EVMTokenBase{}
+
 	newStore := func(t *testing.T) datastore.DataStore {
 		t.Helper()
 		ds := datastore.NewMemoryDataStore()
@@ -35,13 +37,13 @@ func TestResolveRouterAddress(t *testing.T) {
 	}
 
 	t.Run("nil ref defaults to production router", func(t *testing.T) {
-		got, err := resolveRouterAddress(newStore(t), chainSelector, nil)
+		got, err := evmTokenBase.ResolveRouterAddress(newStore(t), chainSelector, nil)
 		require.NoError(t, err)
 		require.Equal(t, prodRouter, got)
 	})
 
 	t.Run("ref with TestRouter type resolves to test router", func(t *testing.T) {
-		got, err := resolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
+		got, err := evmTokenBase.ResolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
 			Type: datastore.ContractType(router.TestRouterContractType),
 		})
 		require.NoError(t, err)
@@ -51,7 +53,7 @@ func TestResolveRouterAddress(t *testing.T) {
 	t.Run("ref with explicit Address bypasses datastore", func(t *testing.T) {
 		// Empty datastore would normally cause a lookup failure; an explicit
 		// Address must skip the lookup entirely.
-		got, err := resolveRouterAddress(datastore.NewMemoryDataStore().Seal(), chainSelector, &datastore.AddressRef{
+		got, err := evmTokenBase.ResolveRouterAddress(datastore.NewMemoryDataStore().Seal(), chainSelector, &datastore.AddressRef{
 			Address: override.Hex(),
 		})
 		require.NoError(t, err)
@@ -61,7 +63,7 @@ func TestResolveRouterAddress(t *testing.T) {
 	t.Run("ref with non-hex Address errors", func(t *testing.T) {
 		// "0x123" is not 20 bytes; common.HexToAddress would silently pad it,
 		// so resolveRouterAddress must reject it up-front.
-		_, err := resolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
+		_, err := evmTokenBase.ResolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
 			Address: "0x123",
 		})
 		require.Error(t, err)
@@ -69,7 +71,7 @@ func TestResolveRouterAddress(t *testing.T) {
 	})
 
 	t.Run("ref with zero Address errors", func(t *testing.T) {
-		_, err := resolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
+		_, err := evmTokenBase.ResolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
 			Address: "0x0000000000000000000000000000000000000000",
 		})
 		require.Error(t, err)
@@ -79,7 +81,7 @@ func TestResolveRouterAddress(t *testing.T) {
 	t.Run("ref forces chain selector to target chain", func(t *testing.T) {
 		// User passes a ref with the wrong chain selector — the helper must
 		// rewrite it to the target chain so the lookup succeeds.
-		got, err := resolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
+		got, err := evmTokenBase.ResolveRouterAddress(newStore(t), chainSelector, &datastore.AddressRef{
 			ChainSelector: chainSelector + 1,
 			Type:          datastore.ContractType(router.TestRouterContractType),
 		})
@@ -89,7 +91,7 @@ func TestResolveRouterAddress(t *testing.T) {
 
 	t.Run("missing router type in datastore returns error", func(t *testing.T) {
 		emptyDS := datastore.NewMemoryDataStore().Seal()
-		_, err := resolveRouterAddress(emptyDS, chainSelector, nil)
+		_, err := evmTokenBase.ResolveRouterAddress(emptyDS, chainSelector, nil)
 		require.Error(t, err)
 	})
 
@@ -110,7 +112,7 @@ func TestResolveRouterAddress(t *testing.T) {
 			Version:       router.Version,
 			Address:       prodRouter.Hex(),
 		}))
-		got, err := resolveRouterAddress(ds.Seal(), chainSelector, &datastore.AddressRef{
+		got, err := evmTokenBase.ResolveRouterAddress(ds.Seal(), chainSelector, &datastore.AddressRef{
 			Qualifier: "canary",
 		})
 		require.NoError(t, err)
