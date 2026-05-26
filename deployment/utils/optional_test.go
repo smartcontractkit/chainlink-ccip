@@ -40,6 +40,45 @@ func TestOptionalUnmarshalYAML(t *testing.T) {
 	}
 }
 
+func TestOptionalUnmarshalYAMLWithStruct(t *testing.T) {
+	type config struct {
+		Arg1 Optional[string] `yaml:"arg1"`
+		Arg2 Optional[int]    `yaml:"arg2"`
+	}
+
+	var cfg1 config
+	err := yaml.Unmarshal([]byte("arg1: hello\narg2: 42"), &cfg1)
+	require.NoError(t, err)
+	require.Equal(t, "hello", cfg1.Arg1.Value)
+	require.True(t, cfg1.Arg1.Valid)
+	require.Equal(t, 42, cfg1.Arg2.Value)
+	require.True(t, cfg1.Arg2.Valid)
+
+	var cfg2 config
+	err = yaml.Unmarshal([]byte("arg1: world"), &cfg2)
+	require.NoError(t, err)
+	require.Equal(t, "world", cfg2.Arg1.Value)
+	require.True(t, cfg2.Arg1.Valid)
+	require.Equal(t, 0, cfg2.Arg2.Value)
+	require.False(t, cfg2.Arg2.Valid)
+
+	var cfg3 config
+	err = yaml.Unmarshal([]byte("arg2: 100"), &cfg3)
+	require.NoError(t, err)
+	require.Equal(t, "", cfg3.Arg1.Value)
+	require.False(t, cfg3.Arg1.Valid)
+	require.Equal(t, 100, cfg3.Arg2.Value)
+	require.True(t, cfg3.Arg2.Valid)
+
+	existing := config{Arg1: NewOptional("hi"), Arg2: NewOptional(10)}
+	err = yaml.Unmarshal([]byte("arg1: bye"), &existing)
+	require.NoError(t, err)
+	require.Equal(t, "bye", existing.Arg1.Value)
+	require.True(t, existing.Arg1.Valid)
+	require.Equal(t, 10, existing.Arg2.Value)
+	require.True(t, existing.Arg2.Valid)
+}
+
 func TestOptionalUnmarshalYAMLWithString(t *testing.T) {
 	tests := []struct {
 		name      string
