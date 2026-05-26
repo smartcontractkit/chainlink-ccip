@@ -47,14 +47,25 @@ func TestRevokeTokenAdminRoleVerifyPreconditions(t *testing.T) {
 		error string
 	}{
 		{
+			title: "requires chain adapter version",
+			error: "chain adapter version is required",
+			input: tokensapi.RevokeTokenAdminRoleInput{
+				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
+					ChainSelector: chainSelector,
+					TokenRef:      tokenRef,
+				}},
+			},
+		},
+		{
 			title: "requires revocations",
 			error: "at least one token admin role revocation is required",
-			input: tokensapi.RevokeTokenAdminRoleInput{},
+			input: tokensapi.RevokeTokenAdminRoleInput{ChainAdapterVersion: cciputils.Version_1_0_0},
 		},
 		{
 			title: "requires chain in environment",
 			error: "not found in environment",
 			input: tokensapi.RevokeTokenAdminRoleInput{
+				ChainAdapterVersion: cciputils.Version_1_0_0,
 				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
 					ChainSelector: chainSelector + 1,
 					TokenRef:      datastore.AddressRef{ChainSelector: chainSelector + 1},
@@ -65,6 +76,7 @@ func TestRevokeTokenAdminRoleVerifyPreconditions(t *testing.T) {
 			title: "requires token ref",
 			error: "token ref is required",
 			input: tokensapi.RevokeTokenAdminRoleInput{
+				ChainAdapterVersion: cciputils.Version_1_0_0,
 				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
 					ChainSelector: chainSelector,
 				}},
@@ -74,6 +86,7 @@ func TestRevokeTokenAdminRoleVerifyPreconditions(t *testing.T) {
 			title: "rejects token ref chain mismatch",
 			error: "chain selector mismatch",
 			input: tokensapi.RevokeTokenAdminRoleInput{
+				ChainAdapterVersion: cciputils.Version_1_0_0,
 				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
 					ChainSelector: chainSelector,
 					TokenRef: datastore.AddressRef{
@@ -86,6 +99,7 @@ func TestRevokeTokenAdminRoleVerifyPreconditions(t *testing.T) {
 		{
 			title: "accepts datastore token ref by address",
 			input: tokensapi.RevokeTokenAdminRoleInput{
+				ChainAdapterVersion: cciputils.Version_1_0_0,
 				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
 					ChainSelector: chainSelector,
 					TokenRef: datastore.AddressRef{
@@ -97,6 +111,7 @@ func TestRevokeTokenAdminRoleVerifyPreconditions(t *testing.T) {
 		{
 			title: "accepts address and type without datastore version",
 			input: tokensapi.RevokeTokenAdminRoleInput{
+				ChainAdapterVersion: cciputils.Version_1_0_0,
 				Revocations: []tokensapi.RevokeTokenAdminRoleConfig{{
 					ChainSelector: chainSelector,
 					TokenRef: datastore.AddressRef{
@@ -327,7 +342,8 @@ func revokeTokenAdminRoleForTest(t *testing.T,
 
 	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
 	return tokensapi.RevokeTokenAdminRole().Apply(*env, tokensapi.RevokeTokenAdminRoleInput{
-		MCMS: NewDefaultInputForMCMS("Revoke admin role on token"),
+		MCMS:                NewDefaultInputForMCMS("Revoke admin role on token"),
+		ChainAdapterVersion: cciputils.Version_1_0_0,
 		Revocations: []tokensapi.RevokeTokenAdminRoleConfig{
 			{
 				ChainSelector:   chainSelector,

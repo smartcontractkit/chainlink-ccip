@@ -9,6 +9,7 @@ import (
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -26,6 +27,9 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found among provided EVM chains", input.ChainSelector)
+		}
+		if !datastore_utils.IsAddressRefFullyPopulated(input.TokenRef) {
+			return sequences.OnChainOutput{}, fmt.Errorf("token ref is incomplete: %v", input.TokenRef)
 		}
 
 		// Validate the token address
@@ -57,8 +61,7 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 			}
 		}
 
-		// If the token does not support admin role management, then we skip the revocation and return
-		// no operations since proceeding would ultimately result in a failure.
+		// Validate that the token type supports admin role management
 		tokenImpl, ok := tokenimpl.Get(cldf_deployment.ContractType(input.TokenRef.Type))
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token type %q for token address %q on chain %d", input.TokenRef.Type, input.TokenRef.Address, input.TokenRef.ChainSelector)
@@ -92,8 +95,8 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 		}
 
 		// If the user does not provide an AdminAddress, then the top-level changeset will attempt
-		// to set it to timelock. If timelock isn't found in the datastore, then we fall back back
-		// to the deployer key in this sequence.
+		// to set it to timelock. If timelock isn't found in the datastore then we'll fall back to
+		// the deployer key in this sequence.
 		revokeAddress := chain.DeployerKey.From
 		if input.AdminAddress != "" {
 			if !common.IsHexAddress(input.AdminAddress) {

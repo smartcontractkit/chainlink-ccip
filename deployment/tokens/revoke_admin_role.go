@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -17,8 +17,9 @@ import (
 )
 
 type RevokeTokenAdminRoleInput struct {
-	Revocations []RevokeTokenAdminRoleConfig `yaml:"revocations" json:"revocations"`
-	MCMS        mcms.Input                   `yaml:"mcms,omitempty" json:"mcms"`
+	ChainAdapterVersion *semver.Version              `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
+	Revocations         []RevokeTokenAdminRoleConfig `yaml:"revocations" json:"revocations"`
+	MCMS                mcms.Input                   `yaml:"mcms,omitempty" json:"mcms"`
 }
 
 type RevokeTokenAdminRoleConfig struct {
@@ -73,9 +74,13 @@ func revokeTokenAdminRoleVerify(tokenRegistry *TokenAdapterRegistry) func(cldf.E
 			return errors.New("at least one token admin role revocation is required")
 		}
 
+		version := cfg.ChainAdapterVersion
+		if version == nil {
+			return errors.New("chain adapter version is required")
+		}
+
 		for i, revocation := range cfg.Revocations {
 			selector := revocation.ChainSelector
-			version := cciputils.Version_1_0_0
 			if revocation.TokenRef.ChainSelector != 0 && revocation.TokenRef.ChainSelector != revocation.ChainSelector {
 				return fmt.Errorf("revocation[%d]: chain selector mismatch in TokenRef: expected %d, got %d", i, revocation.ChainSelector, revocation.TokenRef.ChainSelector)
 			}
@@ -92,7 +97,7 @@ func revokeTokenAdminRoleVerify(tokenRegistry *TokenAdapterRegistry) func(cldf.E
 			}
 			adapter, exists := tokenRegistry.GetTokenAdapter(family, version)
 			if !exists {
-				return fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, version)
+				return fmt.Errorf("revocation[%d]: no token adapter registered for chain family '%s' and version '%v'", i, family, version)
 			}
 			if _, ok := adapter.(TokenAdminRoleAdapter); !ok {
 				return fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, version)
@@ -108,9 +113,13 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
+		version := cfg.ChainAdapterVersion
+		if version == nil {
+			return cldf.ChangesetOutput{}, errors.New("chain adapter version is required")
+		}
+
 		for i, revocation := range cfg.Revocations {
 			selector := revocation.ChainSelector
-			version := cciputils.Version_1_0_0
 
 			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
@@ -124,7 +133,7 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			if !ok {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, version)
 			}
-			tokenRef, err := ResolveTokenRef(e, tokenRegistry, selector, revocation.TokenRef)
+			tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, revocation.TokenRef, revocation.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to resolve token ref: %w", i, err)
 			}
