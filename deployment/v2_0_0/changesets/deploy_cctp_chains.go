@@ -221,6 +221,11 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			}
 			batchOps = append(batchOps, configureCCTPChainForLanesReport.Output.BatchOps...)
 			reports = append(reports, configureCCTPChainForLanesReport.ExecutionReports...)
+			for _, r := range configureCCTPChainForLanesReport.Output.Addresses {
+				if err := newDS.Addresses().Add(r); err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
+				}
+			}
 		}
 
 		// Return the output.

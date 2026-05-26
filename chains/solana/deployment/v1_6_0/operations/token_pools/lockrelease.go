@@ -150,11 +150,14 @@ var UpsertRemoteChainConfigLockRelease = operations.NewOperation(
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
-		var remoteChainConfigAccount base_token_pool.BaseChain
+		// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain), not a bare
+		// BaseChain — decoding into BaseChain silently fails because the discriminator is parsed
+		// as the start of the payload.
+		var remoteChainConfigAccount lockrelease_token_pool.ChainConfig
 		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
 			isSupportedChain = true
-			existingConfig = remoteChainConfigAccount
+			existingConfig = remoteChainConfigAccount.Base
 		}
 		batches := make([]types.BatchOperation, 0)
 		var ixns []solana.Instruction
@@ -312,6 +315,50 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		batches := make([]types.BatchOperation, 0)
+		var ixns []solana.Instruction
+
+		// There is a bug on the token pool contract which does not allow us to set the actual rate limits directly.
+		// We have to setup dummy limits first and then update it.
+		// This workaround is only needed when enabling a rate limit that is currently disabled on-chain,
+		// not when updating already-enabled limits, to avoid resetting that direction's token bucket.
+		// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain); decoding into a
+		// bare BaseChain silently fails on the discriminator and incorrectly forces needsDummy=true.
+		var remoteChainConfigAccount lockrelease_token_pool.ChainConfig
+		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		// If the account doesn't exist yet (e.g. during token expansion where MCMS batches
+		// init_chain_remote_config and set_chain_rate_limit in a single proposal), we treat
+		// both directions as uninitialized and always prepend the dummy instruction.
+		needsDummy := false
+		if err != nil {
+			needsDummy = inbound.Enabled || outbound.Enabled
+		} else {
+			needsDummy = (inbound.Enabled && !remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled) ||
+				(outbound.Enabled && !remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Enabled)
+		}
+		if needsDummy {
+			ixDummyRates, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				lockrelease_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				lockrelease_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, ixDummyRates)
+		}
+
 		ixn, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
 			input.RemoteSelector,
 			input.TokenMint,
@@ -324,10 +371,12 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+		ixns = append(ixns, ixn)
+
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
-				[]solana.Instruction{ixn},
+				ixns,
 				input.TokenPool.String(),
 				common_utils.LockReleaseTokenPool.String(),
 			)
@@ -337,7 +386,7 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 			batches = append(batches, b)
 			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
+			err = chain.Confirm(ixns)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}

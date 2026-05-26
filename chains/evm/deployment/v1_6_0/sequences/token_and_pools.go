@@ -6,8 +6,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evm_ds_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
@@ -25,7 +25,7 @@ func (a *EVMAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
 // GetTokenAdminRegistryAddress looks up the TAR (v1.5.0) address from the datastore.
 // Delegates to the shared v1.0.0 adapter helper.
 func (a *EVMAdapter) GetTokenAdminRegistryAddress(ds datastore.DataStore, selector uint64) (common.Address, error) {
-	return evm1_0_0.GetTokenAdminRegistryAddress(ds, selector, &evm1_0_0.EVMTokenBase{})
+	return (&evm1_0_0.EVMTokenBase{}).GetTokenAdminRegistryAddress(ds, selector)
 }
 
 func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector uint64, partialRef *datastore.AddressRef) (common.Address, error) {
@@ -58,4 +58,3 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	}
 	return evm_ds_utils.ToEVMAddress(latestRef)
 }
-

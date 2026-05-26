@@ -164,7 +164,16 @@ type TestAdapterForFamily interface {
 	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 }
 
+// ForkCCIPSendTestAdapter narrows TestAdapter to the methods used by fork
+// smoke checks that only validate CCIP send paths.
+type ForkCCIPSendTestAdapter interface {
+	BuildMessage(components MessageComponents) (any, error)
+	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, string, error)
+	TestAdapterForFamily
+}
+
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
+type ForkCCIPSendTestAdapterFactory = func(env *deployment.Environment, selector uint64) ForkCCIPSendTestAdapter
 type TestAdapterForFamilyFactory = func(ds datastore.DataStore, selector uint64) TestAdapterForFamily
 
 type testAdapterID string
@@ -173,6 +182,7 @@ type testAdapterID string
 type TestAdapterRegistry struct {
 	mu sync.Mutex
 	m  map[testAdapterID]TestAdapterFactory
+	f  map[testAdapterID]ForkCCIPSendTestAdapterFactory
 	r  map[testAdapterID]TestAdapterForFamilyFactory
 }
 
@@ -181,6 +191,7 @@ type TestAdapterRegistry struct {
 func newTestAdapterRegistry() *TestAdapterRegistry {
 	return &TestAdapterRegistry{
 		m: make(map[testAdapterID]TestAdapterFactory),
+		f: make(map[testAdapterID]ForkCCIPSendTestAdapterFactory),
 		r: make(map[testAdapterID]TestAdapterForFamilyFactory),
 	}
 }
@@ -194,6 +205,23 @@ func (r *TestAdapterRegistry) RegisterTestAdapter(chainFamily string, version *s
 
 	if _, exists := r.m[id]; !exists {
 		r.m[id] = adapter
+	}
+}
+
+// RegisterForkCCIPSendTestAdapter registers an adapter factory scoped to
+// fork-time CCIP send smoke checks.
+func (r *TestAdapterRegistry) RegisterForkCCIPSendTestAdapter(
+	chainFamily string,
+	version *semver.Version,
+	adapter ForkCCIPSendTestAdapterFactory,
+) {
+	id := newTestAdapterID(chainFamily, version)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.f[id]; !exists {
+		r.f[id] = adapter
 	}
 }
 
@@ -222,6 +250,21 @@ func (r *TestAdapterRegistry) GetTestAdapter(chainFamily string, version *semver
 	defer r.mu.Unlock()
 
 	adapter, ok := r.m[id]
+	return adapter, ok
+}
+
+// GetForkCCIPSendTestAdapter looks up an adapter factory used by fork-time
+// CCIP send smoke checks.
+func (r *TestAdapterRegistry) GetForkCCIPSendTestAdapter(
+	chainFamily string,
+	version *semver.Version,
+) (ForkCCIPSendTestAdapterFactory, bool) {
+	id := newTestAdapterID(chainFamily, version)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	adapter, ok := r.f[id]
 	return adapter, ok
 }
 
@@ -259,7 +302,7 @@ func newTestAdapterID(chainFamily string, version *semver.Version) testAdapterID
 
 // TODO: remove once migration to DataStore is completed and stateview is obsolete
 type StateProvider interface {
-	GetAddress(datastore.ContractType) (string, error)
+	GetAddress(ty datastore.ContractType, qualifier ...string) (string, error)
 }
 
 type DataStoreStateProvider struct {
@@ -267,10 +310,15 @@ type DataStoreStateProvider struct {
 	DS       datastore.DataStore
 }
 
-func (p *DataStoreStateProvider) GetAddress(ty datastore.ContractType) (string, error) {
+func (p *DataStoreStateProvider) GetAddress(ty datastore.ContractType, qualifier ...string) (string, error) {
+	ql := ""
+	if len(qualifier) > 0 {
+		ql = qualifier[0]
+	}
 	addr, err := datastore_utils.FindAndFormatRef(p.DS, datastore.AddressRef{
 		ChainSelector: p.Selector,
 		Type:          ty,
+		Qualifier:     ql,
 		// TODO: version
 	}, p.Selector, datastore_utils.FullRef)
 	if err != nil {

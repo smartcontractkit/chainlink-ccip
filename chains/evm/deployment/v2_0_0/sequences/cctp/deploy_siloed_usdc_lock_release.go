@@ -10,6 +10,7 @@ import (
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
+	evm_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 )
 
@@ -29,6 +31,8 @@ type DeploySiloedUSDCLockReleaseInput struct {
 	// Existing siloed pool address; optional.
 	SiloedUSDCTokenPool       string
 	LockReleaseChainSelectors []uint64
+	// Existing address refs from the datastore; used to skip re-deploying already-deployed lockboxes.
+	ExistingAddresses []datastore.AddressRef
 	// Remote chain configs for lock-release chains; used to run ConfigureTokenPoolForRemoteChain (2.0.0) on the siloed pool.
 	RemoteChainConfigs map[uint64]tokens.RemoteChainConfig[[]byte, string]
 }
@@ -81,22 +85,38 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			configs := make([]siloed_usdc_token_pool.LockBoxConfig, 0, len(input.LockReleaseChainSelectors))
 			for _, sel := range input.LockReleaseChainSelectors {
 				qualifier := fmt.Sprintf("remoteChainSelector(%d)", sel)
-				lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
-					ChainSelector:  chain.Selector,
-					Qualifier:      &qualifier,
-					Args: erc20_lock_box.ConstructorArgs{
-						Token: common.HexToAddress(input.USDCToken),
-					},
-				})
-				if err != nil {
-					return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to deploy ERC20LockBox for chain %d: %w", sel, err)
+
+				existingRef := datastore_utils.GetAddressRef(
+					input.ExistingAddresses,
+					input.ChainSelector,
+					erc20_lock_box.ContractType,
+					erc20_lock_box.Version,
+					qualifier,
+				)
+
+				var lbAddr string
+				if !datastore_utils.IsAddressRefEmpty(existingRef) {
+					lbAddr = existingRef.Address
+				} else {
+					lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
+						TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
+						ChainSelector:  chain.Selector,
+						Qualifier:      &qualifier,
+						Args: erc20_lock_box.ConstructorArgs{
+							Token: common.HexToAddress(input.USDCToken),
+						},
+					})
+					if err != nil {
+						return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to deploy ERC20LockBox for chain %d: %w", sel, err)
+					}
+					addresses = append(addresses, lbReport.Output)
+					lbAddr = lbReport.Output.Address
 				}
-				addresses = append(addresses, lbReport.Output)
-				lockBoxes[sel] = lbReport.Output.Address
+
+				lockBoxes[sel] = lbAddr
 				configs = append(configs, siloed_usdc_token_pool.LockBoxConfig{
 					RemoteChainSelector: sel,
-					LockBox:             common.HexToAddress(lbReport.Output.Address),
+					LockBox:             common.HexToAddress(lbAddr),
 				})
 			}
 
@@ -149,18 +169,30 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		}
 
 		// Configure remote chains on the siloed pool (2.0.0 sequence)
-		for remoteChainSelector, remoteChainConfig := range input.RemoteChainConfigs {
-			report, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPoolForRemoteChain, chain, tokens_sequences.ConfigureTokenPoolForRemoteChainInput{
-				ChainSelector:       input.ChainSelector,
-				TokenPoolAddress:    siloedPoolAddress,
-				AdvancedPoolHooks:   common.Address{},
-				RemoteChainSelector: remoteChainSelector,
-				RemoteChainConfig:   remoteChainConfig,
+		if len(input.RemoteChainConfigs) > 0 {
+			supportedChainsReport, err := cldf_ops.ExecuteOperation(b, evm_token_pool.GetSupportedChains, chain, contract_utils.FunctionInput[struct{}]{
+				ChainSelector: input.ChainSelector,
+				Address:       siloedPoolAddress,
 			})
 			if err != nil {
-				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to configure siloed pool for remote chain %d: %w", remoteChainSelector, err)
+				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to get supported chains on siloed pool: %w", err)
 			}
-			batchOps = append(batchOps, report.Output.BatchOps...)
+			supportedChains := supportedChainsReport.Output
+
+			for remoteChainSelector, remoteChainConfig := range input.RemoteChainConfigs {
+				report, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPoolForRemoteChain, chain, tokens_sequences.ConfigureTokenPoolForRemoteChainInput{
+					ChainSelector:               input.ChainSelector,
+					TokenPoolAddress:            siloedPoolAddress,
+					AdvancedPoolHooks:           common.Address{},
+					RemoteChainSelector:         remoteChainSelector,
+					RemoteChainConfig:           remoteChainConfig,
+					RemoteChainAlreadySupported: slices.Contains(supportedChains, remoteChainSelector),
+				})
+				if err != nil {
+					return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to configure siloed pool for remote chain %d: %w", remoteChainSelector, err)
+				}
+				batchOps = append(batchOps, report.Output.BatchOps...)
+			}
 		}
 
 		return DeploySiloedUSDCLockReleaseOutput{

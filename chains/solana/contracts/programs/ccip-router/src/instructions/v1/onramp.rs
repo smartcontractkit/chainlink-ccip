@@ -473,12 +473,8 @@ mod helpers {
         let required_space = ANCHOR_DISCRIMINATOR + Nonce::INIT_SPACE;
         let minimum_balance = Rent::get()?.minimum_balance(required_space);
 
-        if account_info.owner.key() == system_program::ID && account_info.lamports() == 0 {
+        if account_info.owner.key() == system_program::ID {
             // account not initialized, just initialize it to the new version
-            let init_accs = system_program::CreateAccount {
-                from: authority.to_account_info(),
-                to: account_info.clone(),
-            };
             let nonce_seeds: &[&[u8]] = &[
                 seed::NONCE,
                 &dest_chain_selector.to_le_bytes(),
@@ -486,17 +482,62 @@ mod helpers {
                 &[nonce_bump],
             ];
             let signer_seeds = &[nonce_seeds];
-            let cpi_ctx = CpiContext::new_with_signer(
-                system_program.to_account_info(),
-                init_accs,
-                signer_seeds,
-            );
-            system_program::create_account(
-                cpi_ctx,
-                minimum_balance,
-                required_space as u64,
-                &crate::ID,
-            )?;
+
+            let current_lamports = account_info.lamports();
+            if current_lamports == 0 {
+                // Common path: account has no lamports, use create_account (single CPI).
+                let cpi_ctx = CpiContext::new_with_signer(
+                    system_program.to_account_info(),
+                    system_program::CreateAccount {
+                        from: authority.to_account_info(),
+                        to: account_info.clone(),
+                    },
+                    signer_seeds,
+                );
+                system_program::create_account(
+                    cpi_ctx,
+                    minimum_balance,
+                    required_space as u64,
+                    &crate::ID,
+                )?;
+            } else {
+                // Pre-funded path: account already has lamports (e.g. from a transfer
+                // before initialization). Use allocate + assign, and only transfer the
+                // delta needed for rent exemption — repurposing existing funds.
+                let required_lamports = minimum_balance.saturating_sub(current_lamports);
+                if required_lamports > 0 {
+                    system_program::transfer(
+                        CpiContext::new(
+                            system_program.to_account_info(),
+                            system_program::Transfer {
+                                from: authority.to_account_info(),
+                                to: account_info.clone(),
+                            },
+                        ),
+                        required_lamports,
+                    )?;
+                }
+                system_program::allocate(
+                    CpiContext::new_with_signer(
+                        system_program.to_account_info(),
+                        system_program::Allocate {
+                            account_to_allocate: account_info.clone(),
+                        },
+                        signer_seeds,
+                    ),
+                    required_space as u64,
+                )?;
+                system_program::assign(
+                    CpiContext::new_with_signer(
+                        system_program.to_account_info(),
+                        system_program::Assign {
+                            account_to_assign: account_info.clone(),
+                        },
+                        signer_seeds,
+                    ),
+                    &crate::ID,
+                )?;
+            }
 
             return Ok(Nonce {
                 version: 2, // initialize to version 2

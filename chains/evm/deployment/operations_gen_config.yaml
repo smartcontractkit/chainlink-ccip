@@ -56,6 +56,8 @@ contracts:
     version: "1.6.2"
     package_name: cctp_message_transmitter_proxy
     functions:
+      - name: getAllowedCallers
+        access: public
       - name: configureAllowedCallers
         access: owner
 
@@ -438,6 +440,16 @@ contracts:
       - name: getPath
         access: public
 
+  - contract_name: TokenPoolFactory
+    version: "2.0.0"
+    functions:
+      - name: deployTokenAndTokenPool
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: deployTokenPoolWithExistingToken
+        access: public
+
   - contract_name: CCTPThroughCCVTokenPool
     version: "2.0.0"
     functions:
@@ -448,6 +460,8 @@ contracts:
     version: "2.0.0"
     functions:
       - name: getPools
+        access: public
+      - name: getLockOrBurnMechanism
         access: public
       - name: updateLockOrBurnMechanisms
         access: owner
@@ -618,4 +632,20 @@ contracts:
       - name: getFee
         access: public
       - name: versionTag
+        access: public
+
+  - contract_name: RMN
+    version: "2.0.0"
+    functions:
+      - name: curse
+        access: authorized_callers
+      - name: uncurse
+        access: owner
+      - name: isCursed
+        access: public
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: getCursedSubjects
         access: public

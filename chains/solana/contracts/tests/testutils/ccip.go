@@ -62,9 +62,9 @@ func DeriveSendAccounts(
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
-			tokenIndices = append(tokenIndices, tokenIndex-byte(cap(ccip_router.NewCcipSendInstructionBuilder().AccountMetaSlice)))
+			tokenIndices = append(tokenIndices, tokenIndex-uint8(cap(ccip_router.NewCcipSendInstructionBuilder().AccountMetaSlice))) //nolint:gosec // G115: cap is small and fits in uint8
 		}
-		tokenIndex += byte(len(derivation.AccountsToSave))
+		tokenIndex += uint8(len(derivation.AccountsToSave)) //nolint:gosec // G115: len is small and fits in uint8
 
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{
@@ -138,9 +138,9 @@ func DeriveExecutionAccounts(
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
-			tokenIndices = append(tokenIndices, tokenIndex-byte(cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)))
+			tokenIndices = append(tokenIndices, tokenIndex-uint8(cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice))) //nolint:gosec // G115: cap is small and fits in uint8
 		}
-		tokenIndex += byte(len(derivation.AccountsToSave))
+		tokenIndex += uint8(len(derivation.AccountsToSave)) //nolint:gosec // G115: len is small and fits in uint8
 
 		for _, meta := range derivation.AccountsToSave {
 			derivedAccounts = append(derivedAccounts, &solana.AccountMeta{

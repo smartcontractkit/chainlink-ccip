@@ -4,13 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -22,8 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
 func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokenapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -32,12 +34,13 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-			var result sequences.OnChainOutput
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
+			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
+			addrs := input.ExistingDataStore.Addresses().Filter()
 			b.Logger.Info("SVM Registering token:", input)
 
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
@@ -45,11 +48,10 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get router address: %w", err)
 			}
 
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
+			tokenAddr, tokenProgramId, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
 
 			// if no token admin provided, ccip admin becomes the admin
 			var tokenAdmin solana.PublicKey
@@ -57,31 +59,75 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				tokenAdmin = solana.MustPublicKeyFromBase58(input.ExternalAdmin)
 			}
 
+			var result sequences.OnChainOutput
 			rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
 				Router:            solana.PublicKeyFromBytes(routerAddr),
 				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
 				Admin:             tokenAdmin,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
+				ExistingAddresses: addrs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
 			}
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
 			pendingSigner := rtarOut.Output.PendingSigner
 
-			// accept if we can
-			atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
-				Router:            solana.PublicKeyFromBytes(routerAddr),
-				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
-				Admin:             pendingSigner,
-				ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
+			timelockSigner := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			deployerPK := chain.DeployerKey.PublicKey()
+			routerPK := solana.PublicKeyFromBytes(routerAddr)
+
+			// If the proposed token admin is timelock or the deployer, then we can run Register + Accept
+			// in this sequence, but we need to be careful when orchestrating both of these operations as
+			// MCMS batch ops DON'T execute immediately. If the Register op creates any MCMS batches that
+			// modify the TAR, then reading the live on-chain state of the TAR in the Accept op will lead
+			// to bugs since it is operating on an incomplete snapshot. The switch statement below should
+			// account for this case and cover the non-batch case as well.
+			hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
+			isTimelockPendingAdmin := pendingSigner == timelockSigner
+			isDeployerPendingAdmin := pendingSigner == deployerPK
+			switch {
+			// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
+			// no proposal - in this case either timelock or the deployer can immediately run the Accept
+			// op since there aren't any proposal instructions that need to be batched together with it.
+			case !hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
+				atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+					ExistingAddresses: addrs,
+					TokenMint:         tokenMintPK,
+					Router:            routerPK,
+					Admin:             pendingSigner,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
+				}
+				result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+				result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
+
+			// Case 2: the RegisterTokenAdminRegistry operation has MCMS batches and the proposed admin
+			// is timelock - in this case we bundle Register and Accept into the same MCMS batch.
+			case hasMCMSProposal && isTimelockPendingAdmin:
+				atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+				}
+				batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
+				batchOps, err := utils.BuildMCMSBatchOperation(
+					chain.Selector,
+					batchIxn,
+					routerPK.String(),
+					routerops.ContractType.String(),
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
+				}
+				result.BatchOps = append(result.BatchOps, batchOps)
+
+			// Case 3: skip Accept only do Register
+			default:
+				b.Logger.Infof("Deferring token admin role acceptance to proposed admin (%s)", pendingSigner)
+				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
 			}
-			result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
 
 			b.Logger.Info("SVM Setting token pool:", input)
 
@@ -106,6 +152,10 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
+				if err := remoteChainConfig.Validate(); err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("remote chain config for chain selector %d is invalid: %w", remoteChainSelector, err)
+				}
+
 				op := tokenpoolops.UpsertRemoteChainConfigBurnMint
 				tprl := tokenpoolops.UpsertRateLimitsBurnMint
 				switch input.PoolType {
@@ -131,34 +181,53 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert remote chain config for token pool: %w", err)
 				}
-				localDecimals, err := utils.GetTokenDecimals(chain, tokenMint)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
-				}
-				obRL, ibRL := tokenapi.GenerateTPRLConfigs(
-					remoteChainConfig.OutboundRateLimiterConfig,
-					remoteChainConfig.InboundRateLimiterConfig,
-					localDecimals,
-					remoteChainConfig.RemoteDecimals,
-					chain.Family(),
-					common_utils.Version_1_6_0,
-				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
-				rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
-					tokenpoolops.RemoteChainConfig{
-						TokenPool:                 tpAddr,
-						TokenMint:                 tokenMint,
-						TokenProgramID:            tokenProgramId,
-						RemoteSelector:            remoteChainSelector,
-						InboundRateLimiterConfig:  ibRL,
-						OutboundRateLimiterConfig: obRL,
-					})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+
+				outboundRL, outboundOk := remoteChainConfig.GetOutboundRateLimitBuckets().DefaultBucket()
+				inboundRL, inboundOk := remoteChainConfig.GetInboundRateLimitBuckets().DefaultBucket()
+				switch {
+				case outboundOk && inboundOk:
+					localDecimals, err := utils.GetTokenDecimals(chain, tokenMint)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
+					}
+					obRL, ibRL := tokenapi.GenerateTPRLConfigs(
+						outboundRL.RateLimit,
+						inboundRL.RateLimit,
+						localDecimals,
+						remoteChainConfig.RemoteDecimals,
+						chain.Family(),
+						common_utils.Version_1_6_0,
+						input.PoolType,
+					)
+					rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
+						tokenpoolops.RemoteChainConfig{
+							TokenPool:                 tpAddr,
+							TokenMint:                 tokenMint,
+							TokenProgramID:            tokenProgramId,
+							RemoteSelector:            remoteChainSelector,
+							InboundRateLimiterConfig:  ibRL,
+							OutboundRateLimiterConfig: obRL,
+						})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+					}
+					result.Addresses = append(result.Addresses, rateLimitOut.Output.Addresses...)
+					result.BatchOps = append(result.BatchOps, rateLimitOut.Output.BatchOps...)
+
+				case !outboundOk && !inboundOk:
+					b.Logger.Warnf(
+						"ConfigureTokenForTransfers: skipping rate limit upsert for remote chain %d since no default bucket was provided",
+						remoteChainSelector,
+					)
+
+				default:
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"default outbound and inbound rate limits must both be specified together or both omitted for remote chain %d",
+						remoteChainSelector,
+					)
 				}
-				result.Addresses = append(result.Addresses, rateLimitOut.Output.Addresses...)
-				result.BatchOps = append(result.BatchOps, rateLimitOut.Output.BatchOps...)
 			}
 			return result, nil
 		})
@@ -168,8 +237,62 @@ func (a *SolanaAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, err
 	return solana.MustPublicKeyFromBase58(ref.Address).Bytes(), nil
 }
 
-func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
-	return nil, fmt.Errorf("DeriveTokenAddress not implemented for Solana")
+func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return "", fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	// Optimization: if there's no artificial pool PDA label present in the input pool ref,
+	// then we can try to see if the Address field of the pool ref is the pool PDA. This is
+	// useful in situations where this function is called with an unresolved pool ref where
+	// the user has intentionally provided the pool PDA in the Address field instead of the
+	// token pool program ID in case they already know it. In this situation we can perform
+	// a token derivation.
+	poolPDA := solana.PublicKey{}
+	if poolRef.Address != "" {
+		if pda, err := solana.PublicKeyFromBase58(poolRef.Address); err != nil {
+			return "", fmt.Errorf("failed to parse pool PDA from address field of pool ref: %w", err)
+		} else {
+			poolPDA = pda
+		}
+	}
+
+	// If the ArtificialAddressRefLabel exists in the labels, then we prefer this over
+	// the Address field in the pool ref since this is a more explicit indication that
+	// the pool PDA is being provided instead of the token pool program ID.
+	for _, label := range poolRef.Labels.List() {
+		if pda, ok := decodeArtificialPoolAddressRef(label); ok {
+			poolPDA = pda
+			break
+		}
+	}
+	if poolPDA.IsZero() {
+		return "", fmt.Errorf("pool PDA could not be derived from pool ref: no valid PDA found in address field or labels")
+	}
+
+	// Optimization: we avoid unnecessary decoding if we weren't actually given the pool
+	// PDA. If the account is executable, then the input address is most likely the pool
+	// program ID and not a PDA.
+	resp, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), poolPDA, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	if err != nil {
+		return "", fmt.Errorf("failed to get account info for %s: %w", poolPDA.String(), err)
+	}
+	if resp == nil || resp.Value == nil || resp.Value.Data == nil {
+		return "", fmt.Errorf("failed to get account info for: %s", poolPDA.String())
+	}
+	if resp.Value.Executable {
+		return "", fmt.Errorf("token derivation is only possible if a pool PDA is provided - got an executable account: %s", poolPDA.String())
+	}
+
+	// LockRelease and BurnMint v1.6 pool config accounts share the same state layout, so we
+	// can use the BurnMint config struct to decode the account data for both types of pools
+	var state burnmint_token_pool.State
+	if err = bin.NewBorshDecoder(resp.Value.Data.GetBinary()).Decode(&state); err != nil {
+		return "", fmt.Errorf("failed to decode account data for pool config PDA %s: %w", poolPDA.String(), err)
+	}
+
+	return state.Config.Mint.String(), nil
 }
 
 func (a *SolanaAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
@@ -218,7 +341,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			// to proceed.
 			var tokenProg solana.PublicKey
 			var tokenMint solana.PublicKey
-			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
+			if tokRef, tokProgramID, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, input.TokenRef); err != nil {
 				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
 				if input.TokenRef.Address == "" {
 					return sequences.OnChainOutput{}, errors.New("token information could not be resolved from datastore and token reference does not include an address to attempt on-chain resolution")
@@ -276,13 +399,17 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			/// Initialize Token Pool ///
 			/////////////////////////////
 
-			tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
-			}
+			skipPoolInit := input.SVMExtraArgs != nil && input.SVMExtraArgs.SkipTokenPoolInit
+			if !skipPoolInit {
+				tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+				}
+				tokenPool, err := solana.PublicKeyFromBase58(tokenPoolRef.Address)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token pool address '%s' as a Solana public key: %w", tokenPoolRef.Address, err)
+				}
 
-			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
-			if input.SVMExtraArgs == nil || !input.SVMExtraArgs.SkipTokenPoolInit {
 				initTPOp := tokenpoolops.InitializeBurnMint
 				transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 				switch tokenPoolRef.Type.String() {
@@ -323,15 +450,20 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 			}
+
 			/////////////////////////////
 			/// Create Token Multisig ///
 			/////////////////////////////
 
 			if needTokenMultisig {
+				tokenPool, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, utils.ToAddress)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+				}
+
 				// The multisig will be used as the mint authority (or owner) depending on the pool flow.
 				// We include the TokenPoolSigner PDA as one of the multisig signers so the Token Pool Program
 				// can "sign" via PDA seeds when it needs to act (PDA signing).
-
 				poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
 				signers := make([]solana.PublicKey, 0, 1+len(input.SVMExtraArgs.CustomerMintAuthorities))
 				signers = append(signers, poolSigner)
@@ -402,6 +534,12 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			chain := chains.SolanaChains()[input.ChainSelector]
 
+			rl, ok := input.GetBucketForFinality(false)
+			if !ok {
+				b.Logger.Warnf("skipping rate limiter config for token pool (%s) on chain %d since no default bucket was provided", datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector)
+				return sequences.OnChainOutput{}, nil
+			}
+
 			op := tokenpoolops.UpsertRateLimitsBurnMint
 			switch input.TokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
@@ -411,21 +549,22 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
+			tokenAddr, tokenProgramId, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
 
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenPool := solana.MustPublicKeyFromBase58(input.TokenPoolRef.Address)
+
 			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
 				tokenpoolops.RemoteChainConfig{
 					TokenPool:                 tokenPool,
 					TokenMint:                 tokenMint,
 					TokenProgramID:            tokenProgramId,
 					RemoteSelector:            input.RemoteChainSelector,
-					InboundRateLimiterConfig:  input.InboundRateLimiterConfig,
-					OutboundRateLimiterConfig: input.OutboundRateLimiterConfig,
+					InboundRateLimiterConfig:  rl.InboundRateLimiterConfig,
+					OutboundRateLimiterConfig: rl.OutboundRateLimiterConfig,
 				})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
@@ -435,6 +574,61 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 			}, nil
 		},
 	)
+}
+
+// GetOnchainInboundRateLimit implements tokenapi.RateLimitReaderAdapter. It needs the token
+// mint to derive the remote-chain config PDA, so tokenRef must resolve to the token (pool
+// qualifiers are independent from token qualifiers and may be empty). Solana pools have a
+// single bucket per remote lane; fastFinality=true is not supported.
+func (a *SolanaAdapter) GetOnchainInboundRateLimit(
+	e deployment.Environment,
+	chainSelector uint64,
+	poolRef datastore.AddressRef,
+	tokenRef datastore.AddressRef,
+	remoteSelector uint64,
+	fastFinality bool,
+) (tokenapi.RateLimiterConfig, error) {
+	if fastFinality {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("Solana token pools do not support fastFinality rate limit buckets")
+	}
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	tokenAddr, _, err := a.getTokenMintAndTokenProgram(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, tokenRef)
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for ref (%+v): %w", tokenRef, err)
+	}
+	tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+	tokenPool := solana.MustPublicKeyFromBase58(poolRef.Address)
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, tokenMint, tokenPool)
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
+	}
+	// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain), not a bare
+	// BaseChain. Decoding into BaseChain consumes the discriminator as the start of the
+	// payload and corrupts the parse. ChainConfig has the same discriminator and layout
+	// across burnmint/lockrelease pools, so either binding decodes any pool's account.
+	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
+	err = chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+	if errors.Is(err, rpc.ErrNotFound) {
+		// Pool/lane not configured yet on chain — return a zero RateLimiterConfig so the caller's
+		// 110% check rejects any positive new outbound (the documented behavior in
+		// RateLimitReaderAdapter).
+		return tokenapi.RateLimiterConfig{
+			IsEnabled: false,
+			Capacity:  big.NewInt(0),
+			Rate:      big.NewInt(0),
+		}, nil
+	}
+	if err != nil {
+		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chainSelector, remoteSelector, err)
+	}
+	return tokenapi.RateLimiterConfig{
+		IsEnabled: remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled,
+		Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Capacity),
+		Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate),
+	}, nil
 }
 
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -470,7 +664,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				}
 				var premint uint64 = 0
 				if input.PreMint != nil {
-					value := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
+					value := tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
 					if !value.IsUint64() {
 						return sequences.OnChainOutput{}, fmt.Errorf("pre-mint amount is too large after scaling by decimals: %s", value.String())
 					}
@@ -517,7 +711,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 	return operations.NewSequence(
 		"DeployTokenPoolForToken",
 		common_utils.Version_1_6_0,
-		"Configures a token pool for a given token on Solana. Doesn't actually deploy a new token pool contract, as Solana token pools are just accounts.",
+		"Configures a token pool for a given token on Solana (no new program deploy). Initializes the pool, sets rate limit admin to RateLimitAdmin input or timelock signer PDA, then pool signer ATA and mint authority as needed.",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			b.Logger.Info("SVM Deploying token:", input)
@@ -532,7 +726,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, *input.TokenRef, chain)
+			tokenAddr, tokenProgramId, err := a.getTokenMintAndTokenProgram(b, chains, input.ExistingDataStore, chain.Selector, *input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -569,6 +763,47 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			}
 			result.Addresses = append(result.Addresses, deployOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, deployOut.Output.BatchOps...)
+
+			updateRLOp := tokenpoolops.UpdateRateLimitAdminBurnMint
+			switch input.PoolType {
+			case common_utils.BurnMintTokenPool.String():
+				updateRLOp = tokenpoolops.UpdateRateLimitAdminBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				updateRLOp = tokenpoolops.UpdateRateLimitAdminLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+			}
+
+			var rlAdmin solana.PublicKey
+			if input.RateLimitAdmin != "" {
+				rlAdmin, err = solana.PublicKeyFromBase58(input.RateLimitAdmin)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid base58 pubkey: %w", input.RateLimitAdmin, err)
+				}
+				if rlAdmin.IsZero() {
+					return sequences.OnChainOutput{}, errors.New("rate limit admin cannot be the zero pubkey")
+				}
+			} else {
+				rlAdmin = utils.GetTimelockSignerPDA(
+					input.ExistingDataStore.Addresses().Filter(),
+					chain.Selector,
+					common_utils.CLLQualifier,
+				)
+				if rlAdmin.IsZero() {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: ensure MCMS RBACTimelock is in the datastore", chain.Selector)
+				}
+			}
+
+			rlOut, err := operations.ExecuteOperation(b, updateRLOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   tokenPool,
+				TokenMint: tokenMint,
+				NewOwner:  rlAdmin,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
+			}
+			result.Addresses = append(result.Addresses, rlOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, rlOut.Output.BatchOps...)
 
 			poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
 
@@ -628,18 +863,6 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 	)
 }
 
-func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.AddressRef, chain cldf_solana.Chain) (datastore.AddressRef, solana.PublicKey, error) {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(store, tokenRef, chain.Selector, datastore_utils.FullRef)
-	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", tokenRef, err)
-	}
-	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
-	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to get token program ID for token type '%s': %w", tokenAddr.Type, err)
-	}
-	return tokenAddr, tokenProgramId, nil
-}
-
 func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	return cldf_ops.NewSequence(
 		"svm-adapter:update-authorities",
@@ -652,7 +875,7 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 			ds := e.DataStore
-			tokenRef, _, err := getTokenMintAndTokenProgram(ds, input.TokenRef, chain)
+			tokenRef, _, err := a.getTokenMintAndTokenProgram(b, e.BlockChains, ds, chain.Selector, input.TokenRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
 			}
@@ -672,28 +895,15 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 			acceptOwnershipTPOp := tokenpoolops.AcceptOwnershipBurnMint
-			tprlAdminTPOp := tokenpoolops.UpdateRateLimitAdminBurnMint
 			switch tokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				// Already set to burn mint
 			case common_utils.LockReleaseTokenPool.String():
 				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
 				acceptOwnershipTPOp = tokenpoolops.AcceptOwnershipLockRelease
-				tprlAdminTPOp = tokenpoolops.UpdateRateLimitAdminLockRelease
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 			}
-
-			tprlAdminOut, err := operations.ExecuteOperation(b, tprlAdminTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-				Program:   tokenPool,
-				TokenMint: tokenMint,
-				NewOwner:  timelockSigner,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to update TPRL admin: %w", err)
-			}
-			result.Addresses = append(result.Addresses, tprlAdminOut.Output.Addresses...)
-			result.BatchOps = append(result.BatchOps, tprlAdminOut.Output.BatchOps...)
 
 			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
 			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
@@ -725,4 +935,156 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokenapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
+}
+
+// ResolveTokenPoolRef accepts either the token pool programID or the token pool PDA address
+// and resolves it to the token pool program AddressRef in the datastore. If a PDA is given,
+// then the associated programID is queried from the chain and used to find a matching token
+// pool ref in the datastore. If a programID is provided, then we use it to look up the pool
+// in the datastore. In either case, it returns an error if the token pool can't be found or
+// if on-chain lookups fail.
+func (a *SolanaAdapter) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	chain, ok := chains.SolanaChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	pubKey, err := solana.PublicKeyFromBase58(address)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid pool address %q: %w", address, err)
+	}
+	acct, err := chain.Client.GetAccountInfoWithOpts(b.GetContext(), pubKey, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("get account info for %q: %w", address, err)
+	}
+	if acct == nil || acct.Value == nil {
+		return datastore.AddressRef{}, fmt.Errorf("account %q not found", address)
+	}
+
+	var poolProgramID solana.PublicKey
+	var poolPDA *solana.PublicKey
+	if !acct.Value.Executable {
+		// Case 1: the `pubKey` is the pool config PDA - in this case, DeriveTokenAddress
+		// can use the PDA to get the associated mint for the pool
+		poolProgramID = acct.Value.Owner
+		poolPDA = &pubKey
+	} else {
+		// Case 2: the `pubKey` is the pool program ID - in this case, DeriveTokenAddress
+		// doesn't have enough info to derive the associated mint
+		poolProgramID = pubKey
+		poolPDA = nil
+	}
+
+	// If we were given the PDA, then we re-query the datastore with the derived token pool
+	// program ID - if this still fails, then we have no more resolution options to try and
+	// we raise an error
+	poolRef, err := datastore_utils.FindAndFormatRef(ds,
+		datastore.AddressRef{ChainSelector: chainSelector, Address: poolProgramID.String()},
+		chainSelector,
+		datastore_utils.FullRef,
+	)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find token pool program ref for program id %s: %w", poolProgramID.String(), err)
+	}
+
+	// If we have a datastore match and we have the pool PDA, then we encode this info as a
+	// single label so that DeriveTokenAddress can use it
+	if poolPDA != nil {
+		poolRef.Labels.Add(encodeArtificialPoolAddressRefLabel(*poolPDA))
+	}
+
+	return poolRef, nil
+}
+
+// ResolveTokenRef accepts a token mint public key and resolves it to an AddressRef in the
+// datastore. It performs on-chain lookups to determine the token program and token symbol
+// (for qualifier) associated with the mint address. If the token ref can't be resolved or
+// if on-chain lookups fail, it returns an error. The qualifier is set to the token symbol
+// if it can be found on-chain, otherwise a sensible placeholder is used.
+func (a *SolanaAdapter) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, _ datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error) {
+	chain, ok := chains.SolanaChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	tokenMintPubKey, err := solana.PublicKeyFromBase58(address)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid mint address %q: %w", address, err)
+	}
+	tokenProgramID, err := utils.FetchTokenProgramID(b.GetContext(), chain, tokenMintPubKey)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to resolve token program for mint %s: %w", address, err)
+	}
+	programType, err := utils.GetTokenProgramType(tokenProgramID)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("mint %s: %w", address, err)
+	}
+
+	// NOTE: the token symbol is not strictly required for most Solana operations (some tokens may not have
+	// metadata uploaded via Metaplex). With that in mind, we only perform a best-effort fetch of the token
+	// symbol instead of hard crashing if it isn't on chain. If we can't get this info from the chain, then
+	// we will use a placeholder instead.
+	qualifier := fmt.Sprintf("%s-%s", address, programType)
+	if meta, _, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMintPubKey); err != nil {
+		b.Logger.Warnf("failed to get Metaplex token metadata for mint %s falling back to default qualifier (%s): %v", address, qualifier, err)
+	} else {
+		data := tokens.GetTokenDataV2(meta)
+		if symbol := strings.TrimSpace(data.Symbol); symbol == "" {
+			b.Logger.Warnf("token metadata for mint %s does not include a symbol, falling back to default qualifier (%s): %+v", address, qualifier, data)
+		} else {
+			qualifier = symbol
+		}
+	}
+
+	return datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(programType),
+		Version:       common_utils.Version_1_6_0,
+		Qualifier:     qualifier,
+		Address:       tokenMintPubKey.String(),
+	}, nil
+}
+
+func (a *SolanaAdapter) getTokenMintAndTokenProgram(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, tokenRef datastore.AddressRef) (datastore.AddressRef, solana.PublicKey, error) {
+	chain, ok := chains.SolanaChains()[chainSelector]
+	if !ok {
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	// Try to resolve the token ref from the datastore first to avoid RPC
+	// calls and if that fails, then fall back to onchain ref resolution.
+	var resolvedTokenRef datastore.AddressRef
+	if fullTokenRef, err := datastore_utils.FindAndFormatRef(ds, tokenRef, chain.Selector, datastore_utils.FullRef); err == nil {
+		resolvedTokenRef = fullTokenRef
+	} else {
+		if tokenRef.Address == "" {
+			return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("token reference %q could not be resolved from the datastore and does not include an address to attempt on-chain resolution: %w", datastore_utils.SprintRef(tokenRef), err)
+		} else {
+			resolvedTokenRef, err = a.ResolveTokenRef(b, chains, ds, chainSelector, tokenRef.Address)
+			if err != nil {
+				return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to resolve token reference %s on-chain: %w", datastore_utils.SprintRef(tokenRef), err)
+			}
+		}
+	}
+
+	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(resolvedTokenRef.Type))
+	if err != nil {
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to get token program ID for token type '%s': %w", resolvedTokenRef.Type, err)
+	}
+
+	return resolvedTokenRef, tokenProgramId, nil
+}
+
+func decodeArtificialPoolAddressRef(label string) (solana.PublicKey, bool) {
+	if parts := strings.Split(label, ":"); len(parts) >= 2 && parts[0] == tokenapi.ArtificialAddressRefLabel {
+		if pubKey, err := solana.PublicKeyFromBase58(parts[1]); err != nil {
+			return solana.PublicKey{}, false
+		} else {
+			return pubKey, true
+		}
+	} else {
+		return solana.PublicKey{}, false
+	}
+}
+
+func encodeArtificialPoolAddressRefLabel(poolPDA solana.PublicKey) string {
+	return tokenapi.ArtificialAddressRefLabel + ":" + poolPDA.String()
 }

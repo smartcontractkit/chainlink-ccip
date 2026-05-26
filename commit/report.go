@@ -1,9 +1,7 @@
 package commit
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -212,16 +210,18 @@ func (p *Plugin) validateReport(
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
-	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
+	match, offRampDigest, err := plugincommon.ConfigDigestsMatch(
+		ctx, p.ccipReader, consts.PluginTypeCommit, p.reportingCfg.ConfigDigest,
+	)
 	if err != nil {
-		err = plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
-		return cciptypes.CommitPluginReport{}, plugincommon.NewErrValidatingReport(err)
+		return cciptypes.CommitPluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("check config digest: %w", err))
 	}
 
-	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+	if !match {
 		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
-			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+			"offRampConfigDigest", plugincommon.FormatConfigDigest(offRampDigest),
 		)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("config digest mismatch")
 	}

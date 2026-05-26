@@ -1,7 +1,9 @@
 package cctp
 
 import (
+	"bytes"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
+	evm_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -38,6 +41,8 @@ const (
 	mechanismLockRelease   = "LOCK_RELEASE"
 	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 )
+
+var v162 = semver.MustParse("1.6.2")
 
 // configureCCTPChainRefs holds resolved address refs for ConfigureCCTPChainForLanes.
 type configureCCTPChainRefs struct {
@@ -79,6 +84,11 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		isHomeChainAndConfigureSiloedPool := isHomeChain && len(lockReleaseSelectors) > 0
 
+		// Auto-resolved per Circle's Fast Transfer source list (see finality_defaults.go):
+		// BlockDepth 1 for Fast Transfer chains, wait-for-finality elsewhere. Reconciled on
+		// the CCTPVerifier and used as AllowedFinalityConfig on the CCTP-through-CCV pool.
+		allowedFinality := defaultAllowedFinalityForChain(chain.Selector)
+
 		// Resolve address refs
 		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, input.RegisteredPoolRef)
 		if err != nil {
@@ -99,11 +109,15 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			// Siloed USDC lock release will not be deployed here as it already exists.
 			// One lockbox will be deployed per lock-release selector.
+			existingAddresses := dep.DataStore.Addresses().Filter(
+				datastore.AddressRefByChainSelector(input.ChainSelector),
+			)
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
 				ChainSelector:             input.ChainSelector,
 				USDCToken:                 input.USDCToken,
 				SiloedUSDCTokenPool:       siloedUSDCRef.Address,
 				LockReleaseChainSelectors: lockReleaseSelectors,
+				ExistingAddresses:         existingAddresses,
 				RemoteChainConfigs:        siloedRemoteChainConfigs,
 			})
 			if err != nil {
@@ -152,6 +166,12 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			writes = append(writes, w...)
 		}
 
+		finalityWrites, err := applyCCTPVerifierFinality(b, chain, cctpVerifierAddress, allowedFinality)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		writes = append(writes, finalityWrites...)
+
 		// CCTP V2 token pool: set domains
 		cctpV2DomainUpdates, err := buildCCTPV2PoolDomainUpdates(dep, input)
 		if err != nil {
@@ -178,6 +198,14 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			writes = append(writes, w...)
 		}
+
+		// If a legacy USDCTokenPool v1.6.2 exists on this chain, register each supported
+		// remote's USDCTokenPoolProxy on it via usdc_token_pool.AddRemotePool.
+		v162Writes, err := addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(b, chain, dep, input, remoteChainConfigs)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		writes = append(writes, v162Writes...)
 
 		// Create batch operation from writes
 		if len(writes) > 0 {
@@ -234,9 +262,15 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Proactively configure the CCTP-through-CCV pool for all CCTP-capable remotes.
 		// This excludes lock-release lanes, but includes V1/V2 remotes so the CCV pool
 		// is ready before proxy routing is switched to CCTP_V2_WITH_CCV.
+		// Non-EVM remotes (e.g. Solana) are excluded: CCIP 2.0 does not support them, so
+		// CCTP_V2_WITH_CCV will never be enabled for them and preconfiguring the CCV pool
+		// would be wasted state.
 		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
 			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == mechanismLockRelease {
+				continue
+			}
+			if !isEVMRemote(remoteChainSelector) {
 				continue
 			}
 			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
@@ -247,7 +281,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			TokenPoolAddress:         refs.CCTPV2WithCCVsPool.Address,
 			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
-			AllowedFinalityConfig:    finality.Config{BlockDepth: 1},
+			AllowedFinalityConfig:    allowedFinality,
 			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
 		})
 		if err != nil {
@@ -349,6 +383,100 @@ func resolveConfigureCCTPChainRefs(
 	return refs, siloedRef, nil
 }
 
+// addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool registers each remote chain's USDCTokenPoolProxy
+// on the legacy USDCTokenPool v1.6.2 via usdc_token_pool.AddRemotePool.
+// Skips when there is no v1.6.2 pool on this chain (net new lane), the remote's registered pool
+// ref is not a USDCTokenPoolProxy, the remote chain is not yet supported on the v1.6.2 pool, or the
+// proxy is already listed as a remote pool.
+func addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	dep adapters.ConfigureCCTPChainForLanesDeps,
+	input adapters.ConfigureCCTPChainForLanesInput,
+	remoteChainConfigs map[uint64]tokens_core.RemoteChainConfig[[]byte, string],
+) ([]contract_utils.WriteOutput, error) {
+	refs := dep.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(input.ChainSelector),
+		datastore.AddressRefByType(datastore.ContractType(usdc_token_pool.ContractType)),
+		datastore.AddressRefByVersion(v162),
+	)
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	if len(refs) > 1 {
+		return nil, fmt.Errorf("expected at most one USDCTokenPool v%s on chain %d, found %d", v162.String(), input.ChainSelector, len(refs))
+	}
+	localV162 := common.HexToAddress(refs[0].Address)
+
+	supportedChainsReport, err := cldf_ops.ExecuteOperation[contract_utils.FunctionInput[struct{}], []uint64, evm.Chain](
+		b, evm_token_pool.GetSupportedChains, chain, contract_utils.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       localV162,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("getSupportedChains on USDCTokenPool v1.6.2 %s: %w", localV162.Hex(), err)
+	}
+	supportedChains := supportedChainsReport.Output
+
+	var writes []contract_utils.WriteOutput
+	for remoteSel := range input.RemoteChains {
+		poolRef := input.RemoteRegisteredPoolRefs[remoteSel]
+		if poolRef.Type != datastore.ContractType(usdc_token_pool_proxy.ContractType) {
+			continue
+		}
+		cfg, ok := remoteChainConfigs[remoteSel]
+		if !ok {
+			return nil, fmt.Errorf("missing remote chain config for remote chain %d on chain %d", remoteSel, input.ChainSelector)
+		}
+		if !slices.Contains(supportedChains, remoteSel) {
+			continue
+		}
+		w, err := maybeAddRemotePoolUSDCTokenPoolV162(b, chain, input.ChainSelector, localV162, remoteSel, cfg.RemotePool)
+		if err != nil {
+			return nil, err
+		}
+		if w.ChainSelector != 0 {
+			writes = append(writes, w)
+		}
+	}
+	return writes, nil
+}
+
+func maybeAddRemotePoolUSDCTokenPoolV162(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	localPool common.Address,
+	remoteChainSelector uint64,
+	remotePoolPadded []byte,
+) (contract_utils.WriteOutput, error) {
+	poolsRep, err := cldf_ops.ExecuteOperation[contract_utils.FunctionInput[uint64], [][]byte, evm.Chain](
+		b, evm_token_pool.GetRemotePools, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chainSelector,
+			Address:       localPool,
+			Args:          remoteChainSelector,
+		})
+	if err != nil {
+		return contract_utils.WriteOutput{}, fmt.Errorf("getRemotePools on USDCTokenPool v1.6.2 %s for remote %d: %w", localPool.Hex(), remoteChainSelector, err)
+	}
+	if slices.ContainsFunc(poolsRep.Output, func(p []byte) bool { return bytes.Equal(p, remotePoolPadded) }) {
+		return contract_utils.WriteOutput{}, nil
+	}
+	addRep, err := cldf_ops.ExecuteOperation[contract_utils.FunctionInput[usdc_token_pool.AddRemotePoolArgs], contract_utils.WriteOutput, evm.Chain](
+		b, usdc_token_pool.AddRemotePool, chain, contract_utils.FunctionInput[usdc_token_pool.AddRemotePoolArgs]{
+			ChainSelector: chainSelector,
+			Address:       localPool,
+			Args: usdc_token_pool.AddRemotePoolArgs{
+				RemoteChainSelector: remoteChainSelector,
+				RemotePoolAddress:   remotePoolPadded,
+			},
+		})
+	if err != nil {
+		return contract_utils.WriteOutput{}, fmt.Errorf("addRemotePool on USDCTokenPool v1.6.2 %s for remote %d: %w", localPool.Hex(), remoteChainSelector, err)
+	}
+	return addRep.Output, nil
+}
+
 // buildRemoteChainConfigs builds the remote chain config map used by token pools and configure-token-for-transfers.
 func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (map[uint64]tokens_core.RemoteChainConfig[[]byte, string], error) {
 	configs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string], len(input.RemoteChains))
@@ -365,18 +493,25 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 			RemotePool:                common.LeftPadBytes(remotePoolAddress, 32),
 			RemoteToken:               common.LeftPadBytes(remoteTokenAddress, 32),
 			TokenTransferFeeConfig:    remoteChain.TokenTransferFeeConfig,
-			OutboundRateLimiterConfig: remoteChain.OutboundRateLimiterConfig,
-			InboundRateLimiterConfig:  remoteChain.InboundRateLimiterConfig,
+			OutboundRateLimiterConfig: &remoteChain.OutboundRateLimiterConfig,
+			InboundRateLimiterConfig:  &remoteChain.InboundRateLimiterConfig,
 		}
 	}
 	return configs, nil
 }
 
-// buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver (one per remote chain).
+// buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver.
+// Includes every CCTP-capable EVM remote (V1, V2, V2_WITH_CCV) and excludes lock-release lanes, matching the
+// set of chains preconfigured on the CCTP-through-CCV pool. This keeps CCTPThroughCCVTokenPool.getTokenTransferFeeConfig
+// from reverting on V1 remotes before proxy routing is switched to CCTP_V2_WITH_CCV.
+// Non-EVM remotes (e.g. Solana) are skipped: CCIP 2.0 does not support them, so the CCV pool will never be used for them.
 func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanesInput, cctpVerifierAddress common.Address) []versioned_verifier_resolver.OutboundImplementationArgs {
 	out := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
+		if remoteChain.LockOrBurnMechanism == mechanismLockRelease {
+			continue
+		}
+		if !isEVMRemote(remoteChainSelector) {
 			continue
 		}
 		out = append(out, versioned_verifier_resolver.OutboundImplementationArgs{
@@ -385,6 +520,16 @@ func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanes
 		})
 	}
 	return out
+}
+
+// isEVMRemote reports whether a remote chain selector belongs to the EVM family.
+// Selectors that fail to resolve are treated as non-EVM (skipped by callers).
+func isEVMRemote(remoteChainSelector uint64) bool {
+	family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+	if err != nil {
+		return false
+	}
+	return family == chain_selectors.FamilyEVM
 }
 
 // buildUSDCTokenPoolProxyMechanismArgs builds remote chain selectors and lock/burn mechanisms for the USDCTokenPoolProxy.
@@ -524,12 +669,34 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 	return out, nil
 }
 
-// applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver.
+// applyVerifierResolverOutboundWrites sets the outbound implementation on the CCTPVerifierResolver,
+// skipping entries that are already at the desired state.
 func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, resolverAddress common.Address, args []versioned_verifier_resolver.OutboundImplementationArgs) ([]contract_utils.WriteOutput, error) {
+	currentReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chain.Selector,
+		Address:       resolverAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outbound implementations from CCTPVerifierResolver: %w", err)
+	}
+	existing := make(map[uint64]common.Address, len(currentReport.Output))
+	for _, impl := range currentReport.Output {
+		existing[impl.DestChainSelector] = impl.Verifier
+	}
+	toApply := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(args))
+	for _, arg := range args {
+		if v, ok := existing[arg.DestChainSelector]; ok && v == arg.Verifier {
+			continue
+		}
+		toApply = append(toApply, arg)
+	}
+	if len(toApply) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 		ChainSelector: chain.Selector,
 		Address:       resolverAddress,
-		Args:          args,
+		Args:          toApply,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set outbound implementation on CCTPVerifierResolver: %w", err)
@@ -537,14 +704,35 @@ func applyVerifierResolverOutboundWrites(b cldf_ops.Bundle, chain evm.Chain, res
 	return []contract_utils.WriteOutput{report.Output}, nil
 }
 
-// applyUSDCTokenPoolProxyMechanismWrites updates lock/burn mechanisms on the USDCTokenPoolProxy.
+// applyUSDCTokenPoolProxyMechanismWrites updates lock/burn mechanisms on the USDCTokenPoolProxy,
+// skipping selectors whose on-chain mechanism already matches the desired value.
 func applyUSDCTokenPoolProxyMechanismWrites(b cldf_ops.Bundle, chain evm.Chain, proxyAddress common.Address, remoteChainSelectors []uint64, mechanisms []uint8) ([]contract_utils.WriteOutput, error) {
+	toUpdateSelectors := make([]uint64, 0, len(remoteChainSelectors))
+	toUpdateMechanisms := make([]uint8, 0, len(mechanisms))
+	for i, sel := range remoteChainSelectors {
+		currentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetLockOrBurnMechanism, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       proxyAddress,
+			Args:          sel,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get lock or burn mechanism for remote chain %d: %w", sel, err)
+		}
+		if currentReport.Output == mechanisms[i] {
+			continue
+		}
+		toUpdateSelectors = append(toUpdateSelectors, sel)
+		toUpdateMechanisms = append(toUpdateMechanisms, mechanisms[i])
+	}
+	if len(toUpdateSelectors) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
 		ChainSelector: chain.Selector,
 		Address:       proxyAddress,
 		Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
-			RemoteChainSelectors: remoteChainSelectors,
-			Mechanisms:           mechanisms,
+			RemoteChainSelectors: toUpdateSelectors,
+			Mechanisms:           toUpdateMechanisms,
 		},
 	})
 	if err != nil {
@@ -574,8 +762,13 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 		return nil, fmt.Errorf("failed to set domains on CCTPVerifier: %w", err)
 	}
 	writes = append(writes, domainsReport.Output)
+	return writes, nil
+}
 
-	desiredFinality := finality.Config{BlockDepth: 1}.Raw()
+// applyCCTPVerifierFinality applies the CCTPVerifier's allowed-finality bitmask with
+// the requested config.
+func applyCCTPVerifierFinality(b cldf_ops.Bundle, chain evm.Chain, verifierAddress common.Address, allowedFinality finality.Config) ([]contract_utils.WriteOutput, error) {
+	desiredFinality := allowedFinality.Raw()
 	currentFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetAllowedFinalityConfig, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chain.Selector,
 		Address:       verifierAddress,
@@ -583,27 +776,51 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allowed finality config from CCTPVerifier: %w", err)
 	}
-	if currentFinalityReport.Output != desiredFinality {
-		setFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
-			ChainSelector: chain.Selector,
-			Address:       verifierAddress,
-			Args:          desiredFinality,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to set allowed finality config on CCTPVerifier: %w", err)
-		}
-		writes = append(writes, setFinalityReport.Output)
+	if currentFinalityReport.Output == desiredFinality {
+		return nil, nil
 	}
-
-	return writes, nil
+	setFinalityReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
+		ChainSelector: chain.Selector,
+		Address:       verifierAddress,
+		Args:          desiredFinality,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set allowed finality config on CCTPVerifier: %w", err)
+	}
+	return []contract_utils.WriteOutput{setFinalityReport.Output}, nil
 }
 
-// applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool.
+// applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool,
+// skipping entries whose on-chain state already matches the desired config.
 func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool_cctp_v2.DomainUpdate) ([]contract_utils.WriteOutput, error) {
+	toUpdate := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0, len(domainUpdates))
+	for _, update := range domainUpdates {
+		currentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.GetDomain, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddress,
+			Args:          update.DestChainSelector,
+		})
+		if err != nil {
+			// Domain not yet set (UnknownDomain) or unreadable — include it.
+			toUpdate = append(toUpdate, update)
+			continue
+		}
+		current := currentReport.Output
+		if current.AllowedCaller == update.AllowedCaller &&
+			current.MintRecipient == update.MintRecipient &&
+			current.DomainIdentifier == update.DomainIdentifier &&
+			current.Enabled == update.Enabled {
+			continue
+		}
+		toUpdate = append(toUpdate, update)
+	}
+	if len(toUpdate) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool_cctp_v2.DomainUpdate]{
 		ChainSelector: chain.Selector,
 		Address:       poolAddress,
-		Args:          domainUpdates,
+		Args:          toUpdate,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set domains on CCTP V2 token pool: %w", err)
@@ -611,12 +828,37 @@ func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 	return []contract_utils.WriteOutput{report.Output}, nil
 }
 
-// applyCCTPV1PoolSetDomainsWrites sets domains on the CCTP V1 token pool.
+// applyCCTPV1PoolSetDomainsWrites sets domains on the CCTP V1 token pool,
+// skipping entries whose on-chain state already matches the desired config.
 func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool.DomainUpdate) ([]contract_utils.WriteOutput, error) {
+	toUpdate := make([]usdc_token_pool.DomainUpdate, 0, len(domainUpdates))
+	for _, update := range domainUpdates {
+		currentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.GetDomain, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddress,
+			Args:          update.DestChainSelector,
+		})
+		if err != nil {
+			// Domain not yet set (UnknownDomain) or unreadable — include it.
+			toUpdate = append(toUpdate, update)
+			continue
+		}
+		current := currentReport.Output
+		if current.AllowedCaller == update.AllowedCaller &&
+			current.MintRecipient == update.MintRecipient &&
+			current.DomainIdentifier == update.DomainIdentifier &&
+			current.Enabled == update.Enabled {
+			continue
+		}
+		toUpdate = append(toUpdate, update)
+	}
+	if len(toUpdate) == 0 {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool.DomainUpdate]{
 		ChainSelector: chain.Selector,
 		Address:       poolAddress,
-		Args:          domainUpdates,
+		Args:          toUpdate,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set domains on CCTP V1 token pool: %w", err)

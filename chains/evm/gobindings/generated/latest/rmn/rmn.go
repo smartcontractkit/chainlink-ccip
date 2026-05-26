@@ -1,0 +1,1225 @@
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
+
+package rmn
+
+import (
+	"errors"
+	"math/big"
+	"strings"
+
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+)
+
+var (
+	_ = errors.New
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+	_ = abi.ConvertType
+)
+
+type AuthorizedCallersAuthorizedCallerArgs struct {
+	AddedCallers   []common.Address
+	RemovedCallers []common.Address
+}
+
+var RMNMetaData = &bind.MetaData{
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"curseAdmins\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAuthorizedCallerUpdates\",\"inputs\":[{\"name\":\"authorizedCallerArgs\",\"type\":\"tuple\",\"internalType\":\"struct AuthorizedCallers.AuthorizedCallerArgs\",\"components\":[{\"name\":\"addedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"curse\",\"inputs\":[{\"name\":\"subject\",\"type\":\"bytes16\",\"internalType\":\"bytes16\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"curse\",\"inputs\":[{\"name\":\"subjects\",\"type\":\"bytes16[]\",\"internalType\":\"bytes16[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllAuthorizedCallers\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCursedSubjects\",\"inputs\":[],\"outputs\":[{\"name\":\"subjects\",\"type\":\"bytes16[]\",\"internalType\":\"bytes16[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isCursed\",\"inputs\":[{\"name\":\"subject\",\"type\":\"bytes16\",\"internalType\":\"bytes16\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isCursed\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"uncurse\",\"inputs\":[{\"name\":\"subject\",\"type\":\"bytes16\",\"internalType\":\"bytes16\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"uncurse\",\"inputs\":[{\"name\":\"subjects\",\"type\":\"bytes16[]\",\"internalType\":\"bytes16[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AuthorizedCallerAdded\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AuthorizedCallerRemoved\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Cursed\",\"inputs\":[{\"name\":\"subjects\",\"type\":\"bytes16[]\",\"indexed\":false,\"internalType\":\"bytes16[]\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Uncursed\",\"inputs\":[{\"name\":\"subjects\",\"type\":\"bytes16[]\",\"indexed\":false,\"internalType\":\"bytes16[]\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NotCursed\",\"inputs\":[{\"name\":\"subject\",\"type\":\"bytes16\",\"internalType\":\"bytes16\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"UnauthorizedCaller\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x60806040523461020f576118b28038038061001981610214565b92833981019060208183031261020f578051906001600160401b03821161020f570181601f8201121561020f578051916001600160401b0383116101c8578260051b9160208061006a818601610214565b80968152019382010191821161020f57602001915b8183106101ef578333156101de57600180546001600160a01b031916331790556020906100ab82610214565b60008152600036813760408051929083016001600160401b038111848210176101c8576040528252808383015260005b8151811015610142576001906001600160a01b036100f98285610239565b5116856101058261027b565b610112575b5050016100db565b7fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758091604051908152a1858561010a565b50505160005b81518110156101b9576001600160a01b036101638284610239565b51169081156101a8577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef848361019a600195610379565b50604051908152a101610148565b6342bcdf7f60e11b60005260046000fd5b6040516114d890816103da8239f35b634e487b7160e01b600052604160045260246000fd5b639b15e16f60e01b60005260046000fd5b82516001600160a01b038116810361020f5781526020928301920161007f565b600080fd5b6040519190601f01601f191682016001600160401b038111838210176101c857604052565b805182101561024d5760209160051b010190565b634e487b7160e01b600052603260045260246000fd5b805482101561024d5760005260206000200190600090565b600081815260036020526040902054801561037257600019810181811161035c5760025460001981019190821161035c5780820361030b575b50505060025480156102f557600019016102cf816002610263565b8154906000199060031b1b19169055600255600052600360205260006040812055600190565b634e487b7160e01b600052603160045260246000fd5b61034461031c61032d936002610263565b90549060031b1c9283926002610263565b819391549060031b91821b91600019901b19161790565b905560005260036020526040600020553880806102b4565b634e487b7160e01b600052601160045260246000fd5b5050600090565b806000526003602052604060002054156000146103d357600254680100000000000000008110156101c8576103ba61032d8260018594016002556002610263565b9055600254906000526003602052604060002055600190565b5060009056fe6080604052600436101561001257600080fd5b60003560e01c8063181f5a77146100e75780632451a627146100e25780632cbc26bb146100dd578063397796f7146100d857806362eed415146100d35780636d2d3993146100ce57806379ba5097146100c95780638da5cb5b146100c457806391a2749a146100bf5780639a19b329146100ba578063d881e092146100b5578063f2fde38b146100b05763f8bb876e146100ab57600080fd5b610b89565b610a96565b6109f5565b61093c565b6107c7565b6106e2565b6105f9565b6104a6565b610429565b6103f0565b6103a5565b6102a4565b61017d565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040810190811067ffffffffffffffff82111761013757604052565b6100ec565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761013757604052565b3461024f5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f576040516101b88161011b565b600981527f524d4e20322e302e300000000000000000000000000000000000000000000000602082015260405190602082528181519182602083015260005b8381106102375750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f836000604080968601015201168101030190f35b602082820181015160408784010152859350016101f7565b600080fd5b602060408183019282815284518094520192019060005b8181106102785750505090565b825173ffffffffffffffffffffffffffffffffffffffff1684526020938401939092019160010161026b565b3461024f5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760405180602060025491828152019060026000527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace9060005b8181106103335761032f856103238187038261013c565b60405191829182610254565b0390f35b825484526020909301926001928301920161030c565b600435907fffffffffffffffffffffffffffffffff000000000000000000000000000000008216820361024f57565b35907fffffffffffffffffffffffffffffffff000000000000000000000000000000008216820361024f57565b3461024f5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760206103e66103e1610349565b610b9f565b6040519015158152f35b3461024f5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760206103e6610c3c565b3461024f5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f57610460610349565b610468610c99565b8051156104a1577fffffffffffffffffffffffffffffffff0000000000000000000000000000000061049f92166020820152610f8a565b005b610d28565b3461024f5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f576104dd610349565b6104e5610c99565b908151156104a1577fffffffffffffffffffffffffffffffff0000000000000000000000000000000016602082015261051c6110b5565b60005b81518110156105c45761055d7fffffffffffffffffffffffffffffffff000000000000000000000000000000006105568385610d57565b5116611258565b1561056a5760010161051f565b610595907fffffffffffffffffffffffffffffffff0000000000000000000000000000000092610d57565b51167f73281fa10000000000000000000000000000000000000000000000000000000060005260045260246000fd5b6040517f0676e709c9cc74fa0519fd78f7c33be0f1b2b0bae0507c724aef7229379c6ba190806105f48582610999565b0390a1005b3461024f5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760005473ffffffffffffffffffffffffffffffffffffffff811633036106b8577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b3461024f5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f57602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b67ffffffffffffffff81116101375760051b60200190565b9080601f8301121561024f5781359061076482610734565b92610772604051948561013c565b82845260208085019360051b82010191821161024f57602001915b81831061079a5750505090565b823573ffffffffffffffffffffffffffffffffffffffff8116810361024f5781526020928301920161078d565b3461024f5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760043567ffffffffffffffff811161024f5760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc823603011261024f576040516108408161011b565b816004013567ffffffffffffffff811161024f57610864906004369185010161074c565b8152602482013567ffffffffffffffff811161024f5761049f92600461088d923692010161074c565b6020820152610d6b565b60207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc82011261024f576004359067ffffffffffffffff821161024f578060238301121561024f5781600401356108ed81610734565b926108fb604051948561013c565b8184526024602085019260051b82010192831161024f57602401905b8282106109245750505090565b6020809161093184610378565b815201910190610917565b3461024f5761094a36610897565b6109526110b5565b60005b81518110156105c45761098c7fffffffffffffffffffffffffffffffff000000000000000000000000000000006105568385610d57565b1561056a57600101610955565b602060408183019282815284518094520192019060005b8181106109bd5750505090565b82517fffffffffffffffffffffffffffffffff00000000000000000000000000000000168452602093840193909201916001016109b0565b3461024f5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760405180602060045491828152019060046000527f8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b9060005b818110610a805761032f85610a748187038261013c565b60405191829182610999565b8254845260209093019260019283019201610a5d565b3461024f5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261024f5760043573ffffffffffffffffffffffffffffffffffffffff811680910361024f57610aee6110b5565b338114610b5f57807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b3461024f5761049f610b9a36610897565b610f8a565b60045415610c36577fffffffffffffffffffffffffffffffff0000000000000000000000000000000016600052600560205260406000205415801590610be25790565b507f010000000000000000000000000000010000000000000000000000000000000060005260056020527f8f496e4ceafb62bf7f18e44784f657270af67789253a1cc665c8d949978172bc54151590565b90565b50600090565b60045415610c94577f010000000000000000000000000000010000000000000000000000000000000060005260056020527f8f496e4ceafb62bf7f18e44784f657270af67789253a1cc665c8d949978172bc54151590565b600090565b60408051909190610caa838261013c565b60018152917fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe001366020840137565b90610ce382610734565b610cf0604051918261013c565b8281527fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0610d1e8294610734565b0190602036910137565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b80518210156104a15760209160051b010190565b610d736110b5565b60208101519160005b8351811015610e415780610daf610d9560019387610d57565b5173ffffffffffffffffffffffffffffffffffffffff1690565b610deb610de673ffffffffffffffffffffffffffffffffffffffff83165b73ffffffffffffffffffffffffffffffffffffffff1690565b611404565b610df7575b5001610d7c565b60405173ffffffffffffffffffffffffffffffffffffffff9190911681527fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758090602090a138610df0565b5091505160005b8151811015610f2557610e5e610d958284610d57565b9073ffffffffffffffffffffffffffffffffffffffff821615610efb577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef610ef283610eca610ec5610dcd60019773ffffffffffffffffffffffffffffffffffffffff1690565b611398565b5060405173ffffffffffffffffffffffffffffffffffffffff90911681529081906020820190565b0390a101610e48565b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b5050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8114610f855760010190565b610f29565b90610fad610dcd60015473ffffffffffffffffffffffffffffffffffffffff1690565b33036110a8575b610fbe8251610cd9565b916000805b8251811015611064578061100a611005610fdf60019487610d57565b517fffffffffffffffffffffffffffffffff000000000000000000000000000000001690565b611144565b611015575b01610fc3565b61105f611025610fdf8387610d57565b61103861103186610f58565b9589610d57565b907fffffffffffffffffffffffffffffffff00000000000000000000000000000000169052565b61100f565b5090509190918015610f255781526040517f1716e663a90a76d3b6c7e5f680673d1b051454c19c627e184c8daf28f3104f749181906110a39082610999565b0390a1565b6110b0611100565b610fb4565b73ffffffffffffffffffffffffffffffffffffffff6001541633036110d657565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b3360005260036020526040600020541561111657565b7fd86ad9cf000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b7fffffffffffffffffffffffffffffffff00000000000000000000000000000000610c33911660046113cd565b80548210156104a15760005260206000200190600090565b916111c1918354907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b9055565b80548015611229577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01906111fa8282611171565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b1916905555565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b600081815260056020526040902054908115611335577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820190828211610f8557600454927fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8401938411610f855783836000956112f495036112fa575b5050506112e360046111c5565b600590600052602052604060002090565b55600190565b6112e36113269161131c61131261132c956004611171565b90549060031b1c90565b9283916004611171565b90611189565b553880806112d6565b5050600090565b8054906801000000000000000082101561013757816113639160016111c194018155611171565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b600081815260036020526040902054610c36576113b681600261133c565b600254906000526003602052604060002055600190565b600082815260018201602052604090205461133557806113ef8360019361133c565b80549260005201602052604060002055600190565b600081815260036020526040902054908115611335577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820190828211610f8557600254927fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8401938411610f855783836112f494600096036114a0575b50505061148f60026111c5565b600390600052602052604060002090565b61148f611326916114b86113126114c2956002611171565b9283916002611171565b5538808061148256fea164736f6c634300081a000a",
+}
+
+var RMNABI = RMNMetaData.ABI
+
+var RMNBin = RMNMetaData.Bin
+
+func DeployRMN(auth *bind.TransactOpts, backend bind.ContractBackend, curseAdmins []common.Address) (common.Address, *types.Transaction, *RMN, error) {
+	parsed, err := RMNMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(RMNBin), backend, curseAdmins)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &RMN{address: address, abi: *parsed, RMNCaller: RMNCaller{contract: contract}, RMNTransactor: RMNTransactor{contract: contract}, RMNFilterer: RMNFilterer{contract: contract}}, nil
+}
+
+type RMN struct {
+	address common.Address
+	abi     abi.ABI
+	RMNCaller
+	RMNTransactor
+	RMNFilterer
+}
+
+type RMNCaller struct {
+	contract *bind.BoundContract
+}
+
+type RMNTransactor struct {
+	contract *bind.BoundContract
+}
+
+type RMNFilterer struct {
+	contract *bind.BoundContract
+}
+
+type RMNSession struct {
+	Contract     *RMN
+	CallOpts     bind.CallOpts
+	TransactOpts bind.TransactOpts
+}
+
+type RMNCallerSession struct {
+	Contract *RMNCaller
+	CallOpts bind.CallOpts
+}
+
+type RMNTransactorSession struct {
+	Contract     *RMNTransactor
+	TransactOpts bind.TransactOpts
+}
+
+type RMNRaw struct {
+	Contract *RMN
+}
+
+type RMNCallerRaw struct {
+	Contract *RMNCaller
+}
+
+type RMNTransactorRaw struct {
+	Contract *RMNTransactor
+}
+
+func NewRMN(address common.Address, backend bind.ContractBackend) (*RMN, error) {
+	abi, err := abi.JSON(strings.NewReader(RMNABI))
+	if err != nil {
+		return nil, err
+	}
+	contract, err := bindRMN(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &RMN{address: address, abi: abi, RMNCaller: RMNCaller{contract: contract}, RMNTransactor: RMNTransactor{contract: contract}, RMNFilterer: RMNFilterer{contract: contract}}, nil
+}
+
+func NewRMNCaller(address common.Address, caller bind.ContractCaller) (*RMNCaller, error) {
+	contract, err := bindRMN(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &RMNCaller{contract: contract}, nil
+}
+
+func NewRMNTransactor(address common.Address, transactor bind.ContractTransactor) (*RMNTransactor, error) {
+	contract, err := bindRMN(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &RMNTransactor{contract: contract}, nil
+}
+
+func NewRMNFilterer(address common.Address, filterer bind.ContractFilterer) (*RMNFilterer, error) {
+	contract, err := bindRMN(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &RMNFilterer{contract: contract}, nil
+}
+
+func bindRMN(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := RMNMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
+}
+
+func (_RMN *RMNRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _RMN.Contract.RMNCaller.contract.Call(opts, result, method, params...)
+}
+
+func (_RMN *RMNRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _RMN.Contract.RMNTransactor.contract.Transfer(opts)
+}
+
+func (_RMN *RMNRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _RMN.Contract.RMNTransactor.contract.Transact(opts, method, params...)
+}
+
+func (_RMN *RMNCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _RMN.Contract.contract.Call(opts, result, method, params...)
+}
+
+func (_RMN *RMNTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _RMN.Contract.contract.Transfer(opts)
+}
+
+func (_RMN *RMNTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _RMN.Contract.contract.Transact(opts, method, params...)
+}
+
+func (_RMN *RMNCaller) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []interface{}
+	err := _RMN.contract.Call(opts, &out, "getAllAuthorizedCallers")
+
+	if err != nil {
+		return *new([]common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+
+	return out0, err
+
+}
+
+func (_RMN *RMNSession) GetAllAuthorizedCallers() ([]common.Address, error) {
+	return _RMN.Contract.GetAllAuthorizedCallers(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCallerSession) GetAllAuthorizedCallers() ([]common.Address, error) {
+	return _RMN.Contract.GetAllAuthorizedCallers(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCaller) GetCursedSubjects(opts *bind.CallOpts) ([][16]byte, error) {
+	var out []interface{}
+	err := _RMN.contract.Call(opts, &out, "getCursedSubjects")
+
+	if err != nil {
+		return *new([][16]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([][16]byte)).(*[][16]byte)
+
+	return out0, err
+
+}
+
+func (_RMN *RMNSession) GetCursedSubjects() ([][16]byte, error) {
+	return _RMN.Contract.GetCursedSubjects(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCallerSession) GetCursedSubjects() ([][16]byte, error) {
+	return _RMN.Contract.GetCursedSubjects(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCaller) IsCursed(opts *bind.CallOpts, subject [16]byte) (bool, error) {
+	var out []interface{}
+	err := _RMN.contract.Call(opts, &out, "isCursed", subject)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_RMN *RMNSession) IsCursed(subject [16]byte) (bool, error) {
+	return _RMN.Contract.IsCursed(&_RMN.CallOpts, subject)
+}
+
+func (_RMN *RMNCallerSession) IsCursed(subject [16]byte) (bool, error) {
+	return _RMN.Contract.IsCursed(&_RMN.CallOpts, subject)
+}
+
+func (_RMN *RMNCaller) IsCursed0(opts *bind.CallOpts) (bool, error) {
+	var out []interface{}
+	err := _RMN.contract.Call(opts, &out, "isCursed0")
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_RMN *RMNSession) IsCursed0() (bool, error) {
+	return _RMN.Contract.IsCursed0(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCallerSession) IsCursed0() (bool, error) {
+	return _RMN.Contract.IsCursed0(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _RMN.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_RMN *RMNSession) Owner() (common.Address, error) {
+	return _RMN.Contract.Owner(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCallerSession) Owner() (common.Address, error) {
+	return _RMN.Contract.Owner(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	var out []interface{}
+	err := _RMN.contract.Call(opts, &out, "typeAndVersion")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+func (_RMN *RMNSession) TypeAndVersion() (string, error) {
+	return _RMN.Contract.TypeAndVersion(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNCallerSession) TypeAndVersion() (string, error) {
+	return _RMN.Contract.TypeAndVersion(&_RMN.CallOpts)
+}
+
+func (_RMN *RMNTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "acceptOwnership")
+}
+
+func (_RMN *RMNSession) AcceptOwnership() (*types.Transaction, error) {
+	return _RMN.Contract.AcceptOwnership(&_RMN.TransactOpts)
+}
+
+func (_RMN *RMNTransactorSession) AcceptOwnership() (*types.Transaction, error) {
+	return _RMN.Contract.AcceptOwnership(&_RMN.TransactOpts)
+}
+
+func (_RMN *RMNTransactor) ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "applyAuthorizedCallerUpdates", authorizedCallerArgs)
+}
+
+func (_RMN *RMNSession) ApplyAuthorizedCallerUpdates(authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _RMN.Contract.ApplyAuthorizedCallerUpdates(&_RMN.TransactOpts, authorizedCallerArgs)
+}
+
+func (_RMN *RMNTransactorSession) ApplyAuthorizedCallerUpdates(authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _RMN.Contract.ApplyAuthorizedCallerUpdates(&_RMN.TransactOpts, authorizedCallerArgs)
+}
+
+func (_RMN *RMNTransactor) Curse(opts *bind.TransactOpts, subject [16]byte) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "curse", subject)
+}
+
+func (_RMN *RMNSession) Curse(subject [16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Curse(&_RMN.TransactOpts, subject)
+}
+
+func (_RMN *RMNTransactorSession) Curse(subject [16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Curse(&_RMN.TransactOpts, subject)
+}
+
+func (_RMN *RMNTransactor) Curse0(opts *bind.TransactOpts, subjects [][16]byte) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "curse0", subjects)
+}
+
+func (_RMN *RMNSession) Curse0(subjects [][16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Curse0(&_RMN.TransactOpts, subjects)
+}
+
+func (_RMN *RMNTransactorSession) Curse0(subjects [][16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Curse0(&_RMN.TransactOpts, subjects)
+}
+
+func (_RMN *RMNTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "transferOwnership", to)
+}
+
+func (_RMN *RMNSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _RMN.Contract.TransferOwnership(&_RMN.TransactOpts, to)
+}
+
+func (_RMN *RMNTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _RMN.Contract.TransferOwnership(&_RMN.TransactOpts, to)
+}
+
+func (_RMN *RMNTransactor) Uncurse(opts *bind.TransactOpts, subject [16]byte) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "uncurse", subject)
+}
+
+func (_RMN *RMNSession) Uncurse(subject [16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Uncurse(&_RMN.TransactOpts, subject)
+}
+
+func (_RMN *RMNTransactorSession) Uncurse(subject [16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Uncurse(&_RMN.TransactOpts, subject)
+}
+
+func (_RMN *RMNTransactor) Uncurse0(opts *bind.TransactOpts, subjects [][16]byte) (*types.Transaction, error) {
+	return _RMN.contract.Transact(opts, "uncurse0", subjects)
+}
+
+func (_RMN *RMNSession) Uncurse0(subjects [][16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Uncurse0(&_RMN.TransactOpts, subjects)
+}
+
+func (_RMN *RMNTransactorSession) Uncurse0(subjects [][16]byte) (*types.Transaction, error) {
+	return _RMN.Contract.Uncurse0(&_RMN.TransactOpts, subjects)
+}
+
+type RMNAuthorizedCallerAddedIterator struct {
+	Event *RMNAuthorizedCallerAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *RMNAuthorizedCallerAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RMNAuthorizedCallerAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(RMNAuthorizedCallerAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *RMNAuthorizedCallerAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *RMNAuthorizedCallerAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type RMNAuthorizedCallerAdded struct {
+	Caller common.Address
+	Raw    types.Log
+}
+
+func (_RMN *RMNFilterer) FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*RMNAuthorizedCallerAddedIterator, error) {
+
+	logs, sub, err := _RMN.contract.FilterLogs(opts, "AuthorizedCallerAdded")
+	if err != nil {
+		return nil, err
+	}
+	return &RMNAuthorizedCallerAddedIterator{contract: _RMN.contract, event: "AuthorizedCallerAdded", logs: logs, sub: sub}, nil
+}
+
+func (_RMN *RMNFilterer) WatchAuthorizedCallerAdded(opts *bind.WatchOpts, sink chan<- *RMNAuthorizedCallerAdded) (event.Subscription, error) {
+
+	logs, sub, err := _RMN.contract.WatchLogs(opts, "AuthorizedCallerAdded")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(RMNAuthorizedCallerAdded)
+				if err := _RMN.contract.UnpackLog(event, "AuthorizedCallerAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_RMN *RMNFilterer) ParseAuthorizedCallerAdded(log types.Log) (*RMNAuthorizedCallerAdded, error) {
+	event := new(RMNAuthorizedCallerAdded)
+	if err := _RMN.contract.UnpackLog(event, "AuthorizedCallerAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type RMNAuthorizedCallerRemovedIterator struct {
+	Event *RMNAuthorizedCallerRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *RMNAuthorizedCallerRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RMNAuthorizedCallerRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(RMNAuthorizedCallerRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *RMNAuthorizedCallerRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *RMNAuthorizedCallerRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type RMNAuthorizedCallerRemoved struct {
+	Caller common.Address
+	Raw    types.Log
+}
+
+func (_RMN *RMNFilterer) FilterAuthorizedCallerRemoved(opts *bind.FilterOpts) (*RMNAuthorizedCallerRemovedIterator, error) {
+
+	logs, sub, err := _RMN.contract.FilterLogs(opts, "AuthorizedCallerRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &RMNAuthorizedCallerRemovedIterator{contract: _RMN.contract, event: "AuthorizedCallerRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_RMN *RMNFilterer) WatchAuthorizedCallerRemoved(opts *bind.WatchOpts, sink chan<- *RMNAuthorizedCallerRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _RMN.contract.WatchLogs(opts, "AuthorizedCallerRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(RMNAuthorizedCallerRemoved)
+				if err := _RMN.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_RMN *RMNFilterer) ParseAuthorizedCallerRemoved(log types.Log) (*RMNAuthorizedCallerRemoved, error) {
+	event := new(RMNAuthorizedCallerRemoved)
+	if err := _RMN.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type RMNCursedIterator struct {
+	Event *RMNCursed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *RMNCursedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RMNCursed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(RMNCursed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *RMNCursedIterator) Error() error {
+	return it.fail
+}
+
+func (it *RMNCursedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type RMNCursed struct {
+	Subjects [][16]byte
+	Raw      types.Log
+}
+
+func (_RMN *RMNFilterer) FilterCursed(opts *bind.FilterOpts) (*RMNCursedIterator, error) {
+
+	logs, sub, err := _RMN.contract.FilterLogs(opts, "Cursed")
+	if err != nil {
+		return nil, err
+	}
+	return &RMNCursedIterator{contract: _RMN.contract, event: "Cursed", logs: logs, sub: sub}, nil
+}
+
+func (_RMN *RMNFilterer) WatchCursed(opts *bind.WatchOpts, sink chan<- *RMNCursed) (event.Subscription, error) {
+
+	logs, sub, err := _RMN.contract.WatchLogs(opts, "Cursed")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(RMNCursed)
+				if err := _RMN.contract.UnpackLog(event, "Cursed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_RMN *RMNFilterer) ParseCursed(log types.Log) (*RMNCursed, error) {
+	event := new(RMNCursed)
+	if err := _RMN.contract.UnpackLog(event, "Cursed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type RMNOwnershipTransferRequestedIterator struct {
+	Event *RMNOwnershipTransferRequested
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *RMNOwnershipTransferRequestedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RMNOwnershipTransferRequested)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(RMNOwnershipTransferRequested)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *RMNOwnershipTransferRequestedIterator) Error() error {
+	return it.fail
+}
+
+func (it *RMNOwnershipTransferRequestedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type RMNOwnershipTransferRequested struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_RMN *RMNFilterer) FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*RMNOwnershipTransferRequestedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _RMN.contract.FilterLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &RMNOwnershipTransferRequestedIterator{contract: _RMN.contract, event: "OwnershipTransferRequested", logs: logs, sub: sub}, nil
+}
+
+func (_RMN *RMNFilterer) WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *RMNOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _RMN.contract.WatchLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(RMNOwnershipTransferRequested)
+				if err := _RMN.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_RMN *RMNFilterer) ParseOwnershipTransferRequested(log types.Log) (*RMNOwnershipTransferRequested, error) {
+	event := new(RMNOwnershipTransferRequested)
+	if err := _RMN.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type RMNOwnershipTransferredIterator struct {
+	Event *RMNOwnershipTransferred
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *RMNOwnershipTransferredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RMNOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(RMNOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *RMNOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+func (it *RMNOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type RMNOwnershipTransferred struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_RMN *RMNFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*RMNOwnershipTransferredIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _RMN.contract.FilterLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &RMNOwnershipTransferredIterator{contract: _RMN.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+func (_RMN *RMNFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *RMNOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _RMN.contract.WatchLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(RMNOwnershipTransferred)
+				if err := _RMN.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_RMN *RMNFilterer) ParseOwnershipTransferred(log types.Log) (*RMNOwnershipTransferred, error) {
+	event := new(RMNOwnershipTransferred)
+	if err := _RMN.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type RMNUncursedIterator struct {
+	Event *RMNUncursed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *RMNUncursedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RMNUncursed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(RMNUncursed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *RMNUncursedIterator) Error() error {
+	return it.fail
+}
+
+func (it *RMNUncursedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type RMNUncursed struct {
+	Subjects [][16]byte
+	Raw      types.Log
+}
+
+func (_RMN *RMNFilterer) FilterUncursed(opts *bind.FilterOpts) (*RMNUncursedIterator, error) {
+
+	logs, sub, err := _RMN.contract.FilterLogs(opts, "Uncursed")
+	if err != nil {
+		return nil, err
+	}
+	return &RMNUncursedIterator{contract: _RMN.contract, event: "Uncursed", logs: logs, sub: sub}, nil
+}
+
+func (_RMN *RMNFilterer) WatchUncursed(opts *bind.WatchOpts, sink chan<- *RMNUncursed) (event.Subscription, error) {
+
+	logs, sub, err := _RMN.contract.WatchLogs(opts, "Uncursed")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(RMNUncursed)
+				if err := _RMN.contract.UnpackLog(event, "Uncursed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_RMN *RMNFilterer) ParseUncursed(log types.Log) (*RMNUncursed, error) {
+	event := new(RMNUncursed)
+	if err := _RMN.contract.UnpackLog(event, "Uncursed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+func (RMNAuthorizedCallerAdded) Topic() common.Hash {
+	return common.HexToHash("0xeb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef")
+}
+
+func (RMNAuthorizedCallerRemoved) Topic() common.Hash {
+	return common.HexToHash("0xc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda77580")
+}
+
+func (RMNCursed) Topic() common.Hash {
+	return common.HexToHash("0x1716e663a90a76d3b6c7e5f680673d1b051454c19c627e184c8daf28f3104f74")
+}
+
+func (RMNOwnershipTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
+}
+
+func (RMNOwnershipTransferred) Topic() common.Hash {
+	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
+}
+
+func (RMNUncursed) Topic() common.Hash {
+	return common.HexToHash("0x0676e709c9cc74fa0519fd78f7c33be0f1b2b0bae0507c724aef7229379c6ba1")
+}
+
+func (_RMN *RMN) Address() common.Address {
+	return _RMN.address
+}
+
+type RMNInterface interface {
+	GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error)
+
+	GetCursedSubjects(opts *bind.CallOpts) ([][16]byte, error)
+
+	IsCursed(opts *bind.CallOpts, subject [16]byte) (bool, error)
+
+	IsCursed0(opts *bind.CallOpts) (bool, error)
+
+	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error)
+
+	Curse(opts *bind.TransactOpts, subject [16]byte) (*types.Transaction, error)
+
+	Curse0(opts *bind.TransactOpts, subjects [][16]byte) (*types.Transaction, error)
+
+	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
+
+	Uncurse(opts *bind.TransactOpts, subject [16]byte) (*types.Transaction, error)
+
+	Uncurse0(opts *bind.TransactOpts, subjects [][16]byte) (*types.Transaction, error)
+
+	FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*RMNAuthorizedCallerAddedIterator, error)
+
+	WatchAuthorizedCallerAdded(opts *bind.WatchOpts, sink chan<- *RMNAuthorizedCallerAdded) (event.Subscription, error)
+
+	ParseAuthorizedCallerAdded(log types.Log) (*RMNAuthorizedCallerAdded, error)
+
+	FilterAuthorizedCallerRemoved(opts *bind.FilterOpts) (*RMNAuthorizedCallerRemovedIterator, error)
+
+	WatchAuthorizedCallerRemoved(opts *bind.WatchOpts, sink chan<- *RMNAuthorizedCallerRemoved) (event.Subscription, error)
+
+	ParseAuthorizedCallerRemoved(log types.Log) (*RMNAuthorizedCallerRemoved, error)
+
+	FilterCursed(opts *bind.FilterOpts) (*RMNCursedIterator, error)
+
+	WatchCursed(opts *bind.WatchOpts, sink chan<- *RMNCursed) (event.Subscription, error)
+
+	ParseCursed(log types.Log) (*RMNCursed, error)
+
+	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*RMNOwnershipTransferRequestedIterator, error)
+
+	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *RMNOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferRequested(log types.Log) (*RMNOwnershipTransferRequested, error)
+
+	FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*RMNOwnershipTransferredIterator, error)
+
+	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *RMNOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferred(log types.Log) (*RMNOwnershipTransferred, error)
+
+	FilterUncursed(opts *bind.FilterOpts) (*RMNUncursedIterator, error)
+
+	WatchUncursed(opts *bind.WatchOpts, sink chan<- *RMNUncursed) (event.Subscription, error)
+
+	ParseUncursed(log types.Log) (*RMNUncursed, error)
+
+	Address() common.Address
+}

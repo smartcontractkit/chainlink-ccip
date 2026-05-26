@@ -192,6 +192,50 @@ pub mod burnmint_token_pool {
         Ok(())
     }
 
+    // This method transfers the mint authority back to the pool signer PDA.
+    // Used during migration cleanup to revert from a multisig mint authority back to the pool signer.
+    pub fn transfer_mint_authority_to_pda_signer<'info>(
+        ctx: Context<'_, '_, 'info, 'info, TransferMintAuthorityToPdaSigner<'info>>,
+    ) -> Result<()> {
+        let old_mint_authority = ctx.accounts.current_mint_authority_account.key();
+        let new_mint_authority = ctx.accounts.pool_signer.key();
+        let token_program_id = &ctx.accounts.state.config.token_program.key();
+
+        // Transfer the mint authority to the new mint authority using the corresponding Token Program. It can be token 22 or token SPL
+        let ix = spl_token_2022::instruction::set_authority(
+            token_program_id,
+            &ctx.accounts.mint.key(),
+            Some(&new_mint_authority),
+            spl_token_2022::instruction::AuthorityType::MintTokens,
+            &old_mint_authority,
+            &[ctx.accounts.pool_signer.key],
+        )?;
+
+        let seeds = &[
+            POOL_SIGNER_SEED,
+            &ctx.accounts.mint.key().to_bytes(),
+            &[ctx.bumps.pool_signer],
+        ];
+
+        let account_infos = vec![
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts
+                .current_mint_authority_account
+                .to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+        ];
+
+        invoke_signed(&ix, &account_infos, &[&seeds[..]])?;
+
+        emit!(MintAuthorityTransferred {
+            mint: ctx.accounts.mint.key(),
+            old_mint_authority,
+            new_mint_authority,
+        });
+
+        Ok(())
+    }
+
     /// Returns the program type (name) and version.
     /// Used by offchain code to easily determine which program & version is being interacted with.
     ///

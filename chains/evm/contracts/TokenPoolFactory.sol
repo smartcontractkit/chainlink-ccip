@@ -65,7 +65,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     bytes32 salt;
   }
 
-  string public constant typeAndVersion = "TokenPoolFactory 2.0.0-dev";
+  string public constant typeAndVersion = "TokenPoolFactory 2.0.0";
   bytes private constant LOCKBOX_INIT_CODE = type(ERC20LockBox).creationCode;
 
   address private immutable i_rmnProxy;

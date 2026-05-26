@@ -5732,6 +5732,71 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, expected, derivedAccounts[i], "Account at index %d does not match expected", i)
 			}
 		})
+
+		t.Run("When sending a valid CCIP message with a pre-funded nonce PDA, it succeeds", func(t *testing.T) {
+			// This test verifies that ccip_send works even when the nonce PDA has been
+			// pre-funded with lamports before initialization.
+			prefundedUser, err := solana.NewRandomPrivateKey()
+			require.NoError(t, err)
+			testutils.FundAccounts(ctx, []solana.PrivateKey{prefundedUser}, solanaGoClient, t)
+
+			zeroPubkey := solana.PublicKeyFromBytes(make([]byte, 32))
+
+			// Derive the nonce PDA for this user
+			noncePDA, err := state.FindNoncePDA(config.EvmChainSelector, prefundedUser.PublicKey(), config.CcipRouterProgram)
+			require.NoError(t, err)
+
+			// Pre-fund the nonce PDA. The transfer must meet rent-exemption
+			// for a 0-byte account, otherwise Solana rejects it.
+			rentExemptMin := uint64(890_880) // rent-exempt minimum for 0 data bytes
+			ixPrefund, err := system.NewTransferInstruction(rentExemptMin, prefundedUser.PublicKey(), noncePDA).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixPrefund}, prefundedUser, config.DefaultCommitment)
+
+			// Send a CCIP message paying with native SOL — this should succeed despite the pre-funded nonce PDA
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken:  zeroPubkey, // will pay with native SOL
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+			raw := ccip_router.NewCcipSendInstruction(
+				config.EvmChainSelector,
+				message,
+				[]byte{},
+				config.RouterConfigPDA,
+				config.EvmDestChainStatePDA,
+				noncePDA,
+				prefundedUser.PublicKey(),
+				solana.SystemProgramID,
+				wsol.program,
+				wsol.mint,
+				zeroPubkey, // no user token account, because paying with native SOL
+				wsol.billingATA,
+				config.BillingSignerPDA,
+				config.FeeQuoterProgram,
+				config.FqConfigPDA,
+				config.FqEvmDestChainPDA,
+				wsol.fqBillingConfigPDA,
+				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			)
+
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, prefundedUser, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			// Verify the nonce was initialized correctly
+			var nonceCounterAccount ccip_router.Nonce
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, noncePDA, config.DefaultCommitment, &nonceCounterAccount)
+			require.NoError(t, err, "failed to get nonce account info")
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
+			require.Equal(t, uint64(1), nonceCounterAccount.TotalNonce)
+		})
 	})
 
 	///////////////////////////

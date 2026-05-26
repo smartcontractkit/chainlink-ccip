@@ -54,7 +54,7 @@ type CommitteeVerifierRemoteChainDefaults struct {
 
 // RemoteChainDefaults provides sensible defaults for remote chain configuration
 // fields that are chain-family-specific. Each ChainFamily adapter returns its own
-// defaults; callers override individual fields as needed for lane-pair-specific values.
+// defaults for a source→remote lane pair; callers override individual fields as needed.
 type RemoteChainDefaults struct {
 	AllowTrafficFrom          bool
 	ExecutorDestChainConfig   ExecutorDestChainConfig
@@ -62,23 +62,6 @@ type RemoteChainDefaults struct {
 	TokenReceiverAllowed      bool
 	MessageNetworkFeeUSDCents uint16
 	TokenNetworkFeeUSDCents   uint16
-}
-
-// FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
-type FeeQuoterDestChainConfig struct {
-	OverrideExistingConfig      bool
-	IsEnabled                   bool
-	MaxDataBytes                uint32
-	MaxPerMsgGasLimit           uint32
-	DestGasOverhead             uint32
-	DestGasPerPayloadByteBase   uint8
-	ChainFamilySelector         [4]byte
-	DefaultTokenFeeUSDCents     uint16
-	DefaultTokenDestGasOverhead uint32
-	DefaultTxGasLimit           uint32
-	NetworkFeeUSDCents          uint16
-	LinkFeeMultiplierPercent    uint8
-	USDPerUnitGas               *big.Int
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
@@ -91,7 +74,7 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	DefaultOutboundCCVs       []LocalContract
 	LaneMandatedOutboundCCVs  []LocalContract
 	DefaultExecutor           LocalContract
-	FeeQuoterDestChainConfig  FeeQuoterDestChainConfig
+	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
 	ExecutorDestChainConfig   ExecutorDestChainConfig
 	AddressBytesLength        uint8
 	BaseExecutionGasCost      uint32
@@ -131,8 +114,8 @@ type ChainFamily interface {
 	ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error)
 	GetAddressBytesLength() uint8
 	GetChainFamilySelector() [4]byte
-	GetDefaultFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
-	GetDefaultRemoteChainConfig() RemoteChainDefaults
+	GetDefaultFeeQuoterDestChainConfig(chainSelector, remoteChainSelector uint64, chainFamilySelector [4]byte) FeeQuoterDestChainConfigOverrides
+	GetDefaultRemoteChainConfig(sourceChainSelector, remoteChainSelector uint64) RemoteChainDefaults
 	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
 	GetDefaultFinalityConfig() finality.Config
 }
@@ -172,4 +155,25 @@ func (r *ChainFamilyRegistry) GetChainFamily(chainFamily string) (ChainFamily, b
 	defer r.mu.Unlock()
 	adapter, ok := r.m[chainFamily]
 	return adapter, ok
+}
+
+// FeeQuoterDestChainConfigOverrides is the unified type used both for chain-family adapter
+// defaults (returned by GetDefaultFeeQuoterDestChainConfig) and for lane-pair-specific
+// user-provided overrides. Nil pointer fields are ignored during merge; non-nil fields
+// (including those explicitly set to zero) replace the corresponding value. This ensures
+// user-supplied zero values are honored rather than silently dropped.
+type FeeQuoterDestChainConfigOverrides struct {
+	OverrideExistingConfig      bool
+	IsEnabled                   *bool
+	MaxDataBytes                *uint32
+	MaxPerMsgGasLimit           *uint32
+	DestGasOverhead             *uint32
+	DestGasPerPayloadByteBase   *uint8
+	ChainFamilySelector         [4]byte
+	DefaultTokenFeeUSDCents     *uint16
+	DefaultTokenDestGasOverhead *uint32
+	DefaultTxGasLimit           *uint32
+	NetworkFeeUSDCents          *uint16
+	LinkFeeMultiplierPercent    *uint8
+	USDPerUnitGas               *big.Int
 }

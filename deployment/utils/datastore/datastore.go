@@ -84,30 +84,21 @@ func SprintRef(ref datastore.AddressRef) string {
 // findRef queries the datastore for an AddressRef matching a subset of fields provided by AddressRef.
 // It enforces that exactly one match is found.
 func findRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.AddressRef, int, error) {
-	filterFns := make([]datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef], 0, 5)
-	// Filter by largest scope (chain) to smallest scope (address)
-	// Address is the smallest scope because there can only be one of each address on a given chain
-	if ref.ChainSelector != 0 {
-		filterFns = append(filterFns, datastore.AddressRefByChainSelector(ref.ChainSelector))
-	}
-	if ref.Type != "" {
-		filterFns = append(filterFns, datastore.AddressRefByType(ref.Type))
-	}
-	if ref.Version != nil {
-		filterFns = append(filterFns, datastore.AddressRefByVersion(ref.Version))
-	}
-	if ref.Qualifier != "" {
-		filterFns = append(filterFns, datastore.AddressRefByQualifier(ref.Qualifier))
-	}
-	if ref.Address != "" {
-		filterFns = append(filterFns, datastore.AddressRefByAddress(ref.Address))
-	}
-	refs := ds.Addresses().Filter(filterFns...)
+	refs := ds.Addresses().Filter(AddressRefToFilters(ref)...)
 	if len(refs) != 1 {
 		return datastore.AddressRef{}, len(refs), fmt.Errorf("expected to find exactly 1 ref with criteria %s, found %d", SprintRef(ref), len(refs))
 	}
 
 	return refs[0], 1, nil
+}
+
+// IsAddressRefFullyPopulated checks if an AddressRef has all fields populated (except Labels).
+func IsAddressRefFullyPopulated(ref datastore.AddressRef) bool {
+	return ref.Address != "" &&
+		ref.Type != "" &&
+		ref.Version != nil &&
+		ref.Qualifier != "" &&
+		ref.ChainSelector != 0
 }
 
 // IsAddressRefEmpty checks if an AddressRef is empty.
@@ -313,4 +304,28 @@ func MergeRefs(ref1, ref2 *datastore.AddressRef) (datastore.AddressRef, error) {
 	}
 
 	return merged, nil
+}
+
+func AddressRefToFilters(ref datastore.AddressRef) []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef] {
+	// NOTE: filters are applied sequentially, so it is more efficient to order
+	// the more selective filters first so that each subsequent filter operates
+	// on a smaller set of refs.
+	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
+	if ref.Address != "" {
+		filters = append(filters, datastore.AddressRefByAddress(ref.Address))
+	}
+	if ref.ChainSelector != 0 {
+		filters = append(filters, datastore.AddressRefByChainSelector(ref.ChainSelector))
+	}
+	if ref.Qualifier != "" {
+		filters = append(filters, datastore.AddressRefByQualifier(ref.Qualifier))
+	}
+	if ref.Version != nil {
+		filters = append(filters, datastore.AddressRefByVersion(ref.Version))
+	}
+	if ref.Type != "" {
+		filters = append(filters, datastore.AddressRefByType(ref.Type))
+	}
+
+	return filters
 }

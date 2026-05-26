@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"k8s.io/utils/ptr"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -184,22 +185,24 @@ func (a *ChainFamilyAdapter) GetChainFamilySelector() [4]byte {
 	return evmFamilySelector
 }
 
-func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccvadapters.FeeQuoterDestChainConfig {
-	return ccvadapters.FeeQuoterDestChainConfig{
-		IsEnabled:                   true,
-		MaxDataBytes:                32_000,
-		MaxPerMsgGasLimit:           8_000_000,
-		DestGasPerPayloadByteBase:   20,
-		ChainFamilySelector:         evmFamilySelector,
-		DefaultTokenFeeUSDCents:     25,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		LinkFeeMultiplierPercent:    90,
+func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(chainSelector uint64, remoteChainSelector uint64, chainFamilySelector [4]byte) ccvadapters.FeeQuoterDestChainConfigOverrides {
+	return ccvadapters.FeeQuoterDestChainConfigOverrides{
+		IsEnabled:                   ptr.To(true),
+		MaxDataBytes:                ptr.To(uint32(32_000)),
+		MaxPerMsgGasLimit:           ptr.To(sequences.GetMaxMsgPerGasLimit(remoteChainSelector)),
+		DestGasPerPayloadByteBase:   ptr.To(sequences.GetdestGasPerPayloadByteBase(remoteChainSelector)),
+		DestGasOverhead:             ptr.To(uint32(0)), // not used even set
+		ChainFamilySelector:         chainFamilySelector,
+		DefaultTokenFeeUSDCents:     ptr.To(uint16(0)),
+		DefaultTokenDestGasOverhead: ptr.To(uint32(90_000)),
+		DefaultTxGasLimit:           ptr.To(uint32(200_000)),
+		NetworkFeeUSDCents:          ptr.To(sequences.GetNetworkFeeUSDCents(chainSelector, remoteChainSelector)),
+		LinkFeeMultiplierPercent:    ptr.To(uint8(90)),
 		// USDPerUnitGas is not set here to avoid doing a gas price update by default
 	}
 }
 
+// This needs to be deprecated. use GetDefaultFeeQuoterDestChainConfig instead
 func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	sel := a.GetChainFamilySelector()
 	return lanes.FeeQuoterDestChainConfig{
@@ -220,14 +223,17 @@ func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestCh
 	}
 }
 
-func (a *ChainFamilyAdapter) GetDefaultRemoteChainConfig() ccvadapters.RemoteChainDefaults {
+func (a *ChainFamilyAdapter) GetDefaultRemoteChainConfig(sourceChainSelector, remoteChainSelector uint64) ccvadapters.RemoteChainDefaults {
 	return ccvadapters.RemoteChainDefaults{
-		AllowTrafficFrom:          true,
-		ExecutorDestChainConfig:   ccvadapters.ExecutorDestChainConfig{USDCentsFee: 0, Enabled: true},
-		BaseExecutionGasCost:      175_000,
+		AllowTrafficFrom: true,
+		ExecutorDestChainConfig: ccvadapters.ExecutorDestChainConfig{
+			USDCentsFee: 0,
+			Enabled:     true,
+		},
+		BaseExecutionGasCost:      200_000,
 		TokenReceiverAllowed:      false,
-		MessageNetworkFeeUSDCents: 10,
-		TokenNetworkFeeUSDCents:   25,
+		MessageNetworkFeeUSDCents: sequences.GetNetworkFeeUSDCents(sourceChainSelector, remoteChainSelector),
+		TokenNetworkFeeUSDCents:   sequences.GetDefaultTokenFeeUSDCentsFor1_6Lane(sourceChainSelector, remoteChainSelector),
 	}
 }
 
@@ -235,15 +241,15 @@ func (a *ChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccva
 	return ccvadapters.CommitteeVerifierRemoteChainDefaults{
 		AllowlistEnabled:   false,
 		FeeUSDCents:        0,
-		GasForVerification: 60_000,
-		PayloadSizeBytes:   390,
+		GasForVerification: 75_000,
+		PayloadSizeBytes:   582,
 	}
 }
 
 func (a *ChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 	return finality.Config{
 		WaitForFinality: true,
-		WaitForSafe:     true,
+		WaitForSafe:     false,
 		BlockDepth:      1,
 	}
 }

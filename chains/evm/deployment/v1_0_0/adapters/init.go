@@ -16,6 +16,8 @@ func init() {
 	deployapi.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMDeployer{})
 	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMTransferOwnershipAdapter{})
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilyEVM, &EVMMCMSReader{})
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilyEVM, &EVMTokenBase{})
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMTokenBase{})
 	feesapi.GetRegistry().RegisterFeeResolver(chain_selectors.FamilyEVM, &EVMFeeResolver{})
+	deployapi.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, &EVMAddressNormalizer{})
 }

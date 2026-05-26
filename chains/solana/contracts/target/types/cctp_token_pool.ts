@@ -1,5 +1,5 @@
 export type CctpTokenPool = {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "name": "cctp_token_pool",
   "instructions": [
     {
@@ -226,7 +226,7 @@ export type CctpTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -262,7 +262,7 @@ export type CctpTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -674,7 +674,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -763,7 +763,7 @@ export type CctpTokenPool = {
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1388,7 +1388,7 @@ export type CctpTokenPool = {
 };
 
 export const IDL: CctpTokenPool = {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "name": "cctp_token_pool",
   "instructions": [
     {
@@ -1615,7 +1615,7 @@ export const IDL: CctpTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1651,7 +1651,7 @@ export const IDL: CctpTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2063,7 +2063,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2152,7 +2152,7 @@ export const IDL: CctpTokenPool = {
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {

@@ -99,17 +99,33 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 				return cldf.ChangesetOutput{}, err
 			}
 
-			adapter, exists := tokenPoolRegistry.GetTokenAdapter(chainfam, cfg.ChainAdapterVersion)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", chainfam)
-			}
-
 			// Safeguard: always prevent chain selector mismatches
 			if registration.TokenPoolRef.ChainSelector != 0 && registration.TokenPoolRef.ChainSelector != registration.ChainSelector {
 				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenPoolRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenPoolRef.ChainSelector)
 			}
 			if registration.TokenRef.ChainSelector != 0 && registration.TokenRef.ChainSelector != registration.ChainSelector {
 				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenRef.ChainSelector)
+			}
+
+			var adapterVersion *semver.Version
+			fullPool, findErr := ResolveTokenPoolRef(e, tokenPoolRegistry, registration.ChainSelector, registration.TokenPoolRef)
+			if findErr == nil {
+				adapterVersion = fullPool.Version
+			}
+			if adapterVersion == nil {
+				switch {
+				case registration.TokenPoolRef.Version != nil:
+					adapterVersion = registration.TokenPoolRef.Version
+				case cfg.ChainAdapterVersion != nil:
+					adapterVersion = cfg.ChainAdapterVersion
+				default:
+					return cldf.ChangesetOutput{}, fmt.Errorf("registration[%d]: cannot determine token pool adapter version: pool not found in datastore under tokenPoolRef and neither tokenPoolRef.version nor chainAdapterVersion is set", i)
+				}
+			}
+
+			adapter, exists := tokenPoolRegistry.GetTokenAdapter(chainfam, adapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s' and version '%v'", chainfam, adapterVersion)
 			}
 
 			report, err := cldf_ops.ExecuteSequence(
@@ -132,6 +148,9 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add address ref (%+v) from report output to datastore for registration index %d, address index %d: %w", addrRef, i, j, err)
 				}
 			}
+
+			// update environment datastore with new addresses for next iteration to use
+			e.DataStore = ds.Seal()
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
