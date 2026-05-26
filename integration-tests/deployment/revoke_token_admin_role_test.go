@@ -257,12 +257,58 @@ func TestRevokeTokenAdminRoleTimelock(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, hasRole)
 
-		// We should be able to revoke admin if no fallback address is provided
+		// The changeset should default to revoking timelock if no particular account is specified
 		revokeOutput, err := revokeTokenAdminRoleForTest(t, env, selector, token.Address().Hex(), "", customer.Hex())
 		require.NoError(t, err)
 		testhelpers.ProcessTimelockProposals(t, *env, revokeOutput.MCMSTimelockProposals, false)
 
 		// Verify token roles (customer is an admin, timelock is not)
+		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
+		require.NoError(t, err)
+		require.False(t, hasRole)
+		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, customer)
+		require.NoError(t, err)
+		require.True(t, hasRole)
+	})
+
+	t.Run("mixed timelock and deployer", func(t *testing.T) {
+		// Only make timelock an admin on the token
+		token := DeployBurnMintTokenEVM(t, env, selector, "")
+		_ = DeployBurnMintPoolEVM(t, env, selector, cciputils.Version_1_6_1, token.Address())
+		defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+
+		// Verify token roles (timelock is an admin, deployer is not)
+		hasRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
+		require.NoError(t, err)
+		require.True(t, hasRole)
+		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, chain.DeployerKey.From)
+		require.NoError(t, err)
+		require.False(t, hasRole)
+
+		// The changeset should default to revoking timelock if no particular account is specified
+		revokeOutput, err := revokeTokenAdminRoleForTest(t, env, selector, token.Address().Hex(), "", chain.DeployerKey.From.Hex())
+		require.NoError(t, err)
+		require.Len(t, revokeOutput.MCMSTimelockProposals, 1)
+		testhelpers.ProcessTimelockProposals(t, *env, revokeOutput.MCMSTimelockProposals, false)
+
+		// Verify token roles (deployer is an admin, timelock is not)
+		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
+		require.NoError(t, err)
+		require.False(t, hasRole)
+		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, chain.DeployerKey.From)
+		require.NoError(t, err)
+		require.True(t, hasRole)
+
+		// We should be able to revoke the deployer key even if timelock was already revoked
+		revokeOutput, err = revokeTokenAdminRoleForTest(t, env, selector, token.Address().Hex(), chain.DeployerKey.From.Hex(), customer.Hex())
+		require.NoError(t, err)
+		testhelpers.ProcessTimelockProposals(t, *env, revokeOutput.MCMSTimelockProposals, false)
+
+		// Verify token roles (only customer should be an admin)
+		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, chain.DeployerKey.From)
+		require.NoError(t, err)
+		require.False(t, hasRole)
 		hasRole, err = token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddress)
 		require.NoError(t, err)
 		require.False(t, hasRole)
