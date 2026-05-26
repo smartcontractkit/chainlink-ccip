@@ -32,8 +32,9 @@ import (
 )
 
 var (
-	_ tokensapi.TokenRefResolver = &EVMTokenBase{}
-	_ tokensapi.TokenAdapter     = &EVMTokenBase{}
+	_ tokensapi.TokenAdminRoleAdapter = &EVMTokenBase{}
+	_ tokensapi.TokenRefResolver      = &EVMTokenBase{}
+	_ tokensapi.TokenAdapter          = &EVMTokenBase{}
 )
 
 // EVMTokenBase provides version-agnostic EVM token adapter methods that are
@@ -52,6 +53,10 @@ func (a *EVMTokenBase) AddressRefToBytes(ref datastore.AddressRef) ([]byte, erro
 
 func (a *EVMTokenBase) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return v1_0_0_seq.DeployToken
+}
+
+func (a *EVMTokenBase) RevokeTokenAdminRole() *cldf_ops.Sequence[tokensapi.RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return v1_0_0_seq.RevokeTokenAdminRole
 }
 
 func (a *EVMTokenBase) DeployTokenVerify(e deployment.Environment, input tokensapi.DeployTokenInput) error {

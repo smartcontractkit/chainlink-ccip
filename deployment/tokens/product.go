@@ -35,6 +35,11 @@ type TokenFeeAdapter interface {
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
 }
 
+// TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.
+type TokenAdminRoleAdapter interface {
+	RevokeTokenAdminRole() *cldf_ops.Sequence[RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
 // TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
 // and pool references to be resolved in a particular way before they are passed into the adapter logic. For example, a ref resolver can
 // reconstruct refs from onchain data, normalize addresses, apply transformations on the raw input ref, etc.
