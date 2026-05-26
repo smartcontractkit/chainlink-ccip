@@ -127,7 +127,7 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			}
 			tokenAdapter, ok := tokenRegistry.GetTokenAdapter(family, version)
 			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: no TokenPoolAdapter registered for chain family '%s' and version '%v'", i, family, version)
+				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: no token adapter registered for chain family '%s' and version '%v'", i, family, version)
 			}
 			roleAdapter, ok := tokenAdapter.(TokenAdminRoleAdapter)
 			if !ok {
