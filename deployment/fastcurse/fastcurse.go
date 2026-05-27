@@ -110,10 +110,17 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 			if err != nil {
 				return curseCfg, fmt.Errorf("failed to derive curse adapter version for chain selector %d: %w", connectedChainSelector, err)
 			}
+			// Add both directions for v1.6 lane safety (reverse can be any version).
+			// Even for a global curse, v1.6 lanes must be represented bidirectionally.
 			curseCfg.CurseActions = append(curseCfg.CurseActions, CurseActionInput{
 				ChainSelector:        connectedChainSelector,
 				Version:              connectedVersion,
 				SubjectChainSelector: chainSelector,
+			})
+			curseCfg.CurseActions = append(curseCfg.CurseActions, CurseActionInput{
+				ChainSelector:        chainSelector,
+				Version:              version,
+				SubjectChainSelector: connectedChainSelector,
 			})
 		}
 	}
@@ -174,6 +181,10 @@ func filterSubjectsToCurse(e cldf.Environment, force bool, selector uint64, curs
 
 func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
+		if err := validateBidirectionalV16Cursing(cfg); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("curse validation failed: %w", err)
+		}
+
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		grouped, err := cr.groupRMNSubjectBySelector(e, cfg.CurseActions)
@@ -212,6 +223,10 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 
 func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
+		if err := validateBidirectionalV16Cursing(cfg); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("uncurse validation failed: %w", err)
+		}
+
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		// Group curse actions by chain selector

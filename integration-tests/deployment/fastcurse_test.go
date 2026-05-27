@@ -291,6 +291,13 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				SubjectChainSelector: chainsel.SOLANA_MAINNET.Selector,
 				Version:              semver.MustParse("1.6.0"),
 			},
+			{
+				// v1.6 lanes must be represented bidirectionally; reverse direction can be any version.
+				IsGlobalCurse:        false,
+				ChainSelector:        chainsel.SOLANA_MAINNET.Selector,
+				SubjectChainSelector: chain2,
+				Version:              semver.MustParse("1.6.0"),
+			},
 		},
 		Force: false,
 		MCMS: mcms.Input{
