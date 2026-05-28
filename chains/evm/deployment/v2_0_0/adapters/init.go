@@ -93,16 +93,14 @@ func init() {
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
 	ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyEVM, &ChainFamilyAdapter{})
 
-	// Register all EVM ccv adapter implementations into the ccv singleton registry.
-	ccvdeploymentadapters.GetRegistry().Register(chainsel.FamilyEVM, ccvdeploymentadapters.ChainAdapters{
-		Aggregator:               &EVMCCVAggregatorConfigAdapter{},
-		Executor:                 &EVMCCVExecutorConfigAdapter{},
-		Verifier:                 &EVMCCVVerifierConfigAdapter{},
-		Indexer:                  &EVMCCVIndexerConfigAdapter{},
-		TokenVerifier:            &EVMCCVTokenVerifierConfigAdapter{},
-		CommitteeVerifierOnchain: &EVMCCVCommitteeVerifierOnchainAdapter{},
-		CommitteeVerifierDeploy:  &EVMCommitteeVerifierDeployAdapter{},
-	})
+	// Register all EVM ccv adapter implementations into the ccv singleton registries.
+	ccvdeploymentadapters.GetAggregatorRegistry().Register(chainsel.FamilyEVM, &EVMCCVAggregatorConfigAdapter{})
+	ccvdeploymentadapters.GetExecutorRegistry().Register(chainsel.FamilyEVM, &EVMCCVExecutorConfigAdapter{})
+	ccvdeploymentadapters.GetVerifierRegistry().Register(chainsel.FamilyEVM, &EVMCCVVerifierConfigAdapter{})
+	ccvdeploymentadapters.GetIndexerRegistry().Register(chainsel.FamilyEVM, &EVMCCVIndexerConfigAdapter{})
+	ccvdeploymentadapters.GetTokenVerifierRegistry().Register(chainsel.FamilyEVM, &EVMCCVTokenVerifierConfigAdapter{})
+	ccvdeploymentadapters.GetCommitteeVerifierOnchainRegistry().Register(chainsel.FamilyEVM, &EVMCCVCommitteeVerifierOnchainAdapter{})
+	ccvdeploymentadapters.GetCommitteeVerifierDeployRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierDeployAdapter{})
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
 	ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyEVM, &EVMExecutorConfigAdapter{})
 	ccvadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyEVM, &EVMVerifierJobConfigAdapter{})
