@@ -123,10 +123,23 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				}
 			}
 
+			// Set the allowed finality config (if applicable) - this does not produce a
+			// batch if the current on-chain config already matches the requested config
+			output := sequences.OnChainOutput{Addresses: matches}
+			if report, err := cldf_ops.ExecuteSequence(b, SetAllowedFinalityConfigForTokenPools, chains, tokens.SetAllowedFinalityConfigSequenceInput{
+				Settings: map[string]finality.Config{tokenPoolAddress.Hex(): input.AllowedFinalityConfig},
+				Selector: chain.Selector,
+			}); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config for existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
+			} else {
+				output.Addresses = append(output.Addresses, report.Output.Addresses...)
+				output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
+			}
+
 			// If the caller did not provide any dynamic config fields to update, then
 			// skip the configure step and return early.
 			if configureInput == (ConfigureTokenPoolInput{}) {
-				return sequences.OnChainOutput{Addresses: matches}, nil
+				return output, nil
 			} else {
 				configureInput.TokenPoolAddress = tokenPoolAddress
 				configureInput.ChainSelector = chain.Selector
@@ -135,21 +148,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			// ConfigureTokenPool reads current values and only emits a write when they
 			// differ so reruns with the same inputs are no-ops. Fields that the caller
 			// leaves unset (zero/empty) retain their current on-chain values.
-			output := sequences.OnChainOutput{Addresses: matches}
 			if report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPool, chain, configureInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to reconcile dynamic config for existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
-			} else {
-				output.Addresses = append(output.Addresses, report.Output.Addresses...)
-				output.BatchOps = report.Output.BatchOps
-			}
-
-			// Set the allowed finality config (if applicable) - this does not produce a
-			// batch if the current on-chain config already matches the requested config
-			if report, err := cldf_ops.ExecuteSequence(b, SetAllowedFinalityConfigForTokenPools, chains, tokens.SetAllowedFinalityConfigSequenceInput{
-				Settings: map[string]finality.Config{tokenPoolAddress.Hex(): input.AllowedFinalityConfig},
-				Selector: chain.Selector,
-			}); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config for existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
 			} else {
 				output.Addresses = append(output.Addresses, report.Output.Addresses...)
 				output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
@@ -244,6 +244,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 		// Configure the finality config (if applicable)
 		if len(output.Addresses) > 0 {
+			// NOTE: Addresses[0] is the deployed pool AddressRef by convention
+			// for both DeployLockReleaseTokenPool and DeployBurnMintTokenPool.
 			poolRef := output.Addresses[0]
 			if report, err := cldf_ops.ExecuteSequence(b, SetAllowedFinalityConfigForTokenPools, chains, tokens.SetAllowedFinalityConfigSequenceInput{
 				Settings: map[string]finality.Config{poolRef.Address: input.AllowedFinalityConfig},
