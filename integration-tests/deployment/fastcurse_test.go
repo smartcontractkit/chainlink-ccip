@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	soladapterv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
+	solofframpops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -74,6 +75,24 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+
+	// Ensure the Solana OffRamp is configured with chain2 as an enabled source chain.
+	// The Solana fastcurse adapter's connectivity check for lane actions reads the OffRamp
+	// source-chain state (PDA) and will treat the chains as disconnected unless this is set.
+	_, err = cldf_ops.ExecuteOperation(
+		env.OperationsBundle,
+		solofframpops.ConnectChains,
+		env.BlockChains.SolanaChains()[chainsel.SOLANA_MAINNET.Selector],
+		solofframpops.ConnectChainsParams{
+			OffRamp:                   solana.MustPublicKeyFromBase58(solanaProgramIDs["ccip_offramp"]),
+			RemoteChainSelector:       chain2,
+			SourceOnRamp:              common.HexToAddress("0x0000000000000000000000000000000000000001").Bytes(),
+			EnabledAsSource:           true,
+			IsRMNVerificationDisabled: true,
+		},
+	)
+	require.NoError(t, err, "Failed to connect Solana OffRamp to EVM chain2")
+
 	DeployMCMS(t, env, chainsel.SOLANA_MAINNET.Selector, []string{deploymentutils.CLLQualifier})
 	SolanaTransferOwnership(t, env, chainsel.SOLANA_MAINNET.Selector)
 	ds := datastore.NewMemoryDataStore()
@@ -292,7 +311,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				Version:              semver.MustParse("1.6.0"),
 			},
 			{
-				// v1.6 lanes must be represented bidirectionally; reverse direction can be any version.
+				// Lane curse actions must be represented bidirectionally; reverse direction can be any version.
 				IsGlobalCurse:        false,
 				ChainSelector:        chainsel.SOLANA_MAINNET.Selector,
 				SubjectChainSelector: chain2,
