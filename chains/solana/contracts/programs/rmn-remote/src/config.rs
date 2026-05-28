@@ -53,7 +53,7 @@ pub(super) fn load_config(config: &AccountInfo<'_>) -> Result<Config> {
                 RmnRemoteError::InvalidInputsConfigAccount
             );
             let old_config = load_old_config::<ConfigV2>(borrowed_data)?;
-            return Ok(Config::from(old_config));
+            Ok(Config::from(old_config))
         }
         Config::LATEST_VERSION => {
             const MIN_SPACE: usize = Config::DISCRIMINATOR.len() + Config::INIT_SPACE;
@@ -64,7 +64,7 @@ pub(super) fn load_config(config: &AccountInfo<'_>) -> Result<Config> {
                 RmnRemoteError::InvalidInputsConfigAccount
             );
             let mut data: &[u8] = &borrowed_data;
-            return Config::try_deserialize(&mut data);
+            Config::try_deserialize(&mut data)
         }
         _ => Err(RmnRemoteError::InvalidInputsConfigAccount.into()),
     }
