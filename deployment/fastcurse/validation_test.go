@@ -36,9 +36,10 @@ func globalAction(t *testing.T, chain uint64, version string) CurseActionInput {
 
 func TestValidateBidirectionalCursing(t *testing.T) {
 	tests := []struct {
-		name        string
-		actions     []CurseActionInput
-		expectError bool
+		name           string
+		actions        []CurseActionInput
+		expectError    bool
+		errorSubstring string
 	}{
 		{
 			name: "valid bidirectional v1.6 cursing",
@@ -53,14 +54,16 @@ func TestValidateBidirectionalCursing(t *testing.T) {
 			actions: []CurseActionInput{
 				laneAction(t, 1, 2, "1.6.0"),
 			},
-			expectError: true,
+			expectError:    true,
+			errorSubstring: "unidirectional lane",
 		},
 		{
 			name: "invalid v1.5 unidirectional cursing",
 			actions: []CurseActionInput{
 				laneAction(t, 1, 2, "1.5.0"),
 			},
-			expectError: true,
+			expectError:    true,
+			errorSubstring: "unidirectional lane",
 		},
 		{
 			name: "valid mixed version bidirectional cursing (v1.6 forward, v1.5 reverse)",
@@ -83,14 +86,16 @@ func TestValidateBidirectionalCursing(t *testing.T) {
 				laneAction(t, 1, 2, "1.6.0"),
 				laneAction(t, 3, 4, "1.6.0"),
 			},
-			expectError: true,
+			expectError:    true,
+			errorSubstring: "unidirectional lane",
 		},
 		{
 			name: "invalid v1.7+ unidirectional cursing",
 			actions: []CurseActionInput{
 				laneAction(t, 1, 2, "1.7.0"),
 			},
-			expectError: true,
+			expectError:    true,
+			errorSubstring: "unidirectional lane",
 		},
 		{
 			name: "self-lane is ignored",
@@ -98,6 +103,19 @@ func TestValidateBidirectionalCursing(t *testing.T) {
 				laneAction(t, 1, 1, "1.6.0"),
 			},
 			expectError: false,
+		},
+		{
+			name: "self-lane with nil version is rejected",
+			actions: []CurseActionInput{
+				{
+					ChainSelector:        1,
+					SubjectChainSelector: 1,
+					Version:              nil,
+					IsGlobalCurse:        false,
+				},
+			},
+			expectError:    true,
+			errorSubstring: "missing version",
 		},
 	}
 
@@ -107,7 +125,9 @@ func TestValidateBidirectionalCursing(t *testing.T) {
 			err := validateBidirectionalLaneActions(cfg)
 			if tt.expectError {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "unidirectional lane")
+				if tt.errorSubstring != "" {
+					require.Contains(t, err.Error(), tt.errorSubstring)
+				}
 			} else {
 				require.NoError(t, err)
 			}
