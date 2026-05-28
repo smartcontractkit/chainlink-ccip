@@ -10,13 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -274,7 +275,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
@@ -322,7 +323,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
