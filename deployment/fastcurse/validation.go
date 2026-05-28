@@ -3,8 +3,6 @@ package fastcurse
 import (
 	"fmt"
 	"strings"
-
-	"github.com/Masterminds/semver/v3"
 )
 
 type laneKey struct {
@@ -18,21 +16,27 @@ type curseActionInfo struct {
 	subjectSelector uint64
 }
 
-// validateBidirectionalV16Cursing validates that v1.6 lanes are only cursed/uncursed bidirectionally.
+// validateBidirectionalLaneActions validates that lane curses/uncurses are only applied bidirectionally.
 //
 // Business rule:
-// - v1.6 lane actions (non-global) must include the reverse direction (any version is acceptable)
+// - non-global lane actions must include the reverse direction (any version is acceptable)
 // - global curses are excluded
-func validateBidirectionalV16Cursing(cfg RMNCurseConfig) error {
+func validateBidirectionalLaneActions(cfg RMNCurseConfig) error {
 	allLaneActions := make(map[laneKey]curseActionInfo)
-	v16LaneActions := make(map[laneKey]curseActionInfo)
 
 	for _, action := range cfg.CurseActions {
 		if action.IsGlobalCurse {
 			continue
 		}
 		if action.Version == nil {
-			continue
+			if action.ChainSelector == action.SubjectChainSelector {
+				continue
+			}
+			return fmt.Errorf(
+				"lane curse action missing version: chain %d -> %d",
+				action.ChainSelector,
+				action.SubjectChainSelector,
+			)
 		}
 		if action.ChainSelector == action.SubjectChainSelector {
 			continue
@@ -45,14 +49,10 @@ func validateBidirectionalV16Cursing(cfg RMNCurseConfig) error {
 			subjectSelector: action.SubjectChainSelector,
 		}
 		allLaneActions[key] = actionInfo
-
-		if isV16(action.Version) {
-			v16LaneActions[key] = actionInfo
-		}
 	}
 
 	var unidirectional []curseActionInfo
-	for key, actionInfo := range v16LaneActions {
+	for key, actionInfo := range allLaneActions {
 		reverseKey := laneKey{source: key.target, target: key.source}
 		if _, ok := allLaneActions[reverseKey]; ok {
 			continue
@@ -61,20 +61,16 @@ func validateBidirectionalV16Cursing(cfg RMNCurseConfig) error {
 	}
 
 	if len(unidirectional) > 0 {
-		return formatUnidirectionalV16Error(unidirectional)
+		return formatUnidirectionalLaneError(unidirectional)
 	}
 	return nil
 }
 
-func isV16(v *semver.Version) bool {
-	return v != nil && v.Major() == 1 && v.Minor() == 6
-}
-
-func formatUnidirectionalV16Error(unidirectional []curseActionInfo) error {
+func formatUnidirectionalLaneError(unidirectional []curseActionInfo) error {
 	if len(unidirectional) == 1 {
 		lane := unidirectional[0]
 		return fmt.Errorf(
-			"unidirectional v1.6 lane cursing is not allowed: chain %d -> %d (version %s). v1.6 lanes must be cursed bidirectionally to prevent requests from getting stuck indefinitely",
+			"unidirectional lane cursing is not allowed: chain %d -> %d (version %s). lanes must be cursed bidirectionally to prevent requests from getting stuck indefinitely",
 			lane.chainSelector,
 			lane.subjectSelector,
 			lane.version,
@@ -84,7 +80,7 @@ func formatUnidirectionalV16Error(unidirectional []curseActionInfo) error {
 	var b strings.Builder
 	fmt.Fprintf(
 		&b,
-		"unidirectional v1.6 lane cursing is not allowed for %d lanes. v1.6 lanes must be cursed bidirectionally to prevent requests from getting stuck indefinitely:\n",
+		"unidirectional lane cursing is not allowed for %d lanes. lanes must be cursed bidirectionally to prevent requests from getting stuck indefinitely:\n",
 		len(unidirectional),
 	)
 	for i, lane := range unidirectional {

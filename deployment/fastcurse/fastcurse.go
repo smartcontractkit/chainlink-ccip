@@ -5,9 +5,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -181,7 +182,7 @@ func filterSubjectsToCurse(e cldf.Environment, force bool, selector uint64, curs
 
 func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
-		if err := validateBidirectionalV16Cursing(cfg); err != nil {
+		if err := validateBidirectionalLaneActions(cfg); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("curse validation failed: %w", err)
 		}
 
@@ -223,7 +224,7 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 
 func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
-		if err := validateBidirectionalV16Cursing(cfg); err != nil {
+		if err := validateBidirectionalLaneActions(cfg); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("uncurse validation failed: %w", err)
 		}
 
