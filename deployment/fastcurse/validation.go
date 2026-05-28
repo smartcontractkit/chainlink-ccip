@@ -28,27 +28,22 @@ func validateBidirectionalLaneActions(cfg RMNCurseConfig) error {
 		if action.IsGlobalCurse {
 			continue
 		}
+		if action.ChainSelector == action.SubjectChainSelector {
+			continue
+		}
 		if action.Version == nil {
-			if action.ChainSelector == action.SubjectChainSelector {
-				continue
-			}
 			return fmt.Errorf(
 				"lane curse action missing version: chain %d -> %d",
 				action.ChainSelector,
 				action.SubjectChainSelector,
 			)
 		}
-		if action.ChainSelector == action.SubjectChainSelector {
-			continue
-		}
 
-		key := laneKey{source: action.ChainSelector, target: action.SubjectChainSelector}
-		actionInfo := curseActionInfo{
+		allLaneActions[laneKey{source: action.ChainSelector, target: action.SubjectChainSelector}] = curseActionInfo{
 			version:         action.Version.String(),
 			chainSelector:   action.ChainSelector,
 			subjectSelector: action.SubjectChainSelector,
 		}
-		allLaneActions[key] = actionInfo
 	}
 
 	var unidirectional []curseActionInfo
