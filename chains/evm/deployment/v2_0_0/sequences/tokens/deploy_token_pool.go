@@ -145,16 +145,14 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 			// Set the allowed finality config (if applicable) - this does not produce a
 			// batch if the current on-chain config already matches the requested config
-			if !input.AllowedFinalityConfig.IsZero() {
-				if report, err := cldf_ops.ExecuteSequence(b, SetAllowedFinalityConfigForTokenPools, chains, tokens.SetAllowedFinalityConfigSequenceInput{
-					Settings: map[string]finality.Config{tokenPoolAddress.Hex(): input.AllowedFinalityConfig},
-					Selector: chain.Selector,
-				}); err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config for existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
-				} else {
-					output.Addresses = append(output.Addresses, report.Output.Addresses...)
-					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
-				}
+			if report, err := cldf_ops.ExecuteSequence(b, SetAllowedFinalityConfigForTokenPools, chains, tokens.SetAllowedFinalityConfigSequenceInput{
+				Settings: map[string]finality.Config{tokenPoolAddress.Hex(): input.AllowedFinalityConfig},
+				Selector: chain.Selector,
+			}); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config for existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
+			} else {
+				output.Addresses = append(output.Addresses, report.Output.Addresses...)
+				output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
 			}
 
 			return output, nil
@@ -226,28 +224,26 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Deploy the desired pool contract
-		output := sequences.OnChainOutput{Addresses: matches}
+		output := sequences.OnChainOutput{}
 		switch {
 		case poolutil.IsLockReleasePoolType(tokenPoolType.String()):
 			if report, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, internalInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool on chain %d: %w", chain.Selector, err)
 			} else {
-				output.Addresses = append(output.Addresses, report.Output.Addresses...)
-				output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
+				output = report.Output
 			}
 		case poolutil.IsBurnMintPoolType(tokenPoolType.String()):
 			if report, err := cldf_ops.ExecuteSequence(b, DeployBurnMintTokenPool, chain, internalInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool on chain %d: %w", chain.Selector, err)
 			} else {
-				output.Addresses = append(output.Addresses, report.Output.Addresses...)
-				output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
+				output = report.Output
 			}
 		default:
 			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for chain with selector %d", input.PoolType, chain.Selector)
 		}
 
 		// Configure the finality config (if applicable)
-		if !input.AllowedFinalityConfig.IsZero() && len(output.Addresses) > 0 {
+		if len(output.Addresses) > 0 {
 			poolRef := output.Addresses[0]
 			if report, err := cldf_ops.ExecuteSequence(b, SetAllowedFinalityConfigForTokenPools, chains, tokens.SetAllowedFinalityConfigSequenceInput{
 				Settings: map[string]finality.Config{poolRef.Address: input.AllowedFinalityConfig},
@@ -261,6 +257,9 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Return the deployment output
-		return output, nil
+		return sequences.OnChainOutput{
+			Addresses: append(matches, output.Addresses...),
+			BatchOps:  output.BatchOps,
+		}, nil
 	},
 )

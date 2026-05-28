@@ -28,8 +28,12 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 
 		writes := make([]contract.WriteOutput, 0, len(input.Settings))
 		for pool, finalityConfig := range input.Settings {
+			if finalityConfig.IsZero() {
+				b.Logger.Warnf("skipping finality configuration for pool %s for src %d since finality config is zero", pool, input.Selector)
+				continue
+			}
 			if err := finalityConfig.Validate(); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid finality config for pool %s: %w", pool, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid finality config for pool %s for src %d: %w", pool, input.Selector, err)
 			}
 
 			selector := chain.Selector
