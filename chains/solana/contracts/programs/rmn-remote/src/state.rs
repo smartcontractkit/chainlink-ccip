@@ -64,7 +64,7 @@ pub struct Config {
     pub default_code_version: CodeVersion,
 
     // --- v3 fields below ---
-    pub curser: Pubkey, // the only account authorized to curse subjects.
+    pub curser: Pubkey, // the only account authorized to curse subjects, besides the owner
     pub bump: u8,
 
     // --- v2 fields below (keeping variable-length fields at the end) ---
