@@ -16,6 +16,7 @@ import (
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	tokenpoolV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -221,6 +222,10 @@ func TestTPRL_BasicSetTokenPoolRateLimitsV2(t *testing.T) {
 						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 							PoolType:           string(bnmOpsV2_0_0.ContractType),
 							TokenPoolQualifier: "",
+							AllowedFinalityConfig: finality.Config{
+								WaitForFinality: true,
+								BlockDepth:      12,
+							},
 						},
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -242,6 +247,9 @@ func TestTPRL_BasicSetTokenPoolRateLimitsV2(t *testing.T) {
 						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 							PoolType:           string(bnmOpsV2_0_0.ContractType),
 							TokenPoolQualifier: "",
+							AllowedFinalityConfig: finality.Config{
+								BlockDepth: 20,
+							},
 						},
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -262,6 +270,10 @@ func TestTPRL_BasicSetTokenPoolRateLimitsV2(t *testing.T) {
 			poolB, err := datastore_utils.FindAndFormatRef(e.DataStore, fltrB, selB, evm_datastore_utils.ToEVMAddress)
 			require.NoError(t, err)
 			require.NotEqual(t, poolA, poolB)
+
+			// Validate that the finality configs were correctly set for both pools
+			validateFinalityConfigV2_0_0(t, poolA, clientA, finality.Config{WaitForFinality: true, BlockDepth: 12})
+			validateFinalityConfigV2_0_0(t, poolB, clientB, finality.Config{BlockDepth: 20})
 
 			// Apply the rate limits
 			_, err = tokensapi.SetTokenPoolRateLimits().Apply(*e, tokensapi.TPRLInput{
@@ -351,6 +363,9 @@ func TestTPRL_NoAccidentalOverwritesV2(t *testing.T) {
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					PoolType:           string(bnmOpsV2_0_0.ContractType),
 					TokenPoolQualifier: "",
+					AllowedFinalityConfig: finality.Config{
+						WaitForFinality: true,
+					},
 				},
 				TokenTransferConfig: &tokensapi.TokenTransferConfig{
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -372,6 +387,9 @@ func TestTPRL_NoAccidentalOverwritesV2(t *testing.T) {
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					PoolType:           string(bnmOpsV2_0_0.ContractType),
 					TokenPoolQualifier: "",
+					AllowedFinalityConfig: finality.Config{
+						WaitForSafe: true,
+					},
 				},
 				TokenTransferConfig: &tokensapi.TokenTransferConfig{
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -391,6 +409,10 @@ func TestTPRL_NoAccidentalOverwritesV2(t *testing.T) {
 	fltrB := datastore.AddressRef{ChainSelector: selB, Type: datastore.ContractType(bnmOpsV2_0_0.ContractType), Version: bnmOpsV2_0_0.Version, Qualifier: ""}
 	poolB, err := datastore_utils.FindAndFormatRef(e.DataStore, fltrB, selB, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
+
+	// Validate that the finality configs were correctly set for both pools
+	validateFinalityConfigV2_0_0(t, poolA, clientA, finality.Config{WaitForFinality: true})
+	validateFinalityConfigV2_0_0(t, poolB, clientB, finality.Config{WaitForSafe: true})
 
 	// Set initial default rate limits
 	initRateLimitAB := tokensapi.RateLimitConfig{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100}, FastFinality: false}
@@ -565,6 +587,9 @@ func TestTPRL_AsymmetricPoolVersions(t *testing.T) {
 		require.NoError(t, err)
 		poolV2, err := datastore_utils.FindAndFormatRef(ev.DataStore, fltrV2, selV2, evm_datastore_utils.ToEVMAddress)
 		require.NoError(t, err)
+
+		// If no AllowedFinalityConfig was provided, then the v2 token pool contract defaults to WaitForFinality=true
+		validateFinalityConfigV2_0_0(t, poolV2, clientV2, finality.Config{WaitForFinality: true})
 
 		// Setting a FF and default rate limit on a pre-V2 token pool should only change the pool's
 		// default rate limits. For the V2 pool, the FF and default rate limits should be updated.
@@ -797,6 +822,16 @@ func validateScaledTPRLBucket(t *testing.T, label string, localDecimals uint8, b
 	inRate := tokensapi.ScaleFloatToBigInt(expInbound.Rate, int(localDecimals), 0.10)
 	RequireBigIntsEqual(t, inCap, bucket.InboundRateLimiterConfig.Capacity, label+" inbound capacity")
 	RequireBigIntsEqual(t, inRate, bucket.InboundRateLimiterConfig.Rate, label+" inbound rate")
+}
+
+func validateFinalityConfigV2_0_0(t *testing.T, address common.Address, backend bind.ContractBackend, expectedFinalityConfig finality.Config) {
+	t.Helper()
+
+	tokenPool, err := tokenpoolV2_0_0.NewTokenPool(address, backend)
+	require.NoError(t, err)
+	actualFinalityConfigRaw, err := tokenPool.GetAllowedFinalityConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, expectedFinalityConfig.Raw(), actualFinalityConfigRaw, "finality config mismatch")
 }
 
 func getRateLimits(t *testing.T, version *semver.Version, address common.Address, backend bind.ContractBackend, destSel uint64) (*tokensapi.TPRLRateLimitBucket, *tokensapi.TPRLRateLimitBucket) {
