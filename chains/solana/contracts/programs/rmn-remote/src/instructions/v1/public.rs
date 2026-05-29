@@ -30,16 +30,19 @@ impl Public for Impl {
     }
 
     fn migrate_config_v2_to_v3(&self, ctx: Context<MigrateConfigV2ToV3>) -> Result<()> {
-        let required_space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE;
-        let minimum_balance = Rent::get()?.minimum_balance(required_space);
-
         let account_info = &ctx.accounts.config.to_account_info();
-
         require_eq!(
             account_info.data_len(),
             ANCHOR_DISCRIMINATOR + ConfigV2::INIT_SPACE, // it's v2 space
             RmnRemoteError::InvalidInputsConfigAccount
         );
+
+        let new_config = old_to_new(account_info.try_borrow_data()?, ctx.bumps.config)?;
+        msg!("Computed new config: {:?}", new_config);
+
+        let required_space =
+            ANCHOR_DISCRIMINATOR + Config::dynamic_len(new_config.event_authorities.len());
+        let minimum_balance = Rent::get()?.minimum_balance(required_space);
 
         // Extend the account
         msg!("Extending RMNRemote Config account...");
@@ -57,9 +60,6 @@ impl Public for Impl {
             )?;
         }
         account_info.realloc(required_space, false)?;
-
-        // Set the new values
-        let new_config = old_to_new(account_info.try_borrow_data()?, ctx.bumps.config)?;
 
         // Write back to permanent state
         msg!("Writing migrated RMNRemote Config to account...");
