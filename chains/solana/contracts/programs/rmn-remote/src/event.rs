@@ -33,3 +33,8 @@ pub struct SubjectUncursed {
 pub struct EventAuthoritiesSet {
     pub event_authorities: Vec<Pubkey>,
 }
+
+#[event]
+pub struct CurserSet {
+    pub curser: Pubkey,
+}

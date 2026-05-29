@@ -304,6 +304,7 @@ fn internal_execute<'info>(
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
             i,
+            token_amount.dest_token_address,
         )?;
         let offramp_token_pool_signer = accs
             .ccip_offramp_pool_signer
@@ -517,6 +518,7 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
         token_receiver: Pubkey,
         chain_selector: u64,
         i: usize,
+        message_mint: Pubkey,
     ) -> Result<TokenAccounts<'a>> {
         let accs = self
             .token_accounts_per_token
@@ -531,6 +533,7 @@ impl<'a> ExecuteReportContextRemainingAccountsLayout<'a> {
             fee_quoter,
             Some(crate::ID),
             accs,
+            message_mint,
         )
     }
 
