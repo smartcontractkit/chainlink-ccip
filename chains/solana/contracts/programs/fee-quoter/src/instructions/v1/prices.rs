@@ -61,15 +61,10 @@ fn apply_token_price_update<'info>(
     token_update: &TokenPriceUpdate,
     token_config_account_info: &'info AccountInfo<'info>,
 ) -> Result<()> {
-    // Token is uninitialized, so we ignore it.
-    if token_config_account_info.owner == &system_program::ID {
-        emit!(TokenPriceUpdateIgnored {
-            token: token_update.source_token,
-            value: token_update.usd_per_token
-        });
-        return Ok(());
-    }
-
+    // Validate account key matches the expected billing-token-config PDA before
+    // deciding whether this is an uninitialized (system-owned) account or not.
+    // This makes a wrong account fail fast with a clear error instead of being
+    // silently ignored by the system-owner check below.
     let (expected, _) = Pubkey::find_program_address(
         &[
             seed::FEE_BILLING_TOKEN_CONFIG,
@@ -83,6 +78,15 @@ fn apply_token_price_update<'info>(
         expected,
         FeeQuoterError::InvalidInputsTokenConfigAccount
     );
+
+    // Token is uninitialized, so we ignore it.
+    if token_config_account_info.owner == &system_program::ID {
+        emit!(TokenPriceUpdateIgnored {
+            token: token_update.source_token,
+            value: token_update.usd_per_token
+        });
+        return Ok(());
+    }
 
     require!(
         token_config_account_info.is_writable,
