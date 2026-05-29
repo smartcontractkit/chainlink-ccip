@@ -24,6 +24,7 @@ type Uncurse struct {
 	Subject *CurseSubject
 
 	// [0] = [] config
+	// ··········· account manually to handle the different structs before and after migration., allowing for no-downtime migration.
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
@@ -48,12 +49,14 @@ func (inst *Uncurse) SetSubject(subject CurseSubject) *Uncurse {
 }
 
 // SetConfigAccount sets the "config" account.
+// account manually to handle the different structs before and after migration., allowing for no-downtime migration.
 func (inst *Uncurse) SetConfigAccount(config ag_solanago.PublicKey) *Uncurse {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
+// account manually to handle the different structs before and after migration., allowing for no-downtime migration.
 func (inst *Uncurse) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }

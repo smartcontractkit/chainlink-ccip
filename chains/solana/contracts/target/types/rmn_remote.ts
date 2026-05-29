@@ -184,7 +184,10 @@ export type RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "account manually to handle the different structs before and after migration., allowing for no-downtime migration."
+          ]
         },
         {
           "name": "authority",
@@ -229,7 +232,10 @@ export type RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "account manually to handle the different structs before and after migration., allowing for no-downtime migration."
+          ]
         },
         {
           "name": "authority",
@@ -294,6 +300,41 @@ export type RmnRemote = {
       ]
     },
     {
+      "name": "setCurser",
+      "docs": [
+        "Sets the address for the curser role who, alongside the contract owner, is authorized to curse.",
+        "",
+        "Only the CCIP Admin may perform this operation.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for updating event authorities.",
+        "* `curser` - The new curser public key."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "curses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "curser",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "verifyNotCursed",
       "docs": [
         "Verifies that the subject is not cursed AND that this chain is not globally cursed.",
@@ -314,10 +355,7 @@ export type RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "After the upgrade is made, this can be changed to Account<'info, Config>."
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -348,7 +386,10 @@ export type RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "After the upgrade is made, this can be changed to Account<'info, Config>."
+          ]
         },
         {
           "name": "authority",
@@ -364,7 +405,7 @@ export type RmnRemote = {
       ]
     },
     {
-      "name": "migrateConfigV1ToV2",
+      "name": "migrateConfigV2ToV3",
       "docs": [
         "Extends the Config PDA to allocate space for v2 fields, and migrates the onchain state",
         "from v1 to v2. This is a permissionless operation, as the default values set for the new",
@@ -421,6 +462,14 @@ export type RmnRemote = {
             }
           },
           {
+            "name": "curser",
+            "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
             "name": "eventAuthorities",
             "type": {
               "vec": "publicKey"
@@ -451,6 +500,38 @@ export type RmnRemote = {
     }
   ],
   "types": [
+    {
+      "name": "ConfigV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposedOwner",
+            "type": "publicKey"
+          },
+          {
+            "name": "defaultCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
+            "name": "eventAuthorities",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "CurseSubject",
       "docs": [
@@ -567,6 +648,16 @@ export type RmnRemote = {
           "type": {
             "vec": "publicKey"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CurserSet",
+      "fields": [
+        {
+          "name": "curser",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -812,7 +903,10 @@ export const IDL: RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "account manually to handle the different structs before and after migration., allowing for no-downtime migration."
+          ]
         },
         {
           "name": "authority",
@@ -857,7 +951,10 @@ export const IDL: RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "account manually to handle the different structs before and after migration., allowing for no-downtime migration."
+          ]
         },
         {
           "name": "authority",
@@ -922,6 +1019,41 @@ export const IDL: RmnRemote = {
       ]
     },
     {
+      "name": "setCurser",
+      "docs": [
+        "Sets the address for the curser role who, alongside the contract owner, is authorized to curse.",
+        "",
+        "Only the CCIP Admin may perform this operation.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for updating event authorities.",
+        "* `curser` - The new curser public key."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "curses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "curser",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "verifyNotCursed",
       "docs": [
         "Verifies that the subject is not cursed AND that this chain is not globally cursed.",
@@ -942,10 +1074,7 @@ export const IDL: RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "After the upgrade is made, this can be changed to Account<'info, Config>."
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -976,7 +1105,10 @@ export const IDL: RmnRemote = {
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "After the upgrade is made, this can be changed to Account<'info, Config>."
+          ]
         },
         {
           "name": "authority",
@@ -992,7 +1124,7 @@ export const IDL: RmnRemote = {
       ]
     },
     {
-      "name": "migrateConfigV1ToV2",
+      "name": "migrateConfigV2ToV3",
       "docs": [
         "Extends the Config PDA to allocate space for v2 fields, and migrates the onchain state",
         "from v1 to v2. This is a permissionless operation, as the default values set for the new",
@@ -1049,6 +1181,14 @@ export const IDL: RmnRemote = {
             }
           },
           {
+            "name": "curser",
+            "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
             "name": "eventAuthorities",
             "type": {
               "vec": "publicKey"
@@ -1079,6 +1219,38 @@ export const IDL: RmnRemote = {
     }
   ],
   "types": [
+    {
+      "name": "ConfigV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposedOwner",
+            "type": "publicKey"
+          },
+          {
+            "name": "defaultCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
+            "name": "eventAuthorities",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "CurseSubject",
       "docs": [
@@ -1195,6 +1367,16 @@ export const IDL: RmnRemote = {
           "type": {
             "vec": "publicKey"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CurserSet",
+      "fields": [
+        {
+          "name": "curser",
+          "type": "publicKey",
           "index": false
         }
       ]

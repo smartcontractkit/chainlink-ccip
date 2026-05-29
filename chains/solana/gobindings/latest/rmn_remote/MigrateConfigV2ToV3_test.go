@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_MigrateConfigV1ToV2(t *testing.T) {
+func TestEncodeDecode_MigrateConfigV2ToV3(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("MigrateConfigV1ToV2"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("MigrateConfigV2ToV3"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(MigrateConfigV1ToV2)
+				params := new(MigrateConfigV2ToV3)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(MigrateConfigV1ToV2)
+				got := new(MigrateConfigV2ToV3)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)
