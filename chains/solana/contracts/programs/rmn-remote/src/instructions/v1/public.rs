@@ -88,7 +88,7 @@ fn old_to_new(bytes: Ref<&mut [u8]>, bump: u8) -> Result<Config> {
         event_authorities: config_v2.event_authorities,
 
         // new v3 fields
-        curser: config_v2.owner, // initialize to same value as owner, so there is no downtime on cursing
+        curser: config_v2.owner, // initialize to same value as owner
         bump,
     };
     Ok(new_config)
