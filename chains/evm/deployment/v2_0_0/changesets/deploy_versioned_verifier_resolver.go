@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cs_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -14,31 +14,13 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type VerifierResolverType string
-
-func (t VerifierResolverType) Validate() error {
-	switch t {
-	case VerifierResolverType(versioned_verifier_resolver.CommitteeVerifierResolverType), VerifierResolverType(versioned_verifier_resolver.LombardVerifierResolverType):
-    // If lombard resolver, we can't deploy with "default" as the qualifier as it shares the same bytecode as commitee resolver.
-		if versioned_verifier_resolver.LombardVerifierResolverType.String() == "default" {
-			return fmt.Errorf("unsupported qualifier for resolver type %q (must not be default)")
-		}
-
-	  return nil
-	default:
-		return fmt.Errorf("unsupported verifier resolver type %q (must be %q or %q)",
-			t, versioned_verifier_resolver.CommitteeVerifierResolverType, versioned_verifier_resolver.LombardVerifierResolverType)
-	}
-}
-
-func (t VerifierResolverType) contractType() datastore.ContractType {
-	return datastore.ContractType(t)
-}
-
 // DeployVersionedVerifierResolverChainCfg configures deployment on a single EVM chain.
 type DeployVersionedVerifierResolverChainCfg struct {
-	ResolverType   VerifierResolverType
-	Qualifier string
+	ResolverType datastore.ContractType
+	// Qualifier is used to differentiate multiple resolver deployments of the same type on the same chain.
+	// As a note, since all resolver types share the same bytecode, the CREATE2 salt is solely determined by the qualifier. Therefore, different resolver types deployed on the same chain must use different qualifiers to avoid CREATE2 address collisions.
+	// These are enforced at the sequence level.
+	Qualifier      string
 	CREATE2Factory common.Address
 }
 
@@ -61,11 +43,8 @@ func makeVerifyDeployVersionedVerifierResolver() func(cldf_deployment.Environmen
 			return fmt.Errorf("at least one chain must be configured")
 		}
 		for chainSel, chainCfg := range cfg.Cfg.Chains {
-			if err := chainCfg.ResolverType.Validate(); err != nil {
-				return fmt.Errorf("chain %d: %w", chainSel, err)
-			}
 			if chainCfg.Qualifier == "" {
-				return fmt.Errorf("chain %d: Qualifier must not be empty")
+				return fmt.Errorf("chain %d: qualifier must not be empty", chainSel)
 			}
 			if chainCfg.CREATE2Factory == (common.Address{}) {
 				return fmt.Errorf("chain %d: CREATE2Factory is required", chainSel)
@@ -96,7 +75,7 @@ func makeApplyDeployVersionedVerifierResolver(
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d not found in environment", chainSel)
 			}
 
-			contractType := chainCfg.ResolverType.contractType()
+			contractType := chainCfg.ResolverType
 			qualifier := chainCfg.Qualifier
 			existing := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
 
