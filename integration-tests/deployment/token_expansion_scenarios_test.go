@@ -547,7 +547,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		_, err = evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selA, Qualifier: "S3_POOL_A", Type: datastore.ContractType(bmPoolType)})
 		require.Error(t, err, "pool should not exist after token-only deploy")
 
-		// Thrid call: deploy pools referencing existing tokens, and connect
+		// Third call: deploy pools referencing existing tokens, and connect
 		poolQualA := "S3_POOL_A"
 		poolQualB := "S3_POOL_B"
 
