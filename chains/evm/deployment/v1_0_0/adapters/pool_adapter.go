@@ -189,7 +189,8 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 			}
 			result.BatchOps = append(result.BatchOps, batchOp)
 			return result, nil
-		})
+		},
+	)
 }
 
 func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -254,7 +255,8 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 			}
 
 			var result sequences.OnChainOutput
-			result, err = sequences.RunAndMergeSequence(b, chains,
+			result, err = sequences.RunAndMergeSequence(
+				b, chains,
 				tarseq.ManualRegistrationSequence,
 				tarseq.ManualRegistrationSequenceInput{
 					AdminAddress:  proposedOwnerAddr,
@@ -269,7 +271,8 @@ func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.Manua
 			}
 
 			return result, nil
-		})
+		},
+	)
 }
 
 func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -299,17 +302,20 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				return sequences.OnChainOutput{}, errors.New("token ref must be provided in input to DeployTokenPoolForToken sequence for EVM pools")
 			}
 
-			// NOTE: the token ref may be fully populated, but might not exist in the datastore
-			// (this can happen when using token address ref resolvers). In these situations we
-			// should avoid the datastore lookup altogether since it is doomed to fail and just
-			// use the input address ref directly. Failure to do this would cause this sequence
-			// to fail unnecessarily even when it has all the data it needs to succeed.
 			tokenRef := input.TokenRef.Clone()
 			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
-				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token address for ref (%s) from datastore after token pool deployment: %w", datastore_utils.SprintRef(tokenRef), err)
-				} else {
+				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err == nil {
 					tokenRef = ref
+				} else {
+					b.Logger.Warnf("token ref (%s) is not fully populated and could not be resolved in datastore - attempting to resolve ref from on-chain data: %v", datastore_utils.SprintRef(tokenRef), err)
+					if tokenRef.Address == "" {
+						return sequences.OnChainOutput{}, fmt.Errorf("token ref (%s) is missing address field so on-chain resolution cannot be attempted", datastore_utils.SprintRef(tokenRef))
+					}
+					fallbackRef, err := a.ResolveTokenRef(b, chains, input.ExistingDataStore, input.ChainSelector, tokenRef.Address)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token ref from on-chain data for token address %s: %w", tokenRef.Address, err)
+					}
+					tokenRef = fallbackRef
 				}
 			}
 
