@@ -108,8 +108,8 @@ func setupEVMOnlyEnv(t *testing.T) (*deployment.Environment, uint64, uint64) {
 	return env, selA, selB
 }
 
-// assertTokenNotExists verifies a token does not exist in the datastore yet, but
-// does exist on-chain with the expected name, symbol, and decimals.
+// assertTokenOnlyExistsOnChain verifies a token does not exist in the datastore
+// yet, but does exist on-chain with the expected name, symbol, and decimals.
 func assertTokenOnlyExistsOnChain(
 	t *testing.T,
 	out deployment.ChangesetOutput,
