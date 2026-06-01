@@ -309,7 +309,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				} else {
 					b.Logger.Warnf("token ref (%s) is not fully populated and could not be resolved in datastore - attempting to resolve ref from on-chain data: %v", datastore_utils.SprintRef(tokenRef), err)
 					if tokenRef.Address == "" {
-						return sequences.OnChainOutput{}, fmt.Errorf("token ref (%s) is missing address field so on-chain resolution cannot be attempted", datastore_utils.SprintRef(tokenRef))
+						return sequences.OnChainOutput{}, fmt.Errorf("token ref (%s) could not be resolved from datastore and is missing address field so on-chain resolution cannot be attempted: %w", datastore_utils.SprintRef(tokenRef), err)
 					}
 					fallbackRef, err := a.ResolveTokenRef(b, chains, input.ExistingDataStore, input.ChainSelector, tokenRef.Address)
 					if err != nil {
