@@ -169,7 +169,7 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment, feeRef datastore.A
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("invalid base58 token address for src %d and dst %d: %s", src, dst, rawTokenAddress)
 					}
-					if feeCfg == nil {
+					if feeCfg == nil || !feeCfg.IsEnabled {
 						// NOTE: the Solana FeeQuoter will always perform validation checks on the input
 						// config even if we are trying to disable it. As a result, we need to provide a
 						// proper set of values even though none of them will actually be used.
@@ -204,7 +204,6 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment, feeRef datastore.A
 				solseq.SetTokenTransferFeeConfig,
 				solseq.FeeQuoterSetTokenTransferFeeConfigSequenceInput{
 					RemoteChainConfigs: remoteChainConfigs,
-					DataStore:          e.DataStore,
 					FeeQuoter:          fqAddr,
 					Selector:           input.Selector,
 				},

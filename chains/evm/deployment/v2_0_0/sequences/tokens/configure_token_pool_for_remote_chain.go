@@ -419,17 +419,15 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 
 		// Update token transfer fee configuration (after applyChainUpdates so chain exists on pool).
-		tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
+		ttfcArgs, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
 		}
-		if len(tokenTransferFeeConfigUpdates) > 0 {
+		if len(ttfcArgs.DisableTokenTransferFeeConfigs) > 0 || len(ttfcArgs.TokenTransferFeeConfigArgs) > 0 {
 			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
-				Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
-					TokenTransferFeeConfigArgs: tokenTransferFeeConfigUpdates,
-				},
+				Args:          ttfcArgs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
@@ -752,20 +750,17 @@ func tokensRateLimiterToConfig(c tokens.RateLimiterConfig) token_pool.Config {
 }
 
 func applyTokenTransferFeeConfigIfNeeded(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]evm_contract.WriteOutput, error) {
-	tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, remoteChainSelector)
+	ttfcArgs, err := makeTokenTransferFeeConfigUpdates(b, chain, input, remoteChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
 	}
-	if len(tokenTransferFeeConfigUpdates) == 0 {
+	if len(ttfcArgs.DisableTokenTransferFeeConfigs) == 0 && len(ttfcArgs.TokenTransferFeeConfigArgs) == 0 {
 		return nil, nil
 	}
 	report, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,
-		Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
-			TokenTransferFeeConfigArgs:     tokenTransferFeeConfigUpdates,
-			DisableTokenTransferFeeConfigs: nil,
-		},
+		Args:          ttfcArgs,
 	})
 	if err != nil {
 		return nil, err
@@ -982,76 +977,88 @@ func mergeTokenTransferFeeConfig(desired, imported *tokens.TokenTransferFeeConfi
 	return &merged
 }
 
-func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigArgs, error) {
+func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) (token_pool.ApplyTokenTransferFeeConfigUpdatesArgs, error) {
 	desiredTokenTransferFeeConfig := input.RemoteChainConfig.TokenTransferFeeConfig
+	if desiredTokenTransferFeeConfig == nil {
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
+	}
+
 	importedConfig, err := importTokenTransferFeeConfigFromActivePool(b, chain, input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to import token transfer fee config from active pool: %w", err)
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to import token transfer fee config from active pool: %w", err)
 	}
-	// merge imported config with desired config, giving precedence to desired config values when they are non-zero (i.e. non-default)
-	desiredTokenTransferFeeConfig = *mergeTokenTransferFeeConfig(&desiredTokenTransferFeeConfig, importedConfig)
-	if !desiredTokenTransferFeeConfig.IsEnabled {
-		return nil, nil
-	}
+
 	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,
 		Args: token_pool.GetTokenTransferFeeConfigArgs{
-			Arg0:              common.Address{},
-			DestChainSelector: remoteChainSelector,
-			Arg2:              finality.RawWaitForFinality,
-			Arg3:              []byte{},
+			Arg0:              common.Address{},            // unused
+			DestChainSelector: remoteChainSelector,         // this IS used
+			Arg2:              finality.RawWaitForFinality, // unused
+			Arg3:              []byte{},                    // unused
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token transfer fee config: %w", err)
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
 	}
 
-	currentTokenTransferFeeConfig := report.Output
+	defaultConfig := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(
+		input.ChainSelector,
+		input.RemoteChainSelector,
+	)
 
-	// Fall back to on-chain values if inputted values are empty
-	if desiredTokenTransferFeeConfig.DestGasOverhead == 0 {
-		desiredTokenTransferFeeConfig.DestGasOverhead = currentTokenTransferFeeConfig.DestGasOverhead
-	}
-	if desiredTokenTransferFeeConfig.DestBytesOverhead == 0 {
-		desiredTokenTransferFeeConfig.DestBytesOverhead = currentTokenTransferFeeConfig.DestBytesOverhead
-	}
-	if desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents == 0 {
-		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents = currentTokenTransferFeeConfig.FinalityFeeUSDCents
-	}
-	if desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents == 0 {
-		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents = currentTokenTransferFeeConfig.FastFinalityFeeUSDCents
-	}
-	if desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps == 0 {
-		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps = currentTokenTransferFeeConfig.FinalityTransferFeeBps
-	}
-	if desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps == 0 {
-		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps = currentTokenTransferFeeConfig.FastFinalityTransferFeeBps
+	currentConfig := tokens.TokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
+		CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
+		DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
+		CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
+		DestBytesOverhead:             report.Output.DestBytesOverhead,
+		DestGasOverhead:               report.Output.DestGasOverhead,
+		IsEnabled:                     report.Output.IsEnabled,
 	}
 
-	updates := make([]token_pool.TokenTransferFeeConfigArgs, 0)
+	// Resolution strategy:
+	// (1) If imported config is enabled, merge it with the user's provided config (giving precedence to user's config)
+	// (2) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)
+	// (3) Fall back to sensible defaults merged with user's provided config (giving precedence to user's config)
+	resolvedConfig := tokens.TokenTransferFeeConfig{}
+	switch {
+	case importedConfig != nil && importedConfig.IsEnabled:
+		resolvedConfig = desiredTokenTransferFeeConfig.MergeWith(*importedConfig)
+	case currentConfig.IsEnabled:
+		resolvedConfig = desiredTokenTransferFeeConfig.MergeWith(currentConfig)
+	default:
+		resolvedConfig = desiredTokenTransferFeeConfig.MergeWith(defaultConfig)
+	}
 
-	if desiredTokenTransferFeeConfig.DestGasOverhead != currentTokenTransferFeeConfig.DestGasOverhead ||
-		desiredTokenTransferFeeConfig.DestBytesOverhead != currentTokenTransferFeeConfig.DestBytesOverhead ||
-		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents != currentTokenTransferFeeConfig.FinalityFeeUSDCents ||
-		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents != currentTokenTransferFeeConfig.FastFinalityFeeUSDCents ||
-		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps != currentTokenTransferFeeConfig.FinalityTransferFeeBps ||
-		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps != currentTokenTransferFeeConfig.FastFinalityTransferFeeBps {
-		updates = append(updates, token_pool.TokenTransferFeeConfigArgs{
-			DestChainSelector: remoteChainSelector,
-			TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
-				DestGasOverhead:            desiredTokenTransferFeeConfig.DestGasOverhead,
-				DestBytesOverhead:          desiredTokenTransferFeeConfig.DestBytesOverhead,
-				FinalityFeeUSDCents:        desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
-				FastFinalityFeeUSDCents:    desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents,
-				FinalityTransferFeeBps:     desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
-				FastFinalityTransferFeeBps: desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps,
-				IsEnabled:                  true,
+	if resolvedConfig == currentConfig {
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
+	}
+
+	if !resolvedConfig.IsEnabled {
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
+			DisableTokenTransferFeeConfigs: []uint64{
+				remoteChainSelector,
 			},
-		})
+		}, nil
+	} else {
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
+			TokenTransferFeeConfigArgs: []token_pool.TokenTransferFeeConfigArgs{
+				{
+					DestChainSelector: remoteChainSelector,
+					TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
+						FastFinalityTransferFeeBps: resolvedConfig.CustomFinalityTransferFeeBps,
+						FastFinalityFeeUSDCents:    resolvedConfig.CustomFinalityFeeUSDCents,
+						FinalityTransferFeeBps:     resolvedConfig.DefaultFinalityTransferFeeBps,
+						FinalityFeeUSDCents:        resolvedConfig.DefaultFinalityFeeUSDCents,
+						DestBytesOverhead:          resolvedConfig.DestBytesOverhead,
+						DestGasOverhead:            resolvedConfig.DestGasOverhead,
+						IsEnabled:                  resolvedConfig.IsEnabled,
+					},
+				},
+			},
+		}, nil
 	}
-
-	return updates, nil
 }
 
 // makeCCVUpdates returns the CCV config update to apply for the remote chain, or (nil, false, nil) if on-chain

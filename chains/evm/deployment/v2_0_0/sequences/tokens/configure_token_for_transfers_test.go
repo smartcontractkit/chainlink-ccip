@@ -80,6 +80,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		tokenAdminRegistryAddress := tokenAdminRegistryAddr.Hex()
 
 		// Prepare input for configuring token for transfers
+		feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(testsetup.CreateBasicTokenTransferFeeConfig())
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,
 			TokenAddress:     tokenAddress,
@@ -92,7 +93,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					OutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(150, 1500),
 					OutboundCCVs:              []string{"0x789"},
 					InboundCCVs:               []string{"0xabc"},
-					TokenTransferFeeConfig:    testsetup.CreateBasicTokenTransferFeeConfig(),
+					TokenTransferFeeConfig:    &feeCfg,
 				},
 				remoteChainSel2: {
 					RemoteToken:               common.LeftPadBytes(common.FromHex("0x321"), 32),
@@ -101,7 +102,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					OutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(250, 2500),
 					OutboundCCVs:              []string{"0xdef"},
 					InboundCCVs:               []string{"0x012"},
-					TokenTransferFeeConfig:    testsetup.CreateBasicTokenTransferFeeConfig(),
+					TokenTransferFeeConfig:    &feeCfg,
 				},
 			},
 			ExternalAdmin:         "", // Use internal admin
@@ -213,6 +214,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NoError(t, err, "Token admin registry should exist in datastore")
 		tokenAdminRegistryAddress := tokenAdminRegistryAddr.Hex()
 
+		feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(testsetup.CreateBasicTokenTransferFeeConfig())
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,
 			TokenAddress:     result.TokenAddress.Hex(),
@@ -225,7 +227,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					OutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(600, 6000),
 					OutboundCCVs:              []string{"0x999"},
 					InboundCCVs:               []string{"0xaa0"},
-					TokenTransferFeeConfig:    testsetup.CreateBasicTokenTransferFeeConfig(),
+					TokenTransferFeeConfig:    &feeCfg,
 				},
 			},
 			ExternalAdmin:   "",

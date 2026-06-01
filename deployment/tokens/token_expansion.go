@@ -10,6 +10,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -97,6 +98,10 @@ type DeployTokenPoolInput struct {
 	PoolType           string                `yaml:"poolType" json:"poolType"`
 	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
+	// AllowedFinalityConfig specifies the finality config to set on the token pool. If this is
+	// the zero value, then the finality config will remain unchanged on-chain. Pre-v2 pools will
+	// ignore this parameter as it is not supported on those versions.
+	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
 	// For Solana: If empty, DeployTokenPoolForToken sets the timelock signer PDA from the datastore;
 	// if non-empty, sets this base58 pubkey. On EVM, empty leaves the pool default (unchanged from contract deploy).
