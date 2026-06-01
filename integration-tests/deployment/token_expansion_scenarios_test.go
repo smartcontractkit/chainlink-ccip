@@ -67,7 +67,8 @@ func setupEVMOnlyEnv(t *testing.T) (*deployment.Environment, uint64, uint64) {
 	selA := chainsel.TEST_90000001.Selector
 	selB := chainsel.TEST_90000002.Selector
 
-	env, err := environment.New(t.Context(),
+	env, err := environment.New(
+		t.Context(),
 		environment.WithEVMSimulated(t, []uint64{selA, selB}),
 	)
 	require.NoError(t, err)
@@ -105,6 +106,42 @@ func setupEVMOnlyEnv(t *testing.T) (*deployment.Environment, uint64, uint64) {
 	}
 
 	return env, selA, selB
+}
+
+// assertTokenNotExists verifies a token does not exist in the datastore yet, but
+// does exist on-chain with the expected name, symbol, and decimals.
+func assertTokenOnlyExistsOnChain(
+	t *testing.T,
+	out deployment.ChangesetOutput,
+	env *deployment.Environment,
+	chainSel uint64,
+	symbol string,
+	expectedName string,
+	expectedDecimals uint8,
+) common.Address {
+	t.Helper()
+
+	evmAdapter := evmseqV1_6_0.EVMAdapter{}
+	_, err := evmAdapter.FindOneTokenAddress(env.DataStore, chainSel, &datastore.AddressRef{Qualifier: symbol})
+	require.Error(t, err, "token %q should not exist in datastore on chain %d", symbol, chainSel)
+	tokAddress, err := evmAdapter.FindOneTokenAddress(out.DataStore.Seal(), chainSel, &datastore.AddressRef{Qualifier: symbol})
+	require.NoError(t, err, "token %q should exist in output datastore on chain %d", symbol, chainSel)
+
+	chain, ok := env.BlockChains.EVMChains()[chainSel]
+	require.True(t, ok)
+	tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, chain.Client)
+	require.NoError(t, err)
+	name, err := tokn.Name(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, expectedName, name)
+	symb, err := tokn.Symbol(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, symbol, symb)
+	deci, err := tokn.Decimals(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, expectedDecimals, deci)
+
+	return tokAddress
 }
 
 // assertTokenExists verifies a token exists in the datastore and matches
@@ -471,8 +508,8 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		tokenSymbolA := "S3_TOK_A"
 		tokenSymbolB := "S3_TOK_B"
 
-		// First call: deploy tokens only (no pools, no transfer config)
-		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		// First call: deploy token A but do NOT add it to the datastore
+		output1, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 			ChainAdapterVersion: v1_6_0_scenarios,
 			MCMS:                NewDefaultInputForMCMS("Scenario 3 tokens"),
 			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
@@ -483,6 +520,15 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply,
 					},
 				},
+			},
+		})
+		require.NoError(t, err)
+
+		// Second call: deploy token B and add it to the datastore
+		output2, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 3 tokens"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 				selB: {
 					TokenPoolVersion: v1_5_1_scenarios,
 					DeployTokenInput: &tokensapi.DeployTokenInput{
@@ -493,19 +539,19 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		MergeAddresses(t, env, output.DataStore)
+		MergeAddresses(t, env, output2.DataStore)
 
 		// Tokens should exist, no pools yet
-		assertTokenExists(t, env, selA, tokenSymbolA, "Scenario3 Token A", 18)
-		assertTokenExists(t, env, selB, tokenSymbolB, "Scenario3 Token B", 18)
+		tokAddrA := assertTokenOnlyExistsOnChain(t, output1, env, selA, tokenSymbolA, "Scenario3 Token A", 18)
+		tokAddrB := assertTokenExists(t, env, selB, tokenSymbolB, "Scenario3 Token B", 18)
 		_, err = evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selA, Qualifier: "S3_POOL_A", Type: datastore.ContractType(bmPoolType)})
 		require.Error(t, err, "pool should not exist after token-only deploy")
 
-		// Second call: deploy pools referencing existing tokens, and connect
+		// Thrid call: deploy pools referencing existing tokens, and connect
 		poolQualA := "S3_POOL_A"
 		poolQualB := "S3_POOL_B"
 
-		output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 			ChainAdapterVersion: v1_6_0_scenarios,
 			MCMS:                NewDefaultInputForMCMS("Scenario 3 pools"),
 			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
@@ -515,8 +561,9 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 						TokenPoolQualifier: poolQualA,
 						PoolType:           bmPoolType.String(),
 						TokenRef: &datastore.AddressRef{
-							Qualifier: tokenSymbolA,
-							Type:      datastore.ContractType(bnmERC20ops.ContractType),
+							// A pool deployment should still be possible even if the token ref
+							// is not in the datastore and the input only provides the address.
+							Address: tokAddrA.Hex(),
 						},
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
@@ -546,10 +593,6 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		require.NoError(t, err)
 		MergeAddresses(t, env, output.DataStore)
 		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
-
-		// Verify
-		tokAddrA := assertTokenExists(t, env, selA, tokenSymbolA, "Scenario3 Token A", 18)
-		tokAddrB := assertTokenExists(t, env, selB, tokenSymbolB, "Scenario3 Token B", 18)
 
 		chainA := env.BlockChains.EVMChains()[selA]
 		chainB := env.BlockChains.EVMChains()[selB]
@@ -928,7 +971,8 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 	programsPath, ds, err := PreloadSolanaEnvironment(t, solChainSel)
 	require.NoError(t, err)
 
-	env, err := environment.New(t.Context(),
+	env, err := environment.New(
+		t.Context(),
 		environment.WithSolanaContainer(t, []uint64{solChainSel}, programsPath, solanaProgramIDs),
 		environment.WithEVMSimulated(t, []uint64{evmChainSel, newChainSel}),
 	)
@@ -1466,7 +1510,8 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 	require.NoError(t, err)
 
 	// Setup test env
-	env, err := environment.New(t.Context(),
+	env, err := environment.New(
+		t.Context(),
 		environment.WithSolanaContainer(t, []uint64{solChainSel}, programsPath, solanaProgramIDs),
 		environment.WithEVMSimulated(t, []uint64{evmChainSel}),
 	)
@@ -1681,16 +1726,20 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 	timelockSigner := solanautils.GetTimelockSignerPDA(
 		env.DataStore.Addresses().Filter(), solChainSel, cciputils.CLLQualifier,
 	)
-	require.Equal(t, solMintPK, tarState.Mint,
+	require.Equal(
+		t, solMintPK, tarState.Mint,
 		"TAR mint must stay bound to the SPL mint deployed in the first token expansion",
 	)
-	require.Equal(t, timelockSigner, tarState.Administrator,
+	require.Equal(
+		t, timelockSigner, tarState.Administrator,
 		"the TAR administrator should be the MCMS timelock signer after override + accept in ConfigureTokenForTransfers",
 	)
-	require.True(t, tarState.PendingAdministrator.IsZero(),
+	require.True(
+		t, tarState.PendingAdministrator.IsZero(),
 		"no pending administrator should remain after TAR accept completes",
 	)
-	require.NotEqual(t, customer, tarState.Administrator,
+	require.NotEqual(
+		t, customer, tarState.Administrator,
 		"third-party key from the between-pass Register must not be the final TAR administrator",
 	)
 }
