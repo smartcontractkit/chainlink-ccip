@@ -81,6 +81,9 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 			if !slices.Contains(cfg.Cfg.ChainSelectors, sel) {
 				return fmt.Errorf("chainOverrides contains selector %d which is not in chainSelectors", sel)
 			}
+			if cfg.Cfg.ChainOverrides[sel].DeployerContract != nil && *cfg.Cfg.ChainOverrides[sel].DeployerContract == "" {
+				return fmt.Errorf("chain %d: deployerContract override cannot be empty string", sel)
+			}
 		}
 
 		return nil

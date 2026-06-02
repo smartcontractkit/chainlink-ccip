@@ -21,9 +21,14 @@ const (
 )
 
 func defaultDeployContractParams() ccvadapters.DeployContractParams {
-	usdPerLink, _ := new(big.Int).SetString("15000000000000000000", 10)   // $15
-	usdPerWeth, _ := new(big.Int).SetString("2000000000000000000000", 10) // $2000
-
+	usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+	if !ok {
+		panic("invalid usdPerLink constant")
+	}
+	usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+	if !ok {
+		panic("invalid usdPerWeth constant")
+	}
 	return ccvadapters.DeployContractParams{
 		RMNRemote: ccvadapters.RMNRemoteDeployParams{
 			Version: rmn_remote.Version,

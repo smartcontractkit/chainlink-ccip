@@ -118,6 +118,9 @@ type DeployContractParamsOverrides struct {
 	MockReceivers *[]MockReceiverDeployParams     `json:"mockReceivers,omitempty" yaml:"mockReceivers,omitempty"`
 }
 
+// DeployContractParams holds the fully resolved deploy configuration for one chain.
+// BuildDeployContractParams produces this; DeployChainContracts consumes it via
+// DeployChainContractsInput.ContractParams.
 type DeployContractParams struct {
 	RMNRemote          RMNRemoteDeployParams
 	OffRamp            OffRampDeployParams
@@ -128,7 +131,9 @@ type DeployContractParams struct {
 	MockReceivers      []MockReceiverDeployParams
 }
 
-// MergeWithOverrideIfNotEmpty merges source into a copy of d. Only non-empty source fields overwrite
+// MergeWithOverrideIfNotEmpty merges source into a copy of d. Only non-empty source
+// fields overwrite. Not used by the DeployChainContracts changeset; retained for
+// legacy config-import merge paths.
 func (d DeployContractParams) MergeWithOverrideIfNotEmpty(source DeployContractParams) (DeployContractParams, error) {
 	result := d
 	if err := mergo.Merge(&result, &source, mergo.WithOverride); err != nil {
@@ -137,6 +142,9 @@ func (d DeployContractParams) MergeWithOverrideIfNotEmpty(source DeployContractP
 	return result, nil
 }
 
+// DeployChainContractsInput is the chain-agnostic input passed to
+// DeployChainContractsAdapter.DeployChainContracts. The DeployChainContracts
+// changeset assembles it after ResolveDeployAddresses and BuildDeployContractParams.
 type DeployChainContractsInput struct {
 	ChainSelector     uint64
 	DeployerContract  string
@@ -158,19 +166,25 @@ type DeployChainConfigCreatorInput struct {
 	UserProvidedConfig DeployContractParams
 }
 
+// DeployChainContractsOutput is returned by DeployChainContractsAdapter.DeployChainContracts.
+// RefsToTransferOwnership lists product contracts the changeset transfers to the timelock
+// when DeployerKeyOwned is false.
 type DeployChainContractsOutput struct {
 	sequences.OnChainOutput
 	RefsToTransferOwnership []datastore.AddressRef
 }
 
-// DeployChainResolvedAddresses holds addresses resolved from the datastore (or deployed
-// during resolution) before the main DeployChainContracts sequence runs.
+// DeployChainResolvedAddresses is the result of DeployChainContractsAdapter.ResolveDeployAddresses.
+// DeployerContract is coalesced with ChainOverrides.DeployerContract by the changeset;
+// NewAddressRefs are added to the deploy input and output datastore.
 type DeployChainResolvedAddresses struct {
 	DeployerContract string
 	NewAddressRefs   []datastore.AddressRef
 }
 
-// BuildDeployContractParamsInput carries topology-derived data and optional user overrides.
+// BuildDeployContractParamsInput carries topology-derived committee verifiers,
+// adapter defaults, and optional per-chain overrides. The DeployChainContracts
+// changeset passes this to DeployChainContractsAdapter.BuildDeployContractParams.
 type BuildDeployContractParamsInput struct {
 	ChainSelector      uint64
 	CommitteeVerifiers []CommitteeVerifierDeployParams
@@ -178,7 +192,10 @@ type BuildDeployContractParamsInput struct {
 	Overrides          *DeployContractParamsOverrides
 }
 
-// ApplyDeployContractParamsOverrides merges optional user overrides onto adapter defaults.
+// ApplyDeployContractParamsOverrides merges optional per-chain overrides from
+// DeployChainContractsCfg.ChainOverrides onto adapter-built defaults. Chain-family
+// adapters call this at the end of BuildDeployContractParams; unset override
+// pointer fields leave the corresponding default value unchanged.
 func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *DeployContractParamsOverrides) DeployContractParams {
 	if overrides == nil {
 		return params
@@ -218,13 +235,46 @@ func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *
 	return params
 }
 
+// DeployChainContractsAdapter is the chain-family extension point for the
+// DeployChainContracts changeset. Each family (EVM, Solana, …) registers one
+// implementation that supplies defaults, resolves prerequisites, builds deploy
+// params from topology, and runs the on-chain deploy sequence.
+//
+// The changeset invokes methods in this order per chain selector:
+//  1. GetDefaultDeployContractParams
+//  2. ResolveDeployAddresses
+//  3. BuildDeployContractParams (receives defaults from step 1)
+//  4. DeployChainContracts
 type DeployChainContractsAdapter interface {
+	// GetDefaultDeployContractParams returns family-specific defaults for contract
+	// versions, fee-quoter static config, and other fields not derived from topology.
+	// The changeset passes the result as BuildDeployContractParamsInput.Defaults;
+	// per-chain overrides from ChainOverrides.ContractParams are applied later in
+	// BuildDeployContractParams.
 	GetDefaultDeployContractParams(chainSelector uint64) DeployContractParams
+
+	// ResolveDeployAddresses looks up or deploys chain prerequisites before the
+	// main deploy sequence runs. At minimum this must resolve DeployerContract
+	// (e.g. CREATE2 factory on EVM). NewAddressRefs are merged into ExistingAddresses
+	// for the deploy input and written to the output datastore by the changeset.
 	ResolveDeployAddresses(e deployment.Environment, chainSelector uint64) (DeployChainResolvedAddresses, error)
+
+	// BuildDeployContractParams combines adapter defaults, topology-derived
+	// CommitteeVerifiers, and optional ChainOverrides.ContractParams into the
+	// final DeployContractParams passed to DeployChainContracts. Family adapters
+	// typically wire fee aggregators and executors from committee verifiers here.
 	BuildDeployContractParams(input BuildDeployContractParamsInput) (DeployContractParams, error)
+
+	// DeployChainContracts returns the operations sequence that deploys CCIP 2.0
+	// chain contracts for this family. The changeset executes it with a fully
+	// populated DeployChainContractsInput and persists addresses/metadata from
+	// the returned DeployChainContractsOutput.
 	DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, DeployChainContractsOutput, cldf_chain.BlockChains]
 }
 
+// DeployChainContractsRegistry maps chain families to DeployChainContractsAdapter
+// implementations. The DeployChainContracts changeset resolves adapters via
+// GetByChain using the selector's family from chain-selectors.
 type DeployChainContractsRegistry struct {
 	mu                  sync.Mutex
 	adapters            map[string]DeployChainContractsAdapter
@@ -237,6 +287,9 @@ var (
 	deployChainContractsRegistryOnce      sync.Once
 )
 
+// NewDeployChainContractsRegistry creates an empty registry. Tests and bootstrap
+// code typically construct a dedicated instance; production wiring may use
+// GetDeployChainContractsRegistry for the process-wide singleton.
 func NewDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	return &DeployChainContractsRegistry{
 		adapters:            make(map[string]DeployChainContractsAdapter),
@@ -245,6 +298,8 @@ func NewDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	}
 }
 
+// GetDeployChainContractsRegistry returns the process-wide singleton registry.
+// The first call initializes it; subsequent calls return the same pointer.
 func GetDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	deployChainContractsRegistryOnce.Do(func() {
 		singletonDeployChainContractsRegistry = NewDeployChainContractsRegistry()
@@ -252,6 +307,8 @@ func GetDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	return singletonDeployChainContractsRegistry
 }
 
+// Register associates a DeployChainContractsAdapter with a chain family (e.g.
+// chainsel.FamilyEVM). Only the first registration for a family is kept.
 func (r *DeployChainContractsRegistry) Register(family string, a DeployChainContractsAdapter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -260,6 +317,9 @@ func (r *DeployChainContractsRegistry) Register(family string, a DeployChainCont
 	}
 }
 
+// RegisterConfigImporter associates a versioned config importer with a chain
+// family. Not used by the DeployChainContracts changeset directly; retained
+// for other deployment flows that import legacy lane config.
 func (r *DeployChainContractsRegistry) RegisterConfigImporter(family string, version *semver.Version, importer deploy.ConfigImporter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -269,6 +329,9 @@ func (r *DeployChainContractsRegistry) RegisterConfigImporter(family string, ver
 	}
 }
 
+// RegisterLaneVersionResolver associates a lane version resolver with a chain
+// family. Not used by the DeployChainContracts changeset directly; retained
+// for other deployment flows that inspect connected lane versions.
 func (r *DeployChainContractsRegistry) RegisterLaneVersionResolver(family string, resolver deploy.LaneVersionResolver) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -277,6 +340,8 @@ func (r *DeployChainContractsRegistry) RegisterLaneVersionResolver(family string
 	}
 }
 
+// GetLaneVersionResolver returns the lane version resolver for the chain
+// selector's family, if one was registered.
 func (r *DeployChainContractsRegistry) GetLaneVersionResolver(sel uint64) (deploy.LaneVersionResolver, bool) {
 	family, err := chainsel.GetSelectorFamily(sel)
 	if err != nil {
@@ -288,6 +353,8 @@ func (r *DeployChainContractsRegistry) GetLaneVersionResolver(sel uint64) (deplo
 	return resolver, ok
 }
 
+// Get returns the DeployChainContractsAdapter registered for the given chain
+// family, if any.
 func (r *DeployChainContractsRegistry) Get(family string) (DeployChainContractsAdapter, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -295,6 +362,8 @@ func (r *DeployChainContractsRegistry) Get(family string) (DeployChainContractsA
 	return a, ok
 }
 
+// GetConfigImporter returns the config importer for the chain selector's family
+// and version, if one was registered.
 func (r *DeployChainContractsRegistry) GetConfigImporter(chainSel uint64, version *semver.Version) (deploy.ConfigImporter, bool) {
 	family, err := chainsel.GetSelectorFamily(chainSel)
 	if err != nil {
@@ -307,6 +376,9 @@ func (r *DeployChainContractsRegistry) GetConfigImporter(chainSel uint64, versio
 	return importer, ok
 }
 
+// GetByChain resolves the DeployChainContractsAdapter for a chain selector by
+// looking up its family. The DeployChainContracts changeset calls this for each
+// entry in ChainSelectors.
 func (r *DeployChainContractsRegistry) GetByChain(chainSelector uint64) (DeployChainContractsAdapter, error) {
 	family, err := chainsel.GetSelectorFamily(chainSelector)
 	if err != nil {
