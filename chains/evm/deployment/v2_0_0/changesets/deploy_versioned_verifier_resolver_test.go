@@ -10,7 +10,6 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/lombard"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	cs_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -192,7 +191,7 @@ func TestDeployVersionedVerifierResolver_Apply_CommitteeAndLombardOnSameChainHav
 	)
 	lombardRef := deployType(
 		datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
-		lombard.ContractQualifier,
+		versioned_verifier_resolver.LombardVerifierResolverType.String(),
 	)
 
 	assert.NotEqual(t, committeeRef.Address, lombardRef.Address,
@@ -200,5 +199,5 @@ func TestDeployVersionedVerifierResolver_Apply_CommitteeAndLombardOnSameChainHav
 	assert.Equal(t, datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType), committeeRef.Type)
 	assert.Equal(t, datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType), lombardRef.Type)
 	assert.Equal(t, committeeVerifierResolverDefaultQualifier, committeeRef.Qualifier)
-	assert.Equal(t, lombard.ContractQualifier, lombardRef.Qualifier)
+	assert.Equal(t, versioned_verifier_resolver.LombardVerifierResolverType.String(), lombardRef.Qualifier)
 }
