@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/Masterminds/semver/v3"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -14,44 +13,38 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
+// DeployChainContractsPerChainCfg holds optional per-chain deploy settings.
+// ContractParams is the only field whose unset pointer sub-fields are merged with
+// adapter defaults via BuildDeployContractParams; other fields coalesce against
+// changeset defaults (resolved deployer address, false for both deploy flags).
 type DeployChainContractsPerChainCfg struct {
-	DeployerContract string
-	DeployTestRouter bool
-	RMNRemote        adapters.RMNRemoteDeployParams
-	OffRamp          adapters.OffRampDeployParams
-	OnRamp           adapters.OnRampDeployParams
-	FeeQuoter        adapters.FeeQuoterDeployParams
-	Executors        []adapters.ExecutorDeployParams
-	MockReceivers    []adapters.MockReceiverDeployParams
-	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
-	// contracts remain owned by the deployer key. By default (false) the
-	// sequence transfers ownership of product contracts to the CLLCCIP
-	// RBACTimelock, failing fast if the required MCMS instances are not found.
-	DeployerKeyOwned bool
+	DeployerContract *string                                 `json:"deployerContract,omitempty" yaml:"deployerContract,omitempty"`
+	DeployTestRouter bool                                    `json:"deployTestRouter,omitempty" yaml:"deployTestRouter,omitempty"`
+	DeployerKeyOwned bool                                    `json:"deployerKeyOwned,omitempty" yaml:"deployerKeyOwned,omitempty"`
+	ContractParams   *adapters.DeployContractParamsOverrides `json:"contractParams,omitempty" yaml:"contractParams,omitempty"`
 }
 
+// DeployChainContractsCfg is the durable-pipeline payload for deploying CCIP 2.0 chain contracts.
+// Contract versions, fee-quoter static config, CREATE2 factory resolution, and
+// executor/mock-receiver wiring are resolved via the chain-family DeployChainContractsAdapter;
+// topology supplies committee verifiers.
 type DeployChainContractsCfg struct {
-	Topology                                *offchain.EnvironmentTopology
-	ChainSelectors                          []uint64
-	DefaultCfg                              DeployChainContractsPerChainCfg
-	ChainCfgs                               map[uint64]DeployChainContractsPerChainCfg
-	IgnoreImportedConfigFromPreviousVersion bool // if true, the changeset will not import any config from previous version,
-	// and will only rely on the config provided in DeployChainContractsCfg, else it will import config from previous version
-	// and will give precedence to the imported config over the config provided in DeployChainContractsCfg.
+	Topology       *offchain.EnvironmentTopology              `json:"topology" yaml:"topology"`
+	ChainSelectors []uint64                                   `json:"chainSelectors" yaml:"chainSelectors"`
+	ChainOverrides map[uint64]DeployChainContractsPerChainCfg `json:"chainOverrides,omitempty" yaml:"chainOverrides,omitempty"`
 }
 
-func (c DeployChainContractsCfg) resolveChainCfg(sel uint64) DeployChainContractsPerChainCfg {
-	if override, ok := c.ChainCfgs[sel]; ok {
-		return override
+func (c DeployChainContractsCfg) resolvePerChainCfg(sel uint64) DeployChainContractsPerChainCfg {
+	if c.ChainOverrides == nil {
+		return DeployChainContractsPerChainCfg{}
 	}
-	return c.DefaultCfg
+	return c.ChainOverrides[sel]
 }
 
 func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
@@ -76,22 +69,17 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 		envSelectors := e.BlockChains.ListChainSelectors()
 		for _, sel := range cfg.Cfg.ChainSelectors {
 			if seen[sel] {
-				return fmt.Errorf("duplicate chain selector %d in ChainSelectors", sel)
+				return fmt.Errorf("duplicate chain selector %d in chainSelectors", sel)
 			}
 			seen[sel] = true
 			if !slices.Contains(envSelectors, sel) {
 				return fmt.Errorf("chain selector %d is not available in environment", sel)
 			}
-
-			perChain := cfg.Cfg.resolveChainCfg(sel)
-			if perChain.DeployerContract == "" {
-				return fmt.Errorf("DeployerContract is required for chain %d", sel)
-			}
 		}
 
-		for sel := range cfg.Cfg.ChainCfgs {
+		for sel := range cfg.Cfg.ChainOverrides {
 			if !slices.Contains(cfg.Cfg.ChainSelectors, sel) {
-				return fmt.Errorf("ChainCfgs contains selector %d which is not in ChainSelectors", sel)
+				return fmt.Errorf("chainOverrides contains selector %d which is not in chainSelectors", sel)
 			}
 		}
 
@@ -117,69 +105,37 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				return deployment.ChangesetOutput{}, fmt.Errorf("chain %d: no committees have chain_config for this selector", sel)
 			}
 
-			perChain := cfg.Cfg.resolveChainCfg(sel)
+			perChainCfg := cfg.Cfg.resolvePerChainCfg(sel)
+
+			resolved, resolveErr := adapter.ResolveDeployAddresses(e, sel)
+			if resolveErr != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve deploy addresses on chain %d: %w", sel, resolveErr)
+			}
+
+			contractParams, err := adapter.BuildDeployContractParams(adapters.BuildDeployContractParamsInput{
+				ChainSelector:      sel,
+				CommitteeVerifiers: committeeVerifiers,
+				Overrides:          perChainCfg.ContractParams,
+				Defaults:           adapter.GetDefaultDeployContractParams(sel),
+			})
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to build contract params for chain %d: %w", sel, err)
+			}
 
 			existingAddresses := e.DataStore.Addresses().Filter(
 				datastore.AddressRefByChainSelector(sel),
 			)
+			existingAddresses = append(existingAddresses, resolved.NewAddressRefs...)
+
+			deployerContract := coalesce(perChainCfg.DeployerContract, resolved.DeployerContract)
 
 			input := adapters.DeployChainContractsInput{
 				ChainSelector:     sel,
-				DeployerContract:  perChain.DeployerContract,
-				DeployTestRouter:  perChain.DeployTestRouter,
+				DeployerContract:  deployerContract,
+				DeployTestRouter:  perChainCfg.DeployTestRouter,
 				ExistingAddresses: existingAddresses,
-				DeployerKeyOwned:  perChain.DeployerKeyOwned,
-				ContractParams: adapters.DeployContractParams{
-					RMNRemote:          perChain.RMNRemote,
-					OffRamp:            perChain.OffRamp,
-					CommitteeVerifiers: committeeVerifiers,
-					OnRamp:             perChain.OnRamp,
-					FeeQuoter:          perChain.FeeQuoter,
-					Executors:          perChain.Executors,
-					MockReceivers:      perChain.MockReceivers,
-				},
-			}
-			if !cfg.Cfg.IgnoreImportedConfigFromPreviousVersion {
-				importNeeded, err := shouldImportConfigFromPreviousVersion(e, registry, sel)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to check if config import from previous version is needed for chain %d: %w", sel, err)
-				}
-				if importNeeded {
-					// so far we do not need any config from 1.5.0 , so only importing config from 1.6.0
-					// if in the future we need to import some config from 1.5.0,
-					// we should leverage lane version resolver to get the right adapter to import config
-					version := semver.MustParse("1.6.0")
-					configImporter, ok := registry.GetConfigImporter(sel, version)
-					if !ok {
-						return deployment.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", sel, version)
-					}
-					populateCfgOutput, err := deploy.PopulateMetaDataFromConfigImporter(e, configImporter, sel)
-					if err != nil {
-						return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate metadata from config importer for chain %d: %w", sel, err)
-					}
-					// if the importer found config from previous version,
-					// import it and merge it with the input config, giving precedence to the imported config
-					if len(populateCfgOutput.Metadata.Contracts) > 0 {
-						importReport, err := operations.ExecuteSequence(
-							e.OperationsBundle,
-							adapter.SetContractParamsFromImportedConfig(),
-							e.BlockChains, adapters.DeployChainConfigCreatorInput{
-								ChainSelector:      sel,
-								ContractMeta:       populateCfgOutput.Metadata.Contracts,
-								ExistingAddresses:  existingAddresses,
-								UserProvidedConfig: input.ContractParams,
-							})
-						if err != nil {
-							return deployment.ChangesetOutput{Reports: allReports},
-								fmt.Errorf("failed to execute config importer sequence for chain %d: %w", sel, err)
-						}
-						allReports = append(allReports, importReport.ExecutionReports...)
-						input.ContractParams, err = input.ContractParams.MergeWithOverrideIfNotEmpty(importReport.Output)
-						if err != nil {
-							return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge imported config with input config for chain %d: %w", sel, err)
-						}
-					}
-				}
+				DeployerKeyOwned:  perChainCfg.DeployerKeyOwned,
+				ContractParams:    contractParams,
 			}
 
 			e.Logger.Infow(
@@ -194,7 +150,6 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 					fmt.Errorf("failed to deploy chain contracts on chain %d: %w", sel, err)
 			}
 
-			// if the deployed contracts are not to be owned by the deployer key, transfer ownership to the timelock via MCMS and, if needed, execute the accept ownership sequence
 			if !input.DeployerKeyOwned {
 				ownershipBatchOps, ownershipReports, err := deploy.TransferToTimelock(sel, e, cfg.MCMS, report.Output.RefsToTransferOwnership)
 				if err != nil {
@@ -203,6 +158,14 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 				}
 				allReports = append(allReports, ownershipReports...)
 				allBatchOps = append(allBatchOps, ownershipBatchOps...)
+			}
+
+			for _, ref := range resolved.NewAddressRefs {
+				if addErr := ds.Addresses().Add(ref); addErr != nil {
+					return deployment.ChangesetOutput{Reports: allReports},
+						fmt.Errorf("failed to add resolved %s %s at %s on chain %d to datastore: %w",
+							ref.Type, ref.Version, ref.Address, ref.ChainSelector, addErr)
+				}
 			}
 
 			for _, ref := range report.Output.Addresses {
@@ -282,27 +245,4 @@ func BuildCommitteeVerifierParams(
 	}
 
 	return params, nil
-}
-
-// shouldImportConfigFromPreviousVersion checks if any of the lanes connected to the given chain selector are using version 1.6.0,
-// if so, it returns true, indicating that we should import config from previous version, otherwise it returns false
-func shouldImportConfigFromPreviousVersion(e deployment.Environment, registry *adapters.DeployChainContractsRegistry, sel uint64) (bool, error) {
-	res, exists := registry.GetLaneVersionResolver(sel)
-	if !exists {
-		return false, fmt.Errorf("no lane version resolver registered for chain %d", sel)
-	}
-	if !res.IsSupportedChain(e, sel) {
-		return false, nil
-	}
-	_, versions, err := res.DeriveLaneVersionsForChain(e, sel)
-	if err != nil {
-		return false, fmt.Errorf("failed to derive lane versions for chain %d: %w", sel, err)
-	}
-	reqVersion := semver.MustParse("1.6.0")
-	for _, v := range versions {
-		if v.Equal(reqVersion) {
-			return true, nil
-		}
-	}
-	return false, nil
 }

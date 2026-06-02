@@ -170,3 +170,19 @@ func ExecutionStateToString(state uint8) string {
 		return "UNKNOWN"
 	}
 }
+
+// Coalesce returns the dereferenced override if non-nil, otherwise returns def.
+func Coalesce[T any](override *T, def T) T {
+	if override != nil {
+		return *override
+	}
+	return def
+}
+
+// CoalescePtr returns override if non-nil, otherwise returns def.
+func CoalescePtr[T any](override, def *T) *T {
+	if override != nil {
+		return override
+	}
+	return def
+}

@@ -11,6 +11,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -75,6 +76,48 @@ type MockReceiverDeployParams struct {
 	Qualifier             string
 }
 
+// RMNRemoteDeployParamsOverrides holds optional RMN remote deploy overrides.
+// Unset pointer fields use adapter defaults at apply time.
+type RMNRemoteDeployParamsOverrides struct {
+	Version   *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
+	LegacyRMN *string         `json:"legacyRMN,omitempty" yaml:"legacyRMN,omitempty"`
+}
+
+// OffRampDeployParamsOverrides holds optional off-ramp deploy overrides.
+type OffRampDeployParamsOverrides struct {
+	Version                   *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
+	GasForCallExactCheck      *uint16         `json:"gasForCallExactCheck,omitempty" yaml:"gasForCallExactCheck,omitempty"`
+	MaxGasBufferToUpdateState *uint32         `json:"maxGasBufferToUpdateState,omitempty" yaml:"maxGasBufferToUpdateState,omitempty"`
+}
+
+// OnRampDeployParamsOverrides holds optional on-ramp deploy overrides.
+type OnRampDeployParamsOverrides struct {
+	Version               *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
+	FeeAggregator         *string         `json:"feeAggregator,omitempty" yaml:"feeAggregator,omitempty"`
+	MaxUSDCentsPerMessage *uint32         `json:"maxUSDCentsPerMessage,omitempty" yaml:"maxUSDCentsPerMessage,omitempty"`
+}
+
+// FeeQuoterDeployParamsOverrides holds optional fee quoter deploy overrides.
+type FeeQuoterDeployParamsOverrides struct {
+	Version                        *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
+	MaxFeeJuelsPerMsg              *big.Int        `json:"maxFeeJuelsPerMsg,omitempty" yaml:"maxFeeJuelsPerMsg,omitempty"`
+	LINKPremiumMultiplierWeiPerEth *uint64         `json:"linkPremiumMultiplierWeiPerEth,omitempty" yaml:"linkPremiumMultiplierWeiPerEth,omitempty"`
+	WETHPremiumMultiplierWeiPerEth *uint64         `json:"wethPremiumMultiplierWeiPerEth,omitempty" yaml:"wethPremiumMultiplierWeiPerEth,omitempty"`
+	USDPerLINK                     *big.Int        `json:"usdPerLINK,omitempty" yaml:"usdPerLINK,omitempty"`
+	USDPerWETH                     *big.Int        `json:"usdPerWETH,omitempty" yaml:"usdPerWETH,omitempty"`
+}
+
+// DeployContractParamsOverrides holds optional contract deploy overrides.
+// Unset pointer fields use adapter defaults at apply time.
+type DeployContractParamsOverrides struct {
+	RMNRemote     *RMNRemoteDeployParamsOverrides `json:"rmnRemote,omitempty" yaml:"rmnRemote,omitempty"`
+	OffRamp       *OffRampDeployParamsOverrides   `json:"offRamp,omitempty" yaml:"offRamp,omitempty"`
+	OnRamp        *OnRampDeployParamsOverrides    `json:"onRamp,omitempty" yaml:"onRamp,omitempty"`
+	FeeQuoter     *FeeQuoterDeployParamsOverrides `json:"feeQuoter,omitempty" yaml:"feeQuoter,omitempty"`
+	Executors     *[]ExecutorDeployParams         `json:"executors,omitempty" yaml:"executors,omitempty"`
+	MockReceivers *[]MockReceiverDeployParams     `json:"mockReceivers,omitempty" yaml:"mockReceivers,omitempty"`
+}
+
 type DeployContractParams struct {
 	RMNRemote          RMNRemoteDeployParams
 	OffRamp            OffRampDeployParams
@@ -120,11 +163,65 @@ type DeployChainContractsOutput struct {
 	RefsToTransferOwnership []datastore.AddressRef
 }
 
+// DeployChainResolvedAddresses holds addresses resolved from the datastore (or deployed
+// during resolution) before the main DeployChainContracts sequence runs.
+type DeployChainResolvedAddresses struct {
+	DeployerContract string
+	NewAddressRefs   []datastore.AddressRef
+}
+
+// BuildDeployContractParamsInput carries topology-derived data and optional user overrides.
+type BuildDeployContractParamsInput struct {
+	ChainSelector      uint64
+	CommitteeVerifiers []CommitteeVerifierDeployParams
+	Defaults           DeployContractParams
+	Overrides          *DeployContractParamsOverrides
+}
+
+// ApplyDeployContractParamsOverrides merges optional user overrides onto adapter defaults.
+func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *DeployContractParamsOverrides) DeployContractParams {
+	if overrides == nil {
+		return params
+	}
+	if overrides.RMNRemote != nil {
+		o := overrides.RMNRemote
+		params.RMNRemote.Version = utils.CoalescePtr(o.Version, params.RMNRemote.Version)
+		params.RMNRemote.LegacyRMN = utils.Coalesce(o.LegacyRMN, params.RMNRemote.LegacyRMN)
+	}
+	if overrides.OffRamp != nil {
+		o := overrides.OffRamp
+		params.OffRamp.Version = utils.CoalescePtr(o.Version, params.OffRamp.Version)
+		params.OffRamp.GasForCallExactCheck = utils.Coalesce(o.GasForCallExactCheck, params.OffRamp.GasForCallExactCheck)
+		params.OffRamp.MaxGasBufferToUpdateState = utils.Coalesce(o.MaxGasBufferToUpdateState, params.OffRamp.MaxGasBufferToUpdateState)
+	}
+	if overrides.OnRamp != nil {
+		o := overrides.OnRamp
+		params.OnRamp.Version = utils.CoalescePtr(o.Version, params.OnRamp.Version)
+		params.OnRamp.FeeAggregator = utils.Coalesce(o.FeeAggregator, params.OnRamp.FeeAggregator)
+		params.OnRamp.MaxUSDCentsPerMessage = utils.Coalesce(o.MaxUSDCentsPerMessage, params.OnRamp.MaxUSDCentsPerMessage)
+	}
+	if overrides.FeeQuoter != nil {
+		o := overrides.FeeQuoter
+		params.FeeQuoter.Version = utils.CoalescePtr(o.Version, params.FeeQuoter.Version)
+		params.FeeQuoter.MaxFeeJuelsPerMsg = utils.CoalescePtr(o.MaxFeeJuelsPerMsg, params.FeeQuoter.MaxFeeJuelsPerMsg)
+		params.FeeQuoter.LINKPremiumMultiplierWeiPerEth = utils.Coalesce(o.LINKPremiumMultiplierWeiPerEth, params.FeeQuoter.LINKPremiumMultiplierWeiPerEth)
+		params.FeeQuoter.WETHPremiumMultiplierWeiPerEth = utils.Coalesce(o.WETHPremiumMultiplierWeiPerEth, params.FeeQuoter.WETHPremiumMultiplierWeiPerEth)
+		params.FeeQuoter.USDPerLINK = utils.CoalescePtr(o.USDPerLINK, params.FeeQuoter.USDPerLINK)
+		params.FeeQuoter.USDPerWETH = utils.CoalescePtr(o.USDPerWETH, params.FeeQuoter.USDPerWETH)
+	}
+	if overrides.Executors != nil {
+		params.Executors = *overrides.Executors
+	}
+	if overrides.MockReceivers != nil {
+		params.MockReceivers = *overrides.MockReceivers
+	}
+	return params
+}
+
 type DeployChainContractsAdapter interface {
-	// SetContractParamsFromImportedConfig is used when ImportConfig is true in DeployChainContractsInput.
-	// It should read the necessary contract parameters from the datastore contract metadata based on the chain selector and
-	// return them in the same format as DeployContractParams for use in the deployment sequence.
-	SetContractParamsFromImportedConfig() *cldf_ops.Sequence[DeployChainConfigCreatorInput, DeployContractParams, cldf_chain.BlockChains]
+	GetDefaultDeployContractParams(chainSelector uint64) DeployContractParams
+	ResolveDeployAddresses(e deployment.Environment, chainSelector uint64) (DeployChainResolvedAddresses, error)
+	BuildDeployContractParams(input BuildDeployContractParamsInput) (DeployContractParams, error)
 	DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, DeployChainContractsOutput, cldf_chain.BlockChains]
 }
 
