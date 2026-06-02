@@ -165,6 +165,164 @@ func Test_PollingWorking(t *testing.T) {
 	require.Equal(t, homeChainConfig, configs)
 }
 
+// makeValidOnChainConfig returns a ChainConfigInfo that passes validateChainConfigInfos.
+func makeValidOnChainConfig(
+	t *testing.T,
+	sel cciptypes.ChainSelector,
+	fChain uint8,
+	peers ...libocrtypes.PeerID,
+) ChainConfigInfo {
+	t.Helper()
+
+	chainConfig := chainconfig.ChainConfig{}
+	encoded, err := chainconfig.EncodeChainConfig(chainConfig)
+	require.NoError(t, err)
+	return ChainConfigInfo{
+		ChainSelector: sel,
+		ChainConfig: HomeChainConfigMapper{
+			FChain:  fChain,
+			Readers: peers,
+			Config:  encoded,
+		},
+	}
+}
+
+// makeInvalidOnChainConfig returns a ChainConfigInfo that fails validateChainConfigInfos
+// (FChain == 0 is the simplest trigger).
+func makeInvalidOnChainConfig(sel cciptypes.ChainSelector) ChainConfigInfo {
+	return ChainConfigInfo{
+		ChainSelector: sel,
+		ChainConfig:   HomeChainConfigMapper{FChain: 0},
+	}
+}
+
+// paginatedMock sets up GetLatestValue to return successive pages from pages.
+// Each call pops the next page from the slice.
+func paginatedMock(t *testing.T, pages [][]ChainConfigInfo) *readermock.MockContractReaderFacade {
+	t.Helper()
+	m := readermock.NewMockContractReaderFacade(t)
+	call := 0
+	m.On("GetLatestValue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			out := args.Get(4).(*[]ChainConfigInfo)
+			if call < len(pages) {
+				*out = pages[call]
+			} else {
+				*out = nil
+			}
+			call++
+		}).
+		Return(nil)
+	return m
+}
+
+// Test_FetchAndSetConfigs_ZeroConfigs verifies that fetchAndSetConfigs returns
+// promptly when no configs exist on-chain (empty first page) instead of
+// hanging forever.
+func Test_FetchAndSetConfigs_ZeroConfigs(t *testing.T) {
+	m := paginatedMock(t, [][]ChainConfigInfo{
+		{}, // page 0: empty
+	})
+
+	poller := NewHomeChainConfigPoller(m, logger.Test(t), time.Hour, ccipConfigBoundContract)
+	hcp := poller.(*homeChainPoller)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	require.NoError(t, hcp.fetchAndSetConfigs(ctx))
+
+	configs, err := poller.GetAllChainConfigs()
+	require.NoError(t, err)
+	require.Empty(t, configs)
+}
+
+// Test_FetchAndSetConfigs_ExactPageMultiple verifies that the loop terminates
+// when the total config count is an exact multiple of defaultConfigPageSize.
+// The mock returns one full page of valid configs followed by an empty page.
+func Test_FetchAndSetConfigs_ExactPageMultiple(t *testing.T) {
+	pageSize := int(defaultConfigPageSize)
+	fullPage := make([]ChainConfigInfo, pageSize)
+	for i := 0; i < pageSize; i++ {
+		fullPage[i] = makeValidOnChainConfig(t, cciptypes.ChainSelector(i+1), 1, p2pOracleAId)
+	}
+
+	m := paginatedMock(t, [][]ChainConfigInfo{
+		fullPage, // page 0: exactly 100 valid entries
+		{},       // page 1: empty — terminates pagination
+	})
+
+	poller := NewHomeChainConfigPoller(m, logger.Test(t), time.Hour, ccipConfigBoundContract)
+	hcp := poller.(*homeChainPoller)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	require.NoError(t, hcp.fetchAndSetConfigs(ctx))
+
+	configs, err := poller.GetAllChainConfigs()
+	require.NoError(t, err)
+	require.Len(t, configs, pageSize)
+}
+
+// Test_FetchAndSetConfigs_MixedValidInvalid verifies that only valid entries
+// reach setState when a page contains a mix of valid and invalid configs.
+func Test_FetchAndSetConfigs_MixedValidInvalid(t *testing.T) {
+	m := paginatedMock(t, [][]ChainConfigInfo{
+		{
+			makeValidOnChainConfig(t, chainA, 1, p2pOracleAId),
+			makeInvalidOnChainConfig(chainB), // FChain == 0: invalid
+			makeValidOnChainConfig(t, chainC, 2, p2pOracleCId),
+		},
+	})
+
+	poller := NewHomeChainConfigPoller(m, logger.Test(t), time.Hour, ccipConfigBoundContract)
+	hcp := poller.(*homeChainPoller)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	require.NoError(t, hcp.fetchAndSetConfigs(ctx))
+
+	configs, err := poller.GetAllChainConfigs()
+	require.NoError(t, err)
+	require.Len(t, configs, 2)
+	require.Contains(t, configs, chainA)
+	require.Contains(t, configs, chainC)
+	require.NotContains(t, configs, chainB)
+}
+
+// Test_FetchAndSetConfigs_ContextCancelled verifies that fetchAndSetConfigs
+// returns ctx.Err() when the context is cancelled mid-pagination.
+// The mock returns a full page on the first call and cancels the context so
+// that the ctx.Done() guard at the top of the second iteration fires.
+func Test_FetchAndSetConfigs_ContextCancelled(t *testing.T) {
+	pageSize := int(defaultConfigPageSize)
+	fullPage := make([]ChainConfigInfo, pageSize)
+	for i := 0; i < pageSize; i++ {
+		fullPage[i] = makeValidOnChainConfig(t, cciptypes.ChainSelector(i+1), 1, p2pOracleAId)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	m := readermock.NewMockContractReaderFacade(t)
+	m.On("GetLatestValue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			out := args.Get(4).(*[]ChainConfigInfo)
+			*out = fullPage
+			// Cancel after the first page so the next iteration's ctx.Done() fires.
+			cancel()
+		}).
+		Return(nil).
+		Once()
+
+	poller := NewHomeChainConfigPoller(m, logger.Test(t), time.Hour, ccipConfigBoundContract)
+	hcp := poller.(*homeChainPoller)
+
+	err := hcp.fetchAndSetConfigs(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	donID := uint32(1)
 	pluginType := uint8(1) // execution
