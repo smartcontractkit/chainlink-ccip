@@ -16,11 +16,7 @@ import (
 
 // DeployVersionedVerifierResolverChainCfg configures deployment on a single EVM chain.
 type DeployVersionedVerifierResolverChainCfg struct {
-	ResolverType datastore.ContractType
-	// Qualifier is used to differentiate multiple resolver deployments of the same type on the same chain.
-	// As a note, since all resolver types share the same bytecode, the CREATE2 salt is solely determined by the qualifier. Therefore, different resolver types deployed on the same chain must use different qualifiers to avoid CREATE2 address collisions.
-	// These are enforced at the sequence level.
-	Qualifier      string
+	ResolverType   datastore.ContractType
 	CREATE2Factory common.Address
 }
 
@@ -43,9 +39,6 @@ func makeVerifyDeployVersionedVerifierResolver() func(cldf_deployment.Environmen
 			return fmt.Errorf("at least one chain must be configured")
 		}
 		for chainSel, chainCfg := range cfg.Cfg.Chains {
-			if chainCfg.Qualifier == "" {
-				return fmt.Errorf("chain %d: qualifier must not be empty", chainSel)
-			}
 			if chainCfg.CREATE2Factory == (common.Address{}) {
 				return fmt.Errorf("chain %d: CREATE2Factory is required", chainSel)
 			}
@@ -76,8 +69,11 @@ func makeApplyDeployVersionedVerifierResolver(
 			}
 
 			contractType := chainCfg.ResolverType
-			qualifier := chainCfg.Qualifier
 			existing := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
+			qualifier, err := getQualifierForResolverType(contractType)
+			if err != nil {
+				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to get qualifier for resolver type %s: %w", chainSel, contractType, err)
+			}
 
 			if ref := findExistingVerifierResolver(existing, contractType, qualifier); ref != nil {
 				if err := newDS.Addresses().Add(*ref); err != nil {
@@ -89,9 +85,9 @@ func makeApplyDeployVersionedVerifierResolver(
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployVerifierResolverViaCREATE2, chain, sequences.DeployVerifierResolverViaCREATE2Input{
 				CREATE2Factory: chainCfg.CREATE2Factory,
 				ChainSelector:  chainSel,
-				Qualifier:      qualifier,
 				Type:           contractType,
 				Version:        versioned_verifier_resolver.Version,
+				Qualifier:      qualifier,
 			})
 			if err != nil {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy %s on chain %d: %w", contractType, chainSel, err)
@@ -135,4 +131,21 @@ func findExistingVerifierResolver(
 		}
 	}
 	return nil
+}
+
+func getQualifierForResolverType(contractType datastore.ContractType) (string, error) {
+	var CommiteeVerifierQualifier = "default"
+	var LombardVerifierQualifier = versioned_verifier_resolver.LombardVerifierResolverType.String()
+	var CCTPVerifierQualifier = versioned_verifier_resolver.CCTPVerifierResolverType.String()
+
+	switch contractType {
+	case datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType):
+		return CommiteeVerifierQualifier, nil
+	case datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType):
+		return CCTPVerifierQualifier, nil
+	case datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType):
+		return LombardVerifierQualifier, nil
+	default:
+		return "", fmt.Errorf("unsupported resolver type: %s", contractType)
+	}
 }

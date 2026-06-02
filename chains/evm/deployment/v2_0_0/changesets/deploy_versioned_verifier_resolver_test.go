@@ -41,14 +41,12 @@ func deployTestCREATE2Factory(t *testing.T, e *deployment.Environment) common.Ad
 
 func deployVersionedVerifierResolverCfg(
 	resolverType datastore.ContractType,
-	qualifier string,
 	create2Addr common.Address,
 ) changesets.DeployVersionedVerifierResolverCfg {
 	return changesets.DeployVersionedVerifierResolverCfg{
 		Chains: map[uint64]changesets.DeployVersionedVerifierResolverChainCfg{
 			deployVVRTestChainSel: {
 				ResolverType:   resolverType,
-				Qualifier:      qualifier,
 				CREATE2Factory: create2Addr,
 			},
 		},
@@ -71,23 +69,15 @@ func TestDeployVersionedVerifierResolver_VerifyPreconditions(t *testing.T) {
 			desc: "valid committee resolver config",
 			input: cs_changesets.WithMCMS[changesets.DeployVersionedVerifierResolverCfg]{
 				MCMS: mcms.Input{},
-				Cfg:  deployVersionedVerifierResolverCfg(datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType), committeeVerifierResolverDefaultQualifier, create2Addr),
+				Cfg:  deployVersionedVerifierResolverCfg(datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType), create2Addr),
 			},
 		},
 		{
 			desc: "valid lombard resolver config",
 			input: cs_changesets.WithMCMS[changesets.DeployVersionedVerifierResolverCfg]{
 				MCMS: mcms.Input{},
-				Cfg:  deployVersionedVerifierResolverCfg(datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType), lombard.ContractQualifier, create2Addr),
+				Cfg:  deployVersionedVerifierResolverCfg(datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType), create2Addr),
 			},
-		},
-		{
-			desc: "empty qualifier",
-			input: cs_changesets.WithMCMS[changesets.DeployVersionedVerifierResolverCfg]{
-				MCMS: mcms.Input{},
-				Cfg:  deployVersionedVerifierResolverCfg(datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType), "", create2Addr),
-			},
-			expectedErr: "qualifier must not be empty",
 		},
 		{
 			desc: "missing CREATE2 factory",
@@ -97,7 +87,6 @@ func TestDeployVersionedVerifierResolver_VerifyPreconditions(t *testing.T) {
 					Chains: map[uint64]changesets.DeployVersionedVerifierResolverChainCfg{
 						deployVVRTestChainSel: {
 							ResolverType: datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
-							Qualifier:    lombard.ContractQualifier,
 						},
 					},
 				},
@@ -136,7 +125,6 @@ func TestDeployVersionedVerifierResolver_Apply_DeploysAndIsIdempotent(t *testing
 		MCMS: mcms.Input{},
 		Cfg: deployVersionedVerifierResolverCfg(
 			datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
-			committeeVerifierResolverDefaultQualifier,
 			create2Addr,
 		),
 	}
@@ -169,32 +157,6 @@ func TestDeployVersionedVerifierResolver_Apply_DeploysAndIsIdempotent(t *testing
 	assert.Empty(t, out2.Reports, "second apply should skip deployment and produce no new reports")
 }
 
-func TestDeployVersionedVerifierResolver_Apply_DifferentQualifiersProduceDifferentAddresses(t *testing.T) {
-	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{deployVVRTestChainSel}))
-	require.NoError(t, err)
-
-	create2Addr := deployTestCREATE2Factory(t, e)
-	mcmsRegistry := cs_changesets.GetRegistry()
-	committeeType := datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType)
-
-	deployWith := func(qualifier string) string {
-		out, err := changesets.DeployVersionedVerifierResolver(mcmsRegistry).Apply(*e, cs_changesets.WithMCMS[changesets.DeployVersionedVerifierResolverCfg]{
-			MCMS: mcms.Input{},
-			Cfg:  deployVersionedVerifierResolverCfg(committeeType, qualifier, create2Addr),
-		})
-		require.NoError(t, err)
-		addrs, err := out.DataStore.Addresses().Fetch()
-		require.NoError(t, err)
-		require.Len(t, addrs, 1)
-		assert.Equal(t, qualifier, addrs[0].Qualifier)
-		return addrs[0].Address
-	}
-
-	alphaAddr := deployWith("alpha")
-	betaAddr := deployWith("beta")
-	assert.NotEqual(t, alphaAddr, betaAddr, "different qualifiers must produce different CREATE2 addresses")
-}
-
 func TestDeployVersionedVerifierResolver_Apply_CommitteeAndLombardOnSameChainHaveDifferentAddresses(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{deployVVRTestChainSel}))
 	require.NoError(t, err)
@@ -205,7 +167,7 @@ func TestDeployVersionedVerifierResolver_Apply_CommitteeAndLombardOnSameChainHav
 	deployType := func(resolverType datastore.ContractType, qualifier string) datastore.AddressRef {
 		out, err := changesets.DeployVersionedVerifierResolver(mcmsRegistry).Apply(*e, cs_changesets.WithMCMS[changesets.DeployVersionedVerifierResolverCfg]{
 			MCMS: mcms.Input{},
-			Cfg:  deployVersionedVerifierResolverCfg(resolverType, qualifier, create2Addr),
+			Cfg:  deployVersionedVerifierResolverCfg(resolverType, create2Addr),
 		})
 		require.NoError(t, err)
 		addrs, err := out.DataStore.Addresses().Fetch()

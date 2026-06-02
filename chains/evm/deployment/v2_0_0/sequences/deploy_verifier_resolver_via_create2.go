@@ -34,7 +34,7 @@ func (i DeployVerifierResolverViaCREATE2Input) Validate() error {
 func validateQualifier(contractType datastore.ContractType, qualifier string) error {
 	// Since all resolver types share the same bytecode, the CREATE2 salt is solely determined by the qualifier.
 	// Therefore, we must ensure that different resolver types do not use the same qualifier, or else they would collide on CREATE2 address.
-	// As we have already deployed a CommitteeVerifierResolver with the "default" qualifier, we will reserve that qualifier for the CommitteeVerifierResolver and require LombardVerifierResolver to use its type as the qualifier.
+	// NOTE: DO NOT CHANGE EXISITING VALUES, EVER. Otherwise it will break determistic addresses of already deployed resolvers!!
 	var CommiteeVerifierQualifier = "default"
 	var LombardVerifierQualifier = versioned_verifier_resolver.LombardVerifierResolverType.String()
 	var CCTPVerifierQualifier = versioned_verifier_resolver.CCTPVerifierResolverType.String()
