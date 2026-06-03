@@ -5,18 +5,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	upstream "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-
-	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
-	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -51,145 +48,73 @@ var (
 
 			return report.Output, nil
 		})
-
-	importConfigForDeployContracts = cldf_ops.NewSequence(
-		"evm-import-config-for-deploy-chain-contracts",
-		semver.MustParse("2.0.0"),
-		"Reads contract parameters from the datastore based on the chain selector and returns them in the format needed for DeployChainContracts",
-		func(b cldf_ops.Bundle, chains chain.BlockChains, input ccvadapters.DeployChainConfigCreatorInput) (output ccvadapters.DeployContractParams, err error) {
-			evmChains := chains.EVMChains()
-			evmChain, ok := evmChains[input.ChainSelector]
-			if !ok {
-				return ccvadapters.DeployContractParams{}, fmt.Errorf("EVM chain not found for selector %d", input.ChainSelector)
-			}
-			paramsFrom1_6_0, err := importConfigFromv1_6_0(b, evmChain, input)
-			if err != nil {
-				return output, fmt.Errorf("failed to import config from v1.6.0: %w", err)
-			}
-			paramsFrom1_5_0, err := importConfigFromv1_5_0(input)
-			if err != nil {
-				return output, fmt.Errorf("failed to import config from v1.5.0: %w", err)
-			}
-			output, err = paramsFrom1_5_0.MergeWithOverrideIfNotEmpty(paramsFrom1_6_0)
-			return
-		})
 )
 
-func (a *EVMDeployChainContractsAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[ccvadapters.DeployChainConfigCreatorInput, ccvadapters.DeployContractParams, chain.BlockChains] {
-	return importConfigForDeployContracts
+func (a *EVMDeployChainContractsAdapter) GetDefaultDeployContractParams(_ uint64) ccvadapters.DeployContractParams {
+	return defaultDeployContractParams()
+}
+
+func (a *EVMDeployChainContractsAdapter) ResolveDeployAddresses(
+	e deployment.Environment,
+	chainSelector uint64,
+) (ccvadapters.DeployChainResolvedAddresses, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return ccvadapters.DeployChainResolvedAddresses{}, fmt.Errorf("EVM chain not found for selector %d", chainSelector)
+	}
+
+	existing := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
+	ref := datastore_utils.GetAddressRef(
+		existing,
+		chainSelector,
+		create2_factory.ContractType,
+		create2_factory.Version,
+		"",
+	)
+	if ref.Address != "" {
+		return ccvadapters.DeployChainResolvedAddresses{DeployerContract: ref.Address}, nil
+	}
+
+	create2Ref, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, evmChain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
+			ChainSelector:  chainSelector,
+			Args: create2_factory.ConstructorArgs{
+				AllowList: []common.Address{evmChain.DeployerKey.From},
+			},
+		}, nil,
+	)
+	if err != nil {
+		return ccvadapters.DeployChainResolvedAddresses{}, fmt.Errorf("failed to deploy CREATE2 factory on chain %d: %w", chainSelector, err)
+	}
+
+	return ccvadapters.DeployChainResolvedAddresses{
+		DeployerContract: create2Ref.Address,
+		NewAddressRefs:   []datastore.AddressRef{create2Ref},
+	}, nil
+}
+
+func (a *EVMDeployChainContractsAdapter) BuildDeployContractParams(
+	input ccvadapters.BuildDeployContractParamsInput,
+) (ccvadapters.DeployContractParams, error) {
+	if len(input.CommitteeVerifiers) == 0 {
+		return ccvadapters.DeployContractParams{}, fmt.Errorf("chain %d: at least one committee verifier is required", input.ChainSelector)
+	}
+	primaryFeeAggregator := input.CommitteeVerifiers[0].FeeAggregator
+
+	params := input.Defaults
+	params.CommitteeVerifiers = input.CommitteeVerifiers
+
+	params.OnRamp.FeeAggregator = primaryFeeAggregator
+
+	params.Executors = defaultExecutorParams(primaryFeeAggregator)
+
+	return ccvadapters.ApplyDeployContractParamsOverrides(params, input.Overrides), nil
 }
 
 func (a *EVMDeployChainContractsAdapter) DeployChainContracts() *cldf_ops.Sequence[ccvadapters.DeployChainContractsInput, ccvadapters.DeployChainContractsOutput, chain.BlockChains] {
 	return evmDeployChainContracts
-}
-
-func importConfigFromv1_5_0(input ccvadapters.DeployChainConfigCreatorInput) (ccvadapters.DeployContractParams, error) {
-	output := input.UserProvidedConfig
-	// find legacy RMN address
-	rmnAddr := datastore_utils.GetAddressRef(
-		input.ExistingAddresses,
-		input.ChainSelector,
-		rmnops1_5.ContractType,
-		semver.MustParse("1.5.0"),
-		"",
-	)
-	if rmnAddr.Address != "" {
-		output.RMNRemote.LegacyRMN = rmnAddr.Address
-	}
-	// set default value for gas for call exact check based on v1.5.0 deployments
-	//https://github.com/smartcontractkit/ccip/blob/b5529a39311a2fd39cafceb62e4bb8f40eeb2e9e/contracts/src/v0.8/ccip/libraries/Internal.sol#L14C55-L14C60
-	output.OffRamp.GasForCallExactCheck = 5000
-	return output, nil
-}
-
-func importConfigFromv1_6_0(b cldf_ops.Bundle, chain evm.Chain, input ccvadapters.DeployChainConfigCreatorInput) (ccvadapters.DeployContractParams, error) {
-	output := input.UserProvidedConfig
-	// fetch onRamp 1.6.0 , if not found, it's possible onRamp wasn't deployed in v1.6.0 for this chain, so we just return
-	onRampAddr := datastore_utils.GetAddressRef(
-		input.ExistingAddresses,
-		input.ChainSelector,
-		onrampops_v160.ContractType,
-		onrampops_v160.Version,
-		"",
-	)
-	if onRampAddr.Address == "" {
-		return output, nil
-	}
-	// if onRamp address is found, we assume the other onRamp metadata fields are also present
-	metadataForonRamp16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
-		input.ExistingAddresses,
-		input.ContractMeta,
-		onrampops_v160.ContractType,
-		onrampops_v160.Version,
-		"",
-		input.ChainSelector,
-	)
-	if err != nil {
-		return output, fmt.Errorf("failed to get onRamp metadata for chain selector %d: %w", input.ChainSelector, err)
-	}
-	if len(metadataForonRamp16) == 0 {
-		return output, fmt.Errorf("no metadata found for onRamp v1.6.0 on chain selector %d", input.ChainSelector)
-	}
-	if len(metadataForonRamp16) > 1 {
-		return output, fmt.Errorf("multiple metadata entries found for onRamp v1.6.0 on chain selector %d", input.ChainSelector)
-	}
-
-	// Convert metadata to typed struct if needed
-	onRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OnRampImportConfigSequenceOutput](metadataForonRamp16[0].Metadata)
-	if err != nil {
-		return output, fmt.Errorf("failed to convert metadata to "+
-			"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
-	}
-	feeAggr := onRampCfg16.DynamicConfig.FeeAggregator.String()
-	output.OnRamp.FeeAggregator = feeAggr
-
-	for i := range output.Executors {
-		output.Executors[i].DynamicConfig.FeeAggregator = feeAggr
-	}
-	for i := range output.CommitteeVerifiers {
-		output.CommitteeVerifiers[i].FeeAggregator = feeAggr
-	}
-	offRampAddr := datastore_utils.GetAddressRef(
-		input.ExistingAddresses,
-		input.ChainSelector,
-		offrampops_v160.ContractType,
-		offrampops_v160.Version,
-		"",
-	)
-	if offRampAddr.Address == "" {
-		return output, fmt.Errorf("offRamp v1.6.0 address not found for chain selector %d, expected to find it since onRamp v1.6.0 was found", input.ChainSelector)
-	}
-	// see if offRamp metadata is found, if not fetch it directly, fail if both are unsuccessful
-	metadataForoffRamp16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
-		input.ExistingAddresses,
-		input.ContractMeta,
-		offrampops_v160.ContractType,
-		offrampops_v160.Version,
-		"",
-		input.ChainSelector,
-	)
-	if err == nil {
-		if len(metadataForoffRamp16) == 1 {
-			offRampCfg16, err := datastore_utils.ConvertMetadataToType[seq1_6.OffRampImportConfigSequenceOutput](metadataForoffRamp16[0].Metadata)
-			if err != nil {
-				return output, fmt.Errorf("failed to convert metadata to "+
-					"OffRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
-			}
-			output.OffRamp.GasForCallExactCheck = offRampCfg16.StaticConfig.GasForCallExactCheck
-			return output, nil
-		}
-	}
-	// directly fetch offRamp static config
-	offRampCfg16Rep, err := cldf_ops.ExecuteOperation(b, offrampops_v160.GetStaticConfig, chain, upstream.FunctionInput[struct{}]{
-		ChainSelector: input.ChainSelector,
-		Address:       common.HexToAddress(offRampAddr.Address),
-		Args:          struct{}{},
-	})
-	if err != nil {
-		return output, fmt.Errorf("failed to execute operation to get offRamp v1.6.0 static config for chain selector %d: %w", input.ChainSelector, err)
-	}
-	output.OffRamp.GasForCallExactCheck = offRampCfg16Rep.Output.GasForCallExactCheck
-	return output, nil
 }
 
 func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.DeployChainContractsInput, error) {
