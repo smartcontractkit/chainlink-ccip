@@ -6,29 +6,18 @@ import (
 	"sort"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
 // ChainOverrides holds per-chain lane settings that differ from chain-family adapter defaults.
 // Only set fields you need to override; omitted fields use adapter defaults at apply time.
 type ChainOverrides struct {
-	AllowTrafficFrom          *bool                                      `json:"allowTrafficFrom,omitempty" yaml:"allowTrafficFrom,omitempty"`
-	MessageNetworkFeeUSDCents *uint16                                    `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
-	TokenNetworkFeeUSDCents   *uint16                                    `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
-	AllowlistEnabled          *bool                                      `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
-	AllowList                 []string                                   `json:"allowList,omitempty" yaml:"allowList,omitempty"`
-	BaseExecutionGasCost      *uint32                                    `json:"baseExecutionGasCost,omitempty" yaml:"baseExecutionGasCost,omitempty"`
-	TokenReceiverAllowed      *bool                                      `json:"tokenReceiverAllowed,omitempty" yaml:"tokenReceiverAllowed,omitempty"`
-	DefaultExecutorQualifier  *string                                    `json:"defaultExecutorQualifier,omitempty" yaml:"defaultExecutorQualifier,omitempty"`
-	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides `json:"feeQuoterDestChainConfig,omitempty" yaml:"feeQuoterDestChainConfig,omitempty"`
-	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig          `json:"executorDestChainConfig,omitempty" yaml:"executorDestChainConfig,omitempty"`
-	DefaultInBoundCCVs        []datastore.AddressRef                     `json:"defaultInBoundCCVs,omitempty" yaml:"defaultInBoundCCVs,omitempty"`
-	DefaultOutBoundCCVs       []datastore.AddressRef                     `json:"defaultOutBoundCCVs,omitempty" yaml:"defaultOutBoundCCVs,omitempty"`
+	AllowlistEnabled *bool                    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
+	AllowList        []string                 `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	RemoteChainCfg   PartialRemoteChainConfig `json:"remoteChainCfg,omitempty" yaml:"remoteChainCfg,omitempty"`
 }
 
 // CrossFamilyLanePair defines a bidirectional lane with optional per-chain overrides.
@@ -143,7 +132,7 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 		cfg = &partialChainConfig{
 			ChainSelector:      local,
 			CommitteeVerifiers: cvConfigs,
-			RemoteChains:       make(map[uint64]partialRemoteChainConfig),
+			RemoteChains:       make(map[uint64]PartialRemoteChainConfig),
 		}
 		byChain[local] = cfg
 	}
@@ -167,22 +156,11 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	}
 }
 
-func chainOverridesToPartialRemote(o *ChainOverrides) partialRemoteChainConfig {
+func chainOverridesToPartialRemote(o *ChainOverrides) PartialRemoteChainConfig {
 	if o == nil {
-		return partialRemoteChainConfig{}
+		return PartialRemoteChainConfig{}
 	}
-	return partialRemoteChainConfig{
-		AllowTrafficFrom:          o.AllowTrafficFrom,
-		MessageNetworkFeeUSDCents: o.MessageNetworkFeeUSDCents,
-		TokenNetworkFeeUSDCents:   o.TokenNetworkFeeUSDCents,
-		DefaultExecutorQualifier:  o.DefaultExecutorQualifier,
-		TokenReceiverAllowed:      o.TokenReceiverAllowed,
-		BaseExecutionGasCost:      o.BaseExecutionGasCost,
-		FeeQuoterDestChainConfig:  o.FeeQuoterDestChainConfig,
-		ExecutorDestChainConfig:   o.ExecutorDestChainConfig,
-		DefaultInboundCCVs:        o.DefaultInBoundCCVs,
-		DefaultOutboundCCVs:       o.DefaultOutBoundCCVs,
-	}
+	return o.RemoteChainCfg
 }
 
 func chainOverridesToCommitteeVerifierRemote(o *ChainOverrides) committeeVerifierRemoteChainInput {
@@ -195,7 +173,7 @@ func chainOverridesToCommitteeVerifierRemote(o *ChainOverrides) committeeVerifie
 	}
 }
 
-func mergePartialRemoteInput(base, overlay partialRemoteChainConfig) partialRemoteChainConfig {
+func mergePartialRemoteInput(base, overlay PartialRemoteChainConfig) PartialRemoteChainConfig {
 	if overlay.AllowTrafficFrom != nil {
 		base.AllowTrafficFrom = overlay.AllowTrafficFrom
 	}
@@ -221,6 +199,12 @@ func mergePartialRemoteInput(base, overlay partialRemoteChainConfig) partialRemo
 	}
 	if overlay.DefaultOutboundCCVs != nil {
 		base.DefaultOutboundCCVs = overlay.DefaultOutboundCCVs
+	}
+	if overlay.LaneMandatedOutboundCCVs != nil {
+		base.LaneMandatedOutboundCCVs = overlay.LaneMandatedOutboundCCVs
+	}
+	if overlay.LaneMandatedInboundCCVs != nil {
+		base.LaneMandatedInboundCCVs = overlay.LaneMandatedInboundCCVs
 	}
 	return base
 }

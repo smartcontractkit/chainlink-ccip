@@ -42,9 +42,9 @@ type committeeVerifierInputConfig struct {
 	AllowedFinalityConfig *finality.Config
 }
 
-// partialRemoteChainConfig is the internal per-remote chain input after lane expansion.
+// PartialRemoteChainConfig is the internal per-remote chain input after lane expansion.
 // Unset fields use adapter defaults, datastore resolution, or CCV auto-resolution.
-type partialRemoteChainConfig struct {
+type PartialRemoteChainConfig struct {
 	AllowTrafficFrom          *bool
 	DefaultExecutorQualifier  *string
 	DefaultInboundCCVs        []datastore.AddressRef
@@ -62,7 +62,7 @@ type partialRemoteChainConfig struct {
 type partialChainConfig struct {
 	ChainSelector      uint64
 	CommitteeVerifiers []committeeVerifierInputConfig
-	RemoteChains       map[uint64]partialRemoteChainConfig
+	RemoteChains       map[uint64]PartialRemoteChainConfig
 	FamilyExtras       map[string]any
 }
 
@@ -70,7 +70,7 @@ type partialChainConfig struct {
 type enrichedChainConfig struct {
 	ChainSelector      uint64
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
-	RemoteChains       map[uint64]partialRemoteChainConfig
+	RemoteChains       map[uint64]PartialRemoteChainConfig
 	FamilyExtras       map[string]any
 }
 
@@ -387,7 +387,7 @@ func resolveRemoteChainConfig(
 	remoteAdapter adapters.ChainFamily,
 	localChainSelector uint64,
 	remoteChainSelector uint64,
-	inCfg partialRemoteChainConfig,
+	inCfg PartialRemoteChainConfig,
 	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	remoteOnRampBytes, err := remoteAdapter.GetOnRampAddress(e.DataStore, remoteChainSelector)

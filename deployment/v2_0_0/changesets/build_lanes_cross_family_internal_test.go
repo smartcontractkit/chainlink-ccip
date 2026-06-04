@@ -45,7 +45,9 @@ func TestExpandLanesToPartialChainConfigs_AppliesChainOverrides(t *testing.T) {
 			ChainA: chainA,
 			ChainB: chainB,
 			ChainAOverrides: &ChainOverrides{
-				MessageNetworkFeeUSDCents: &fee,
+				RemoteChainCfg: PartialRemoteChainConfig{
+					MessageNetworkFeeUSDCents: &fee,
+				},
 			},
 		},
 	}, nil)

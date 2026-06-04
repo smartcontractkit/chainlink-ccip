@@ -558,14 +558,18 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				ChainA: chainA,
 				ChainB: sharedDest,
 				ChainAOverrides: &changesets.ChainOverrides{
-					MessageNetworkFeeUSDCents: &feeA,
+					RemoteChainCfg: changesets.PartialRemoteChainConfig{
+						MessageNetworkFeeUSDCents: &feeA,
+					},
 				},
 			},
 			{
 				ChainA: chainB,
 				ChainB: sharedDest,
 				ChainAOverrides: &changesets.ChainOverrides{
-					MessageNetworkFeeUSDCents: &feeB,
+					RemoteChainCfg: changesets.PartialRemoteChainConfig{
+						MessageNetworkFeeUSDCents: &feeB,
+					},
 				},
 			},
 		},
@@ -997,9 +1001,11 @@ func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *
 			ChainA: localSelector,
 			ChainB: remoteSelector,
 			ChainAOverrides: &changesets.ChainOverrides{
-				AllowTrafficFrom:          ptrTo(false),
-				MessageNetworkFeeUSDCents: ptrTo[uint16](50),
-				TokenNetworkFeeUSDCents:   ptrTo[uint16](75),
+				RemoteChainCfg: changesets.PartialRemoteChainConfig{
+					AllowTrafficFrom:          ptrTo(false),
+					MessageNetworkFeeUSDCents: ptrTo[uint16](50),
+					TokenNetworkFeeUSDCents:   ptrTo[uint16](75),
+				},
 			},
 		}},
 	))
