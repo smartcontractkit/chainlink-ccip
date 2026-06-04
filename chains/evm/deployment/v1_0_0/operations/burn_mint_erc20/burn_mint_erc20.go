@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
@@ -49,12 +49,13 @@ var SetCCIPAdmin = contract.NewWrite(contract.WriteParams[string, *burn_mint_erc
 	ContractABI:  burn_mint_erc20.BurnMintERC20ABI,
 	NewContract:  burn_mint_erc20.NewBurnMintERC20,
 	IsAllowedCaller: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, caller common.Address, input string) (bool, error) {
-		// SetCCIPAdmin can only be called by the current CCIP admin
-		currentAdmin, err := token.GetCCIPAdmin(opts)
+		// SetCCIPAdmin requires DEFAULT_ADMIN_ROLE on BurnMintERC20 (not the current ccipAdmin).
+		// https://bscscan.com/address/0x02bcC4C181B83a8c0A342BC003389CbEcb4BC54D#code#F1#L151
+		defaultAdminRole, err := token.DEFAULTADMINROLE(opts)
 		if err != nil {
 			return false, err
 		}
-		return currentAdmin == caller, nil
+		return token.HasRole(opts, defaultAdminRole, caller)
 	},
 	Validate: func(string) error { return nil },
 	CallContract: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.TransactOpts, input string) (*types.Transaction, error) {
