@@ -113,7 +113,7 @@ func ConfigureChainsForLanesFromTopology(
 		if cfg.Topology.NOPTopology == nil || len(cfg.Topology.NOPTopology.Committees) == 0 {
 			return fmt.Errorf("no committees defined in topology")
 		}
-		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes, cfg.Topology.NOPTopology)
+		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes, cfg.Topology.NOPTopology.Committees)
 		if err != nil {
 			return err
 		}
@@ -140,7 +140,7 @@ func ConfigureChainsForLanesFromTopology(
 	}
 
 	apply := func(e deployment.Environment, cfg ConfigureChainsForLanesFromTopologyConfig) (deployment.ChangesetOutput, error) {
-		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes, cfg.Topology.NOPTopology)
+		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes, cfg.Topology.NOPTopology.Committees)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -634,4 +634,3 @@ func coalesce[T any](override *T, def T) T {
 	}
 	return def
 }
-

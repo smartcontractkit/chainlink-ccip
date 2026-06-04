@@ -58,17 +58,20 @@ type ConfigureChainsForLanesFromTopologyConfig struct {
 
 // expandLanesToPartialChainConfigs converts bidirectional lane pairs into the internal
 // chain-centric representation used by the changeset apply path.
-func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, topology *offchain.NOPTopology) ([]partialChainConfig, error) {
+func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees map[string]offchain.CommitteeConfig) ([]partialChainConfig, error) {
 	if len(lanes) == 0 {
 		return nil, fmt.Errorf("at least one lane must be specified")
 	}
 
-	qualifiers := []string{defaultQualifier}
-	if topology != nil && len(topology.Committees) > 0 {
-		qualifiers = make([]string, 0, len(topology.Committees))
-		for qualifier := range topology.Committees {
+	var qualifiers []string
+	if len(committees) > 0 {
+		qualifiers = make([]string, 0, len(committees))
+		for qualifier := range committees {
 			qualifiers = append(qualifiers, qualifier)
 		}
+	}
+	if len(qualifiers) == 0 {
+		qualifiers = []string{defaultQualifier}
 	}
 
 	byChain := make(map[uint64]*partialChainConfig)
@@ -119,17 +122,17 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	cfg, ok := byChain[local]
 	if !ok {
 		cvConfigs := make([]committeeVerifierInputConfig, 0, len(qualifiers))
-		for range qualifiers {
+		for _, q := range qualifiers {
 			cvConfigs = append(cvConfigs, committeeVerifierInputConfig{
-				CommitteeQualifier: defaultQualifier,
+				CommitteeQualifier: q,
 				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
 			})
 		}
 
 		cfg = &partialChainConfig{
-			ChainSelector: local,
+			ChainSelector:      local,
 			CommitteeVerifiers: cvConfigs,
-			RemoteChains: make(map[uint64]partialRemoteChainConfig),
+			RemoteChains:       make(map[uint64]partialRemoteChainConfig),
 		}
 		byChain[local] = cfg
 	}
