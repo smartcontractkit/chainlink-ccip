@@ -49,20 +49,16 @@ var DeployToken = cldf_ops.NewSequence(
 		// NOTE: the raw input struct is passed to `tokenImpl.Deploy`, so we need to ensure that
 		// the relevant fields are validated ahead of time to prevent any issues downstream.
 		externalAdmin := common.Address{}
-		if input.ExternalAdmin != "" {
-			if !common.IsHexAddress(input.ExternalAdmin) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid external admin address: %s", input.ExternalAdmin)
-			} else {
-				externalAdmin = common.HexToAddress(input.ExternalAdmin)
-			}
+		if input.ExternalAdmin != "" && !common.IsHexAddress(input.ExternalAdmin) {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid external admin address: %s", input.ExternalAdmin)
+		} else {
+			externalAdmin = common.HexToAddress(input.ExternalAdmin)
 		}
 		ccipAdmin := common.Address{}
-		if input.CCIPAdmin != "" {
-			if !common.IsHexAddress(input.CCIPAdmin) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid CCIP admin address: %s", input.CCIPAdmin)
-			} else {
-				ccipAdmin = common.HexToAddress(input.CCIPAdmin)
-			}
+		if input.CCIPAdmin != "" && !common.IsHexAddress(input.CCIPAdmin) {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid CCIP admin address: %s", input.CCIPAdmin)
+		} else {
+			ccipAdmin = common.HexToAddress(input.CCIPAdmin)
 		}
 
 		tokenImpl, ok := tokenimpl.Get(input.Type)
