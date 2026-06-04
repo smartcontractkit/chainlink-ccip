@@ -48,10 +48,9 @@ Finality is a single **`bytes4`** value carried on the wire as `MessageV1.finali
 
 - **INV-FIN-POOL-1**: A pool exposes a configured **allowed finality** (`bytes4`) that bounds which requested modes it accepts. The default `WAIT_FOR_FINALITY_FLAG` means the pool does not support FTF.
 
-### 4.2 Outbound and Inbound Validation
+### 4.2 Pool Allowed-Finality Enforcement
 
-- **INV-FIN-POOL-2**: On both outbound and inbound, the pool validates the requested finality against its allowed finality using the rule in INV-FIN-ENC-3 and reverts otherwise.
-- **INV-FIN-POOL-3**: Legacy `lockOrBurn` / `releaseOrMint` paths that take no finality parameter are treated as `WAIT_FOR_FINALITY_FLAG`.
+- **INV-FIN-POOL-3**: On both outbound and inbound, the pool is able to validate the requested finality. The default pool implementation does not re-verify the finality on inbound, effectively delegating finality enforcement to the source-chain pool. However, a pool implementation can choose to enforce allowed finality on inbound as well, in which case it must apply the same rule as INV-FIN-ENC-3.
 
 ### 4.3 Rate Limiting
 

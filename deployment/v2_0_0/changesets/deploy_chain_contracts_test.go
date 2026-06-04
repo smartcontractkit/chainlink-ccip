@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -35,49 +33,16 @@ type mockDeployAdapter struct {
 	errByChain    map[uint64]error
 }
 
-func (m *mockDeployAdapter) IsSupportedChain(_ deployment.Environment, _ uint64) bool {
-	return false
+func (m *mockDeployAdapter) GetDefaultDeployContractParams(_ uint64) adapters.DeployContractParams {
+	return adapters.DeployContractParams{}
 }
 
-func (m *mockDeployAdapter) DeriveLaneVersionsForChain(_ deployment.Environment, _ uint64) (map[uint64]*semver.Version, []*semver.Version, error) {
-	return map[uint64]*semver.Version{}, []*semver.Version{}, nil
+func (m *mockDeployAdapter) ResolveDeployAddresses(_ deployment.Environment, _ uint64) (adapters.DeployChainResolvedAddresses, error) {
+	return adapters.DeployChainResolvedAddresses{DeployerContract: "0x0000000000000000000000000000000000001234"}, nil
 }
 
-func (m *mockDeployAdapter) InitializeAdapter(_ deployment.Environment, _ uint64) error {
-	return nil
-}
-
-func (m *mockDeployAdapter) ConnectedChains(_ deployment.Environment, _ uint64) ([]uint64, error) {
-	return []uint64{}, nil
-}
-
-func (m *mockDeployAdapter) SupportedTokensPerRemoteChain(_ deployment.Environment, _ uint64, _ []uint64) (map[uint64][]common.Address, error) {
-	return map[uint64][]common.Address{}, nil
-}
-
-func (m *mockDeployAdapter) SequenceImportConfig() *cldf_ops.Sequence[deploy.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"mock-import-config",
-		semver.MustParse("2.0.0"),
-		"Mock sequence for importing config",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input deploy.ImportConfigPerChainInput) (sequences.OnChainOutput, error) {
-			return sequences.OnChainOutput{}, nil
-		})
-}
-
-func (m *mockDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[adapters.DeployChainConfigCreatorInput, adapters.DeployContractParams, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"mock-set-contract-params",
-		semver.MustParse("2.0.0"),
-		"Mock sequence for setting contract params from imported config",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainConfigCreatorInput) (adapters.DeployContractParams, error) {
-			return adapters.DeployContractParams{
-				OnRamp: adapters.OnRampDeployParams{
-					Version:       semver.MustParse("2.0.0"),
-					FeeAggregator: "0xDummyOnRampFeeAgg",
-				},
-			}, nil
-		})
+func (m *mockDeployAdapter) BuildDeployContractParams(in adapters.BuildDeployContractParamsInput) (adapters.DeployContractParams, error) {
+	return adapters.DeployContractParams{CommitteeVerifiers: in.CommitteeVerifiers}, nil
 }
 
 func (m *mockDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapters.DeployChainContractsInput, adapters.DeployChainContractsOutput, cldf_chain.BlockChains] {
@@ -154,10 +119,17 @@ func newDeployTestTopology(chainSelectors ...uint64) *offchain.EnvironmentTopolo
 	}
 }
 
-func newDefaultPerChainCfg() changesets.DeployChainContractsPerChainCfg {
-	return changesets.DeployChainContractsPerChainCfg{
-		DeployerContract: "0x0000000000000000000000000000000000001234",
-		DeployerKeyOwned: true,
+func newDeployChainContractsCfg(selectors ...uint64) changesets.DeployChainContractsCfg {
+	chainOverrides := make(map[uint64]changesets.DeployChainContractsPerChainCfg, len(selectors))
+	for _, sel := range selectors {
+		chainOverrides[sel] = changesets.DeployChainContractsPerChainCfg{
+			DeployerKeyOwned: true,
+		}
+	}
+	return changesets.DeployChainContractsCfg{
+		Topology:       newDeployTestTopology(selectors...),
+		ChainSelectors: selectors,
+		ChainOverrides: chainOverrides,
 	}
 }
 
@@ -174,9 +146,7 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 		{
 			name: "rejects nil topology",
 			cfg: changesets.DeployChainContractsCfg{
-				ChainSelectors:                          []uint64{sel1},
-				DefaultCfg:                              newDefaultPerChainCfg(),
-				IgnoreImportedConfigFromPreviousVersion: true,
+				ChainSelectors: []uint64{sel1},
 			},
 			expectedErr: "topology is required",
 		},
@@ -191,88 +161,48 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 					},
 					ExecutorPools: map[string]offchain.ExecutorPoolConfig{},
 				},
-				ChainSelectors:                          []uint64{sel1},
-				DefaultCfg:                              newDefaultPerChainCfg(),
-				IgnoreImportedConfigFromPreviousVersion: true,
+				ChainSelectors: []uint64{sel1},
 			},
 			expectedErr: "no committees defined in topology",
 		},
 		{
 			name: "rejects empty chain selectors",
 			cfg: changesets.DeployChainContractsCfg{
-				Topology:                                validTopology,
-				ChainSelectors:                          []uint64{},
-				DefaultCfg:                              newDefaultPerChainCfg(),
-				IgnoreImportedConfigFromPreviousVersion: true,
+				Topology:       validTopology,
+				ChainSelectors: []uint64{},
 			},
 			expectedErr: "at least one chain selector is required",
 		},
 		{
 			name: "rejects unknown chain selector",
 			cfg: changesets.DeployChainContractsCfg{
-				Topology:                                validTopology,
-				ChainSelectors:                          []uint64{99999},
-				DefaultCfg:                              newDefaultPerChainCfg(),
-				IgnoreImportedConfigFromPreviousVersion: true,
+				Topology:       validTopology,
+				ChainSelectors: []uint64{99999},
 			},
 			expectedErr: "chain selector 99999 is not available in environment",
 		},
 		{
-			name: "rejects empty DeployerContract",
-			cfg: changesets.DeployChainContractsCfg{
-				Topology:       validTopology,
-				ChainSelectors: []uint64{sel1},
-				DefaultCfg: changesets.DeployChainContractsPerChainCfg{
-					DeployerContract: "",
-				},
-				IgnoreImportedConfigFromPreviousVersion: true,
-			},
-			expectedErr: "DeployerContract is required",
-		},
-		{
-			name: "rejects empty DeployerContract in chain override",
-			cfg: changesets.DeployChainContractsCfg{
-				Topology:       validTopology,
-				ChainSelectors: []uint64{sel1},
-				DefaultCfg:     newDefaultPerChainCfg(),
-				ChainCfgs: map[uint64]changesets.DeployChainContractsPerChainCfg{
-					sel1: {DeployerContract: ""},
-				},
-				IgnoreImportedConfigFromPreviousVersion: true,
-			},
-			expectedErr: "DeployerContract is required",
-		},
-		{
 			name: "rejects duplicate chain selectors",
 			cfg: changesets.DeployChainContractsCfg{
-				Topology:                                validTopology,
-				ChainSelectors:                          []uint64{sel1, sel1},
-				DefaultCfg:                              newDefaultPerChainCfg(),
-				IgnoreImportedConfigFromPreviousVersion: true,
+				Topology:       validTopology,
+				ChainSelectors: []uint64{sel1, sel1},
 			},
 			expectedErr: "duplicate chain selector",
 		},
 		{
-			name: "rejects ChainCfgs key not in ChainSelectors",
+			name: "rejects chainOverrides key not in chainSelectors",
 			cfg: changesets.DeployChainContractsCfg{
 				Topology:       validTopology,
 				ChainSelectors: []uint64{sel1},
-				DefaultCfg:     newDefaultPerChainCfg(),
-				ChainCfgs: map[uint64]changesets.DeployChainContractsPerChainCfg{
-					77777: newDefaultPerChainCfg(),
+				ChainOverrides: map[uint64]changesets.DeployChainContractsPerChainCfg{
+					77777: {},
 				},
-				IgnoreImportedConfigFromPreviousVersion: true,
 			},
-			expectedErr: "ChainCfgs contains selector 77777 which is not in ChainSelectors",
+			expectedErr: "chainOverrides contains selector 77777 which is not in chainSelectors",
 		},
 		{
 			name: "accepts valid config",
-			cfg: changesets.DeployChainContractsCfg{
-				Topology:                                validTopology,
-				ChainSelectors:                          []uint64{sel1},
-				DefaultCfg:                              newDefaultPerChainCfg(),
-				IgnoreImportedConfigFromPreviousVersion: true,
-			},
+			cfg:  newDeployChainContractsCfg(sel1),
 		},
 	}
 
@@ -296,7 +226,7 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 	}
 }
 
-func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
+func TestDeployChainContracts_Apply_MinimalConfigWithoutOverrides(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	env := newDeployTestEnv(t, []uint64{sel1})
 	mock := &mockDeployAdapter{
@@ -310,16 +240,11 @@ func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
 	}
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, mock)
 
 	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:       newDeployTestTopology(sel1),
-			ChainSelectors: []uint64{sel1},
-			DefaultCfg:     newDefaultPerChainCfg(),
-		},
+		Cfg:  newDeployChainContractsCfg(sel1),
 	})
 	require.NoError(t, err)
 }
@@ -349,12 +274,7 @@ func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
 	cs := changesets.DeployChainContracts(registry)
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:                                newDeployTestTopology(sel1),
-			ChainSelectors:                          []uint64{sel1},
-			DefaultCfg:                              newDefaultPerChainCfg(),
-			IgnoreImportedConfigFromPreviousVersion: true,
-		},
+		Cfg:  newDeployChainContractsCfg(sel1),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out.DataStore)
@@ -392,12 +312,7 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 	cs := changesets.DeployChainContracts(registry)
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:                                newDeployTestTopology(sel1, sel2),
-			ChainSelectors:                          []uint64{sel1, sel2},
-			DefaultCfg:                              newDefaultPerChainCfg(),
-			IgnoreImportedConfigFromPreviousVersion: true,
-		},
+		Cfg:  newDeployChainContractsCfg(sel1, sel2),
 	})
 	require.NoError(t, err)
 
@@ -406,22 +321,18 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 	assert.Len(t, addrs, 2)
 }
 
-func TestDeployChainContracts_Apply_PerChainOverrideIsUsed(t *testing.T) {
+func TestDeployChainContracts_Apply_PerChainContractParamsOverrideIsUsed(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 	env := newDeployTestEnv(t, []uint64{sel1, sel2})
 
-	var capturedInputs []adapters.DeployChainContractsInput
-
+	maxUSDCents := uint32(50_00)
 	captureAdapter := &capturingDeployAdapter{
-		captured: &capturedInputs,
+		buildInputsByChain: make(map[uint64]adapters.BuildDeployContractParamsInput),
 	}
 
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, captureAdapter)
-
-	overrideCfg := newDefaultPerChainCfg()
-	overrideCfg.DeployerContract = "0x0000000000000000000000000000000000005678"
 
 	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
@@ -429,32 +340,88 @@ func TestDeployChainContracts_Apply_PerChainOverrideIsUsed(t *testing.T) {
 		Cfg: changesets.DeployChainContractsCfg{
 			Topology:       newDeployTestTopology(sel1, sel2),
 			ChainSelectors: []uint64{sel1, sel2},
-			DefaultCfg:     newDefaultPerChainCfg(),
-			ChainCfgs: map[uint64]changesets.DeployChainContractsPerChainCfg{
-				sel2: overrideCfg,
+			ChainOverrides: map[uint64]changesets.DeployChainContractsPerChainCfg{
+				sel1: {DeployerKeyOwned: true},
+				sel2: {
+					DeployerKeyOwned: true,
+					ContractParams: &adapters.DeployContractParamsOverrides{
+						OnRamp: &adapters.OnRampDeployParamsOverrides{
+							MaxUSDCentsPerMessage: &maxUSDCents,
+						},
+					},
+				},
 			},
-			IgnoreImportedConfigFromPreviousVersion: true,
 		},
 	})
 	require.NoError(t, err)
 
-	require.Len(t, capturedInputs, 2)
-	assert.Equal(t, "0x0000000000000000000000000000000000001234", capturedInputs[0].DeployerContract)
-	assert.Equal(t, "0x0000000000000000000000000000000000005678", capturedInputs[1].DeployerContract)
+	_, ok := captureAdapter.buildInputsByChain[sel1]
+	require.True(t, ok, "chain %d should be deployed", sel1)
+	sel2Input, ok := captureAdapter.buildInputsByChain[sel2]
+	require.True(t, ok, "chain %d should be deployed", sel2)
+	require.NotNil(t, sel2Input.Overrides)
+	require.NotNil(t, sel2Input.Overrides.OnRamp)
+	require.NotNil(t, sel2Input.Overrides.OnRamp.MaxUSDCentsPerMessage)
+	assert.Equal(t, maxUSDCents, *sel2Input.Overrides.OnRamp.MaxUSDCentsPerMessage)
+}
+
+func TestDeployChainContracts_Apply_PerChainDeployFlagsAreUsed(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+	env := newDeployTestEnv(t, []uint64{sel1, sel2})
+
+	captureAdapter := &capturingDeployAdapter{
+		buildInputsByChain:  make(map[uint64]adapters.BuildDeployContractParamsInput),
+		deployInputsByChain: make(map[uint64]adapters.DeployChainContractsInput),
+	}
+
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, captureAdapter)
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:       newDeployTestTopology(sel1, sel2),
+			ChainSelectors: []uint64{sel1, sel2},
+			ChainOverrides: map[uint64]changesets.DeployChainContractsPerChainCfg{
+				sel1: {DeployerKeyOwned: true},
+				sel2: {
+					DeployTestRouter: true,
+					DeployerKeyOwned: true,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	sel1Input, ok := captureAdapter.deployInputsByChain[sel1]
+	require.True(t, ok, "chain %d should be deployed", sel1)
+	assert.False(t, sel1Input.DeployTestRouter)
+	assert.True(t, sel1Input.DeployerKeyOwned)
+
+	sel2Input, ok := captureAdapter.deployInputsByChain[sel2]
+	require.True(t, ok, "chain %d should be deployed", sel2)
+	assert.True(t, sel2Input.DeployTestRouter)
+	assert.True(t, sel2Input.DeployerKeyOwned)
 }
 
 type capturingDeployAdapter struct {
-	captured *[]adapters.DeployChainContractsInput
+	buildInputsByChain  map[uint64]adapters.BuildDeployContractParamsInput
+	deployInputsByChain map[uint64]adapters.DeployChainContractsInput
 }
 
-func (c *capturingDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[adapters.DeployChainConfigCreatorInput, adapters.DeployContractParams, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"capturing-set-contract-params",
-		semver.MustParse("2.0.0"),
-		"Captures inputs for testing",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainConfigCreatorInput) (adapters.DeployContractParams, error) {
-			return adapters.DeployContractParams{}, nil
-		})
+func (c *capturingDeployAdapter) GetDefaultDeployContractParams(_ uint64) adapters.DeployContractParams {
+	return adapters.DeployContractParams{}
+}
+
+func (c *capturingDeployAdapter) ResolveDeployAddresses(_ deployment.Environment, _ uint64) (adapters.DeployChainResolvedAddresses, error) {
+	return adapters.DeployChainResolvedAddresses{DeployerContract: "0x0000000000000000000000000000000000001234"}, nil
+}
+
+func (c *capturingDeployAdapter) BuildDeployContractParams(in adapters.BuildDeployContractParamsInput) (adapters.DeployContractParams, error) {
+	c.buildInputsByChain[in.ChainSelector] = in
+	return adapters.DeployContractParams{CommitteeVerifiers: in.CommitteeVerifiers}, nil
 }
 
 var _ adapters.DeployChainContractsAdapter = (*capturingDeployAdapter)(nil)
@@ -465,7 +432,9 @@ func (c *capturingDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapt
 		semver.MustParse("2.0.0"),
 		"Captures inputs for testing",
 		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainContractsInput) (adapters.DeployChainContractsOutput, error) {
-			*c.captured = append(*c.captured, input)
+			if c.deployInputsByChain != nil {
+				c.deployInputsByChain[input.ChainSelector] = input
+			}
 			return adapters.DeployChainContractsOutput{}, nil
 		},
 	)
@@ -487,12 +456,7 @@ func TestDeployChainContracts_Apply_AdapterErrorPropagated(t *testing.T) {
 	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:                                newDeployTestTopology(sel1),
-			ChainSelectors:                          []uint64{sel1},
-			DefaultCfg:                              newDefaultPerChainCfg(),
-			IgnoreImportedConfigFromPreviousVersion: true,
-		},
+		Cfg:  newDeployChainContractsCfg(sel1),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "deploy failed: out of gas")
@@ -511,10 +475,8 @@ func TestDeployChainContracts_Apply_ReturnsError_WhenNoCommitteesHaveChainConfig
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
-			Topology:                                newDeployTestTopology(sel2),
-			ChainSelectors:                          []uint64{sel1},
-			DefaultCfg:                              newDefaultPerChainCfg(),
-			IgnoreImportedConfigFromPreviousVersion: true,
+			Topology:       newDeployTestTopology(sel2),
+			ChainSelectors: []uint64{sel1},
 		},
 	})
 	require.Error(t, err)
@@ -529,108 +491,10 @@ func TestDeployChainContracts_Apply_NoAdapterRegistered(t *testing.T) {
 	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:                                newDeployTestTopology(sel1),
-			ChainSelectors:                          []uint64{sel1},
-			DefaultCfg:                              newDefaultPerChainCfg(),
-			IgnoreImportedConfigFromPreviousVersion: true,
-		},
+		Cfg:  newDeployChainContractsCfg(sel1),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no deploy chain contracts adapter registered")
-}
-
-// versionAwareLVR is a LaneVersionResolver whose behaviour is controlled by the test.
-type versionAwareLVR struct {
-	supported bool
-	versions  []*semver.Version
-	err       error
-}
-
-func (v *versionAwareLVR) IsSupportedChain(_ deployment.Environment, _ uint64) bool {
-	return v.supported
-}
-
-func (v *versionAwareLVR) DeriveLaneVersionsForChain(_ deployment.Environment, _ uint64) (map[uint64]*semver.Version, []*semver.Version, error) {
-	return map[uint64]*semver.Version{}, v.versions, v.err
-}
-
-var _ deploy.LaneVersionResolver = (*versionAwareLVR)(nil)
-
-func TestDeployChainContracts_Apply_NoLaneVersionResolverRegistered(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-	env := newDeployTestEnv(t, []uint64{sel1})
-
-	mock := &mockDeployAdapter{}
-	registry := adapters.NewDeployChainContractsRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
-	// Intentionally no RegisterLaneVersionResolver call.
-
-	cs := changesets.DeployChainContracts(registry)
-	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:       newDeployTestTopology(sel1),
-			ChainSelectors: []uint64{sel1},
-			DefaultCfg:     newDefaultPerChainCfg(),
-			// IgnoreImportedConfigFromPreviousVersion defaults to false → calls shouldImportConfigFromPreviousVersion
-		},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no lane version resolver")
-}
-
-func TestDeployChainContracts_Apply_ImportsConfig_When16Found(t *testing.T) {
-	// IsSupportedChain=true + versions=[1.6.0] → shouldImport=true → no ConfigImporter → error
-	sel1 := chainsel.TEST_90000001.Selector
-	env := newDeployTestEnv(t, []uint64{sel1})
-
-	mock := &mockDeployAdapter{}
-	lvr := &versionAwareLVR{
-		supported: true,
-		versions:  []*semver.Version{semver.MustParse("1.6.0")},
-	}
-	registry := adapters.NewDeployChainContractsRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, lvr)
-
-	cs := changesets.DeployChainContracts(registry)
-	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:       newDeployTestTopology(sel1),
-			ChainSelectors: []uint64{sel1},
-			DefaultCfg:     newDefaultPerChainCfg(),
-		},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ConfigImporter")
-}
-
-func TestDeployChainContracts_Apply_SkipsImport_WhenNo16Version(t *testing.T) {
-	// IsSupportedChain=true + versions=[1.7.0] → shouldImport=false → deploys normally
-	sel1 := chainsel.TEST_90000001.Selector
-	env := newDeployTestEnv(t, []uint64{sel1})
-
-	mock := &mockDeployAdapter{}
-	lvr := &versionAwareLVR{
-		supported: true,
-		versions:  []*semver.Version{semver.MustParse("1.7.0")},
-	}
-	registry := adapters.NewDeployChainContractsRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterLaneVersionResolver(chainsel.FamilyEVM, lvr)
-
-	cs := changesets.DeployChainContracts(registry)
-	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			Topology:       newDeployTestTopology(sel1),
-			ChainSelectors: []uint64{sel1},
-			DefaultCfg:     newDefaultPerChainCfg(),
-		},
-	})
-	require.NoError(t, err)
 }
 
 func TestBuildCommitteeVerifierParams_MapsAllCommittees(t *testing.T) {

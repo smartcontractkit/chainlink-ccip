@@ -130,6 +130,12 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	pageIndex := uint64(0)
 
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
 			ctx,
@@ -145,13 +151,12 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
 		}
 
-		validCfgInfos := getValidChainConfigInfos(r.lggr, chainConfigInfos)
+		allChainConfigInfos = append(allChainConfigInfos, getValidChainConfigInfos(r.lggr, chainConfigInfos)...)
 
-		if len(validCfgInfos) == 0 {
-			continue
-		}
-		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
-
+		// A page shorter than the requested size signals the last page;
+		// termination is intentionally based on the raw (unfiltered) page
+		// length so that a page consisting entirely of invalid entries still
+		// advances and eventually ends pagination rather than looping forever.
 		if uint64(len(chainConfigInfos)) < defaultConfigPageSize {
 			break
 		}

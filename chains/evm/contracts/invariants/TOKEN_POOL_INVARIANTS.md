@@ -19,7 +19,7 @@
 ## 3. V1 vs V2 Interface
 
 - **INV-POOL-7**: V1 pools support `lockOrBurn` and `releaseOrMint` without finality or fee parameters. The full token amount is locked/burned and released/minted. V1 is legacy, relevant for v1 CCIP chains migrating to v2.
-- **INV-POOL-8**: V2 pools extend V1 with: `getFee`, `getTokenTransferFeeConfig`, `getRequiredCCVs`, and finality-aware `lockOrBurn`/`releaseOrMint` (receiving `requestedFinalityConfig` and `tokenArgs`).
+- **INV-POOL-8**: V2 pools extend V1 with: `getFee`, `getTokenTransferFeeConfig`, `getRequiredCCVs`, and finality-aware `lockOrBurn`/`releaseOrMint` (receiving `requestedFinalityConfig` and `tokenArgs`). Allowed-finality is enforced on outbound `lockOrBurn` and `getFee`; the default TokenPool implementation inbound `releaseOrMint` uses `requestedFinalityConfig` for rate-limit bucket selection only. It effectively delegates finality enforcement to the source-chain pool. Other pool implementations can explicitly check on the destination chain as well; the interface must support this.
 - **INV-POOL-9**: V1 pools cannot support FTF or custom token args. See FINALITY_INVARIANTS.md (**INV-FIN-SRC-4**, **INV-FIN-POOL-3**).
 
 ---
