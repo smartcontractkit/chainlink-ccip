@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
 func TestExpandLanesToPartialChainConfigs_MinimalLane(t *testing.T) {
@@ -78,6 +80,44 @@ func TestExpandLanesToPartialChainConfigs_MergesMultipleLanesOnSameChain(t *test
 	assert.Len(t, cfgA.RemoteChains, 2)
 	assert.Contains(t, cfgA.RemoteChains, chainB)
 	assert.Contains(t, cfgA.RemoteChains, chainC)
+}
+
+func TestExpandLanesToPartialChainConfigs_MultipleCommittees(t *testing.T) {
+	chainA := uint64(1)
+	chainB := uint64(2)
+	committees := map[string]offchain.CommitteeConfig{
+		"alpha": {},
+		"beta":  {},
+	}
+
+	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
+		{ChainA: chainA, ChainB: chainB},
+	}, committees)
+	require.NoError(t, err)
+	require.Len(t, chains, 2)
+
+	bySel := make(map[uint64]partialChainConfig, len(chains))
+	for _, c := range chains {
+		bySel[c.ChainSelector] = c
+	}
+
+	cfgA := bySel[chainA]
+	require.Len(t, cfgA.CommitteeVerifiers, 2)
+
+	// Qualifiers must be sorted deterministically.
+	assert.Equal(t, "alpha", cfgA.CommitteeVerifiers[0].CommitteeQualifier)
+	assert.Equal(t, "beta", cfgA.CommitteeVerifiers[1].CommitteeQualifier)
+
+	// Each verifier must have the remote chain entry.
+	assert.Contains(t, cfgA.CommitteeVerifiers[0].RemoteChains, chainB)
+	assert.Contains(t, cfgA.CommitteeVerifiers[1].RemoteChains, chainB)
+
+	cfgB := bySel[chainB]
+	require.Len(t, cfgB.CommitteeVerifiers, 2)
+	assert.Equal(t, "alpha", cfgB.CommitteeVerifiers[0].CommitteeQualifier)
+	assert.Equal(t, "beta", cfgB.CommitteeVerifiers[1].CommitteeQualifier)
+	assert.Contains(t, cfgB.CommitteeVerifiers[0].RemoteChains, chainA)
+	assert.Contains(t, cfgB.CommitteeVerifiers[1].RemoteChains, chainA)
 }
 
 func TestExpandLanesToPartialChainConfigs_ChainOverridesToCommitteeVerifier(t *testing.T) {

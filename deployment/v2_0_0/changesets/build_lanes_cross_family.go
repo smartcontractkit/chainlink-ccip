@@ -6,19 +6,29 @@ import (
 	"sort"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
 // ChainOverrides holds per-chain lane settings that differ from chain-family adapter defaults.
 // Only set fields you need to override; omitted fields use adapter defaults at apply time.
 type ChainOverrides struct {
-	AllowTrafficFrom          *bool    `json:"allowTrafficFrom,omitempty" yaml:"allowTrafficFrom,omitempty"`
-	MessageNetworkFeeUSDCents *uint16  `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
-	TokenNetworkFeeUSDCents   *uint16  `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
-	AllowlistEnabled          *bool    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
-	AllowList                 []string `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	AllowTrafficFrom          *bool                                      `json:"allowTrafficFrom,omitempty" yaml:"allowTrafficFrom,omitempty"`
+	MessageNetworkFeeUSDCents *uint16                                    `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
+	TokenNetworkFeeUSDCents   *uint16                                    `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
+	AllowlistEnabled          *bool                                      `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
+	AllowList                 []string                                   `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	BaseExecutionGasCost      *uint32                                    `json:"baseExecutionGasCost,omitempty" yaml:"baseExecutionGasCost,omitempty"`
+	TokenReceiverAllowed      *bool                                      `json:"tokenReceiverAllowed,omitempty" yaml:"tokenReceiverAllowed,omitempty"`
+	DefaultExecutorQualifier  *string                                    `json:"defaultExecutorQualifier,omitempty" yaml:"defaultExecutorQualifier,omitempty"`
+	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides `json:"feeQuoterDestChainConfig,omitempty" yaml:"feeQuoterDestChainConfig,omitempty"`
+	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig          `json:"executorDestChainConfig,omitempty" yaml:"executorDestChainConfig,omitempty"`
+	DefaultInBoundCCVs        []datastore.AddressRef                     `json:"defaultInBoundCCVs,omitempty" yaml:"defaultInBoundCCVs,omitempty"`
+	DefaultOutBoundCCVs       []datastore.AddressRef                     `json:"defaultOutBoundCCVs,omitempty" yaml:"defaultOutBoundCCVs,omitempty"`
 }
 
 // CrossFamilyLanePair defines a bidirectional lane with optional per-chain overrides.
@@ -69,6 +79,7 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 		for qualifier := range committees {
 			qualifiers = append(qualifiers, qualifier)
 		}
+		sort.Strings(qualifiers)
 	}
 	if len(qualifiers) == 0 {
 		qualifiers = []string{defaultQualifier}
@@ -164,6 +175,13 @@ func chainOverridesToPartialRemote(o *ChainOverrides) partialRemoteChainConfig {
 		AllowTrafficFrom:          o.AllowTrafficFrom,
 		MessageNetworkFeeUSDCents: o.MessageNetworkFeeUSDCents,
 		TokenNetworkFeeUSDCents:   o.TokenNetworkFeeUSDCents,
+		DefaultExecutorQualifier:  o.DefaultExecutorQualifier,
+		TokenReceiverAllowed:      o.TokenReceiverAllowed,
+		BaseExecutionGasCost:      o.BaseExecutionGasCost,
+		FeeQuoterDestChainConfig:  o.FeeQuoterDestChainConfig,
+		ExecutorDestChainConfig:   o.ExecutorDestChainConfig,
+		DefaultInboundCCVs:        o.DefaultInBoundCCVs,
+		DefaultOutboundCCVs:       o.DefaultOutBoundCCVs,
 	}
 }
 
@@ -186,6 +204,23 @@ func mergePartialRemoteInput(base, overlay partialRemoteChainConfig) partialRemo
 	}
 	if overlay.TokenNetworkFeeUSDCents != nil {
 		base.TokenNetworkFeeUSDCents = overlay.TokenNetworkFeeUSDCents
+	}
+	if overlay.TokenReceiverAllowed != nil {
+		base.TokenReceiverAllowed = overlay.TokenReceiverAllowed
+	}
+	if overlay.DefaultExecutorQualifier != nil {
+		base.DefaultExecutorQualifier = overlay.DefaultExecutorQualifier
+	}
+	if overlay.BaseExecutionGasCost != nil {
+		base.BaseExecutionGasCost = overlay.BaseExecutionGasCost
+	}
+	base.FeeQuoterDestChainConfig = mergeFeeQuoterDestChainConfig(base.FeeQuoterDestChainConfig, overlay.FeeQuoterDestChainConfig)
+	base.ExecutorDestChainConfig = utils.CoalescePtr(base.ExecutorDestChainConfig, overlay.ExecutorDestChainConfig)
+	if overlay.DefaultInboundCCVs != nil {
+		base.DefaultInboundCCVs = overlay.DefaultInboundCCVs
+	}
+	if overlay.DefaultOutboundCCVs != nil {
+		base.DefaultOutboundCCVs = overlay.DefaultOutboundCCVs
 	}
 	return base
 }

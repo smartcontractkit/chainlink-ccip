@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+	"k8s.io/utils/ptr"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -45,7 +46,7 @@ type committeeVerifierInputConfig struct {
 // Unset fields use adapter defaults, datastore resolution, or CCV auto-resolution.
 type partialRemoteChainConfig struct {
 	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  string
+	DefaultExecutorQualifier  *string
 	DefaultInboundCCVs        []datastore.AddressRef
 	LaneMandatedInboundCCVs   []datastore.AddressRef
 	DefaultOutboundCCVs       []datastore.AddressRef
@@ -399,12 +400,12 @@ func resolveRemoteChainConfig(
 	}
 
 	executorQualifier := inCfg.DefaultExecutorQualifier
-	if executorQualifier == "" {
-		executorQualifier = defaultQualifier
+	if executorQualifier == nil {
+		executorQualifier = ptr.To(defaultQualifier)
 	}
-	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, executorQualifier)
+	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, *executorQualifier)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", executorQualifier, localChainSelector, err)
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", *executorQualifier, localChainSelector, err)
 	}
 
 	defaultInboundCCVs, err := resolveDefaultCCVs(e, localChainSelector, inCfg.DefaultInboundCCVs, committeeVerifierContractRegistry)
