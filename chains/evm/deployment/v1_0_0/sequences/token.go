@@ -28,7 +28,6 @@ var DeployToken = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found among provided chains", input.ChainSelector)
 		}
-
 		preMint := big.NewInt(0)
 		if input.PreMint != nil {
 			preMint = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
@@ -45,6 +44,25 @@ var DeployToken = cldf_ops.NewSequence(
 		// default admin role can update it later with `setCCIPAdmin`.
 		if input.CCIPAdmin == "" && input.ExternalAdmin != "" {
 			input.CCIPAdmin = input.ExternalAdmin
+		}
+
+		// NOTE: the raw input struct is passed to `tokenImpl.Deploy`, so we need to ensure that
+		// the relevant fields are validated ahead of time to prevent any issues downstream.
+		externalAdmin := common.Address{}
+		if input.ExternalAdmin != "" {
+			if !common.IsHexAddress(input.ExternalAdmin) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid external admin address: %s", input.ExternalAdmin)
+			} else {
+				externalAdmin = common.HexToAddress(input.ExternalAdmin)
+			}
+		}
+		ccipAdmin := common.Address{}
+		if input.CCIPAdmin != "" {
+			if !common.IsHexAddress(input.CCIPAdmin) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid CCIP admin address: %s", input.CCIPAdmin)
+			} else {
+				ccipAdmin = common.HexToAddress(input.CCIPAdmin)
+			}
 		}
 
 		tokenImpl, ok := tokenimpl.Get(input.Type)
@@ -85,13 +103,6 @@ var DeployToken = cldf_ops.NewSequence(
 			writes = append(writes, transferWrites...)
 		}
 		if input.ExternalAdmin != "" && caps.SupportsAdminRole {
-			externalAdmin := common.Address{}
-			if !common.IsHexAddress(input.ExternalAdmin) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid external admin address: %s", input.ExternalAdmin)
-			} else {
-				externalAdmin = common.HexToAddress(input.ExternalAdmin)
-			}
-
 			grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, externalAdmin)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
@@ -99,13 +110,6 @@ var DeployToken = cldf_ops.NewSequence(
 			writes = append(writes, grantWrites...)
 		}
 		if input.CCIPAdmin != "" && caps.SupportsCCIPAdmin {
-			ccipAdmin := common.Address{}
-			if !common.IsHexAddress(input.CCIPAdmin) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid CCIP admin address: %s", input.CCIPAdmin)
-			} else {
-				ccipAdmin = common.HexToAddress(input.CCIPAdmin)
-			}
-
 			adminWrites, err := tokenImpl.SetCCIPAdmin(b, chain, tokenAddr, ccipAdmin)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCIP admin: %w", err)
