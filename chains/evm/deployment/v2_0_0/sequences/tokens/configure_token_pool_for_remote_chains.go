@@ -2,14 +2,11 @@ package tokens
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -27,47 +24,21 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 	TokenAddress      common.Address
 }
 
-// ConfigureTokenPoolForRemoteChains runs the supported-chains check once (when registry/token set) then calls
-// ConfigureTokenPoolForRemoteChain for each remote chain.
+// ConfigureTokenPoolForRemoteChains calls ConfigureTokenPoolForRemoteChain for each remote chain.
+//
+// TODO: re-enable the active-pool upgrade-safety validation that previously lived here. It compared
+// input.RemoteChains against getSupportedChains() of the currently-registered pool on the
+// TokenAdminRegistry. That check fired incorrectly when configuring an auxiliary pool (e.g. the
+// CCTP-through-CCV pool) whose chain set is intentionally a strict subset of the registered pool's
+// (non-EVM remotes like Solana are excluded from the CCV pool). It needs to be reintroduced in a
+// way that only runs when the pool being configured is actually being installed as the new active
+// pool — see configure_cctp_chain_for_lanes.go where input.TokenPoolAddress (CCV pool) intentionally
+// differs from the RegistryTokenPoolAddress passed to ConfigureTokenForTransfers.
 var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	"configure-token-pool-for-remote-chains",
 	semver.MustParse("2.0.0"),
-	"Configures a token pool for all configured remote chains; validates active pool supported chains when upgrading.",
+	"Configures a token pool for all configured remote chains.",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
-		// Active-pool validation: when RegistryAddress and TokenAddress are set, the registry's
-		// "active" pool for that token is queried. For USDC/CCTP the registered pool is the
-		// USDCTokenPoolProxy (so the router uses the proxy). The proxy does not implement
-		// getSupportedChains like a 2.0.0 TokenPool and may revert—so we treat this check as
-		// best-effort and skip validation when the call fails.
-		if input.RegistryAddress != (common.Address{}) && input.TokenAddress != (common.Address{}) {
-			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.RegistryAddress,
-				Args:          input.TokenAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for supported-chains check: %w", err)
-			}
-			activePool := tokenConfigReport.Output.TokenPool
-			if activePool != (common.Address{}) {
-				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       activePool,
-				})
-				if err == nil {
-					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
-					supportedChains := supportedChainsReport.Output
-					for _, sel := range supportedChains {
-						if _, ok := input.RemoteChains[sel]; !ok {
-							slices.Sort(supportedChains)
-							return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
-								supportedChains, slices.Sorted(maps.Keys(input.RemoteChains)))
-						}
-					}
-				}
-				// If GetSupportedChains failed (e.g. active pool is USDCTokenPoolProxy and reverts), skip validation.
-			}
-		}
 		ops := make([]mcms_types.BatchOperation, 0)
 		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
