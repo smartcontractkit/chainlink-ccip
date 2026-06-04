@@ -63,9 +63,12 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, topology *off
 		return nil, fmt.Errorf("at least one lane must be specified")
 	}
 
-	qualifiers := make([]string, 0, len(topology.Committees))
-	for qualifier := range topology.Committees {
-		qualifiers = append(qualifiers, qualifier)
+	qualifiers := []string{defaultQualifier}
+	if topology != nil && len(topology.Committees) > 0 {
+		qualifiers = make([]string, 0, len(topology.Committees))
+		for qualifier := range topology.Committees {
+			qualifiers = append(qualifiers, qualifier)
+		}
 	}
 
 	byChain := make(map[uint64]*partialChainConfig)
@@ -120,7 +123,6 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 			cvConfigs = append(cvConfigs, committeeVerifierInputConfig{
 				CommitteeQualifier: defaultQualifier,
 				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
-				// TODO: AllowedFinalityConfig: local.AllowedFinalityConfig, sourced from where?
 			})
 		}
 
