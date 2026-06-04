@@ -112,16 +112,16 @@ func sortedKeys(m map[uint64]*partialChainConfig) []uint64 {
 	return keys
 }
 
-func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, qualifiers[]string, o *ChainOverrides) {
+func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, qualifiers []string, o *ChainOverrides) {
 	cfg, ok := byChain[local]
 	if !ok {
 		cvConfigs := make([]committeeVerifierInputConfig, 0, len(qualifiers))
-		for _, qualifier := range qualifiers {
+		for range qualifiers {
 			cvConfigs = append(cvConfigs, committeeVerifierInputConfig{
 				CommitteeQualifier: defaultQualifier,
 				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
 				// TODO: AllowedFinalityConfig: local.AllowedFinalityConfig, sourced from where?
-			}),
+			})
 		}
 
 		cfg = &partialChainConfig{
