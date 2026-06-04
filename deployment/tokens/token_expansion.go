@@ -237,6 +237,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// Please note that the timelock ref is lazy loaded from the datastore. This
 				// is intentional as some tests may not setup MCMS (so querying the timelock
 				// ref too eagerly will cause failures in those tests).
+				if deployTokenInput.CCIPAdmin == "" && deployTokenInput.ExternalAdmin != "" {
+					deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
+				}
 				if deployTokenInput.CCIPAdmin == "" || deployTokenInput.ExternalAdmin == "" {
 					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 					if !ok {
