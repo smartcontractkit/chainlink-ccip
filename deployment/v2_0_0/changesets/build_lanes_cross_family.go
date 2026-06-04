@@ -140,10 +140,13 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	cv := chainOverridesToCommitteeVerifierRemote(o)
 	rc := chainOverridesToPartialRemote(o)
 
-	if existing, ok := cfg.CommitteeVerifiers[0].RemoteChains[remote]; ok {
-		cfg.CommitteeVerifiers[0].RemoteChains[remote] = mergeCommitteeVerifierRemoteInput(existing, cv)
-	} else {
-		cfg.CommitteeVerifiers[0].RemoteChains[remote] = cv
+	for i, cfgCv := range cfg.CommitteeVerifiers {
+		if existingRemote, ok := cfgCv.RemoteChains[remote]; ok {
+			cfgCv.RemoteChains[remote] = mergeCommitteeVerifierRemoteInput(existingRemote, cv)
+		} else {
+			cfgCv.RemoteChains[remote] = cv
+		}
+		cfg.CommitteeVerifiers[i] = cfgCv
 	}
 
 	if existing, ok := cfg.RemoteChains[remote]; ok {
