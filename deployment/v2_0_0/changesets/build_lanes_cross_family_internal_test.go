@@ -13,7 +13,7 @@ func TestExpandLanesToPartialChainConfigs_MinimalLane(t *testing.T) {
 
 	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
 		{ChainA: chainA, ChainB: chainB},
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.Len(t, chains, 2)
 
@@ -46,7 +46,7 @@ func TestExpandLanesToPartialChainConfigs_AppliesChainOverrides(t *testing.T) {
 				MessageNetworkFeeUSDCents: &fee,
 			},
 		},
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	var cfgA partialChainConfig
@@ -66,7 +66,7 @@ func TestExpandLanesToPartialChainConfigs_MergesMultipleLanesOnSameChain(t *test
 	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
 		{ChainA: chainA, ChainB: chainB},
 		{ChainA: chainA, ChainB: chainC},
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	var cfgA partialChainConfig
@@ -93,7 +93,7 @@ func TestExpandLanesToPartialChainConfigs_ChainOverridesToCommitteeVerifier(t *t
 				AllowList:        allow,
 			},
 		},
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	var cfg partialChainConfig

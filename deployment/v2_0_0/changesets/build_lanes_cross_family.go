@@ -58,13 +58,17 @@ type ConfigureChainsForLanesFromTopologyConfig struct {
 
 // expandLanesToPartialChainConfigs converts bidirectional lane pairs into the internal
 // chain-centric representation used by the changeset apply path.
-func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair) ([]partialChainConfig, error) {
+func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, topology *offchain.NOPTopology) ([]partialChainConfig, error) {
 	if len(lanes) == 0 {
 		return nil, fmt.Errorf("at least one lane must be specified")
 	}
 
-	byChain := make(map[uint64]*partialChainConfig)
+	qualifiers := make([]string, 0, len(topology.Committees))
+	for qualifier := range topology.Committees {
+		qualifiers = append(qualifiers, qualifier)
+	}
 
+	byChain := make(map[uint64]*partialChainConfig)
 	for i, lane := range lanes {
 		if lane.ChainA == 0 || lane.ChainB == 0 {
 			return nil, fmt.Errorf("lane %d: chainA and chainB are required", i)
@@ -73,8 +77,8 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair) ([]partialCha
 			return nil, fmt.Errorf("lane %d: chainA and chainB must differ", i)
 		}
 
-		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, lane.ChainAOverrides)
-		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, lane.ChainBOverrides)
+		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, qualifiers, lane.ChainAOverrides)
+		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, qualifiers, lane.ChainBOverrides)
 	}
 
 	out := make([]partialChainConfig, 0, len(byChain))
@@ -108,15 +112,21 @@ func sortedKeys(m map[uint64]*partialChainConfig) []uint64 {
 	return keys
 }
 
-func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, o *ChainOverrides) {
+func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, qualifiers[]string, o *ChainOverrides) {
 	cfg, ok := byChain[local]
 	if !ok {
-		cfg = &partialChainConfig{
-			ChainSelector: local,
-			CommitteeVerifiers: []committeeVerifierInputConfig{{
+		cvConfigs := make([]committeeVerifierInputConfig, 0, len(qualifiers))
+		for _, qualifier := range qualifiers {
+			cvConfigs = append(cvConfigs, committeeVerifierInputConfig{
 				CommitteeQualifier: defaultQualifier,
 				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
-			}},
+				// TODO: AllowedFinalityConfig: local.AllowedFinalityConfig, sourced from where?
+			}),
+		}
+
+		cfg = &partialChainConfig{
+			ChainSelector: local,
+			CommitteeVerifiers: cvConfigs,
 			RemoteChains: make(map[uint64]partialRemoteChainConfig),
 		}
 		byChain[local] = cfg
