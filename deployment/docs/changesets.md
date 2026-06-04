@@ -194,7 +194,7 @@ func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput]
 **Input:** [`TokenExpansionInput`](types.md#tokenexpansioninput)
 
 **Behavior:**
-1. **Deploy tokens** (if `DeployTokenInput` is non-nil): Executes `adapter.DeployToken()`
+1. **Deploy tokens** (if `DeployTokenInput` is non-nil): Executes `adapter.DeployToken()`. When `externalAdmin` or `ccipAdmin` are empty, defaults both from the chain timelock (when available). If only `ccipAdmin` is empty, it is set to `externalAdmin`. The deploy sequence also copies `externalAdmin` to `ccipAdmin` when `ccipAdmin` is unset.
 2. **Deploy token pools** (if `DeployTokenPoolInput` is non-nil): Executes `adapter.DeployTokenPoolForToken()`
 3. **Configure for transfers** (if `TokenTransferConfig` is non-nil): Calls `processTokenConfigForChain()` which executes `adapter.ConfigureTokenForTransfersSequence()`
 4. **Update authorities** (unless `SkipOwnershipTransfer` is true): Executes `adapter.UpdateAuthorities()` to transfer pool ownership to the timelock (Solana: rate limit admin is already set in step 2 via `DeployTokenPoolForToken`; this step only transfers ownership)

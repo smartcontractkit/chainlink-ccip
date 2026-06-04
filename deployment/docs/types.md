@@ -345,8 +345,8 @@ type DeployTokenInput struct {
     Decimals              uint8               // Token decimals
     Supply                *uint64             // Total supply (decimal scaling happens automatically, nil or 0 means unlimited supply)
     PreMint               *uint64             // Amount to pre-mint (decimal scaling happens automatically, nil or 0 means no pre-mint)
-    ExternalAdmin         string              // External admin address (chain-agnostic string)
-    CCIPAdmin             string              // CCIP admin address (defaults to timelock)
+    ExternalAdmin         string              // Operator admin (hex on EVM). Empty in TokenExpansion defaults to timelock. On EVM BnM, receives DEFAULT_ADMIN_ROLE and is proposed as TokenAdminRegistry administrator.
+    CCIPAdmin             string              // EVM BnM ERC20 only. Optional. Empty defaults to ExternalAdmin (timelock when ExternalAdmin is also empty). Sets getCCIPAdmin() for registerAdminViaGetCCIPAdmin; not mint/burn or registry admin.
     Senders               []string            // Addresses needing special processing (e.g., Solana ATAs)
     Type                  cldf.ContractType   // SPLToken, ERC20, etc.
     TokenPrivKey          string              // Solana: base58 private key for vanity addresses

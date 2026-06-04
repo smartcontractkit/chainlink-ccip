@@ -139,7 +139,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
 				TokenPrivKey:           "", // if empty, a new key will be generated
-				CCIPAdmin:              "", // default to timelock admin
+				CCIPAdmin:              "", // defaults to ExternalAdmin (timelock when both unset)
 			},
 		},
 		{
@@ -165,7 +165,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DisableFreezeAuthority: true,
 				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
 				TokenPrivKey:           "", // if empty, a new key will be generated
-				CCIPAdmin:              "", // default to timelock admin
+				CCIPAdmin:              "", // defaults to ExternalAdmin (timelock when both unset)
 			},
 		},
 	}
@@ -211,7 +211,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
 				Senders:                []string{}, // not needed for test
-				CCIPAdmin:              "",         // default to timelock admin
+				CCIPAdmin:              "",         // defaults to ExternalAdmin (timelock when both unset)
 			},
 		},
 		{
@@ -238,7 +238,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
 				Senders:                []string{}, // not needed for test
-				CCIPAdmin:              "",         // default to timelock admin
+				CCIPAdmin:              "",         // defaults to ExternalAdmin (timelock when both unset)
 			},
 		},
 	}
