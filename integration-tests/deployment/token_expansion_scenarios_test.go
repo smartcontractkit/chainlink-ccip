@@ -508,8 +508,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		tokenSymbolA := "S3_TOK_A"
 		tokenSymbolB := "S3_TOK_B"
 
-		// First call: deploy token A but do NOT add it to the datastore
-		output1, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+		// First call: deploy token A but do NOT merge it into the environment datastore
 			ChainAdapterVersion: v1_6_0_scenarios,
 			MCMS:                NewDefaultInputForMCMS("Scenario 3 tokens"),
 			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
