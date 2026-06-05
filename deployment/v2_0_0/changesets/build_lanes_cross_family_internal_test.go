@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -87,9 +88,13 @@ func TestExpandLanesToPartialChainConfigs_MergesMultipleLanesOnSameChain(t *test
 func TestExpandLanesToPartialChainConfigs_MultipleCommittees(t *testing.T) {
 	chainA := uint64(1)
 	chainB := uint64(2)
+	chainConfigsBoth := map[string]offchain.ChainCommitteeConfig{
+		strconv.FormatUint(chainA, 10): {},
+		strconv.FormatUint(chainB, 10): {},
+	}
 	committees := map[string]offchain.CommitteeConfig{
-		"alpha": {},
-		"beta":  {},
+		"alpha": {Qualifier: "alpha", ChainConfigs: chainConfigsBoth},
+		"beta":  {Qualifier: "beta", ChainConfigs: chainConfigsBoth},
 	}
 
 	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
@@ -120,6 +125,60 @@ func TestExpandLanesToPartialChainConfigs_MultipleCommittees(t *testing.T) {
 	assert.Equal(t, "beta", cfgB.CommitteeVerifiers[1].CommitteeQualifier)
 	assert.Contains(t, cfgB.CommitteeVerifiers[0].RemoteChains, chainA)
 	assert.Contains(t, cfgB.CommitteeVerifiers[1].RemoteChains, chainA)
+}
+
+func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerLocalChain(t *testing.T) {
+	chainA := uint64(100)
+	chainB := uint64(200)
+
+	// alpha is on both chains; beta only on chainA; gamma only on chainB.
+	committees := map[string]offchain.CommitteeConfig{
+		"alpha": {
+			Qualifier: "alpha",
+			ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+				strconv.FormatUint(chainA, 10): {},
+				strconv.FormatUint(chainB, 10): {},
+			},
+		},
+		"beta": {
+			Qualifier: "beta",
+			ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+				strconv.FormatUint(chainA, 10): {},
+			},
+		},
+		"gamma": {
+			Qualifier: "gamma",
+			ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+				strconv.FormatUint(chainB, 10): {},
+			},
+		},
+	}
+
+	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
+		{ChainA: chainA, ChainB: chainB},
+	}, committees)
+	require.NoError(t, err)
+
+	bySel := make(map[uint64]partialChainConfig, len(chains))
+	for _, c := range chains {
+		bySel[c.ChainSelector] = c
+	}
+
+	cfgA := bySel[chainA]
+	require.Len(t, cfgA.CommitteeVerifiers, 2)
+	assert.Equal(t, "alpha", cfgA.CommitteeVerifiers[0].CommitteeQualifier)
+	assert.Equal(t, "beta", cfgA.CommitteeVerifiers[1].CommitteeQualifier)
+	for _, cv := range cfgA.CommitteeVerifiers {
+		assert.Contains(t, cv.RemoteChains, chainB)
+	}
+
+	cfgB := bySel[chainB]
+	require.Len(t, cfgB.CommitteeVerifiers, 2)
+	assert.Equal(t, "alpha", cfgB.CommitteeVerifiers[0].CommitteeQualifier)
+	assert.Equal(t, "gamma", cfgB.CommitteeVerifiers[1].CommitteeQualifier)
+	for _, cv := range cfgB.CommitteeVerifiers {
+		assert.Contains(t, cv.RemoteChains, chainA)
+	}
 }
 
 func TestExpandLanesToPartialChainConfigs_ChainOverridesToCommitteeVerifier(t *testing.T) {

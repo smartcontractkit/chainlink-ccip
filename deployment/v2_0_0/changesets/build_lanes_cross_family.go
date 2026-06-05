@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
@@ -62,18 +63,6 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 		return nil, fmt.Errorf("at least one lane must be specified")
 	}
 
-	var qualifiers []string
-	if len(committees) > 0 {
-		qualifiers = make([]string, 0, len(committees))
-		for qualifier := range committees {
-			qualifiers = append(qualifiers, qualifier)
-		}
-		sort.Strings(qualifiers)
-	}
-	if len(qualifiers) == 0 {
-		qualifiers = []string{defaultQualifier}
-	}
-
 	byChain := make(map[uint64]*partialChainConfig)
 	for i, lane := range lanes {
 		if lane.ChainA == 0 || lane.ChainB == 0 {
@@ -82,8 +71,27 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 		if lane.ChainA == lane.ChainB {
 			return nil, fmt.Errorf("lane %d: chainA and chainB must differ", i)
 		}
-
+		var qualifiers []string
+		for _, cvCfg := range committees {
+			if _, exists := cvCfg.ChainConfigs[strconv.FormatUint(lane.ChainA, 10)]; exists {
+				qualifiers = append(qualifiers, cvCfg.Qualifier)
+			}
+		}
+		sort.Strings(qualifiers)
+		if len(qualifiers) == 0 {
+			qualifiers = []string{defaultQualifier}
+		}
 		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, qualifiers, lane.ChainAOverrides)
+		qualifiers = make([]string, 0, len(committees))
+		for _, cvCfg := range committees {
+			if _, exists := cvCfg.ChainConfigs[strconv.FormatUint(lane.ChainB, 10)]; exists {
+				qualifiers = append(qualifiers, cvCfg.Qualifier)
+			}
+		}
+		sort.Strings(qualifiers)
+		if len(qualifiers) == 0 {
+			qualifiers = []string{defaultQualifier}
+		}
 		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, qualifiers, lane.ChainBOverrides)
 	}
 
@@ -193,7 +201,7 @@ func mergePartialRemoteInput(base, overlay PartialRemoteChainConfig) PartialRemo
 		base.BaseExecutionGasCost = overlay.BaseExecutionGasCost
 	}
 	base.FeeQuoterDestChainConfig = mergeFeeQuoterDestChainConfig(base.FeeQuoterDestChainConfig, overlay.FeeQuoterDestChainConfig)
-	base.ExecutorDestChainConfig = utils.CoalescePtr(base.ExecutorDestChainConfig, overlay.ExecutorDestChainConfig)
+	base.ExecutorDestChainConfig = utils.CoalescePtr(overlay.ExecutorDestChainConfig, base.ExecutorDestChainConfig)
 	if overlay.DefaultInboundCCVs != nil {
 		base.DefaultInboundCCVs = overlay.DefaultInboundCCVs
 	}
