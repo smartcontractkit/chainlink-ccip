@@ -310,7 +310,9 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				// the token type, then this sequence will deliberately skip the role management steps since there's
 				// not enough context to perform this portion. Instead, a warning will be logged and we will need to
 				// rely on the token owner to perform these adjustments after the fact if necessary.
-				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err == nil {
+				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err != nil {
+					b.Logger.Warnf("failed to resolve token ref from datastore (%s) on chain %d; proceeding with input ref: %v", datastore_utils.SprintRef(tokenRef), input.ChainSelector, err)
+				} else {
 					tokenRef = ref
 				}
 			}
