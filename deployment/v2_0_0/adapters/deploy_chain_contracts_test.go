@@ -11,6 +11,7 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldfevm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -285,15 +286,16 @@ func TestMergeIfNotEmpty(t *testing.T) {
 
 type transferOwnershipAwareAdapter struct{}
 
-func (a *transferOwnershipAwareAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[DeployChainConfigCreatorInput, DeployContractParams, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"transfer-ownership-aware-set-contract-params",
-		semver.MustParse("2.0.0"),
-		"No-op sequence for tests",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ DeployChainConfigCreatorInput) (DeployContractParams, error) {
-			return DeployContractParams{}, nil
-		},
-	)
+func (a *transferOwnershipAwareAdapter) GetDefaultDeployContractParams(_ uint64) DeployContractParams {
+	return DeployContractParams{}
+}
+
+func (a *transferOwnershipAwareAdapter) ResolveDeployAddresses(_ cldf.Environment, _ uint64) (DeployChainResolvedAddresses, error) {
+	return DeployChainResolvedAddresses{DeployerContract: "0x0000000000000000000000000000000000001234"}, nil
+}
+
+func (a *transferOwnershipAwareAdapter) BuildDeployContractParams(in BuildDeployContractParamsInput) (DeployContractParams, error) {
+	return DeployContractParams{CommitteeVerifiers: in.CommitteeVerifiers}, nil
 }
 
 func (a *transferOwnershipAwareAdapter) DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, DeployChainContractsOutput, cldf_chain.BlockChains] {

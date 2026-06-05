@@ -39,9 +39,9 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef `yaml:"registryRef" json:"registryRef"`
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] `yaml:"remoteChains" json:"remoteChains"`
-	// AllowedFinalityConfig, if set, specifies the allowed finality configurations to set on the token pool. If this is unspecified, then one of
-	// two things will happen. If this is a new pool, then the onchain code will use a sensible default (e.g. WAIT_FOR_FINALITY). Otherwise, this
-	// config will be left as-is, meaning that the existing allowed finality config on the pool remains in place.
+	// AllowedFinalityConfig specifies the finality config to set on the token pool. If this is
+	// the zero value, then the finality config will remain unchanged on-chain. Pre-v2 pools will
+	// ignore this parameter as it is not supported on those versions.
 	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
 	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.

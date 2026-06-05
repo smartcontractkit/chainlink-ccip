@@ -80,6 +80,13 @@ func TestEVMTokenDeployments(t *testing.T) {
 			decimals:    18,
 			ccipAdmin:   "0x1111111111111111111111111111111111111111",
 		},
+		{
+			name:        "BurnMintERC20Token_derivesCCIPAdminFromExternal",
+			tokenType:   burn_mint_erc20.ContractType,
+			tokenName:   "Test BurnMint ERC20 Derived CCIP Admin",
+			tokenSymbol: "TBMDERIVE",
+			decimals:    18,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -96,9 +103,11 @@ func TestEVMTokenDeployments(t *testing.T) {
 			chain := e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector]
 			deployerAddr := chain.DeployerKey.From
 
-			// Generate test addresses for CCIP admin and external admins
-			ccipAdminAddr := common.HexToAddress("0x1111111111111111111111111111111111111111")
 			externalAdmin := "0x2222222222222222222222222222222222222222"
+			expectedCCIPAdmin := common.HexToAddress(externalAdmin)
+			if tc.ccipAdmin != "" {
+				expectedCCIPAdmin = common.HexToAddress(tc.ccipAdmin)
+			}
 
 			// Build token input based on test case configuration
 			tokenInput := tokensapi.DeployTokenInput{
@@ -200,8 +209,8 @@ func TestEVMTokenDeployments(t *testing.T) {
 						t.Log("  Verifying CCIP Admin...")
 						onChainCCIPAdmin, err := tokenContract.GetCCIPAdmin(&bind.CallOpts{})
 						require.NoError(t, err, "Failed to get CCIP admin from chain")
-						require.Equal(t, ccipAdminAddr, onChainCCIPAdmin, "CCIP admin mismatch")
-						t.Logf("  On-chain CCIP admin: %s (expected: %s)", onChainCCIPAdmin.Hex(), ccipAdminAddr.Hex())
+						require.Equal(t, expectedCCIPAdmin, onChainCCIPAdmin, "CCIP admin mismatch")
+						t.Logf("  On-chain CCIP admin: %s (expected: %s)", onChainCCIPAdmin.Hex(), expectedCCIPAdmin.Hex())
 
 						// TEST 2: Verify External Admins have the DEFAULT_ADMIN_ROLE
 						t.Log("  Verifying External Admin roles...")

@@ -5,9 +5,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -25,6 +25,35 @@ type DeployVerifierResolverViaCREATE2Input struct {
 type DeployVerifierResolverViaCREATE2Output struct {
 	Addresses []datastore.AddressRef
 	Writes    []contract_utils.WriteOutput
+}
+
+func (i DeployVerifierResolverViaCREATE2Input) Validate() error {
+	return validateQualifier(i.Type, i.Qualifier)
+}
+
+func validateQualifier(contractType datastore.ContractType, qualifier string) error {
+	// Since all resolver types share the same bytecode, the CREATE2 salt is solely determined by the qualifier.
+	// Therefore, we must ensure that different resolver types do not use the same qualifier, or else they would collide on CREATE2 address.
+	// NOTE: DO NOT CHANGE EXISITING VALUES, EVER. Otherwise it will break determistic addresses of already deployed resolvers!!
+	var LombardVerifierQualifier = versioned_verifier_resolver.LombardVerifierResolverType.String()
+	var CCTPVerifierQualifier = versioned_verifier_resolver.CCTPVerifierResolverType.String()
+
+	switch contractType {
+	case datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType):
+		// The CommiteeVerifierResolver is allowed to be any value as multiple commitees can be deployed
+		return nil
+	case datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType):
+		if qualifier != CCTPVerifierQualifier {
+			return fmt.Errorf("qualifier must be %s for %s", CCTPVerifierQualifier, contractType)
+		}
+	case datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType):
+		if qualifier != LombardVerifierQualifier {
+			return fmt.Errorf("qualifier must be %s for %s", LombardVerifierQualifier, contractType)
+		}
+	default:
+		return fmt.Errorf("unsupported contract type: %s", contractType)
+	}
+	return nil
 }
 
 var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(

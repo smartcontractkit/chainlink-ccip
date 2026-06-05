@@ -10,6 +10,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -48,7 +49,8 @@ type DeployTokenInput struct {
 	// Customer admin who will be granted admin rights on the token
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
 	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`
-	// CCIPAdmin is the address to be set as the CCIP admin on the token contract, defaults to the timelock address. Only applicable for EVM BnM ERC20 tokens.
+	// CCIPAdmin is applicable to EVM BnM ERC20 tokens only. When empty, defaults to ExternalAdmin.
+	// In TokenExpansion, empty ExternalAdmin defaults to the chain timelock first (when available).
 	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
 	// Currency is the TIP20 token currency. This field is only applicable for TIP20 tokens on Tempo. If this field is empty, then a sensible default will be chosen.
 	Currency string `yaml:"currency" json:"currency"`
@@ -97,6 +99,10 @@ type DeployTokenPoolInput struct {
 	PoolType           string                `yaml:"poolType" json:"poolType"`
 	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
+	// AllowedFinalityConfig specifies the finality config to set on the token pool. If this is
+	// the zero value, then the finality config will remain unchanged on-chain. Pre-v2 pools will
+	// ignore this parameter as it is not supported on those versions.
+	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// RateLimitAdmin specifies the rate limit admin for the token pool. This field is optional.
 	// For Solana: If empty, DeployTokenPoolForToken sets the timelock signer PDA from the datastore;
 	// if non-empty, sets this base58 pubkey. On EVM, empty leaves the pool default (unchanged from contract deploy).
@@ -223,14 +229,17 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenInput.ExistingDataStore = e.DataStore
 				deployTokenInput.ChainSelector = selector
 
-				// If token is deployed by CLL, set CCIP admin as RBACTimelock by default.
-				// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
-				// and we may not be able to register the token by CLL in that case.
+				// External admin defaults to timelock admin if not provided. CCIP admin is
+				// only applicable for BnM ERC20 tokens. If unspecified, then it falls back
+				// to the same value as ExternalAdmin, and if ExternalAdmin is unspecified,
+				// then it falls back to timelock.
 				//
-				// External admin defaults to timelock admin if not provided - please take note
-				// that the timelock ref is lazy loaded from the datastore. This is intentional
-				// as some tests may not setup MCMS so querying the timelock ref in those cases
-				// will cause an error.
+				// Please note that the timelock ref is lazy loaded from the datastore. This
+				// is intentional as some tests may not setup MCMS (so querying the timelock
+				// ref too eagerly will cause failures in those tests).
+				if deployTokenInput.CCIPAdmin == "" && deployTokenInput.ExternalAdmin != "" {
+					deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
+				}
 				if deployTokenInput.CCIPAdmin == "" || deployTokenInput.ExternalAdmin == "" {
 					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 					if !ok {
@@ -241,13 +250,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
 					}
 					if datastore_utils.IsAddressRefEmpty(timelockRef) {
-						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter must provide a default CCIP admin address", selector)
+						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter is expected to provide fallbacks for ExternalAdmin and/or CCIPAdmin", selector)
 					} else {
 						if deployTokenInput.ExternalAdmin == "" {
 							deployTokenInput.ExternalAdmin = timelockRef.Address
 						}
 						if deployTokenInput.CCIPAdmin == "" {
-							deployTokenInput.CCIPAdmin = timelockRef.Address
+							deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
 						}
 					}
 				}
