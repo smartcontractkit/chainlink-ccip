@@ -305,12 +305,11 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			tokenRef := input.TokenRef.Clone()
 			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
 				// NOTE: if the token ref can't be resolved from the datastore, then this is a very strong indicator
-				// that it is a pre-existing 3rd party token which we did not deploy. In these cases, we do not have
-				// sufficient evidence to conclude that we can tidy up the token roles or grant a BnM pool burn/mint
-				// privileges, so this sequence deliberately skips those steps and expects the token owner to set up
-				// this on their end. For cases where the token ref is missing, but we do in fact have proper access
-				// on it, the caller can add the missing ref to the datastore *before* execution if they'd like this
-				// sequence to tidy the roles/access on both the token and the pool.
+				// that it's a pre-existing 3rd party token which we didn't deploy. In these cases, we still proceed
+				// with using the partial token ref as long as it has a valid address. If the partial ref is missing
+				// the token type, then this sequence will deliberately skip the role management steps since there's
+				// not enough context to perform this portion. Instead, a warning will be logged and we will need to
+				// rely on the token owner to perform these adjustments after the fact if necessary.
 				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err == nil {
 					tokenRef = ref
 				}
@@ -399,13 +398,13 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 		tokenCaps := tokenImpl.Capabilities()
 		if !tokenCaps.ParticipatesInPoolRoleGrant {
 			b.Logger.Warnf(
-				"token type %q has no pool role grant strategy registered, skipping grant for token pool %q on token %q on chain %d",
-				tokenImpl.ContractType().String(), poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
+				"token with address %q and type %q has no pool role grant strategy registered, skipping grant for token pool %q on chain %d",
+				tokenAddr.Hex(), tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector,
 			)
 			return nil, nil
 		}
 		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
-			return nil, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", tokenImpl.ContractType().String(), input.TokenRef.Qualifier, poolAddr.Hex(), input.ChainSelector, grantErr)
+			return nil, fmt.Errorf("failed to grant pool roles for token with address %q and type %q and pool %q on chain %d: %w", tokenAddr, tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
 		}
@@ -429,8 +428,8 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	tokenCaps := tokenImpl.Capabilities()
 	if !tokenCaps.SupportsAdminRole {
 		b.Logger.Warnf(
-			"token type %q does not support admin role management; skipping tidy of token admin roles for token at %q on chain %d",
-			tokenImpl.ContractType().String(), tokenAddr.Hex(), input.ChainSelector,
+			"token with address %q and type %q does not support admin role management; skipping tidy of token admin roles on chain %d",
+			tokenAddr.Hex(), tokenImpl.ContractType().String(), tokenAddr.Hex(), input.ChainSelector,
 		)
 		return nil, nil
 	}
