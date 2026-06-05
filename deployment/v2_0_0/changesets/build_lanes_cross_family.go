@@ -72,8 +72,9 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 			return nil, fmt.Errorf("lane %d: chainA and chainB must differ", i)
 		}
 		var qualifiers []string
+		remoteKey := strconv.FormatUint(lane.ChainB, 10)
 		for _, cvCfg := range committees {
-			if _, exists := cvCfg.ChainConfigs[strconv.FormatUint(lane.ChainA, 10)]; exists {
+			if _, exists := cvCfg.ChainConfigs[remoteKey]; exists {
 				qualifiers = append(qualifiers, cvCfg.Qualifier)
 			}
 		}
@@ -82,9 +83,10 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 			qualifiers = []string{defaultQualifier}
 		}
 		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, qualifiers, lane.ChainAOverrides)
-		qualifiers = make([]string, 0, len(committees))
+		qualifiers = nil
+		remoteKey = strconv.FormatUint(lane.ChainA, 10)
 		for _, cvCfg := range committees {
-			if _, exists := cvCfg.ChainConfigs[strconv.FormatUint(lane.ChainB, 10)]; exists {
+			if _, exists := cvCfg.ChainConfigs[remoteKey]; exists {
 				qualifiers = append(qualifiers, cvCfg.Qualifier)
 			}
 		}

@@ -167,7 +167,7 @@ func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerLocalChai
 	cfgA := bySel[chainA]
 	require.Len(t, cfgA.CommitteeVerifiers, 2)
 	assert.Equal(t, "alpha", cfgA.CommitteeVerifiers[0].CommitteeQualifier)
-	assert.Equal(t, "beta", cfgA.CommitteeVerifiers[1].CommitteeQualifier)
+	assert.Equal(t, "gamma", cfgA.CommitteeVerifiers[1].CommitteeQualifier)
 	for _, cv := range cfgA.CommitteeVerifiers {
 		assert.Contains(t, cv.RemoteChains, chainB)
 	}
@@ -175,7 +175,7 @@ func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerLocalChai
 	cfgB := bySel[chainB]
 	require.Len(t, cfgB.CommitteeVerifiers, 2)
 	assert.Equal(t, "alpha", cfgB.CommitteeVerifiers[0].CommitteeQualifier)
-	assert.Equal(t, "gamma", cfgB.CommitteeVerifiers[1].CommitteeQualifier)
+	assert.Equal(t, "beta", cfgB.CommitteeVerifiers[1].CommitteeQualifier)
 	for _, cv := range cfgB.CommitteeVerifiers {
 		assert.Contains(t, cv.RemoteChains, chainA)
 	}
