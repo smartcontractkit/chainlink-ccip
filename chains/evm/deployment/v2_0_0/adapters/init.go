@@ -21,6 +21,7 @@ import (
 	offrampv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
 	onrampv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
@@ -158,4 +159,5 @@ func registerContractVerificationMetadata(v *semver.Version) {
 	verification.RegisterContractMetadata(executorops.ContractType, v, executor.SolidityStandardInput, executor.ExecutorBin, "contracts/executor/Executor.sol:Executor")
 	verification.RegisterContractMetadata(seq1_7.ExecutorProxyType, v, proxy.SolidityStandardInput, proxy.ProxyBin, "contracts/Proxy.sol:Proxy")
 	verification.RegisterContractMetadata(committeeverifierops.ContractType, v, committee_verifier.SolidityStandardInput, committee_verifier.CommitteeVerifierBin, "contracts/ccvs/CommitteeVerifier.sol:CommitteeVerifier")
+	verification.RegisterContractMetadata(utils.TokenPoolFactory, v, token_pool_factory.SolidityStandardInput, token_pool_factory.TokenPoolFactoryBin, "contracts/TokenPoolFactory.sol:TokenPoolFactory")
 }
