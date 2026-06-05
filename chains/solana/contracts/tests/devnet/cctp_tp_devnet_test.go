@@ -130,7 +130,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		rmnConfig, _, err := state.FindRMNRemoteConfigPDA(referenceAddresses.RmnRemote)
 		require.NoError(t, err)
 
-		ix, err := rmn_remote.NewMigrateConfigV1ToV2Instruction(
+		ix, err := rmn_remote.NewMigrateConfigV2ToV3Instruction(
 			rmnConfig,
 			admin.PublicKey(),
 			solana.SystemProgramID,
