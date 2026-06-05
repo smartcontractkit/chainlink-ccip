@@ -127,7 +127,7 @@ func TestExpandLanesToPartialChainConfigs_MultipleCommittees(t *testing.T) {
 	assert.Contains(t, cfgB.CommitteeVerifiers[1].RemoteChains, chainA)
 }
 
-func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerLocalChain(t *testing.T) {
+func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerRemoteChain(t *testing.T) {
 	chainA := uint64(100)
 	chainB := uint64(200)
 
@@ -207,4 +207,108 @@ func TestExpandLanesToPartialChainConfigs_ChainOverridesToCommitteeVerifier(t *t
 	require.NotNil(t, rc.AllowlistEnabled)
 	assert.True(t, *rc.AllowlistEnabled)
 	assert.Equal(t, allow, rc.AddedAllowlistedSenders)
+}
+
+func TestMergeLaneLeg(t *testing.T) {
+	local := uint64(10)
+	remoteB := uint64(20)
+	remoteC := uint64(30)
+
+	t.Run("multiple remote same qualifier", func(t *testing.T) {
+		byChain := make(map[uint64]*partialChainConfig)
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha"}, nil)
+		mergeLaneLeg(byChain, local, remoteC, []string{"alpha"}, nil)
+
+		cfg := byChain[local]
+		require.NotNil(t, cfg)
+		assert.Equal(t, local, cfg.ChainSelector)
+		require.Len(t, cfg.CommitteeVerifiers, 1)
+		assert.Equal(t, "alpha", cfg.CommitteeVerifiers[0].CommitteeQualifier)
+		assert.Contains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteB)
+		assert.Contains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteC)
+		assert.Contains(t, cfg.RemoteChains, remoteB)
+		assert.Contains(t, cfg.RemoteChains, remoteC)
+	})
+
+	t.Run("initializes local chain with qualifiers and remote", func(t *testing.T) {
+		byChain := make(map[uint64]*partialChainConfig)
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha", "beta"}, nil)
+
+		cfg := byChain[local]
+		require.NotNil(t, cfg)
+		assert.Equal(t, local, cfg.ChainSelector)
+		require.Len(t, cfg.CommitteeVerifiers, 2)
+		assert.Equal(t, "alpha", cfg.CommitteeVerifiers[0].CommitteeQualifier)
+		assert.Equal(t, "beta", cfg.CommitteeVerifiers[1].CommitteeQualifier)
+		assert.Contains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteB)
+		assert.Contains(t, cfg.CommitteeVerifiers[1].RemoteChains, remoteB)
+		assert.Contains(t, cfg.RemoteChains, remoteB)
+	})
+
+	t.Run("adds remote only to qualifiers in second merge", func(t *testing.T) {
+		byChain := make(map[uint64]*partialChainConfig)
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha", "beta"}, nil)
+		mergeLaneLeg(byChain, local, remoteC, []string{"alpha"}, nil)
+
+		cfg := byChain[local]
+		assert.Contains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteB)
+		assert.Contains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteC)
+		assert.Contains(t, cfg.CommitteeVerifiers[1].RemoteChains, remoteB)
+		assert.NotContains(t, cfg.CommitteeVerifiers[1].RemoteChains, remoteC)
+		assert.Contains(t, cfg.RemoteChains, remoteC)
+		assert.Contains(t, cfg.RemoteChains, remoteB)
+	})
+
+	t.Run("adds remote only to new qualifiers in second merge", func(t *testing.T) {
+		byChain := make(map[uint64]*partialChainConfig)
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha"}, nil)
+		mergeLaneLeg(byChain, local, remoteC, []string{"beta"}, nil)
+
+		cfg := byChain[local]
+		assert.Contains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteB)
+		assert.NotContains(t, cfg.CommitteeVerifiers[0].RemoteChains, remoteC)
+		assert.NotContains(t, cfg.CommitteeVerifiers[1].RemoteChains, remoteB)
+		assert.Contains(t, cfg.CommitteeVerifiers[1].RemoteChains, remoteC)
+		assert.Contains(t, cfg.RemoteChains, remoteC)
+		assert.Contains(t, cfg.RemoteChains, remoteB)
+	})
+
+	t.Run("appends new qualifier on existing local chain", func(t *testing.T) {
+		byChain := make(map[uint64]*partialChainConfig)
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha"}, nil)
+		mergeLaneLeg(byChain, local, remoteB, []string{"beta"}, nil)
+
+		cfg := byChain[local]
+		require.Len(t, cfg.CommitteeVerifiers, 2)
+		assert.Equal(t, "alpha", cfg.CommitteeVerifiers[0].CommitteeQualifier)
+		assert.Equal(t, "beta", cfg.CommitteeVerifiers[1].CommitteeQualifier)
+	})
+
+	t.Run("merges chain overrides into committee verifier and remote config", func(t *testing.T) {
+		enabled := true
+		allow := []string{"0xabc"}
+		feeFirst := uint16(10)
+		feeSecond := uint16(20)
+
+		byChain := make(map[uint64]*partialChainConfig)
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha"}, &ChainOverrides{
+			AllowlistEnabled: &enabled,
+			AllowList:        allow,
+			RemoteChainCfg: PartialRemoteChainConfig{
+				MessageNetworkFeeUSDCents: &feeFirst,
+			},
+		})
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha"}, &ChainOverrides{
+			RemoteChainCfg: PartialRemoteChainConfig{
+				MessageNetworkFeeUSDCents: &feeSecond,
+			},
+		})
+
+		cfg := byChain[local]
+		cv := cfg.CommitteeVerifiers[0].RemoteChains[remoteB]
+		require.NotNil(t, cv.AllowlistEnabled)
+		assert.True(t, *cv.AllowlistEnabled)
+		assert.Equal(t, allow, cv.AddedAllowlistedSenders)
+		require.Equal(t, feeSecond, *cfg.RemoteChains[remoteB].MessageNetworkFeeUSDCents)
+	})
 }

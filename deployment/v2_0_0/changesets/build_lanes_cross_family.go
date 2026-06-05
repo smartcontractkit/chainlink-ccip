@@ -80,7 +80,11 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 		}
 		sort.Strings(qualifiers)
 		if len(qualifiers) == 0 {
-			qualifiers = []string{defaultQualifier}
+			if len(committees) == 0 {
+				qualifiers = []string{defaultQualifier}
+			} else {
+				return nil, fmt.Errorf("lane %d: no committees have chain_config for remote chain %d", i, lane.ChainB)
+			}
 		}
 		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, qualifiers, lane.ChainAOverrides)
 		qualifiers = nil
@@ -92,7 +96,11 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 		}
 		sort.Strings(qualifiers)
 		if len(qualifiers) == 0 {
-			qualifiers = []string{defaultQualifier}
+			if len(committees) == 0 {
+				qualifiers = []string{defaultQualifier}
+			} else {
+				return nil, fmt.Errorf("lane %d: no committees have chain_config for remote chain %d", i, lane.ChainA)
+			}
 		}
 		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, qualifiers, lane.ChainBOverrides)
 	}
@@ -150,14 +158,32 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	cv := chainOverridesToCommitteeVerifierRemote(o)
 	rc := chainOverridesToPartialRemote(o)
 
-	for i, cfgCv := range cfg.CommitteeVerifiers {
+	// Ensure we have a verifier entry per qualifier, and only attach this remote chain to those qualifiers.
+	byQualifier := make(map[string]int, len(cfg.CommitteeVerifiers))
+	for i := range cfg.CommitteeVerifiers {
+		byQualifier[cfg.CommitteeVerifiers[i].CommitteeQualifier] = i
+	}
+	for _, q := range qualifiers {
+		idx, ok := byQualifier[q]
+		if !ok {
+			cfg.CommitteeVerifiers = append(cfg.CommitteeVerifiers, committeeVerifierInputConfig{
+				CommitteeQualifier: q,
+				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
+			})
+			idx = len(cfg.CommitteeVerifiers) - 1
+			byQualifier[q] = idx
+		}
+		cfgCv := cfg.CommitteeVerifiers[idx]
 		if existingRemote, ok := cfgCv.RemoteChains[remote]; ok {
 			cfgCv.RemoteChains[remote] = mergeCommitteeVerifierRemoteInput(existingRemote, cv)
 		} else {
 			cfgCv.RemoteChains[remote] = cv
 		}
-		cfg.CommitteeVerifiers[i] = cfgCv
+		cfg.CommitteeVerifiers[idx] = cfgCv
 	}
+	sort.Slice(cfg.CommitteeVerifiers, func(i, j int) bool {
+		return cfg.CommitteeVerifiers[i].CommitteeQualifier < cfg.CommitteeVerifiers[j].CommitteeQualifier
+	})
 
 	if existing, ok := cfg.RemoteChains[remote]; ok {
 		cfg.RemoteChains[remote] = mergePartialRemoteInput(existing, rc)
