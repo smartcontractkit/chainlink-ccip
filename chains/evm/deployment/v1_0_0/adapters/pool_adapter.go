@@ -317,7 +317,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					// instead defer them to whoever owns the token. For cases where the token ref is missing, but we do
 					// have proper access on it, the caller can add the missing token ref to the datastore beforehand if
 					// they'd like this sequence to tidy the roles/access on both the token and the pool.
-					b.Logger.Infof("token ref (%s) was not found in the datastore - to unblock pool deployment, on-chain token derivation will be attempted: %v", datastore_utils.SprintRef(tokenRef), err)
+					b.Logger.Infof("token ref (%s) could not be uniquely resolved from the datastore - to unblock pool deployment, on-chain token derivation will be attempted: %v", datastore_utils.SprintRef(tokenRef), err)
 					if tokenRef.Address == "" {
 						return sequences.OnChainOutput{}, fmt.Errorf("token ref (%s) could not be resolved from datastore and is missing address field so on-chain resolution cannot be attempted: %w", datastore_utils.SprintRef(tokenRef), err)
 					}
