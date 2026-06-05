@@ -404,7 +404,7 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 			return nil, nil
 		}
 		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
-			return nil, fmt.Errorf("failed to grant pool roles for token with address %q and type %q and pool %q on chain %d: %w", tokenAddr, tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
+			return nil, fmt.Errorf("failed to grant pool roles for token with address %s and type %s and pool %s on chain %d: %w", tokenAddr.Hex(), tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
 		}
