@@ -15,6 +15,9 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip/chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 
+	// Make sure we're working with the latest chainlink-ccip/chains/solana/gobindings
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ../chains/solana/gobindings
+
 	// Make sure we're working with the latest chainlink-ccip/deployment
 	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
 )
