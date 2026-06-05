@@ -304,18 +304,29 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 
 			tokenRef := input.TokenRef.Clone()
 			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
+				b.Logger.Infof("token ref (%s) is not fully populated - attempting to resolve the full ref from the datastore", datastore_utils.SprintRef(tokenRef))
 				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err == nil {
+					b.Logger.Infof("successfully resolved token ref from datastore: %s", datastore_utils.SprintRef(ref))
 					tokenRef = ref
 				} else {
-					b.Logger.Warnf("token ref (%s) is not fully populated and could not be resolved in datastore - attempting to resolve ref from on-chain data: %v", datastore_utils.SprintRef(tokenRef), err)
+					// NOTE: if we're in this branch, then the token ref was NOT found in the datastore, which is a very
+					// strong indicator that it's a pre-existing 3rd party token which we did not deploy. In these cases
+					// we can still derive the token data from the chain to unblock the token pool deployment, but we do
+					// not have enough evidence to conclude that we can safely update the token roles or grant burn/mint
+					// permissions to BnM pools. With that in mind, this sequence will deliberately skip those steps and
+					// instead defer them to whoever owns the token. For cases where the token ref is missing, but we do
+					// have proper access on it, the caller can add the missing token ref to the datastore beforehand if
+					// they'd like this sequence to tidy the roles/access on both the token and the pool.
+					b.Logger.Infof("token ref (%s) was not found in the datastore - to unblock pool deployment, on-chain token derivation will be attempted: %v", datastore_utils.SprintRef(tokenRef), err)
 					if tokenRef.Address == "" {
 						return sequences.OnChainOutput{}, fmt.Errorf("token ref (%s) could not be resolved from datastore and is missing address field so on-chain resolution cannot be attempted: %w", datastore_utils.SprintRef(tokenRef), err)
 					}
-					fallbackRef, err := a.ResolveTokenRef(b, chains, input.ExistingDataStore, input.ChainSelector, tokenRef.Address)
-					if err != nil {
+					if fallbackRef, err := a.ResolveTokenRef(b, chains, input.ExistingDataStore, input.ChainSelector, tokenRef.Address); err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token ref from on-chain data for token address %s: %w", tokenRef.Address, err)
+					} else {
+						b.Logger.Warnf("token ref was successfully derived, but token role adjustments and pool burn/mint permissions will need to be handled by the owner of the token at address %q on chain %s", tokenRef.Address, chain.String())
+						tokenRef = fallbackRef
 					}
-					tokenRef = fallbackRef
 				}
 			}
 
