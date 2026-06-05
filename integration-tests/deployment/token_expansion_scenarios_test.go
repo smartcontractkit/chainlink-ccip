@@ -523,6 +523,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		testhelpers.ProcessTimelockProposals(t, *env, output1.MCMSTimelockProposals, false)
 
 		// Second call: deploy token B and add it to the datastore
 		output2, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
@@ -540,6 +541,7 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		})
 		require.NoError(t, err)
 		MergeAddresses(t, env, output2.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, output2.MCMSTimelockProposals, false)
 
 		// Tokens should exist, no pools yet
 		tokAddrA := assertTokenOnlyExistsOnChain(t, output1, env, selA, tokenSymbolA, "Scenario3 Token A", 18)
