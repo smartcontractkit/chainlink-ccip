@@ -1,5 +1,5 @@
 {
-  "version": "1.6.2",
+  "version": "1.6.3",
   "name": "example_ccip_sender",
   "docs": [
     "This program an example of a CCIP Sender Program.",

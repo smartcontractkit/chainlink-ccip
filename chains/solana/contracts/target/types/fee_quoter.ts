@@ -1,5 +1,5 @@
 export type FeeQuoter = {
-  "version": "1.6.2",
+  "version": "1.6.3",
   "name": "fee_quoter",
   "instructions": [
     {
@@ -1746,7 +1746,7 @@ export type FeeQuoter = {
 };
 
 export const IDL: FeeQuoter = {
-  "version": "1.6.2",
+  "version": "1.6.3",
   "name": "fee_quoter",
   "instructions": [
     {

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::context::UpdateEventAuthorities;
-use crate::event::EventAuthoritiesSet;
+use crate::event::{CurserSet, EventAuthoritiesSet};
 use crate::instructions::interfaces::Admin;
 use crate::{
     AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject, OwnershipTransferRequested,
@@ -94,6 +94,15 @@ impl Admin for Impl {
         ctx.accounts.config.event_authorities = new_event_authorities;
         emit!(EventAuthoritiesSet {
             event_authorities: ctx.accounts.config.event_authorities.clone(),
+        });
+
+        Ok(())
+    }
+
+    fn set_curser(&self, ctx: Context<UpdateConfig>, curser: Pubkey) -> Result<()> {
+        ctx.accounts.config.curser = curser;
+        emit!(CurserSet {
+            curser: ctx.accounts.config.curser,
         });
 
         Ok(())
