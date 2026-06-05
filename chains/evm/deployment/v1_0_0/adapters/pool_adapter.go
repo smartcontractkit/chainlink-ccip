@@ -304,30 +304,30 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 
 			tokenRef := input.TokenRef.Clone()
 			if !datastore_utils.IsAddressRefFullyPopulated(tokenRef) {
-				b.Logger.Infof("token ref (%s) is not fully populated - attempting to resolve the full ref from the datastore", datastore_utils.SprintRef(tokenRef))
+				// NOTE: if the token ref can't be resolved from the datastore, then this is a very strong indicator
+				// that it is a pre-existing 3rd party token which we did not deploy. In these cases, we do not have
+				// sufficient evidence to conclude that we can tidy up the token roles or grant a BnM pool burn/mint
+				// privileges, so this sequence deliberately skips those steps and expects the token owner to set up
+				// this on their end. For cases where the token ref is missing, but we do in fact have proper access
+				// on it, the caller can add the missing ref to the datastore *before* execution if they'd like this
+				// sequence to tidy the roles/access on both the token and the pool.
 				if ref, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err == nil {
-					b.Logger.Infof("successfully resolved token ref from datastore: %s", datastore_utils.SprintRef(ref))
 					tokenRef = ref
-				} else {
-					// NOTE: if we're in this branch, then the token ref was NOT found in the datastore, which is a very
-					// strong indicator that it's a pre-existing 3rd party token which we did not deploy. In these cases
-					// we can still derive the token data from the chain to unblock the token pool deployment, but we do
-					// not have enough evidence to conclude that we can safely update the token roles or grant burn/mint
-					// permissions to BnM pools. With that in mind, this sequence will deliberately skip those steps and
-					// instead defer them to whoever owns the token. For cases where the token ref is missing, but we do
-					// have proper access on it, the caller can add the missing token ref to the datastore beforehand if
-					// they'd like this sequence to tidy the roles/access on both the token and the pool.
-					b.Logger.Infof("token ref (%s) could not be uniquely resolved from the datastore - to unblock pool deployment, on-chain token derivation will be attempted: %v", datastore_utils.SprintRef(tokenRef), err)
-					if tokenRef.Address == "" {
-						return sequences.OnChainOutput{}, fmt.Errorf("token ref (%s) could not be resolved from datastore and is missing address field so on-chain resolution cannot be attempted: %w", datastore_utils.SprintRef(tokenRef), err)
-					}
-					if fallbackRef, err := a.ResolveTokenRef(b, chains, input.ExistingDataStore, input.ChainSelector, tokenRef.Address); err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve token ref from on-chain data for token address %s: %w", tokenRef.Address, err)
-					} else {
-						b.Logger.Warnf("token ref was successfully derived, but token role adjustments and pool burn/mint permissions will need to be handled by the owner of the token at address %q on chain %s", tokenRef.Address, chain.String())
-						tokenRef = fallbackRef
-					}
 				}
+			}
+
+			var tokenAddr common.Address
+			if addr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token address ref to EVM address for chain %d: %w", input.ChainSelector, err)
+			} else {
+				tokenAddr = addr
+			}
+
+			var tokenImpl tokenimpl.Token
+			if impl, ok := tokenimpl.Get(deployment.ContractType(tokenRef.Type)); !ok {
+				b.Logger.Warnf("token implementation not found for token ref (%s); skipping token and pool role tidying", datastore_utils.SprintRef(tokenRef))
+			} else {
+				tokenImpl = impl
 			}
 
 			var poolRef datastore.AddressRef
@@ -337,19 +337,21 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 
 			var writes []evm_contract.WriteOutput
 			if !datastore_utils.IsAddressRefEmpty(poolRef) {
-				if tokenPoolRolesWrites, err := a.TidyTokenPoolRoles(b, chain, input, poolRef, tokenRef); err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token pool roles: %w", err)
-				} else {
-					writes = append(writes, tokenPoolRolesWrites...)
+				poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
+				}
+				if tokenImpl != nil {
+					if tokenPoolRolesWrites, err := a.TidyTokenPoolRoles(b, chain, input, poolAddr, tokenAddr, tokenImpl); err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token pool roles: %w", err)
+					} else {
+						writes = append(writes, tokenPoolRolesWrites...)
+					}
 				}
 				if input.RateLimitAdmin != "" {
 					rlAdminHex := input.RateLimitAdmin
 					if !common.IsHexAddress(rlAdminHex) {
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
-					}
-					poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
 					}
 					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, common.HexToAddress(rlAdminHex))
 					if err != nil {
@@ -361,10 +363,12 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				}
 			}
 
-			if tokenRolesWrites, err := a.TidyTokenRoles(b, chain, input, tokenRef); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token roles: %w", err)
-			} else {
-				writes = append(writes, tokenRolesWrites...)
+			if tokenImpl != nil {
+				if tokenRolesWrites, err := a.TidyTokenRoles(b, chain, input, tokenAddr, tokenImpl); err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to tidy token roles: %w", err)
+				} else {
+					writes = append(writes, tokenRolesWrites...)
+				}
 			}
 
 			if len(writes) > 0 {
@@ -387,39 +391,21 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
-	tokenPoolRef datastore.AddressRef,
-	tokenRef datastore.AddressRef,
+	poolAddr common.Address,
+	tokenAddr common.Address,
+	tokenImpl tokenimpl.Token,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenPoolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenPoolRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token pool ref to EVM address for chain %d: %w", input.ChainSelector, err)
-	}
-	tokenAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
-	}
-
 	if a.IsBurnMintPoolType(input.PoolType) {
-		tokenImpl, ok := tokenimpl.Get(deployment.ContractType(tokenRef.Type))
-		if !ok {
-			b.Logger.Warnf(
-				"unsupported token type %q for token at ref (%s); skipping pool role grants for this token on chain %d",
-				tokenRef.Type.String(), datastore_utils.SprintRef(tokenRef), input.ChainSelector,
-			)
-			return nil, nil
-		}
-
 		tokenCaps := tokenImpl.Capabilities()
 		if !tokenCaps.ParticipatesInPoolRoleGrant {
 			b.Logger.Warnf(
 				"token type %q has no pool role grant strategy registered, skipping grant for token pool %q on token %q on chain %d",
-				tokenRef.Type.String(), tokenPoolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
+				tokenImpl.ContractType().String(), poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector,
 			)
 			return nil, nil
 		}
-
-		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, tokenPoolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
-			return nil, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", tokenRef.Type, input.TokenRef.Qualifier, tokenPoolAddr.Hex(), input.ChainSelector, grantErr)
+		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
+			return nil, fmt.Errorf("failed to grant pool roles for token type %q (token %q, pool %q) on chain %d: %w", tokenImpl.ContractType().String(), input.TokenRef.Qualifier, poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
 		}
@@ -437,27 +423,14 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input tokensapi.DeployTokenPoolInput,
-	tokenRef datastore.AddressRef,
+	tokenAddr common.Address,
+	tokenImpl tokenimpl.Token,
 ) ([]evm_contract.WriteOutput, error) {
-	tokenAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(tokenRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token ref to EVM address for chain %d: %w", input.ChainSelector, err)
-	}
-
-	tokenImpl, ok := tokenimpl.Get(deployment.ContractType(tokenRef.Type))
-	if !ok {
-		b.Logger.Warnf(
-			"unsupported token type %q for token at ref (%s); skipping admin role tidy for this token on chain %d",
-			tokenRef.Type.String(), datastore_utils.SprintRef(tokenRef), input.ChainSelector,
-		)
-		return nil, nil
-	}
-
 	tokenCaps := tokenImpl.Capabilities()
 	if !tokenCaps.SupportsAdminRole {
 		b.Logger.Warnf(
-			"token type %q does not support admin role management; skipping tidy of token admin roles for token at ref (%s) on chain %d",
-			tokenRef.Type.String(), datastore_utils.SprintRef(tokenRef), input.ChainSelector,
+			"token type %q does not support admin role management; skipping tidy of token admin roles for token at %q on chain %d",
+			tokenImpl.ContractType().String(), tokenAddr.Hex(), input.ChainSelector,
 		)
 		return nil, nil
 	}
@@ -467,7 +440,6 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
 		return nil, nil
 	}
-
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
