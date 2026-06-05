@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-// ActivateRMNInput deploys RMN 2.0.0 with the Ultra Fast Curse MCMS proposer as an initial
+// ActivateRMNInput deploys RMN 2.0.0 with the Ultra Fast Curse RBACTimelock as an initial
 // curse admin, transfers RMN ownership to RMNMCMS, and points RMNProxy at the new RMN
 // implementation (final step — makes fast curse live for CCIP consumers).
 type ActivateRMNInput struct {
@@ -52,7 +52,7 @@ var ActivateRMN = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse MCMS proposer as an initial curse admin.
+		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock as an initial curse admin.
 		deployReport, err := cldf_ops.ExecuteSequence(b, DeployRMN, chain, DeployRMNInput{
 			ChainSelector:     chain.Selector,
 			ExistingAddresses: input.ExistingAddresses,
@@ -117,19 +117,6 @@ func pointRMNProxyAtRMN(
 		return nil, fmt.Errorf("failed to set RMN on RMNProxy on chain %d: %w", chain.Selector, err)
 	}
 
-	currentRMN, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       rmnProxyAddr,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify RMN on RMNProxy on chain %d: %w", chain.Selector, err)
-	}
-	if currentRMN.Output != rmnAddr {
-		return nil, fmt.Errorf(
-			"RMNProxy RMN on chain %d is %s after setRMN, expected %s",
-			chain.Selector, currentRMN.Output.Hex(), rmnAddr.Hex(),
-		)
-	}
 
 	var writes []contract.WriteOutput
 	writes = append(writes, setRMNReport.Output)

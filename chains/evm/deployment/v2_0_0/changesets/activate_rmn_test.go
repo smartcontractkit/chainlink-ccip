@@ -67,7 +67,7 @@ func TestActivateRMN_Apply(t *testing.T) {
 			ValidUntil:     3759765795,
 		},
 		Cfg: changesets.ActivateRMNCfg{
-			ChainSel: chainSelector,
+			ChainSels: []uint64{chainSelector},
 		},
 	})
 	require.NoError(t, err)
@@ -137,7 +137,7 @@ func TestActivateRMN_MissingRMNMCMS(t *testing.T) {
 	mcmsRegistry := cs_core.GetRegistry()
 	_, err = changesets.ActivateRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
 		MCMS: mcms.Input{},
-		Cfg:  changesets.ActivateRMNCfg{ChainSel: chainSelector},
+		Cfg:  changesets.ActivateRMNCfg{ChainSels: []uint64{chainSelector}},
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, common_utils.RMNTimelockQualifier)
