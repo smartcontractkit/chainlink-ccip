@@ -429,7 +429,7 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	if !tokenCaps.SupportsAdminRole {
 		b.Logger.Warnf(
 			"token with address %q and type %q does not support admin role management; skipping tidy of token admin roles on chain %d",
-			tokenAddr.Hex(), tokenImpl.ContractType().String(), tokenAddr.Hex(), input.ChainSelector,
+			tokenAddr.Hex(), tokenImpl.ContractType().String(), input.ChainSelector,
 		)
 		return nil, nil
 	}
