@@ -8,6 +8,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
@@ -16,9 +17,10 @@ import (
 // ChainOverrides holds per-chain lane settings that differ from chain-family adapter defaults.
 // Only set fields you need to override; omitted fields use adapter defaults at apply time.
 type ChainOverrides struct {
-	AllowlistEnabled *bool                    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
-	AllowList        []string                 `json:"allowList,omitempty" yaml:"allowList,omitempty"`
-	RemoteChainCfg   PartialRemoteChainConfig `json:"remoteChainCfg,omitempty" yaml:"remoteChainCfg,omitempty"`
+	AllowlistEnabled                *bool                    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
+	AllowList                       []string                 `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	CommitteeVerifierFinalityConfig *finality.Config         `json:"committeeVerifierFinalityConfig,omitempty" yaml:"committeeVerifierFinalityConfig,omitempty"`
+	RemoteChainCfg                  PartialRemoteChainConfig `json:"remoteChainCfg,omitempty" yaml:"remoteChainCfg,omitempty"`
 }
 
 // CrossFamilyLanePair defines a bidirectional lane with optional per-chain overrides.
@@ -167,8 +169,9 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 		idx, ok := byQualifier[q]
 		if !ok {
 			cfg.CommitteeVerifiers = append(cfg.CommitteeVerifiers, committeeVerifierInputConfig{
-				CommitteeQualifier: q,
-				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
+				CommitteeQualifier:    q,
+				AllowedFinalityConfig: o.CommitteeVerifierFinalityConfig,
+				RemoteChains:          make(map[uint64]committeeVerifierRemoteChainInput),
 			})
 			idx = len(cfg.CommitteeVerifiers) - 1
 			byQualifier[q] = idx
