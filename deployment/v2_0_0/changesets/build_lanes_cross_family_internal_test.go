@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
@@ -181,6 +182,31 @@ func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerRemoteCha
 	}
 }
 
+func TestExpandLanesToPartialChainConfigs_ChainOverridesCommitteeVerifierFinalityConfig(t *testing.T) {
+	finalityCfg := &finality.Config{WaitForSafe: true, BlockDepth: 100}
+
+	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
+		{
+			ChainA: 10,
+			ChainB: 20,
+			ChainAOverrides: &ChainOverrides{
+				CommitteeVerifierFinalityConfig: finalityCfg,
+			},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	var cfg partialChainConfig
+	for _, c := range chains {
+		if c.ChainSelector == 10 {
+			cfg = c
+		}
+	}
+	require.Len(t, cfg.CommitteeVerifiers, 1)
+	require.NotNil(t, cfg.CommitteeVerifiers[0].AllowedFinalityConfig)
+	assert.Equal(t, *finalityCfg, *cfg.CommitteeVerifiers[0].AllowedFinalityConfig)
+}
+
 func TestExpandLanesToPartialChainConfigs_ChainOverridesToCommitteeVerifier(t *testing.T) {
 	enabled := true
 	allow := []string{"0xabc"}
@@ -282,6 +308,18 @@ func TestMergeLaneLeg(t *testing.T) {
 		require.Len(t, cfg.CommitteeVerifiers, 2)
 		assert.Equal(t, "alpha", cfg.CommitteeVerifiers[0].CommitteeQualifier)
 		assert.Equal(t, "beta", cfg.CommitteeVerifiers[1].CommitteeQualifier)
+	})
+
+	t.Run("applies committee verifier finality config from chain overrides", func(t *testing.T) {
+		byChain := make(map[uint64]*partialChainConfig)
+		finalityCfg := &finality.Config{WaitForSafe: true, BlockDepth: 50}
+		mergeLaneLeg(byChain, local, remoteB, []string{"alpha"}, &ChainOverrides{
+			CommitteeVerifierFinalityConfig: finalityCfg,
+		})
+
+		cfg := byChain[local]
+		require.NotNil(t, cfg.CommitteeVerifiers[0].AllowedFinalityConfig)
+		assert.Equal(t, *finalityCfg, *cfg.CommitteeVerifiers[0].AllowedFinalityConfig)
 	})
 
 	t.Run("merges chain overrides into committee verifier and remote config", func(t *testing.T) {
