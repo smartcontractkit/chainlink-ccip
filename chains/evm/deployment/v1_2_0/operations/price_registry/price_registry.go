@@ -4,6 +4,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
@@ -15,6 +16,11 @@ var (
 	ContractType = cldf.ContractType("PriceRegistry")
 	Version      = semver.MustParse("1.2.0")
 )
+
+type ApplyFeeTokensInput struct {
+	FeeTokensToAdd    []common.Address
+	FeeTokensToRemove []common.Address
+}
 
 var PriceRegistryGetFeeToken = contract.NewRead(contract.ReadParams[any, []common.Address, *price_registry.PriceRegistry]{
 	Name:         "price_registry:getfeetokens",
@@ -46,5 +52,19 @@ var PriceRegistryGetDestinationChainGasPrice = contract.NewRead(contract.ReadPar
 	NewContract:  price_registry.NewPriceRegistry,
 	CallContract: func(pr *price_registry.PriceRegistry, opts *bind.CallOpts, args uint64) (price_registry.InternalTimestampedPackedUint224, error) {
 		return pr.GetDestinationChainGasPrice(opts, args)
+	},
+})
+
+var PriceRegistryApplyFeeTokenUpdates = contract.NewWrite(contract.WriteParams[ApplyFeeTokensInput, *price_registry.PriceRegistry]{
+	Name:            "price_registry:apply-feetoken-updates",
+	Version:         Version,
+	Description:     "Calls applyFeeTokenUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     price_registry.PriceRegistryABI,
+	NewContract:     price_registry.NewPriceRegistry,
+	IsAllowedCaller: contract.OnlyOwner[*price_registry.PriceRegistry, ApplyFeeTokensInput],
+	Validate:        func(ApplyFeeTokensInput) error { return nil },
+	CallContract: func(pr *price_registry.PriceRegistry, opts *bind.TransactOpts, args ApplyFeeTokensInput) (*types.Transaction, error) {
+		return pr.ApplyFeeTokensUpdates(opts, args.FeeTokensToAdd, args.FeeTokensToRemove)
 	},
 })
