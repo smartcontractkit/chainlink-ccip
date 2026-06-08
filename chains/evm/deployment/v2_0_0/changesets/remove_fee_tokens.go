@@ -229,6 +229,10 @@ func extraFeeTokens(fq20Tokens, legacyFeeTokens []common.Address) []common.Addre
 		legacySet[token] = struct{}{}
 	}
 
+	if len(legacySet) == 0 {
+		return nil
+	}
+
 	extra := make([]common.Address, 0)
 	for _, token := range fq20Tokens {
 		if _, exists := legacySet[token]; !exists {
