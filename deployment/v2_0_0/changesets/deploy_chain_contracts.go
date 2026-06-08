@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -130,7 +131,7 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deplo
 			)
 			existingAddresses = append(existingAddresses, resolved.NewAddressRefs...)
 
-			deployerContract := coalesce(perChainCfg.DeployerContract, resolved.DeployerContract)
+			deployerContract := utils.Coalesce(perChainCfg.DeployerContract, resolved.DeployerContract)
 
 			input := adapters.DeployChainContractsInput{
 				ChainSelector:     sel,
