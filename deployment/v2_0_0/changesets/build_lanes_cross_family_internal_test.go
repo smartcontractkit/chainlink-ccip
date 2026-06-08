@@ -184,27 +184,53 @@ func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerRemoteCha
 
 func TestExpandLanesToPartialChainConfigs_ChainOverridesCommitteeVerifierFinalityConfig(t *testing.T) {
 	finalityCfg := &finality.Config{WaitForSafe: true, BlockDepth: 100}
-
+	chainA := uint64(100)
+	chainB := uint64(200)
+	committees := map[string]offchain.CommitteeConfig{
+		"alpha": {
+			Qualifier: "alpha",
+			ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+				strconv.FormatUint(chainA, 10): {},
+				strconv.FormatUint(chainB, 10): {},
+			},
+		},
+		"beta": {
+			Qualifier: "beta",
+			ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+				strconv.FormatUint(chainA, 10): {},
+			},
+		},
+		"gamma": {
+			Qualifier: "gamma",
+			ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+				strconv.FormatUint(chainB, 10): {},
+			},
+		},
+	}
 	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
 		{
-			ChainA: 10,
-			ChainB: 20,
+			ChainA: chainA,
+			ChainB: chainB,
 			ChainAOverrides: &ChainOverrides{
 				CommitteeVerifierFinalityConfig: finalityCfg,
 			},
 		},
-	}, nil)
+	}, committees)
 	require.NoError(t, err)
 
 	var cfg partialChainConfig
 	for _, c := range chains {
-		if c.ChainSelector == 10 {
+		if c.ChainSelector == chainA {
 			cfg = c
 		}
 	}
-	require.Len(t, cfg.CommitteeVerifiers, 1)
-	require.NotNil(t, cfg.CommitteeVerifiers[0].AllowedFinalityConfig)
-	assert.Equal(t, *finalityCfg, *cfg.CommitteeVerifiers[0].AllowedFinalityConfig)
+	require.Len(t, cfg.CommitteeVerifiers, 2)
+	for _, cv := range cfg.CommitteeVerifiers {
+		require.NotNil(t, cv.AllowedFinalityConfig)
+		require.Equal(t, *finalityCfg, *cv.AllowedFinalityConfig)
+		require.Contains(t, cv.RemoteChains, chainB)
+
+	}
 }
 
 func TestExpandLanesToPartialChainConfigs_ChainOverridesToCommitteeVerifier(t *testing.T) {

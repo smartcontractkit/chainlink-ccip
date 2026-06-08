@@ -141,21 +141,9 @@ func sortedKeys(m map[uint64]*partialChainConfig) []uint64 {
 func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, qualifiers []string, o *ChainOverrides) {
 	cfg, ok := byChain[local]
 	if !ok {
-		cvConfigs := make([]committeeVerifierInputConfig, 0, len(qualifiers))
-		for _, q := range qualifiers {
-			cv := committeeVerifierInputConfig{
-				CommitteeQualifier: q,
-				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
-			}
-			if o != nil {
-				cv.AllowedFinalityConfig = o.CommitteeVerifierFinalityConfig
-			}
-			cvConfigs = append(cvConfigs, cv)
-		}
-
 		cfg = &partialChainConfig{
 			ChainSelector:      local,
-			CommitteeVerifiers: cvConfigs,
+			CommitteeVerifiers: make([]committeeVerifierInputConfig, 0, len(qualifiers)),
 			RemoteChains:       make(map[uint64]PartialRemoteChainConfig),
 		}
 		byChain[local] = cfg
@@ -172,14 +160,10 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	for _, q := range qualifiers {
 		idx, ok := byQualifier[q]
 		if !ok {
-			newCv := committeeVerifierInputConfig{
+			cfg.CommitteeVerifiers = append(cfg.CommitteeVerifiers, committeeVerifierInputConfig{
 				CommitteeQualifier: q,
 				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
-			}
-			if o != nil {
-				newCv.AllowedFinalityConfig = o.CommitteeVerifierFinalityConfig
-			}
-			cfg.CommitteeVerifiers = append(cfg.CommitteeVerifiers, newCv)
+			})
 			idx = len(cfg.CommitteeVerifiers) - 1
 			byQualifier[q] = idx
 		}
