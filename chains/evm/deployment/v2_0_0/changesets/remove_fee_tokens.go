@@ -76,6 +76,17 @@ func resolveRemoveFeeTokensPerChain(e cldf_deployment.Environment, chainSel uint
 		)
 	}
 
+	fq20Ref := datastore_utils.GetAddressRef(
+		addresses,
+		chainSel,
+		fqops.ContractType,
+		fqops.Version,
+		"",
+	)
+	if datastore_utils.IsAddressRefEmpty(fq20Ref) {
+		return sequences.RemoveFeeTokensPerChainInput{}, fmt.Errorf("no FeeQuoter v%s found on chain selector %d", fqops.Version, chainSel)
+	}
+
 	laneResolver := &adapters1_2.LaneVersionResolver{}
 	_, laneVersions, err := laneResolver.DeriveLaneVersionsForChain(e, chainSel)
 	if err != nil {
@@ -93,17 +104,6 @@ func resolveRemoveFeeTokensPerChain(e cldf_deployment.Environment, chainSel uint
 	legacyFeeTokens, err := collectLegacyFeeTokens(e, chain, addresses, laneVersions)
 	if err != nil {
 		return sequences.RemoveFeeTokensPerChainInput{}, err
-	}
-
-	fq20Ref := datastore_utils.GetAddressRef(
-		addresses,
-		chainSel,
-		fqops.ContractType,
-		fqops.Version,
-		"",
-	)
-	if datastore_utils.IsAddressRefEmpty(fq20Ref) {
-		return sequences.RemoveFeeTokensPerChainInput{}, fmt.Errorf("no FeeQuoter v%s found on chain selector %d", fqops.Version, chainSel)
 	}
 
 	fq20Tokens, err := queryFeeQuoter20FeeTokens(e, chain, common.HexToAddress(fq20Ref.Address))
@@ -132,6 +132,10 @@ func collectLegacyFeeTokens(
 		if version.Major() == 1 && version.Minor() == 6 {
 			hasV16 = true
 		}
+	}
+
+	if !hasV15 && !hasV16 {
+		return []common.Address{}, fmt.Errorf("no legacy fee tokens found")
 	}
 
 	legacySet := make(map[common.Address]struct{})

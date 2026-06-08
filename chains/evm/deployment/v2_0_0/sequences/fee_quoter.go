@@ -754,7 +754,7 @@ var SequenceRemoveFeeTokens = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
-		output.BatchOps = []mcms_types.BatchOperation{batch}
+		output.BatchOps = append(output.BatchOps, batch)
 		return output, nil
 	},
 )
