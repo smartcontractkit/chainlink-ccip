@@ -51,6 +51,7 @@ const (
 	BurnMintWithLockReleaseFlag         cldf.ContractType = "BurnMintWithLockReleaseFlag"
 	TokenGovernor                       cldf.ContractType = "TokenGovernor"
 	ERC20LockBox                        cldf.ContractType = "ERC20LockBox"
+	SiloedUSDCTokenPool                 cldf.ContractType = "SiloedUSDCTokenPool"
 
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"

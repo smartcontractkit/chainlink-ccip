@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_usdc_token_pool"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/link_token"
@@ -343,6 +344,13 @@ var (
 				solidityStandardJSONInput: "{\"version\":\"v0.8.19+commit.7dd6d404\",\"language\":\"Solidity\",\"sources\":{\"src/CallProxy.sol\":{\"content\":\"// SPDX-License-Identifier: BUSL-1.1\\npragma solidity =0.8.19;\\n\\n/// @notice a contract which acts as a forwarder that forwards the input from\\n/// any caller to a a target contract.\\ncontract CallProxy {\\n    event TargetSet(address target);\\n\\n    address immutable i_target;\\n\\n    constructor(address target) {\\n        i_target = target;\\n        emit TargetSet(target);\\n    }\\n\\n    fallback() external payable {\\n        address target = i_target;\\n        assembly {\\n            // This code destroys Solidity's memory layout.\\n            // That's fine, because we never return to Solidity anyways,\\n            // we either return or revert out of the callframe at the end.\\n            calldatacopy(0, 0, calldatasize())\\n            let success := call(gas(), target, callvalue(), 0, calldatasize(), 0, 0)\\n            returndatacopy(0, 0, returndatasize())\\n            if success { return(0, returndatasize()) }\\n            revert(0, returndatasize())\\n        }\\n    }\\n}\\n\"}},\"settings\":{\"remappings\":[\"ds-test/=lib/forge-std/lib/ds-test/src/\",\"forge-std/=lib/forge-std/src/\",\"openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/\",\"safe-contracts/=lib/safe-contracts/contracts/\",\"erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/\",\"openzeppelin/=lib/openzeppelin-contracts/contracts/\"],\"optimizer\":{\"enabled\":true,\"runs\":200},\"metadata\":{\"useLiteralContent\":false,\"bytecodeHash\":\"ipfs\",\"appendCBOR\":true},\"outputSelection\":{\"*\":{\"*\":[\"abi\",\"evm.bytecode.object\",\"evm.bytecode.sourceMap\",\"evm.bytecode.linkReferences\",\"evm.deployedBytecode.object\",\"evm.deployedBytecode.sourceMap\",\"evm.deployedBytecode.linkReferences\",\"evm.deployedBytecode.immutableReferences\",\"evm.methodIdentifiers\",\"metadata\"]}},\"evmVersion\":\"paris\",\"viaIR\":false,\"libraries\":{}}}", //nolint:dupword
 				bytecode:                  mcmsbindings.CallProxyBin,
 				name:                      "src/CallProxy.sol:CallProxy",
+			},
+		},
+		utils.SiloedUSDCTokenPool: {
+			Version2_0_0: {
+				solidityStandardJSONInput: siloed_usdc_token_pool.SolidityStandardInput,
+				bytecode:                  siloed_usdc_token_pool.SiloedUSDCTokenPoolBin,
+				name:                      "contracts/pools/USDC/SiloedUSDCTokenPool.sol:SiloedUSDCTokenPool",
 			},
 		},
 	}
