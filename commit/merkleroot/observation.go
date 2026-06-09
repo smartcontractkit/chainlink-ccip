@@ -53,6 +53,30 @@ func (p *Processor) ObservationQuorum(
 
 const SendingObservation = "sending merkle root processor observation"
 
+const (
+	defaultChainRPCTimeout           = 10 * time.Second
+	chainRPCTimeoutOCRBudgetFraction = 0.8
+)
+
+// chainRPCTimeoutDuration returns the per-chain RPC timeout as
+// min(80% of remaining OCR budget, defaultChainRPCTimeout).
+func chainRPCTimeoutDuration(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return defaultChainRPCTimeout
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0
+	}
+	ocrBudget := time.Duration(float64(remaining) * chainRPCTimeoutOCRBudgetFraction)
+	return min(defaultChainRPCTimeout, ocrBudget)
+}
+
+func chainRPCContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, chainRPCTimeoutDuration(ctx))
+}
+
 // Observation makes external calls to observe information according to the current processor state.
 // According to the state it either observes sequence numbers, root hashes, RMN remote config, etc...
 func (p *Processor) Observation(
@@ -568,9 +592,15 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	slices.Sort(supportedSourceChains)
 
-	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, supportedSourceChains)
+	configCtx, configCancel := chainRPCContext(ctx)
+	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(configCtx, supportedSourceChains)
+	configCancel()
 	if err != nil {
-		lggr.Warnw("call to GetOffRampSourceChainsConfig failed", "err", err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			lggr.Warnw("call to GetOffRampSourceChainsConfig timed out", "err", err)
+		} else {
+			lggr.Warnw("call to GetOffRampSourceChainsConfig failed", "err", err)
+		}
 		return nil
 	}
 
@@ -590,12 +620,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
 				return
 			}
-			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
+			chainCtx, chainCancel := chainRPCContext(ctx)
+			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(chainCtx, sourceChain)
+			chainCancel()
 			if err != nil {
 				if isNoBindingsError(err) {
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+				} else if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting latest msg seq num for source chain", "sourceChain", sourceChain)
 				} else {
 					lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
 				}
