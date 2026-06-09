@@ -77,6 +77,10 @@ func (c *FeeQuoterContract) ApplyTokenTransferFeeConfigUpdates(opts *bind.Transa
 	return c.contract.Transact(opts, "applyTokenTransferFeeConfigUpdates", tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)
 }
 
+func (c *FeeQuoterContract) ApplyFeeTokensUpdates(opts *bind.TransactOpts, feeTokensToRemove []common.Address, feeTokensToAdd []common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "applyFeeTokensUpdates", feeTokensToRemove, feeTokensToAdd)
+}
+
 func (c *FeeQuoterContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getDestChainConfig", args)
@@ -240,6 +244,11 @@ type ApplyTokenTransferFeeConfigUpdatesArgs struct {
 	TokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs
 }
 
+type ApplyFeeTokensUpdatesArgs struct {
+	FeeTokensToRemove []common.Address
+	FeeTokensToAdd    []common.Address
+}
+
 type GetTokenTransferFeeConfigArgs struct {
 	DestChainSelector uint64
 	Token             common.Address
@@ -340,6 +349,24 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 		args ApplyTokenTransferFeeConfigUpdatesArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
+	},
+})
+
+var ApplyFeeTokensUpdates = contract.NewWrite(contract.WriteParams[ApplyFeeTokensUpdatesArgs, *FeeQuoterContract]{
+	Name:            "fee-quoter:apply-fee-tokens-updates",
+	Version:         Version,
+	Description:     "Calls applyFeeTokensUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     FeeQuoterABI,
+	NewContract:     NewFeeQuoterContract,
+	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, ApplyFeeTokensUpdatesArgs],
+	Validate:        func(ApplyFeeTokensUpdatesArgs) error { return nil },
+	CallContract: func(
+		c *FeeQuoterContract,
+		opts *bind.TransactOpts,
+		args ApplyFeeTokensUpdatesArgs,
+	) (*types.Transaction, error) {
+		return c.ApplyFeeTokensUpdates(opts, args.FeeTokensToRemove, args.FeeTokensToAdd)
 	},
 })
 
