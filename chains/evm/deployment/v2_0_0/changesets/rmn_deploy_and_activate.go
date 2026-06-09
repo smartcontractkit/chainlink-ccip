@@ -22,7 +22,7 @@ type ActivateRMNCfg struct {
 var ActivateRMN = func(mcmsRegistry *changesets.MCMSReaderRegistry) cldf_deployment.ChangeSetV2[changesets.WithMCMS[ActivateRMNCfg]] {
 	return cldf_deployment.CreateChangeSet(
 		func(e cldf_deployment.Environment, input changesets.WithMCMS[ActivateRMNCfg]) (cldf_deployment.ChangesetOutput, error) {
-			return applyActivateRMN(e, mcmsRegistry, input)
+			return applyDeployAndActivateRMN(e, mcmsRegistry, input)
 		},
 		validateActivateRMN,
 	)
@@ -45,7 +45,7 @@ func validateActivateRMN(e cldf_deployment.Environment, input changesets.WithMCM
 	return nil
 }
 
-func applyActivateRMN(
+func applyDeployAndActivateRMN(
 	e cldf_deployment.Environment,
 	mcmsRegistry *changesets.MCMSReaderRegistry,
 	input changesets.WithMCMS[ActivateRMNCfg],
@@ -58,7 +58,7 @@ func applyActivateRMN(
 		chain := evmChains[sel]
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(sel))
 
-		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.ActivateRMN, chain, sequences.ActivateRMNInput{
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployAndActivateRMN, chain, sequences.ActivateRMNInput{
 			ChainSelector:     sel,
 			ExistingAddresses: addresses,
 		})
