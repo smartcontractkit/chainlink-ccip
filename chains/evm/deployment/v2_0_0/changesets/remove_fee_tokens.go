@@ -3,7 +3,6 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -12,9 +11,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
-	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fq1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -64,18 +61,6 @@ var RemoveFeeTokens = changesets.NewFromOnChainSequence(changesets.NewFromOnChai
 func resolveRemoveFeeTokensPerChain(e cldf_deployment.Environment, chainSel uint64) (sequences.RemoveFeeTokensPerChainInput, error) {
 	addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
 
-	routerRefs := e.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(chainSel),
-		datastore.AddressRefByType(datastore.ContractType(routerops.ContractType)),
-		datastore.AddressRefByVersion(routerops.Version),
-	)
-	if len(routerRefs) != 1 {
-		return sequences.RemoveFeeTokensPerChainInput{}, fmt.Errorf(
-			"expected exactly one Router v%s on chain %d, found %d",
-			routerops.Version, chainSel, len(routerRefs),
-		)
-	}
-
 	fq20Ref := datastore_utils.GetAddressRef(
 		addresses,
 		chainSel,
@@ -87,21 +72,12 @@ func resolveRemoveFeeTokensPerChain(e cldf_deployment.Environment, chainSel uint
 		return sequences.RemoveFeeTokensPerChainInput{}, fmt.Errorf("no FeeQuoter v%s found on chain selector %d", fqops.Version, chainSel)
 	}
 
-	laneResolver := &adapters1_2.LaneVersionResolver{}
-	_, laneVersions, err := laneResolver.DeriveLaneVersionsForChain(e, chainSel)
-	if err != nil {
-		return sequences.RemoveFeeTokensPerChainInput{}, fmt.Errorf(
-			"failed to derive lane versions for chain %d from router %s: %w",
-			chainSel, routerRefs[0].Address, err,
-		)
-	}
-
 	chain, ok := e.BlockChains.EVMChains()[chainSel]
 	if !ok {
 		return sequences.RemoveFeeTokensPerChainInput{}, fmt.Errorf("chain selector %d not found in environment EVM chains", chainSel)
 	}
 
-	legacyFeeTokens, err := collectLegacyFeeTokens(e, chain, addresses, laneVersions)
+	legacyFeeTokens, err := collectLegacyFeeTokens(e, chain, addresses)
 	if err != nil {
 		return sequences.RemoveFeeTokensPerChainInput{}, err
 	}
@@ -122,52 +98,22 @@ func collectLegacyFeeTokens(
 	e cldf_deployment.Environment,
 	chain evm.Chain,
 	addresses []datastore.AddressRef,
-	laneVersions []*semver.Version,
 ) ([]common.Address, error) {
-	var hasV15, hasV16 bool
-	for _, version := range laneVersions {
-		if version.Major() == 1 && version.Minor() == 5 {
-			hasV15 = true
-		}
-		if version.Major() == 1 && version.Minor() == 6 {
-			hasV16 = true
-		}
-	}
-
-	if !hasV15 && !hasV16 {
-		return []common.Address{}, fmt.Errorf("no legacy fee tokens found")
-	}
-
 	legacySet := make(map[common.Address]struct{})
-
-	if hasV15 {
-		priceRegistryRef := datastore_utils.GetAddressRef(
-			addresses,
-			chain.Selector,
-			priceregistryops.ContractType,
-			priceregistryops.Version,
-			"",
-		)
-		if datastore_utils.IsAddressRefEmpty(priceRegistryRef) {
-			return nil, fmt.Errorf("no PriceRegistry v%s found on chain selector %d for 1.5 lanes",
-				priceregistryops.Version, chain.Selector)
-		}
-
-		feeTokens, err := queryPriceRegistryFeeTokens(e, chain, common.HexToAddress(priceRegistryRef.Address))
-		if err != nil {
-			return nil, err
-		}
-		for _, token := range feeTokens {
-			legacySet[token] = struct{}{}
+	var hasFQ16 bool
+	for _, address := range addresses {
+		if address.Type == datastore.ContractType(fq1_6ops.ContractType) {
+			if address.Version.Major() == 1 {
+				hasFQ16 = true
+			}
 		}
 	}
-
-	if hasV16 {
+	// if there is FQ 1.6.x query the feetoken from fq 1.6.x
+	if hasFQ16 {
 		fq16Ref, err := seq1_6.GetFeeQuoterAddress(addresses, chain.Selector, fqops.Version)
 		if err != nil {
 			return nil, fmt.Errorf("no FeeQuoter v1.6.x found on chain selector %d for 1.6 lanes: %w", chain.Selector, err)
 		}
-
 		feeTokens, err := queryFeeQuoter16FeeTokens(e, chain, common.HexToAddress(fq16Ref.Address))
 		if err != nil {
 			return nil, err
@@ -175,13 +121,26 @@ func collectLegacyFeeTokens(
 		for _, token := range feeTokens {
 			legacySet[token] = struct{}{}
 		}
+		return feeTokens, nil
+	}
+	// if no fq is found fallback to price registry
+	priceRegistryRef := datastore_utils.GetAddressRef(
+		addresses,
+		chain.Selector,
+		priceregistryops.ContractType,
+		priceregistryops.Version,
+		"",
+	)
+	if datastore_utils.IsAddressRefEmpty(priceRegistryRef) {
+		return nil, fmt.Errorf("neither PriceRegistry v%s nor FeeQuoter 1.6.x found on chain selector %d",
+			priceregistryops.Version, chain.Selector)
 	}
 
-	legacyFeeTokens := make([]common.Address, 0, len(legacySet))
-	for token := range legacySet {
-		legacyFeeTokens = append(legacyFeeTokens, token)
+	feeTokens, err := queryPriceRegistryFeeTokens(e, chain, common.HexToAddress(priceRegistryRef.Address))
+	if err != nil {
+		return nil, err
 	}
-	return legacyFeeTokens, nil
+	return feeTokens, nil
 }
 
 func queryPriceRegistryFeeTokens(e cldf_deployment.Environment, chain evm.Chain, priceRegistry common.Address) ([]common.Address, error) {
