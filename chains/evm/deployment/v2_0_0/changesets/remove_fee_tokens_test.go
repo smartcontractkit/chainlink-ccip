@@ -10,6 +10,7 @@ import (
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -94,6 +95,25 @@ func TestRemoveFeeTokens_RemovesExtraFeeTokensFromFeeQuoter20(t *testing.T) {
 		require.True(t, containsAllAddresses(afterTokens, legacyLinkToken, legacyWethToken))
 		require.False(t, containsAnyAddress(afterTokens, extraFeeToken1, extraFeeToken2))
 	}
+
+	hook := changesets.RemoveFeeTokensPostProposalHook()
+	require.Equal(t, changesets.RemoveFeeTokensPostProposalHookName, hook.Name)
+	err = hook.Func(t.Context(), cldf_changeset.PostProposalHookParams{
+		Env: cldf_changeset.ProposalHookEnv{
+			Name:        e.Name,
+			Logger:      e.Logger,
+			BlockChains: e.BlockChains,
+			DataStore:   e.DataStore,
+		},
+		Config: changesets.RemoveFeeTokensCfg{
+			ChainSels: []uint64{
+				removeFeeTokensFQ16ChainSel,
+				removeFeeTokensPRChainSel,
+				removeFeeTokensFQ16MultiChainSel,
+			},
+		},
+	})
+	require.NoError(t, err)
 }
 
 func deployRemoveFeeTokensFixtureWithFeeQuoter16(
