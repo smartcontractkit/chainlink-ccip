@@ -56,6 +56,22 @@ func verifyRemoveFeeTokens(ctx context.Context, params changeset.PostProposalHoo
 		return fmt.Errorf("%s: no chain selectors in config", RemoveFeeTokensPostProposalHookName)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, hookTimeout)
+	defer cancel()
+	cldfEnv := cldf_deployment.NewEnvironment(
+		params.Env.Name,
+		params.Env.Logger,
+		nil,
+		params.Env.DataStore,
+		nil,
+		nil,
+		func() context.Context {
+			return ctx
+		},
+		ocr.OCRSecrets{},
+		params.Env.BlockChains,
+	)
+
 	var errs []error
 	for _, chainSel := range cfg.ChainSels {
 		chain, ok := params.Env.BlockChains.EVMChains()[chainSel]
@@ -63,7 +79,7 @@ func verifyRemoveFeeTokens(ctx context.Context, params changeset.PostProposalHoo
 			errs = append(errs, fmt.Errorf("chain selector %d not found in environment EVM chains", chainSel))
 			continue
 		}
-		if err := verifyRemoveFeeTokensOnChain(params.Env, params.Env.DataStore, chain); err != nil {
+		if err := verifyRemoveFeeTokensOnChain(*cldfEnv, chain); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -87,7 +103,8 @@ func resolveRemoveFeeTokensCfg(config any) (RemoveFeeTokensCfg, error) {
 	return cfg, nil
 }
 
-func verifyRemoveFeeTokensOnChain(env changeset.ProposalHookEnv, ds datastore.DataStore, chain evm.Chain) error {
+func verifyRemoveFeeTokensOnChain(env cldf_deployment.Environment, chain evm.Chain) error {
+	ds := env.DataStore
 	addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(chain.Selector))
 
 	fq20Ref := datastore_utils.GetAddressRef(
@@ -100,28 +117,13 @@ func verifyRemoveFeeTokensOnChain(env changeset.ProposalHookEnv, ds datastore.Da
 	if datastore_utils.IsAddressRefEmpty(fq20Ref) {
 		return fmt.Errorf("no FeeQuoter v%s found on chain selector %d", fqops.Version, chain.Selector)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), hookTimeout)
-	defer cancel()
-	cldfEnv := cldf_deployment.NewEnvironment(
-		env.Name,
-		env.Logger,
-		nil,
-		env.DataStore,
-		nil,
-		nil,
-		func() context.Context {
-			return ctx
-		},
-		ocr.OCRSecrets{},
-		env.BlockChains,
-	)
 
-	legacyFeeTokens, err := collectLegacyFeeTokens(*cldfEnv, chain, addresses)
+	legacyFeeTokens, err := collectLegacyFeeTokens(env, chain, addresses)
 	if err != nil {
 		return err
 	}
 
-	fq20Tokens, err := queryFeeQuoter20FeeTokens(*cldfEnv, chain, common.HexToAddress(fq20Ref.Address))
+	fq20Tokens, err := queryFeeQuoter20FeeTokens(env, chain, common.HexToAddress(fq20Ref.Address))
 	if err != nil {
 		return err
 	}
