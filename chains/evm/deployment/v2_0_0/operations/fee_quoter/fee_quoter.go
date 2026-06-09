@@ -127,6 +127,20 @@ func (c *FeeQuoterContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]comm
 	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
 }
 
+func (c *FeeQuoterContract) GetFeeTokens(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getFeeTokens")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
+func (c *FeeQuoterContract) RemoveFeeTokens(opts *bind.TransactOpts, args []common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "removeFeeTokens", args)
+}
+
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
@@ -355,5 +369,34 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
+	},
+})
+
+var GetFeeTokens = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-fee-tokens",
+	Version:      Version,
+	Description:  "Calls getFeeTokens on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetFeeTokens(opts)
+	},
+})
+
+var RemoveFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address, *FeeQuoterContract]{
+	Name:            "fee-quoter:remove-fee-tokens",
+	Version:         Version,
+	Description:     "Calls removeFeeTokens on the contract",
+	ContractType:    ContractType,
+	ContractABI:     FeeQuoterABI,
+	NewContract:     NewFeeQuoterContract,
+	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, []common.Address],
+	Validate:        func([]common.Address) error { return nil },
+	CallContract: func(
+		c *FeeQuoterContract,
+		opts *bind.TransactOpts,
+		args []common.Address,
+	) (*types.Transaction, error) {
+		return c.RemoveFeeTokens(opts, args)
 	},
 })

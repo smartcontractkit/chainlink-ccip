@@ -36,6 +36,8 @@ contracts:
         access: owner
       - name: applyTokenTransferFeeConfigUpdates
         access: owner
+      - name: applyFeeTokensUpdates
+        access: owner
       - name: getDestChainConfig
         access: public
       - name: getTokenTransferFeeConfig
@@ -185,6 +187,8 @@ contracts:
         access: owner
       - name: applyTokenTransferFeeConfigUpdates
         access: owner
+      - name: applyFeeTokensUpdates
+        access: owner
       - name: getDestChainConfig
         access: public
       - name: getTokenTransferFeeConfig
@@ -254,6 +258,10 @@ contracts:
         access: public
       - name: getAllAuthorizedCallers
         access: public
+      - name: getFeeTokens
+        access: public
+      - name: removeFeeTokens
+        access: owner
 
   - contract_name: CrossChainToken
     version: "2.0.0"

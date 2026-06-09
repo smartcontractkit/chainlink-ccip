@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
@@ -209,25 +208,13 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			}
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for chain %d (%s)", chainSelector, evmChain.Name())
-			allTokens := make(map[common.Address]struct{})
-			for _, tokens := range in.TokensPerRemoteChain {
-				for _, token := range tokens {
-					if token == (common.Address{}) {
-						continue
-					}
-					if _, exists := allTokens[token]; !exists {
-						allTokens[token] = struct{}{}
-					}
-				}
-			}
 			var result sequences.OnChainOutput
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				sequences1_2.PriceRegistryImportConfigSequence,
 				sequences1_2.PriceRegistryImportConfigSequenceInput{
-					ChainSelector:   chainSelector,
-					PriceRegistry:   ci.PriceRegistry,
-					SupportedTokens: maps.Keys(allTokens),
-					RemoteChains:    in.RemoteChains,
+					ChainSelector: chainSelector,
+					PriceRegistry: ci.PriceRegistry,
+					RemoteChains:  in.RemoteChains,
 				}, result)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import price registry config for chain %d: %w", chainSelector, err)
