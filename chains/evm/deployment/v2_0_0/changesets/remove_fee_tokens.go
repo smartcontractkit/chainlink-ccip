@@ -1,13 +1,19 @@
 package changesets
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/go-viper/mapstructure/v2"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
+	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -16,8 +22,13 @@ import (
 	fq1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+)
+
+const (
+	RemoveFeeTokensPostProposalHookName = "verify-remove-fee-tokens"
+	hookTimeout                         = 5 * time.Minute
 )
 
 // RemoveFeeTokensCfg is configuration for the RemoveFeeTokens changeset.
@@ -25,7 +36,122 @@ type RemoveFeeTokensCfg struct {
 	ChainSels []uint64
 }
 
-var RemoveFeeTokens = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
+func RemoveFeeTokensPostProposalHook() changeset.PostProposalHook {
+	return changeset.PostProposalHook{
+		HookDefinition: changeset.HookDefinition{
+			Name:          RemoveFeeTokensPostProposalHookName,
+			FailurePolicy: changeset.Abort,
+			Timeout:       hookTimeout,
+		},
+		Func: verifyRemoveFeeTokens,
+	}
+}
+
+func verifyRemoveFeeTokens(ctx context.Context, params changeset.PostProposalHookParams) error {
+	cfg, err := resolveRemoveFeeTokensCfg(params.Config)
+	if err != nil {
+		return fmt.Errorf("%s: %w", RemoveFeeTokensPostProposalHookName, err)
+	}
+	if len(cfg.ChainSels) == 0 {
+		return fmt.Errorf("%s: no chain selectors in config", RemoveFeeTokensPostProposalHookName)
+	}
+
+	var errs []error
+	for _, chainSel := range cfg.ChainSels {
+		chain, ok := params.Env.BlockChains.EVMChains()[chainSel]
+		if !ok {
+			errs = append(errs, fmt.Errorf("chain selector %d not found in environment EVM chains", chainSel))
+			continue
+		}
+		if err := verifyRemoveFeeTokensOnChain(params.Env, params.Env.DataStore, chain); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func resolveRemoveFeeTokensCfg(config any) (RemoveFeeTokensCfg, error) {
+	if cfg, ok := config.(RemoveFeeTokensCfg); ok {
+		return cfg, nil
+	}
+
+	var withMCMS cs_core.WithMCMS[RemoveFeeTokensCfg]
+	if err := mapstructure.Decode(config, &withMCMS); err == nil && len(withMCMS.Cfg.ChainSels) > 0 {
+		return withMCMS.Cfg, nil
+	}
+
+	var cfg RemoveFeeTokensCfg
+	if err := mapstructure.Decode(config, &cfg); err != nil {
+		return RemoveFeeTokensCfg{}, fmt.Errorf("decode config: %w", err)
+	}
+	return cfg, nil
+}
+
+func verifyRemoveFeeTokensOnChain(env changeset.ProposalHookEnv, ds datastore.DataStore, chain evm.Chain) error {
+	addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(chain.Selector))
+
+	fq20Ref := datastore_utils.GetAddressRef(
+		addresses,
+		chain.Selector,
+		fqops.ContractType,
+		fqops.Version,
+		"",
+	)
+	if datastore_utils.IsAddressRefEmpty(fq20Ref) {
+		return fmt.Errorf("no FeeQuoter v%s found on chain selector %d", fqops.Version, chain.Selector)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), hookTimeout)
+	defer cancel()
+	cldfEnv := cldf_deployment.NewEnvironment(
+		env.Name,
+		env.Logger,
+		nil,
+		env.DataStore,
+		nil,
+		nil,
+		func() context.Context {
+			return ctx
+		},
+		ocr.OCRSecrets{},
+		env.BlockChains,
+	)
+
+	legacyFeeTokens, err := collectLegacyFeeTokens(*cldfEnv, chain, addresses)
+	if err != nil {
+		return err
+	}
+
+	fq20Tokens, err := queryFeeQuoter20FeeTokens(*cldfEnv, chain, common.HexToAddress(fq20Ref.Address))
+	if err != nil {
+		return err
+	}
+
+	if !feeTokenSetsEqual(fq20Tokens, legacyFeeTokens) {
+		return fmt.Errorf(
+			"FeeQuoter 2.0 fee tokens on chain %d do not match legacy fee tokens: fq20=%v legacy=%v",
+			chain.Selector, fq20Tokens, legacyFeeTokens,
+		)
+	}
+	return nil
+}
+
+func feeTokenSetsEqual(a, b []common.Address) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := make(map[common.Address]struct{}, len(a))
+	for _, token := range a {
+		set[token] = struct{}{}
+	}
+	for _, token := range b {
+		if _, exists := set[token]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+var RemoveFeeTokens = cs_core.NewFromOnChainSequence(cs_core.NewFromOnChainSequenceParams[
 	sequences.RemoveFeeTokensInput,
 	cldf_chain.BlockChains,
 	RemoveFeeTokensCfg,
