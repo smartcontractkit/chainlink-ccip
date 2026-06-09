@@ -711,7 +711,6 @@ var SequenceRemoveFeeTokens = cldf_ops.NewSequence(
 	semver.MustParse("2.0.0"),
 	"Removes fee tokens from FeeQuoter 2.0",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input RemoveFeeTokensInput) (output sequences.OnChainOutput, err error) {
-		writes := make([]contract.WriteOutput, 0)
 		for _, chainInput := range input.ChainUpdates {
 			if len(chainInput.FeeTokensToRemove) == 0 {
 				continue
@@ -743,18 +742,14 @@ var SequenceRemoveFeeTokens = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove fee tokens from FeeQuoter(%s) on chain %s: %w",
 					fqAddr.Hex(), chain, err)
 			}
-			writes = append(writes, removeReport.Output)
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{
+				removeReport.Output,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			output.BatchOps = append(output.BatchOps, batchOp)
 		}
-
-		if len(writes) == 0 {
-			return sequences.OnChainOutput{}, nil
-		}
-
-		batch, err := contract.NewBatchOperationFromWrites(writes)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-		}
-		output.BatchOps = append(output.BatchOps, batch)
 		return output, nil
 	},
 )
