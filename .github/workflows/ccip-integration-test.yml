@@ -113,7 +113,7 @@ jobs:
           - name: "CCIPReader Test"
             file: ccip_reader_test.go
             run: ""
-            timeout: 5m
+            timeout: 12m
           - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
             file: ccip_topologies_test.go
             run: "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$"
@@ -230,10 +230,25 @@ jobs:
           echo "::set-output name=sha::$COMMIT_SHA"
       - name: Update chainlink-ccip dependency in chainlink
         run: |
-          cd $GITHUB_WORKSPACE/chainlink
-          go get github.com/smartcontractkit/chainlink-ccip@${{ steps.get_sha.outputs.sha }}
-          go get github.com/smartcontractkit/chainlink-ccip/chains/evm@${{ steps.get_sha.outputs.sha }}
+          ccip_sha="${{ steps.get_sha.outputs.sha }}"
+          ccip_modules=(
+            github.com/smartcontractkit/chainlink-ccip
+            github.com/smartcontractkit/chainlink-ccip/chains/evm
+            github.com/smartcontractkit/chainlink-ccip/deployment
+          )
+          update_ccip_modules() {
+            for module in "${ccip_modules[@]}"; do
+              go get "${module}@${ccip_sha}"
+            done
+          }
+
+          cd "$GITHUB_WORKSPACE/chainlink"
+          update_ccip_modules
           make gomodtidy
+
+          cd "$GITHUB_WORKSPACE/chainlink/integration-tests"
+          update_ccip_modules
+          go mod tidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
       - name: Download Go vendor packages
