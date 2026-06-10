@@ -3,6 +3,7 @@ package erc20_lock_box
 import (
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -44,12 +45,7 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 		if err != nil {
 			return false, err
 		}
-		for _, authorized := range callers {
-			if authorized == caller {
-				return true, nil
-			}
-		}
-		return false, nil
+		return slices.Contains(callers, caller), nil
 	},
 	Validate: func(args DepositArgs) error {
 		if args.Amount == nil || args.Amount.Sign() <= 0 {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -218,11 +219,8 @@ var (
 			}
 
 			// update price (gas and token prices batched to avoid block gas limit; paired by step index)
-			priceUpdateSteps := len(gasPriceUpdateBatches)
-			if len(tokenPriceUpdateBatches) > priceUpdateSteps {
-				priceUpdateSteps = len(tokenPriceUpdateBatches)
-			}
-			for i := 0; i < priceUpdateSteps; i++ {
+			priceUpdateSteps := max(len(tokenPriceUpdateBatches), len(gasPriceUpdateBatches))
+			for i := range priceUpdateSteps {
 				var gasBatch []fqops.GasPriceUpdate
 				if i < len(gasPriceUpdateBatches) {
 					gasBatch = gasPriceUpdateBatches[i]
@@ -984,64 +982,30 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 	return output, nil
 }
 
+func batched[T any](items []T, batchLen int) [][]T {
+	if len(items) == 0 {
+		return nil
+	}
+	if len(items) <= batchLen {
+		return [][]T{items}
+	}
+	return slices.Collect(slices.Chunk(items, batchLen))
+}
+
 func batchedDestChainConfigArgs(destChainConfigs []fqops.DestChainConfigArgs) [][]fqops.DestChainConfigArgs {
-	var batches [][]fqops.DestChainConfigArgs
-	if len(destChainConfigs) <= DestChainConfigUpdateBatchLen {
-		return append(batches, destChainConfigs)
-	}
-	for i := 0; i < len(destChainConfigs); i += DestChainConfigUpdateBatchLen {
-		end := i + DestChainConfigUpdateBatchLen
-		if end > len(destChainConfigs) {
-			end = len(destChainConfigs)
-		}
-		batches = append(batches, destChainConfigs[i:end])
-	}
-	return batches
+	return batched(destChainConfigs, DestChainConfigUpdateBatchLen)
 }
 
 func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigArgs) [][]fqops.TokenTransferFeeConfigArgs {
-	var batches [][]fqops.TokenTransferFeeConfigArgs
-	if len(tokenTransferFeeConfigArgs) <= TokenTransferFeeConfigUpdateBatchLen {
-		return append(batches, tokenTransferFeeConfigArgs)
-	}
-	for i := 0; i < len(tokenTransferFeeConfigArgs); i += TokenTransferFeeConfigUpdateBatchLen {
-		end := i + TokenTransferFeeConfigUpdateBatchLen
-		if end > len(tokenTransferFeeConfigArgs) {
-			end = len(tokenTransferFeeConfigArgs)
-		}
-		batches = append(batches, tokenTransferFeeConfigArgs[i:end])
-	}
-	return batches
+	return batched(tokenTransferFeeConfigArgs, TokenTransferFeeConfigUpdateBatchLen)
 }
 
 func batchedGasPriceUpdates(gasPriceUpdates []fqops.GasPriceUpdate) [][]fqops.GasPriceUpdate {
-	var batches [][]fqops.GasPriceUpdate
-	if len(gasPriceUpdates) <= GasPriceUpdateBatchLen {
-		return append(batches, gasPriceUpdates)
-	}
-	for i := 0; i < len(gasPriceUpdates); i += GasPriceUpdateBatchLen {
-		end := i + GasPriceUpdateBatchLen
-		if end > len(gasPriceUpdates) {
-			end = len(gasPriceUpdates)
-		}
-		batches = append(batches, gasPriceUpdates[i:end])
-	}
-	return batches
+	return batched(gasPriceUpdates, GasPriceUpdateBatchLen)
 }
 
 func batchedTokenPriceUpdates(tokenPriceUpdates []fqops.TokenPriceUpdate) [][]fqops.TokenPriceUpdate {
-	var batches [][]fqops.TokenPriceUpdate
-	if len(tokenPriceUpdates) <= TokenPriceUpdateBatchLen {
-		return append(batches, tokenPriceUpdates)
-	}
-	for i := 0; i < len(tokenPriceUpdates); i += TokenPriceUpdateBatchLen {
-		end := i + TokenPriceUpdateBatchLen
-		if end > len(tokenPriceUpdates) {
-			end = len(tokenPriceUpdates)
-		}
-		batches = append(batches, tokenPriceUpdates[i:end])
-	}
-	return batches
+	return batched(tokenPriceUpdates, TokenPriceUpdateBatchLen)
 }
 
 type BatchedFeeQuoterUpdate struct {

@@ -104,8 +104,6 @@ type laneContracts struct {
 	addresses                 []datastore.AddressRef
 }
 
-func boolPtr(v bool) *bool { return &v }
-
 func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_evm.Chain, chainSelector uint64) laneContracts {
 	t.Helper()
 
@@ -197,7 +195,7 @@ func buildConfigureChainForLanesInput(
 		},
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:    boolPtr(true),
+				AllowTrafficFrom:    new(true),
 				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
 				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultExecutor:     local.executor,
