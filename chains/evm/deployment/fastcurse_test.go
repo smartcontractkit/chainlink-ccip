@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -160,7 +159,7 @@ func TestFastCurse(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        new("test"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			chain2: {
@@ -168,7 +167,7 @@ func TestFastCurse(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        new("test"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
@@ -446,7 +445,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			Bypasser:         testhelpers.SingleGroupMCMS(),
 			Proposer:         testhelpers.SingleGroupMCMS(),
 			TimelockMinDelay: big.NewInt(0),
-			Qualifier:        ptr.String("test"),
+			Qualifier:        new("test"),
 			TimelockAdmin:    evmChain.DeployerKey.From,
 		}
 	}

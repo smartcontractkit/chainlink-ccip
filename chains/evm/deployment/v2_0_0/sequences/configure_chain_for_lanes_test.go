@@ -31,10 +31,6 @@ import (
 
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
 
-func boolPtr(v bool) *bool { return &v }
-
-func uint32Ptr(v uint32) *uint32 { return &v }
-
 type deployedContracts struct {
 	router                    string
 	onRamp                    string
@@ -127,7 +123,7 @@ func buildConfigureChainForLanesInput(
 		},
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:         boolPtr(true),
+				AllowTrafficFrom:         new(true),
 				OnRamps:                  [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
 				OffRamp:                  common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultExecutor:          local.executor,
@@ -536,7 +532,7 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 
 	input := buildConfigureChainForLanesInput(local, chainSelector, remoteAContracts, remoteA)
 	input.RemoteChains[remoteB] = changesetadapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:    boolPtr(true),
+		AllowTrafficFrom:    new(true),
 		OnRamps:             [][]byte{common.HexToAddress(remoteBContracts.onRamp).Bytes()},
 		OffRamp:             common.HexToAddress(remoteBContracts.offRamp).Bytes(),
 		DefaultExecutor:     local.executor,
@@ -544,12 +540,12 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 		DefaultOutboundCCVs: []string{local.committeeVerifier},
 		FeeQuoterDestChainConfig: func() changesetadapters.FeeQuoterDestChainConfigOverrides {
 			cfg := testsetup.CreateBasicFeeQuoterDestChainConfigOverrides()
-			cfg.MaxDataBytes = uint32Ptr(50_000)
-			cfg.MaxPerMsgGasLimit = uint32Ptr(5_000_000)
-			cfg.DestGasOverhead = uint32Ptr(400_000)
+			cfg.MaxDataBytes = new(uint32(50_000))
+			cfg.MaxPerMsgGasLimit = new(uint32(5_000_000))
+			cfg.DestGasOverhead = new(uint32(400_000))
 			cfg.DefaultTokenFeeUSDCents = func() *uint16 { v := uint16(30); return &v }()
-			cfg.DefaultTokenDestGasOverhead = uint32Ptr(100_000)
-			cfg.DefaultTxGasLimit = uint32Ptr(250_000)
+			cfg.DefaultTokenDestGasOverhead = new(uint32(100_000))
+			cfg.DefaultTxGasLimit = new(uint32(250_000))
 			cfg.NetworkFeeUSDCents = func() *uint16 { v := uint16(20); return &v }()
 			return cfg
 		}(),
@@ -747,7 +743,7 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 		OffRamp:       addrBytes(local.offRamp),
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
-				AllowTrafficFrom:     boolPtr(true),
+				AllowTrafficFrom:     new(true),
 				OnRamps:              [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
 				OffRamp:              common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultInboundCCVs:   []string{local.committeeVerifier},
@@ -755,7 +751,7 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 				BaseExecutionGasCost: 120_000,
 				FeeQuoterDestChainConfig: changesetadapters.FeeQuoterDestChainConfigOverrides{
 					OverrideExistingConfig: true,
-					DestGasOverhead:        uint32Ptr(500_000),
+					DestGasOverhead:        new(uint32(500_000)),
 					ChainFamilySelector:    evmFamilySelector,
 				},
 				DefaultExecutor: local.executor,
@@ -825,7 +821,7 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 	noOverrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
 	rc := noOverrideInput.RemoteChains[remoteSelector]
 	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = false
-	rc.FeeQuoterDestChainConfig.MaxDataBytes = uint32Ptr(99_000)
+	rc.FeeQuoterDestChainConfig.MaxDataBytes = new(uint32(99_000))
 	noOverrideInput.RemoteChains[remoteSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -845,7 +841,7 @@ func TestConfigureChainForLanes_OverrideExistingFeeQuoterConfig(t *testing.T) {
 	overrideInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteSelector)
 	rc = overrideInput.RemoteChains[remoteSelector]
 	rc.FeeQuoterDestChainConfig.OverrideExistingConfig = true
-	rc.FeeQuoterDestChainConfig.MaxDataBytes = uint32Ptr(99_000)
+	rc.FeeQuoterDestChainConfig.MaxDataBytes = new(uint32(99_000))
 	overrideInput.RemoteChains[remoteSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -976,7 +972,7 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseDisablesTraffic(t *testing.
 
 	disabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
 	rc := disabledInput.RemoteChains[remoteChainSelector]
-	rc.AllowTrafficFrom = boolPtr(false)
+	rc.AllowTrafficFrom = new(false)
 	disabledInput.RemoteChains[remoteChainSelector] = rc
 
 	_, err = operations.ExecuteSequence(
@@ -1008,7 +1004,7 @@ func TestConfigureChainForLanes_AllowTrafficFromFalseToTrueEnablesTraffic(t *tes
 
 	disabledInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
 	rc := disabledInput.RemoteChains[remoteChainSelector]
-	rc.AllowTrafficFrom = boolPtr(false)
+	rc.AllowTrafficFrom = new(false)
 	disabledInput.RemoteChains[remoteChainSelector] = rc
 
 	_, err = operations.ExecuteSequence(

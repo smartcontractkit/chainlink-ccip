@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -316,39 +317,40 @@ func DecodeTokenTransferV1(encoded []byte, offset int) (*TokenTransferV1, int, e
 
 // PrettyPrintMessage formats a decoded message for readable output
 func PrettyPrintMessage(msg *MessageV1) string {
-	s := "=== CCIP Message V1 ===\n\n"
-	s += fmt.Sprintf("  Version:               %d\n", msg.Version)
-	s += fmt.Sprintf("  Source Chain Selector: %d (0x%x)\n", msg.SourceChainSelector, msg.SourceChainSelector)
-	s += fmt.Sprintf("  Dest Chain Selector:   %d (0x%x)\n", msg.DestChainSelector, msg.DestChainSelector)
-	s += fmt.Sprintf("  Sequence Number:       %d\n", msg.SequenceNumber)
-	s += fmt.Sprintf("  Execution Gas Limit:   %d\n", msg.ExecutionGasLimit)
-	s += fmt.Sprintf("  Callback Gas Limit:    %d\n", msg.CallbackGasLimit)
-	s += fmt.Sprintf("  Finality:              %d\n", msg.Finality)
-	s += fmt.Sprintf("  CCV & Executor Hash:   0x%x\n", msg.CCVAndExecutorHash)
-	s += fmt.Sprintf("  OnRamp Address:        %s\n", formatAddress(msg.OnRampAddress))
-	s += fmt.Sprintf("  OffRamp Address:       %s\n", formatAddress(msg.OffRampAddress))
-	s += "\n"
-	s += fmt.Sprintf("  Sender:                %s\n", formatAddress(msg.Sender))
-	s += fmt.Sprintf("  Receiver:              %s\n", formatAddress(msg.Receiver))
-	s += fmt.Sprintf("  Dest Blob:             %s (%d bytes)\n", formatHex(msg.DestBlob), len(msg.DestBlob))
-	s += fmt.Sprintf("  Data Payload:          %s (%d bytes)\n", formatHex(msg.Data), len(msg.Data))
-	s += "\n"
+	var s strings.Builder
+	s.WriteString("=== CCIP Message V1 ===\n\n")
+	s.WriteString(fmt.Sprintf("  Version:               %d\n", msg.Version))
+	s.WriteString(fmt.Sprintf("  Source Chain Selector: %d (0x%x)\n", msg.SourceChainSelector, msg.SourceChainSelector))
+	s.WriteString(fmt.Sprintf("  Dest Chain Selector:   %d (0x%x)\n", msg.DestChainSelector, msg.DestChainSelector))
+	s.WriteString(fmt.Sprintf("  Sequence Number:       %d\n", msg.SequenceNumber))
+	s.WriteString(fmt.Sprintf("  Execution Gas Limit:   %d\n", msg.ExecutionGasLimit))
+	s.WriteString(fmt.Sprintf("  Callback Gas Limit:    %d\n", msg.CallbackGasLimit))
+	s.WriteString(fmt.Sprintf("  Finality:              %d\n", msg.Finality))
+	s.WriteString(fmt.Sprintf("  CCV & Executor Hash:   0x%x\n", msg.CCVAndExecutorHash))
+	s.WriteString(fmt.Sprintf("  OnRamp Address:        %s\n", formatAddress(msg.OnRampAddress)))
+	s.WriteString(fmt.Sprintf("  OffRamp Address:       %s\n", formatAddress(msg.OffRampAddress)))
+	s.WriteString("\n")
+	s.WriteString(fmt.Sprintf("  Sender:                %s\n", formatAddress(msg.Sender)))
+	s.WriteString(fmt.Sprintf("  Receiver:              %s\n", formatAddress(msg.Receiver)))
+	s.WriteString(fmt.Sprintf("  Dest Blob:             %s (%d bytes)\n", formatHex(msg.DestBlob), len(msg.DestBlob)))
+	s.WriteString(fmt.Sprintf("  Data Payload:          %s (%d bytes)\n", formatHex(msg.Data), len(msg.Data)))
+	s.WriteString("\n")
 
-	s += fmt.Sprintf("Token Transfers: %d\n", len(msg.TokenTransfers))
+	s.WriteString(fmt.Sprintf("Token Transfers: %d\n", len(msg.TokenTransfers)))
 	for i, tt := range msg.TokenTransfers {
-		s += fmt.Sprintf("\n  Token Transfer #%d:\n", i+1)
-		s += fmt.Sprintf("    Version:             %d\n", tt.Version)
-		s += fmt.Sprintf("    Amount:              %s (wei)\n", tt.Amount.String())
-		s += fmt.Sprintf("    Source Pool:         %s\n", formatAddress(tt.SourcePoolAddress))
-		s += fmt.Sprintf("    Source Token:        %s\n", formatAddress(tt.SourceTokenAddress))
-		s += fmt.Sprintf("    Dest Token:          %s\n", formatAddress(tt.DestTokenAddress))
-		s += fmt.Sprintf("    Token Receiver:      %s\n", formatAddress(tt.TokenReceiver))
-		s += fmt.Sprintf("    Extra Data:          %s (%d bytes)\n", formatHex(tt.ExtraData), len(tt.ExtraData))
+		s.WriteString(fmt.Sprintf("\n  Token Transfer #%d:\n", i+1))
+		s.WriteString(fmt.Sprintf("    Version:             %d\n", tt.Version))
+		s.WriteString(fmt.Sprintf("    Amount:              %s (wei)\n", tt.Amount.String()))
+		s.WriteString(fmt.Sprintf("    Source Pool:         %s\n", formatAddress(tt.SourcePoolAddress)))
+		s.WriteString(fmt.Sprintf("    Source Token:        %s\n", formatAddress(tt.SourceTokenAddress)))
+		s.WriteString(fmt.Sprintf("    Dest Token:          %s\n", formatAddress(tt.DestTokenAddress)))
+		s.WriteString(fmt.Sprintf("    Token Receiver:      %s\n", formatAddress(tt.TokenReceiver)))
+		s.WriteString(fmt.Sprintf("    Extra Data:          %s (%d bytes)\n", formatHex(tt.ExtraData), len(tt.ExtraData)))
 	}
 
-	s += "\n"
+	s.WriteString("\n")
 
-	return s
+	return s.String()
 }
 
 // formatAddress formats a byte slice as an Ethereum address or hex string
