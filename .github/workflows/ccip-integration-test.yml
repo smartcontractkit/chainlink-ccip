@@ -69,7 +69,7 @@ jobs:
             run: "^Test_CCIPMessaging_Solana2EVM$"
             timeout: 30m
             installLoopPlugins: true
-          - name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
+          - name: "Messaging Test Test_CCIPMessaging_MultiExecReports_EVM2Solana"
             run: "^Test_CCIPMessaging_MultiExecReports_EVM2Solana$"
             timeout: 35m
             installLoopPlugins: true
@@ -262,8 +262,13 @@ jobs:
         continue-on-error: true
         run: |
           cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
-          echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run '${{ matrix.type.run }}'"
-          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run "${{ matrix.type.run }}"
+          run="${{ matrix.type.run }}"
+          if ! go test -list "$run" . | grep -q '^Test'; then
+            echo "No tests matched -run '$run'"
+            exit 1
+          fi
+          echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run '${run}'"
+          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run "$run"
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
