@@ -69,9 +69,6 @@ func acceptOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *ch
 
 func acceptOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) error {
 	return func(e cldf.Environment, input TransferOwnershipInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }
@@ -104,6 +101,14 @@ func transferOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *
 			batchOps = append(batchOps, chainBatchOps...)
 			reports = append(reports, chainReports...)
 		}
+
+		// If MCMS fields are not populated, there will be no mcms proposal. Just return the reports
+		if err := validateMCMSForProposal(input.MCMS, batchOps); err != nil {
+			output := cldf.ChangesetOutput{}
+			output.Reports = reports
+			return output, nil
+		}
+
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithBatchOps(batchOps).
@@ -113,9 +118,6 @@ func transferOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *
 
 func transferOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) error {
 	return func(e cldf.Environment, input TransferOwnershipInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }
@@ -160,8 +162,10 @@ func transferAndAcceptOwnership(
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
 
-	if err := adapter.InitializeTimelockAddress(e, mcmsInput); err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize timelock address for chain %d: %w", input.ChainSelector, err)
+	if requiresMCMSProposal(mcmsInput) {
+		if err := adapter.InitializeTimelockAddress(e, mcmsInput); err != nil {
+			return nil, nil, fmt.Errorf("failed to initialize timelock address for chain %d: %w", input.ChainSelector, err)
+		}
 	}
 
 	transferReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SequenceTransferOwnershipViaMCMS(), e.BlockChains, input)
@@ -184,4 +188,17 @@ func transferAndAcceptOwnership(
 		reports = append(reports, acceptReport.ExecutionReports...)
 	}
 	return batchOps, reports, nil
+}
+
+// requiresMCMSProposal reports whether the input includes MCMS proposal configuration.
+// Direct EOA-to-EOA ownership transfers omit MCMS fields and execute on-chain immediately.
+func requiresMCMSProposal(input mcms.Input) bool {
+	return input.TimelockAction != ""
+}
+
+func validateMCMSForProposal(input mcms.Input, batchOps []mcms_types.BatchOperation) error {
+	if len(batchOps) == 0 {
+		return nil
+	}
+	return input.Validate()
 }
