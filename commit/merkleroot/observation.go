@@ -26,6 +26,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -52,30 +53,6 @@ func (p *Processor) ObservationQuorum(
 }
 
 const SendingObservation = "sending merkle root processor observation"
-
-const (
-	defaultChainRPCTimeout           = 10 * time.Second
-	chainRPCTimeoutOCRBudgetFraction = 0.8
-)
-
-// chainRPCTimeoutDuration returns the per-chain RPC timeout as
-// min(80% of remaining OCR budget, defaultChainRPCTimeout).
-func chainRPCTimeoutDuration(ctx context.Context) time.Duration {
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		return defaultChainRPCTimeout
-	}
-	remaining := time.Until(deadline)
-	if remaining <= 0 {
-		return 0
-	}
-	ocrBudget := time.Duration(float64(remaining) * chainRPCTimeoutOCRBudgetFraction)
-	return min(defaultChainRPCTimeout, ocrBudget)
-}
-
-func chainRPCContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, chainRPCTimeoutDuration(ctx))
-}
 
 // Observation makes external calls to observe information according to the current processor state.
 // According to the state it either observes sequence numbers, root hashes, RMN remote config, etc...
@@ -592,7 +569,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	slices.Sort(supportedSourceChains)
 
-	configCtx, configCancel := chainRPCContext(ctx)
+	configCtx, configCancel := rpctimeout.Context(ctx)
 	defer configCancel()
 	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(configCtx, supportedSourceChains)
 	if err != nil {
@@ -620,7 +597,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
 				return
 			}
-			chainCtx, chainCancel := chainRPCContext(ctx)
+			chainCtx, chainCancel := rpctimeout.Context(ctx)
 			defer chainCancel()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(chainCtx, sourceChain)
 			if err != nil {

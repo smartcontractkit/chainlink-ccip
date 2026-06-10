@@ -38,6 +38,7 @@ import (
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -570,8 +571,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		hungRPCChains := []cciptypes.ChainSelector{4, 7}
 		hungRPCSupported := mapset.NewSet(hungRPCChains...)
 
-		// Long parent deadline: without per-chain timeout, LatestMsgSeqNum would receive the
-		// full parent context (~30s). Timeout duration behavior is covered by Test_chainRPCTimeoutDuration.
+		// Long parent ctx: per-chain RPC must not inherit the full OCR deadline.
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -591,7 +591,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				case 4:
 					deadline, ok := callCtx.Deadline()
 					require.True(t, ok, "expected per-chain RPC context to have a deadline")
-					assert.LessOrEqual(t, time.Until(deadline), defaultChainRPCTimeout)
+					assert.LessOrEqual(t, time.Until(deadline), rpctimeout.Default)
 					return 0, context.DeadlineExceeded
 				case 7:
 					return 608, nil
@@ -611,41 +611,6 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 
 		result := o.ObserveLatestOnRampSeqNums(ctx)
 		assert.Equal(t, []plugintypes.SeqNumChain{plugintypes.NewSeqNumChain(7, 608)}, result)
-	})
-}
-
-func Test_chainRPCTimeoutDuration(t *testing.T) {
-	t.Parallel()
-
-	t.Run("uses default timeout without parent deadline", func(t *testing.T) {
-		t.Parallel()
-		assert.Equal(t, defaultChainRPCTimeout, chainRPCTimeoutDuration(context.Background()))
-	})
-
-	t.Run("caps at default timeout when OCR budget is larger", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-
-		assert.Equal(t, defaultChainRPCTimeout, chainRPCTimeoutDuration(ctx))
-	})
-
-	t.Run("caps at 80 percent of remaining OCR budget when tighter", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		defer cancel()
-
-		got := chainRPCTimeoutDuration(ctx)
-		want := time.Duration(float64(8*time.Second) * chainRPCTimeoutOCRBudgetFraction)
-		assert.InDelta(t, float64(want), float64(got), float64(50*time.Millisecond))
-	})
-
-	t.Run("returns zero when parent deadline has expired", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
-		defer cancel()
-
-		assert.Equal(t, time.Duration(0), chainRPCTimeoutDuration(ctx))
 	})
 }
 
