@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -53,6 +54,63 @@ func rmnSetEventAuthoritiesApply(e cldf.Environment, input RMNRemoteSetEventAuth
 	reports = append(reports, report.ExecutionReports...)
 
 	// Create the datastore with the addresses from the report
+	ds := datastore.NewMemoryDataStore()
+	for _, addr := range report.Output.Addresses {
+		if err := ds.Addresses().Add(addr); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to add address to datastore: %w", err)
+		}
+	}
+
+	return changesets.
+		NewOutputBuilder(e, changesets.GetRegistry()).
+		WithReports(reports).
+		WithDataStore(ds).
+		WithBatchOps(report.Output.BatchOps).
+		Build(input.MCMS)
+}
+
+type RMNRemoteSetCurserChangesetInput struct {
+	ChainSelector uint64           `json:"chainSelector"`
+	Curser        solana.PublicKey `json:"curser"`
+	MCMS          mcms.Input       `json:"mcms"`
+}
+
+func RMNRemoteSetCurserChangeset() cldf.ChangeSetV2[RMNRemoteSetCurserChangesetInput] {
+	return cldf.CreateChangeSet(rmnSetCurserApply, rmnSetCurserVerify)
+}
+
+func rmnSetCurserVerify(env cldf.Environment, input RMNRemoteSetCurserChangesetInput) error {
+	if err := cldf.IsValidChainSelector(input.ChainSelector); err != nil {
+		return fmt.Errorf("invalid chain selector: %d - %w", input.ChainSelector, err)
+	}
+	if !env.BlockChains.Exists(input.ChainSelector) {
+		return fmt.Errorf("chain with selector %d does not exist", input.ChainSelector)
+	}
+	if input.Curser.IsZero() {
+		return fmt.Errorf("curser public key must not be zero")
+	}
+	if err := input.MCMS.Validate(); err != nil {
+		return fmt.Errorf("invalid MCMS configuration: %w", err)
+	}
+	return nil
+}
+
+func rmnSetCurserApply(e cldf.Environment, input RMNRemoteSetCurserChangesetInput) (cldf.ChangesetOutput, error) {
+	reports := make([]cldf_ops.Report[any, any], 0)
+
+	seqInput := sequences.RMNRemoteSetCurserSequenceInput{
+		DataStore: e.DataStore,
+		Curser:    input.Curser,
+		Selector:  input.ChainSelector,
+	}
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.SetRMNRemoteCurser, e.BlockChains, seqInput)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rmn curser: %w", err)
+	}
+
+	reports = append(reports, report.ExecutionReports...)
+
 	ds := datastore.NewMemoryDataStore()
 	for _, addr := range report.Output.Addresses {
 		if err := ds.Addresses().Add(addr); err != nil {

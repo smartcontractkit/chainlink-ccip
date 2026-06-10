@@ -2145,7 +2145,8 @@ func TestCCIPRouter(t *testing.T) {
 							Timestamp: validTimestamp,
 						},
 						PremiumMultiplierWeiPerEth: 9000000,
-					}},
+					},
+				},
 				{
 					Accounts: link22,
 					Config: fee_quoter.BillingTokenConfig{
@@ -2156,7 +2157,8 @@ func TestCCIPRouter(t *testing.T) {
 							Timestamp: validTimestamp,
 						},
 						PremiumMultiplierWeiPerEth: 11000000,
-					}},
+					},
+				},
 			}
 
 			for _, token := range testTokens {
@@ -3605,6 +3607,24 @@ func TestCCIPRouter(t *testing.T) {
 	//   Manual Cursing Tests  //
 	/////////////////////////////
 	t.Run("Manual Cursing", func(t *testing.T) {
+		t.Run("setup curser", func(t *testing.T) {
+			ix, err := rmn_remote.NewSetCurserInstruction(
+				legacyAdmin.PublicKey(),
+				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
+				ccipAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
+
+			var conf rmn_remote.Config
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteConfigPDA, config.DefaultCommitment, &conf)
+			require.NoError(t, err, "failed to get account info")
+
+			require.Equal(t, legacyAdmin.PublicKey(), conf.Curser)
+		})
+
 		t.Run("no curses by default", func(t *testing.T) {
 			svmCurse := rmn_remote.CurseSubject{}
 			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
@@ -3630,7 +3650,19 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 		})
 
-		t.Run("applying a global curse", func(t *testing.T) {
+		t.Run("when a random user tries to apply a curse, it fails", func(t *testing.T) {
+			ix, err := rmn_remote.NewCurseInstruction(
+				rmn_remote.CurseSubject{Value: [16]uint8{1, 2, 3}},
+				config.RMNRemoteConfigPDA,
+				user.PublicKey(),
+				config.RMNRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_RmnRemoteError.String()})
+		})
+
+		t.Run("applying a global curse as the owner", func(t *testing.T) {
 			globalCurse := rmn_remote.CurseSubject{
 				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 			}
@@ -3638,7 +3670,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewCurseInstruction(
 				globalCurse,
 				config.RMNRemoteConfigPDA,
-				ccipAdmin.PublicKey(),
+				ccipAdmin.PublicKey(), // owner here
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -3788,7 +3820,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, len(curses.CursedSubjects), 0)
 		})
 
-		t.Run("adding chain selector curses", func(t *testing.T) {
+		t.Run("adding chain selector curses as the curser", func(t *testing.T) {
 			svmCurse := rmn_remote.CurseSubject{}
 			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
 			evmCurse := rmn_remote.CurseSubject{}
@@ -3797,12 +3829,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewCurseInstruction(
 				svmCurse,
 				config.RMNRemoteConfigPDA,
-				ccipAdmin.PublicKey(),
+				legacyAdmin.PublicKey(), // this is registered as the "curser" in RMN
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses

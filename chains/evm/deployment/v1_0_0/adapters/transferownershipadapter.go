@@ -12,11 +12,11 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
+	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
 type EVMTransferOwnershipAdapter struct {
@@ -60,16 +60,12 @@ func (a *EVMTransferOwnershipAdapter) SequenceTransferOwnershipViaMCMS() *cldf_o
 			}
 
 			for _, contractRef := range in.ContractRef {
-				timelockAddr, ok := a.timelockAddr[in.ChainSelector]
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("timelock address not initialized for chain %d", in.ChainSelector)
-				}
 				seqInput.Contracts = append(seqInput.Contracts, ops.OpTransferOwnershipInput{
 					ChainSelector:   in.ChainSelector,
 					ProposedOwner:   common.HexToAddress(in.ProposedOwner),
 					Address:         common.HexToAddress(contractRef.Address),
 					ContractType:    deployment.ContractType(contractRef.Type),
-					TimelockAddress: timelockAddr,
+					TimelockAddress: a.timelockAddress(in.ChainSelector),
 				})
 			}
 			report, err := cldf_ops.ExecuteSequence(b, seq.SeqTransferMCMOwnershipToTimelock, evmChain, seqInput)
@@ -91,6 +87,13 @@ func (a *EVMTransferOwnershipAdapter) ShouldAcceptOwnershipWithTransferOwnership
 		return false, nil
 	}
 	return true, nil
+}
+
+func (a *EVMTransferOwnershipAdapter) timelockAddress(chainSelector uint64) common.Address {
+	if a.timelockAddr == nil {
+		return common.Address{}
+	}
+	return a.timelockAddr[chainSelector]
 }
 
 func (a *EVMTransferOwnershipAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

@@ -296,8 +296,9 @@ func TestConfigureChainsForLanesFromTopology_HappyPathAndCrossFamily(t *testing.
 					"default": {
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
-							fmt.Sprintf("%d", remoteEVM):    {NOPAliases: []string{"nop-1"}, Threshold: 1},
-							fmt.Sprintf("%d", remoteSolana): {NOPAliases: []string{"nop-1", "nop-2"}, Threshold: 2},
+							fmt.Sprintf("%d", remoteEVM):     {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", remoteSolana):  {NOPAliases: []string{"nop-1", "nop-2"}, Threshold: 2},
+							fmt.Sprintf("%d", localSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -394,6 +395,7 @@ func TestConfigureChainsForLanesFromTopology_JDFallback(t *testing.T) {
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -436,6 +438,7 @@ func TestConfigureChainsForLanesFromTopology_MissingSignerAfterJDFallback(t *tes
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -486,6 +489,7 @@ func TestConfigureChainsForLanesFromTopology_MissingRemoteAdapter(t *testing.T) 
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -548,6 +552,8 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", sharedDest): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", chainA):     {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", chainB):     {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -558,14 +564,18 @@ func TestConfigureChainsForLanesFromTopology_PerSourceDestinationConfig(t *testi
 				ChainA: chainA,
 				ChainB: sharedDest,
 				ChainAOverrides: &changesets.ChainOverrides{
-					MessageNetworkFeeUSDCents: &feeA,
+					RemoteChainCfg: changesets.PartialRemoteChainConfig{
+						MessageNetworkFeeUSDCents: &feeA,
+					},
 				},
 			},
 			{
 				ChainA: chainB,
 				ChainB: sharedDest,
 				ChainAOverrides: &changesets.ChainOverrides{
-					MessageNetworkFeeUSDCents: &feeB,
+					RemoteChainCfg: changesets.PartialRemoteChainConfig{
+						MessageNetworkFeeUSDCents: &feeB,
+					},
 				},
 			},
 		},
@@ -625,6 +635,7 @@ func TestConfigureChainsForLanesFromTopology_UsesTestRouterWhenFlagIsSet(t *test
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -682,6 +693,7 @@ func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -777,6 +789,10 @@ func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeN
 								NOPAliases: []string{"committee-nop-1", "committee-nop-2"},
 								Threshold:  2,
 							},
+							fmt.Sprintf("%d", localSelector): {
+								NOPAliases: []string{"committee-nop-1", "committee-nop-2"},
+								Threshold:  2,
+							},
 						},
 					},
 				},
@@ -839,6 +855,7 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 							},
 							ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 								fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+								fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 							},
 						},
 					},
@@ -869,6 +886,7 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 							},
 							ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 								fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+								fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 							},
 						},
 					},
@@ -922,6 +940,7 @@ func TestConfigureChainsForLanesFromTopology_EmptyConfigUsesAdapterDefaults(t *t
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -988,6 +1007,7 @@ func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -997,9 +1017,11 @@ func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *
 			ChainA: localSelector,
 			ChainB: remoteSelector,
 			ChainAOverrides: &changesets.ChainOverrides{
-				AllowTrafficFrom:          ptrTo(false),
-				MessageNetworkFeeUSDCents: ptrTo[uint16](50),
-				TokenNetworkFeeUSDCents:   ptrTo[uint16](75),
+				RemoteChainCfg: changesets.PartialRemoteChainConfig{
+					AllowTrafficFrom:          ptrTo(false),
+					MessageNetworkFeeUSDCents: ptrTo[uint16](50),
+					TokenNetworkFeeUSDCents:   ptrTo[uint16](75),
+				},
 			},
 		}},
 	))
@@ -1058,6 +1080,7 @@ func TestConfigureChainsForLanesFromTopology_EmptyCVConfigUsesAdapterDefaults(t 
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},
@@ -1125,6 +1148,7 @@ func TestConfigureChainsForLanesFromTopology_CVPointerOverridesReplaceDefaults(t
 						Qualifier: "default",
 						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
 							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
 						},
 					},
 				},

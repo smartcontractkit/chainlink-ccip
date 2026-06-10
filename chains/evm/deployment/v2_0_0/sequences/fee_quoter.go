@@ -162,6 +162,7 @@ func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
 }
 
 var (
+
 	// SequenceFeeQuoterUpdate is a sequence that deploys or fetches existing FeeQuoter contract
 	// and does the following if the corresponding input is provided -
 	// 1. applies destination chain config updates
@@ -690,6 +691,67 @@ var (
 			}
 			return output, nil
 		})
+)
+
+// RemoveFeeTokensPerChainInput holds per-chain parameters for removing extra fee tokens from FeeQuoter 2.0.
+type RemoveFeeTokensPerChainInput struct {
+	ChainSelector     uint64
+	FeeQuoter20Ref    datastore.AddressRef
+	FeeTokensToRemove []common.Address
+}
+
+// RemoveFeeTokensInput holds the parameters for removing extra fee tokens from FeeQuoter 2.0 on multiple chains.
+type RemoveFeeTokensInput struct {
+	ChainUpdates []RemoveFeeTokensPerChainInput
+}
+
+// SequenceRemoveFeeTokens removes fee tokens from existing FeeQuoter 2.0 contracts on multiple chains.
+var SequenceRemoveFeeTokens = cldf_ops.NewSequence(
+	"fee-quoter-v2.0.0:remove-fee-tokens-sequence",
+	semver.MustParse("2.0.0"),
+	"Removes fee tokens from FeeQuoter 2.0",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input RemoveFeeTokensInput) (output sequences.OnChainOutput, err error) {
+		for _, chainInput := range input.ChainUpdates {
+			if len(chainInput.FeeTokensToRemove) == 0 {
+				continue
+			}
+			if datastore_utils.IsAddressRefEmpty(chainInput.FeeQuoter20Ref) {
+				return sequences.OnChainOutput{}, fmt.Errorf("empty FeeQuoter 2.0 ref for chain selector %d", chainInput.ChainSelector)
+			}
+			if chainInput.FeeQuoter20Ref.ChainSelector != chainInput.ChainSelector {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"FeeQuoter 2.0 ref chain selector %d does not match input chain selector %d",
+					chainInput.FeeQuoter20Ref.ChainSelector, chainInput.ChainSelector,
+				)
+			}
+
+			chain, ok := chains.EVMChains()[chainInput.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", chainInput.ChainSelector)
+			}
+
+			fqAddr := common.HexToAddress(chainInput.FeeQuoter20Ref.Address)
+			removeReport, err := cldf_ops.ExecuteOperation(
+				b, fqops.RemoveFeeTokens, chain,
+				contract.FunctionInput[[]common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       fqAddr,
+					Args:          chainInput.FeeTokensToRemove,
+				})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove fee tokens from FeeQuoter(%s) on chain %s: %w",
+					fqAddr.Hex(), chain, err)
+			}
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{
+				removeReport.Output,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			output.BatchOps = append(output.BatchOps, batchOp)
+		}
+		return output, nil
+	},
 )
 
 // MergeFeeQuoterUpdateOutputs merges FeeQuoterUpdate outputs from the v1.6.x and v1.5.0 import
