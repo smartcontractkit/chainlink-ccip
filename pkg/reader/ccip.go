@@ -408,31 +408,39 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
 
 	for _, chain := range chains {
-		chainAccessor, err := getChainAccessor(r.accessors, chain)
-		if err != nil {
-			lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
-			continue
-		}
+		func(chain cciptypes.ChainSelector) {
+			chainAccessor, err := getChainAccessor(r.accessors, chain)
+			if err != nil {
+				lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
+				return
+			}
 
-		feeComponent, err := chainAccessor.GetChainFeeComponents(ctx)
-		if err != nil {
-			lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
-			continue
-		}
+			chainCtx, chainCancel := rpctimeout.Context(ctx)
+			defer chainCancel()
+			feeComponent, err := chainAccessor.GetChainFeeComponents(chainCtx)
+			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting chain fee components", "chain", chain)
+				} else {
+					lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
+				}
+				return
+			}
 
-		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
-			lggr.Errorw("execution fee is nil or non positive", "chain", chain)
-			continue
-		}
-		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
-			lggr.Errorw("data availability fee is nil or negative", "chain", chain)
-			continue
-		}
+			if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
+				lggr.Errorw("execution fee is nil or non positive", "chain", chain)
+				return
+			}
+			if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
+				lggr.Errorw("data availability fee is nil or negative", "chain", chain)
+				return
+			}
 
-		feeComponents[chain] = types.ChainFeeComponents{
-			ExecutionFee:        feeComponent.ExecutionFee,
-			DataAvailabilityFee: feeComponent.DataAvailabilityFee,
-		}
+			feeComponents[chain] = types.ChainFeeComponents{
+				ExecutionFee:        feeComponent.ExecutionFee,
+				DataAvailabilityFee: feeComponent.DataAvailabilityFee,
+			}
+		}(chain)
 	}
 	return feeComponents
 }
