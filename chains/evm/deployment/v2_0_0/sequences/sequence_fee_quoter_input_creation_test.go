@@ -2,6 +2,7 @@ package sequences_test
 
 import (
 	"math/big"
+	"slices"
 	"sort"
 	"testing"
 
@@ -867,7 +868,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	for selector := range chainSelectors {
 		chainSelectorList = append(chainSelectorList, selector)
 	}
-	sort.Slice(chainSelectorList, func(i, j int) bool { return chainSelectorList[i] < chainSelectorList[j] })
+	slices.Sort(chainSelectorList)
 
 	// Create environment with simulated EVM chains
 	e, err := environment.New(t.Context(),

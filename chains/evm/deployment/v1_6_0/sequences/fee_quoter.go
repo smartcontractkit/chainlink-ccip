@@ -173,7 +173,6 @@ var (
 					fqAddress.Hex(), evmChain.String(), err)
 			}
 			for _, remoteChain := range in.RemoteChains {
-				remoteChain := remoteChain
 				destGrp.Go(func() error {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 						Address:       fqAddress,
@@ -216,8 +215,6 @@ var (
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
 			tokenGrp.SetLimit(10)
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
-				remoteChain := remoteChain
-				tokens := tokens
 				tokenGrp.Go(func() error {
 					destChainMu.Lock()
 					_, enabled := destChainConfigs[remoteChain]
@@ -231,7 +228,6 @@ var (
 					innerTokenGrp, _ := errgroup.WithContext(b.GetContext())
 					innerTokenGrp.SetLimit(10)
 					for _, token := range tokens {
-						token := token
 						if token == (common.Address{}) {
 							continue
 						}

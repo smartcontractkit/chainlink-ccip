@@ -7,7 +7,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"k8s.io/utils/ptr"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -513,34 +512,34 @@ func fillFeeQuoterDestChainConfigOverridesFromOnChain(
 	cur fqc.FeeQuoterDestChainConfig,
 ) changesetadapters.FeeQuoterDestChainConfigOverrides {
 	if desired.IsEnabled == nil {
-		desired.IsEnabled = ptr.To(cur.IsEnabled)
+		desired.IsEnabled = new(cur.IsEnabled)
 	}
 	if desired.MaxDataBytes == nil {
-		desired.MaxDataBytes = ptr.To(cur.MaxDataBytes)
+		desired.MaxDataBytes = new(cur.MaxDataBytes)
 	}
 	if desired.MaxPerMsgGasLimit == nil {
-		desired.MaxPerMsgGasLimit = ptr.To(cur.MaxPerMsgGasLimit)
+		desired.MaxPerMsgGasLimit = new(cur.MaxPerMsgGasLimit)
 	}
 	if desired.DestGasOverhead == nil {
-		desired.DestGasOverhead = ptr.To(cur.DestGasOverhead)
+		desired.DestGasOverhead = new(cur.DestGasOverhead)
 	}
 	if desired.DestGasPerPayloadByteBase == nil {
-		desired.DestGasPerPayloadByteBase = ptr.To(cur.DestGasPerPayloadByteBase)
+		desired.DestGasPerPayloadByteBase = new(cur.DestGasPerPayloadByteBase)
 	}
 	if desired.DefaultTokenFeeUSDCents == nil {
-		desired.DefaultTokenFeeUSDCents = ptr.To(cur.DefaultTokenFeeUSDCents)
+		desired.DefaultTokenFeeUSDCents = new(cur.DefaultTokenFeeUSDCents)
 	}
 	if desired.DefaultTokenDestGasOverhead == nil {
-		desired.DefaultTokenDestGasOverhead = ptr.To(cur.DefaultTokenDestGasOverhead)
+		desired.DefaultTokenDestGasOverhead = new(cur.DefaultTokenDestGasOverhead)
 	}
 	if desired.DefaultTxGasLimit == nil {
-		desired.DefaultTxGasLimit = ptr.To(cur.DefaultTxGasLimit)
+		desired.DefaultTxGasLimit = new(cur.DefaultTxGasLimit)
 	}
 	if desired.NetworkFeeUSDCents == nil {
-		desired.NetworkFeeUSDCents = ptr.To(cur.NetworkFeeUSDCents)
+		desired.NetworkFeeUSDCents = new(cur.NetworkFeeUSDCents)
 	}
 	if desired.LinkFeeMultiplierPercent == nil {
-		desired.LinkFeeMultiplierPercent = ptr.To(cur.LinkFeeMultiplierPercent)
+		desired.LinkFeeMultiplierPercent = new(cur.LinkFeeMultiplierPercent)
 	}
 	return desired
 }
