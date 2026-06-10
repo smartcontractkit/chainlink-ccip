@@ -48,17 +48,12 @@ func sendFunds(ctx context.Context, chain evm.Chain, to common.Address, percenta
 		return err
 	}
 
-	err = chain.Client.SendTransaction(ctx, signedTx)
-	if err != nil {
+	if err = chain.Client.SendTransaction(ctx, signedTx); err != nil {
 		return err
 	}
 
 	_, err = chain.Confirm(signedTx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func TestCREATE2Factory(t *testing.T) {
