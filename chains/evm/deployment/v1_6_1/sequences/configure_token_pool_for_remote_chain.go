@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -37,10 +38,7 @@ func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
 	if c.ChainSelector != chain.Selector {
 		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
 	}
-	if err := c.RemoteChainConfig.Validate(); err != nil {
-		return fmt.Errorf("invalid remote chain config: %w", err)
-	}
-	return nil
+	return evmutils.Wrap(c.RemoteChainConfig.Validate(), "invalid remote chain config")
 }
 
 var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
