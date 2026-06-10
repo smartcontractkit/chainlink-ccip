@@ -649,9 +649,18 @@ func (o observerImpl) ObserveMerkleRoots(
 	for _, chainRange := range ranges {
 		if supportedChains.Contains(chainRange.ChainSel) {
 			wg.Go(func() {
-				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
+				chainCtx, chainCancel := rpctimeout.Context(ctx)
+				defer chainCancel()
+				msgs, err := o.ccipReader.MsgsBetweenSeqNums(chainCtx, chainRange.ChainSel, chainRange.SeqNumRange)
 				if err != nil {
-					lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					if errors.Is(err, context.DeadlineExceeded) {
+						lggr.Warnw("timed out getting messages for source chain",
+							"sourceChain", chainRange.ChainSel,
+							"range", chainRange.SeqNumRange,
+						)
+					} else {
+						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					}
 					return
 				}
 
