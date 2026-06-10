@@ -593,8 +593,8 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	slices.Sort(supportedSourceChains)
 
 	configCtx, configCancel := chainRPCContext(ctx)
+	defer configCancel()
 	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(configCtx, supportedSourceChains)
-	configCancel()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			lggr.Warnw("call to GetOffRampSourceChainsConfig timed out", "err", err)
@@ -621,8 +621,8 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				return
 			}
 			chainCtx, chainCancel := chainRPCContext(ctx)
+			defer chainCancel()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(chainCtx, sourceChain)
-			chainCancel()
 			if err != nil {
 				if isNoBindingsError(err) {
 					// when a source chain is disabled there will not be a binding for the onRamp contract
