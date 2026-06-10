@@ -47,75 +47,58 @@ jobs:
       matrix:
         type:
           - name: "Fees Test"
-            file: ccip_fees_test.go
-            run: ""
+            run: "Test_CCIPFees"
             timeout: 12m
           - name: "Token Transfer Test"
-            file: ccip_token_transfer_test.go
             run: "TestTokenTransfer_EVM2EVM"
             timeout: 12m
           - name: "USDC Test"
-            file: ccip_usdc_test.go
-            run: ""
+            run: "TestUSDCTokenTransfer"
             timeout: 12m
           - name: "OOO Execution Test"
-            file: ccip_ooo_execution_test.go
-            run: ""
+            run: "Test_OutOfOrderExecution"
             timeout: 12m
           - name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
-            file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2EVM$"
             timeout: 20m
           - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
-            file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2Solana$"
             timeout: 30m
             installLoopPlugins: true
           - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
-            file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_Solana2EVM$"
             timeout: 30m
             installLoopPlugins: true
           - name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
-            file: ccip_messaging_test.go
-            run: "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$"
+            run: "^Test_CCIPMessaging_MultiExecReports_EVM2Solana$"
             timeout: 35m
             installLoopPlugins: true
           - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
-            file: ccip_batching_test.go
             run: "Test_CCIPBatching_MaxBatchSizeEVM"
             timeout: 12m
           - name: "Batching Test Test_CCIPBatching_MultiSource"
-            file: ccip_batching_test.go
             run: "^Test_CCIPBatching_MultiSource$"
             timeout: 12m
           - name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
-            file: ccip_batching_test.go
             run: "Test_CCIPBatching_MultiSource_MultiRoot"
             timeout: 12m
           - name: "Batching Test Test_CCIPBatching_SingleSource"
-            file: ccip_batching_test.go
             run: "^Test_CCIPBatching_SingleSource$"
             timeout: 12m
           - name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
-            file: ccip_batching_test.go
             run: "Test_CCIPBatching_SingleSource_MultiRoot"
             timeout: 12m
           - name: "Gas Price Updates Test"
-            file: ccip_gas_price_updates_test.go
-            run: ""
+            run: "Test_CCIPGasPriceUpdates"
             timeout: 12m
           # TODO: this can only run in docker for now, switch to in-memory and uncomment
           # - name: "Token Price Updates Test"
-          #   file: ccip_token_price_updates_test.go
-          #   run: ""
+          #   run: "Test_CCIPTokenPriceUpdates"
           #   timeout: 12m
           - name: "CCIPReader Test"
-            file: ccip_reader_test.go
-            run: ""
+            run: "TestCCIPReader|Test_GetChainFeePriceUpdates|Test_GetWrappedNativeTokenPriceUSD"
             timeout: 12m
           - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
-            file: ccip_topologies_test.go
             run: "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$"
             timeout: 20m
 
@@ -278,13 +261,9 @@ jobs:
         id: run-tests
         continue-on-error: true
         run: |
-          run="${{ matrix.type.run }}"
-          run_cmd="gotestsum --junitfile=test-results.xml --format=github-actions -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}"
-          if [ -n "$run" ]; then
-            run_cmd="$run_cmd -run $run"
-          fi
-          echo "$run_cmd"
-          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip && $run_cmd
+          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
+          echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run '${{ matrix.type.run }}'"
+          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run "${{ matrix.type.run }}"
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
