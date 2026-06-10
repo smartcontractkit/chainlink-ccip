@@ -22,6 +22,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -455,6 +456,8 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		chain := chainSelector
 
 		wg.Go(func() {
+			chainCtx, chainCancel := rpctimeout.Context(ctx)
+			defer chainCancel()
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
@@ -462,9 +465,13 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 				return
 			}
 
-			config, err := r.configPoller.GetChainConfig(ctx, chain)
+			config, err := r.configPoller.GetChainConfig(chainCtx, chain)
 			if err != nil {
-				lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting chain config for native token address", "chain", chain)
+				} else {
+					lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+				}
 				return
 			}
 			nativeTokenAddress := config.Router.WrappedNativeAddress
@@ -475,9 +482,13 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 				return
 			}
 
-			price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
+			price, err := chainAccessor.GetTokenPriceUSD(chainCtx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
-				lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting native token price", "chain", chain, "address", nativeTokenAddress.String())
+				} else {
+					lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+				}
 				return
 			}
 

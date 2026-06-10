@@ -22,6 +22,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	writermocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
@@ -1276,6 +1277,72 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1})
 		require.Empty(t, prices)
+
+		mockCache.AssertExpectations(t)
+	})
+
+	t.Run("hung RPC on one chain does not block others", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		mockCache := new(mockConfigCache)
+		sourceChain1Config := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
+				WrappedNativeAddress: wrappedNative1,
+			},
+		}
+		sourceChain2Config := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
+				WrappedNativeAddress: wrappedNative2,
+			},
+		}
+
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceChain1Config, nil)
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(sourceChain2Config, nil)
+		mockCache.On("Start", mock.Anything).Return(nil)
+
+		cw := writermocks.NewMockContractWriter(t)
+		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+		contractWriters[sourceChain1] = cw
+		contractWriters[sourceChain2] = cw
+
+		offRampAddress := []byte{0x3}
+		chainAccessors := createMockedChainAccessors(t, destChain, sourceChain1, sourceChain2)
+		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
+		chainAccessors[sourceChain1].(*commonccipocr3.MockChainAccessor).EXPECT().
+			GetTokenPriceUSD(mock.Anything, cciptypes.UnknownAddress(wrappedNative1)).
+			RunAndReturn(func(callCtx context.Context, _ cciptypes.UnknownAddress) (cciptypes.TimestampedUnixBig, error) {
+				deadline, ok := callCtx.Deadline()
+				require.True(t, ok, "expected per-chain RPC context to have a deadline")
+				assert.LessOrEqual(t, time.Until(deadline), rpctimeout.Default)
+				return cciptypes.TimestampedUnixBig{}, context.DeadlineExceeded
+			})
+		mockExpectChainAccessorGetTokenPriceUSD(
+			chainAccessors[sourceChain2],
+			cciptypes.UnknownAddress(wrappedNative2),
+			cciptypes.TimestampedUnixBig{Value: big.NewInt(200), Timestamp: uint32(time.Now().Unix())},
+		)
+
+		ccipReader, err := newCCIPChainReaderWithConfigPollerInternal(
+			t.Context(),
+			logger.Test(t),
+			chainAccessors,
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+				sourceChain1: readermocks.NewMockContractReaderFacade(t),
+				sourceChain2: readermocks.NewMockContractReaderFacade(t),
+			},
+			contractWriters,
+			destChain,
+			offRampAddress,
+			internal.NewMockAddressCodecHex(t),
+			mockCache,
+			false,
+		)
+		require.NoError(t, err)
+
+		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
+		require.Len(t, prices, 1)
+		assert.Equal(t, cciptypes.NewBigInt(big.NewInt(200)), prices[sourceChain2])
 
 		mockCache.AssertExpectations(t)
 	})
