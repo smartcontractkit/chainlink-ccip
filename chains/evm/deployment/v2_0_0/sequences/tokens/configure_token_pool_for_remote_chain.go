@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	v17seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 
+	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -62,10 +63,7 @@ func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
 	if c.ChainSelector != chain.Selector {
 		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
 	}
-	if err := c.RemoteChainConfig.Validate(); err != nil {
-		return fmt.Errorf("invalid remote chain config: %w", err)
-	}
-	return nil
+	return evmutils.Wrap(c.RemoteChainConfig.Validate(), "invalid remote chain config")
 }
 
 // activePoolImportedConfig holds config imported from an active pool (< 2.0.0) for upgrade cutover.
@@ -540,10 +538,7 @@ func importConfigFromActivePoolV150(
 		}
 	}
 	cfg, err := fetchRateLimitsAndRemotePoolV150(b, chain, chainSelector, poolForRateLimits, activePool, remoteChainSelector)
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
+	return cfg, err
 }
 
 // fetchRateLimitsAndRemotePoolV150 fetches rate limiter state and the single remote pool for the given remote chain
