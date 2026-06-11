@@ -5,7 +5,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -13,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 )
@@ -149,7 +150,8 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			}
 			output.Addresses = append(output.Addresses, report.Output.Addresses...)
 			cancellerAddr := report.Output.Addresses[0]
-			// deploy timelock
+			// deploy timelock — always use the deployer key as the initial admin
+			// so we can manage roles immediately after deployment
 			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
 				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
@@ -159,7 +161,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 					Proposers:        []common.Address{common.HexToAddress(proposerAddr.Address)},
 					Bypassers:        []common.Address{common.HexToAddress(bypasserAddr.Address)},
 					Cancellers:       []common.Address{common.HexToAddress(cancellerAddr.Address)},
-					Admin:            in.TimelockAdmin,
+					Admin:            evmChain.DeployerKey.From,
 					// Add Executor later after call proxy is deployed
 					Executors: []common.Address{},
 				},
@@ -196,6 +198,46 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant executor role to call proxy on timelock on chain %d: %w", in.ChainSelector, err)
 			}
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
+
+			// Determine the final ADMIN_ROLE holder for the timelock.
+			// If in.TimelockAdmin is zero, the timelock becomes its own admin.
+			// Otherwise, hand admin to the specified address.
+			finalAdmin := common.HexToAddress(timelockAddr.Address)
+			if in.TimelockAdmin != (common.Address{}) {
+				finalAdmin = in.TimelockAdmin
+			}
+
+			// If finalAdmin differs from the deployer key we need to transfer the ADMIN_ROLE.
+			// RBACTimelock uses RBAC (not Ownable2Step), so:
+			//   "transfer" = grantRole(ADMIN_ROLE, finalAdmin)
+			//   "accept"   = renounceRole(ADMIN_ROLE) by the deployer — both happen in the same changeset.
+			if finalAdmin != evmChain.DeployerKey.From {
+				_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, evmChain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
+					ChainSelector: in.ChainSelector,
+					Address:       common.HexToAddress(timelockAddr.Address),
+					Args: ops.OpGrantRoleTimelockInput{
+						RoleID:  ops.ADMIN_ROLE.ID,
+						Account: finalAdmin,
+					},
+				})
+				if err != nil {
+					return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s on timelock on chain %d: %w", finalAdmin, in.ChainSelector, err)
+				}
+				b.Logger.Infof("Granted Admin role on Timelock %s to %s on chain %s", timelockAddr.Address, finalAdmin, evmChain.Name)
+
+				_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, evmChain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
+					ChainSelector: in.ChainSelector,
+					Address:       common.HexToAddress(timelockAddr.Address),
+					Args: ops.OpRenounceRoleTimelockInput{
+						RoleID: ops.ADMIN_ROLE.ID,
+					},
+				})
+				if err != nil {
+					return sequtil.OnChainOutput{}, fmt.Errorf("failed to renounce admin role on timelock on chain %d: %w", in.ChainSelector, err)
+				}
+				b.Logger.Infof("Deployer renounced Admin role on Timelock %s on chain %s", timelockAddr.Address, evmChain.Name)
+			}
+
 			return output, nil
 		})
 }
