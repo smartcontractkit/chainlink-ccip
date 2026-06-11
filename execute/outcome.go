@@ -36,6 +36,7 @@ func (p *Plugin) Outcome(
 
 	state := previousOutcome.State.Next()
 	lggr = logger.With(lggr, "execPluginState", state)
+	//TODO logs over >1MB
 	lggr.Debugw("Execute plugin performing outcome",
 		"outctx", outctx,
 		"query", query,
