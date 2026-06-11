@@ -14,8 +14,16 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
+
+// ArtificialAddressRefLabel is a special label that can be used by adapters that implement
+// TokenRefResolver. Adapters can add this label to reconstructed `AddressRefs` to indicate
+// that the ref is artificial. It's not required to use this label - if there is no need to
+// distinguish between artificial AddressRefs and datastore AddressRefs in the adapter then
+// this label can be ignored.
+const ArtificialAddressRefLabel = "ArtificialAddressRef"
 
 type tokenAdapterID string
 
@@ -25,6 +33,19 @@ type TokenFeeAdapter interface {
 	SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (TokenTransferFeeConfig, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
+}
+
+// TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.
+type TokenAdminRoleAdapter interface {
+	RevokeTokenAdminRole() *cldf_ops.Sequence[RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
+// and pool references to be resolved in a particular way before they are passed into the adapter logic. For example, a ref resolver can
+// reconstruct refs from onchain data, normalize addresses, apply transformations on the raw input ref, etc.
+type TokenRefResolver interface {
+	ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error)
+	ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, chainSelector uint64, address string) (datastore.AddressRef, error)
 }
 
 // RateLimitReaderAdapter is an optional interface that exposes on-chain rate limit reads
@@ -62,9 +83,9 @@ type TokenAdapter interface {
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
-	// DeriveTokenAddress derives the token address (in bytes) from the given token pool reference.
+	// DeriveTokenAddress derives the token address (as a string) from the given token pool reference.
 	// For example, if this address is stored on the pool, this method should fetch it.
-	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error)
 	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
 	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)
 	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
@@ -118,22 +139,56 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// PartialTokenTransferFeeConfig is a version of TokenTransferFeeConfig where all fields are optional. This
+// is used for user input, where the user may only want to specify a subset of the fields and have the rest
+// be filled in with defaults or existing on-chain values.
+type PartialTokenTransferFeeConfig struct {
+	DefaultFinalityTransferFeeBps utils.Optional[uint16] `yaml:"defaultFinalityTransferFeeBps" json:"defaultFinalityTransferFeeBps"`
+	CustomFinalityTransferFeeBps  utils.Optional[uint16] `yaml:"customFinalityTransferFeeBps" json:"customFinalityTransferFeeBps"`
+	DefaultFinalityFeeUSDCents    utils.Optional[uint32] `yaml:"defaultFinalityFeeUSDCents" json:"defaultFinalityFeeUSDCents"`
+	CustomFinalityFeeUSDCents     utils.Optional[uint32] `yaml:"customFinalityFeeUSDCents" json:"customFinalityFeeUSDCents"`
+	DestBytesOverhead             utils.Optional[uint32] `yaml:"destBytesOverhead" json:"destBytesOverhead"`
+	DestGasOverhead               utils.Optional[uint32] `yaml:"destGasOverhead" json:"destGasOverhead"`
+	IsEnabled                     utils.Optional[bool]   `yaml:"isEnabled" json:"isEnabled"`
+}
+
+// Populate fills in the fields of the PartialTokenTransferFeeConfig with values from the provided TokenTransferFeeConfig
+// and returns a new PartialTokenTransferFeeConfig.
+func (cfg PartialTokenTransferFeeConfig) Populate(input TokenTransferFeeConfig) PartialTokenTransferFeeConfig {
+	return PartialTokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: utils.NewOptional(input.DefaultFinalityTransferFeeBps),
+		CustomFinalityTransferFeeBps:  utils.NewOptional(input.CustomFinalityTransferFeeBps),
+		DefaultFinalityFeeUSDCents:    utils.NewOptional(input.DefaultFinalityFeeUSDCents),
+		CustomFinalityFeeUSDCents:     utils.NewOptional(input.CustomFinalityFeeUSDCents),
+		DestBytesOverhead:             utils.NewOptional(input.DestBytesOverhead),
+		DestGasOverhead:               utils.NewOptional(input.DestGasOverhead),
+		IsEnabled:                     utils.NewOptional(input.IsEnabled),
+	}
+}
+
+// MergeWith fills in the missing fields in the PartialTokenTransferFeeConfig with values from
+// the provided fallbacks TokenTransferFeeConfig and returns a complete TokenTransferFeeConfig.
+func (cfg PartialTokenTransferFeeConfig) MergeWith(fallbacks TokenTransferFeeConfig) TokenTransferFeeConfig {
+	return TokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: cfg.DefaultFinalityTransferFeeBps.GetOrDefault(fallbacks.DefaultFinalityTransferFeeBps),
+		CustomFinalityTransferFeeBps:  cfg.CustomFinalityTransferFeeBps.GetOrDefault(fallbacks.CustomFinalityTransferFeeBps),
+		DefaultFinalityFeeUSDCents:    cfg.DefaultFinalityFeeUSDCents.GetOrDefault(fallbacks.DefaultFinalityFeeUSDCents),
+		CustomFinalityFeeUSDCents:     cfg.CustomFinalityFeeUSDCents.GetOrDefault(fallbacks.CustomFinalityFeeUSDCents),
+		DestBytesOverhead:             cfg.DestBytesOverhead.GetOrDefault(fallbacks.DestBytesOverhead),
+		DestGasOverhead:               cfg.DestGasOverhead.GetOrDefault(fallbacks.DestGasOverhead),
+		IsEnabled:                     cfg.IsEnabled.GetOrDefault(fallbacks.IsEnabled),
+	}
+}
+
 // TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
 type TokenTransferFeeConfig struct {
-	// DestGasOverhead is the gas overhead for the token transfer.
-	DestGasOverhead uint32
-	// DestBytesOverhead is the bytes overhead for the token transfer.
-	DestBytesOverhead uint32
-	// DefaultFinalityFeeUSDCents is the flat fee for a default finality transfer.
-	DefaultFinalityFeeUSDCents uint32
-	// CustomFinalityFeeUSDCents is the flat fee for a custom finality transfer.
-	CustomFinalityFeeUSDCents uint32
-	// DefaultFinalityTransferFeeBps is the bps fee for a default finality transfer.
-	DefaultFinalityTransferFeeBps uint16
-	// CustomFinalityTransferFeeBps is the bps fee for a custom finality transfer.
-	CustomFinalityTransferFeeBps uint16
-	// IsEnabled is whether the token transfer fee config is enabled.
-	IsEnabled bool
+	DefaultFinalityTransferFeeBps uint16 `yaml:"defaultFinalityTransferFeeBps" json:"defaultFinalityTransferFeeBps"`
+	CustomFinalityTransferFeeBps  uint16 `yaml:"customFinalityTransferFeeBps" json:"customFinalityTransferFeeBps"`
+	DefaultFinalityFeeUSDCents    uint32 `yaml:"defaultFinalityFeeUSDCents" json:"defaultFinalityFeeUSDCents"`
+	CustomFinalityFeeUSDCents     uint32 `yaml:"customFinalityFeeUSDCents" json:"customFinalityFeeUSDCents"`
+	DestBytesOverhead             uint32 `yaml:"destBytesOverhead" json:"destBytesOverhead"`
+	DestGasOverhead               uint32 `yaml:"destGasOverhead" json:"destGasOverhead"`
+	IsEnabled                     bool   `yaml:"isEnabled" json:"isEnabled"`
 }
 
 // RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts
@@ -204,7 +259,7 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
 	InboundCCVsToAddAboveThreshold []CCV `yaml:"inboundCCVsToAddAboveThreshold" json:"inboundCCVsToAddAboveThreshold"`
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
-	TokenTransferFeeConfig TokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
+	TokenTransferFeeConfig *PartialTokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
 }
 
 // GetOutboundRateLimitBuckets returns the outbound RL configuration as a RemoteOutbounds struct. The
@@ -287,14 +342,34 @@ type SetTokenTransferFeeSequenceInput struct {
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
-	mu sync.Mutex
-	m  map[tokenAdapterID]TokenAdapter
+	tokenRefResolverReg map[string]TokenRefResolver
+	tokenAdapterReg     map[tokenAdapterID]TokenAdapter
+	tokenRefResolverMu  sync.Mutex
+	tokenAdapterMu      sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
-		m: make(map[tokenAdapterID]TokenAdapter),
+		tokenRefResolverReg: make(map[string]TokenRefResolver),
+		tokenAdapterReg:     make(map[tokenAdapterID]TokenAdapter),
 	}
+}
+
+// Given a chain family, RegisterTokenRefResolver registers a TokenRefResolver that can resolve token and pool references for that chain family.
+func (r *TokenAdapterRegistry) RegisterTokenRefResolver(chainFamily string, resolver TokenRefResolver) {
+	r.tokenRefResolverMu.Lock()
+	defer r.tokenRefResolverMu.Unlock()
+	if _, exists := r.tokenRefResolverReg[chainFamily]; !exists {
+		r.tokenRefResolverReg[chainFamily] = resolver
+	}
+}
+
+// GetTokenRefResolver retrieves a registered TokenRefResolver for the given chain family.
+func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRefResolver, bool) {
+	r.tokenRefResolverMu.Lock()
+	defer r.tokenRefResolverMu.Unlock()
+	resolver, ok := r.tokenRefResolverReg[chainFamily]
+	return resolver, ok
 }
 
 // RegisterTokenAdapter allows chains to register their changeset logic.
@@ -304,10 +379,10 @@ func newTokenAdapterRegistry() *TokenAdapterRegistry {
 // Thus each version of a token pool on a chain family should have its own adapter implementation.
 func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version *semver.Version, adapter TokenAdapter) {
 	id := newTokenAdapterID(chainFamily, version)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.m[id]; !exists {
-		r.m[id] = adapter
+	r.tokenAdapterMu.Lock()
+	defer r.tokenAdapterMu.Unlock()
+	if _, exists := r.tokenAdapterReg[id]; !exists {
+		r.tokenAdapterReg[id] = adapter
 	}
 }
 
@@ -319,9 +394,9 @@ func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semv
 		return nil, false
 	}
 	id := newTokenAdapterID(chainFamily, version)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	adapter, ok := r.m[id]
+	r.tokenAdapterMu.Lock()
+	defer r.tokenAdapterMu.Unlock()
+	adapter, ok := r.tokenAdapterReg[id]
 	return adapter, ok
 }
 

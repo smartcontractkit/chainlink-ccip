@@ -195,6 +195,64 @@ func TestReportBuilders(t *testing.T) {
 	}
 }
 
+func Test_buildMultipleMerkleRootReports_priceOnlyOutcome(t *testing.T) {
+	lggr := logger.Test(t)
+
+	cfg := pluginconfig.CommitOffchainConfig{}
+	require.NoError(t, cfg.ApplyDefaultsAndValidate())
+	cfg.MaxMerkleRootsPerReport = 1
+	cfg.MaxPricesPerReport = 0
+	cfg.MultipleReportsEnabled = true
+
+	tokenPrices := ccipocr3.TokenPriceMap{
+		"a": ccipocr3.NewBigIntFromInt64(123),
+		"b": ccipocr3.NewBigIntFromInt64(456),
+	}
+	gasPrices := []ccipocr3.GasPriceChain{
+		{GasPrice: ccipocr3.NewBigIntFromInt64(1), ChainSel: 123},
+		{GasPrice: ccipocr3.NewBigIntFromInt64(2), ChainSel: 456},
+	}
+	expectedPriceUpdates := ccipocr3.PriceUpdates{
+		TokenPriceUpdates: tokenPrices.ToSortedSlice(),
+		GasPriceUpdates:   gasPrices,
+	}
+
+	t.Run("price-only outcome emits one report", func(t *testing.T) {
+		outcome := committypes.Outcome{
+			MerkleRootOutcome: merkleroot.Outcome{
+				OutcomeType:   merkleroot.ReportEmpty,
+				RootsToReport: nil,
+			},
+			TokenPriceOutcome: tokenprice.Outcome{TokenPrices: tokenPrices},
+			ChainFeeOutcome:   chainfee.Outcome{GasPrices: gasPrices},
+		}
+
+		reports, err := buildMultipleMerkleRootReports(lggr, outcome, cfg)
+		require.NoError(t, err)
+		require.Len(t, reports, 1)
+
+		report := reports[0].Report
+		require.Empty(t, report.BlessedMerkleRoots)
+		require.Empty(t, report.UnblessedMerkleRoots)
+		require.Equal(t, expectedPriceUpdates, report.PriceUpdates)
+	})
+
+	t.Run("empty outcome emits no reports", func(t *testing.T) {
+		outcome := committypes.Outcome{
+			MerkleRootOutcome: merkleroot.Outcome{
+				OutcomeType:   merkleroot.ReportEmpty,
+				RootsToReport: nil,
+			},
+			TokenPriceOutcome: tokenprice.Outcome{TokenPrices: ccipocr3.TokenPriceMap{}},
+			ChainFeeOutcome:   chainfee.Outcome{GasPrices: nil},
+		}
+
+		reports, err := buildMultipleMerkleRootReports(lggr, outcome, cfg)
+		require.NoError(t, err)
+		require.Nil(t, reports)
+	})
+}
+
 func Test_buildOneReport(t *testing.T) {
 	lggr := logger.Test(t)
 

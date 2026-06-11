@@ -347,8 +347,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         }
         ICrossChainVerifierV1(implAddress)
           .verifyMessage({
-            message: message, messageId: messageId, verifierResults: verifierResults[verifierResultsIndex[i]]
-          });
+          message: message, messageId: messageId, verifierResults: verifierResults[verifierResultsIndex[i]]
+        });
       }
     }
 

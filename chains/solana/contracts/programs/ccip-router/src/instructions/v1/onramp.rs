@@ -77,6 +77,7 @@ impl OnRamp for Impl {
                 ctx.accounts.config.fee_quoter,
                 None,
                 &ctx.remaining_accounts[start..end],
+                token_amount.token,
             )?;
 
             accounts_per_sent_token.push(current_token_accounts);
@@ -203,12 +204,6 @@ impl OnRamp for Impl {
             .zip(message.token_amounts.iter())
             .enumerate()
         {
-            require_keys_eq!(
-                token_amount.token,
-                current_token_accounts.mint.key(),
-                CcipRouterError::InvalidInputsTokenAccounts,
-            );
-
             let transfer_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
 
             // CPI: transfer token amount from user to token pool

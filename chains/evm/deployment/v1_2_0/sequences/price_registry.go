@@ -16,10 +16,9 @@ import (
 )
 
 type PriceRegistryImportConfigSequenceInput struct {
-	ChainSelector   uint64
-	PriceRegistry   common.Address
-	SupportedTokens []common.Address
-	RemoteChains    []uint64
+	ChainSelector uint64
+	PriceRegistry common.Address
+	RemoteChains  []uint64
 }
 
 type PriceRegistryImportConfigSequenceOutput struct {
@@ -36,14 +35,7 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 		}
-		var allTokens []common.Address
-		// check if any supported token is blank address, if so delete
-		for i, token := range input.SupportedTokens {
-			if token == (common.Address{}) {
-				continue
-			}
-			allTokens = append(allTokens, input.SupportedTokens[i])
-		}
+
 		gasPrices := make(map[uint64]*big.Int)
 		for _, remoteChainSelector := range input.RemoteChains {
 			gasPricesOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
@@ -67,28 +59,19 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
 				"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
 		}
-		// check if fee tokens are already present in allTokens
-		allTokenMap := make(map[common.Address]struct{})
-		for _, token := range allTokens {
-			allTokenMap[token] = struct{}{}
-		}
-		for _, token := range feetokensRep.Output {
-			if _, exists := allTokenMap[token]; !exists {
-				allTokenMap[token] = struct{}{}
-				allTokens = append(allTokens, token)
-			}
-		}
+
+		// get token prices for fee tokens
 		tokenPrices := make(map[common.Address]*big.Int)
 		tokenPriceOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetTokenPrices, chain, contract.FunctionInput[[]common.Address]{
 			ChainSelector: chain.Selector,
 			Address:       input.PriceRegistry,
-			Args:          allTokens,
+			Args:          feetokensRep.Output,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetTokenPricesOp "+
-				"on %s for price registry %s and tokens %v: %w", chain.String(), input.PriceRegistry.String(), allTokens, err)
+				"on %s for price registry %s and fee tokens %v: %w", chain.String(), input.PriceRegistry.String(), feetokensRep.Output, err)
 		}
-		for i, token := range allTokens {
+		for i, token := range feetokensRep.Output {
 			tokenPrices[token] = tokenPriceOutput.Output[i].Value
 		}
 

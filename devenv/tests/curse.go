@@ -34,6 +34,9 @@ func RunCurseTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 	fromImpl, toImpl := selectorsToImpl[selectors[0]], selectorsToImpl[selectors[1]]
 	require.NotEqual(t, fromImpl, toImpl)
 
+	srcFamily, err := chainsel.GetSelectorFamily(fromImpl.ChainSelector())
+	require.NoError(t, err)
+
 	destFamily, err := chainsel.GetSelectorFamily(toImpl.ChainSelector())
 	require.NoError(t, err)
 
@@ -44,6 +47,14 @@ func RunCurseTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 	require.NotNil(t, curseAdapter, "registered curse adapter is nil")
 
 	require.NoError(t, curseAdapter.Initialize(*e, toImpl.ChainSelector()))
+
+	srcCurseAdapter, ok := fastcurse.GetCurseRegistry().GetCurseAdapter(srcFamily, semver.MustParse("1.6.0"))
+	if !ok {
+		t.Skipf("no curse adapter registered for chain family: %s and version: %s", srcFamily, semver.MustParse("1.6.0"))
+	}
+	require.NotNil(t, srcCurseAdapter, "registered curse adapter is nil")
+
+	require.NoError(t, srcCurseAdapter.Initialize(*e, fromImpl.ChainSelector()))
 
 	// Ping the loki URL to ensure its available, else skip the test.
 	err = PingLoki(t.Context(), DefaultLokiURL)
@@ -58,12 +69,21 @@ func RunCurseTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		Level(zerolog.InfoLevel).
 		WithContext(t.Context())
 
-	// curse the source selector on the destination chain if its not already cursed.
-	subject := selectorToSubject(fromImpl.ChainSelector())
-	alreadyCursed, err := curseAdapter.IsSubjectCursedOnChain(*e, toImpl.ChainSelector(), subject)
+	// v1.6 lanes must be cursed bidirectionally to avoid requests getting stuck indefinitely.
+	subjectOnDest := selectorToSubject(fromImpl.ChainSelector())
+	subjectOnSrc := selectorToSubject(toImpl.ChainSelector())
+
+	alreadyCursedOnDest, err := curseAdapter.IsSubjectCursedOnChain(*e, toImpl.ChainSelector(), subjectOnDest)
 	require.NoError(t, err)
-	if !alreadyCursed {
-		t.Logf("cursing source selector %d on destination chain %d", fromImpl.ChainSelector(), toImpl.ChainSelector())
+	alreadyCursedOnSrc, err := srcCurseAdapter.IsSubjectCursedOnChain(*e, fromImpl.ChainSelector(), subjectOnSrc)
+	require.NoError(t, err)
+
+	if !alreadyCursedOnDest || !alreadyCursedOnSrc {
+		t.Logf(
+			"cursing lane bidirectionally between chains %d <-> %d",
+			fromImpl.ChainSelector(),
+			toImpl.ChainSelector(),
+		)
 		curseCS := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 		output, err := curseCS.Apply(*e, fastcurse.RMNCurseConfig{
 			CurseActions: []fastcurse.CurseActionInput{
@@ -73,18 +93,32 @@ func RunCurseTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 					Version:              semver.MustParse("1.6.0"),
 					IsGlobalCurse:        false,
 				},
+				{
+					ChainSelector:        fromImpl.ChainSelector(),
+					SubjectChainSelector: toImpl.ChainSelector(),
+					Version:              semver.MustParse("1.6.0"),
+					IsGlobalCurse:        false,
+				},
 			},
 		})
 		require.NoError(t, err)
 		require.Greater(t, len(output.Reports), 0)
 	} else {
-		t.Logf("source selector %d is already cursed on destination chain %d, skipping curse", fromImpl.ChainSelector(), toImpl.ChainSelector())
+		t.Logf(
+			"lane already cursed bidirectionally between chains %d <-> %d, skipping curse",
+			fromImpl.ChainSelector(),
+			toImpl.ChainSelector(),
+		)
 	}
 
-	// Confirm that the subject is cursed on the destination chain.
-	isCursed, err := curseAdapter.IsSubjectCursedOnChain(*e, toImpl.ChainSelector(), subject)
+	// Confirm that the lane is cursed in both directions.
+	isCursed, err := curseAdapter.IsSubjectCursedOnChain(*e, toImpl.ChainSelector(), subjectOnDest)
 	require.NoError(t, err)
 	require.True(t, isCursed, "subject should be cursed on destination chain")
+
+	isCursed, err = srcCurseAdapter.IsSubjectCursedOnChain(*e, fromImpl.ChainSelector(), subjectOnSrc)
+	require.NoError(t, err)
+	require.True(t, isCursed, "subject should be cursed on source chain")
 
 	// Send a message from the source chain to the destination chain
 	// The plugin should ignore the message because the dest is cursing the source selector.

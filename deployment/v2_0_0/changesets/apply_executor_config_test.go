@@ -136,13 +136,13 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 			wantErr: "nop_topology is required",
 		},
 		{
-			name: "production topology with fewer than sixteen NOPs returns error",
+			name: "production topology with fewer than fifteen NOPs returns error",
 			env:  deployment.Environment{Name: "prod_mainnet", BlockChains: newExecutorTestBlockChains([]uint64{sel1})},
 			input: changesets.ApplyExecutorConfigInput{
 				Topology:          newMinimalTopology([]string{"nop1"}, "pool1", ""),
 				ExecutorQualifier: "pool1",
 			},
-			wantErr: "requires at least 16 unique NOPs",
+			wantErr: "requires at least 15 unique NOPs",
 		},
 		{
 			name: "missing executor qualifier returns error",
@@ -176,7 +176,7 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 			env:  deployment.Environment{Name: "mainnet", BlockChains: newExecutorTestBlockChains([]uint64{sel1})},
 			input: changesets.ApplyExecutorConfigInput{
 				Topology: func() *offchain.EnvironmentTopology {
-					topo := newMinimalTopology(makeTestNOPAliases(16), "pool1", "")
+					topo := newMinimalTopology(makeTestNOPAliases(15), "pool1", "")
 					topo.PyroscopeURL = "http://pyroscope"
 					return topo
 				}(),

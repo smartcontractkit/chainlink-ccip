@@ -42,6 +42,7 @@ const (
 	ERC677TokenHelper                   cldf.ContractType = "ERC677TokenHelper"
 	USDCTokenPool                       cldf.ContractType = "USDCTokenPool"
 	CCTPMessageTransmitterProxy         cldf.ContractType = "CCTPMessageTransmitterProxy"
+	SiloedLockReleaseTokenPool          cldf.ContractType = "SiloedLockReleaseTokenPool"
 	HybridLockReleaseUSDCTokenPool      cldf.ContractType = "HybridLockReleaseUSDCTokenPool"
 	BurnMintWithExternalMinterTokenPool cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
 	HybridWithExternalMinterTokenPool   cldf.ContractType = "HybridWithExternalMinterTokenPool"
@@ -49,10 +50,14 @@ const (
 	LockReleaseTokenPool                cldf.ContractType = "LockReleaseTokenPool"
 	BurnMintWithLockReleaseFlag         cldf.ContractType = "BurnMintWithLockReleaseFlag"
 	TokenGovernor                       cldf.ContractType = "TokenGovernor"
+	ERC20LockBox                        cldf.ContractType = "ERC20LockBox"
 
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
+	// UltraFastCurseMCMSQualifier qualifies the dedicated MCMS deployment used for Ultra Fast Curse
+	// (RMN 2.0.0 authorized caller / curse admin).
+	UltraFastCurseMCMSQualifier = "UltraFastCurse"
 )
 
 // familySelectors is a concurrent-safe registry of chain family → 4-byte
@@ -168,4 +173,20 @@ func ExecutionStateToString(state uint8) string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+// Coalesce returns the dereferenced override if non-nil, otherwise returns def.
+func Coalesce[T any](override *T, def T) T {
+	if override != nil {
+		return *override
+	}
+	return def
+}
+
+// CoalescePtr returns override if non-nil, otherwise returns def.
+func CoalescePtr[T any](override, def *T) *T {
+	if override != nil {
+		return override
+	}
+	return def
 }

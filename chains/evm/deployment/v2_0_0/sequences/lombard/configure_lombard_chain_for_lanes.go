@@ -121,10 +121,11 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token address: %w", err)
 			}
 
+			feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(remoteChain.TokenTransferFeeConfig)
 			remoteChainConfigs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
 				RemotePool:             common.LeftPadBytes(remotePoolAddress, 32),
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
-				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
+				TokenTransferFeeConfig: &feeCfg,
 				// Lombard does not use rate limiters
 				InboundRateLimiterConfig: &tokens_core.RateLimiterConfigFloatInput{
 					Capacity: 0,

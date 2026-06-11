@@ -61,6 +61,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     offramp: Option<Pubkey>, // id of the offramp program that called this function, when the caller is not the router
     raw_acc_infos: &'info [AccountInfo<'info>],
+    message_mint: Pubkey,
 ) -> Result<TokenAccounts<'info>> {
     // The program_id here is provided solely to satisfy the interface of try_accounts.
     // Note: All program IDs for PDA derivation are explicitly defined in the account context
@@ -141,6 +142,12 @@ pub fn validate_and_parse_token_accounts<'info>(
     } else {
         0
     };
+
+    require_keys_eq!(
+        mint.key(),
+        message_mint,
+        CommonCcipError::InvalidInputsPoolAccounts
+    );
 
     // collect remaining accounts
     let remaining_accounts = accounts_iter.as_slice();

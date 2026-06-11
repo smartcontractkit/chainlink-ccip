@@ -22,6 +22,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -407,31 +408,39 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
 
 	for _, chain := range chains {
-		chainAccessor, err := getChainAccessor(r.accessors, chain)
-		if err != nil {
-			lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
-			continue
-		}
+		func(chain cciptypes.ChainSelector) {
+			chainAccessor, err := getChainAccessor(r.accessors, chain)
+			if err != nil {
+				lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
+				return
+			}
 
-		feeComponent, err := chainAccessor.GetChainFeeComponents(ctx)
-		if err != nil {
-			lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
-			continue
-		}
+			chainCtx, chainCancel := rpctimeout.Context(ctx)
+			defer chainCancel()
+			feeComponent, err := chainAccessor.GetChainFeeComponents(chainCtx)
+			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting chain fee components", "chain", chain)
+				} else {
+					lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
+				}
+				return
+			}
 
-		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
-			lggr.Errorw("execution fee is nil or non positive", "chain", chain)
-			continue
-		}
-		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
-			lggr.Errorw("data availability fee is nil or negative", "chain", chain)
-			continue
-		}
+			if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
+				lggr.Errorw("execution fee is nil or non positive", "chain", chain)
+				return
+			}
+			if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
+				lggr.Errorw("data availability fee is nil or negative", "chain", chain)
+				return
+			}
 
-		feeComponents[chain] = types.ChainFeeComponents{
-			ExecutionFee:        feeComponent.ExecutionFee,
-			DataAvailabilityFee: feeComponent.DataAvailabilityFee,
-		}
+			feeComponents[chain] = types.ChainFeeComponents{
+				ExecutionFee:        feeComponent.ExecutionFee,
+				DataAvailabilityFee: feeComponent.DataAvailabilityFee,
+			}
+		}(chain)
 	}
 	return feeComponents
 }
@@ -455,6 +464,8 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		chain := chainSelector
 
 		wg.Go(func() {
+			chainCtx, chainCancel := rpctimeout.Context(ctx)
+			defer chainCancel()
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
@@ -462,9 +473,13 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 				return
 			}
 
-			config, err := r.configPoller.GetChainConfig(ctx, chain)
+			config, err := r.configPoller.GetChainConfig(chainCtx, chain)
 			if err != nil {
-				lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting chain config for native token address", "chain", chain)
+				} else {
+					lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+				}
 				return
 			}
 			nativeTokenAddress := config.Router.WrappedNativeAddress
@@ -475,9 +490,13 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 				return
 			}
 
-			price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
+			price, err := chainAccessor.GetTokenPriceUSD(chainCtx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
-				lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting native token price", "chain", chain, "address", nativeTokenAddress.String())
+				} else {
+					lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+				}
 				return
 			}
 

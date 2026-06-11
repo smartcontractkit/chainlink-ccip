@@ -1,6 +1,7 @@
 package tokenimpl
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -36,6 +37,22 @@ func revokeDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, tok
 		return nil, fmt.Errorf("failed to revoke default admin role: %w", err)
 	}
 	return []contract.WriteOutput{report.Output}, nil
+}
+
+func hasDefaultAdminRoleBurnMintERC20(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error) {
+	tokenContract, err := bnm_erc20_bindings.NewBurnMintERC20(token, chain.Client)
+	if err != nil {
+		return false, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
+	}
+	role, err := tokenContract.DEFAULTADMINROLE(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return false, fmt.Errorf("failed to get default admin role constant: %w", err)
+	}
+	hasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: ctx}, role, user)
+	if err != nil {
+		return false, fmt.Errorf("failed to check default admin role for %s: %w", user.Hex(), err)
+	}
+	return hasRole, nil
 }
 
 func grantDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {

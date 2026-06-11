@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -564,6 +566,51 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 			assert.Equal(t, tc.expResult, o.ObserveLatestOnRampSeqNums(ctx))
 		})
 	}
+
+	t.Run("hung RPC on one chain does not block others", func(t *testing.T) {
+		hungRPCChains := []cciptypes.ChainSelector{4, 7}
+		hungRPCSupported := mapset.NewSet(hungRPCChains...)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		chainSupport := common_mock.NewMockChainSupport(t)
+		chainSupport.EXPECT().KnownSourceChainsSlice().Return(hungRPCChains, nil)
+		chainSupport.EXPECT().SupportedChains(nodeID).Return(hungRPCSupported, nil)
+
+		ccipReader := reader_mock.NewMockCCIPReader(t)
+		ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, hungRPCChains).
+			Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+				cciptypes.ChainSelector(4): {IsRMNVerificationDisabled: true},
+				cciptypes.ChainSelector(7): {IsRMNVerificationDisabled: true},
+			}, nil)
+		ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+			RunAndReturn(func(callCtx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+				switch chain {
+				case 4:
+					deadline, ok := callCtx.Deadline()
+					require.True(t, ok, "expected per-chain RPC context to have a deadline")
+					assert.LessOrEqual(t, time.Until(deadline), rpctimeout.Default)
+					return 0, context.DeadlineExceeded
+				case 7:
+					return 608, nil
+				default:
+					return 0, fmt.Errorf("unexpected chain %d", chain)
+				}
+			})
+
+		o := newObserverImpl(
+			logger.Test(t),
+			nil,
+			nodeID,
+			chainSupport,
+			ccipReader,
+			mocks.NewMessageHasher(),
+		)
+
+		result := o.ObserveLatestOnRampSeqNums(ctx)
+		assert.Equal(t, []plugintypes.SeqNumChain{plugintypes.NewSeqNumChain(7, 608)}, result)
+	})
 }
 
 func Test_ObserveMerkleRoots(t *testing.T) {
@@ -796,7 +843,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 					err = e
 				}
 				mockCCIPReader.On(
-					"MsgsBetweenSeqNums", ctx, r.ChainSel, r.SeqNumRange,
+					"MsgsBetweenSeqNums", mock.Anything, r.ChainSel, r.SeqNumRange,
 				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
 			}
 
@@ -833,6 +880,65 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("hung RPC on one chain does not block others", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		var nodeID commontypes.OracleID = 1
+		hungChain := cciptypes.ChainSelector(4)
+		okChain := cciptypes.ChainSelector(9)
+		ranges := []plugintypes.ChainRange{
+			{ChainSel: hungChain, SeqNumRange: cciptypes.SeqNumRange{10, 11}},
+			{ChainSel: okChain, SeqNumRange: cciptypes.SeqNumRange{93, 95}},
+		}
+		okMessages := []cciptypes.Message{
+			{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0xa1"), SequenceNumber: 93}},
+			{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0xa2"), SequenceNumber: 94}},
+			{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0xa3"), SequenceNumber: 95}},
+		}
+
+		mockCCIPReader := reader_mock.NewMockCCIPReader(t)
+		mockCCIPReader.EXPECT().MsgsBetweenSeqNums(mock.Anything, mock.Anything, mock.Anything).
+			RunAndReturn(func(
+				callCtx context.Context,
+				chain cciptypes.ChainSelector,
+				_ cciptypes.SeqNumRange,
+			) ([]cciptypes.Message, error) {
+				switch chain {
+				case hungChain:
+					deadline, ok := callCtx.Deadline()
+					require.True(t, ok, "expected per-chain RPC context to have a deadline")
+					assert.LessOrEqual(t, time.Until(deadline), rpctimeout.Default)
+					return nil, context.DeadlineExceeded
+				case okChain:
+					return okMessages, nil
+				default:
+					return nil, fmt.Errorf("unexpected chain %d", chain)
+				}
+			})
+		mockCCIPReader.EXPECT().
+			GetContractAddress(mock.Anything, mock.Anything).
+			Return(cciptypes.Bytes{}, nil).Maybe()
+
+		chainSupport := common_mock.NewMockChainSupport(t)
+		chainSupport.EXPECT().SupportedChains(nodeID).Return(mapset.NewSet(hungChain, okChain), nil)
+
+		o := newObserverImpl(
+			logger.Test(t),
+			nil,
+			nodeID,
+			chainSupport,
+			mockCCIPReader,
+			mocks.NewMessageHasher(),
+		)
+
+		roots := o.ObserveMerkleRoots(ctx, ranges)
+		require.Len(t, roots, 1)
+		assert.Equal(t, okChain, roots[0].ChainSel)
+		assert.Equal(t, "f1b02d28559f60a67b431e2c580ac1d6b3e0fd7319ff055c6c67408aa31788e4",
+			hex.EncodeToString(roots[0].MerkleRoot[:]))
+	})
 }
 
 func Test_computeMerkleRoot(t *testing.T) {

@@ -31,14 +31,19 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for initialization.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
+            version: Config::LATEST_VERSION,
             owner: ctx.accounts.authority.key(),
-            version: 2,
             proposed_owner: Pubkey::default(),
             default_code_version: CodeVersion::V1,
             event_authorities: vec![],
+            curser: ctx.accounts.authority.key(), // initialize the curser as the admin, so that they can perform curses right away if needed
+            bump: ctx.bumps.config,               // initialize the bump
         });
 
-        ctx.accounts.curses.version = 1;
+        ctx.accounts.curses.set_inner(Curses {
+            version: 1,
+            cursed_subjects: vec![],
+        });
 
         emit!(ConfigSet {
             default_code_version: ctx.accounts.config.default_code_version,
@@ -108,7 +113,8 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for adding a new curse.
     /// * `subject` - The subject to curse.
     pub fn curse(ctx: Context<Curse>, subject: CurseSubject) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version).curse(ctx, subject)
+        let config = load_config(&ctx.accounts.config)?;
+        router::admin(config.default_code_version).curse(ctx, subject)
     }
 
     /// Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,
@@ -122,7 +128,8 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for removing a curse.
     /// * `subject` - The subject to uncurse.
     pub fn uncurse(ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version).uncurse(ctx, subject)
+        let config = load_config(&ctx.accounts.config)?;
+        router::admin(config.default_code_version).uncurse(ctx, subject)
     }
 
     /// Overwrites the list of addresses authorized to invoke the `cpi_event` instruction.
@@ -138,6 +145,18 @@ pub mod rmn_remote {
     ) -> Result<()> {
         let code_version = ctx.accounts.config.default_code_version;
         router::admin(code_version).set_event_authorities(ctx, new_event_authorities)
+    }
+
+    /// Sets the address for the curser role who, alongside the contract owner, is authorized to curse.
+    ///
+    /// Only the CCIP Admin may perform this operation.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for updating event authorities.
+    /// * `curser` - The new curser public key.
+    pub fn set_curser(ctx: Context<UpdateConfig>, curser: Pubkey) -> Result<()> {
+        let code_version = ctx.accounts.config.default_code_version;
+        router::admin(code_version).set_curser(ctx, curser)
     }
 
     /// Verifies that the subject is not cursed AND that this chain is not globally cursed.
@@ -178,9 +197,9 @@ pub mod rmn_remote {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for the migration.
-    pub fn migrate_config_v1_to_v2(ctx: Context<MigrateConfigV1ToV2>) -> Result<()> {
+    pub fn migrate_config_v2_to_v3(ctx: Context<MigrateConfigV2ToV3>) -> Result<()> {
         let code_version = load_config(&ctx.accounts.config)?.default_code_version;
-        router::public(code_version).migrate_config_v1_to_v2(ctx)
+        router::public(code_version).migrate_config_v2_to_v3(ctx)
     }
 }
 

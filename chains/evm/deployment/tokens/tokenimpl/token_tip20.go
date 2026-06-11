@@ -1,9 +1,11 @@
 package tokenimpl
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
@@ -40,6 +42,18 @@ func (tokenTIP20) RevokeAdminRole(b operations.Bundle, chain evm.Chain, token, u
 		return nil, fmt.Errorf("failed to revoke TIP-20 admin role: %w", err)
 	}
 	return []contract.WriteOutput{report.Output}, nil
+}
+
+func (tokenTIP20) HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error) {
+	tokenContract, err := tip20.NewTIP20Token(token, chain.Client)
+	if err != nil {
+		return false, fmt.Errorf("failed to instantiate TIP-20 token contract: %w", err)
+	}
+	hasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: ctx}, user, tip20.DefaultAdminRole)
+	if err != nil {
+		return false, fmt.Errorf("failed to check TIP-20 admin role for %s: %w", user.Hex(), err)
+	}
+	return hasRole, nil
 }
 
 func (tokenTIP20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {

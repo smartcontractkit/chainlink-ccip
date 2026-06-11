@@ -1,6 +1,7 @@
 package tokenimpl
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -33,6 +34,10 @@ func (tokenBurnMintERC20) Capabilities() CapabilitySet {
 
 func (tokenBurnMintERC20) RevokeAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
 	return revokeDefaultAdminRoleBurnMintERC20(b, chain, token, user)
+}
+
+func (tokenBurnMintERC20) HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error) {
+	return hasDefaultAdminRoleBurnMintERC20(ctx, chain, token, user)
 }
 
 func (tokenBurnMintERC20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {

@@ -1,16 +1,9 @@
 package adapters_test
 
 import (
-	"sort"
-	"testing"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
-
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
@@ -18,10 +11,7 @@ import (
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 )
 
 // importConfigAddressRefs are address refs for SetContractParamsFromImportedConfig.
@@ -111,107 +101,5 @@ func dummyDeployContractParams() ccvadapters.DeployContractParams {
 				Qualifier:        "dummy-cv",
 			},
 		},
-	}
-}
-
-func TestSetContractParamsFromImportedConfig(t *testing.T) {
-	chainSelectors := make(map[uint64]bool)
-	ds := datastore.NewMemoryDataStore()
-	for _, ref := range importConfigAddressRefs {
-		chainSelectors[ref.ChainSelector] = true
-		err := ds.Addresses().Add(ref)
-		require.NoError(t, err, "Failed to add address ref %+v to datastore", ref)
-	}
-	err := sequences.WriteMetadataToDatastore(ds, sequences.Metadata{Contracts: importConfigContractMetadata})
-	require.NoError(t, err, "Failed to write contract metadata to datastore")
-
-	chainSelectorList := make([]uint64, 0, len(chainSelectors))
-	for selector := range chainSelectors {
-		chainSelectorList = append(chainSelectorList, selector)
-	}
-	sort.Slice(chainSelectorList, func(i, j int) bool { return chainSelectorList[i] < chainSelectorList[j] })
-
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, chainSelectorList),
-	)
-	require.NoError(t, err, "Failed to create environment")
-	require.NotNil(t, e, "Environment should be created")
-	e.DataStore = ds.Seal()
-
-	adapter := &adapters.EVMDeployChainContractsAdapter{}
-
-	for _, chainSelector := range chainSelectorList {
-		_, ok := e.BlockChains.EVMChains()[chainSelector]
-		require.True(t, ok, "Chain with selector %d should exist", chainSelector)
-
-		existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
-		contractMeta := e.DataStore.ContractMetadata().Filter(datastore.ContractMetadataByChainSelector(chainSelector))
-		dummyBase := dummyDeployContractParams()
-		input := ccvadapters.DeployChainConfigCreatorInput{
-			ChainSelector:      chainSelector,
-			ExistingAddresses:  existingAddresses,
-			ContractMeta:       contractMeta,
-			UserProvidedConfig: dummyBase,
-		}
-
-		report, err := cldf_ops.ExecuteSequence(
-			e.OperationsBundle,
-			adapter.SetContractParamsFromImportedConfig(),
-			e.BlockChains,
-			input,
-		)
-
-		require.NoError(t, err, "SetContractParamsFromImportedConfig should not error for chain %d", chainSelector)
-		require.NotNil(t, report, "Report should not be nil for chain %d", chainSelector)
-
-		generated := report.Output
-		// Merge generated (imported) config with dummy base: generated.MergeWithOverrideIfNotEmpty(dummy).
-		// the non-empty fields in generated (imported config) should overwrite dummy, while empty fields in generated should keep dummy's values after merge.
-		merged, err := dummyBase.MergeWithOverrideIfNotEmpty(generated)
-		require.NoError(t, err, "MergeWithOverrideIfNotEmpty should not error")
-		switch chainSelector {
-		case 5009297550715157269:
-			// This chain has OnRamp 1.6.0 + OffRamp 1.6.0 + RMN 1.5.0: v1.6 and v1.5 merge.
-			// v1.5's GasForCallExactCheck (5000) is overwritten by v1.6's value.
-			require.Equal(t, feeAggregatorAddress, common.HexToAddress(generated.OnRamp.FeeAggregator),
-				"OnRamp.FeeAggregator should come from v1.6 OnRamp DynamicConfig")
-			require.Equal(t, uint16(6000), generated.OffRamp.GasForCallExactCheck,
-				"OffRamp.GasForCallExactCheck comes from v1.6 path after merge (v1.6 overwrites v1.5)")
-			require.Equal(t, legacyRMNAddress1, common.HexToAddress(generated.RMNRemote.LegacyRMN),
-				"RMNRemote.LegacyRMN should come from v1.5 address ref")
-			require.Equal(t, uint16(6000), merged.OffRamp.GasForCallExactCheck,
-				"merged OffRamp.GasForCallExactCheck should come from generated")
-			require.Equal(t, legacyRMNAddress1, common.HexToAddress(merged.RMNRemote.LegacyRMN),
-				"merged RMNRemote.LegacyRMN should come from generated")
-			// OnRamp, OffRamp, RMNRemote unchanged from generated (imported config).
-			require.Equal(t, feeAggregatorAddress, common.HexToAddress(merged.OnRamp.FeeAggregator),
-				"merged OnRamp.FeeAggregator should come from generated (imported config)")
-
-			for i, exec := range dummyBase.Executors {
-				exec.DynamicConfig.FeeAggregator = feeAggregatorAddress.String()
-				require.Equal(t, exec, merged.Executors[i], "merged Executors should keep dummy values for empty fields in generated (imported) config")
-			}
-			for i, cv := range dummyBase.CommitteeVerifiers {
-				cv.FeeAggregator = feeAggregatorAddress.String()
-				require.Equal(t, cv, merged.CommitteeVerifiers[i], "merged CommitteeVerifiers should keep dummy values for empty fields in generated (imported) config")
-			}
-
-		case 4949039107694359620:
-			// This chain has only RMN 1.5.0: v1.6 path returns empty (no OnRamp 1.6.0), v1.5 fills LegacyRMN and default GasForCallExactCheck.
-			require.Equal(t, legacyRMNAddress2, common.HexToAddress(generated.RMNRemote.LegacyRMN),
-				"RMNRemote.LegacyRMN should come from v1.5 address ref")
-			require.Equal(t, uint16(5000), generated.OffRamp.GasForCallExactCheck,
-				"OffRamp.GasForCallExactCheck should be default from v1.5 path when no v1.6 OffRamp")
-			require.Equal(t, uint16(5000), merged.OffRamp.GasForCallExactCheck,
-				"merged OffRamp.GasForCallExactCheck should come from generated")
-			require.Equal(t, legacyRMNAddress2, common.HexToAddress(merged.RMNRemote.LegacyRMN),
-				"merged RMNRemote.LegacyRMN should come from generated")
-			require.ElementsMatch(t, dummyBase.Executors, merged.Executors,
-				"merged Executors should be the same as dummy since generated (imported config) is empty for this chain")
-			require.ElementsMatch(t, dummyBase.CommitteeVerifiers, merged.CommitteeVerifiers,
-				"merged CommitteeVerifiers should be the same as dummy since generated (imported config) is empty for this chain")
-		}
-
-		t.Logf("Successfully executed SetContractParamsFromImportedConfig for chain %d", chainSelector)
 	}
 }
