@@ -14,11 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
@@ -114,10 +114,10 @@ func migrateHybridLockReleaseLiquidity(
 		}
 	}
 
-	// Migration runs in three phases, all batched into a single MCMS proposal:
+	// Migration runs in two phases, batched into a single MCMS proposal:
 	// 1. Authorize callers: add siloed pool, timelock, and LP to each lockbox so deposits succeed.
 	// 2. Migrate liquidity: withdraw from hybrid pool, approve lockbox, deposit into each lockbox.
-	// 3. Transfer ownership: propose lockbox ownership to LPs (each LP must call acceptOwnership separately).
+	// Lockbox ownership remains with the MCMS timelock.
 	ctx := &migratePhaseCtx{
 		b:              b,
 		chain:          chain,
@@ -139,11 +139,6 @@ func migrateHybridLockReleaseLiquidity(
 		return sequences.OnChainOutput{}, err
 	}
 	writes = append(writes, liquidityWrites...)
-	ownershipWrites, err := transferLockboxOwnershipToLPs(ctx)
-	if err != nil {
-		return sequences.OnChainOutput{}, err
-	}
-	writes = append(writes, ownershipWrites...)
 
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	if len(writes) > 0 {
@@ -284,55 +279,6 @@ func migrateLiquidityToLockboxes(ctx *migratePhaseCtx) ([]contract_utils.WriteOu
 			return nil, fmt.Errorf("migrateLiquidityToLockboxes: chain %d lockbox %s amount %s: deposit: %w", sel, lockBoxAddr.Hex(), withdrawAmount.String(), err)
 		}
 		writes = append(writes, depositReport.Output)
-	}
-	return writes, nil
-}
-
-// transferLockboxOwnershipToLPs proposes ownership transfer to the liquidity provider for each lockbox.
-// Runs last so all deposits complete before ownership changes. LP must call acceptOwnership() afterward.
-func transferLockboxOwnershipToLPs(ctx *migratePhaseCtx) ([]contract_utils.WriteOutput, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("migratePhaseCtx is nil")
-	}
-	writes := make([]contract_utils.WriteOutput, 0)
-	for _, sel := range ctx.selectors {
-		lockBoxAddr := ctx.lockBoxes[sel]
-
-		lpReport, err := cldf_ops.ExecuteOperation(ctx.b, hybrid_lock_release_usdc_token_pool.GetLiquidityProvider, ctx.chain, contract_utils.FunctionInput[uint64]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       ctx.hybridPoolAddr,
-			Args:          sel,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s: get liquidity provider: %w", sel, lockBoxAddr.Hex(), err)
-		}
-		lp := lpReport.Output
-
-		if lp == (common.Address{}) || lp == ctx.timelockAddr {
-			continue
-		}
-
-		ownerReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.Owner, ctx.chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
-			Args:          struct{}{},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s: get owner: %w", sel, lockBoxAddr.Hex(), err)
-		}
-		if ownerReport.Output == lp {
-			continue
-		}
-
-		transferReport, err := cldf_ops.ExecuteOperation(ctx.b, erc20_lock_box.TransferOwnership, ctx.chain, contract_utils.FunctionInput[common.Address]{
-			ChainSelector: ctx.input.ChainSelector,
-			Address:       lockBoxAddr,
-			Args:          lp,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("transferLockboxOwnershipToLPs: chain %d lockbox %s lp %s: transfer ownership: %w", sel, lockBoxAddr.Hex(), lp.Hex(), err)
-		}
-		writes = append(writes, transferReport.Output)
 	}
 	return writes, nil
 }
