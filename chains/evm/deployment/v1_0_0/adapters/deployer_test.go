@@ -124,7 +124,103 @@ func TestDeployMCMS(t *testing.T) {
 	hasRole, err = timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, eRole, common.HexToAddress(callProxyRef[0].Address))
 	require.NoError(t, err)
 	require.True(t, hasRole, "Call Proxy should have admin role for EXECUTOR_ROLE")
+
+	// When TimelockAdmin == deployer key, deployer should retain ADMIN_ROLE (no transfer)
+	adminRoleAdmin, err := timelockC.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
+	require.NoError(t, err)
+	deployerIsAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain1.DeployerKey.From)
+	require.NoError(t, err)
+	require.True(t, deployerIsAdmin, "deployer should retain ADMIN_ROLE when TimelockAdmin == deployer key")
 }
+
+// TestDeployMCMS_TimelockAdminRoleTransfer verifies the admin-role handover logic inside DeployMCMS:
+//   - zero TimelockAdmin  → timelock itself holds ADMIN_ROLE; deployer has renounced it
+//   - external address    → that address holds ADMIN_ROLE; deployer has renounced it
+func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
+	t.Parallel()
+	selector := chainsel.TEST_90000001.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{selector}),
+	)
+	require.NoError(t, err)
+	env.Logger = logger.Test(t)
+	evmChain := env.BlockChains.EVMChains()[selector]
+
+	externalAdmin := common.HexToAddress("0x1111111111111111111111111111111111111111")
+
+	evmDeployer := &adapters.EVMDeployer{}
+	dReg := deployops.GetRegistry()
+	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
+	cs := deployops.DeployMCMS(dReg, nil)
+
+	tests := []struct {
+		name            string
+		qualifier       string
+		timelockAdmin   common.Address // zero means self-sovereign
+		expectAdmin     func(timelockAddr common.Address) common.Address
+		deployerIsAdmin bool
+	}{
+		{
+			name:            "zero TimelockAdmin makes timelock self-sovereign",
+			qualifier:       "zero-admin",
+			timelockAdmin:   common.Address{},
+			expectAdmin:     func(timelockAddr common.Address) common.Address { return timelockAddr },
+			deployerIsAdmin: false,
+		},
+		{
+			name:            "external TimelockAdmin receives ADMIN_ROLE",
+			qualifier:       "external-admin",
+			timelockAdmin:   externalAdmin,
+			expectAdmin:     func(_ common.Address) common.Address { return externalAdmin },
+			deployerIsAdmin: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+				AdapterVersion: deployops.MCMSVersion,
+				Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+					selector: {
+						Canceller:        testhelpers.SingleGroupMCMS(),
+						Bypasser:         testhelpers.SingleGroupMCMS(),
+						Proposer:         testhelpers.SingleGroupMCMS(),
+						TimelockMinDelay: big.NewInt(0),
+						Qualifier:        new(tc.qualifier),
+						TimelockAdmin:    tc.timelockAdmin,
+					},
+				},
+			})
+			require.NoError(t, err)
+			env.DataStore = output.DataStore.Seal()
+
+			timelockRef := env.DataStore.Addresses().Filter(
+				datastore.AddressRefByChainSelector(selector),
+				datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+				datastore.AddressRefByQualifier(tc.qualifier),
+			)
+			require.Len(t, timelockRef, 1)
+			timelockAddr := common.HexToAddress(timelockRef[0].Address)
+
+			timelockC, err := bindings.NewRBACTimelock(timelockAddr, evmChain.Client)
+			require.NoError(t, err)
+
+			adminRoleAdmin, err := timelockC.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
+			require.NoError(t, err)
+
+			expectedAdmin := tc.expectAdmin(timelockAddr)
+			expectedIsAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, expectedAdmin)
+			require.NoError(t, err)
+			require.True(t, expectedIsAdmin, "expected %s to hold ADMIN_ROLE", expectedAdmin)
+
+			deployerStillAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain.DeployerKey.From)
+			require.NoError(t, err)
+			require.Equal(t, tc.deployerIsAdmin, deployerStillAdmin,
+				"deployer ADMIN_ROLE mismatch: expected deployerIsAdmin=%v", tc.deployerIsAdmin)
+		})
+	}
+}
+
 
 func TestUpdateMCMSConfig(t *testing.T) {
 	t.Parallel()
