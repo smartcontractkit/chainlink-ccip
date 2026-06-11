@@ -11,8 +11,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+	"k8s.io/utils/ptr"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -40,11 +42,11 @@ type committeeVerifierInputConfig struct {
 	AllowedFinalityConfig *finality.Config
 }
 
-// partialRemoteChainConfig is the internal per-remote chain input after lane expansion.
+// PartialRemoteChainConfig is the internal per-remote chain input after lane expansion.
 // Unset fields use adapter defaults, datastore resolution, or CCV auto-resolution.
-type partialRemoteChainConfig struct {
+type PartialRemoteChainConfig struct {
 	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  string
+	DefaultExecutorQualifier  *string
 	DefaultInboundCCVs        []datastore.AddressRef
 	LaneMandatedInboundCCVs   []datastore.AddressRef
 	DefaultOutboundCCVs       []datastore.AddressRef
@@ -60,7 +62,7 @@ type partialRemoteChainConfig struct {
 type partialChainConfig struct {
 	ChainSelector      uint64
 	CommitteeVerifiers []committeeVerifierInputConfig
-	RemoteChains       map[uint64]partialRemoteChainConfig
+	RemoteChains       map[uint64]PartialRemoteChainConfig
 	FamilyExtras       map[string]any
 }
 
@@ -68,7 +70,7 @@ type partialChainConfig struct {
 type enrichedChainConfig struct {
 	ChainSelector      uint64
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
-	RemoteChains       map[uint64]partialRemoteChainConfig
+	RemoteChains       map[uint64]PartialRemoteChainConfig
 	FamilyExtras       map[string]any
 }
 
@@ -113,7 +115,7 @@ func ConfigureChainsForLanesFromTopology(
 		if cfg.Topology.NOPTopology == nil || len(cfg.Topology.NOPTopology.Committees) == 0 {
 			return fmt.Errorf("no committees defined in topology")
 		}
-		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes)
+		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes, cfg.Topology.NOPTopology.Committees)
 		if err != nil {
 			return err
 		}
@@ -140,7 +142,7 @@ func ConfigureChainsForLanesFromTopology(
 	}
 
 	apply := func(e deployment.Environment, cfg ConfigureChainsForLanesFromTopologyConfig) (deployment.ChangesetOutput, error) {
-		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes)
+		chains, err := expandLanesToPartialChainConfigs(cfg.Lanes, cfg.Topology.NOPTopology.Committees)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -385,7 +387,7 @@ func resolveRemoteChainConfig(
 	remoteAdapter adapters.ChainFamily,
 	localChainSelector uint64,
 	remoteChainSelector uint64,
-	inCfg partialRemoteChainConfig,
+	inCfg PartialRemoteChainConfig,
 	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	remoteOnRampBytes, err := remoteAdapter.GetOnRampAddress(e.DataStore, remoteChainSelector)
@@ -398,12 +400,12 @@ func resolveRemoteChainConfig(
 	}
 
 	executorQualifier := inCfg.DefaultExecutorQualifier
-	if executorQualifier == "" {
-		executorQualifier = defaultQualifier
+	if executorQualifier == nil {
+		executorQualifier = ptr.To(defaultQualifier)
 	}
-	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, executorQualifier)
+	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, *executorQualifier)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", executorQualifier, localChainSelector, err)
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", *executorQualifier, localChainSelector, err)
 	}
 
 	defaultInboundCCVs, err := resolveDefaultCCVs(e, localChainSelector, inCfg.DefaultInboundCCVs, committeeVerifierContractRegistry)
@@ -435,8 +437,8 @@ func resolveRemoteChainConfig(
 
 	// Apply per-field user overrides on top of adapter defaults via coalesce.
 	// Pointer fields: nil = keep adapter default; non-nil = use caller value.
-	allowTrafficFrom := coalesce(inCfg.AllowTrafficFrom, defaults.AllowTrafficFrom)
-	tokenReceiverAllowed := coalesce(inCfg.TokenReceiverAllowed, defaults.TokenReceiverAllowed)
+	allowTrafficFrom := utils.Coalesce(inCfg.AllowTrafficFrom, defaults.AllowTrafficFrom)
+	tokenReceiverAllowed := utils.Coalesce(inCfg.TokenReceiverAllowed, defaults.TokenReceiverAllowed)
 
 	return adapters.RemoteChainConfig[[]byte, string]{
 		AllowTrafficFrom:          &allowTrafficFrom,
@@ -448,12 +450,12 @@ func resolveRemoteChainConfig(
 		DefaultOutboundCCVs:       defaultOutboundCCVs,
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  fqConfig,
-		ExecutorDestChainConfig:   coalesce(inCfg.ExecutorDestChainConfig, defaults.ExecutorDestChainConfig),
+		ExecutorDestChainConfig:   utils.Coalesce(inCfg.ExecutorDestChainConfig, defaults.ExecutorDestChainConfig),
 		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
-		BaseExecutionGasCost:      coalesce(inCfg.BaseExecutionGasCost, defaults.BaseExecutionGasCost),
+		BaseExecutionGasCost:      utils.Coalesce(inCfg.BaseExecutionGasCost, defaults.BaseExecutionGasCost),
 		TokenReceiverAllowed:      &tokenReceiverAllowed,
-		MessageNetworkFeeUSDCents: coalesce(inCfg.MessageNetworkFeeUSDCents, defaults.MessageNetworkFeeUSDCents),
-		TokenNetworkFeeUSDCents:   coalesce(inCfg.TokenNetworkFeeUSDCents, defaults.TokenNetworkFeeUSDCents),
+		MessageNetworkFeeUSDCents: utils.Coalesce(inCfg.MessageNetworkFeeUSDCents, defaults.MessageNetworkFeeUSDCents),
+		TokenNetworkFeeUSDCents:   utils.Coalesce(inCfg.TokenNetworkFeeUSDCents, defaults.TokenNetworkFeeUSDCents),
 	}, nil
 }
 
@@ -538,12 +540,12 @@ func mergeCommitteeVerifierRemoteChainConfig(
 	signatureConfig adapters.CommitteeVerifierSignatureQuorumConfig,
 ) adapters.CommitteeVerifierRemoteChainConfig {
 	return adapters.CommitteeVerifierRemoteChainConfig{
-		AllowlistEnabled:          coalesce(overrides.AllowlistEnabled, defaults.AllowlistEnabled),
+		AllowlistEnabled:          utils.Coalesce(overrides.AllowlistEnabled, defaults.AllowlistEnabled),
 		AddedAllowlistedSenders:   overrides.AddedAllowlistedSenders,
 		RemovedAllowlistedSenders: overrides.RemovedAllowlistedSenders,
-		FeeUSDCents:               coalesce(overrides.FeeUSDCents, defaults.FeeUSDCents),
-		GasForVerification:        coalesce(overrides.GasForVerification, defaults.GasForVerification),
-		PayloadSizeBytes:          coalesce(overrides.PayloadSizeBytes, defaults.PayloadSizeBytes),
+		FeeUSDCents:               utils.Coalesce(overrides.FeeUSDCents, defaults.FeeUSDCents),
+		GasForVerification:        utils.Coalesce(overrides.GasForVerification, defaults.GasForVerification),
+		PayloadSizeBytes:          utils.Coalesce(overrides.PayloadSizeBytes, defaults.PayloadSizeBytes),
 		SignatureConfig:           signatureConfig,
 	}
 }
@@ -623,14 +625,4 @@ func deriveFamiliesFromChains(chains []partialChainConfig) []string {
 		selectors = append(selectors, c.ChainSelector)
 	}
 	return deriveFamiliesFromSelectors(selectors)
-}
-
-// coalesce returns the dereferenced override if non-nil, otherwise returns def.
-// It is the canonical way to apply a user-supplied optional override on top of an
-// adapter-supplied default throughout this changeset.
-func coalesce[T any](override *T, def T) T {
-	if override != nil {
-		return *override
-	}
-	return def
 }

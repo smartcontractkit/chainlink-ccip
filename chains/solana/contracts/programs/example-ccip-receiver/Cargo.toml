@@ -1,6 +1,6 @@
 [package]
 name = "example_ccip_receiver"
-version = "1.6.2"
+version = "1.6.3"
 description = "Created with Anchor"
 edition = "2021"
 

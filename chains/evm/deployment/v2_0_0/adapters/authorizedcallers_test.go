@@ -4,16 +4,18 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // TestAuthorizedCallersAdapter_OperatorFlow verifies the end-to-end operator workflow:
@@ -37,22 +39,10 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 	e.DataStore = datastore.NewMemoryDataStore().Seal()
 	mcmsRegistry := cs_core.GetRegistry()
 
-	// Deploy RMN with no initial curse admins.
-	deployOut, err := changesets.DeployRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployRMNCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployRMNCfg{
-			ChainSel:    chainSelector,
-			CurseAdmins: []common.Address{},
-		},
-	})
-	require.NoError(t, err)
-
-	rmnAddrs, err := deployOut.DataStore.Addresses().Fetch()
-	require.NoError(t, err)
-	require.Len(t, rmnAddrs, 1)
+	rmnRef := deployRMNForTest(t, e.OperationsBundle, chain, nil)
 
 	ds := datastore.NewMemoryDataStore()
-	require.NoError(t, ds.Addresses().Add(rmnAddrs[0]))
+	require.NoError(t, ds.Addresses().Add(rmnRef))
 	e.DataStore = ds.Seal()
 
 	// Initialize the adapter.
@@ -96,7 +86,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 	afterAdd, err := adapter.GetAllAuthorizedCallers(*e, chainSelector, rmnops.ContractType, rmnops.Version)
 	require.NoError(t, err)
 	require.Len(t, afterAdd, 1)
-	require.Equal(t, deployer.Bytes(), []byte(afterAdd[0]))
+	require.Equal(t, deployer.Bytes(), afterAdd[0])
 
 	// Step 6 — remove.
 	_, err = api.ConfigureAuthorizedCallersChangeset(reg, mcmsRegistry).Apply(*e, api.Config{
@@ -132,22 +122,10 @@ func TestConfigureAuthorizedCallersChangeset_Force(t *testing.T) {
 	e.DataStore = datastore.NewMemoryDataStore().Seal()
 	mcmsRegistry := cs_core.GetRegistry()
 
-	// Deploy RMN with deployer pre-added as curse admin.
-	deployOut, err := changesets.DeployRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployRMNCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.DeployRMNCfg{
-			ChainSel:    chainSelector,
-			CurseAdmins: []common.Address{deployer},
-		},
-	})
-	require.NoError(t, err)
-
-	rmnAddrs, err := deployOut.DataStore.Addresses().Fetch()
-	require.NoError(t, err)
-	require.Len(t, rmnAddrs, 1)
+	rmnRef := deployRMNForTest(t, e.OperationsBundle, chain, []common.Address{deployer})
 
 	ds := datastore.NewMemoryDataStore()
-	require.NoError(t, ds.Addresses().Add(rmnAddrs[0]))
+	require.NoError(t, ds.Addresses().Add(rmnRef))
 	e.DataStore = ds.Seal()
 
 	reg := api.GetAuthorizedCallersRegistry()
@@ -187,15 +165,7 @@ func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
 	e.DataStore = datastore.NewMemoryDataStore().Seal()
 	mcmsRegistry := cs_core.GetRegistry()
 
-	// Deploy a real RMN for the primary type.
-	deployOut, err := changesets.DeployRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployRMNCfg]{
-		MCMS: mcms.Input{},
-		Cfg:  changesets.DeployRMNCfg{ChainSel: chainSelector, CurseAdmins: []common.Address{}},
-	})
-	require.NoError(t, err)
-	rmnAddrs, err := deployOut.DataStore.Addresses().Fetch()
-	require.NoError(t, err)
-	require.Len(t, rmnAddrs, 1)
+	rmnRef := deployRMNForTest(t, e.OperationsBundle, chain, nil)
 
 	// Register a second adapter for a stub type so validation resolves both entries.
 	const secondType = "AuthorizedCallersV2"
@@ -216,7 +186,7 @@ func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
 		Address:       common.HexToAddress("0x0000000000000000000000000000000000000001").Hex(),
 	}
 	ds := datastore.NewMemoryDataStore()
-	require.NoError(t, ds.Addresses().Add(rmnAddrs[0]))
+	require.NoError(t, ds.Addresses().Add(rmnRef))
 	require.NoError(t, ds.Addresses().Add(secondRef))
 	e.DataStore = ds.Seal()
 
@@ -241,4 +211,21 @@ func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
 	// VerifyPreconditions must pass: both contract types have registered adapters.
 	err = api.ConfigureAuthorizedCallersChangeset(reg, mcmsRegistry).VerifyPreconditions(*e, cfg)
 	require.NoError(t, err, "both contract types should resolve to registered adapters")
+}
+
+func deployRMNForTest(
+	t *testing.T,
+	b operations.Bundle,
+	chain evm.Chain,
+	curseAdmins []common.Address,
+) datastore.AddressRef {
+	t.Helper()
+
+	ref, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
+		ChainSelector:  chain.Selector,
+		Args:           rmnops.ConstructorArgs{CurseAdmins: curseAdmins},
+	}, nil)
+	require.NoError(t, err)
+	return ref
 }

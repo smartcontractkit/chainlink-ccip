@@ -407,7 +407,7 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 						DefaultTokenFeeUSDCents:     DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: dstChainCfg.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           DefaultTxGasLimit,
-						NetworkFeeUSDCents:          dstChainCfg.NetworkFeeUSDCents,
+						NetworkFeeUSDCents:          seq2_0.GetNetworkFeeUSDCents(input.ChainSelector, remoteChainSelector), // differs based on source and destination chain
 						LinkFeeMultiplierPercent:    dstChainCfg.LinkFeeMultiplierPercent,
 					},
 				})

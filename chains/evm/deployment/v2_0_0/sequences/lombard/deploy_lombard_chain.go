@@ -136,6 +136,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Type:           datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
 				Version:        lombard_verifier.Version,
 				CREATE2Factory: common.HexToAddress(input.DeployerContract),
+				Qualifier:      versioned_verifier_resolver.LombardVerifierResolverType.String(), // The qualifier for LombardVerifierResolver is the same as its type to avoid colliding with CommitteeVerifierResolver deployed with the "default" qualifier
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardVerifierResolver: %w", err)

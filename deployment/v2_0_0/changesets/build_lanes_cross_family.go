@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
@@ -14,11 +17,10 @@ import (
 // ChainOverrides holds per-chain lane settings that differ from chain-family adapter defaults.
 // Only set fields you need to override; omitted fields use adapter defaults at apply time.
 type ChainOverrides struct {
-	AllowTrafficFrom          *bool    `json:"allowTrafficFrom,omitempty" yaml:"allowTrafficFrom,omitempty"`
-	MessageNetworkFeeUSDCents *uint16  `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
-	TokenNetworkFeeUSDCents   *uint16  `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
-	AllowlistEnabled          *bool    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
-	AllowList                 []string `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	AllowlistEnabled                *bool                    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
+	AllowList                       []string                 `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	CommitteeVerifierFinalityConfig *finality.Config         `json:"committeeVerifierFinalityConfig,omitempty" yaml:"committeeVerifierFinalityConfig,omitempty"`
+	RemoteChainCfg                  PartialRemoteChainConfig `json:"remoteChainCfg,omitempty" yaml:"remoteChainCfg,omitempty"`
 }
 
 // CrossFamilyLanePair defines a bidirectional lane with optional per-chain overrides.
@@ -58,13 +60,12 @@ type ConfigureChainsForLanesFromTopologyConfig struct {
 
 // expandLanesToPartialChainConfigs converts bidirectional lane pairs into the internal
 // chain-centric representation used by the changeset apply path.
-func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair) ([]partialChainConfig, error) {
+func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees map[string]offchain.CommitteeConfig) ([]partialChainConfig, error) {
 	if len(lanes) == 0 {
 		return nil, fmt.Errorf("at least one lane must be specified")
 	}
 
 	byChain := make(map[uint64]*partialChainConfig)
-
 	for i, lane := range lanes {
 		if lane.ChainA == 0 || lane.ChainB == 0 {
 			return nil, fmt.Errorf("lane %d: chainA and chainB are required", i)
@@ -72,9 +73,38 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair) ([]partialCha
 		if lane.ChainA == lane.ChainB {
 			return nil, fmt.Errorf("lane %d: chainA and chainB must differ", i)
 		}
-
-		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, lane.ChainAOverrides)
-		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, lane.ChainBOverrides)
+		var qualifiers []string
+		remoteKey := strconv.FormatUint(lane.ChainB, 10)
+		for _, cvCfg := range committees {
+			if _, exists := cvCfg.ChainConfigs[remoteKey]; exists {
+				qualifiers = append(qualifiers, cvCfg.Qualifier)
+			}
+		}
+		sort.Strings(qualifiers)
+		if len(qualifiers) == 0 {
+			if len(committees) == 0 {
+				qualifiers = []string{defaultQualifier}
+			} else {
+				return nil, fmt.Errorf("lane %d: no committees have chain_config for remote chain %d", i, lane.ChainB)
+			}
+		}
+		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, qualifiers, lane.ChainAOverrides)
+		qualifiers = nil
+		remoteKey = strconv.FormatUint(lane.ChainA, 10)
+		for _, cvCfg := range committees {
+			if _, exists := cvCfg.ChainConfigs[remoteKey]; exists {
+				qualifiers = append(qualifiers, cvCfg.Qualifier)
+			}
+		}
+		sort.Strings(qualifiers)
+		if len(qualifiers) == 0 {
+			if len(committees) == 0 {
+				qualifiers = []string{defaultQualifier}
+			} else {
+				return nil, fmt.Errorf("lane %d: no committees have chain_config for remote chain %d", i, lane.ChainA)
+			}
+		}
+		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, qualifiers, lane.ChainBOverrides)
 	}
 
 	out := make([]partialChainConfig, 0, len(byChain))
@@ -108,16 +138,13 @@ func sortedKeys(m map[uint64]*partialChainConfig) []uint64 {
 	return keys
 }
 
-func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, o *ChainOverrides) {
+func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, qualifiers []string, o *ChainOverrides) {
 	cfg, ok := byChain[local]
 	if !ok {
 		cfg = &partialChainConfig{
-			ChainSelector: local,
-			CommitteeVerifiers: []committeeVerifierInputConfig{{
-				CommitteeQualifier: defaultQualifier,
-				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
-			}},
-			RemoteChains: make(map[uint64]partialRemoteChainConfig),
+			ChainSelector:      local,
+			CommitteeVerifiers: make([]committeeVerifierInputConfig, 0, len(qualifiers)),
+			RemoteChains:       make(map[uint64]PartialRemoteChainConfig),
 		}
 		byChain[local] = cfg
 	}
@@ -125,11 +152,35 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	cv := chainOverridesToCommitteeVerifierRemote(o)
 	rc := chainOverridesToPartialRemote(o)
 
-	if existing, ok := cfg.CommitteeVerifiers[0].RemoteChains[remote]; ok {
-		cfg.CommitteeVerifiers[0].RemoteChains[remote] = mergeCommitteeVerifierRemoteInput(existing, cv)
-	} else {
-		cfg.CommitteeVerifiers[0].RemoteChains[remote] = cv
+	// Ensure we have a verifier entry per qualifier, and only attach this remote chain to those qualifiers.
+	byQualifier := make(map[string]int, len(cfg.CommitteeVerifiers))
+	for i := range cfg.CommitteeVerifiers {
+		byQualifier[cfg.CommitteeVerifiers[i].CommitteeQualifier] = i
 	}
+	for _, q := range qualifiers {
+		idx, ok := byQualifier[q]
+		if !ok {
+			cfg.CommitteeVerifiers = append(cfg.CommitteeVerifiers, committeeVerifierInputConfig{
+				CommitteeQualifier: q,
+				RemoteChains:       make(map[uint64]committeeVerifierRemoteChainInput),
+			})
+			idx = len(cfg.CommitteeVerifiers) - 1
+			byQualifier[q] = idx
+		}
+		cfgCv := cfg.CommitteeVerifiers[idx]
+		if o != nil && o.CommitteeVerifierFinalityConfig != nil {
+			cfgCv.AllowedFinalityConfig = o.CommitteeVerifierFinalityConfig
+		}
+		if existingRemote, ok := cfgCv.RemoteChains[remote]; ok {
+			cfgCv.RemoteChains[remote] = mergeCommitteeVerifierRemoteInput(existingRemote, cv)
+		} else {
+			cfgCv.RemoteChains[remote] = cv
+		}
+		cfg.CommitteeVerifiers[idx] = cfgCv
+	}
+	sort.Slice(cfg.CommitteeVerifiers, func(i, j int) bool {
+		return cfg.CommitteeVerifiers[i].CommitteeQualifier < cfg.CommitteeVerifiers[j].CommitteeQualifier
+	})
 
 	if existing, ok := cfg.RemoteChains[remote]; ok {
 		cfg.RemoteChains[remote] = mergePartialRemoteInput(existing, rc)
@@ -138,15 +189,11 @@ func mergeLaneLeg(byChain map[uint64]*partialChainConfig, local, remote uint64, 
 	}
 }
 
-func chainOverridesToPartialRemote(o *ChainOverrides) partialRemoteChainConfig {
+func chainOverridesToPartialRemote(o *ChainOverrides) PartialRemoteChainConfig {
 	if o == nil {
-		return partialRemoteChainConfig{}
+		return PartialRemoteChainConfig{}
 	}
-	return partialRemoteChainConfig{
-		AllowTrafficFrom:          o.AllowTrafficFrom,
-		MessageNetworkFeeUSDCents: o.MessageNetworkFeeUSDCents,
-		TokenNetworkFeeUSDCents:   o.TokenNetworkFeeUSDCents,
-	}
+	return o.RemoteChainCfg
 }
 
 func chainOverridesToCommitteeVerifierRemote(o *ChainOverrides) committeeVerifierRemoteChainInput {
@@ -159,7 +206,7 @@ func chainOverridesToCommitteeVerifierRemote(o *ChainOverrides) committeeVerifie
 	}
 }
 
-func mergePartialRemoteInput(base, overlay partialRemoteChainConfig) partialRemoteChainConfig {
+func mergePartialRemoteInput(base, overlay PartialRemoteChainConfig) PartialRemoteChainConfig {
 	if overlay.AllowTrafficFrom != nil {
 		base.AllowTrafficFrom = overlay.AllowTrafficFrom
 	}
@@ -168,6 +215,29 @@ func mergePartialRemoteInput(base, overlay partialRemoteChainConfig) partialRemo
 	}
 	if overlay.TokenNetworkFeeUSDCents != nil {
 		base.TokenNetworkFeeUSDCents = overlay.TokenNetworkFeeUSDCents
+	}
+	if overlay.TokenReceiverAllowed != nil {
+		base.TokenReceiverAllowed = overlay.TokenReceiverAllowed
+	}
+	if overlay.DefaultExecutorQualifier != nil {
+		base.DefaultExecutorQualifier = overlay.DefaultExecutorQualifier
+	}
+	if overlay.BaseExecutionGasCost != nil {
+		base.BaseExecutionGasCost = overlay.BaseExecutionGasCost
+	}
+	base.FeeQuoterDestChainConfig = mergeFeeQuoterDestChainConfig(base.FeeQuoterDestChainConfig, overlay.FeeQuoterDestChainConfig)
+	base.ExecutorDestChainConfig = utils.CoalescePtr(overlay.ExecutorDestChainConfig, base.ExecutorDestChainConfig)
+	if overlay.DefaultInboundCCVs != nil {
+		base.DefaultInboundCCVs = overlay.DefaultInboundCCVs
+	}
+	if overlay.DefaultOutboundCCVs != nil {
+		base.DefaultOutboundCCVs = overlay.DefaultOutboundCCVs
+	}
+	if overlay.LaneMandatedOutboundCCVs != nil {
+		base.LaneMandatedOutboundCCVs = overlay.LaneMandatedOutboundCCVs
+	}
+	if overlay.LaneMandatedInboundCCVs != nil {
+		base.LaneMandatedInboundCCVs = overlay.LaneMandatedInboundCCVs
 	}
 	return base
 }
