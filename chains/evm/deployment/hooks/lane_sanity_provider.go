@@ -48,26 +48,24 @@ type EVMLaneSanityProvider struct {
 func (e *EVMLaneSanityProvider) ApplySenderPrivateKey(
 	ctx context.Context,
 	lggr logger.Logger,
-	env cldf.Environment,
+	env *cldf.Environment,
 	senderKey string,
-) (cldf.Environment, error) {
+) error {
 	senderKey = strings.TrimSpace(senderKey)
 	if senderKey == "" {
-		return env, nil
+		return nil
 	}
 
 	privateKey, err := parseSenderPrivateKey(senderKey)
 	if err != nil {
-		return env, err
-	}
-
-	if len(env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))) == 0 {
-		return env, fmt.Errorf("no EVM chains in environment")
+		return err
 	}
 
 	senderAddr := crypto.PubkeyToAddress(privateKey.PublicKey)
 	lggr.Infof("lane-sanity-check: sending from %s", senderAddr.Hex())
-
+	if len(env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))) == 0 {
+		return fmt.Errorf("no EVM chains in environment")
+	}
 	updatedChains := make(map[uint64]cldf_chain.BlockChain)
 	for sel, chain := range env.BlockChains.All() {
 		evmChain, ok := chain.(cldf_evm.Chain)
@@ -78,13 +76,13 @@ func (e *EVMLaneSanityProvider) ApplySenderPrivateKey(
 
 		chainMeta, ok := chain_selectors.ChainBySelector(sel)
 		if !ok {
-			return env, fmt.Errorf("unknown chain selector %d", sel)
+			return fmt.Errorf("unknown chain selector %d", sel)
 		}
 		chainID := big.NewInt(int64(chainMeta.EvmChainID))
 
 		transactor, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
 		if err != nil {
-			return env, fmt.Errorf("transactor selector=%d: %w", sel, err)
+			return fmt.Errorf("transactor selector=%d: %w", sel, err)
 		}
 		if evmChain.DeployerKey != nil {
 			transactor.GasLimit = evmChain.DeployerKey.GasLimit
@@ -101,7 +99,7 @@ func (e *EVMLaneSanityProvider) ApplySenderPrivateKey(
 	}
 
 	env.BlockChains = cldf_chain.NewBlockChains(updatedChains)
-	return env, nil
+	return nil
 }
 
 func parseSenderPrivateKey(senderKey string) (*ecdsa.PrivateKey, error) {

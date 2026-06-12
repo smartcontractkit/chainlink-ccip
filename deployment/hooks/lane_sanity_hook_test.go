@@ -14,12 +14,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	evmchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 )
 
 type stubLaneSanityProvider struct {
 	stubPostProposalProvider
-	applySenderPrivateKeyFn       func(ctx context.Context, lggr logger.Logger, env cldf.Environment, senderKey string) (cldf.Environment, error)
+	applySenderPrivateKeyFn       func(ctx context.Context, lggr logger.Logger, env *cldf.Environment, senderKey string) error
 	availableTransferTokensFn     func(env cldf.Environment, source, dest uint64) (map[string]string, error)
 	encodeReceiverAddressFn       func(env cldf.Environment, destSel uint64, receiverAddress string) ([]byte, error)
 	mockReceiverAddressFn         func(env cldf.Environment, chainSel uint64) ([]byte, error)
@@ -30,13 +31,13 @@ type stubLaneSanityProvider struct {
 func (s *stubLaneSanityProvider) ApplySenderPrivateKey(
 	ctx context.Context,
 	lggr logger.Logger,
-	env cldf.Environment,
+	env *cldf.Environment,
 	senderKey string,
-) (cldf.Environment, error) {
+) error {
 	if s.applySenderPrivateKeyFn != nil {
 		return s.applySenderPrivateKeyFn(ctx, lggr, env, senderKey)
 	}
-	return env, nil
+	return nil
 }
 
 func (s *stubLaneSanityProvider) AvailableTransferTokens(
@@ -140,10 +141,10 @@ func TestApplySenderPrivateKeyForRequests(t *testing.T) {
 	var lastKey string
 	var callCount int
 	GetPostProposalLaneSanityRegistry().Register(chain_selectors.FamilyEVM, &stubLaneSanityProvider{
-		applySenderPrivateKeyFn: func(_ context.Context, _ logger.Logger, env cldf.Environment, senderKey string) (cldf.Environment, error) {
+		applySenderPrivateKeyFn: func(_ context.Context, _ logger.Logger, env *cldf.Environment, senderKey string) error {
 			lastKey = senderKey
 			callCount++
-			return env, nil
+			return nil
 		},
 	})
 
@@ -152,15 +153,18 @@ func TestApplySenderPrivateKeyForRequests(t *testing.T) {
 		{src: poly, dest: eth},
 	}
 
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{eth, poly}))
+	require.NoError(t, err)
+
 	t.Run("empty env var leaves env unchanged", func(t *testing.T) {
 		lastKey = ""
 		callCount = 0
 		t.Setenv(laneSanityPrivateKeyEnv, "")
 
 		env := cldf.Environment{}
-		got, err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), env, requests)
+		err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), &env, requests)
 		require.NoError(t, err)
-		require.Equal(t, env, got)
 		require.Empty(t, lastKey)
 		require.Zero(t, callCount)
 	})
@@ -169,18 +173,18 @@ func TestApplySenderPrivateKeyForRequests(t *testing.T) {
 		lastKey = ""
 		callCount = 0
 		t.Setenv(laneSanityPrivateKeyEnv, "0xdeadbeef")
-
-		_, err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), cldf.Environment{}, requests)
+		err = applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), env, requests)
 		require.NoError(t, err)
 		require.Equal(t, "0xdeadbeef", lastKey)
 		require.Equal(t, 1, callCount)
+		require.Equal(t, 2, len(env.BlockChains.EVMChains()))
 	})
 
 	t.Run("missing provider errors", func(t *testing.T) {
 		ResetPostProposalLaneSanityRegistryForTest()
 		t.Setenv(laneSanityPrivateKeyEnv, "0xabc")
 
-		_, err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), cldf.Environment{}, requests)
+		err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), &cldf.Environment{}, requests)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "no provider for family")
 	})
@@ -188,13 +192,13 @@ func TestApplySenderPrivateKeyForRequests(t *testing.T) {
 	t.Run("provider error propagates", func(t *testing.T) {
 		ResetPostProposalLaneSanityRegistryForTest()
 		GetPostProposalLaneSanityRegistry().Register(chain_selectors.FamilyEVM, &stubLaneSanityProvider{
-			applySenderPrivateKeyFn: func(_ context.Context, _ logger.Logger, env cldf.Environment, _ string) (cldf.Environment, error) {
-				return env, errors.New("bad key")
+			applySenderPrivateKeyFn: func(_ context.Context, _ logger.Logger, env *cldf.Environment, _ string) error {
+				return errors.New("bad key")
 			},
 		})
 		t.Setenv(laneSanityPrivateKeyEnv, "0xabc")
 
-		_, err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), cldf.Environment{}, requests)
+		err := applySenderPrivateKeyForRequests(t.Context(), logger.Test(t), env, requests)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "bad key")
 	})

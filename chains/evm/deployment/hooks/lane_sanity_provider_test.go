@@ -10,26 +10,27 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 )
 
 func TestEVMLaneSanityProvider_ApplySenderPrivateKey_EmptyKey(t *testing.T) {
 	p := &EVMLaneSanityProvider{}
 	env := cldf.Environment{BlockChains: blockChainsWithSelectors(chain_selectors.ETHEREUM_MAINNET.Selector)}
 
-	got, err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), env, "")
+	err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), &env, "")
 	require.NoError(t, err)
-	require.Equal(t, env, got)
 }
 
 func TestEVMLaneSanityProvider_ApplySenderPrivateKey_InvalidKey(t *testing.T) {
 	p := &EVMLaneSanityProvider{}
 	env := cldf.Environment{BlockChains: blockChainsWithSelectors(chain_selectors.ETHEREUM_MAINNET.Selector)}
 
-	_, err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), env, "not-a-key")
+	err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), &env, "not-a-key")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "parse sender private key")
+	require.Contains(t, env.BlockChains.EVMChains(), chain_selectors.ETHEREUM_MAINNET.Selector)
 }
 
 func TestEVMLaneSanityProvider_ApplySenderPrivateKey_SetsDeployerKeyOnAllChains(t *testing.T) {
@@ -41,11 +42,11 @@ func TestEVMLaneSanityProvider_ApplySenderPrivateKey_SetsDeployerKeyOnAllChains(
 	const anvilKey0 = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	wantAddr := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
 
-	updated, err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), env, anvilKey0)
+	err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), &env, anvilKey0)
 	require.NoError(t, err)
 
 	for _, sel := range []uint64{ethSel, arbSel} {
-		chain := updated.BlockChains.EVMChains()[sel]
+		chain := env.BlockChains.EVMChains()[sel]
 		require.NotNil(t, chain.DeployerKey)
 		require.Equal(t, wantAddr, chain.DeployerKey.From)
 	}
@@ -55,7 +56,7 @@ func TestEVMLaneSanityProvider_ApplySenderPrivateKey_NoEVMChains(t *testing.T) {
 	p := &EVMLaneSanityProvider{}
 	env := cldf.Environment{}
 
-	_, err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), env, "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	err := p.ApplySenderPrivateKey(t.Context(), logger.Test(t), &env, "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no EVM chains")
 }

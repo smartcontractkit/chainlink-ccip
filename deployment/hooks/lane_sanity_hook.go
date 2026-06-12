@@ -19,6 +19,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
@@ -42,9 +43,9 @@ type PostProposalLaneSanity interface {
 	ApplySenderPrivateKey(
 		ctx context.Context,
 		lggr logger.Logger,
-		env cldf.Environment,
+		env *cldf.Environment,
 		senderKey string,
-	) (cldf.Environment, error)
+	) error
 
 	// AvailableTransferTokens returns selectable transfer tokens for source→dest.
 	// Keys are display labels; values are source-chain token addresses.
@@ -152,13 +153,13 @@ var transferTokenSelector = promptTransferTokenSelection
 var laneSanityWriteResultsCSV = writeLaneSanityResultsCSV
 
 type laneSanityCSVRecord struct {
-	SourceChain    string
-	DestChain      string
-	FeeToken       string
-	TransferToken  string
-	Data           string
-	Fee            string
-	ExplorerLink   string
+	SourceChain   string
+	DestChain     string
+	FeeToken      string
+	TransferToken string
+	Data          string
+	Fee           string
+	ExplorerLink  string
 }
 
 type laneSanityResultCollector struct {
@@ -198,7 +199,7 @@ func RunLaneSanityChecks(
 
 	bidirectionalReq := expandBidirectionalRequests(requests)
 
-	env, err := applySenderPrivateKeyForRequests(ctx, lggr, env, bidirectionalReq)
+	err := applySenderPrivateKeyForRequests(ctx, lggr, &env, bidirectionalReq)
 	if err != nil {
 		return fmt.Errorf("%s: sender key: %w", laneSanityCheckName, err)
 	}
@@ -253,19 +254,19 @@ func expandBidirectionalRequests(pairs []LaneSanityChainPair) []laneSanityCheckR
 func applySenderPrivateKeyForRequests(
 	ctx context.Context,
 	lggr logger.Logger,
-	env cldf.Environment,
+	env *cldf.Environment,
 	requests []laneSanityCheckRequest,
-) (cldf.Environment, error) {
+) error {
 	senderKey := strings.TrimSpace(os.Getenv(laneSanityPrivateKeyEnv))
 	if senderKey == "" {
-		return env, nil
+		return nil
 	}
 
 	seenFamilies := make(map[string]struct{})
 	for _, req := range requests {
 		family, err := chain_selectors.GetSelectorFamily(req.src)
 		if err != nil {
-			return env, fmt.Errorf("src selector %d: %w", req.src, err)
+			return fmt.Errorf("src selector %d: %w", req.src, err)
 		}
 		if _, ok := seenFamilies[family]; ok {
 			continue
@@ -274,14 +275,17 @@ func applySenderPrivateKeyForRequests(
 
 		provider, ok := GetPostProposalLaneSanityRegistry().Get(family)
 		if !ok {
-			return env, fmt.Errorf("no provider for family %s", family)
+			return fmt.Errorf("no provider for family %s", family)
 		}
-		env, err = provider.ApplySenderPrivateKey(ctx, lggr, env, senderKey)
+		if len(env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(family))) == 0 {
+			return fmt.Errorf("no %s chains in environment", family)
+		}
+		err = provider.ApplySenderPrivateKey(ctx, lggr, env, senderKey)
 		if err != nil {
-			return env, err
+			return err
 		}
 	}
-	return env, nil
+	return nil
 }
 
 // runLaneSanityMessageSendWithAllFeeTokens sends one message per supported fee token on
