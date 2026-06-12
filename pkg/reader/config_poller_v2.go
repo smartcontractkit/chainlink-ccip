@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -16,9 +15,8 @@ import (
 // refreshAllKnownChains refreshes all known chains in background using batched requests where possible
 // bgRefreshTimeout defines the timeout for background refresh operations
 const (
-	bgRefreshTimeout           = 30 * time.Second
-	MaxFailedPolls             = 10
-	noDestAccessorLogFrequency = 30 * time.Minute
+	bgRefreshTimeout = 30 * time.Second
+	MaxFailedPolls   = 10
 )
 
 // ConfigPoller defines the interface for caching chain configuration data
@@ -58,7 +56,6 @@ type configPollerV2 struct {
 	stopChan               chan struct{}
 	wg                     sync.WaitGroup
 	consecutiveFailedPolls atomic.Uint32
-	lastNoDestAccessorLog  atomic.Pointer[time.Time]
 }
 
 // chainCache represents the cache for a single chain.
@@ -270,10 +267,8 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	}
 
 	if _, exists := c.chainAccessors[c.destChainSelector]; !exists {
-		logutil.LogWhenExceedFrequency(&c.lastNoDestAccessorLog, noDestAccessorLogFrequency, func() {
-			c.lggr.Errorw("no chain accessor for dest chain; cannot track or refresh source configs",
-				"destChain", c.destChainSelector)
-		})
+		c.lggr.Errorw("no chain accessor for dest chain; cannot track or refresh source configs",
+			"destChain", c.destChainSelector)
 		return nil, fmt.Errorf("no chain accessor for dest chain %s", c.destChainSelector)
 	}
 

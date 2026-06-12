@@ -342,10 +342,10 @@ func (r *ccipChainReader) NextSeqNum(
 
 	res := make(map[cciptypes.ChainSelector]cciptypes.SeqNum, len(chains))
 	var (
-		configNotFound []cciptypes.ChainSelector
-		disabledChains []cciptypes.ChainSelector
-		onRampMissing  []cciptypes.ChainSelector
-		routerMissing  []cciptypes.ChainSelector
+		configNotFound  []cciptypes.ChainSelector
+		disabledChains  []cciptypes.ChainSelector
+		onRampMissing   []cciptypes.ChainSelector
+		routerMissing   []cciptypes.ChainSelector
 		minSeqNrMissing []cciptypes.ChainSelector
 	)
 	for _, chain := range chains {
