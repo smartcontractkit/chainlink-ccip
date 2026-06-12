@@ -29,12 +29,12 @@ type ApplyVerifierConfigInput struct {
 	RevokeOrphanedJobs bool
 }
 
-func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry, chainFamilyRegistry *adapters.ChainFamilyRegistry) deployment.ChangeSetV2[ApplyVerifierConfigInput] {
+func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry) deployment.ChangeSetV2[ApplyVerifierConfigInput] {
 	validate := func(e deployment.Environment, cfg ApplyVerifierConfigInput) error {
 		if cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
-		if err := cfg.Topology.ValidateForEnvironment(e.Name, chainFamilyRegistry); err != nil {
+		if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
 			return fmt.Errorf("topology validation failed: %w", err)
 		}
 

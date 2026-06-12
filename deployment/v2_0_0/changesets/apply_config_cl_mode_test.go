@@ -115,7 +115,7 @@ func TestApplyVerifierConfig_FailsWhenNOPMissingChainSupport(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -179,7 +179,7 @@ func TestApplyVerifierConfig_PassesWhenNOPSupportsExtraChains(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -209,7 +209,7 @@ func TestApplyVerifierConfig_SkipsChainSupportValidationForStandaloneNOPs(t *tes
 	topo := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -269,7 +269,7 @@ func TestApplyVerifierConfig_PassesWhenNonTargetNOPMissingChainSupport(t *testin
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -339,7 +339,7 @@ func TestApplyExecutorConfig_FailsWhenNOPMissingChainSupport(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -403,7 +403,7 @@ func TestApplyExecutorConfig_PassesWhenNOPSupportsExtraChains(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -434,7 +434,7 @@ func TestApplyExecutorConfig_SkipsChainSupportValidationForStandaloneNOPs(t *tes
 	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -494,7 +494,7 @@ func TestApplyExecutorConfig_PassesWhenNonTargetNOPMissingChainSupport(t *testin
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -552,7 +552,7 @@ func TestApplyVerifierConfig_ProposesCorrectSpecToCorrectNode(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -630,7 +630,7 @@ func TestApplyExecutorConfig_ProposesCorrectSpecToCorrectNode(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -709,7 +709,7 @@ func TestApplyVerifierConfig_ExtraNodeIDsDoNotReceiveProposals(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2", "node-extra"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -753,7 +753,7 @@ func TestApplyVerifierConfig_FailsWhenTopologyNOPNotInNodeIDs(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -809,7 +809,7 @@ func TestApplyVerifierConfig_ListNodesFilteredByNodeIDs(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -871,7 +871,7 @@ func TestApplyVerifierConfig_TargetNOPsScopesProposals(t *testing.T) {
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2", "node-3"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -938,7 +938,7 @@ func TestApplyVerifierConfig_RevokeOrphanedJobsDoesNotAffectOtherCommittees(t *t
 		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "prop-1"}}, nil,
 	)
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -1000,7 +1000,7 @@ func TestApplyExecutorConfig_RevokeOrphanedJobsDoesNotAffectVerifierJobs(t *test
 		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "prop-1"}}, nil,
 	)
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:           topo,
 		ExecutorQualifier:  "pool1",
@@ -1080,7 +1080,7 @@ func TestApplyVerifierConfig_TargetNOPsSucceedsWhenNonTargetedNOPMissingFromJD(t
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -1152,7 +1152,7 @@ func TestApplyVerifierConfig_UntargetedNOPMissingSignerDoesNotBlockTargetedNOPs(
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -1200,7 +1200,7 @@ func TestApplyVerifierConfig_WrapperPassesTargetNOPsAndRevokeOrphanedJobsToSeque
 	env.Offchain = mockJD
 	env.NodeIDs = []string{"node-1", "node-2"}
 
-	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyVerifierConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",

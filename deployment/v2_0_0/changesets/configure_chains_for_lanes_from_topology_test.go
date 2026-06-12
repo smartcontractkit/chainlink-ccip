@@ -2,7 +2,6 @@ package changesets_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -138,46 +137,6 @@ func (m *mockChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 		WaitForSafe:     true,
 		BlockDepth:      1,
 	}
-}
-
-// ValidateNOPsTopology accepts every topology. The production NOP
-// minimum is a chain-family concern owned and tested against each real adapter
-// (see the EVM adapter's chain_family_test.go); changeset tests only need a
-// benign default here. Use newRejectingChainFamilyRegistry to exercise the
-// failure path.
-func (m *mockChainFamilyAdapter) ValidateNOPsTopology(_ string, _ int) error {
-	return nil
-}
-
-// newTestChainFamilyRegistry returns a chain family registry with the mock
-// adapter registered for the EVM family, suitable for changeset tests that need
-// to satisfy the ValidateForEnvironment signature.
-func newTestChainFamilyRegistry() *adapters.ChainFamilyRegistry {
-	registry := adapters.NewChainFamilyRegistry()
-	registry.RegisterChainFamily(chainsel.FamilyEVM, &mockChainFamilyAdapter{})
-	return registry
-}
-
-// errStubNOPValidation is returned by rejectingChainFamilyAdapter so tests can
-// assert that changesets surface chain-family NOP validation failures.
-var errStubNOPValidation = errors.New("stub chain family rejected topology")
-
-// rejectingChainFamilyAdapter is a ChainFamily test double whose only behaviour
-// is to reject production NOP validation. The embedded nil interface satisfies
-// the rest of the contract; those methods are never called during
-// VerifyPreconditions.
-type rejectingChainFamilyAdapter struct {
-	adapters.ChainFamily
-}
-
-func (rejectingChainFamilyAdapter) ValidateNOPsTopology(_ string, _ int) error {
-	return errStubNOPValidation
-}
-
-func newRejectingChainFamilyRegistry() *adapters.ChainFamilyRegistry {
-	registry := adapters.NewChainFamilyRegistry()
-	registry.RegisterChainFamily(chainsel.FamilyEVM, rejectingChainFamilyAdapter{})
-	return registry
 }
 
 func (m *mockChainFamilyAdapter) getAddress(chainSelector uint64, contractType string) ([]byte, error) {

@@ -69,7 +69,7 @@ func TestApplyExecutorConfig_GeneratesValidJobSpec(t *testing.T) {
 	topo.IndexerAddress = []string{"http://indexer:8100", "http://indexer:8101"}
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -116,7 +116,7 @@ func TestApplyExecutorConfig_PreservesExistingJobSpecs(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newExecutorTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -165,7 +165,7 @@ func TestApplyExecutorConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newExecutorTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:           topo,
 		ExecutorQualifier:  "pool1",
@@ -209,7 +209,7 @@ func TestApplyExecutorConfig_PreservesOrphanedJobSpecsWhenRevokeOrphanedJobsFals
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newExecutorTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -253,7 +253,7 @@ func TestApplyExecutorConfig_TargetNOPsScopingPreservesUntargetedJobs(t *testing
 	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
 	env := newExecutorTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -306,7 +306,7 @@ func TestApplyExecutorConfig_OnlyIncludesDeployedChains(t *testing.T) {
 	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2, sel3})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -359,7 +359,7 @@ func TestApplyExecutorConfig_PoolMembershipIncludedInJobSpec(t *testing.T) {
 
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -422,7 +422,7 @@ func TestApplyExecutorConfig_PerChainPoolMembershipAndIntervalInJobSpec(t *testi
 
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -493,7 +493,7 @@ func TestApplyExecutorConfig_FailsWhenPoolChainHasNoDeployedContracts(t *testing
 
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	_, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -532,7 +532,7 @@ func TestApplyExecutorConfig_UpdatesJobsWhenChainRemovedFromTopology(t *testing.
 	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	firstOutput, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -600,7 +600,7 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberAddedToPool(t *testing.T) {
 
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	firstOutput, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          initialTopo,
 		ExecutorQualifier: "pool1",
@@ -693,7 +693,7 @@ func TestApplyExecutorConfig_AllNOPsUpdatedWhenMemberRemovedFromPool(t *testing.
 
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
+	cs := changesets.ApplyExecutorConfig(registry)
 	firstOutput, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          initialTopo,
 		ExecutorQualifier: "pool1",
