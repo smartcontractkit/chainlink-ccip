@@ -317,8 +317,8 @@ func (e *EVMLaneSanityProvider) queryFeeTokensFromChain(
 }
 
 // FundAndApproveTransferToken verifies that the sender on srcSel holds at
-// least one whole token unit (10^decimals) of tokenAddress, then approves the
-// Router to spend that amount.
+// least one smallest token unit (1/10^decimals of a whole token) of tokenAddress,
+// then approves the Router to spend that amount.
 //
 // Lane sanity checks always run against a real environment where the sender is
 // pre-funded. If the balance is insufficient an error is returned immediately so
@@ -344,21 +344,18 @@ func (e *EVMLaneSanityProvider) FundAndApproveTransferToken(
 		return nil, fmt.Errorf("BurnMintERC20 binding %s: %w", tokenAddress, err)
 	}
 
-	decimals, err := token.Decimals(nil)
-	if err != nil {
-		return nil, fmt.Errorf("decimals %s on chain %d: %w", tokenAddress, srcSel, err)
-	}
-	oneUnit := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil)
+	// 1 smallest unit = 1/10^decimals of a whole token (e.g. 1e-18 for 18 decimals).
+	minTransferAmount := big.NewInt(1)
 
 	senderAddr := chain.DeployerKey.From
 	balance, err := token.BalanceOf(nil, senderAddr)
 	if err != nil {
 		return nil, fmt.Errorf("balanceOf sender token=%s chain=%d: %w", tokenAddress, srcSel, err)
 	}
-	if balance.Cmp(oneUnit) < 0 {
+	if balance.Cmp(minTransferAmount) < 0 {
 		return nil, fmt.Errorf(
-			"sender %s has insufficient balance for token %s on chain %d: have %s, need %s (1 whole unit); ensure the sender is funded before running lane sanity checks",
-			senderAddr.Hex(), tokenAddress, srcSel, balance.String(), oneUnit.String(),
+			"sender %s has insufficient balance for token %s on chain %d: have %s, need %s (1 smallest unit); ensure the sender is funded before running lane sanity checks",
+			senderAddr.Hex(), tokenAddress, srcSel, balance.String(), minTransferAmount.String(),
 		)
 	}
 
@@ -367,7 +364,7 @@ func (e *EVMLaneSanityProvider) FundAndApproveTransferToken(
 		return nil, fmt.Errorf("router address chain=%d: %w", srcSel, err)
 	}
 
-	approveTx, err := token.Approve(chain.DeployerKey, routerAddr, oneUnit)
+	approveTx, err := token.Approve(chain.DeployerKey, routerAddr, minTransferAmount)
 	if err != nil {
 		return nil, fmt.Errorf("approve router=%s token=%s chain=%d: %w",
 			routerAddr.Hex(), tokenAddress, srcSel, err)
@@ -376,7 +373,7 @@ func (e *EVMLaneSanityProvider) FundAndApproveTransferToken(
 		return nil, fmt.Errorf("confirm approve token=%s chain=%d: %w", tokenAddress, srcSel, err)
 	}
 
-	return oneUnit, nil
+	return minTransferAmount, nil
 }
 
 // feeQuoterV2 resolves the v2.0 FeeQuoter binding for srcSel. Returns an error

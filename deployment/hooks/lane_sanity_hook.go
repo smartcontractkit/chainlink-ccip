@@ -60,10 +60,10 @@ type PostProposalLaneSanity interface {
 	MockReceiverAddress(env cldf.Environment, chainSel uint64) ([]byte, error)
 
 	// FundAndApproveTransferToken verifies that the sender on srcSel holds at
-	// least one whole token unit of tokenAddress and approves the Router to spend
-	// it. Returns the approved amount (1 unit = 10^decimals). Returns an error if
-	// the sender balance is insufficient — callers must ensure the sender is
-	// funded before running lane sanity checks.
+	// least one smallest token unit of tokenAddress (1/10^decimals of a whole
+	// token) and approves the Router to spend it. Returns the approved amount.
+	// Returns an error if the sender balance is insufficient — callers must ensure
+	// the sender is funded before running lane sanity checks.
 	FundAndApproveTransferToken(
 		ctx context.Context,
 		env cldf.Environment,
