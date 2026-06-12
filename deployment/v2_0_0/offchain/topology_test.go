@@ -2,15 +2,40 @@ package offchain
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
+// stubChainFamily is a minimal ChainFamily test double used to verify how
+// ValidateForEnvironment orchestrates the per-chain NOP check (production-only,
+// per committee/pool, with error wrapping). It enforces an arbitrary test
+// threshold rather than the real production minimum, which is owned and tested
+// separately for each chain family. The embedded nil interface
+// satisfies the rest of the ChainFamily contract; those methods are never
+// called by ValidateForEnvironment.
+type stubChainFamily struct {
+	adapters.ChainFamily
+	minNOPs int
+}
+
+func (s stubChainFamily) ValidateMinimumNOPsTopology(chainSelector string, nopCount int) error {
+	if nopCount < s.minNOPs {
+		return fmt.Errorf("chain %q rejected: %d NOPs below test minimum %d", chainSelector, nopCount, s.minNOPs)
+	}
+	return nil
+}
+
 func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *testing.T) {
-	fifteenAliases := testNOPAliases(15)
-	fourteenAliases := testNOPAliases(14)
+	const testMinNOPs = 3
+	chainSelector := strconv.FormatUint(chainsel.TEST_90000001.Selector, 10)
+	enough := testNOPAliases(testMinNOPs)
+	tooFew := testNOPAliases(testMinNOPs - 1)
 
 	tests := []struct {
 		name             string
@@ -20,33 +45,27 @@ func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *test
 		wantErr          string
 	}{
 		{
-			name:             "prod committee chain with fifteen unique NOPs fails",
+			name:             "production committee below minimum is rejected and wrapped",
 			envName:          "prod_mainnet",
-			committeeAliases: fourteenAliases,
-			poolAliases:      fifteenAliases,
-			wantErr:          `committee "default" chain "1" requires at least 15 unique NOPs`,
+			committeeAliases: tooFew,
+			poolAliases:      enough,
+			wantErr:          fmt.Sprintf(`committee "default" validation failed: chain %q rejected`, chainSelector),
 		},
 		{
-			name:             "prod committee chain with fifteen unique NOPs passes",
+			name:             "production executor pool below minimum is rejected and wrapped",
+			envName:          "prod_testnet",
+			committeeAliases: enough,
+			poolAliases:      tooFew,
+			wantErr:          fmt.Sprintf(`executor pool "default" validation failed: chain %q rejected`, chainSelector),
+		},
+		{
+			name:             "production topology meeting the minimum passes",
 			envName:          "prod_mainnet",
-			committeeAliases: fifteenAliases,
-			poolAliases:      fifteenAliases,
+			committeeAliases: enough,
+			poolAliases:      enough,
 		},
 		{
-			name:             "prod executor pool chain with fifteen unique NOPs fails",
-			envName:          "prod_testnet",
-			committeeAliases: fifteenAliases,
-			poolAliases:      fourteenAliases,
-			wantErr:          `executor pool "default" chain "1" requires at least 15 unique NOPs`,
-		},
-		{
-			name:             "prod executor pool chain with fifteen unique NOPs passes",
-			envName:          "prod_testnet",
-			committeeAliases: fifteenAliases,
-			poolAliases:      fifteenAliases,
-		},
-		{
-			name:             "non prod chain with fewer than fifteen NOPs passes",
+			name:             "non production environment skips the chain family check",
 			envName:          "test",
 			committeeAliases: []string{"nop-1"},
 			poolAliases:      []string{"nop-1"},
@@ -54,17 +73,19 @@ func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *test
 		{
 			name:             "duplicate committee aliases do not count toward minimum",
 			envName:          "prod_mainnet",
-			committeeAliases: append(testNOPAliases(14), "nop-1"),
-			poolAliases:      fifteenAliases,
-			wantErr:          `committee "default" chain "1" requires at least 15 unique NOPs`,
+			committeeAliases: append(testNOPAliases(testMinNOPs-1), "nop-1"),
+			poolAliases:      enough,
+			wantErr:          fmt.Sprintf(`committee "default" validation failed: chain %q rejected`, chainSelector),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			topology := testEnvironmentTopology(tt.committeeAliases, tt.poolAliases)
+			topology := testEnvironmentTopology(chainSelector, tt.committeeAliases, tt.poolAliases)
+			registry := adapters.NewChainFamilyRegistry()
+			registry.RegisterChainFamily(chainsel.FamilyEVM, stubChainFamily{minNOPs: testMinNOPs})
 
-			err := topology.ValidateForEnvironment(tt.envName)
+			err := topology.ValidateForEnvironment(tt.envName, registry)
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				return
@@ -84,7 +105,7 @@ func TestEnvironmentTopologyValidate_NilNOPTopology(t *testing.T) {
 	assert.Contains(t, err.Error(), "nop_topology is required")
 }
 
-func testEnvironmentTopology(committeeAliases []string, poolAliases []string) *EnvironmentTopology {
+func testEnvironmentTopology(chainSelector string, committeeAliases []string, poolAliases []string) *EnvironmentTopology {
 	nops := make([]NOPConfig, 0, len(committeeAliases)+len(poolAliases))
 	seen := make(map[string]struct{}, len(committeeAliases)+len(poolAliases))
 	for _, alias := range append(append([]string{}, committeeAliases...), poolAliases...) {
@@ -109,7 +130,7 @@ func testEnvironmentTopology(committeeAliases []string, poolAliases []string) *E
 						{Name: "agg-1", Address: "http://aggregator:8080"},
 					},
 					ChainConfigs: map[string]ChainCommitteeConfig{
-						"1": {NOPAliases: committeeAliases, Threshold: 1},
+						chainSelector: {NOPAliases: committeeAliases, Threshold: 1},
 					},
 				},
 			},
@@ -117,7 +138,7 @@ func testEnvironmentTopology(committeeAliases []string, poolAliases []string) *E
 		ExecutorPools: map[string]ExecutorPoolConfig{
 			"default": {
 				ChainConfigs: map[string]ChainExecutorPoolConfig{
-					"1": {NOPAliases: poolAliases},
+					chainSelector: {NOPAliases: poolAliases},
 				},
 			},
 		},

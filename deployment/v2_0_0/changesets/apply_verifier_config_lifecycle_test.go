@@ -109,7 +109,7 @@ func TestApplyVerifierConfig_GeneratesValidJobSpec(t *testing.T) {
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -159,7 +159,7 @@ func TestApplyVerifierConfig_PreservesExistingJobSpecs(t *testing.T) {
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -201,7 +201,7 @@ func TestApplyVerifierConfig_MultipleAggregators(t *testing.T) {
 	topo := newVerifierTopologyWithAggregators([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone, aggregators, nil)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -256,7 +256,7 @@ func TestApplyVerifierConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -301,7 +301,7 @@ func TestApplyVerifierConfig_PreservesOrphanedJobSpecsWhenRevokeOrphanedJobsFals
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -346,7 +346,7 @@ func TestApplyVerifierConfig_TargetNOPsScopingPreservesUntargetedJobs(t *testing
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
 
 	topo := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -397,7 +397,7 @@ func TestApplyVerifierConfig_OnlyIncludesCommitteeChains(t *testing.T) {
 	topo := newVerifierTopologyWithAggregators([]string{"nop1"}, "c1", nil, shared.NOPModeStandalone, nil, chainConfigs)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2, sel3})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -446,7 +446,7 @@ func TestApplyVerifierConfig_FiltersChainsPerNOPMembership(t *testing.T) {
 	topo := newVerifierTopologyWithAggregators([]string{"nop1", "nop2"}, "c1", nil, shared.NOPModeStandalone, nil, chainConfigs)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -508,7 +508,7 @@ func TestApplyVerifierConfig_SkipsNOPsNotInAnyChainConfig(t *testing.T) {
 	}
 	env := newVerifierTestEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -544,7 +544,7 @@ func TestApplyVerifierConfig_SkipsUnchangedJobSpecs(t *testing.T) {
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -595,7 +595,7 @@ func TestApplyVerifierConfig_UpdatesJobsWhenChainRemoved(t *testing.T) {
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1, sel2}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
 		CommitteeQualifier:       "c1",
@@ -654,7 +654,7 @@ func TestApplyVerifierConfig_RemovesJobWhenNOPRemovedFromCommittee(t *testing.T)
 	topoBoth := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1, sel2}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topoBoth,
 		CommitteeQualifier:       "c1",
@@ -719,7 +719,7 @@ func TestApplyVerifierConfig_CreatesJobWhenNOPAddedToCommittee(t *testing.T) {
 	topoNOP1Only := newVerifierTopologyWithAggregators([]string{"nop1", "nop2"}, "c1", nil, shared.NOPModeStandalone, nil, chainConfigsNOP1Only)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyVerifierConfig(registry)
+	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topoNOP1Only,
 		CommitteeQualifier:       "c1",

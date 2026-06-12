@@ -26,12 +26,12 @@ type ApplyExecutorConfigInput struct {
 	RevokeOrphanedJobs bool
 }
 
-func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry) deployment.ChangeSetV2[ApplyExecutorConfigInput] {
+func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry, chainFamilyRegistry *adapters.ChainFamilyRegistry) deployment.ChangeSetV2[ApplyExecutorConfigInput] {
 	validate := func(e deployment.Environment, cfg ApplyExecutorConfigInput) error {
 		if cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
-		if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+		if err := cfg.Topology.ValidateForEnvironment(e.Name, chainFamilyRegistry); err != nil {
 			return fmt.Errorf("topology validation failed: %w", err)
 		}
 

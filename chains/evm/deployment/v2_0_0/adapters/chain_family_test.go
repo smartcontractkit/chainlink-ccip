@@ -443,3 +443,40 @@ func TestChainFamilyAdapter_DefaultsAppliedOnChainViaConfigureChainsForLanesFrom
 		remoteSelector,
 	)
 }
+
+func TestChainFamilyAdapter_ValidateMinimumNOPsTopology(t *testing.T) {
+	adapter := &evmadapters.ChainFamilyAdapter{}
+	const chainSelector = "5009297550715157269"
+
+	tests := []struct {
+		name     string
+		nopCount int
+		wantErr  string
+	}{
+		{
+			name:     "fewer than the minimum is rejected",
+			nopCount: 14,
+			wantErr:  `chain "5009297550715157269" requires at least 15 unique NOPs for production environments, got 14`,
+		},
+		{
+			name:     "exactly the minimum is allowed",
+			nopCount: 15,
+		},
+		{
+			name:     "more than the minimum is allowed",
+			nopCount: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := adapter.ValidateMinimumNOPsTopology(chainSelector, tt.nopCount)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Equal(t, tt.wantErr, err.Error())
+		})
+	}
+}

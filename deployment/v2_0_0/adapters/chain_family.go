@@ -118,6 +118,7 @@ type ChainFamily interface {
 	GetDefaultRemoteChainConfig(sourceChainSelector, remoteChainSelector uint64) RemoteChainDefaults
 	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
 	GetDefaultFinalityConfig() finality.Config
+	ValidateMinimumNOPsTopology(chainSelector string, nopCount int) error
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.
