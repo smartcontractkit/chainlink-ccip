@@ -352,7 +352,8 @@ func TestRunLaneSanityTokenChecksForPair_SkipsPTTWithoutMockReceiver(t *testing.
 	}
 
 	err := runLaneSanityTokenChecksForPair(
-		t.Context(), logger.Test(t), env, chain_selectors.FamilyEVM, provider, eth, poly, "", &laneSanityResultCollector{},
+		t.Context(), logger.Test(t), env, chain_selectors.FamilyEVM, provider, eth, poly,
+		[]string{"0xlink"}, "", &laneSanityResultCollector{},
 	)
 	require.NoError(t, err)
 	require.Equal(t, 1, sendCount)
@@ -392,6 +393,14 @@ func TestWriteLaneSanityResultsCSV(t *testing.T) {
 			Fee:           "200",
 			ExplorerLink:  "https://ccip.chain.link/msg/0xdef",
 		},
+		{
+			SourceChain:   "ethereum-mainnet",
+			DestChain:     "polygon-mainnet",
+			FeeToken:      "0xusdc",
+			TransferToken: "",
+			Data:          "lane-sanity-check",
+			Error:         "insufficient funds",
+		},
 	}
 	require.NoError(t, writeLaneSanityResultsCSV(logger.Test(t), records))
 
@@ -401,16 +410,19 @@ func TestWriteLaneSanityResultsCSV(t *testing.T) {
 
 	rows, err := csv.NewReader(f).ReadAll()
 	require.NoError(t, err)
-	require.Len(t, rows, 3)
+	require.Len(t, rows, 4)
 	require.Equal(t, []string{
-		"source", "destination", "fee_token", "transfer_token", "data", "fee", "explorer_link",
+		"source", "destination", "fee_token", "transfer_token", "data", "fee", "explorer_link", "error",
 	}, rows[0])
 	require.Equal(t, []string{
-		"ethereum-mainnet", "polygon-mainnet", "native", "", "lane-sanity-check", "100", "https://ccip.chain.link/msg/0xabc",
+		"ethereum-mainnet", "polygon-mainnet", "native", "", "lane-sanity-check", "100", "https://ccip.chain.link/msg/0xabc", "",
 	}, rows[1])
 	require.Equal(t, []string{
-		"ethereum-mainnet", "polygon-mainnet", "native", "0xlink", "", "200", "https://ccip.chain.link/msg/0xdef",
+		"ethereum-mainnet", "polygon-mainnet", "native", "0xlink", "", "200", "https://ccip.chain.link/msg/0xdef", "",
 	}, rows[2])
+	require.Equal(t, []string{
+		"ethereum-mainnet", "polygon-mainnet", "0xusdc", "", "lane-sanity-check", "", "", "insufficient funds",
+	}, rows[3])
 }
 
 func TestWriteLaneSanityResultsCSV_EmptyRecords(t *testing.T) {
@@ -471,7 +483,8 @@ func TestRunLaneSanityTokenChecksForPair_WritesCSVRecord(t *testing.T) {
 
 	collector := &laneSanityResultCollector{}
 	require.NoError(t, runLaneSanityTokenChecksForPair(
-		t.Context(), logger.Test(t), env, chain_selectors.FamilyEVM, provider, eth, poly, "", collector,
+		t.Context(), logger.Test(t), env, chain_selectors.FamilyEVM, provider, eth, poly,
+		[]string{"0xlink"}, "", collector,
 	))
 	require.NoError(t, writeLaneSanityResultsCSV(logger.Test(t), collector.snapshot()))
 
@@ -484,6 +497,47 @@ func TestRunLaneSanityTokenChecksForPair_WritesCSVRecord(t *testing.T) {
 	require.Equal(t, "0xlink", rows[1][3])
 	require.Equal(t, "42", rows[1][5])
 	require.Equal(t, "https://ccip.chain.link/msg/0xtransfer-id", rows[1][6])
+	require.Empty(t, rows[1][7])
+}
+
+func TestRunTokenTransferScenario_RecordsFailureInCSV(t *testing.T) {
+	eth := chain_selectors.ETHEREUM_MAINNET.Selector
+	poly := chain_selectors.POLYGON_MAINNET.Selector
+	version := newUniqueAdapterVersion()
+	adapters := map[uint64]*stubTestAdapter{
+		eth: {selector: eth, family: chain_selectors.FamilyEVM},
+	}
+	registerFactoryForVersion(t, chain_selectors.FamilyEVM, version, adapters)
+
+	sendErr := errors.New("send rejected")
+	provider := &stubLaneSanityProvider{
+		fundAndApproveTransferTokenFn: func(_ context.Context, _ cldf.Environment, _ uint64, _ string) (*big.Int, error) {
+			return big.NewInt(1), nil
+		},
+	}
+	adapters[eth].sendMessageFn = func(_ context.Context, _ uint64, _ any) (uint64, string, error) {
+		return 0, "", sendErr
+	}
+
+	env := cldf.Environment{
+		BlockChains: chain.NewBlockChains(map[uint64]chain.BlockChain{
+			eth: evmchain.Chain{Selector: eth},
+		}),
+	}
+	collector := &laneSanityResultCollector{}
+	err := runTokenTransferScenario(
+		t.Context(), logger.Test(t), env, adapters[eth], eth, poly,
+		"0xlink", []byte("receiver"), []byte("extra"), nil, provider, collector,
+	)
+	require.ErrorIs(t, err, sendErr)
+
+	records := collector.snapshot()
+	require.Len(t, records, 1)
+	require.Equal(t, chain_selectors.ETHEREUM_MAINNET.Name, records[0].SourceChain)
+	require.Equal(t, chain_selectors.POLYGON_MAINNET.Name, records[0].DestChain)
+	require.Equal(t, "0xlink", records[0].TransferToken)
+	require.Equal(t, sendErr.Error(), records[0].Error)
+	require.Empty(t, records[0].ExplorerLink)
 }
 
 func mustOpen(t *testing.T, path string) *os.File {

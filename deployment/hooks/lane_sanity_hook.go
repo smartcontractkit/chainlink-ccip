@@ -160,6 +160,7 @@ type laneSanityCSVRecord struct {
 	Data          string
 	Fee           string
 	ExplorerLink  string
+	Error         string
 }
 
 type laneSanityResultCollector struct {
@@ -185,7 +186,8 @@ func (c *laneSanityResultCollector) snapshot() []laneSanityCSVRecord {
 // chain pair it exercises both directions: fee-token message sends, interactive
 // transfer-token selection, basic transfers, and one PTT when a MockReceiver exists.
 // Sender key resolution: PRIVATE_KEY env when set, otherwise each chain deployer key.
-// Successful sends are consolidated into a CSV (LANE_SANITY_CSV_OUTPUT or default filename).
+// Successful and failed send attempts are consolidated into a CSV
+// (LANE_SANITY_CSV_OUTPUT or default filename).
 func RunLaneSanityChecks(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -218,11 +220,30 @@ func RunLaneSanityChecks(
 				laneSanityCheckName, family, chainLabel(req.src), chainLabel(req.dest))
 			continue
 		}
+		available, err := provider.AvailableTransferTokens(env, req.src, req.dest)
+		if err != nil {
+			lggr.Warnf("%s: available transfer tokens %s→%s: %v",
+				laneSanityCheckName, chainLabel(req.src), chainLabel(req.dest), err)
+			errs = append(errs, fmt.Errorf("%s: available transfer tokens %s→%s: %w",
+				laneSanityCheckName, chainLabel(req.src), chainLabel(req.dest), err))
+			continue
+		}
+
+		selectedTokens, err := transferTokenSelector(available, req.src, req.dest)
+		if err != nil {
+			return fmt.Errorf("token selection %s→%s: %w", chainLabel(req.src), chainLabel(req.dest), err)
+		}
+
 		if err := runLaneSanityMessageSendWithAllFeeTokens(ctx, lggr, env, family, provider, req.src, req.dest, receiver, collector); err != nil {
 			errs = append(errs, fmt.Errorf("%s: fee-token sends %s→%s: %w",
 				laneSanityCheckName, chainLabel(req.src), chainLabel(req.dest), err))
 		}
-		if err := runLaneSanityTokenChecksForPair(ctx, lggr, env, family, provider, req.src, req.dest, receiver, collector); err != nil {
+		if len(selectedTokens) == 0 {
+			lggr.Infof("%s: no transfer tokens selected %s→%s, skipping token transfer checks",
+				laneSanityCheckName, chainLabel(req.src), chainLabel(req.dest))
+			continue
+		}
+		if err := runLaneSanityTokenChecksForPair(ctx, lggr, env, family, provider, req.src, req.dest, selectedTokens, receiver, collector); err != nil {
 			errs = append(errs, fmt.Errorf("%s: token transfers %s→%s: %w",
 				laneSanityCheckName, chainLabel(req.src), chainLabel(req.dest), err))
 		}
@@ -304,8 +325,8 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 	failed := make(map[laneFailureKey]map[string]struct{})
 
 	if err := provider.PreSendValidation(env, srcSel); err != nil {
-		lggr.Warnf("%s: skip message sends from %s: %v",
-			laneSanityCheckName, chainLabel(srcSel), err)
+		lggr.Warnf("%s: pre-send validation %s→%s: %v",
+			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)
 		return err
 	}
 
@@ -378,6 +399,7 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 			lggr.Warnf("%s: ❌ build message feeToken=%s %s→%s: %v",
 				laneSanityCheckName, feeLabel, chainLabel(srcSel), chainLabel(destSel), err)
 			addLaneFailureSummary(failed, srcSel, destSel, feeLabel)
+			collector.recordMessageAttempt(srcSel, destSel, feeLabel, "", messageData, "", "", err)
 			continue
 		}
 
@@ -392,6 +414,7 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 			lggr.Warnf("%s: ❌ send failed feeToken=%s %s→%s: %v",
 				laneSanityCheckName, feeLabel, chainLabel(srcSel), chainLabel(destSel), err)
 			addLaneFailureSummary(failed, srcSel, destSel, feeLabel)
+			collector.recordMessageAttempt(srcSel, destSel, feeLabel, "", messageData, fee, "", err)
 			continue
 		}
 
@@ -402,15 +425,7 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 		lggr.Infof("  fee charged: %s", fee)
 		lggr.Infof("  message ID:  %s", msgID)
 		lggr.Infof("  explorer:    %s", ccipExplorerURL(msgID))
-		collector.add(laneSanityCSVRecord{
-			SourceChain:   chainName(srcSel),
-			DestChain:     chainName(destSel),
-			FeeToken:      feeLabel,
-			TransferToken: "",
-			Data:          formatDataForCSV(messageData),
-			Fee:           fee,
-			ExplorerLink:  ccipExplorerURL(msgID),
-		})
+		collector.recordMessageAttempt(srcSel, destSel, feeLabel, "", messageData, fee, msgID, nil)
 	}
 
 	if len(failed) > 0 {
@@ -438,6 +453,7 @@ func runLaneSanityTokenChecksForPair(
 	family string,
 	provider PostProposalLaneSanity,
 	srcSel, destSel uint64,
+	selectedTokens []string,
 	receiverAddress string,
 	collector *laneSanityResultCollector,
 ) error {
@@ -445,9 +461,10 @@ func runLaneSanityTokenChecksForPair(
 	failed := make(map[laneFailureKey]map[string]struct{})
 
 	if err := provider.PreSendValidation(env, srcSel); err != nil {
-		lggr.Warnf("%s: skip token checks from %s: %v",
-			laneSanityCheckName, chainLabel(srcSel), err)
-		return nil
+		lggr.Warnf("%s: pre-send validation %s→%s: %v",
+			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)
+		return fmt.Errorf("failed pre-send validation %s→%s: %w",
+			chainLabel(srcSel), chainLabel(destSel), err)
 	}
 
 	adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
@@ -496,23 +513,6 @@ func runLaneSanityTokenChecksForPair(
 			laneSanityCheckName, chainLabel(destSel), err)
 	}
 
-	available, err := provider.AvailableTransferTokens(env, srcSel, destSel)
-	if err != nil {
-		lggr.Warnf("%s: available transfer tokens %s→%s: %v",
-			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)
-		addLaneFailureSummary(failed, srcSel, destSel, "native")
-		return fmt.Errorf("failed token-transfer probes: %s", buildLaneSanityFailureSummary(failed))
-	}
-
-	selectedTokens, err := transferTokenSelector(available, srcSel, destSel)
-	if err != nil {
-		return fmt.Errorf("token selection %s→%s: %w", chainLabel(srcSel), chainLabel(destSel), err)
-	}
-	if len(selectedTokens) == 0 {
-		lggr.Infof("%s: no transfer tokens selected %s→%s",
-			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel))
-		return nil
-	}
 	pttSent := false
 	for _, tok := range selectedTokens {
 		if err := runTokenTransferScenario(ctx, lggr, env, srcAdapter, srcSel, destSel,
@@ -522,14 +522,15 @@ func runLaneSanityTokenChecksForPair(
 		if pttSent || len(mockReceiver) == 0 {
 			continue
 		}
+		pttData := []byte("lane-sanity-check-payload")
 		mockExtraArgs, mockErr := destAdapter.GetExtraArgs(mockReceiver, family)
 		if mockErr != nil {
 			lggr.Warnf("%s: PTT token=%s: extra args for MockReceiver dest=%s: %v",
 				laneSanityCheckName, tok, chainLabel(destSel), mockErr)
 			addLaneFailureSummary(failed, srcSel, destSel, "PTT:"+tok)
+			collector.recordTransferAttempt(srcSel, destSel, tok, pttData, "", "", mockErr)
 			continue
 		}
-		pttData := []byte("lane-sanity-check-payload")
 		if err := runTokenTransferScenario(ctx, lggr, env, srcAdapter, srcSel, destSel,
 			tok, mockReceiver, mockExtraArgs, pttData, provider, collector); err != nil {
 			addLaneFailureSummary(failed, srcSel, destSel, "PTT:"+tok)
@@ -559,10 +560,20 @@ func runTokenTransferScenario(
 	provider PostProposalLaneSanity,
 	collector *laneSanityResultCollector,
 ) error {
+	record := laneSanityCSVRecord{
+		SourceChain:   chainName(srcSel),
+		DestChain:     chainName(destSel),
+		FeeToken:      formatFeeTokenLogLabel(""),
+		TransferToken: tok,
+		Data:          formatDataForCSV(data),
+	}
+
 	amount, err := provider.FundAndApproveTransferToken(ctx, env, srcSel, tok)
 	if err != nil {
 		lggr.Warnf("%s: ❌ fund/approve token=%s src=%s: %v",
 			laneSanityCheckName, tok, chainLabel(srcSel), err)
+		record.Error = err.Error()
+		collector.add(record)
 		return err
 	}
 
@@ -576,6 +587,8 @@ func runTokenTransferScenario(
 	if err != nil {
 		lggr.Warnf("%s: ❌ build message token=%s %s→%s: %v",
 			laneSanityCheckName, tok, chainLabel(srcSel), chainLabel(destSel), err)
+		record.Error = err.Error()
+		collector.add(record)
 		return err
 	}
 
@@ -589,6 +602,9 @@ func runTokenTransferScenario(
 	if err != nil {
 		lggr.Warnf("%s: ❌ send failed token=%s %s→%s: %v",
 			laneSanityCheckName, tok, chainLabel(srcSel), chainLabel(destSel), err)
+		record.Fee = fee
+		record.Error = err.Error()
+		collector.add(record)
 		return err
 	}
 
@@ -601,15 +617,9 @@ func runTokenTransferScenario(
 	}
 	lggr.Infof("  message ID:  %s", msgID)
 	lggr.Infof("  explorer:    %s", ccipExplorerURL(msgID))
-	collector.add(laneSanityCSVRecord{
-		SourceChain:   chainName(srcSel),
-		DestChain:     chainName(destSel),
-		FeeToken:      formatFeeTokenLogLabel(""),
-		TransferToken: tok,
-		Data:          formatDataForCSV(data),
-		Fee:           fee,
-		ExplorerLink:  ccipExplorerURL(msgID),
-	})
+	record.Fee = fee
+	record.ExplorerLink = ccipExplorerURL(msgID)
+	collector.add(record)
 	return nil
 }
 
@@ -706,6 +716,46 @@ func isPrintableASCII(s string) bool {
 	return true
 }
 
+func (c *laneSanityResultCollector) recordMessageAttempt(
+	srcSel, destSel uint64,
+	feeToken, transferToken string,
+	data []byte,
+	fee, msgID string,
+	err error,
+) {
+	rec := laneSanityCSVRecord{
+		SourceChain:   chainName(srcSel),
+		DestChain:     chainName(destSel),
+		FeeToken:      feeToken,
+		TransferToken: transferToken,
+		Data:          formatDataForCSV(data),
+		Fee:           fee,
+	}
+	if err != nil {
+		rec.Error = err.Error()
+	} else {
+		rec.ExplorerLink = ccipExplorerURL(msgID)
+	}
+	c.add(rec)
+}
+
+func (c *laneSanityResultCollector) recordTransferAttempt(
+	srcSel, destSel uint64,
+	transferToken string,
+	data []byte,
+	fee, msgID string,
+	err error,
+) {
+	c.recordMessageAttempt(
+		srcSel, destSel,
+		formatFeeTokenLogLabel(""),
+		transferToken,
+		data,
+		fee, msgID,
+		err,
+	)
+}
+
 func laneSanityCSVOutputPath() string {
 	if path := strings.TrimSpace(os.Getenv(laneSanityCSVOutputEnv)); path != "" {
 		return path
@@ -734,6 +784,7 @@ func writeLaneSanityResultsCSV(lggr logger.Logger, records []laneSanityCSVRecord
 		"data",
 		"fee",
 		"explorer_link",
+		"error",
 	}); err != nil {
 		return fmt.Errorf("write csv header: %w", err)
 	}
@@ -746,6 +797,7 @@ func writeLaneSanityResultsCSV(lggr logger.Logger, records []laneSanityCSVRecord
 			r.Data,
 			r.Fee,
 			r.ExplorerLink,
+			r.Error,
 		}); err != nil {
 			return fmt.Errorf("write csv row: %w", err)
 		}
