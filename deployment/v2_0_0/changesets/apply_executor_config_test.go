@@ -144,7 +144,7 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 				ExecutorQualifier: "pool1",
 			},
 			chainFamily: newRejectingChainFamilyRegistry(),
-			wantErr:     `executor pool "pool1" validation failed: stub chain family rejected topology`,
+			wantErr:     fmt.Sprintf(`executor pool "pool1" validation failed on chain "%d": stub chain family rejected topology`, sel1),
 		},
 		{
 			name: "missing executor qualifier returns error",

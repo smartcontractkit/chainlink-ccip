@@ -24,7 +24,7 @@ type stubChainFamily struct {
 	minNOPs int
 }
 
-func (s stubChainFamily) ValidateMinimumNOPsTopology(chainSelector string, nopCount int) error {
+func (s stubChainFamily) ValidateNOPsTopology(chainSelector string, nopCount int) error {
 	if nopCount < s.minNOPs {
 		return fmt.Errorf("chain %q rejected: %d NOPs below test minimum %d", chainSelector, nopCount, s.minNOPs)
 	}
@@ -49,14 +49,14 @@ func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *test
 			envName:          "prod_mainnet",
 			committeeAliases: tooFew,
 			poolAliases:      enough,
-			wantErr:          fmt.Sprintf(`committee "default" validation failed: chain %q rejected`, chainSelector),
+			wantErr:          fmt.Sprintf(`committee "default" validation failed on chain %q`, chainSelector),
 		},
 		{
 			name:             "production executor pool below minimum is rejected and wrapped",
 			envName:          "prod_testnet",
 			committeeAliases: enough,
 			poolAliases:      tooFew,
-			wantErr:          fmt.Sprintf(`executor pool "default" validation failed: chain %q rejected`, chainSelector),
+			wantErr:          fmt.Sprintf(`executor pool "default" validation failed on chain %q`, chainSelector),
 		},
 		{
 			name:             "production topology meeting the minimum passes",
@@ -75,7 +75,7 @@ func TestEnvironmentTopologyValidateForEnvironment_ProductionMinimumNOPs(t *test
 			envName:          "prod_mainnet",
 			committeeAliases: append(testNOPAliases(testMinNOPs-1), "nop-1"),
 			poolAliases:      enough,
-			wantErr:          fmt.Sprintf(`committee "default" validation failed: chain %q rejected`, chainSelector),
+			wantErr:          fmt.Sprintf(`committee "default" validation failed on chain %q`, chainSelector),
 		},
 	}
 

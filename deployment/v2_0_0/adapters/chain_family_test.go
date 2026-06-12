@@ -82,7 +82,7 @@ func (m *mockChainFamily) GetDefaultFinalityConfig() finality.Config {
 	return finality.Config{}
 }
 
-func (m *mockChainFamily) ValidateMinimumNOPsTopology(chainSelector string, nopCount int) error {
+func (m *mockChainFamily) ValidateNOPsTopology(chainSelector string, nopCount int) error {
 	return nil
 }
 

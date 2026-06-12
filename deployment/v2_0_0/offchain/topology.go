@@ -201,6 +201,10 @@ func (c *EnvironmentTopology) ValidateForEnvironment(envName string, chainFamily
 		return nil
 	}
 
+	if chainFamilyRegistry == nil {
+		return fmt.Errorf("chain family registry is required to validate production environment %q", envName)
+	}
+
 	if err := c.NOPTopology.validateMinimumNOPsPerChain(chainFamilyRegistry); err != nil {
 		return err
 	}
@@ -290,9 +294,9 @@ func (t *NOPTopology) validateMinimumNOPsPerChain(chainFamilyRegistry *adapters.
 				return fmt.Errorf("no adapter registered for chain family %q", selectorFamily)
 			}
 
-			err = familyAdapter.ValidateMinimumNOPsTopology(chainSelectorString, nopCount)
+			err = familyAdapter.ValidateNOPsTopology(chainSelectorString, nopCount)
 			if err != nil {
-				return fmt.Errorf("committee %q validation failed: %w", qualifier, err)
+				return fmt.Errorf("committee %q validation failed on chain %q: %w", qualifier, chainSelectorString, err)
 			}
 		}
 	}
@@ -380,9 +384,9 @@ func (p *ExecutorPoolConfig) validateMinimumNOPsPerChain(poolName string, chainF
 			return fmt.Errorf("no adapter registered for chain family %q", selectorFamily)
 		}
 
-		err = familyAdapter.ValidateMinimumNOPsTopology(chainSelectorString, nopCount)
+		err = familyAdapter.ValidateNOPsTopology(chainSelectorString, nopCount)
 		if err != nil {
-			return fmt.Errorf("executor pool %q validation failed: %w", poolName, err)
+			return fmt.Errorf("executor pool %q validation failed on chain %q: %w", poolName, chainSelectorString, err)
 		}
 	}
 	return nil

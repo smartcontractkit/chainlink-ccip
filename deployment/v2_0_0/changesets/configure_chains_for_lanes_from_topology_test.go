@@ -140,12 +140,12 @@ func (m *mockChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 	}
 }
 
-// ValidateMinimumNOPsTopology accepts every topology. The production NOP
+// ValidateNOPsTopology accepts every topology. The production NOP
 // minimum is a chain-family concern owned and tested against each real adapter
 // (see the EVM adapter's chain_family_test.go); changeset tests only need a
 // benign default here. Use newRejectingChainFamilyRegistry to exercise the
 // failure path.
-func (m *mockChainFamilyAdapter) ValidateMinimumNOPsTopology(_ string, _ int) error {
+func (m *mockChainFamilyAdapter) ValidateNOPsTopology(_ string, _ int) error {
 	return nil
 }
 
@@ -170,7 +170,7 @@ type rejectingChainFamilyAdapter struct {
 	adapters.ChainFamily
 }
 
-func (rejectingChainFamilyAdapter) ValidateMinimumNOPsTopology(_ string, _ int) error {
+func (rejectingChainFamilyAdapter) ValidateNOPsTopology(_ string, _ int) error {
 	return errStubNOPValidation
 }
 

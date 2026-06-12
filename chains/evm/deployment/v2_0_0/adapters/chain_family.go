@@ -261,7 +261,7 @@ func (a *ChainFamilyAdapter) GetDefaultGasPrice() *big.Int {
 	return big.NewInt(2e12)
 }
 
-func (a *ChainFamilyAdapter) ValidateMinimumNOPsTopology(chainSelector string, nopCount int) error {
+func (a *ChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, nopCount int) error {
 	if nopCount < minProductionChainNOPs {
 		return fmt.Errorf(
 			"chain %q requires at least %d unique NOPs for production environments, got %d",
