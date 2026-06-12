@@ -304,7 +304,7 @@ func (e *EVMLaneSanityProvider) queryFeeTokensFromChain(
 		return nil, err
 	}
 
-	allFeeTokens, err := fq.GetFeeTokens(&bind.CallOpts{})
+	allFeeTokens, err := fq.GetFeeTokens(&bind.CallOpts{Context: env.GetContext()})
 	if err != nil {
 		return nil, fmt.Errorf("GetFeeTokens src=%d: %w", srcSel, err)
 	}
@@ -348,7 +348,7 @@ func (e *EVMLaneSanityProvider) FundAndApproveTransferToken(
 	minTransferAmount := big.NewInt(1)
 
 	senderAddr := chain.DeployerKey.From
-	balance, err := token.BalanceOf(nil, senderAddr)
+	balance, err := token.BalanceOf(&bind.CallOpts{Context: env.GetContext()}, senderAddr)
 	if err != nil {
 		return nil, fmt.Errorf("balanceOf sender token=%s chain=%d: %w", tokenAddress, srcSel, err)
 	}
