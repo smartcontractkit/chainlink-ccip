@@ -204,12 +204,11 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
 
 			// Determine the final ADMIN_ROLE holder for the timelock.
-			// Non-CLLCCIP deployments default to the existing CLLCCIP RBACTimelock so
-			// they are governed by CLL from the start. If no CLLCCIP timelock is found
-			// (bootstrapping), the timelock becomes self-governed.
-			// The CLLCCIP instance itself (bootstrap) is always self-governed.
-			finalAdmin := common.HexToAddress(timelockAddr.Address) // default: self-governed
+			// CLLCCIP is always self-governed (its timelock is its own admin).
+			// Every other MCMS instance MUST use the existing CLLCCIP RBACTimelock as its
+			// admin — if CLLCCIP has not been deployed yet, fail fast.
 			isCLLCCIP := in.Qualifier != nil && *in.Qualifier == utils.CLLQualifier
+			finalAdmin := common.HexToAddress(timelockAddr.Address) // default: self-governed (CLLCCIP case)
 			if !isCLLCCIP {
 				existingDS := cldf_datastore.NewMemoryDataStore()
 				for _, ref := range in.ExistingAddresses {
@@ -224,9 +223,13 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 					in.ChainSelector,
 					evm_datastore_utils.ToEVMAddress,
 				)
-				if lookupErr == nil && cllTimelockAddr != (common.Address{}) {
-					finalAdmin = cllTimelockAddr
+				if lookupErr != nil || cllTimelockAddr == (common.Address{}) {
+					return sequtil.OnChainOutput{}, fmt.Errorf(
+						"cannot deploy MCMS with qualifier %q on chain %d: CLLCCIP RBACTimelock must be deployed first (it will be set as admin)",
+						ptrOrEmpty(in.Qualifier), in.ChainSelector,
+					)
 				}
+				finalAdmin = cllTimelockAddr
 			}
 
 			// If finalAdmin differs from the deployer key we need to transfer the ADMIN_ROLE.
@@ -273,3 +276,11 @@ func (d *EVMDeployer) FinalizeDeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploy
 			return output, nil
 		})
 }
+
+func ptrOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+

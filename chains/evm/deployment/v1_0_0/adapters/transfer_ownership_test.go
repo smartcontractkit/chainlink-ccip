@@ -48,6 +48,8 @@ func TestTransferOwnership(t *testing.T) {
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
 	deployMCMS := deploy.DeployMCMS(dReg, nil)
+
+	// Deploy CLLCCIP (bootstrap).
 	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
@@ -56,22 +58,24 @@ func TestTransferOwnership(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 			},
 		},
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 	ds := output.DataStore
+	require.NoError(t, ds.Merge(env.DataStore))
+	env.DataStore = ds.Seal()
 
-	// deploy another timelock so that later we can transfer ownership to it from first timelock
+	// Deploy a second MCMS set (RMNMCMS) so we can transfer ownership to it later.
 	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
@@ -80,14 +84,14 @@ func TestTransferOwnership(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test1"),
+				Qualifier:        ptr.String(deploymentutils.RMNTimelockQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test1"),
+				Qualifier:        ptr.String(deploymentutils.RMNTimelockQualifier),
 			},
 		},
 	})
@@ -131,7 +135,7 @@ func TestTransferOwnership(t *testing.T) {
 		timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			ChainSelector: sel,
 			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier:     "test",
+			Qualifier:     deploymentutils.CLLQualifier,
 			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
@@ -139,7 +143,7 @@ func TestTransferOwnership(t *testing.T) {
 		newTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			ChainSelector: sel,
 			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier:     "test1",
+			Qualifier:     deploymentutils.RMNTimelockQualifier,
 			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
@@ -174,7 +178,7 @@ func TestTransferOwnership(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership test",
 		},
 	}
@@ -205,8 +209,7 @@ func TestTransferOwnership(t *testing.T) {
 		t.Logf("Ownership of router on chain %d successfully transferred to timelock %s", sel, timelockAddrs[sel])
 	}
 
-	// now transfer ownership from first timelock to second timelock
-	// the mcms input should denote the first timelock address
+	// now transfer ownership from CLLCCIP timelock to RMNMCMS timelock
 	transferOwnershipInput = deploy.TransferOwnershipInput{
 		ChainInputs: []deploy.TransferOwnershipPerChainInput{
 			{
@@ -236,7 +239,7 @@ func TestTransferOwnership(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership test",
 		},
 	}
@@ -248,13 +251,13 @@ func TestTransferOwnership(t *testing.T) {
 
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
-	// now accept ownership from the new timelock, the mcms input should denote new timelock address
+	// now accept ownership from the RMNMCMS timelock
 	transferOwnershipInput.MCMS = mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           3759765795,
 		TimelockDelay:        mcms_types.MustParseDuration("0s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
-		Qualifier:            "test1",
+		Qualifier:            deploymentutils.RMNTimelockQualifier,
 		Description:          "Transfer ownership test",
 	}
 	acceptOwnershipChangeset := deploy.AcceptOwnershipChangeset(cr, mcmsRegistry)
