@@ -19,7 +19,7 @@ type GenerateAggregatorConfigInput struct {
 	Topology           *offchain.EnvironmentTopology
 }
 
-func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry, chainFamilyRegistry *adapters.ChainFamilyRegistry) deployment.ChangeSetV2[GenerateAggregatorConfigInput] {
+func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry) deployment.ChangeSetV2[GenerateAggregatorConfigInput] {
 	validate := func(e deployment.Environment, cfg GenerateAggregatorConfigInput) error {
 		if cfg.ServiceIdentifier == "" {
 			return fmt.Errorf("service identifier is required")
@@ -27,12 +27,12 @@ func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry, chain
 		if cfg.CommitteeQualifier == "" {
 			return fmt.Errorf("committee qualifier is required")
 		}
-		_, err := resolveAggregatorChainSelectors(e, cfg, chainFamilyRegistry)
+		_, err := resolveAggregatorChainSelectors(e, cfg)
 		return err
 	}
 
 	apply := func(e deployment.Environment, cfg GenerateAggregatorConfigInput) (deployment.ChangesetOutput, error) {
-		chainSelectors, err := resolveAggregatorChainSelectors(e, cfg, chainFamilyRegistry)
+		chainSelectors, err := resolveAggregatorChainSelectors(e, cfg)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -61,11 +61,11 @@ func GenerateAggregatorConfig(registry *adapters.AggregatorConfigRegistry, chain
 	return deployment.CreateChangeSet(apply, validate)
 }
 
-func resolveAggregatorChainSelectors(e deployment.Environment, cfg GenerateAggregatorConfigInput, chainFamilyRegistry *adapters.ChainFamilyRegistry) ([]uint64, error) {
+func resolveAggregatorChainSelectors(e deployment.Environment, cfg GenerateAggregatorConfigInput) ([]uint64, error) {
 	if cfg.Topology == nil {
 		return nil, fmt.Errorf("topology is required")
 	}
-	if err := cfg.Topology.ValidateForEnvironment(e.Name, chainFamilyRegistry); err != nil {
+	if err := cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
 		return nil, fmt.Errorf("topology validation failed: %w", err)
 	}
 	if cfg.Topology.NOPTopology == nil {

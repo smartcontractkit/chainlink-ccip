@@ -10,9 +10,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/semver/v3"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
 
@@ -192,7 +190,7 @@ func WriteEnvironmentTopology(path string, cfg EnvironmentTopology) error {
 	return nil
 }
 
-func (c *EnvironmentTopology) ValidateForEnvironment(envName string, chainFamilyRegistry *adapters.ChainFamilyRegistry) error {
+func (c *EnvironmentTopology) ValidateForEnvironment(envName string) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
@@ -201,15 +199,11 @@ func (c *EnvironmentTopology) ValidateForEnvironment(envName string, chainFamily
 		return nil
 	}
 
-	if chainFamilyRegistry == nil {
-		return fmt.Errorf("chain family registry is required to validate production environment %q", envName)
-	}
-
-	if err := c.NOPTopology.validateMinimumNOPsPerChain(chainFamilyRegistry); err != nil {
+	if err := c.NOPTopology.validateMinimumNOPsPerChain(); err != nil {
 		return err
 	}
 	for poolName, pool := range c.ExecutorPools {
-		if err := pool.validateMinimumNOPsPerChain(poolName, chainFamilyRegistry); err != nil {
+		if err := pool.validateMinimumNOPsPerChain(poolName); err != nil {
 			return err
 		}
 	}
@@ -277,38 +271,22 @@ func (t *NOPTopology) Validate() error {
 	return nil
 }
 
-func (t *NOPTopology) validateMinimumNOPsPerChain(chainFamilyRegistry *adapters.ChainFamilyRegistry) error {
+func (t *NOPTopology) validateMinimumNOPsPerChain() error {
 	for qualifier, committee := range t.Committees {
-		for chainSelectorString, chainCfg := range committee.ChainConfigs {
+		for chainSelector, chainCfg := range committee.ChainConfigs {
 			nopCount := uniqueNOPCount(chainCfg.NOPAliases)
-			chainSelector, err := strconv.ParseUint(chainSelectorString, 10, 64)
-			if err != nil {
-				return fmt.Errorf("committee chain_configs key %q is not a valid chain selector: %w", chainSelectorString, err)
-			}
-			selectorFamily, err := chainsel.GetSelectorFamily(chainSelector)
-			if err != nil {
-				return fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSelector, err)
-			}
-			familyAdapter, ok := chainFamilyRegistry.GetChainFamily(selectorFamily)
-			if !ok {
-				return fmt.Errorf("no adapter registered for chain family %q", selectorFamily)
-			}
-
-			err = familyAdapter.ValidateNOPsTopology(chainSelectorString, nopCount)
-			if err != nil {
-				return fmt.Errorf("committee %q validation failed on chain %q: %w", qualifier, chainSelectorString, err)
+			if nopCount < minProductionChainNOPs {
+				return fmt.Errorf(
+					"committee %q chain %q requires at least %d unique NOPs for production environments, got %d",
+					qualifier,
+					chainSelector,
+					minProductionChainNOPs,
+					nopCount,
+				)
 			}
 		}
 	}
 	return nil
-}
-
-func uniqueNOPCount(aliases []string) int {
-	seen := make(map[string]struct{}, len(aliases))
-	for _, alias := range aliases {
-		seen[alias] = struct{}{}
-	}
-	return len(seen)
 }
 
 func (c *CommitteeConfig) Validate(topology *NOPTopology) error {
@@ -368,28 +346,28 @@ func (p *ExecutorPoolConfig) Validate(poolName string, topology *NOPTopology) er
 	return nil
 }
 
-func (p *ExecutorPoolConfig) validateMinimumNOPsPerChain(poolName string, chainFamilyRegistry *adapters.ChainFamilyRegistry) error {
-	for chainSelectorString, chainCfg := range p.ChainConfigs {
+func (p *ExecutorPoolConfig) validateMinimumNOPsPerChain(poolName string) error {
+	for chainSelector, chainCfg := range p.ChainConfigs {
 		nopCount := uniqueNOPCount(chainCfg.NOPAliases)
-		chainSelector, err := strconv.ParseUint(chainSelectorString, 10, 64)
-		if err != nil {
-			return fmt.Errorf("executor pool config key %q is not a valid chain selector: %w", chainSelectorString, err)
-		}
-		selectorFamily, err := chainsel.GetSelectorFamily(chainSelector)
-		if err != nil {
-			return fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSelector, err)
-		}
-		familyAdapter, ok := chainFamilyRegistry.GetChainFamily(selectorFamily)
-		if !ok {
-			return fmt.Errorf("no adapter registered for chain family %q", selectorFamily)
-		}
-
-		err = familyAdapter.ValidateNOPsTopology(chainSelectorString, nopCount)
-		if err != nil {
-			return fmt.Errorf("executor pool %q validation failed on chain %q: %w", poolName, chainSelectorString, err)
+		if nopCount < minProductionChainNOPs {
+			return fmt.Errorf(
+				"executor pool %q chain %q requires at least %d unique NOPs for production environments, got %d",
+				poolName,
+				chainSelector,
+				minProductionChainNOPs,
+				nopCount,
+			)
 		}
 	}
 	return nil
+}
+
+func uniqueNOPCount(aliases []string) int {
+	seen := make(map[string]struct{}, len(aliases))
+	for _, alias := range aliases {
+		seen[alias] = struct{}{}
+	}
+	return len(seen)
 }
 
 func (c *EnvironmentTopology) GetNOPsForPool(poolName string) ([]string, error) {
