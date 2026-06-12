@@ -18,10 +18,10 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -43,8 +43,6 @@ func TestTransferOwnership(t *testing.T) {
 	)
 	require.NoError(t, err)
 	env.Logger = logger.Test(t)
-	evmChain1 := env.BlockChains.EVMChains()[selector1]
-	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
@@ -59,7 +57,6 @@ func TestTransferOwnership(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -67,7 +64,6 @@ func TestTransferOwnership(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
 	})
@@ -85,7 +81,6 @@ func TestTransferOwnership(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test1"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -93,7 +88,6 @@ func TestTransferOwnership(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test1"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
 	})

@@ -210,8 +210,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 
 	// deploy mcms
 	cs := deploy.DeployMCMS(dReg, nil)
-	evmChain1 := env.BlockChains.EVMChains()[chain1]
-	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
@@ -221,7 +219,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -229,7 +226,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
 	})

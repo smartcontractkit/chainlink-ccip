@@ -204,38 +204,29 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
 
 			// Determine the final ADMIN_ROLE holder for the timelock.
-			// Priority: explicit TimelockAdmin > existing CLLCCIP timelock > self-govern.
-			// Exception: when deploying the CLLCCIP instance itself (bootstrap), the
-			// timelock always becomes self-governed regardless of existing addresses.
+			// Non-CLLCCIP deployments default to the existing CLLCCIP RBACTimelock so
+			// they are governed by CLL from the start. If no CLLCCIP timelock is found
+			// (bootstrapping), the timelock becomes self-governed.
+			// The CLLCCIP instance itself (bootstrap) is always self-governed.
 			finalAdmin := common.HexToAddress(timelockAddr.Address) // default: self-governed
-			if in.TimelockAdmin != (common.Address{}) {
-				// Caller explicitly requested a specific admin — honour it.
-				finalAdmin = in.TimelockAdmin
-			} else {
-				isCLLCCIP := in.Qualifier != nil && *in.Qualifier == utils.CLLQualifier
-				if !isCLLCCIP {
-					// For every non-CLLCCIP MCMS deployment, default the admin to the
-					// existing CLLCCIP RBACTimelock so it is governed by CLLMCMS from the
-					// start. If it isn't deployed yet (bootstrapping), fall back to
-					// self-govern (finalAdmin stays as the timelock itself).
-					existingDS := cldf_datastore.NewMemoryDataStore()
-					for _, ref := range in.ExistingAddresses {
-						_ = existingDS.Addresses().Add(ref)
-					}
-					cllTimelockAddr, lookupErr := datastore_utils.FindAndFormatRef(
-						existingDS.Seal(),
-						cldf_datastore.AddressRef{
-							Type:      cldf_datastore.ContractType(utils.RBACTimelock),
-							Qualifier: utils.CLLQualifier,
-						},
-						in.ChainSelector,
-						evm_datastore_utils.ToEVMAddress,
-					)
-					if lookupErr == nil && cllTimelockAddr != (common.Address{}) {
-						finalAdmin = cllTimelockAddr
-					}
+			isCLLCCIP := in.Qualifier != nil && *in.Qualifier == utils.CLLQualifier
+			if !isCLLCCIP {
+				existingDS := cldf_datastore.NewMemoryDataStore()
+				for _, ref := range in.ExistingAddresses {
+					_ = existingDS.Addresses().Add(ref)
 				}
-				// isCLLCCIP: finalAdmin stays as the timelock itself (self-governed).
+				cllTimelockAddr, lookupErr := datastore_utils.FindAndFormatRef(
+					existingDS.Seal(),
+					cldf_datastore.AddressRef{
+						Type:      cldf_datastore.ContractType(utils.RBACTimelock),
+						Qualifier: utils.CLLQualifier,
+					},
+					in.ChainSelector,
+					evm_datastore_utils.ToEVMAddress,
+				)
+				if lookupErr == nil && cllTimelockAddr != (common.Address{}) {
+					finalAdmin = cllTimelockAddr
+				}
 			}
 
 			// If finalAdmin differs from the deployer key we need to transfer the ADMIN_ROLE.
