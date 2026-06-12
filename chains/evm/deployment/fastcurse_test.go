@@ -162,14 +162,14 @@ func TestFastCurse(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 			},
 		},
 	})
@@ -216,7 +216,7 @@ func TestFastCurse(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
 		},
 	}
@@ -251,7 +251,7 @@ func TestFastCurse(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
 		},
 	}
@@ -445,7 +445,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			Bypasser:         testhelpers.SingleGroupMCMS(),
 			Proposer:         testhelpers.SingleGroupMCMS(),
 			TimelockMinDelay: big.NewInt(0),
-			Qualifier:        ptr.String("test"),
+			Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 		}
 	}
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
@@ -505,7 +505,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
 		},
 	}
@@ -534,7 +534,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
 		},
 	}
@@ -650,7 +650,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
+			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
 		},
 	}

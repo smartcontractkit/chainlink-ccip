@@ -336,6 +336,8 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// check that the subjects were actually cursed
+	evmChain1 := env.BlockChains.EVMChains()[chain1]
+	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	rmnC, err := rmn_contract.NewRMNContract(rmnAddress, evmChain1.Client)
 	require.NoError(t, err)
 	isCursed, err := rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))
