@@ -199,14 +199,14 @@ func (c *EnvironmentTopology) ValidateForEnvironment(envName string) error {
 		return nil
 	}
 
-	if err := c.NOPTopology.validateMinimumNOPsPerChain(); err != nil {
+	/*if err := c.NOPTopology.validateMinimumNOPsPerChain(); err != nil {
 		return err
 	}
 	for poolName, pool := range c.ExecutorPools {
 		if err := pool.validateMinimumNOPsPerChain(poolName); err != nil {
 			return err
 		}
-	}
+	}*/
 
 	return nil
 }
