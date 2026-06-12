@@ -438,6 +438,51 @@ func TestConfigPollerV2_ConcurrentCacheAccess_PrepopulatedCache(t *testing.T) {
 	accessors[destChain].AssertNumberOfCalls(t, "GetAllConfigsLegacy", 1)
 }
 
+func TestConfigPollerV2_GetOfframpSourceChainConfigs_NoDestAccessor(t *testing.T) {
+	cPollerV2, _ := setupConfigPollerV2(t)
+	ctx := context.Background()
+
+	delete(cPollerV2.chainAccessors, destChain)
+
+	sourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
+	_, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no chain accessor for dest chain")
+
+	cPollerV2.RLock()
+	assert.Empty(t, cPollerV2.knownSourceChains)
+	cPollerV2.RUnlock()
+}
+
+func TestConfigPollerV2_GetOfframpSourceChainConfigs_TracksSourceChains(t *testing.T) {
+	cPollerV2, accessors := setupConfigPollerV2(t)
+	ctx := context.Background()
+
+	sourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
+	expectedChainConfig := createMockChainConfigSnapshot()
+	expectedSourceConfigs := createMockSourceChainConfigs(sourceChains)
+
+	accessors[destChain].On(
+		"GetAllConfigsLegacy",
+		mock.Anything,
+		destChain,
+		mock.MatchedBy(chainSelectorSliceMatcher(sourceChains)),
+	).Return(expectedChainConfig, expectedSourceConfigs, nil).Once()
+
+	_, err := cPollerV2.GetOfframpSourceChainConfigs(ctx, destChain, sourceChains)
+	require.NoError(t, err)
+
+	cPollerV2.RLock()
+	assert.Contains(t, cPollerV2.knownSourceChains, sourceChain1)
+	assert.Contains(t, cPollerV2.knownSourceChains, sourceChain2)
+	cPollerV2.RUnlock()
+
+	chainsToRefresh := cPollerV2.getChainsToRefresh()
+	assert.Contains(t, chainsToRefresh, sourceChain1)
+	assert.Contains(t, chainsToRefresh, sourceChain2)
+	assert.Contains(t, chainsToRefresh, destChain)
+}
+
 func TestConfigPollerV2_TrackSourceChain(t *testing.T) {
 	cPollerV2, _ := setupConfigPollerV2(t)
 

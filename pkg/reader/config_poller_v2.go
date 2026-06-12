@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -15,8 +16,9 @@ import (
 // refreshAllKnownChains refreshes all known chains in background using batched requests where possible
 // bgRefreshTimeout defines the timeout for background refresh operations
 const (
-	bgRefreshTimeout = 30 * time.Second
-	MaxFailedPolls   = 10
+	bgRefreshTimeout           = 30 * time.Second
+	MaxFailedPolls             = 10
+	noDestAccessorLogFrequency = 30 * time.Minute
 )
 
 // ConfigPoller defines the interface for caching chain configuration data
@@ -56,6 +58,7 @@ type configPollerV2 struct {
 	stopChan               chan struct{}
 	wg                     sync.WaitGroup
 	consecutiveFailedPolls atomic.Uint32
+	lastNoDestAccessorLog  atomic.Pointer[time.Time]
 }
 
 // chainCache represents the cache for a single chain.
@@ -266,6 +269,14 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 				destChain, c.destChainSelector)
 	}
 
+	if _, exists := c.chainAccessors[c.destChainSelector]; !exists {
+		logutil.LogWhenExceedFrequency(&c.lastNoDestAccessorLog, noDestAccessorLogFrequency, func() {
+			c.lggr.Errorw("no chain accessor for dest chain; cannot track or refresh source configs",
+				"destChain", c.destChainSelector)
+		})
+		return nil, fmt.Errorf("no chain accessor for dest chain %s", c.destChainSelector)
+	}
+
 	// Ensure we're not trying to fetch source chain configs for the destination chain itself
 	filteredSourceChains := filterOutChainSelector(sourceChains, c.destChainSelector)
 	if len(filteredSourceChains) == 0 {
@@ -274,11 +285,7 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 
 	// Add any new source chains to list of tracked source chains for background refreshing
 	for _, chain := range filteredSourceChains {
-		if !c.trackSourceChainForDest(chain) {
-			c.lggr.Warnw("Could not track source chain for background refreshing",
-				"destChain", c.destChainSelector,
-				"sourceChain", chain)
-		}
+		c.trackSourceChainForDest(chain)
 	}
 
 	destChainCache := c.getOrCreateChainCache(c.destChainSelector)
@@ -510,14 +517,6 @@ func (c *configPollerV2) getChainsToRefresh() []cciptypes.ChainSelector {
 func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSelector) bool {
 	if c.destChainSelector == sourceChain {
 		c.lggr.Debugw("Skipping tracking source chain - destination chain is the same as source chain",
-			"destChain", c.destChainSelector,
-			"sourceChain", sourceChain)
-		return false
-	}
-
-	// Check if we have a chain accessor for the dest chain. We always should.
-	if _, exists := c.chainAccessors[c.destChainSelector]; !exists {
-		c.lggr.Errorw("Cannot track source chain - no chain accessor for dest chain",
 			"destChain", c.destChainSelector,
 			"sourceChain", sourceChain)
 		return false

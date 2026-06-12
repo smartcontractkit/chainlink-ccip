@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -39,6 +40,15 @@ import (
 
 var ErrSignaturesNotProvidedByLeader = errors.New("rmn signatures were not provided by the leader, " +
 	"in most cases this indicates that the RMN nodes did not include any chain in their response")
+
+const skippedLanesLogFrequency = 30 * time.Minute
+
+var lastSkippedLanesLog atomic.Pointer[time.Time]
+
+// isLiveOffRampSourceLane reports whether the offramp has an enabled inbound lane from sourceChain.
+func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool) bool {
+	return exists && cfg.IsEnabled && len(cfg.OnRamp) > 0
+}
 
 // ObservationQuorum requires "across all chains" at least 2F+1 observations.
 func (p *Processor) ObservationQuorum(
@@ -581,22 +591,54 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
+	var (
+		skippedNotALane       []cciptypes.ChainSelector
+		skippedDisabled       []cciptypes.ChainSelector
+		rmnMisconfiguredLanes []cciptypes.ChainSelector
+		liveLanes             []cciptypes.ChainSelector
+	)
+
+	for _, sourceChain := range supportedSourceChains {
+		cfg, ok := sourceChainsCfg[sourceChain]
+		if !ok {
+			skippedNotALane = append(skippedNotALane, sourceChain)
+			continue
+		}
+		if !cfg.IsEnabled {
+			skippedDisabled = append(skippedDisabled, sourceChain)
+			continue
+		}
+		if len(cfg.OnRamp) == 0 {
+			skippedNotALane = append(skippedNotALane, sourceChain)
+			continue
+		}
+		if !cfg.IsRMNVerificationDisabled {
+			rmnMisconfiguredLanes = append(rmnMisconfiguredLanes, sourceChain)
+			continue
+		}
+		liveLanes = append(liveLanes, sourceChain)
+	}
+
+	if len(skippedNotALane) > 0 || len(skippedDisabled) > 0 {
+		logutil.LogWhenExceedFrequency(&lastSkippedLanesLog, skippedLanesLogFrequency, func() {
+			lggr.Debugw("skipping onRamp seq num observations for non-live lanes",
+				"noConfigOrOnRamp", skippedNotALane,
+				"disabled", skippedDisabled,
+			)
+		})
+	}
+	if len(rmnMisconfiguredLanes) > 0 {
+		lggr.Warnw("rmn enablement is misconfigured on these lanes, skipping observations",
+			"sources", rmnMisconfiguredLanes,
+		)
+	}
+
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(liveLanes))
 
 	wg := &sync.WaitGroup{}
-	for _, sourceChain := range supportedSourceChains {
+	for _, sourceChain := range liveLanes {
 		wg.Go(func() {
-			// RMN should never be enabled on any source chain lane
-			// if it is misconfigured, we skip observations to avoid impact to the report
-			if _, ok := sourceChainsCfg[sourceChain]; !ok {
-				lggr.Warnw("source chain config not found, skipping observations", "source", sourceChain)
-				return
-			}
-			if !sourceChainsCfg[sourceChain].IsRMNVerificationDisabled {
-				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
-				return
-			}
 			chainCtx, chainCancel := rpctimeout.Context(ctx)
 			defer chainCancel()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(chainCtx, sourceChain)
