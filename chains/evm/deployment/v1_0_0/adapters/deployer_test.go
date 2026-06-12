@@ -134,8 +134,9 @@ func TestDeployMCMS(t *testing.T) {
 }
 
 // TestDeployMCMS_TimelockAdminRoleTransfer verifies the admin-role handover logic inside DeployMCMS:
-//   - zero TimelockAdmin  → timelock itself holds ADMIN_ROLE; deployer has renounced it
-//   - external address    → that address holds ADMIN_ROLE; deployer has renounced it
+//   - zero TimelockAdmin, no CLLCCIP in datastore → timelock itself holds ADMIN_ROLE (self-sovereign)
+//   - zero TimelockAdmin, qualifier == CLLCCIP (bootstrap) → timelock itself holds ADMIN_ROLE (self-sovereign)
+//   - external address → that address holds ADMIN_ROLE; deployer has renounced it
 func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	t.Parallel()
 	selector := chainsel.TEST_90000001.Selector
@@ -156,13 +157,23 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	tests := []struct {
 		name            string
 		qualifier       string
-		timelockAdmin   common.Address // zero means self-sovereign
+		timelockAdmin   common.Address // zero means fall through to default logic
 		expectAdmin     func(timelockAddr common.Address) common.Address
 		deployerIsAdmin bool
 	}{
 		{
-			name:            "zero TimelockAdmin makes timelock self-sovereign",
+			// No CLLCCIP timelock in the datastore → falls back to self-sovereign.
+			name:            "zero TimelockAdmin with no CLLCCIP in datastore makes timelock self-sovereign",
 			qualifier:       "zero-admin",
+			timelockAdmin:   common.Address{},
+			expectAdmin:     func(timelockAddr common.Address) common.Address { return timelockAddr },
+			deployerIsAdmin: false,
+		},
+		{
+			// CLLCCIP bootstrap: deploying the CLLCCIP instance itself must always be
+			// self-governed, even if a CLLCCIP timelock somehow already exists.
+			name:            "CLLCCIP bootstrap: zero TimelockAdmin is self-governed",
+			qualifier:       utils.CLLQualifier,
 			timelockAdmin:   common.Address{},
 			expectAdmin:     func(timelockAddr common.Address) common.Address { return timelockAddr },
 			deployerIsAdmin: false,
@@ -221,6 +232,94 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	}
 }
 
+// TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock verifies that when a new non-CLLCCIP
+// MCMS is deployed with a zero TimelockAdmin, the deployer automatically uses the
+// existing CLLCCIP RBACTimelock as the admin (so it is governed by CLL from the start).
+func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
+	t.Parallel()
+	selector := chainsel.TEST_90000001.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{selector}),
+	)
+	require.NoError(t, err)
+	env.Logger = logger.Test(t)
+	evmChain := env.BlockChains.EVMChains()[selector]
+
+	evmDeployer := &adapters.EVMDeployer{}
+	dReg := deployops.GetRegistry()
+	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
+	cs := deployops.DeployMCMS(dReg, nil)
+
+	// Step 1: deploy the CLLCCIP MCMS instance (bootstrap — self-governed).
+	cllOutput, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: deployops.MCMSVersion,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(utils.CLLQualifier),
+				// zero TimelockAdmin → CLLCCIP timelock becomes self-governed
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, cllOutput.DataStore.Merge(env.DataStore))
+	env.DataStore = cllOutput.DataStore.Seal()
+
+	// Resolve the CLLCCIP timelock address for later assertion.
+	cllTimelockRefs := env.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
+	)
+	require.Len(t, cllTimelockRefs, 1)
+	cllTimelockAddr := common.HexToAddress(cllTimelockRefs[0].Address)
+
+	// Step 2: deploy a second (non-CLLCCIP) MCMS instance with zero TimelockAdmin.
+	// The deployer should automatically pick the CLLCCIP timelock as the admin.
+	rmnOutput, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: deployops.MCMSVersion,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(utils.RMNTimelockQualifier),
+				// zero TimelockAdmin → should default to CLLCCIP timelock
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, rmnOutput.DataStore.Merge(env.DataStore))
+	env.DataStore = rmnOutput.DataStore.Seal()
+
+	rmnTimelockRefs := env.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+		datastore.AddressRefByQualifier(utils.RMNTimelockQualifier),
+	)
+	require.Len(t, rmnTimelockRefs, 1)
+	rmnTimelockAddr := common.HexToAddress(rmnTimelockRefs[0].Address)
+
+	rmnTimelock, err := bindings.NewRBACTimelock(rmnTimelockAddr, evmChain.Client)
+	require.NoError(t, err)
+
+	adminRoleAdmin, err := rmnTimelock.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
+	require.NoError(t, err)
+
+	// The CLLCCIP timelock should be the admin of the new RMNMCMS timelock.
+	cllIsAdmin, err := rmnTimelock.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, cllTimelockAddr)
+	require.NoError(t, err)
+	require.True(t, cllIsAdmin, "CLLCCIP timelock should be admin of the RMNMCMS timelock")
+
+	// The deployer EOA must have renounced ADMIN_ROLE.
+	deployerIsAdmin, err := rmnTimelock.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain.DeployerKey.From)
+	require.NoError(t, err)
+	require.False(t, deployerIsAdmin, "deployer should have renounced ADMIN_ROLE after transfer to CLLCCIP timelock")
+}
 
 func TestUpdateMCMSConfig(t *testing.T) {
 	t.Parallel()

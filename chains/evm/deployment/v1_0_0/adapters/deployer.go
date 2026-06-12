@@ -8,13 +8,16 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 )
@@ -150,6 +153,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			}
 			output.Addresses = append(output.Addresses, report.Output.Addresses...)
 			cancellerAddr := report.Output.Addresses[0]
+
 			// deploy timelock — always use the deployer key as the initial admin
 			// so we can manage roles immediately after deployment
 			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
@@ -200,11 +204,38 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
 
 			// Determine the final ADMIN_ROLE holder for the timelock.
-			// If in.TimelockAdmin is zero, the timelock becomes its own admin.
-			// Otherwise, hand admin to the specified address.
-			finalAdmin := common.HexToAddress(timelockAddr.Address)
+			// Priority: explicit TimelockAdmin > existing CLLCCIP timelock > self-govern.
+			// Exception: when deploying the CLLCCIP instance itself (bootstrap), the
+			// timelock always becomes self-governed regardless of existing addresses.
+			finalAdmin := common.HexToAddress(timelockAddr.Address) // default: self-governed
 			if in.TimelockAdmin != (common.Address{}) {
+				// Caller explicitly requested a specific admin — honour it.
 				finalAdmin = in.TimelockAdmin
+			} else {
+				isCLLCCIP := in.Qualifier != nil && *in.Qualifier == utils.CLLQualifier
+				if !isCLLCCIP {
+					// For every non-CLLCCIP MCMS deployment, default the admin to the
+					// existing CLLCCIP RBACTimelock so it is governed by CLLMCMS from the
+					// start. If it isn't deployed yet (bootstrapping), fall back to
+					// self-govern (finalAdmin stays as the timelock itself).
+					existingDS := cldf_datastore.NewMemoryDataStore()
+					for _, ref := range in.ExistingAddresses {
+						_ = existingDS.Addresses().Add(ref)
+					}
+					cllTimelockAddr, lookupErr := datastore_utils.FindAndFormatRef(
+						existingDS.Seal(),
+						cldf_datastore.AddressRef{
+							Type:      cldf_datastore.ContractType(utils.RBACTimelock),
+							Qualifier: utils.CLLQualifier,
+						},
+						in.ChainSelector,
+						evm_datastore_utils.ToEVMAddress,
+					)
+					if lookupErr == nil && cllTimelockAddr != (common.Address{}) {
+						finalAdmin = cllTimelockAddr
+					}
+				}
+				// isCLLCCIP: finalAdmin stays as the timelock itself (self-governed).
 			}
 
 			// If finalAdmin differs from the deployer key we need to transfer the ADMIN_ROLE.
