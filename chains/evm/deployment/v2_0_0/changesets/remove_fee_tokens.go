@@ -90,14 +90,26 @@ func resolveRemoveFeeTokensCfg(config any) (RemoveFeeTokensCfg, error) {
 	if cfg, ok := config.(RemoveFeeTokensCfg); ok {
 		return cfg, nil
 	}
+	if wrapped, ok := config.(cs_core.WithMCMS[RemoveFeeTokensCfg]); ok {
+		return wrapped.Cfg, nil
+	}
 
-	var withMCMS cs_core.WithMCMS[RemoveFeeTokensCfg]
-	if err := mapstructure.Decode(config, &withMCMS); err == nil && len(withMCMS.Cfg.ChainSels) > 0 {
-		return withMCMS.Cfg, nil
+	raw := config
+	if m, ok := config.(map[string]interface{}); ok {
+		if cfgRaw, ok := m["Cfg"]; ok {
+			raw = cfgRaw
+		}
 	}
 
 	var cfg RemoveFeeTokensCfg
-	if err := mapstructure.Decode(config, &cfg); err != nil {
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		WeaklyTypedInput: true,
+		Result:           &cfg,
+	})
+	if err != nil {
+		return RemoveFeeTokensCfg{}, fmt.Errorf("decode config: %w", err)
+	}
+	if err := decoder.Decode(raw); err != nil {
 		return RemoveFeeTokensCfg{}, fmt.Errorf("decode config: %w", err)
 	}
 	return cfg, nil

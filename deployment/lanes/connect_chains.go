@@ -29,17 +29,17 @@ func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegis
 				return fmt.Errorf("lane %d: Version must not be nil", i)
 			}
 			if err := validateChainDefinition(lane.ChainA); err != nil {
-				return fmt.Errorf("lane %d ChainA: %w", i, err)
+				return fmt.Errorf("lane %d src: %w", i, err)
 			}
 			if err := validateChainDefinition(lane.ChainB); err != nil {
-				return fmt.Errorf("lane %d ChainB: %w", i, err)
+				return fmt.Errorf("lane %d dest: %w", i, err)
 			}
 			if !lane.Version.LessThan(common_utils.Version_2_0_0) {
 				if err := validateV2ChainDefinition(lane.ChainA, cfg.CommitteePopulator); err != nil {
-					return fmt.Errorf("lane %d ChainA: %w", i, err)
+					return fmt.Errorf("lane %d src: %w", i, err)
 				}
 				if err := validateV2ChainDefinition(lane.ChainB, cfg.CommitteePopulator); err != nil {
-					return fmt.Errorf("lane %d ChainB: %w", i, err)
+					return fmt.Errorf("lane %d dest: %w", i, err)
 				}
 			}
 			for _, sel := range []uint64{lane.ChainA.Selector, lane.ChainB.Selector} {

@@ -29,6 +29,9 @@ import (
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
+// minProductionChainNOPs is the minimum number of NOPs we must have for a production chain.
+const minProductionChainNOPs = 15
+
 // ChainFamilyAdapter is the adapter for chains of the EVM family.
 type ChainFamilyAdapter struct{}
 
@@ -256,4 +259,16 @@ func (a *ChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 
 func (a *ChainFamilyAdapter) GetDefaultGasPrice() *big.Int {
 	return big.NewInt(2e12)
+}
+
+func (a *ChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, nopCount int) error {
+	if nopCount < minProductionChainNOPs {
+		return fmt.Errorf(
+			"chain %q requires at least %d unique NOPs for production environments, got %d",
+			chainSelector,
+			minProductionChainNOPs,
+			nopCount,
+		)
+	}
+	return nil
 }
