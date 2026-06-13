@@ -108,7 +108,6 @@ type MCMSDeploymentConfigPerChain struct {
     TimelockMinDelay *big.Int           // Minimum delay for timelock operations
     Label            *string            // Optional label for the MCMS instance
     Qualifier        *string            // Optional qualifier for the MCMS instance
-    TimelockAdmin    common.Address     // Admin address for the timelock
     ContractVersion  string             // Contract version string
 }
 ```

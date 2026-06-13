@@ -13,10 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	adaptersv1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -28,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
+
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -161,7 +163,6 @@ func TestFastCurse(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -169,7 +170,6 @@ func TestFastCurse(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
 	})
@@ -440,14 +440,12 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	cs := deploy.DeployMCMS(dReg, nil)
 	mcmsChainInput := make(map[uint64]deploy.MCMSDeploymentConfigPerChain)
 	for _, sel := range []uint64{chain1, chain2, chain3} {
-		evmChain := env.BlockChains.EVMChains()[sel]
 		mcmsChainInput[sel] = deploy.MCMSDeploymentConfigPerChain{
 			Canceller:        testhelpers.SingleGroupMCMS(),
 			Bypasser:         testhelpers.SingleGroupMCMS(),
 			Proposer:         testhelpers.SingleGroupMCMS(),
 			TimelockMinDelay: big.NewInt(0),
 			Qualifier:        ptr.String("test"),
-			TimelockAdmin:    evmChain.DeployerKey.From,
 		}
 	}
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{

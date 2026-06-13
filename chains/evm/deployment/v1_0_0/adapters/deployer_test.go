@@ -36,12 +36,12 @@ func TestDeployMCMS(t *testing.T) {
 	require.NoError(t, err)
 	env.Logger = logger.Test(t)
 	evmChain1 := env.BlockChains.EVMChains()[selector1]
-	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deployops.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 	cs := deployops.DeployMCMS(dReg, nil)
+
 	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
@@ -50,19 +50,18 @@ func TestDeployMCMS(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
+				Qualifier:        ptr.String(utils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
+				Qualifier:        ptr.String(utils.CLLQualifier),
 			},
 		},
 	})
+
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 	env.DataStore = output.DataStore.Seal()
@@ -70,7 +69,7 @@ func TestDeployMCMS(t *testing.T) {
 	proposerRef := env.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.ProposerManyChainMultisig)),
-		datastore.AddressRefByQualifier("test"),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
 	)
 	require.Len(t, proposerRef, 1)
 	require.NotEqual(t, common.Address{}, proposerRef[0].Address)
@@ -78,7 +77,7 @@ func TestDeployMCMS(t *testing.T) {
 	bypasserRef := env.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.BypasserManyChainMultisig)),
-		datastore.AddressRefByQualifier("test"),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
 	)
 	require.Len(t, bypasserRef, 1)
 	require.NotEqual(t, common.Address{}, bypasserRef[0].Address)
@@ -86,7 +85,7 @@ func TestDeployMCMS(t *testing.T) {
 	cancellerRef := env.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.CancellerManyChainMultisig)),
-		datastore.AddressRefByQualifier("test"),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
 	)
 	require.Len(t, cancellerRef, 1)
 	require.NotEqual(t, common.Address{}, cancellerRef[0].Address)
@@ -94,7 +93,7 @@ func TestDeployMCMS(t *testing.T) {
 	timelockRef := env.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
-		datastore.AddressRefByQualifier("test"),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
 	)
 	require.Len(t, timelockRef, 1)
 	require.NotEqual(t, common.Address{}, timelockRef[0].Address)
@@ -102,7 +101,7 @@ func TestDeployMCMS(t *testing.T) {
 	callProxyRef := env.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.CallProxy)),
-		datastore.AddressRefByQualifier("test"),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
 	)
 	require.Len(t, callProxyRef, 1)
 	require.NotEqual(t, common.Address{}, callProxyRef[0].Address)
@@ -125,17 +124,18 @@ func TestDeployMCMS(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, hasRole, "Call Proxy should have admin role for EXECUTOR_ROLE")
 
-	// When TimelockAdmin == deployer key, deployer should retain ADMIN_ROLE (no transfer)
+	// CLLCCIP timelock is self-governed.
 	adminRoleAdmin, err := timelockC.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
 	require.NoError(t, err)
-	deployerIsAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain1.DeployerKey.From)
+	timelockAddr := common.HexToAddress(timelockRef[0].Address)
+	selfAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, timelockAddr)
 	require.NoError(t, err)
-	require.True(t, deployerIsAdmin, "deployer should retain ADMIN_ROLE when TimelockAdmin == deployer key")
+	require.True(t, selfAdmin, "CLLCCIP timelock should be self-governed")
 }
 
-// TestDeployMCMS_TimelockAdminRoleTransfer verifies the admin-role handover logic inside DeployMCMS:
-//   - zero TimelockAdmin  → timelock itself holds ADMIN_ROLE; deployer has renounced it
-//   - external address    → that address holds ADMIN_ROLE; deployer has renounced it
+// TestDeployMCMS_TimelockAdminRoleTransfer verifies the admin-role logic inside DeployMCMS:
+//   - non-CLLCCIP qualifier with no CLLCCIP deployed → changeset fails with an error
+//   - CLLCCIP qualifier (bootstrap) → timelock itself holds ADMIN_ROLE (self-sovereign)
 func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	t.Parallel()
 	selector := chainsel.TEST_90000001.Selector
@@ -146,81 +146,154 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	env.Logger = logger.Test(t)
 	evmChain := env.BlockChains.EVMChains()[selector]
 
-	externalAdmin := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	evmDeployer := &adapters.EVMDeployer{}
+	dReg := deployops.GetRegistry()
+	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
+	cs := deployops.DeployMCMS(dReg, nil)
+
+	t.Run("non-CLLCCIP with no CLLCCIP deployed fails", func(t *testing.T) {
+		_, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+			AdapterVersion: deployops.MCMSVersion,
+			Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+				selector: {
+					Canceller:        testhelpers.SingleGroupMCMS(),
+					Bypasser:         testhelpers.SingleGroupMCMS(),
+					Proposer:         testhelpers.SingleGroupMCMS(),
+					TimelockMinDelay: big.NewInt(0),
+					Qualifier:        ptr.String("no-cllccip"),
+				},
+			},
+		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "CLLCCIP RBACTimelock must be deployed first")
+	})
+
+	t.Run("CLLCCIP bootstrap is self-governed", func(t *testing.T) {
+		output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+			AdapterVersion: deployops.MCMSVersion,
+			Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+				selector: {
+					Canceller:        testhelpers.SingleGroupMCMS(),
+					Bypasser:         testhelpers.SingleGroupMCMS(),
+					Proposer:         testhelpers.SingleGroupMCMS(),
+					TimelockMinDelay: big.NewInt(0),
+					Qualifier:        ptr.String(utils.CLLQualifier),
+				},
+			},
+		})
+		require.NoError(t, err)
+		env.DataStore = output.DataStore.Seal()
+
+		timelockRef := env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(selector),
+			datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+			datastore.AddressRefByQualifier(utils.CLLQualifier),
+		)
+		require.Len(t, timelockRef, 1)
+		timelockAddr := common.HexToAddress(timelockRef[0].Address)
+
+		timelockC, err := bindings.NewRBACTimelock(timelockAddr, evmChain.Client)
+		require.NoError(t, err)
+
+		adminRoleAdmin, err := timelockC.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
+		require.NoError(t, err)
+
+		timelockIsSelfAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, timelockAddr)
+		require.NoError(t, err)
+		require.True(t, timelockIsSelfAdmin, "CLLCCIP timelock should be self-governed")
+
+		deployerStillAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain.DeployerKey.From)
+		require.NoError(t, err)
+		require.False(t, deployerStillAdmin, "deployer should never hold ADMIN_ROLE after deployment")
+	})
+}
+
+// TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock verifies that when a new non-CLLCCIP
+// MCMS is deployed, the deployer automatically uses the
+// existing CLLCCIP RBACTimelock as the admin (so it is governed by CLL from the start).
+func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
+	t.Parallel()
+	selector := chainsel.TEST_90000001.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{selector}),
+	)
+	require.NoError(t, err)
+	env.Logger = logger.Test(t)
+	evmChain := env.BlockChains.EVMChains()[selector]
 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deployops.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 	cs := deployops.DeployMCMS(dReg, nil)
 
-	tests := []struct {
-		name            string
-		qualifier       string
-		timelockAdmin   common.Address // zero means self-sovereign
-		expectAdmin     func(timelockAddr common.Address) common.Address
-		deployerIsAdmin bool
-	}{
-		{
-			name:            "zero TimelockAdmin makes timelock self-sovereign",
-			qualifier:       "zero-admin",
-			timelockAdmin:   common.Address{},
-			expectAdmin:     func(timelockAddr common.Address) common.Address { return timelockAddr },
-			deployerIsAdmin: false,
+	// Step 1: deploy the CLLCCIP MCMS instance
+	cllOutput, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: deployops.MCMSVersion,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        new(utils.CLLQualifier),
+			},
 		},
-		{
-			name:            "external TimelockAdmin receives ADMIN_ROLE",
-			qualifier:       "external-admin",
-			timelockAdmin:   externalAdmin,
-			expectAdmin:     func(_ common.Address) common.Address { return externalAdmin },
-			deployerIsAdmin: false,
+	})
+	require.NoError(t, err)
+	require.NoError(t, cllOutput.DataStore.Merge(env.DataStore))
+	env.DataStore = cllOutput.DataStore.Seal()
+
+	// Resolve the CLLCCIP timelock address for later assertion.
+	cllTimelockRefs := env.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+		datastore.AddressRefByQualifier(utils.CLLQualifier),
+	)
+	require.Len(t, cllTimelockRefs, 1)
+	cllTimelockAddr := common.HexToAddress(cllTimelockRefs[0].Address)
+
+	// Step 2: deploy a second (non-CLLCCIP) MCMS instance.
+	// The deployer should automatically pick the CLLCCIP timelock as the admin.
+	rmnOutput, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: deployops.MCMSVersion,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        new(utils.RMNTimelockQualifier),
+			},
 		},
-	}
+	})
+	require.NoError(t, err)
+	require.NoError(t, rmnOutput.DataStore.Merge(env.DataStore))
+	env.DataStore = rmnOutput.DataStore.Seal()
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
-				AdapterVersion: deployops.MCMSVersion,
-				Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
-					selector: {
-						Canceller:        testhelpers.SingleGroupMCMS(),
-						Bypasser:         testhelpers.SingleGroupMCMS(),
-						Proposer:         testhelpers.SingleGroupMCMS(),
-						TimelockMinDelay: big.NewInt(0),
-						Qualifier:        new(tc.qualifier),
-						TimelockAdmin:    tc.timelockAdmin,
-					},
-				},
-			})
-			require.NoError(t, err)
-			env.DataStore = output.DataStore.Seal()
+	rmnTimelockRefs := env.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+		datastore.AddressRefByQualifier(utils.RMNTimelockQualifier),
+	)
+	require.Len(t, rmnTimelockRefs, 1)
+	rmnTimelockAddr := common.HexToAddress(rmnTimelockRefs[0].Address)
 
-			timelockRef := env.DataStore.Addresses().Filter(
-				datastore.AddressRefByChainSelector(selector),
-				datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
-				datastore.AddressRefByQualifier(tc.qualifier),
-			)
-			require.Len(t, timelockRef, 1)
-			timelockAddr := common.HexToAddress(timelockRef[0].Address)
+	rmnTimelock, err := bindings.NewRBACTimelock(rmnTimelockAddr, evmChain.Client)
+	require.NoError(t, err)
 
-			timelockC, err := bindings.NewRBACTimelock(timelockAddr, evmChain.Client)
-			require.NoError(t, err)
+	adminRoleAdmin, err := rmnTimelock.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
+	require.NoError(t, err)
 
-			adminRoleAdmin, err := timelockC.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
-			require.NoError(t, err)
+	// The CLLCCIP timelock should be the admin of the new RMNMCMS timelock.
+	cllIsAdmin, err := rmnTimelock.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, cllTimelockAddr)
+	require.NoError(t, err)
+	require.True(t, cllIsAdmin, "CLLCCIP timelock should be admin of the RMNMCMS timelock")
 
-			expectedAdmin := tc.expectAdmin(timelockAddr)
-			expectedIsAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, expectedAdmin)
-			require.NoError(t, err)
-			require.True(t, expectedIsAdmin, "expected %s to hold ADMIN_ROLE", expectedAdmin)
-
-			deployerStillAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain.DeployerKey.From)
-			require.NoError(t, err)
-			require.Equal(t, tc.deployerIsAdmin, deployerStillAdmin,
-				"deployer ADMIN_ROLE mismatch: expected deployerIsAdmin=%v", tc.deployerIsAdmin)
-		})
-	}
+	// The deployer EOA must have renounced ADMIN_ROLE.
+	deployerIsAdmin, err := rmnTimelock.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, evmChain.DeployerKey.From)
+	require.NoError(t, err)
+	require.False(t, deployerIsAdmin, "deployer should have renounced ADMIN_ROLE after transfer to CLLCCIP timelock")
 }
-
 
 func TestUpdateMCMSConfig(t *testing.T) {
 	t.Parallel()
@@ -231,8 +304,6 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	)
 	require.NoError(t, err)
 	env.Logger = logger.Test(t)
-	evmChain1 := env.BlockChains.EVMChains()[selector1]
-	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deployops.GetRegistry()
@@ -248,16 +319,14 @@ func TestUpdateMCMSConfig(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
+				Qualifier:        new("CLLCCIP"),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
+				Qualifier:        new("CLLCCIP"),
 			},
 		},
 	})
@@ -361,7 +430,10 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	}
 }
 
-func TestGrantAdminRoleToTimelock(t *testing.T) {
+// TestDeployMCMS_CLLCCIPAutoAdminMultiChain verifies that on multiple chains, when the CLLCCIP
+// instance is deployed first and a second MCMS set is deployed afterwards, DeployMCMS
+// automatically sets the CLLCCIP timelock as the admin of the new timelock.
+func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 	t.Parallel()
 	selector1 := chainsel.TEST_90000001.Selector
 	selector2 := chainsel.TEST_90000002.Selector
@@ -370,16 +442,15 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 	)
 	require.NoError(t, err)
 	env.Logger = logger.Test(t)
-	evmChain1 := env.BlockChains.EVMChains()[selector1]
-	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deployops.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 
-	// deploy two timelocks on each chain so we can set one as the admin of the other
 	deployMCMS := deployops.DeployMCMS(dReg, nil)
-	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
+
+	// Step 1: deploy CLLCCIP on both chains (bootstrap — each self-governed).
+	cllOutput, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
@@ -387,24 +458,37 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("testQual"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
+				Qualifier:        new(utils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("testQual"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
+				Qualifier:        new(utils.CLLQualifier),
 			},
 		},
 	})
 	require.NoError(t, err)
-	require.Greater(t, len(output.Reports), 0)
-	ds := output.DataStore
+	require.Greater(t, len(cllOutput.Reports), 0)
+	require.NoError(t, cllOutput.DataStore.Merge(env.DataStore))
+	env.DataStore = cllOutput.DataStore.Seal()
 
-	output, err = deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
+	// Collect CLLCCIP timelock addresses for assertion.
+	cllTimelockAddrs := make(map[uint64]common.Address)
+	for _, sel := range []uint64{selector1, selector2} {
+		refs := env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(sel),
+			datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+			datastore.AddressRefByQualifier(utils.CLLQualifier),
+		)
+		require.Len(t, refs, 1)
+		cllTimelockAddrs[sel] = common.HexToAddress(refs[0].Address)
+	}
+
+	// Step 2: deploy a second MCMS set (testQual) with CLLCCIP already in datastore.
+	// DeployMCMS should automatically use CLLCCIP timelock as admin.
+	testOutput, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
@@ -412,133 +496,47 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
+				Qualifier:        new("testQual"),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
+				Qualifier:        new("testQual"),
 			},
 		},
 	})
 	require.NoError(t, err)
-	require.Greater(t, len(output.Reports), 0)
-	addresses, err := output.DataStore.Addresses().Fetch()
-	require.NoError(t, err)
-	for _, addr := range addresses {
-		t.Logf("Adding address %s of type %s on chain %d to datastore", addr.Address, addr.Type, addr.ChainSelector)
-		require.NoError(t, ds.Addresses().Add(addr))
-	}
-	env.DataStore = ds.Seal()
+	require.Greater(t, len(testOutput.Reports), 0)
+	require.NoError(t, testOutput.DataStore.Merge(env.DataStore))
+	env.DataStore = testOutput.DataStore.Seal()
 
-	// get recently deployed timelock addresses
-	timelockAddrs := make(map[uint64]string)
-	newAdminTimelockAddrs := make(map[uint64]string)
-	for _, sel := range []uint64{selector1, selector2} {
-		timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			ChainSelector: sel,
-			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier:     "testQual",
-			Version:       semver.MustParse("1.0.0"),
-		}, sel, datastore_utils.FullRef)
-		require.NoError(t, err)
-		timelockAddrs[sel] = timelockRef.Address
-		newAdminTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			ChainSelector: sel,
-			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier:     "CLLCCIP",
-			Version:       semver.MustParse("1.0.0"),
-		}, sel, datastore_utils.FullRef)
-		require.NoError(t, err)
-		newAdminTimelockAddrs[sel] = newAdminTimelockRef.Address
-	}
-
-	// check that admin of timelock is deployer eoa
 	for _, sel := range []uint64{selector1, selector2} {
 		evmChain := env.BlockChains.EVMChains()[sel]
-		timelock, err := bindings.NewRBACTimelock(common.HexToAddress(timelockAddrs[sel]), evmChain.Client)
+
+		testQualRefs := env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(sel),
+			datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
+			datastore.AddressRefByQualifier("testQual"),
+		)
+		require.Len(t, testQualRefs, 1)
+		testQualTimelockAddr := common.HexToAddress(testQualRefs[0].Address)
+
+		timelock, err := bindings.NewRBACTimelock(testQualTimelockAddr, evmChain.Client)
 		require.NoError(t, err)
-		roleAdmin, err := timelock.GetRoleAdmin(&bind.CallOpts{
-			Context: t.Context(),
-		}, ops.ADMIN_ROLE.ID)
+		roleAdmin, err := timelock.GetRoleAdmin(&bind.CallOpts{Context: t.Context()}, ops.ADMIN_ROLE.ID)
 		require.NoError(t, err)
 
-		callerIsAdmin, err := timelock.HasRole(&bind.CallOpts{
-			Context: t.Context(),
-		}, roleAdmin, evmChain.DeployerKey.From)
+		// CLLCCIP timelock must be admin of testQual timelock.
+		cllIsAdmin, err := timelock.HasRole(&bind.CallOpts{Context: t.Context()}, roleAdmin, cllTimelockAddrs[sel])
 		require.NoError(t, err)
-		require.True(t, callerIsAdmin)
-	}
+		require.True(t, cllIsAdmin, "CLLCCIP timelock should be admin of testQual timelock on chain %d", sel)
+		t.Logf("CLLCCIP timelock %s is admin of testQual timelock %s on chain %d", cllTimelockAddrs[sel], testQualTimelockAddr, sel)
 
-	// grant admin role to timelock
-	grantAdminRoleMCMS := deployops.GrantAdminRoleToTimelock(dReg, nil)
-	output, err = grantAdminRoleMCMS.Apply(*env, deployops.GrantAdminRoleToTimelockConfig{
-		AdapterVersion: semver.MustParse("1.0.0"),
-		Chains: map[uint64]deployops.GrantAdminRoleToTimelockConfigPerChain{
-			selector1: {
-				TimelockToTransferRef: datastore.AddressRef{
-					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-					Version:   semver.MustParse("1.0.0"),
-					Qualifier: "testQual",
-				},
-				NewAdminTimelockRef: datastore.AddressRef{
-					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-					Version:   semver.MustParse("1.0.0"),
-					Qualifier: "CLLCCIP",
-				},
-			},
-			selector2: {
-				TimelockToTransferRef: datastore.AddressRef{
-					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-					Version:   semver.MustParse("1.0.0"),
-					Qualifier: "testQual",
-				},
-				NewAdminTimelockRef: datastore.AddressRef{
-					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-					Version:   semver.MustParse("1.0.0"),
-					Qualifier: "CLLCCIP",
-				},
-			},
-		},
-	})
-
-	// check that "CLLCCIP" timelocks have admin role
-	for _, sel := range []uint64{selector1, selector2} {
-		evmChain := env.BlockChains.EVMChains()[sel]
-		timelock, err := bindings.NewRBACTimelock(common.HexToAddress(timelockAddrs[sel]), evmChain.Client)
+		// Deployer must NOT be admin.
+		deployerIsAdmin, err := timelock.HasRole(&bind.CallOpts{Context: t.Context()}, roleAdmin, evmChain.DeployerKey.From)
 		require.NoError(t, err)
-		roleAdmin, err := timelock.GetRoleAdmin(&bind.CallOpts{
-			Context: t.Context(),
-		}, ops.ADMIN_ROLE.ID)
-		require.NoError(t, err)
-
-		timelockIsAdmin, err := timelock.HasRole(&bind.CallOpts{
-			Context: t.Context(),
-		}, roleAdmin, common.HexToAddress(newAdminTimelockAddrs[sel]))
-		require.NoError(t, err)
-		require.True(t, timelockIsAdmin, "timelock does not have admin role on chain %d", sel)
-		t.Logf("Timelock with address %s on chain %d was successfully granted admin role of timelock with address %s", newAdminTimelockAddrs[sel], sel, timelockAddrs[sel])
-	}
-
-	// check that deployer eoa no longer has admin role
-	for _, sel := range []uint64{selector1, selector2} {
-		evmChain := env.BlockChains.EVMChains()[sel]
-		timelock, err := bindings.NewRBACTimelock(common.HexToAddress(timelockAddrs[sel]), evmChain.Client)
-		require.NoError(t, err)
-		roleAdmin, err := timelock.GetRoleAdmin(&bind.CallOpts{
-			Context: t.Context(),
-		}, ops.ADMIN_ROLE.ID)
-		require.NoError(t, err)
-
-		timelockIsAdmin, err := timelock.HasRole(&bind.CallOpts{
-			Context: t.Context(),
-		}, roleAdmin, evmChain.DeployerKey.From)
-		require.NoError(t, err)
-		require.False(t, timelockIsAdmin, "deployer eoa still has admin role on chain %d", sel)
-		t.Logf("The deployer EOA on chain %d has successfully renounced admin role of timelock with address %s", sel, timelockAddrs[sel])
+		require.False(t, deployerIsAdmin, "deployer should not hold ADMIN_ROLE on chain %d", sel)
 	}
 }
