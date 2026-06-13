@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -50,7 +49,7 @@ func TestDeployMCMS(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        new("test"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
@@ -58,7 +57,7 @@ func TestDeployMCMS(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("test"),
+				Qualifier:        new("test"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
@@ -248,7 +247,7 @@ func TestUpdateMCMSConfig(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
+				Qualifier:        new("CLLCCIP"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
@@ -256,7 +255,7 @@ func TestUpdateMCMSConfig(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
+				Qualifier:        new("CLLCCIP"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
@@ -387,7 +386,7 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("testQual"),
+				Qualifier:        new("testQual"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
@@ -395,7 +394,7 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("testQual"),
+				Qualifier:        new("testQual"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
@@ -412,7 +411,7 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
+				Qualifier:        new("CLLCCIP"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
@@ -420,7 +419,7 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String("CLLCCIP"),
+				Qualifier:        new("CLLCCIP"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},

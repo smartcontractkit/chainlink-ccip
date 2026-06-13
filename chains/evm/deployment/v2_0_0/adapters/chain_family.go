@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"k8s.io/utils/ptr"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -58,10 +57,7 @@ func (a *ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelec
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
+	return addr, err
 }
 
 func (a *ChainFamilyAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -70,10 +66,7 @@ func (a *ChainFamilyAdapter) GetOffRampAddress(ds datastore.DataStore, chainSele
 		Type:          datastore.ContractType(offramp.ContractType),
 		Version:       offramp.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
+	return addr, err
 }
 
 func (a *ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -82,10 +75,7 @@ func (a *ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector 
 		Type:          datastore.ContractType(fee_quoter.ContractType),
 		Version:       fee_quoter.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
+	return addr, err
 }
 
 func (a *ChainFamilyAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) ([]byte, error) {
@@ -127,10 +117,7 @@ func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelec
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
+	return addr, err
 }
 
 func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -139,10 +126,7 @@ func (a *ChainFamilyAdapter) GetTestRouter(ds datastore.DataStore, chainSelector
 		Type:          datastore.ContractType(router.TestRouterContractType),
 		Version:       router.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
+	return addr, err
 }
 
 func (a *ChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
@@ -190,17 +174,17 @@ func (a *ChainFamilyAdapter) GetChainFamilySelector() [4]byte {
 
 func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(chainSelector uint64, remoteChainSelector uint64, chainFamilySelector [4]byte) ccvadapters.FeeQuoterDestChainConfigOverrides {
 	return ccvadapters.FeeQuoterDestChainConfigOverrides{
-		IsEnabled:                   ptr.To(true),
-		MaxDataBytes:                ptr.To(uint32(32_000)),
-		MaxPerMsgGasLimit:           ptr.To(sequences.GetMaxMsgPerGasLimit(remoteChainSelector)),
-		DestGasPerPayloadByteBase:   ptr.To(sequences.GetdestGasPerPayloadByteBase(remoteChainSelector)),
-		DestGasOverhead:             ptr.To(uint32(0)), // not used even set
+		IsEnabled:                   new(true),
+		MaxDataBytes:                new(uint32(32_000)),
+		MaxPerMsgGasLimit:           new(sequences.GetMaxMsgPerGasLimit(remoteChainSelector)),
+		DestGasPerPayloadByteBase:   new(sequences.GetdestGasPerPayloadByteBase(remoteChainSelector)),
+		DestGasOverhead:             new(uint32(0)), // not used even set
 		ChainFamilySelector:         chainFamilySelector,
-		DefaultTokenFeeUSDCents:     ptr.To(uint16(0)),
-		DefaultTokenDestGasOverhead: ptr.To(uint32(90_000)),
-		DefaultTxGasLimit:           ptr.To(uint32(200_000)),
-		NetworkFeeUSDCents:          ptr.To(sequences.GetNetworkFeeUSDCents(chainSelector, remoteChainSelector)),
-		LinkFeeMultiplierPercent:    ptr.To(uint8(90)),
+		DefaultTokenFeeUSDCents:     new(uint16(0)),
+		DefaultTokenDestGasOverhead: new(uint32(90_000)),
+		DefaultTxGasLimit:           new(uint32(200_000)),
+		NetworkFeeUSDCents:          new(sequences.GetNetworkFeeUSDCents(chainSelector, remoteChainSelector)),
+		LinkFeeMultiplierPercent:    new(uint8(90)),
 		// USDPerUnitGas is not set here to avoid doing a gas price update by default
 	}
 }
