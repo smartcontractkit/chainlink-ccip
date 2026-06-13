@@ -659,12 +659,12 @@ func Test_isLiveOffRampSourceLane(t *testing.T) {
 
 func Test_classifyOffRampSourceLanes(t *testing.T) {
 	const (
-		live          cciptypes.ChainSelector = 1
-		disabled      cciptypes.ChainSelector = 2
-		noConfig      cciptypes.ChainSelector = 3
-		noOnRamp      cciptypes.ChainSelector = 4
-		rmnMisconfig  cciptypes.ChainSelector = 5
-		liveTwo       cciptypes.ChainSelector = 6
+		live         cciptypes.ChainSelector = 1
+		disabled     cciptypes.ChainSelector = 2
+		noConfig     cciptypes.ChainSelector = 3
+		noOnRamp     cciptypes.ChainSelector = 4
+		rmnMisconfig cciptypes.ChainSelector = 5
+		liveTwo      cciptypes.ChainSelector = 6
 	)
 
 	supported := []cciptypes.ChainSelector{live, disabled, noConfig, noOnRamp, rmnMisconfig, liveTwo}
