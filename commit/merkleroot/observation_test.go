@@ -657,6 +657,34 @@ func Test_isLiveOffRampSourceLane(t *testing.T) {
 	}, true))
 }
 
+func Test_classifyOffRampSourceLanes(t *testing.T) {
+	const (
+		live          cciptypes.ChainSelector = 1
+		disabled      cciptypes.ChainSelector = 2
+		noConfig      cciptypes.ChainSelector = 3
+		noOnRamp      cciptypes.ChainSelector = 4
+		rmnMisconfig  cciptypes.ChainSelector = 5
+		liveTwo       cciptypes.ChainSelector = 6
+	)
+
+	supported := []cciptypes.ChainSelector{live, disabled, noConfig, noOnRamp, rmnMisconfig, liveTwo}
+	cfgs := map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+		live:         {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		disabled:     {IsEnabled: false, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		noOnRamp:     {IsEnabled: true, IsRMNVerificationDisabled: true},
+		rmnMisconfig: {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: false},
+		liveTwo:      {IsEnabled: true, OnRamp: []byte{0x02}, IsRMNVerificationDisabled: true},
+		// noConfig deliberately absent from the map
+	}
+
+	c := classifyOffRampSourceLanes(supported, cfgs)
+
+	assert.Equal(t, []cciptypes.ChainSelector{live, liveTwo}, c.live)
+	assert.Equal(t, []cciptypes.ChainSelector{noConfig, noOnRamp}, c.skippedNotALane)
+	assert.Equal(t, []cciptypes.ChainSelector{disabled}, c.skippedDisabled)
+	assert.Equal(t, []cciptypes.ChainSelector{rmnMisconfig}, c.rmnMisconfigured)
+}
+
 func Test_ObserveMerkleRoots(t *testing.T) {
 	testCases := []struct {
 		name                     string

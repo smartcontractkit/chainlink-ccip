@@ -50,6 +50,44 @@ func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool)
 	return exists && cfg.IsEnabled && len(cfg.OnRamp) > 0
 }
 
+// offRampLaneClassification buckets source chains by their offramp lane status.
+type offRampLaneClassification struct {
+	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
+	live []cciptypes.ChainSelector
+	// skippedNotALane have no offramp config or no onRamp configured.
+	skippedNotALane []cciptypes.ChainSelector
+	// skippedDisabled have an offramp config but are disabled.
+	skippedDisabled []cciptypes.ChainSelector
+	// rmnMisconfigured are live lanes that unexpectedly have RMN verification enabled.
+	rmnMisconfigured []cciptypes.ChainSelector
+}
+
+// classifyOffRampSourceLanes buckets the supported source chains based on their offramp source chain
+// config. Only "live" lanes should be queried for onRamp seq nums, the other buckets are skipped and
+// exist for logging.
+func classifyOffRampSourceLanes(
+	supported []cciptypes.ChainSelector,
+	cfgs map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig,
+) offRampLaneClassification {
+	var c offRampLaneClassification
+	for _, sourceChain := range supported {
+		cfg, ok := cfgs[sourceChain]
+		switch {
+		case !ok:
+			c.skippedNotALane = append(c.skippedNotALane, sourceChain)
+		case !cfg.IsEnabled:
+			c.skippedDisabled = append(c.skippedDisabled, sourceChain)
+		case len(cfg.OnRamp) == 0:
+			c.skippedNotALane = append(c.skippedNotALane, sourceChain)
+		case !cfg.IsRMNVerificationDisabled:
+			c.rmnMisconfigured = append(c.rmnMisconfigured, sourceChain)
+		default:
+			c.live = append(c.live, sourceChain)
+		}
+	}
+	return c
+}
+
 // ObservationQuorum requires "across all chains" at least 2F+1 observations.
 func (p *Processor) ObservationQuorum(
 	_ context.Context, _ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
@@ -591,53 +629,27 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	var (
-		skippedNotALane       []cciptypes.ChainSelector
-		skippedDisabled       []cciptypes.ChainSelector
-		rmnMisconfiguredLanes []cciptypes.ChainSelector
-		liveLanes             []cciptypes.ChainSelector
-	)
+	classification := classifyOffRampSourceLanes(supportedSourceChains, sourceChainsCfg)
 
-	for _, sourceChain := range supportedSourceChains {
-		cfg, ok := sourceChainsCfg[sourceChain]
-		if !ok {
-			skippedNotALane = append(skippedNotALane, sourceChain)
-			continue
-		}
-		if !cfg.IsEnabled {
-			skippedDisabled = append(skippedDisabled, sourceChain)
-			continue
-		}
-		if len(cfg.OnRamp) == 0 {
-			skippedNotALane = append(skippedNotALane, sourceChain)
-			continue
-		}
-		if !cfg.IsRMNVerificationDisabled {
-			rmnMisconfiguredLanes = append(rmnMisconfiguredLanes, sourceChain)
-			continue
-		}
-		liveLanes = append(liveLanes, sourceChain)
-	}
-
-	if len(skippedNotALane) > 0 || len(skippedDisabled) > 0 {
+	if len(classification.skippedNotALane) > 0 || len(classification.skippedDisabled) > 0 {
 		logutil.LogWhenExceedFrequency(&lastSkippedLanesLog, skippedLanesLogFrequency, func() {
 			lggr.Debugw("skipping onRamp seq num observations for non-live lanes",
-				"noConfigOrOnRamp", skippedNotALane,
-				"disabled", skippedDisabled,
+				"noConfigOrOnRamp", classification.skippedNotALane,
+				"disabled", classification.skippedDisabled,
 			)
 		})
 	}
-	if len(rmnMisconfiguredLanes) > 0 {
+	if len(classification.rmnMisconfigured) > 0 {
 		lggr.Warnw("rmn enablement is misconfigured on these lanes, skipping observations",
-			"sources", rmnMisconfiguredLanes,
+			"sources", classification.rmnMisconfigured,
 		)
 	}
 
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(liveLanes))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(classification.live))
 
 	wg := &sync.WaitGroup{}
-	for _, sourceChain := range liveLanes {
+	for _, sourceChain := range classification.live {
 		wg.Go(func() {
 			chainCtx, chainCancel := rpctimeout.Context(ctx)
 			defer chainCancel()
