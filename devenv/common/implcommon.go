@@ -444,9 +444,13 @@ func AddNodesToContracts(
 	}
 
 	for _, chain := range remoteSelectors {
+		family, _ := chainsel.GetSelectorFamily(chain)
 		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
 			if ocrParams.CommitOffChainConfig != nil {
 				ocrParams.CommitOffChainConfig.RMNEnabled = false
+			}
+			if family == chainsel.FamilyTon {
+				return withTONOCRConfigOverrides(ocrParams)
 			}
 			return ocrParams
 		}
