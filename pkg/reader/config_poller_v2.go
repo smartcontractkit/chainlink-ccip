@@ -266,7 +266,8 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 				destChain, c.destChainSelector)
 	}
 
-	if _, exists := c.chainAccessors[c.destChainSelector]; !exists {
+	_, err := getChainAccessor(c.chainAccessors, c.destChainSelector)
+	if err != nil {
 		c.lggr.Errorw("no chain accessor for dest chain; cannot track or refresh source configs",
 			"destChain", c.destChainSelector)
 		return nil, fmt.Errorf("no chain accessor for dest chain %s", c.destChainSelector)
