@@ -87,8 +87,8 @@ var (
 	}
 
 	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.StaticSourceChainConfig{
-		sourceEvmChain1: {IsEnabled: true, IsRMNVerificationDisabled: true},
-		sourceSolChain:  {IsEnabled: true, IsRMNVerificationDisabled: true},
+		sourceEvmChain1: {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		sourceSolChain:  {IsEnabled: true, OnRamp: []byte{0x02}, IsRMNVerificationDisabled: true},
 	}
 )
 
