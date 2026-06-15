@@ -208,7 +208,7 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 
 	env := newDeployTestEnv(t, []uint64{sel1})
 	registry := adapters.NewDeployChainContractsRegistry()
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestDeployChainContracts_Apply_MinimalConfigWithoutOverrides(t *testing.T) 
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg:  newDeployChainContractsCfg(sel1),
@@ -271,7 +271,7 @@ func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg:  newDeployChainContractsCfg(sel1),
@@ -309,7 +309,7 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg:  newDeployChainContractsCfg(sel1, sel2),
@@ -334,7 +334,7 @@ func TestDeployChainContracts_Apply_PerChainContractParamsOverrideIsUsed(t *test
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, captureAdapter)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -378,7 +378,7 @@ func TestDeployChainContracts_Apply_PerChainDeployFlagsAreUsed(t *testing.T) {
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, captureAdapter)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -453,7 +453,7 @@ func TestDeployChainContracts_Apply_AdapterErrorPropagated(t *testing.T) {
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg:  newDeployChainContractsCfg(sel1),
@@ -471,7 +471,7 @@ func TestDeployChainContracts_Apply_ReturnsError_WhenNoCommitteesHaveChainConfig
 	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -488,7 +488,7 @@ func TestDeployChainContracts_Apply_NoAdapterRegistered(t *testing.T) {
 	env := newDeployTestEnv(t, []uint64{sel1})
 
 	registry := adapters.NewDeployChainContractsRegistry()
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg:  newDeployChainContractsCfg(sel1),
