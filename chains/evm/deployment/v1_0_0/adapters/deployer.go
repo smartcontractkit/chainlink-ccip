@@ -224,9 +224,13 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 					evm_datastore_utils.ToEVMAddress,
 				)
 				if lookupErr != nil || cllTimelockAddr == (common.Address{}) {
+					qualifier := ""
+					if in.Qualifier != nil {
+						qualifier = *in.Qualifier
+					}
 					return sequtil.OnChainOutput{}, fmt.Errorf(
 						"cannot deploy MCMS with qualifier %q on chain %d: CLLCCIP RBACTimelock must be deployed first (it will be set as admin)",
-						ptrOrEmpty(in.Qualifier), in.ChainSelector,
+						qualifier, in.ChainSelector,
 					)
 				}
 				finalAdmin = cllTimelockAddr
@@ -276,11 +280,3 @@ func (d *EVMDeployer) FinalizeDeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploy
 			return output, nil
 		})
 }
-
-func ptrOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
