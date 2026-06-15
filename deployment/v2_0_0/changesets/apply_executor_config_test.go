@@ -108,10 +108,11 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 	registry.Register(chainsel.FamilyEVM, &mockExecutorConfigAdapter{})
 
 	tests := []struct {
-		name    string
-		env     deployment.Environment
-		input   changesets.ApplyExecutorConfigInput
-		wantErr string
+		name        string
+		env         deployment.Environment
+		input       changesets.ApplyExecutorConfigInput
+		chainFamily *adapters.ChainFamilyRegistry
+		wantErr     string
 	}{
 		{
 			name:    "missing topology returns error",
@@ -136,13 +137,14 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 			wantErr: "nop_topology is required",
 		},
 		{
-			name: "production topology with fewer than fifteen NOPs returns error",
+			name: "production topology rejected by chain family adapter returns error",
 			env:  deployment.Environment{Name: "prod_mainnet", BlockChains: newExecutorTestBlockChains([]uint64{sel1})},
 			input: changesets.ApplyExecutorConfigInput{
 				Topology:          newMinimalTopology([]string{"nop1"}, "pool1", ""),
 				ExecutorQualifier: "pool1",
 			},
-			wantErr: "requires at least 15 unique NOPs",
+			chainFamily: newRejectingChainFamilyRegistry(),
+			wantErr:     fmt.Sprintf(`executor pool "pool1" validation failed on chain "%d": stub chain family rejected topology`, sel1),
 		},
 		{
 			name: "missing executor qualifier returns error",
@@ -188,7 +190,11 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := changesets.ApplyExecutorConfig(registry)
+			chainFamilyRegistry := tt.chainFamily
+			if chainFamilyRegistry == nil {
+				chainFamilyRegistry = newTestChainFamilyRegistry()
+			}
+			cs := changesets.ApplyExecutorConfig(registry, chainFamilyRegistry)
 			err := cs.VerifyPreconditions(tt.env, tt.input)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
@@ -218,7 +224,7 @@ func TestApplyExecutorConfig_HappyPathBuildsJobSpecs(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -251,7 +257,7 @@ func TestApplyExecutorConfig_NoDeployedChainsReturnsEmpty(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -276,7 +282,7 @@ func TestApplyExecutorConfig_BuildChainConfigErrorPropagates(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -308,7 +314,7 @@ func TestApplyExecutorConfig_UsesAllDeployedChains(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -339,7 +345,7 @@ func TestApplyExecutorConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 	topo := newMinimalTopology([]string{"nop1", "nop2", "nop3"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
 
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -459,7 +465,7 @@ func TestApplyExecutorConfig_PerChainNOPsIncludesAllChains(t *testing.T) {
 	)
 
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2, sel3})
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -505,7 +511,7 @@ func TestApplyExecutorConfig_AllChainsNOPsGetAllChains(t *testing.T) {
 	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
@@ -551,7 +557,7 @@ func TestApplyExecutorConfig_ExecutorPoolFieldMatchesChainPool(t *testing.T) {
 	)
 
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
-	cs := changesets.ApplyExecutorConfig(registry)
+	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
