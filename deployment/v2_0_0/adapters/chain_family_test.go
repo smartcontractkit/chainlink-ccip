@@ -82,6 +82,10 @@ func (m *mockChainFamily) GetDefaultFinalityConfig() finality.Config {
 	return finality.Config{}
 }
 
+func (m *mockChainFamily) ValidateNOPsTopology(chainSelector string, nopCount int) error {
+	return nil
+}
+
 func TestChainFamilyRegistry_RegisterAndGet(t *testing.T) {
 	registry := adapters.NewChainFamilyRegistry()
 	adapter := &mockChainFamily{}
