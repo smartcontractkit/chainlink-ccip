@@ -10,11 +10,12 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aws/smithy-go v1.24.2
 	github.com/ethereum/go-ethereum v1.17.2
+	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260520171506-73298226c668
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260526052449-0ceed63f1a5a
 	github.com/smartcontractkit/chainlink-ccv v0.0.1
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260520182028-cfd627ddb60c
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260417081611-8bdbd9f45629
@@ -141,7 +142,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.30.1 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
-	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect

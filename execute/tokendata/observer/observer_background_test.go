@@ -118,30 +118,42 @@ func assertTokenDataEmptyInitially(t *testing.T,
 
 func testCacheExpirationAndShutdown(
 	t *testing.T, rawObserver *backgroundObserver, numMsgsPerChain map[cciptypes.ChainSelector]int) {
-	// keep only len(chains) messages in the cache
-	msgsToKeep := len(numMsgsPerChain)
-	i := 0
 	rawObserver.cachedTokenData.mu.Lock()
+	cacheSize := len(rawObserver.cachedTokenData.inMemTokenData)
+	require.Greater(t, cacheSize, 1, "need multiple cached messages to test expiration")
+
+	// Keep at most len(chains) entries, but never more than are actually cached.
+	// Error messages are never cached, so cacheSize can be smaller than len(chains).
+	msgsToKeep := min(len(numMsgsPerChain), cacheSize-1)
+	expiredAt := time.Now().Add(-time.Second).UTC()
+	i := 0
 	for msgID := range rawObserver.cachedTokenData.inMemTokenData {
 		if i < msgsToKeep {
 			i++
 			continue
 		}
-		rawObserver.cachedTokenData.expiresAt[msgID] = time.Now()
+		rawObserver.cachedTokenData.expiresAt[msgID] = expiredAt
 	}
 	rawObserver.cachedTokenData.mu.Unlock()
-	// run another expiration loop to remove expired messages
-	rawObserver.cachedTokenData.runExpirationLoop(time.Millisecond)
 
 	require.Eventually(t, func() bool {
-		rawObserver.cachedTokenData.mu.RLock()
-		totalMsgs := len(rawObserver.cachedTokenData.inMemTokenData)
-		rawObserver.cachedTokenData.mu.RUnlock()
-		return msgsToKeep == totalMsgs
+		purgeExpiredFromCache(rawObserver.cachedTokenData)
+		return msgsToKeep == rawObserver.cachedTokenData.size()
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
 	// graceful shutdown
 	assert.NoError(t, rawObserver.Close())
+}
+
+func purgeExpiredFromCache(c *inMemTokenDataCache) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for msgID := range c.expiresAt {
+		if c.hasExpired(msgID) {
+			delete(c.inMemTokenData, msgID)
+			delete(c.expiresAt, msgID)
+		}
+	}
 }
 
 func generateMsgObservations(

@@ -28,19 +28,32 @@ var DeployToken = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found among provided chains", input.ChainSelector)
 		}
-
 		preMint := big.NewInt(0)
 		if input.PreMint != nil {
 			preMint = tokenapi.ScaleTokenAmount(new(big.Int).SetUint64(*input.PreMint), input.Decimals)
 		}
 
+		// NOTE: CCIP admin is only applicable to BnM ERC20 tokens and mostly serves as a public
+		// label. Despite its naming, the CCIP admin does not actually have any admin privileges
+		// on the token contract itself. Instead this field allows the specified account to self
+		// serve token registration with `registerAdminViaGetCCIPAdmin`. The CCIP admin defaults
+		// to the account that deploys the contract (typically the deployer key) so it's usually
+		// safer to set this to the external admin field if it's specified (see the higher-level
+		// TokenExpansion changeset for more info on how this field gets populated). If external
+		// admin is empty, then the CCIP admin remains the contract deployer and anyone with the
+		// default admin role can update it later with `setCCIPAdmin`.
+		if input.CCIPAdmin == "" && input.ExternalAdmin != "" {
+			input.CCIPAdmin = input.ExternalAdmin
+		}
+
+		// NOTE: the raw input struct is passed to `tokenImpl.Deploy`, so we need to ensure that
+		// the relevant fields are validated ahead of time to prevent any issues downstream.
 		externalAdmin := common.Address{}
 		if input.ExternalAdmin != "" && !common.IsHexAddress(input.ExternalAdmin) {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid external admin address: %s", input.ExternalAdmin)
 		} else {
 			externalAdmin = common.HexToAddress(input.ExternalAdmin)
 		}
-
 		ccipAdmin := common.Address{}
 		if input.CCIPAdmin != "" && !common.IsHexAddress(input.CCIPAdmin) {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid CCIP admin address: %s", input.CCIPAdmin)

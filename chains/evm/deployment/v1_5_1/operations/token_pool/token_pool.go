@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -38,6 +38,17 @@ type AddRemotePoolArgs struct {
 type SetRateLimitAdminArgs struct {
 	NewAdmin common.Address
 }
+
+var GetTokenDecimals = contract.NewRead(contract.ReadParams[struct{}, uint8, *token_pool.TokenPool]{
+	Name:         "token-pool:get-token-decimals",
+	Version:      Version,
+	Description:  "Gets the decimals of the token managed by the TokenPool 1.5.1 contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args struct{}) (uint8, error) {
+		return tp.GetTokenDecimals(opts)
+	},
+})
 
 var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *token_pool.TokenPool]{
 	Name:         "token-pool:get-token",

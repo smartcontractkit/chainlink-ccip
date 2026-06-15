@@ -176,12 +176,6 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	tmp.Merge(out.DataStore.Seal())
 	runningDS.Merge(out.DataStore.Seal())
 
-	// For EVM only, set the timelock admin
-	var timelockAdmin common.Address
-	chain1, ok := env.BlockChains.EVMChains()[selector]
-	if ok {
-		timelockAdmin = chain1.DeployerKey.From
-	}
 	qualifier := "CLLCCIP"
 	cs := deployops.DeployMCMS(dReg, nil)
 	fcs := deployops.FinalizeDeployMCMS(dReg, nil)
@@ -194,7 +188,6 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				Proposer:         SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(qualifier),
-				TimelockAdmin:    timelockAdmin,
 			},
 		},
 	})
@@ -214,7 +207,6 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				Proposer:         SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(qualifier),
-				TimelockAdmin:    timelockAdmin,
 			},
 		},
 	})

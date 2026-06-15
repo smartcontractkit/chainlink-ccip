@@ -47,6 +47,24 @@ var (
 		chain_selectors.FamilyAptos: big.NewInt(15e11),
 		chain_selectors.FamilySui:   big.NewInt(15e11),
 	}
+
+	l2LowTrafficChain = map[uint64]struct{}{
+		chain_selectors.PLUME_MAINNET.Selector:                     {},
+		chain_selectors.PLUME_TESTNET_SEPOLIA.Selector:             {},
+		chain_selectors.ETHEREUM_MAINNET_MANTLE_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_MANTLE_1.Selector: {},
+		chain_selectors.INK_TESTNET_SEPOLIA.Selector:               {},
+		chain_selectors.ETHEREUM_MAINNET_INK_1.Selector:            {},
+	}
+
+	l2HighTrafficChain = map[uint64]struct{}{
+		chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: {},
+		chain_selectors.ETHEREUM_MAINNET_BASE_1.Selector:             {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     {},
+		chain_selectors.POLYGON_MAINNET.Selector:                     {},
+		chain_selectors.POLYGON_TESTNET_AMOY.Selector:                {},
+	}
 )
 
 func isEthChain(chainSelector uint64) bool {
@@ -55,20 +73,20 @@ func isEthChain(chainSelector uint64) bool {
 		chainSelector == chain_selectors.ETHEREUM_TESTNET_HOODI.Selector
 }
 
-// getNetworkFeeUSDCents returns the network fee in USDCents based on the source and remote chain.
+// GetNetworkFeeUSDCents returns the network fee in USDCents based on the source and remote chain.
 // If either chain is an Ethereum chain, it returns a higher fee of 50 USDCents, otherwise it returns 10 USDCents.
 // This value might be wrong in prev versions of the fee quoter,
 // but we want to set it to a reasonable default for the new fee quoter.
-func getNetworkFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
+func GetNetworkFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
 	if isEthChain(sourceChain) || isEthChain(remoteChain) {
 		return 50
 	}
 	return 10
 }
 
-// getDefaultTokenFeeUSDCents returns the default token fee in USDCents based on the source and remote chain.
+// GetDefaultTokenFeeUSDCentsFor1_6Lane returns the default token fee in USDCents based on the source and remote chain.
 // This value might be wrong in prev versions of the fee quoter, but we want to set it to a reasonable default for the new fee quoter.
-func getDefaultTokenFeeUSDCents(sourceChain, remoteChain uint64) uint16 {
+func GetDefaultTokenFeeUSDCentsFor1_6Lane(sourceChain, remoteChain uint64) uint16 {
 	destFamily, _ := chain_selectors.GetSelectorFamily(remoteChain)
 	if destFamily == chain_selectors.FamilySolana && isEthChain(sourceChain) {
 		return 60
@@ -109,6 +127,16 @@ func GetMaxMsgPerGasLimit(destinationChain uint64) uint32 {
 	}
 }
 
+func GetdestGasPerPayloadByteBase(destinationChain uint64) uint8 {
+	if _, exists := l2LowTrafficChain[destinationChain]; exists {
+		return 255
+	}
+	if _, exists := l2HighTrafficChain[destinationChain]; exists {
+		return 100
+	}
+	return 20
+}
+
 type FeeQuoterUpdate struct {
 	ChainSelector                 uint64
 	ExistingAddresses             []datastore.AddressRef
@@ -134,6 +162,7 @@ func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
 }
 
 var (
+
 	// SequenceFeeQuoterUpdate is a sequence that deploys or fetches existing FeeQuoter contract
 	// and does the following if the corresponding input is provided -
 	// 1. applies destination chain config updates
@@ -404,10 +433,10 @@ var (
 						DestGasOverhead:             destChainConfig.DestGasOverhead,
 						DestGasPerPayloadByteBase:   destChainConfig.DestGasPerPayloadByteBase,
 						ChainFamilySelector:         destChainConfig.ChainFamilySelector,
-						DefaultTokenFeeUSDCents:     getDefaultTokenFeeUSDCents(input.ChainSelector, remoteChain),
+						DefaultTokenFeeUSDCents:     GetDefaultTokenFeeUSDCentsFor1_6Lane(input.ChainSelector, remoteChain),
 						DefaultTokenDestGasOverhead: destChainConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           destChainConfig.DefaultTxGasLimit,
-						NetworkFeeUSDCents:          getNetworkFeeUSDCents(input.ChainSelector, remoteChain),
+						NetworkFeeUSDCents:          GetNetworkFeeUSDCents(input.ChainSelector, remoteChain),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
@@ -620,10 +649,10 @@ var (
 						DestGasOverhead:             onRampCfg.DynamicConfig.DestGasOverhead,
 						DestGasPerPayloadByteBase:   uint8(onRampCfg.DynamicConfig.DestGasPerPayloadByte),
 						ChainFamilySelector:         chainFamilySelector,
-						DefaultTokenFeeUSDCents:     getDefaultTokenFeeUSDCents(input.ChainSelector, onRampCfg.RemoteChainSelector),
+						DefaultTokenFeeUSDCents:     GetDefaultTokenFeeUSDCentsFor1_6Lane(input.ChainSelector, onRampCfg.RemoteChainSelector),
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
-						NetworkFeeUSDCents:          getNetworkFeeUSDCents(input.ChainSelector, onRampCfg.RemoteChainSelector),
+						NetworkFeeUSDCents:          GetNetworkFeeUSDCents(input.ChainSelector, onRampCfg.RemoteChainSelector),
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				})
@@ -662,6 +691,67 @@ var (
 			}
 			return output, nil
 		})
+)
+
+// RemoveFeeTokensPerChainInput holds per-chain parameters for removing extra fee tokens from FeeQuoter 2.0.
+type RemoveFeeTokensPerChainInput struct {
+	ChainSelector     uint64
+	FeeQuoter20Ref    datastore.AddressRef
+	FeeTokensToRemove []common.Address
+}
+
+// RemoveFeeTokensInput holds the parameters for removing extra fee tokens from FeeQuoter 2.0 on multiple chains.
+type RemoveFeeTokensInput struct {
+	ChainUpdates []RemoveFeeTokensPerChainInput
+}
+
+// SequenceRemoveFeeTokens removes fee tokens from existing FeeQuoter 2.0 contracts on multiple chains.
+var SequenceRemoveFeeTokens = cldf_ops.NewSequence(
+	"fee-quoter-v2.0.0:remove-fee-tokens-sequence",
+	semver.MustParse("2.0.0"),
+	"Removes fee tokens from FeeQuoter 2.0",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input RemoveFeeTokensInput) (output sequences.OnChainOutput, err error) {
+		for _, chainInput := range input.ChainUpdates {
+			if len(chainInput.FeeTokensToRemove) == 0 {
+				continue
+			}
+			if datastore_utils.IsAddressRefEmpty(chainInput.FeeQuoter20Ref) {
+				return sequences.OnChainOutput{}, fmt.Errorf("empty FeeQuoter 2.0 ref for chain selector %d", chainInput.ChainSelector)
+			}
+			if chainInput.FeeQuoter20Ref.ChainSelector != chainInput.ChainSelector {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"FeeQuoter 2.0 ref chain selector %d does not match input chain selector %d",
+					chainInput.FeeQuoter20Ref.ChainSelector, chainInput.ChainSelector,
+				)
+			}
+
+			chain, ok := chains.EVMChains()[chainInput.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", chainInput.ChainSelector)
+			}
+
+			fqAddr := common.HexToAddress(chainInput.FeeQuoter20Ref.Address)
+			removeReport, err := cldf_ops.ExecuteOperation(
+				b, fqops.RemoveFeeTokens, chain,
+				contract.FunctionInput[[]common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       fqAddr,
+					Args:          chainInput.FeeTokensToRemove,
+				})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove fee tokens from FeeQuoter(%s) on chain %s: %w",
+					fqAddr.Hex(), chain, err)
+			}
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{
+				removeReport.Output,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			output.BatchOps = append(output.BatchOps, batchOp)
+		}
+		return output, nil
+	},
 )
 
 // MergeFeeQuoterUpdateOutputs merges FeeQuoterUpdate outputs from the v1.6.x and v1.5.0 import

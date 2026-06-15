@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20"
@@ -188,45 +187,11 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		if err != nil {
 			return nil, fmt.Errorf("fee quoter 2.x binding: %w", err)
 		}
-		feeTokens, err := fq.GetFeeTokens(&bind.CallOpts{
+		addrs, err = fq.GetFeeTokens(&bind.CallOpts{
 			Context: env.GetContext(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("getFeeTokens: %w", err)
-		}
-		// 2.0 fee quoter returns all tokens as fee token which has price
-		// for now just use wrapped native and link
-		// TODO enable it for all fee tokens later
-		staticCfg, err := fq.GetStaticConfig(&bind.CallOpts{
-			Context: env.GetContext(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("getFeeTokens: %w", err)
-		}
-		linkAddr := staticCfg.LinkToken
-		routerC, err := router.NewRouter(common.HexToAddress(rRef[0].Address), client)
-		if err != nil {
-			return nil, fmt.Errorf("new router contract: %w", err)
-		}
-		wrappedNative, err := routerC.GetWrappedNative(&bind.CallOpts{
-			Context: env.GetContext(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("get wrapped native contract: %w", err)
-		}
-		feeTokenMap := make(map[common.Address]struct{})
-		for _, addr := range feeTokens {
-			feeTokenMap[addr] = struct{}{}
-		}
-		if _, ok := feeTokenMap[linkAddr]; ok {
-			addrs = append(addrs, linkAddr)
-		} else {
-			return nil, fmt.Errorf("link %s is not enabled as fee token for chain %d, found fee tokens: %v", linkAddr, srcSel, feeTokens)
-		}
-		if _, ok := feeTokenMap[wrappedNative]; ok {
-			addrs = append(addrs, wrappedNative)
-		} else {
-			return nil, fmt.Errorf("wrappedNative %s is not enabled as fee token for chain %d, found fee tokens: %v", wrappedNative, srcSel, feeTokens)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported fee quoter major version %d for chain %d", fqVer.Major(), srcSel)

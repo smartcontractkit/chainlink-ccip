@@ -123,7 +123,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			datastore.AddressRefByChainSelector(chain.Selector),
 			datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType)),
 			datastore.AddressRefByVersion(lombard_verifier.Version),
-			datastore.AddressRefByQualifier(ContractQualifier),
+			datastore.AddressRefByQualifier(versioned_verifier_resolver.LombardVerifierResolverType.String()), // The qualifier for LombardVerifierResolver is the same as its type to avoid colliding with CommitteeVerifierResolver deployed with the "default" qualifier
 		)
 		var lombardVerifierResolverRef datastore.AddressRef
 		if len(lombardVerifierResolverRefs) == 0 {
@@ -133,10 +133,10 @@ var DeployLombardChain = cldf_ops.NewSequence(
 
 			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v2_0_0_sequences.DeployVerifierResolverViaCREATE2, chain, v2_0_0_sequences.DeployVerifierResolverViaCREATE2Input{
 				ChainSelector:  input.ChainSelector,
-				Qualifier:      ContractQualifier,
 				Type:           datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
 				Version:        lombard_verifier.Version,
 				CREATE2Factory: common.HexToAddress(input.DeployerContract),
+				Qualifier:      versioned_verifier_resolver.LombardVerifierResolverType.String(), // The qualifier for LombardVerifierResolver is the same as its type to avoid colliding with CommitteeVerifierResolver deployed with the "default" qualifier
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardVerifierResolver: %w", err)

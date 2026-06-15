@@ -489,10 +489,12 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote token address: %w", err)
 		}
+
+		feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(remoteChain.TokenTransferFeeConfig)
 		configs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
 			RemotePool:                common.LeftPadBytes(remotePoolAddress, 32),
 			RemoteToken:               common.LeftPadBytes(remoteTokenAddress, 32),
-			TokenTransferFeeConfig:    remoteChain.TokenTransferFeeConfig,
+			TokenTransferFeeConfig:    &feeCfg,
 			OutboundRateLimiterConfig: &remoteChain.OutboundRateLimiterConfig,
 			InboundRateLimiterConfig:  &remoteChain.InboundRateLimiterConfig,
 		}

@@ -56,7 +56,6 @@ var contractTypesForOwnershipCheck = map[datastore.ContractType]struct{}{
 	datastore.ContractType(common_utils.ProposerManyChainMultisig):                    {},
 	datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType):      {},
 	datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType): {},
-	datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType):   {},
 	datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierContractType): {},
 	datastore.ContractType(versioned_verifier_resolver.ContractType):                  {},
 }

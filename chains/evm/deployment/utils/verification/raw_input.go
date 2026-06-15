@@ -5,6 +5,8 @@ import (
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/burn_mint_with_external_minter_token_pool"
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/hybrid_with_external_minter_token_pool"
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/link_token"
@@ -40,11 +42,13 @@ import (
 	v1_6_1_BurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	v1_6_1_LockReleaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/cctp_message_transmitter_proxy"
+	v1_6_2_Cctp_message_transmitter_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/cctp_message_transmitter_proxy"
 	FactoryBurnMintERC20v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/factory_burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/usdc_token_pool"
+	v1_6_2_Usdc_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	v1_6_5_Usdc_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool"
+	v2_0_0_Cctp_message_transmitter_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -69,6 +73,8 @@ var (
 	Version1_6_1 = semver.MustParse("1.6.1").String()
 	Version1_6_2 = semver.MustParse("1.6.2").String()
 	Version1_6_3 = semver.MustParse("1.6.3").String()
+	Version1_6_5 = semver.MustParse("1.6.5").String()
+	Version2_0_0 = semver.MustParse("2.0.0").String()
 )
 
 // contracts maps type & version of a contract to its corresponding standard JSON input, name, and bytecode.
@@ -76,11 +82,17 @@ var (
 	contractMetadata = map[cldf.ContractType]map[string]rawContractInfo{
 		utils.USDCTokenPool: {
 			Version1_6_2: rawContractInfo{
-				solidityStandardJSONInput: usdc_token_pool.SolidityStandardInput,
-				bytecode:                  usdc_token_pool.USDCTokenPoolBin,
+				solidityStandardJSONInput: v1_6_2_Usdc_token_pool.SolidityStandardInput,
+				bytecode:                  v1_6_2_Usdc_token_pool.USDCTokenPoolBin,
+				name:                      "contracts/pools/USDC/USDCTokenPool.sol:USDCTokenPool",
+			},
+			Version1_6_5: rawContractInfo{
+				solidityStandardJSONInput: v1_6_5_Usdc_token_pool.SolidityStandardInput,
+				bytecode:                  v1_6_5_Usdc_token_pool.USDCTokenPoolBin,
 				name:                      "contracts/pools/USDC/USDCTokenPool.sol:USDCTokenPool",
 			},
 		},
+
 		utils.HybridLockReleaseUSDCTokenPool: {
 			Version1_6_2: rawContractInfo{
 				solidityStandardJSONInput: hybrid_lock_release_usdc_token_pool.SolidityStandardInput,
@@ -90,9 +102,21 @@ var (
 		},
 		utils.CCTPMessageTransmitterProxy: {
 			Version1_6_2: rawContractInfo{
-				solidityStandardJSONInput: cctp_message_transmitter_proxy.SolidityStandardInput,
-				bytecode:                  cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyBin,
+				solidityStandardJSONInput: v1_6_2_Cctp_message_transmitter_proxy.SolidityStandardInput,
+				bytecode:                  v1_6_2_Cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyBin,
 				name:                      "contracts/pools/USDC/CCTPMessageTransmitterProxy.sol:CCTPMessageTransmitterProxy",
+			},
+			Version2_0_0: rawContractInfo{
+				solidityStandardJSONInput: v2_0_0_Cctp_message_transmitter_proxy.SolidityStandardInput,
+				bytecode:                  v2_0_0_Cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyBin,
+				name:                      "contracts/pools/USDC/CCTPMessageTransmitterProxy.sol:CCTPMessageTransmitterProxy",
+			},
+		},
+		utils.ERC20LockBox: {
+			Version2_0_0: rawContractInfo{
+				solidityStandardJSONInput: erc20_lock_box.SolidityStandardInput,
+				bytecode:                  erc20_lock_box.ERC20LockBoxBin,
+				name:                      "contracts/pools/ERC20LockBox.sol:ERC20LockBox",
 			},
 		},
 		rmn_remoteops.ContractType: {

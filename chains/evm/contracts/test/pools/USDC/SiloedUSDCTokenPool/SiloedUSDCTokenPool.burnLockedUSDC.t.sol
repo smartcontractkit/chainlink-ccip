@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../../libraries/Pool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
-import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
+import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.t.sol";
 
 contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
   address public CIRCLE = makeAddr("CIRCLE CCTP Migrator");

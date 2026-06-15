@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,33 +28,49 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 
 		writes := make([]contract.WriteOutput, 0, len(input.Settings))
 		for pool, finalityConfig := range input.Settings {
+			if finalityConfig.IsZero() {
+				b.Logger.Warnf("skipping finality configuration for pool %s for src %d since finality config is zero", pool, input.Selector)
+				continue
+			}
 			if err := finalityConfig.Validate(); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid finality config for pool %s on src %d: %w", pool, chain.Selector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid finality config for pool %s for src %d: %w", pool, input.Selector, err)
 			}
 
-			src := chain.Selector
+			selector := chain.Selector
 			if !common.IsHexAddress(pool) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for src %d: %s", src, pool)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for src %d: %s", selector, pool)
 			}
 
 			addr := common.HexToAddress(pool)
 			if addr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", src)
+				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", selector)
 			}
 
-			report, err := operations.ExecuteOperation(
-				b, token_pool.SetAllowedFinalityConfig, chain,
-				contract.FunctionInput[[4]byte]{
-					ChainSelector: src,
-					Address:       addr,
-					Args:          finalityConfig.Raw(),
-				},
-			)
+			currentFinalityConfigReport, err := operations.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
+				ChainSelector: selector,
+				Address:       addr,
+				Args:          struct{}{},
+			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute token_pool.SetAllowedFinalityConfig for pool %s on src %d: %w", pool, src, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current finality config for token pool at address %s on chain %d: %w", addr.Hex(), selector, err)
 			}
 
-			writes = append(writes, report.Output)
+			requestedFinalityConfig := finalityConfig.Raw()
+			if !bytes.Equal(currentFinalityConfigReport.Output[:], requestedFinalityConfig[:]) {
+				write, err := operations.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
+					ChainSelector: selector,
+					Address:       addr,
+					Args:          requestedFinalityConfig,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set finality config for token pool at address %s on chain %d: %w", addr.Hex(), selector, err)
+				}
+				writes = append(writes, write.Output)
+			}
+		}
+
+		if len(writes) == 0 {
+			return sequences.OnChainOutput{}, nil
 		}
 
 		batch, err := contract.NewBatchOperationFromWrites(writes)

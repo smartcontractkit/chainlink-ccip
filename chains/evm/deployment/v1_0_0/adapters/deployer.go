@@ -5,15 +5,19 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 )
@@ -149,7 +153,9 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			}
 			output.Addresses = append(output.Addresses, report.Output.Addresses...)
 			cancellerAddr := report.Output.Addresses[0]
-			// deploy timelock
+
+			// deploy timelock — always use the deployer key as the initial admin
+			// so we can manage roles immediately after deployment
 			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
 				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
@@ -159,7 +165,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 					Proposers:        []common.Address{common.HexToAddress(proposerAddr.Address)},
 					Bypassers:        []common.Address{common.HexToAddress(bypasserAddr.Address)},
 					Cancellers:       []common.Address{common.HexToAddress(cancellerAddr.Address)},
-					Admin:            in.TimelockAdmin,
+					Admin:            evmChain.DeployerKey.From,
 					// Add Executor later after call proxy is deployed
 					Executors: []common.Address{},
 				},
@@ -196,6 +202,71 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant executor role to call proxy on timelock on chain %d: %w", in.ChainSelector, err)
 			}
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
+
+			// Determine the final ADMIN_ROLE holder for the timelock.
+			// CLLCCIP is always self-governed (its timelock is its own admin).
+			// Every other MCMS instance MUST use the existing CLLCCIP RBACTimelock as its
+			// admin — if CLLCCIP has not been deployed yet, fail fast.
+			isCLLCCIP := in.Qualifier != nil && *in.Qualifier == utils.CLLQualifier
+			finalAdmin := common.HexToAddress(timelockAddr.Address) // default: self-governed (CLLCCIP case)
+			if !isCLLCCIP {
+				existingDS := cldf_datastore.NewMemoryDataStore()
+				for _, ref := range in.ExistingAddresses {
+					_ = existingDS.Addresses().Add(ref)
+				}
+				cllTimelockAddr, lookupErr := datastore_utils.FindAndFormatRef(
+					existingDS.Seal(),
+					cldf_datastore.AddressRef{
+						Type:      cldf_datastore.ContractType(utils.RBACTimelock),
+						Qualifier: utils.CLLQualifier,
+					},
+					in.ChainSelector,
+					evm_datastore_utils.ToEVMAddress,
+				)
+				if lookupErr != nil || cllTimelockAddr == (common.Address{}) {
+					qualifier := ""
+					if in.Qualifier != nil {
+						qualifier = *in.Qualifier
+					}
+					return sequtil.OnChainOutput{}, fmt.Errorf(
+						"cannot deploy MCMS with qualifier %q on chain %d: CLLCCIP RBACTimelock must be deployed first (it will be set as admin)",
+						qualifier, in.ChainSelector,
+					)
+				}
+				finalAdmin = cllTimelockAddr
+			}
+
+			// If finalAdmin differs from the deployer key we need to transfer the ADMIN_ROLE.
+			// RBACTimelock uses RBAC (not Ownable2Step), so:
+			//   "transfer" = grantRole(ADMIN_ROLE, finalAdmin)
+			//   "accept"   = renounceRole(ADMIN_ROLE) by the deployer — both happen in the same changeset.
+			if finalAdmin != evmChain.DeployerKey.From {
+				_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, evmChain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
+					ChainSelector: in.ChainSelector,
+					Address:       common.HexToAddress(timelockAddr.Address),
+					Args: ops.OpGrantRoleTimelockInput{
+						RoleID:  ops.ADMIN_ROLE.ID,
+						Account: finalAdmin,
+					},
+				})
+				if err != nil {
+					return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s on timelock on chain %d: %w", finalAdmin, in.ChainSelector, err)
+				}
+				b.Logger.Infof("Granted Admin role on Timelock %s to %s on chain %s", timelockAddr.Address, finalAdmin, evmChain.Name)
+
+				_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, evmChain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
+					ChainSelector: in.ChainSelector,
+					Address:       common.HexToAddress(timelockAddr.Address),
+					Args: ops.OpRenounceRoleTimelockInput{
+						RoleID: ops.ADMIN_ROLE.ID,
+					},
+				})
+				if err != nil {
+					return sequtil.OnChainOutput{}, fmt.Errorf("failed to renounce admin role on timelock on chain %d: %w", in.ChainSelector, err)
+				}
+				b.Logger.Infof("Deployer renounced Admin role on Timelock %s on chain %s", timelockAddr.Address, evmChain.Name)
+			}
+
 			return output, nil
 		})
 }

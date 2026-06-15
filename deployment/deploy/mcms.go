@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -37,7 +36,6 @@ type MCMSDeploymentConfigPerChain struct {
 	TimelockMinDelay *big.Int         `json:"timelockMinDelay"`
 	Label            *string          `json:"label"`
 	Qualifier        *string          `json:"qualifier"`
-	TimelockAdmin    common.Address   `json:"timelockAdmin"`
 	ContractVersion  string           `json:"contractVersion"`
 }
 

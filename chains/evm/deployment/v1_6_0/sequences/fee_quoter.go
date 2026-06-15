@@ -8,7 +8,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -213,22 +212,12 @@ var (
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
-			allTokens := make(map[common.Address]struct{})
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
 			tokenGrp.SetLimit(10)
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
 				remoteChain := remoteChain
 				tokens := tokens
-				for _, token := range tokens {
-					if token == (common.Address{}) {
-						continue
-					}
-					if _, exists := allTokens[token]; !exists {
-						allTokens[token] = struct{}{}
-					}
-				}
-
 				tokenGrp.Go(func() error {
 					destChainMu.Lock()
 					_, enabled := destChainConfigs[remoteChain]
@@ -308,26 +297,18 @@ var (
 					fqAddress.Hex(), chainSelector, err)
 			}
 
-			// add fee tokens to all tokens if not present
-			for _, token := range feeTokensRep.Output {
-				if _, exists := allTokens[token]; !exists {
-					allTokens[token] = struct{}{}
-				}
-			}
-
-			tokenSlice := maps.Keys(allTokens)
-			// add fee tokens
+			// get token prices for fee tokens
 			tokenPrices, err := operations.ExecuteOperation(b, fqops.GetTokenPrices, evmChain, contract.FunctionInput[[]common.Address]{
 				Address:       fqAddress,
 				ChainSelector: chainSelector,
-				Args:          tokenSlice,
+				Args:          feeTokensRep.Output,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token prices from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
 			tokenPricesPerToken := make(map[common.Address]*big.Int)
-			for i, token := range tokenSlice {
+			for i, token := range feeTokensRep.Output {
 				tokenPricesPerToken[token] = tokenPrices.Output[i].Value
 			}
 			contractMetadata = []datastore.ContractMetadata{

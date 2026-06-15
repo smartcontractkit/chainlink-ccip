@@ -26,6 +26,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -568,9 +569,15 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	slices.Sort(supportedSourceChains)
 
-	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, supportedSourceChains)
+	configCtx, configCancel := rpctimeout.Context(ctx)
+	defer configCancel()
+	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(configCtx, supportedSourceChains)
 	if err != nil {
-		lggr.Warnw("call to GetOffRampSourceChainsConfig failed", "err", err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			lggr.Warnw("call to GetOffRampSourceChainsConfig timed out", "err", err)
+		} else {
+			lggr.Warnw("call to GetOffRampSourceChainsConfig failed", "err", err)
+		}
 		return nil
 	}
 
@@ -590,12 +597,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
 				return
 			}
-			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
+			chainCtx, chainCancel := rpctimeout.Context(ctx)
+			defer chainCancel()
+			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(chainCtx, sourceChain)
 			if err != nil {
 				if isNoBindingsError(err) {
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+				} else if errors.Is(err, context.DeadlineExceeded) {
+					lggr.Warnw("timed out getting latest msg seq num for source chain", "sourceChain", sourceChain)
 				} else {
 					lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
 				}
@@ -638,9 +649,18 @@ func (o observerImpl) ObserveMerkleRoots(
 	for _, chainRange := range ranges {
 		if supportedChains.Contains(chainRange.ChainSel) {
 			wg.Go(func() {
-				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
+				chainCtx, chainCancel := rpctimeout.Context(ctx)
+				defer chainCancel()
+				msgs, err := o.ccipReader.MsgsBetweenSeqNums(chainCtx, chainRange.ChainSel, chainRange.SeqNumRange)
 				if err != nil {
-					lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					if errors.Is(err, context.DeadlineExceeded) {
+						lggr.Warnw("timed out getting messages for source chain",
+							"sourceChain", chainRange.ChainSel,
+							"range", chainRange.SeqNumRange,
+						)
+					} else {
+						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					}
 					return
 				}
 

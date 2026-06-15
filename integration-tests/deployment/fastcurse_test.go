@@ -10,13 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -28,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	soladapterv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
+	solofframpops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -74,6 +76,24 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+
+	// Ensure the Solana OffRamp is configured with chain2 as an enabled source chain.
+	// The Solana fastcurse adapter's connectivity check for lane actions reads the OffRamp
+	// source-chain state (PDA) and will treat the chains as disconnected unless this is set.
+	_, err = cldf_ops.ExecuteOperation(
+		env.OperationsBundle,
+		solofframpops.ConnectChains,
+		env.BlockChains.SolanaChains()[chainsel.SOLANA_MAINNET.Selector],
+		solofframpops.ConnectChainsParams{
+			OffRamp:                   solana.MustPublicKeyFromBase58(solanaProgramIDs["ccip_offramp"]),
+			RemoteChainSelector:       chain2,
+			SourceOnRamp:              common.HexToAddress("0x0000000000000000000000000000000000000001").Bytes(),
+			EnabledAsSource:           true,
+			IsRMNVerificationDisabled: true,
+		},
+	)
+	require.NoError(t, err, "Failed to connect Solana OffRamp to EVM chain2")
+
 	DeployMCMS(t, env, chainsel.SOLANA_MAINNET.Selector, []string{deploymentutils.CLLQualifier})
 	SolanaTransferOwnership(t, env, chainsel.SOLANA_MAINNET.Selector)
 	ds := datastore.NewMemoryDataStore()
@@ -190,8 +210,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 
 	// deploy mcms
 	cs := deploy.DeployMCMS(dReg, nil)
-	evmChain1 := env.BlockChains.EVMChains()[chain1]
-	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
@@ -201,7 +219,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
-				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -209,7 +226,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
-				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
 	})
@@ -255,7 +271,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
@@ -291,12 +307,19 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				SubjectChainSelector: chainsel.SOLANA_MAINNET.Selector,
 				Version:              semver.MustParse("1.6.0"),
 			},
+			{
+				// Lane curse actions must be represented bidirectionally; reverse direction can be any version.
+				IsGlobalCurse:        false,
+				ChainSelector:        chainsel.SOLANA_MAINNET.Selector,
+				SubjectChainSelector: chain2,
+				Version:              semver.MustParse("1.6.0"),
+			},
 		},
 		Force: false,
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
@@ -313,6 +336,8 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// check that the subjects were actually cursed
+	evmChain1 := env.BlockChains.EVMChains()[chain1]
+	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	rmnC, err := rmn_contract.NewRMNContract(rmnAddress, evmChain1.Client)
 	require.NoError(t, err)
 	isCursed, err := rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))

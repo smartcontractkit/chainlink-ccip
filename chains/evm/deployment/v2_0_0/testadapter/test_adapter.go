@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -27,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 )
@@ -120,7 +123,15 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	const errMsgMissingTrieNode = "missing trie node"
 	sender := a.DeployerKey
 	defer func() { sender.Value = nil }()
-	rAddr, err := a.getAddress(datastore.ContractType("Router"))
+	// if TestRouter env var is set use Test Router instead
+	// We are leveraging env var here to avoid making change to the SendMessage method signature
+	// TestRouter is only valid for evm
+	contractType := datastore.ContractType(routerops.ContractType)
+	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
+	if err == nil && isTest {
+		contractType = datastore.ContractType(routerops.TestRouterContractType)
+	}
+	rAddr, err := a.getAddress(contractType)
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get router address: %w", err)
 	}
@@ -182,6 +193,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 			return 0, messageID, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
 		}
+		fmt.Printf("CCIP message sent in block %d with tx %s", blockNum, tx.Hash().Hex())
 		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 			Start:   blockNum,
 			End:     &blockNum,

@@ -38,6 +38,7 @@ import (
 )
 
 func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+	feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(testsetup.CreateBasicTokenTransferFeeConfig())
 	return tokens.ConfigureTokenPoolForRemoteChainInput{
 		ChainSelector:               chainSel,
 		TokenPoolAddress:            tokenPoolAddress,
@@ -53,7 +54,7 @@ func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
-			TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+			TokenTransferFeeConfig:          &feeCfg,
 		},
 	}
 }
@@ -384,6 +385,9 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 		t.Skipf("Token B active pool not set in registry (got %s, expected %s); RegisterToken batch may not execute in this env. Skipping upgrade import assertions.", getCfgReport.Output.TokenPool, poolBAddress)
 	}
 
+	// Build token transfer fee config
+	feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(testsetup.CreateBasicTokenTransferFeeConfig())
+
 	// Configure pool B (1.6.1) for remote chain with specific rate limits to be imported
 	importedOutboundRate, importedOutboundCapacity := 111.0, 1111.0
 	importedInboundRate, importedInboundCapacity := 222.0, 2222.0
@@ -400,7 +404,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
-			TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+			TokenTransferFeeConfig:          &feeCfg,
 		},
 	}
 	_, err = operations.ExecuteSequence(
@@ -429,7 +433,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
-			TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+			TokenTransferFeeConfig:          &feeCfg,
 		},
 	}
 	_, err = operations.ExecuteSequence(
@@ -549,12 +553,14 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 		t.Skipf("active pool not set in registry (got %s, expected %s); skipping legacy import assertions", getCfgReport.Output.TokenPool, legacyPoolAddress)
 	}
 
+	feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(testsetup.CreateBasicTokenTransferFeeConfig())
 	const (
 		importedInboundRate      = 13.88
 		importedInboundCapacity  = 50_000.0
 		importedOutboundRate     = 7.77
 		importedOutboundCapacity = 10_000.0
 	)
+
 	_, err = operations.ExecuteSequence(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
 		v1_5_1_token_pool_sequences.ConfigureTokenPoolForRemoteChain,
@@ -572,7 +578,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 				InboundCCVs:                     []string{"0xabc"},
 				OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 				InboundCCVsToAddAboveThreshold:  []string{"0xace"},
-				TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+				TokenTransferFeeConfig:          &feeCfg,
 			},
 		},
 	)
@@ -603,7 +609,7 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
-			TokenTransferFeeConfig:          testsetup.CreateBasicTokenTransferFeeConfig(),
+			TokenTransferFeeConfig:          &feeCfg,
 		},
 	}
 	_, err = operations.ExecuteSequence(

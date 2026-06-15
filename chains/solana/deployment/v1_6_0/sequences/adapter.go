@@ -32,7 +32,10 @@ func init() {
 	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilySolana, &SolanaAdapter{})
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilySolana, &SolanaAdapter{})
 }
+
+var _ tokensapi.TokenRefResolver = (*SolanaAdapter)(nil)
 
 type SolanaAdapter struct {
 	timelockAddr map[uint64]solana.PublicKey

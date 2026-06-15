@@ -9,14 +9,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type FeeQuoterSetTokenTransferFeeConfigSequenceInput struct {
 	RemoteChainConfigs map[uint64]map[solana.PublicKey]fee_quoter.TokenTransferFeeConfig
-	DataStore          datastore.DataStore
 	FeeQuoter          solana.PublicKey
 	Selector           uint64
 }
@@ -35,11 +33,6 @@ var SetTokenTransferFeeConfig = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not found", input.Selector)
 		}
-		fqAddrBytes, err := (&SolanaAdapter{}).GetFQAddress(input.DataStore, input.Selector)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address: %w", err)
-		}
-		fqPubkey := solana.PublicKeyFromBytes(fqAddrBytes)
 		for dst, dstCfg := range input.RemoteChainConfigs {
 			for tok, feeCfg := range dstCfg {
 				out, err := operations.ExecuteOperation(b,
@@ -48,7 +41,7 @@ var SetTokenTransferFeeConfig = cldf_ops.NewSequence(
 					fqops.SetTokenTransferFeeConfigInput{
 						SrcSelector: input.Selector,
 						DstSelector: dst,
-						FeeQuoter:   fqPubkey,
+						FeeQuoter:   input.FeeQuoter,
 						Config:      feeCfg,
 						Token:       tok,
 					},
