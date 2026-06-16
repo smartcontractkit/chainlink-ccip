@@ -69,7 +69,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   struct StaticConfig {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
-    IRMN rmnRemote; // ───────╯ RMN Verification Contract
+    IRMN rmnRemote; // ─────────────╯ RMN Verification Contract
     address tokenAdminRegistry; // ───────╮ Token admin registry address
     uint32 maxGasBufferToUpdateState; // ─╯ Max Gas Buffer to Update State
   }
