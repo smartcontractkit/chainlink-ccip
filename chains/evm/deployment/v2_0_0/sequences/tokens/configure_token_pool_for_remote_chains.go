@@ -49,20 +49,33 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// getSupportedChains like a 2.0.0 TokenPool and may revert—so we treat this check as
 		// best-effort and skip validation when the call fails.
 		if input.RegistryAddress != (common.Address{}) && input.TokenAddress != (common.Address{}) {
-			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.RegistryAddress,
-				Args:          input.TokenAddress,
-			})
+			// Force fresh execution: these reads reflect mutable on-chain state (the registry's active
+			// pool and that pool's supported chains). Idempotent caching could return a stale result if
+			// the same op+input ran earlier in this bundle, so we always re-read current state.
+			tokenConfigReport, err := cldf_ops.ExecuteOperation(
+				b,
+				token_admin_registry.GetTokenConfig, chain,
+				evm_contract.FunctionInput[common.Address]{
+					ChainSelector: input.ChainSelector,
+					Address:       input.RegistryAddress,
+					Args:          input.TokenAddress,
+				},
+				cldf_ops.WithForceExecute[evm_contract.FunctionInput[common.Address], evm.Chain](),
+			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for supported-chains check: %w", err)
 			}
 			activePool := tokenConfigReport.Output.TokenPool
 			if activePool != (common.Address{}) {
-				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       activePool,
-				})
+				supportedChainsReport, err := cldf_ops.ExecuteOperation(
+					b,
+					token_pool.GetSupportedChains, chain,
+					evm_contract.FunctionInput[struct{}]{
+						ChainSelector: input.ChainSelector,
+						Address:       activePool,
+					},
+					cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
+				)
 				if err == nil {
 					// For each chain the active pool supports but the operator did not list:
 					//   - AutoMigrateRemoteChains=false (default): error — the operator must list every active-pool chain (upgrade safety).
@@ -147,11 +160,18 @@ func discoverRemoteChainFromActivePool(
 		return zero, fmt.Errorf("remote chain with selector %d not found in environment", remoteChainSelector)
 	}
 
-	remoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, localChain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: localChainSelector,
-		Address:       activePool,
-		Args:          remoteChainSelector,
-	})
+	// Force fresh execution: these read the active pool's mutable remote config and must reflect
+	// current on-chain state rather than an idempotent cached result from earlier in the bundle.
+	remoteTokenReport, err := cldf_ops.ExecuteOperation(
+		b,
+		token_pool.GetRemoteToken, localChain,
+		evm_contract.FunctionInput[uint64]{
+			ChainSelector: localChainSelector,
+			Address:       activePool,
+			Args:          remoteChainSelector,
+		},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+	)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get remote token from active pool: %w", err)
 	}
@@ -161,11 +181,16 @@ func discoverRemoteChainFromActivePool(
 		return zero, fmt.Errorf("active pool has no remote token registered for chain %d", remoteChainSelector)
 	}
 
-	remotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, localChain, evm_contract.FunctionInput[uint64]{
-		ChainSelector: localChainSelector,
-		Address:       activePool,
-		Args:          remoteChainSelector,
-	})
+	remotePoolsReport, err := cldf_ops.ExecuteOperation(
+		b,
+		token_pool.GetRemotePools, localChain,
+		evm_contract.FunctionInput[uint64]{
+			ChainSelector: localChainSelector,
+			Address:       activePool,
+			Args:          remoteChainSelector,
+		},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+	)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get remote pools from active pool: %w", err)
 	}
