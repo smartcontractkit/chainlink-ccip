@@ -107,22 +107,7 @@ func (a *EVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 	}, nil
 }
 
-func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
-	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Sending CCIP message")
-
-	messageID := ""
-
-	msg, ok := m.(router.ClientEVM2AnyMessage)
-	if !ok {
-		return 0, messageID, errors.New("expected router.ClientEVM2AnyMessage")
-	}
-
-	const errCodeInsufficientFee = "0x07da6ee6"
-	const cannotDecodeErrorReason = "could not decode error reason"
-	const errMsgMissingTrieNode = "missing trie node"
-	sender := a.DeployerKey
-	defer func() { sender.Value = nil }()
+func (a *EVMAdapter) getRouter() (*router.Router, error) {
 	// if TestRouter env var is set use Test Router instead
 	// We are leveraging env var here to avoid making change to the SendMessage method signature
 	// TestRouter is only valid for evm
@@ -134,14 +119,33 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	}
 	rAddr, err := a.getAddress(contractType)
 	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to get router address: %w", err)
+		return nil, fmt.Errorf("failed to get router address: %w", err)
 	}
-	r, err := router.NewRouter(
+	return router.NewRouter(
 		rAddr,
 		a.Client)
+}
+
+func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
+	l := zerolog.Ctx(ctx)
+	l.Info().Msg("Sending CCIP message")
+
+	messageID := ""
+
+	msg, ok := m.(router.ClientEVM2AnyMessage)
+	if !ok {
+		return 0, messageID, errors.New("expected router.ClientEVM2AnyMessage")
+	}
+	r, err := a.getRouter()
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to create router instance: %w", err)
 	}
+	const errCodeInsufficientFee = "0x07da6ee6"
+	const cannotDecodeErrorReason = "could not decode error reason"
+	const errMsgMissingTrieNode = "missing trie node"
+	sender := a.DeployerKey
+	defer func() { sender.Value = nil }()
+
 	onRampAddr, err := r.GetOnRamp(nil, destChainSelector)
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get onramp address: %w", err)
@@ -307,12 +311,12 @@ func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddre
 	if amount.Cmp(big.NewInt(0)) <= 0 {
 		return fmt.Errorf("amount must be greater than zero: %s", amount.String())
 	}
-
-	routerAddr, err := a.getAddress(datastore.ContractType("Router"))
+	r, err := a.getRouter()
 	if err != nil {
 		return fmt.Errorf("failed to get router address: %w", err)
 	}
 
+	routerAddr := r.Address()
 	tokenAddr := common.HexToAddress(tokenAddress)
 	if tokenAddr == (common.Address{}) {
 		return errors.New("cannot approve zero address token")
