@@ -36,6 +36,7 @@ Add the following remappings
 @chainlink/contracts/=lib/smartcontractkit/chainlink-evm/contracts/
 @chainlink/contracts-ccip/contracts/=lib/smartcontractkit/chainlink-ccip/chains/evm/contracts/
 ```
+
 #### NPM
 
 ```sh
@@ -99,8 +100,8 @@ If required, you can remap dependencies used within CCIP contracts, e.g. Openzep
 by adding the following to your `remappings.txt` file:
 
 ```
-@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/=node_modules/@openzeppelin/contracts/
-@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/=node_modules/@openzeppelin/contracts/
+@openzeppelin/contracts@4.8.3=node_modules/@openzeppelin/contracts/
+@openzeppelin/contracts@5.3.0=node_modules/@openzeppelin/contracts/
 ```
 
 This allows you to use a wide range of versions of Openzeppelin in your project without conflicts.
