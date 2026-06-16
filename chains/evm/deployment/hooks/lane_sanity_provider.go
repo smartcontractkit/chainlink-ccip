@@ -26,9 +26,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	cciphooks "github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func init() {
@@ -121,59 +125,37 @@ func (e *EVMLaneSanityProvider) AvailableTransferTokens(
 	env cldf.Environment,
 	source, dest uint64,
 ) (map[string]string, error) {
-	fq, err := e.feeQuoterV2(env, source)
-	if err != nil {
-		return nil, fmt.Errorf("fee quoter v2: %w", err)
-	}
-	ctx := env.GetContext()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ttConfigs, err := fq.GetAllTokenTransferFeeConfigs(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, err
-	}
-
-	var transferTokens []common.Address
-	var enabled []bool
-	for i, destChain := range ttConfigs.DestChainSelectors {
-		if destChain != dest {
-			continue
-		}
-		transferTokens = ttConfigs.TransferTokens[i]
-		if len(transferTokens) == 0 {
-			return nil, fmt.Errorf(
-				"no transfer tokens configured for destination chain %d from source chain %d",
-				dest, source,
-			)
-		}
-		feeConfigs := ttConfigs.TokenTransferFeeConfigs[i]
-		enabled = make([]bool, len(transferTokens))
-		for j := range transferTokens {
-			if j < len(feeConfigs) {
-				enabled[j] = feeConfigs[j].IsEnabled
-			}
-		}
-		break
-	}
-	if len(transferTokens) == 0 {
-		return nil, fmt.Errorf("no transfer token config for destination %d from source %d", dest, source)
-	}
-
 	chain, ok := env.BlockChains.EVMChains()[source]
 	if !ok {
 		return nil, fmt.Errorf("source chain %d not found in environment EVM chains", source)
 	}
+	tarAddr, err := datastore_utils.FindAndFormatRef(
+		env.DataStore,
+		datastore.AddressRef{
+			Type:    datastore.ContractType(token_admin_registry.ContractType),
+			Version: token_admin_registry.Version,
+		}, source,
+		evm_datastore_utils.ToEVMAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding token_admin_registry contract address on source %d: %w", source, err)
+	}
+	tokensPerChain, err := adapters1_5.GetSupportedTokensPerRemoteChain(env.GetContext(), env.Logger, tarAddr, chain, []uint64{dest})
+	if err != nil {
+		return nil, fmt.Errorf("getting supported tokens per remote chain from token admin registry on source %d to %d: %w", source, dest, err)
+	}
+	TransferTokensForDest, ok := tokensPerChain[dest]
+	if !ok {
+		return nil, fmt.Errorf("no supported tokens found for destination %d in token admin registry on source %d", dest, source)
+	}
+
 	result := make(map[string]string)
-	for j, token := range transferTokens {
-		if !enabled[j] {
-			continue
-		}
+	for _, token := range TransferTokensForDest {
 		tokenC, err := erc20.NewERC20(token, chain.Client)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create ERC20 client for token %s on chain %d: %w", token.Hex(), source, err)
 		}
-		name, err := tokenC.Symbol(&bind.CallOpts{Context: ctx})
+		name, err := tokenC.Symbol(&bind.CallOpts{Context: env.GetContext()})
 		if err != nil {
 			return nil, err
 		}
