@@ -102,6 +102,7 @@ func init() {
 	ccvdeploymentadapters.GetTokenVerifierRegistry().Register(chainsel.FamilyEVM, &EVMCCVTokenVerifierConfigAdapter{})
 	ccvdeploymentadapters.GetCommitteeVerifierOnchainRegistry().Register(chainsel.FamilyEVM, &EVMCCVCommitteeVerifierOnchainAdapter{})
 	ccvdeploymentadapters.GetCommitteeVerifierDeployRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierDeployAdapter{})
+	ccvdeploymentadapters.GetProtocolContractsDeployRegistry().Register(chainsel.FamilyEVM, &EVMProtocolContractsDeployAdapter{})
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
 	ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyEVM, &EVMExecutorConfigAdapter{})
 	ccvadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyEVM, &EVMVerifierJobConfigAdapter{})
