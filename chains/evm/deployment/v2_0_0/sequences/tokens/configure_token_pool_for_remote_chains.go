@@ -27,9 +27,9 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 	RemoteChains      map[uint64]tokens.RemoteChainConfig[[]byte, string]
 	RegistryAddress   common.Address
 	TokenAddress      common.Address
-	// AutoMigrate, when true, carries forward remote chains supported by the active pool but not
+	// AutoMigrateRemoteChains, when true, carries forward remote chains supported by the active pool but not
 	// explicitly listed in RemoteChains. Explicitly listed chains take precedence.
-	AutoMigrate bool
+	AutoMigrateRemoteChains bool
 }
 
 // ConfigureTokenPoolForRemoteChains runs the supported-chains check once (when registry/token set) then calls
@@ -65,8 +65,8 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				})
 				if err == nil {
 					// For each chain the active pool supports but the operator did not list:
-					//   - AutoMigrate=false (default): error — the operator must list every active-pool chain (upgrade safety).
-					//   - AutoMigrate=true: discover the chain's remote token, remote pool, and remote decimals from the
+					//   - AutoMigrateRemoteChains=false (default): error — the operator must list every active-pool chain (upgrade safety).
+					//   - AutoMigrateRemoteChains=true: discover the chain's remote token, remote pool, and remote decimals from the
 					//     active pool and carry it forward. Rate limits and remote pools are imported per-chain downstream
 					//     by ConfigureTokenPoolForRemoteChain (importConfigFromActivePool), so we only supply the fields
 					//     that import does not provide.
@@ -75,7 +75,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 						if _, ok := input.RemoteChains[sel]; ok {
 							continue
 						}
-						if !input.AutoMigrate {
+						if !input.AutoMigrateRemoteChains {
 							slices.Sort(supportedChains)
 							return sequences.OnChainOutput{}, fmt.Errorf(
 								"remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
@@ -129,7 +129,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 )
 
 // discoverRemoteChainFromActivePool builds a RemoteChainConfig for a chain that the active pool supports but
-// the operator did not explicitly list (AutoMigrate). It reads the remote token and remote pool from the active
+// the operator did not explicitly list (AutoMigrateRemoteChains). It reads the remote token and remote pool from the active
 // pool (on the local chain) and the remote token's decimals from the remote chain. Rate limits are intentionally
 // omitted: ConfigureTokenPoolForRemoteChain imports them (and the active pool's remote pools) per-chain via
 // importConfigFromActivePool, which also rebases pre-1.6.1 inbound limits using RemoteDecimals.

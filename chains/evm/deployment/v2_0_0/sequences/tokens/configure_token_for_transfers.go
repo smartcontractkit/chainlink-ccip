@@ -162,7 +162,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			RemoteChains:      input.RemoteChains,
 			RegistryAddress:   registryAddress,
 			TokenAddress:      tokenAddress,
-			AutoMigrate:       input.AutoMigrate,
+			AutoMigrateRemoteChains:       input.AutoMigrateRemoteChains,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for remote chains: %w", err)

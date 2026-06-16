@@ -315,9 +315,9 @@ type ConfigureTokenForTransfersInput struct {
 	// TimelockAddress is the MCMS timelock address, resolved by the changeset from MCMS config.
 	// Required when a liquidity migration is triggered.
 	TimelockAddress string
-	// AutoMigrate, when true, carries forward remote chains supported by the active pool but not
+	// AutoMigrateRemoteChains, when true, carries forward remote chains supported by the active pool but not
 	// explicitly listed in RemoteChains. Explicitly listed chains take precedence. Only used by EVM adapters.
-	AutoMigrate bool
+	AutoMigrateRemoteChains bool
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore
