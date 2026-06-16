@@ -25,6 +25,9 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 	RemoteChains      map[uint64]tokens.RemoteChainConfig[[]byte, string]
 	RegistryAddress   common.Address
 	TokenAddress      common.Address
+	// AutoMigrate, when true, carries forward remote chains supported by the active pool but not
+	// explicitly listed in RemoteChains. Explicitly listed chains take precedence.
+	AutoMigrate bool
 }
 
 // ConfigureTokenPoolForRemoteChains runs the supported-chains check once (when registry/token set) then calls

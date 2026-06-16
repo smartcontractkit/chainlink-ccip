@@ -51,6 +51,13 @@ type TokenTransferConfig struct {
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
+	// AutoMigrate, when true, instructs the configure step to carry forward all remote chains that the
+	// currently-active pool supports but that are not explicitly listed in RemoteChains. Discovered chains
+	// (and their rate limits, remote pools, and remote tokens) are imported from the active pool; any chain
+	// listed explicitly in RemoteChains takes precedence over its discovered config. When false (the default),
+	// the configure step requires RemoteChains to include every chain the active pool supports and errors
+	// otherwise. Only used by EVM v2.0.0 adapters.
+	AutoMigrate bool `yaml:"autoMigrate" json:"autoMigrate"`
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -171,6 +178,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
 			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
 			TimelockAddress:               timelockAddress,
+			AutoMigrate:                   token.AutoMigrate,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
