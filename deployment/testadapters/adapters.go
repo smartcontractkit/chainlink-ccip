@@ -49,8 +49,9 @@ type MessageComponents struct {
 }
 
 const (
-	ExtraArgGasLimit = "gasLimit|computeUnits"
-	ExtraArgOOO      = "outOfOrderExecutionEnabled"
+	ExtraArgGasLimit     = "gasLimit|computeUnits"
+	ExtraArgOOO          = "outOfOrderExecutionEnabled"
+	ExtraArgFastFinality = "fastFinalityEnabled"
 )
 
 // ExtraArgOpt is a generic representation of an extra arg that can be applied
@@ -72,6 +73,13 @@ func NewGasLimitExtraArg(gasLimit *big.Int) ExtraArgOpt {
 	return ExtraArgOpt{
 		Name:  ExtraArgGasLimit,
 		Value: gasLimit,
+	}
+}
+
+func NewFastFinalityExtraArg(fastFinality bool) ExtraArgOpt {
+	return ExtraArgOpt{
+		Name:  ExtraArgFastFinality,
+		Value: fastFinality,
 	}
 }
 

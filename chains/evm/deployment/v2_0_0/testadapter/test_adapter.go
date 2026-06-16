@@ -129,6 +129,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	contractType := datastore.ContractType(routerops.ContractType)
 	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
 	if err == nil && isTest {
+		fmt.Println("Using Test Router for sending message")
 		contractType = datastore.ContractType(routerops.TestRouterContractType)
 	}
 	rAddr, err := a.getAddress(contractType)
