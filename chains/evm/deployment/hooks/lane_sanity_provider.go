@@ -48,14 +48,22 @@ type EVMLaneSanityProvider struct {
 	EVMPostProposalCCIPSend
 }
 
-func (e *EVMLaneSanityProvider) FeeTokenName(env cldf.Environment, source uint64, tokenAddr string) (string, error) {
+func (e *EVMLaneSanityProvider) feeTokenContract(env cldf.Environment, source uint64, tokenAddr string) (*erc20.ERC20, error) {
 	chain, ok := env.BlockChains.EVMChains()[source]
 	if !ok {
-		return "", fmt.Errorf("chain '%d' not found in environment", source)
+		return nil, fmt.Errorf("chain '%d' not found in environment", source)
 	}
 	tokenC, err := erc20.NewERC20(common.HexToAddress(tokenAddr), chain.Client)
 	if err != nil {
-		return "", fmt.Errorf("failed to bind ERC20 contract at address %s on chain %d: %w", tokenAddr, source, err)
+		return nil, fmt.Errorf("failed to bind ERC20 contract at address %s on chain %d: %w", tokenAddr, source, err)
+	}
+	return tokenC, nil
+}
+
+func (e *EVMLaneSanityProvider) FeeTokenName(env cldf.Environment, source uint64, tokenAddr string) (string, error) {
+	tokenC, err := e.feeTokenContract(env, source, tokenAddr)
+	if err != nil {
+		return "", err
 	}
 	name, err := tokenC.Symbol(&bind.CallOpts{Context: env.GetContext()})
 	if err != nil {
@@ -271,7 +279,34 @@ func (e *EVMLaneSanityProvider) GetMessageFee(
 		return "", fmt.Errorf("GetFee src=%d dest=%d: %w", srcSel, destSel, err)
 	}
 
-	return fee.String(), nil
+	decimals := uint8(18) // native fee token is paid in wei
+	if evm2anyMsg.FeeToken != (common.Address{}) {
+		tokenC, err := e.feeTokenContract(env, srcSel, evm2anyMsg.FeeToken.Hex())
+		if err != nil {
+			return "", err
+		}
+		decimals, err = tokenC.Decimals(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return "", fmt.Errorf("decimals for fee token %s chain=%d: %w", evm2anyMsg.FeeToken.Hex(), srcSel, err)
+		}
+	}
+
+	return formatFeeAmount(fee, decimals), nil
+}
+
+// formatFeeAmount converts a raw token amount to a decimal string (e.g. 1500000000000000 → "0.0015").
+func formatFeeAmount(raw *big.Int, decimals uint8) string {
+	if raw == nil || raw.Sign() == 0 {
+		return "0"
+	}
+
+	denom := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
+	feeFloat := new(big.Float).SetPrec(256).Quo(
+		new(big.Float).SetInt(raw),
+		new(big.Float).SetInt(denom),
+	)
+
+	return feeFloat.String()
 }
 
 // SupportedFeeTokens overrides the embedded EVMPostProposalCCIPSend method so
