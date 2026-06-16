@@ -7,12 +7,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -33,7 +33,11 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	"configure-token-pool-for-remote-chains",
 	semver.MustParse("2.0.0"),
 	"Configures a token pool for all configured remote chains; validates active pool supported chains when upgrading.",
-	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chains chain.BlockChains, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
+		chain, ok := chains.EVMChains()[input.ChainSelector]
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
+		}
 		// Active-pool validation: when RegistryAddress and TokenAddress are set, the registry's
 		// "active" pool for that token is queried. For USDC/CCTP the registered pool is the
 		// USDCTokenPoolProxy (so the router uses the proxy). The proxy does not implement
