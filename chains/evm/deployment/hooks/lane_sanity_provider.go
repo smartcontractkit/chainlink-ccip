@@ -48,6 +48,22 @@ type EVMLaneSanityProvider struct {
 	EVMPostProposalCCIPSend
 }
 
+func (e *EVMLaneSanityProvider) FeeTokenName(env cldf.Environment, source uint64, tokenAddr string) (string, error) {
+	chain, ok := env.BlockChains.EVMChains()[source]
+	if !ok {
+		return "", fmt.Errorf("chain '%d' not found in environment", source)
+	}
+	tokenC, err := erc20.NewERC20(common.HexToAddress(tokenAddr), chain.Client)
+	if err != nil {
+		return "", fmt.Errorf("failed to bind ERC20 contract at address %s on chain %d: %w", tokenAddr, source, err)
+	}
+	name, err := tokenC.Symbol(&bind.CallOpts{Context: env.GetContext()})
+	if err != nil {
+		return "", fmt.Errorf("failed to get symbol name for token at address %s on chain %d: %w", tokenAddr, source, err)
+	}
+	return name, nil
+}
+
 // ApplySenderPrivateKey configures every EVM chain in env to send from senderKey.
 func (e *EVMLaneSanityProvider) ApplySenderPrivateKey(
 	ctx context.Context,
