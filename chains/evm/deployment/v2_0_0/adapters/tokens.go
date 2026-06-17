@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -21,13 +22,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var (
-	_ tokens.TokenFeeAdapter = &TokenAdapter{}
-	_ tokens.TokenAdapter    = &TokenAdapter{}
+	_ tokens.TokenPoolMigrator = &TokenAdapter{}
+	_ tokens.TokenFeeAdapter   = &TokenAdapter{}
+	_ tokens.TokenAdapter      = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 2.0.0.
@@ -112,11 +115,124 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 	}, nil
 }
 
+// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry (regRef) as raw
+// address bytes, or empty bytes when none is registered. The registry is taken from regRef when set, otherwise
+// resolved from the datastore (matching ConfigureTokenForTransfers) so callers need not pass a registry ref.
+// The read uses WithForceExecute because it reflects mutable on-chain state that may have been read (and cached)
+// earlier in this bundle.
+func (t *TokenAdapter) GetActivePool(e deployment.Environment, chainSelector uint64, regRef datastore.AddressRef, tokenRef datastore.AddressRef) ([]byte, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+	registry, err := t.EVMTokenBase.GetTokenAdminRegistryAddress(e.DataStore, chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from datastore on chain %d: %w", chainSelector, err)
+	}
+	token, err := t.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, tokenRef, chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token address from ref %v on chain %d: %w", tokenRef, chainSelector, err)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		token_admin_registry.GetTokenConfig, evmChain,
+		contract.FunctionInput[common.Address]{ChainSelector: chainSelector, Address: registry, Args: token},
+		cldf_ops.WithForceExecute[contract.FunctionInput[common.Address], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token config from registry %s for token %s on chain %d: %w", registry.Hex(), token.Hex(), chainSelector, err)
+	}
+
+	activePool := report.Output.TokenPool
+	if activePool == (common.Address{}) {
+		return nil, nil // no active pool registered
+	}
+
+	return activePool.Bytes(), nil
+}
+
+// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
+func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		token_pool.GetSupportedChains, evmChain,
+		contract.FunctionInput[struct{}]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr)},
+		cldf_ops.WithForceExecute[contract.FunctionInput[struct{}], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get supported chains from pool %s on chain %d: %w", common.BytesToAddress(poolAddr).Hex(), chainSelector, err)
+	}
+
+	return report.Output, nil
+}
+
+// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
+func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		token_pool.GetRemoteToken, evmChain,
+		contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
+		cldf_ops.WithForceExecute[contract.FunctionInput[uint64], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote token for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
+	}
+
+	if len(report.Output) == 0 {
+		return nil, fmt.Errorf("pool %s has no remote token registered for chain %d", common.BytesToAddress(poolAddr).Hex(), remoteSelector)
+	}
+
+	return report.Output, nil
+}
+
+// GetRemotePool returns a remote pool (raw bytes) the pool at poolAddr is linked to for remoteSelector. The pool
+// may have more than one during a remote-side upgrade; returning the first valid one is sufficient — the per-chain
+// configure step re-reads and registers the full set, deduping this one.
+func (t *TokenAdapter) GetRemotePool(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		token_pool.GetRemotePools, evmChain,
+		contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
+		cldf_ops.WithForceExecute[contract.FunctionInput[uint64], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote pools for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
+	}
+
+	remotePools := report.Output
+	if len(remotePools) == 0 {
+		return nil, fmt.Errorf("pool %s has no remote pools registered for chain %d", common.BytesToAddress(poolAddr).Hex(), remoteSelector)
+	}
+	remotePool := remotePools[0]
+	if len(remotePool) == 0 {
+		return nil, fmt.Errorf("pool %s has a remote pool registered for chain %d but it is the zero address", common.BytesToAddress(poolAddr).Hex(), remoteSelector)
+	}
+
+	return remotePool, nil
+}
+
 // poolOpsV200 implements PoolOps using v2.0.0 bindings.
 type poolOpsV200 struct{}
 
 func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
-	res, err := cldf_ops.ExecuteOperation(b,
+	res, err := cldf_ops.ExecuteOperation(
+		b,
 		token_pool.GetToken, chain,
 		contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
@@ -130,7 +246,8 @@ func (p *poolOpsV200) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr comm
 }
 
 func (p *poolOpsV200) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error) {
-	res, err := cldf_ops.ExecuteOperation(b,
+	res, err := cldf_ops.ExecuteOperation(
+		b,
 		token_pool.GetTokenDecimals, chain,
 		contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
@@ -234,7 +351,8 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 		return nil, nil
 	}
 
-	report, err := cldf_ops.ExecuteOperation(b,
+	report, err := cldf_ops.ExecuteOperation(
+		b,
 		token_pool.SetDynamicConfig, chain,
 		contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
 			ChainSelector: chain.Selector,

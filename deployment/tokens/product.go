@@ -74,6 +74,24 @@ type RateLimitReaderAdapter interface {
 	) (RateLimiterConfig, error)
 }
 
+// TokenPoolMigrator is an optional interface implemented by adapters that can read an existing pool's
+// cross-chain configuration on-chain. It powers AutoMigrateRemoteChains: during an upgrade, the remote
+// chains/tokens/pools the active pool is configured for are read back (as raw bytes) and carried forward
+// onto the new pool. All addresses are raw on-chain bytes so the interface stays chain-family-agnostic;
+// callers convert them per family via the AddressNormalizer registry when a string form is needed.
+type TokenPoolMigrator interface {
+	// GetActivePool returns the pool currently registered for the token (tokenRef) in the TokenAdminRegistry
+	// (regRef), as raw address bytes. Returns empty bytes (no error) when no pool is registered.
+	GetActivePool(e deployment.Environment, chainSelector uint64, regRef datastore.AddressRef, tokenRef datastore.AddressRef) ([]byte, error)
+	// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
+	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
+	// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
+	GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error)
+	// GetRemotePool returns a remote pool (raw bytes) the pool at poolAddr is linked to for remoteSelector.
+	// A pool may have more than one during a remote-side upgrade; one valid entry is sufficient for the caller.
+	GetRemotePool(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error)
+}
+
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.
 type TokenAdapter interface {
 	// ConfigureTokenForTransfersSequence returns a sequence that configures a token pool for cross-chain transfers.
