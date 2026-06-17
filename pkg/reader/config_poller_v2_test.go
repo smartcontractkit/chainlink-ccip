@@ -487,8 +487,7 @@ func TestConfigPollerV2_TrackSourceChain(t *testing.T) {
 	cPollerV2, _ := setupConfigPollerV2(t)
 
 	// Track source chain
-	success := cPollerV2.trackSourceChainForDest(sourceChain1)
-	assert.True(t, success)
+	cPollerV2.trackSourceChainForDest(sourceChain1)
 
 	// Verify it was tracked
 	cPollerV2.RLock()
@@ -498,12 +497,10 @@ func TestConfigPollerV2_TrackSourceChain(t *testing.T) {
 	cPollerV2.RUnlock()
 
 	// Try to track destination as its own source (should fail)
-	success = cPollerV2.trackSourceChainForDest(destChain)
-	assert.False(t, success)
+	cPollerV2.trackSourceChainForDest(destChain)
 
 	// Add another source chain
-	success = cPollerV2.trackSourceChainForDest(sourceChain2)
-	assert.True(t, success)
+	cPollerV2.trackSourceChainForDest(sourceChain2)
 
 	// Verify both source chains are tracked
 	cPollerV2.RLock()
