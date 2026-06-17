@@ -13,11 +13,14 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/require"
+
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
+	bnmERC20Bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	bnmERC20Operations "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -36,22 +39,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	bnmERC20Bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
-
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, qualifiers []string) {
-	// For EVM only, set the timelock admin
-	var timelockAdmin common.Address
-	chain1, ok := e.BlockChains.EVMChains()[selector]
-	if ok {
-		timelockAdmin = chain1.DeployerKey.From
-	}
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	cs := mcmsapi.DeployMCMS(dReg, nil)
@@ -66,7 +59,6 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
 					Qualifier:        ptr.String(qualifier),
-					TimelockAdmin:    timelockAdmin,
 				},
 			},
 		})
@@ -83,7 +75,6 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
 					Qualifier:        ptr.String(qualifier),
-					TimelockAdmin:    timelockAdmin,
 				},
 			},
 		})

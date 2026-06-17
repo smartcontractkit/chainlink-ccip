@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -141,4 +142,35 @@ func TestEVMLaneSanityProvider_GetMessageFee_ChainNotInEnv(t *testing.T) {
 	)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "not in environment")
+}
+
+func TestFormatFeeAmount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		raw      string
+		decimals uint8
+		want     string
+	}{
+		{name: "zero", raw: "0", decimals: 18, want: "0"},
+		{name: "nil", raw: "", decimals: 18, want: "0"},
+		{name: "native wei", raw: "1500000000000000", decimals: 18, want: "0.0015"},
+		{name: "link juels", raw: "250000000000000000", decimals: 18, want: "0.25"},
+		{name: "usdc", raw: "1234567", decimals: 6, want: "1.234567"},
+		{name: "whole token", raw: "1000000", decimals: 6, want: "1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var raw *big.Int
+			if tt.raw != "" {
+				raw = new(big.Int)
+				raw.SetString(tt.raw, 10)
+			}
+			require.Equal(t, tt.want, formatFeeAmount(raw, tt.decimals))
+		})
+	}
 }

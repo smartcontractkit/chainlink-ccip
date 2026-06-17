@@ -26,9 +26,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	cciphooks "github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func init() {
@@ -42,6 +46,30 @@ var _ cciphooks.PostProposalLaneSanity = (*EVMLaneSanityProvider)(nil)
 // that need v2.0-specific behaviour or that must filter to v2.0 lanes only.
 type EVMLaneSanityProvider struct {
 	EVMPostProposalCCIPSend
+}
+
+func (e *EVMLaneSanityProvider) feeTokenContract(env cldf.Environment, source uint64, tokenAddr string) (*erc20.ERC20, error) {
+	chain, ok := env.BlockChains.EVMChains()[source]
+	if !ok {
+		return nil, fmt.Errorf("chain '%d' not found in environment", source)
+	}
+	tokenC, err := erc20.NewERC20(common.HexToAddress(tokenAddr), chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind ERC20 contract at address %s on chain %d: %w", tokenAddr, source, err)
+	}
+	return tokenC, nil
+}
+
+func (e *EVMLaneSanityProvider) FeeTokenName(env cldf.Environment, source uint64, tokenAddr string) (string, error) {
+	tokenC, err := e.feeTokenContract(env, source, tokenAddr)
+	if err != nil {
+		return "", err
+	}
+	name, err := tokenC.Symbol(&bind.CallOpts{Context: env.GetContext()})
+	if err != nil {
+		return "", fmt.Errorf("failed to get symbol name for token at address %s on chain %d: %w", tokenAddr, source, err)
+	}
+	return name, nil
 }
 
 // ApplySenderPrivateKey configures every EVM chain in env to send from senderKey.
@@ -121,59 +149,37 @@ func (e *EVMLaneSanityProvider) AvailableTransferTokens(
 	env cldf.Environment,
 	source, dest uint64,
 ) (map[string]string, error) {
-	fq, err := e.feeQuoterV2(env, source)
-	if err != nil {
-		return nil, fmt.Errorf("fee quoter v2: %w", err)
-	}
-	ctx := env.GetContext()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ttConfigs, err := fq.GetAllTokenTransferFeeConfigs(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, err
-	}
-
-	var transferTokens []common.Address
-	var enabled []bool
-	for i, destChain := range ttConfigs.DestChainSelectors {
-		if destChain != dest {
-			continue
-		}
-		transferTokens = ttConfigs.TransferTokens[i]
-		if len(transferTokens) == 0 {
-			return nil, fmt.Errorf(
-				"no transfer tokens configured for destination chain %d from source chain %d",
-				dest, source,
-			)
-		}
-		feeConfigs := ttConfigs.TokenTransferFeeConfigs[i]
-		enabled = make([]bool, len(transferTokens))
-		for j := range transferTokens {
-			if j < len(feeConfigs) {
-				enabled[j] = feeConfigs[j].IsEnabled
-			}
-		}
-		break
-	}
-	if len(transferTokens) == 0 {
-		return nil, fmt.Errorf("no transfer token config for destination %d from source %d", dest, source)
-	}
-
 	chain, ok := env.BlockChains.EVMChains()[source]
 	if !ok {
 		return nil, fmt.Errorf("source chain %d not found in environment EVM chains", source)
 	}
+	tarAddr, err := datastore_utils.FindAndFormatRef(
+		env.DataStore,
+		datastore.AddressRef{
+			Type:    datastore.ContractType(token_admin_registry.ContractType),
+			Version: token_admin_registry.Version,
+		}, source,
+		evm_datastore_utils.ToEVMAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding token_admin_registry contract address on source %d: %w", source, err)
+	}
+	tokensPerChain, err := adapters1_5.GetSupportedTokensPerRemoteChain(env.GetContext(), env.Logger, tarAddr, chain, []uint64{dest})
+	if err != nil {
+		return nil, fmt.Errorf("getting supported tokens per remote chain from token admin registry on source %d to %d: %w", source, dest, err)
+	}
+	TransferTokensForDest, ok := tokensPerChain[dest]
+	if !ok {
+		return nil, fmt.Errorf("no supported tokens found for destination %d in token admin registry on source %d", dest, source)
+	}
+
 	result := make(map[string]string)
-	for j, token := range transferTokens {
-		if !enabled[j] {
-			continue
-		}
+	for _, token := range TransferTokensForDest {
 		tokenC, err := erc20.NewERC20(token, chain.Client)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create ERC20 client for token %s on chain %d: %w", token.Hex(), source, err)
 		}
-		name, err := tokenC.Symbol(&bind.CallOpts{Context: ctx})
+		name, err := tokenC.Symbol(&bind.CallOpts{Context: env.GetContext()})
 		if err != nil {
 			return nil, err
 		}
@@ -273,7 +279,34 @@ func (e *EVMLaneSanityProvider) GetMessageFee(
 		return "", fmt.Errorf("GetFee src=%d dest=%d: %w", srcSel, destSel, err)
 	}
 
-	return fee.String(), nil
+	decimals := uint8(18) // native fee token is paid in wei
+	if evm2anyMsg.FeeToken != (common.Address{}) {
+		tokenC, err := e.feeTokenContract(env, srcSel, evm2anyMsg.FeeToken.Hex())
+		if err != nil {
+			return "", err
+		}
+		decimals, err = tokenC.Decimals(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return "", fmt.Errorf("decimals for fee token %s chain=%d: %w", evm2anyMsg.FeeToken.Hex(), srcSel, err)
+		}
+	}
+
+	return formatFeeAmount(fee, decimals), nil
+}
+
+// formatFeeAmount converts a raw token amount to a decimal string (e.g. 1500000000000000 → "0.0015").
+func formatFeeAmount(raw *big.Int, decimals uint8) string {
+	if raw == nil || raw.Sign() == 0 {
+		return "0"
+	}
+
+	denom := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
+	feeFloat := new(big.Float).SetPrec(256).Quo(
+		new(big.Float).SetInt(raw),
+		new(big.Float).SetInt(denom),
+	)
+
+	return feeFloat.String()
 }
 
 // SupportedFeeTokens overrides the embedded EVMPostProposalCCIPSend method so
