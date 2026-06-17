@@ -1,7 +1,9 @@
 package testadapter
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/xssnick/tonutils-go/tlb"
 
@@ -107,6 +110,25 @@ func (a *EVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 	}, nil
 }
 
+func (a *EVMAdapter) getRouter() (*router.Router, error) {
+	// if TestRouter env var is set use Test Router instead
+	// We are leveraging env var here to avoid making change to the SendMessage method signature
+	// TestRouter is only valid for evm
+	contractType := datastore.ContractType(routerops.ContractType)
+	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
+	if err == nil && isTest {
+		fmt.Println("Using Test Router for sending message")
+		contractType = datastore.ContractType(routerops.TestRouterContractType)
+	}
+	rAddr, err := a.getAddress(contractType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get router address: %w", err)
+	}
+	return router.NewRouter(
+		rAddr,
+		a.Client)
+}
+
 func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
@@ -117,30 +139,16 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if !ok {
 		return 0, messageID, errors.New("expected router.ClientEVM2AnyMessage")
 	}
-
+	r, err := a.getRouter()
+	if err != nil {
+		return 0, messageID, fmt.Errorf("failed to create router instance: %w", err)
+	}
 	const errCodeInsufficientFee = "0x07da6ee6"
 	const cannotDecodeErrorReason = "could not decode error reason"
 	const errMsgMissingTrieNode = "missing trie node"
 	sender := a.DeployerKey
 	defer func() { sender.Value = nil }()
-	// if TestRouter env var is set use Test Router instead
-	// We are leveraging env var here to avoid making change to the SendMessage method signature
-	// TestRouter is only valid for evm
-	contractType := datastore.ContractType(routerops.ContractType)
-	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
-	if err == nil && isTest {
-		contractType = datastore.ContractType(routerops.TestRouterContractType)
-	}
-	rAddr, err := a.getAddress(contractType)
-	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to get router address: %w", err)
-	}
-	r, err := router.NewRouter(
-		rAddr,
-		a.Client)
-	if err != nil {
-		return 0, messageID, fmt.Errorf("failed to create router instance: %w", err)
-	}
+
 	onRampAddr, err := r.GetOnRamp(nil, destChainSelector)
 	if err != nil {
 		return 0, messageID, fmt.Errorf("failed to get onramp address: %w", err)
@@ -167,7 +175,17 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 				return 0, messageID, fmt.Errorf("failed to approve tokens for fee: %w", err)
 			}
 		}
-
+		for _, tokenData := range msg.TokenAmounts {
+			// if transfer token is the same as fee token, approve 2x the fee in addition to the transfer amount
+			if tokenData.Token == msg.FeeToken {
+				err = a.AllowRouterToWithdrawTokens(ctx, tokenData.Token.String(),
+					new(big.Int).Add(tokenData.Amount, new(big.Int).Add(fee, fee)))
+				if err != nil {
+					return 0, messageID, fmt.Errorf("failed to approve tokens: %w", err)
+				}
+				break
+			}
+		}
 		tx, err := r.CcipSend(sender, destChainSelector, msg)
 		if err != nil {
 			return 0, messageID, fmt.Errorf("failed to send CCIP message: %w", err)
@@ -251,6 +269,48 @@ func (a *EVMAdapter) NativeFeeToken() string {
 	return "0x0"
 }
 
+func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+	var finalityConfig protocol.Finality
+	gasLimit := new(big.Int).SetUint64(100_000)
+
+	for _, opt := range opts {
+		switch opt.Name {
+		case testadapters.ExtraArgFinality:
+			v, ok := opt.Value.(uint32)
+			if !ok {
+				return nil, fmt.Errorf("finality must be uint32, got %T", opt.Value)
+			}
+			finalityConfig = protocol.Finality(v)
+		case testadapters.ExtraArgGasLimit:
+			v, ok := opt.Value.(*big.Int)
+			if !ok || v == nil {
+				return nil, fmt.Errorf("gasLimit must be *big.Int, got %T", opt.Value)
+			}
+			gasLimit = v
+		case testadapters.ExtraArgOOO:
+			// no-op (not supported in v3 encoding here)
+		default:
+			return nil, fmt.Errorf("unknown extra arg option: %s", opt.Name)
+		}
+	}
+
+	if gasLimit.Sign() < 0 || gasLimit.BitLen() > 32 {
+		return nil, fmt.Errorf("gasLimit must fit uint32, got %s", gasLimit.String())
+	}
+
+	buf := new(bytes.Buffer)
+	genericExtraArgsV3Tag := []byte{0xa6, 0x9d, 0xd4, 0xaa}
+	buf.Write(genericExtraArgsV3Tag)
+
+	if err := binary.Write(buf, binary.BigEndian, uint32(gasLimit.Uint64())); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.BigEndian, uint32(finalityConfig)); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
@@ -260,6 +320,10 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		}
 		for _, opt := range opts {
 			switch opt.Name {
+			case testadapters.ExtraArgFinality:
+				if opt.Value.(uint32) > 0 {
+					return a.serializeExtraArgsV3(opts...)
+				}
 			case testadapters.ExtraArgGasLimit:
 				extraArgs.GasLimit = opt.Value.(*big.Int)
 			case testadapters.ExtraArgOOO:
@@ -306,12 +370,12 @@ func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddre
 	if amount.Cmp(big.NewInt(0)) <= 0 {
 		return fmt.Errorf("amount must be greater than zero: %s", amount.String())
 	}
-
-	routerAddr, err := a.getAddress(datastore.ContractType("Router"))
+	r, err := a.getRouter()
 	if err != nil {
-		return fmt.Errorf("failed to get router address: %w", err)
+		return fmt.Errorf("failed to create router instance: %w", err)
 	}
 
+	routerAddr := r.Address()
 	tokenAddr := common.HexToAddress(tokenAddress)
 	if tokenAddr == (common.Address{}) {
 		return errors.New("cannot approve zero address token")
