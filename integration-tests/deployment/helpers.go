@@ -90,7 +90,8 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	timelockSigner := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
-		common_utils.CLLQualifier)
+		common_utils.CLLQualifier,
+	)
 	mcmSigner := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
@@ -217,7 +218,8 @@ func SolanaTransferMCMSContracts(t *testing.T, e *cldf_deployment.Environment, s
 	timelockSigner := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
-		qualifier)
+		qualifier,
+	)
 	mcmSigner := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
@@ -478,15 +480,17 @@ func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cu
 
 func RequireBigIntsEqual(t *testing.T, want, got *big.Int, msg string) {
 	t.Helper()
-	w := want
-	if w == nil {
-		w = big.NewInt(0)
-	}
-	g := got
-	if g == nil {
-		g = big.NewInt(0)
-	}
-	require.Zero(t, w.Cmp(g), "%s: want %s got %s", msg, w.String(), g.String())
+	require.NotNil(t, got, msg)
+	require.Zero(t, want.Cmp(got), "%s: want %s got %s", msg, want.String(), got.String())
+}
+
+// RequireBigIntApprox asserts |want-got| <= tolerance. Used for rate-limit values where GenerateTPRLConfigs'
+// float64 x1.1 premium introduces sub-token rounding noise that differs across pool-version code paths.
+func RequireBigIntsApprox(t *testing.T, want, got *big.Int, tolerance int64, msg string) {
+	t.Helper()
+	require.NotNil(t, got, msg)
+	diff := new(big.Int).Abs(new(big.Int).Sub(want, got))
+	require.LessOrEqualf(t, diff.Cmp(big.NewInt(tolerance)), 0, "%s: want ~%s got %s (diff %s > tolerance %d)", msg, want, got, diff, tolerance)
 }
 
 func NewRandHex(t *testing.T, nBytes int) string {
