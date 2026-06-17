@@ -195,7 +195,7 @@ func (e *EVMLaneSanityProvider) AvailableTransferTokens(
 }
 
 func (e *EVMLaneSanityProvider) AdapterVersionForLane(env cldf.Environment, srcSel, destSel uint64) (*semver.Version, error) {
-	testRouterStr := os.Getenv("TestRouter")
+	testRouterStr := strings.TrimSpace(os.Getenv("TestRouter"))
 	var routerAddr common.Address
 	if testRouterStr != "" {
 		testRouter, err := strconv.ParseBool(testRouterStr)
@@ -484,7 +484,6 @@ func resolveEVMRouterAddress(ds datastore.DataStore, chainSel uint64) (common.Ad
 	contractType := datastore.ContractType(routerops.ContractType)
 	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
 	if err == nil && isTest {
-		fmt.Println("Using Test Router for sending message")
 		contractType = datastore.ContractType(routerops.TestRouterContractType)
 	}
 	refs := ds.Addresses().Filter(

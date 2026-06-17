@@ -272,26 +272,42 @@ func (a *EVMAdapter) NativeFeeToken() string {
 func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	var finalityConfig protocol.Finality
 	gasLimit := new(big.Int).SetUint64(100_000)
+
 	for _, opt := range opts {
 		switch opt.Name {
 		case testadapters.ExtraArgFinality:
-			finalityConfig = protocol.Finality(opt.Value.(uint32))
+			v, ok := opt.Value.(uint32)
+			if !ok {
+				return nil, fmt.Errorf("finality must be uint32, got %T", opt.Value)
+			}
+			finalityConfig = protocol.Finality(v)
 		case testadapters.ExtraArgGasLimit:
-			gasLimit = opt.Value.(*big.Int)
+			v, ok := opt.Value.(*big.Int)
+			if !ok || v == nil {
+				return nil, fmt.Errorf("gasLimit must be *big.Int, got %T", opt.Value)
+			}
+			gasLimit = v
 		case testadapters.ExtraArgOOO:
-			// no op
+			// no-op (not supported in v3 encoding here)
 		default:
 			return nil, fmt.Errorf("unknown extra arg option: %s", opt.Name)
 		}
 	}
+
+	if gasLimit.Sign() < 0 || gasLimit.BitLen() > 32 {
+		return nil, fmt.Errorf("gasLimit must fit uint32, got %s", gasLimit.String())
+	}
+
 	buf := new(bytes.Buffer)
 	genericExtraArgsV3Tag := []byte{0xa6, 0x9d, 0xd4, 0xaa}
 	buf.Write(genericExtraArgsV3Tag)
-	// Write gasLimit (uint32, big-endian)
-	binary.Write(buf, binary.BigEndian, gasLimit)
 
-	// Write blockConfirmations (uint32, big-endian)
-	binary.Write(buf, binary.BigEndian, finalityConfig)
+	if err := binary.Write(buf, binary.BigEndian, uint32(gasLimit.Uint64())); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.BigEndian, uint32(finalityConfig)); err != nil {
+		return nil, err
+	}
 	return buf.Bytes(), nil
 }
 
@@ -356,7 +372,7 @@ func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddre
 	}
 	r, err := a.getRouter()
 	if err != nil {
-		return fmt.Errorf("failed to get router address: %w", err)
+		return fmt.Errorf("failed to create router instance: %w", err)
 	}
 
 	routerAddr := r.Address()
