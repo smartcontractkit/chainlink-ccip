@@ -195,7 +195,7 @@ func (e *EVMLaneSanityProvider) AvailableTransferTokens(
 }
 
 func (e *EVMLaneSanityProvider) AdapterVersionForLane(env cldf.Environment, srcSel, destSel uint64) (*semver.Version, error) {
-	testRouterStr := os.Getenv("TestRouter")
+	testRouterStr := strings.TrimSpace(os.Getenv("TestRouter"))
 	var routerAddr common.Address
 	if testRouterStr != "" {
 		testRouter, err := strconv.ParseBool(testRouterStr)
@@ -248,28 +248,6 @@ func (e *EVMLaneSanityProvider) EncodeReceiverAddress(
 		return nil, fmt.Errorf("invalid EVM receiver address: %s", receiverAddress)
 	}
 	return common.LeftPadBytes(common.HexToAddress(receiverAddress).Bytes(), 32), nil
-}
-
-// SupportedDestinations overrides the embedded implementation to return only
-// destination selectors whose lane version is v2.0, since all methods in this
-// provider require FeeQuoter v2.0.
-func (e *EVMLaneSanityProvider) SupportedDestinations(env cldf.Environment, srcSel uint64) ([]uint64, error) {
-	allDests, err := e.EVMPostProposalCCIPSend.SupportedDestinations(env, srcSel)
-	if err != nil {
-		return nil, err
-	}
-	var v2Dests []uint64
-	for _, destSel := range allDests {
-		ver, err := e.EVMPostProposalCCIPSend.AdapterVersionForLane(env, srcSel, destSel)
-		if err != nil {
-			env.Logger.Debugf("lane-sanity: AdapterVersionForLane src=%d dest=%d: %v (skipping)", srcSel, destSel, err)
-			continue
-		}
-		if ver.Major() == 2 {
-			v2Dests = append(v2Dests, destSel)
-		}
-	}
-	return v2Dests, nil
 }
 
 // MockReceiverAddress looks up the MockReceiverV2 contract for chainSel in the
@@ -479,12 +457,11 @@ func (e *EVMLaneSanityProvider) feeQuoterV2(env cldf.Environment, srcSel uint64)
 	return fq, nil
 }
 
-// resolveEVMRouterAddress returns the production Router address for chainSel.
+// resolveEVMRouterAddress returns the Router address for chainSel (uses TestRouter env var to optionally select the TestRouter).
 func resolveEVMRouterAddress(ds datastore.DataStore, chainSel uint64) (common.Address, error) {
 	contractType := datastore.ContractType(routerops.ContractType)
 	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
 	if err == nil && isTest {
-		fmt.Println("Using Test Router for sending message")
 		contractType = datastore.ContractType(routerops.TestRouterContractType)
 	}
 	refs := ds.Addresses().Filter(
