@@ -173,16 +173,13 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 			}
 		}
 		for _, tokenData := range msg.TokenAmounts {
-			if tokenData.Token == (common.Address{}) {
-				continue
-			}
-			amount := tokenData.Amount
+			// if transfer token is the same as fee token, approve 2x the fee in addition to the transfer amount
 			if tokenData.Token == msg.FeeToken {
-				amount = new(big.Int).Add(amount, new(big.Int).Add(fee, fee)) // if transfer token is the same as fee token, approve 2x the fee in addition to the transfer amount
-			}
-			err := a.AllowRouterToWithdrawTokens(ctx, tokenData.Token.String(), amount)
-			if err != nil {
-				return 0, messageID, fmt.Errorf("failed to approve tokens for fee: %w", err)
+				err = a.AllowRouterToWithdrawTokens(ctx, tokenData.Token.String(),
+					new(big.Int).Add(tokenData.Amount, new(big.Int).Add(fee, fee)))
+				if err != nil {
+					return 0, messageID, fmt.Errorf("failed to approve tokens: %w", err)
+				}
 			}
 		}
 		tx, err := r.CcipSend(sender, destChainSelector, msg)

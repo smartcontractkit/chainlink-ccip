@@ -481,9 +481,15 @@ func (e *EVMLaneSanityProvider) feeQuoterV2(env cldf.Environment, srcSel uint64)
 
 // resolveEVMRouterAddress returns the production Router address for chainSel.
 func resolveEVMRouterAddress(ds datastore.DataStore, chainSel uint64) (common.Address, error) {
+	contractType := datastore.ContractType(routerops.ContractType)
+	isTest, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TestRouter")))
+	if err == nil && isTest {
+		fmt.Println("Using Test Router for sending message")
+		contractType = datastore.ContractType(routerops.TestRouterContractType)
+	}
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSel),
-		datastore.AddressRefByType(datastore.ContractType("Router")),
+		datastore.AddressRefByType(contractType),
 	)
 	if len(refs) == 0 {
 		return common.Address{}, fmt.Errorf("no Router found for chain %d", chainSel)
