@@ -156,13 +156,13 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 
 		// Configure token pool for all remote chains (validates active pool supported chains once when upgrading).
 		configureTokenPoolForRemoteChainsReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChains, chains, ConfigureTokenPoolForRemoteChainsInput{
-			ChainSelector:     input.ChainSelector,
-			TokenPoolAddress:  tokenPoolAddress,
-			AdvancedPoolHooks: advancedPoolHooksAddress.Output,
-			RemoteChains:      input.RemoteChains,
-			RegistryAddress:   registryAddress,
-			TokenAddress:      tokenAddress,
-			AutoMigrateRemoteChains:       input.AutoMigrateRemoteChains,
+			ChainSelector:           input.ChainSelector,
+			TokenPoolAddress:        tokenPoolAddress,
+			AdvancedPoolHooks:       advancedPoolHooksAddress.Output,
+			RemoteChains:            input.RemoteChains,
+			RegistryAddress:         registryAddress,
+			TokenAddress:            tokenAddress,
+			AutoMigrateRemoteChains: input.AutoMigrateRemoteChains,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for remote chains: %w", err)

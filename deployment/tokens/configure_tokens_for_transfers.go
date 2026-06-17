@@ -57,6 +57,11 @@ type TokenTransferConfig struct {
 	// listed explicitly in RemoteChains takes precedence over its discovered config. When false (the default),
 	// the configure step requires RemoteChains to include every chain the active pool supports and errors
 	// otherwise. Only used by EVM v2.0.0 adapters.
+	//
+	// Auto-discovery only supports EVM remote chains, because it reads the remote token's ERC20 decimals from
+	// the remote chain. Non-EVM remotes (e.g. Solana) must be listed explicitly in RemoteChains — explicitly
+	// listed chains are skipped by discovery and used as provided, so a mixed-family token can list its non-EVM
+	// remotes and let AutoMigrateRemoteChains carry forward the EVM ones.
 	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
 }
 
@@ -178,7 +183,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
 			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
 			TimelockAddress:               timelockAddress,
-			AutoMigrateRemoteChains:                   token.AutoMigrateRemoteChains,
+			AutoMigrateRemoteChains:       token.AutoMigrateRemoteChains,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)

@@ -39,7 +39,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	semver.MustParse("2.0.0"),
 	"Configures a token pool for all configured remote chains; validates active pool supported chains when upgrading.",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
-		chain, ok := chains.EVMChains()[input.ChainSelector]
+		evmChain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
@@ -54,7 +54,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			// the same op+input ran earlier in this bundle, so we always re-read current state.
 			tokenConfigReport, err := cldf_ops.ExecuteOperation(
 				b,
-				token_admin_registry.GetTokenConfig, chain,
+				token_admin_registry.GetTokenConfig, evmChain,
 				evm_contract.FunctionInput[common.Address]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.RegistryAddress,
@@ -69,7 +69,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			if activePool != (common.Address{}) {
 				supportedChainsReport, err := cldf_ops.ExecuteOperation(
 					b,
-					token_pool.GetSupportedChains, chain,
+					token_pool.GetSupportedChains, evmChain,
 					evm_contract.FunctionInput[struct{}]{
 						ChainSelector: input.ChainSelector,
 						Address:       activePool,
@@ -95,7 +95,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 								supportedChains, slices.Sorted(maps.Keys(input.RemoteChains)),
 							)
 						}
-						discovered, err := discoverRemoteChainFromActivePool(b, chains, chain, input.ChainSelector, activePool, sel)
+						discovered, err := discoverRemoteChainFromActivePool(b, chains, evmChain, input.ChainSelector, activePool, sel)
 						if err != nil {
 							return sequences.OnChainOutput{}, fmt.Errorf("auto-migrate: failed to discover config for active pool chain %d: %w", sel, err)
 						}
@@ -104,12 +104,16 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 						}
 						input.RemoteChains[sel] = discovered
 					}
+				} else {
+					// GetSupportedChains failed (e.g. the active pool is a USDCTokenPoolProxy, which reverts).
+					// We skip the supported-chains validation and auto-discovery. For AutoMigrateRemoteChains
+					// this is a silent no-op, so warn that no remote chains are carried forward from the active pool.
+					b.Logger.Warnf("configure-token-pool: could not read supported chains from active pool %s on chain %d (%v); skipping active-pool validation and auto-migrate discovery", activePool.Hex(), input.ChainSelector, err)
 				}
-				// If GetSupportedChains failed (e.g. active pool is USDCTokenPoolProxy and reverts), skip validation.
 			}
 		}
 		ops := make([]mcms_types.BatchOperation, 0)
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
+		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 		})
@@ -122,7 +126,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		}
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			_, alreadySupported := supportedSet[remoteChainSelector]
-			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
+			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, evmChain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:               input.ChainSelector,
 				TokenPoolAddress:            input.TokenPoolAddress,
 				AdvancedPoolHooks:           input.AdvancedPoolHooks,
@@ -155,9 +159,12 @@ func discoverRemoteChainFromActivePool(
 	remoteChainSelector uint64,
 ) (tokens.RemoteChainConfig[[]byte, string], error) {
 	var zero tokens.RemoteChainConfig[[]byte, string]
+	// Auto-discovery only supports EVM remotes (we read the remote token's ERC20 decimals below). A non-EVM
+	// remote (e.g. Solana) will not be present in EVMChains and errors here; operators must list such remotes
+	// explicitly in RemoteChains, which the caller skips before reaching discovery.
 	remoteChain, ok := chains.EVMChains()[remoteChainSelector]
 	if !ok {
-		return zero, fmt.Errorf("remote chain with selector %d not found in environment", remoteChainSelector)
+		return zero, fmt.Errorf("remote chain with selector %d not found among EVM chains; non-EVM remotes must be listed explicitly in remoteChains for auto-migrate", remoteChainSelector)
 	}
 
 	// Force fresh execution: these read the active pool's mutable remote config and must reflect

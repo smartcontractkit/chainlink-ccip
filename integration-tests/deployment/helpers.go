@@ -484,7 +484,7 @@ func RequireBigIntsEqual(t *testing.T, want, got *big.Int, msg string) {
 	require.Zero(t, want.Cmp(got), "%s: want %s got %s", msg, want.String(), got.String())
 }
 
-// RequireBigIntApprox asserts |want-got| <= tolerance. Used for rate-limit values where GenerateTPRLConfigs'
+// RequireBigIntsApprox asserts |want-got| <= tolerance. Used for rate-limit values where GenerateTPRLConfigs'
 // float64 x1.1 premium introduces sub-token rounding noise that differs across pool-version code paths.
 func RequireBigIntsApprox(t *testing.T, want, got *big.Int, tolerance int64, msg string) {
 	t.Helper()
