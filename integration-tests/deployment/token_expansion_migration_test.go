@@ -51,6 +51,58 @@ type legacyBnMPair struct {
 	tarAddrA     common.Address
 }
 
+// TestTokenExpansionMigration_AutoMigrateRemoteChains exercises the AutoMigrateRemoteChains upgrade path:
+// it deploys a legacy BurnMint pool pair, connects them, then upgrades chain A's pool to v2.0 using
+// AutoMigrateRemoteChains with an EMPTY RemoteChains map. The new pool must inherit chain B as a supported
+// remote (token + remote pool + rate limits carried forward from the active pool), and the TokenAdminRegistry
+// must be switched to point at the new pool — all without the operator listing any remote chains.
+//
+// Both legacy versions are covered: v1.5.1 (< 1.6.1) stores inbound rate limits in remote/source decimals and
+// is rebased on import; v1.6.1 (>= 1.6.1) stores them in local decimals and is imported as-is. With chain A at
+// 18 decimals and chain B at 6 decimals, both paths must converge (within float ULP) on the same on-chain
+// values for the new pool, which validates the inbound decimal rebasing end-to-end.
+func TestTokenExpansionMigration_AutoMigrateRemoteChains(t *testing.T) {
+	cases := []struct {
+		name           string
+		oldPoolVersion *semver.Version
+	}{
+		{"v1_5_1_to_v2_0_0", cciputils.Version_1_5_1},
+		{"v1_6_1_to_v2_0_0", cciputils.Version_1_6_1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runAutoMigrateRemoteChainsUpgrade(t, tc.oldPoolVersion)
+		})
+	}
+}
+
+// TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate is the negative case: when
+// AutoMigrateRemoteChains is false (the default), configuring a v2.0 pool over an existing active pool must
+// still error if RemoteChains does not include every chain the active pool supports. This preserves the
+// pre-existing upgrade-safety check. We invoke the ConfigureTokenPoolForRemoteChains sequence directly with
+// an empty RemoteChains so the active pool's supported chain (B) is missing.
+func TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate(t *testing.T) {
+	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_1)
+
+	// RegistryAddress + TokenAddress are set, so the active-pool supported-chains check runs. The active
+	// pool (old pool A) supports chain B, which is absent from RemoteChains and the flag is off → error.
+	chainA := s.env.BlockChains.EVMChains()[s.selA]
+	_, err := cldf_ops.ExecuteSequence(
+		s.env.OperationsBundle,
+		evmtokensseq.ConfigureTokenPoolForRemoteChains,
+		chainA,
+		evmtokensseq.ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    s.selA,
+			TokenPoolAddress: s.oldPoolAddrA, // unused before the error returns
+			RegistryAddress:  s.tarAddrA,
+			TokenAddress:     s.tokAddrA,
+			RemoteChains:     nil,
+		},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "remoteChains must include all active pool supported chains")
+}
+
 // setupLegacyConnectedBnMPair deploys v2.0 core contracts on two chains, then deploys a legacy
 // (oldPoolVersion) BurnMint token+pool pair, connects them bidirectionally, and registers each in its
 // TokenAdminRegistry. It returns the resolved addresses for use in upgrade tests.
@@ -162,32 +214,9 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 	}
 }
 
-// TestTokenExpansionMigration_AutoMigrateRemoteChains exercises the AutoMigrateRemoteChains upgrade path:
-// it deploys a legacy BurnMint pool pair, connects them, then upgrades chain A's pool to v2.0 using
-// AutoMigrateRemoteChains with an EMPTY RemoteChains map. The new pool must inherit chain B as a supported
-// remote (token + remote pool + rate limits carried forward from the active pool), and the TokenAdminRegistry
-// must be switched to point at the new pool — all without the operator listing any remote chains.
-//
-// Both legacy versions are covered: v1.5.1 (< 1.6.1) stores inbound rate limits in remote/source decimals and
-// is rebased on import; v1.6.1 (>= 1.6.1) stores them in local decimals and is imported as-is. With chain A at
-// 18 decimals and chain B at 6 decimals, both paths must converge (within float ULP) on the same on-chain
-// values for the new pool, which validates the inbound decimal rebasing end-to-end.
-func TestTokenExpansionMigration_AutoMigrateRemoteChains(t *testing.T) {
-	cases := []struct {
-		name           string
-		oldPoolVersion *semver.Version
-	}{
-		{"v1_5_1_to_v2_0_0", cciputils.Version_1_5_1},
-		{"v1_6_1_to_v2_0_0", cciputils.Version_1_6_1},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			runAutoMigrateRemoteChainsUpgrade(t, tc.oldPoolVersion)
-		})
-	}
-}
-
 func runAutoMigrateRemoteChainsUpgrade(t *testing.T, oldPoolVersion *semver.Version) {
+	t.Helper()
+
 	s := setupLegacyConnectedBnMPair(t, oldPoolVersion)
 	e, selA, selB := s.env, s.selA, s.selB
 	chainA := e.BlockChains.EVMChains()[selA]
@@ -263,31 +292,4 @@ func runAutoMigrateRemoteChainsUpgrade(t *testing.T, oldPoolVersion *semver.Vers
 	cfgAfter, err := tarA.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, s.tokAddrA)
 	require.NoError(t, err)
 	require.Equal(t, newPoolAddrA, cfgAfter.TokenPool, "TAR should be switched to the new v2.0 pool")
-}
-
-// TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate is the negative case: when
-// AutoMigrateRemoteChains is false (the default), configuring a v2.0 pool over an existing active pool must
-// still error if RemoteChains does not include every chain the active pool supports. This preserves the
-// pre-existing upgrade-safety check. We invoke the ConfigureTokenPoolForRemoteChains sequence directly with
-// an empty RemoteChains so the active pool's supported chain (B) is missing.
-func TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate(t *testing.T) {
-	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_1)
-
-	// RegistryAddress + TokenAddress are set, so the active-pool supported-chains check runs. The active
-	// pool (old pool A) supports chain B, which is absent from RemoteChains and the flag is off → error.
-	chainA := s.env.BlockChains.EVMChains()[s.selA]
-	_, err := cldf_ops.ExecuteSequence(
-		s.env.OperationsBundle,
-		evmtokensseq.ConfigureTokenPoolForRemoteChains,
-		chainA,
-		evmtokensseq.ConfigureTokenPoolForRemoteChainsInput{
-			ChainSelector:    s.selA,
-			TokenPoolAddress:   s.oldPoolAddrA, // unused before the error returns
-			RegistryAddress:    s.tarAddrA,
-			TokenAddress:       s.tokAddrA,
-			RemoteChains:       nil,
-		},
-	)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "remoteChains must include all active pool supported chains")
 }
