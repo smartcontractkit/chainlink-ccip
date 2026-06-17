@@ -7,14 +7,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -27,9 +25,6 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 	RemoteChains      map[uint64]tokens.RemoteChainConfig[[]byte, string]
 	RegistryAddress   common.Address
 	TokenAddress      common.Address
-	// AutoMigrateRemoteChains, when true, carries forward remote chains supported by the active pool but not
-	// explicitly listed in RemoteChains. Explicitly listed chains take precedence.
-	AutoMigrateRemoteChains bool
 }
 
 // ConfigureTokenPoolForRemoteChains runs the supported-chains check once (when registry/token set) then calls
@@ -38,82 +33,43 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	"configure-token-pool-for-remote-chains",
 	semver.MustParse("2.0.0"),
 	"Configures a token pool for all configured remote chains; validates active pool supported chains when upgrading.",
-	func(b cldf_ops.Bundle, chains chain.BlockChains, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
-		evmChain, ok := chains.EVMChains()[input.ChainSelector]
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-		}
+	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainsInput) (output sequences.OnChainOutput, err error) {
 		// Active-pool validation: when RegistryAddress and TokenAddress are set, the registry's
 		// "active" pool for that token is queried. For USDC/CCTP the registered pool is the
 		// USDCTokenPoolProxy (so the router uses the proxy). The proxy does not implement
 		// getSupportedChains like a 2.0.0 TokenPool and may revert—so we treat this check as
 		// best-effort and skip validation when the call fails.
 		if input.RegistryAddress != (common.Address{}) && input.TokenAddress != (common.Address{}) {
-			// Force fresh execution: these reads reflect mutable on-chain state (the registry's active
-			// pool and that pool's supported chains). Idempotent caching could return a stale result if
-			// the same op+input ran earlier in this bundle, so we always re-read current state.
-			tokenConfigReport, err := cldf_ops.ExecuteOperation(
-				b,
-				token_admin_registry.GetTokenConfig, evmChain,
-				evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.RegistryAddress,
-					Args:          input.TokenAddress,
-				},
-				cldf_ops.WithForceExecute[evm_contract.FunctionInput[common.Address], evm.Chain](),
-			)
+			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.RegistryAddress,
+				Args:          input.TokenAddress,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for supported-chains check: %w", err)
 			}
 			activePool := tokenConfigReport.Output.TokenPool
 			if activePool != (common.Address{}) {
-				supportedChainsReport, err := cldf_ops.ExecuteOperation(
-					b,
-					token_pool.GetSupportedChains, evmChain,
-					evm_contract.FunctionInput[struct{}]{
-						ChainSelector: input.ChainSelector,
-						Address:       activePool,
-					},
-					cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
-				)
+				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
+					ChainSelector: input.ChainSelector,
+					Address:       activePool,
+				})
 				if err == nil {
-					// For each chain the active pool supports but the operator did not list:
-					//   - AutoMigrateRemoteChains=false (default): error — the operator must list every active-pool chain (upgrade safety).
-					//   - AutoMigrateRemoteChains=true: discover the chain's remote token, remote pool, and remote decimals from the
-					//     active pool and carry it forward. Rate limits and remote pools are imported per-chain downstream
-					//     by ConfigureTokenPoolForRemoteChain (importConfigFromActivePool), so we only supply the fields
-					//     that import does not provide.
+					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
-						if _, ok := input.RemoteChains[sel]; ok {
-							continue
-						}
-						if !input.AutoMigrateRemoteChains {
+						if _, ok := input.RemoteChains[sel]; !ok {
 							slices.Sort(supportedChains)
-							return sequences.OnChainOutput{}, fmt.Errorf(
-								"remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
-								supportedChains, slices.Sorted(maps.Keys(input.RemoteChains)),
-							)
+							return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
+								supportedChains, slices.Sorted(maps.Keys(input.RemoteChains)))
 						}
-						discovered, err := discoverRemoteChainFromActivePool(b, chains, evmChain, input.ChainSelector, activePool, sel)
-						if err != nil {
-							return sequences.OnChainOutput{}, fmt.Errorf("auto-migrate: failed to discover config for active pool chain %d: %w", sel, err)
-						}
-						if input.RemoteChains == nil {
-							input.RemoteChains = make(map[uint64]tokens.RemoteChainConfig[[]byte, string])
-						}
-						input.RemoteChains[sel] = discovered
 					}
-				} else {
-					// GetSupportedChains failed (e.g. the active pool is a USDCTokenPoolProxy, which reverts).
-					// We skip the supported-chains validation and auto-discovery. For AutoMigrateRemoteChains
-					// this is a silent no-op, so warn that no remote chains are carried forward from the active pool.
-					b.Logger.Warnf("configure-token-pool: could not read supported chains from active pool %s on chain %d (%v); skipping active-pool validation and auto-migrate discovery", activePool.Hex(), input.ChainSelector, err)
 				}
+				// If GetSupportedChains failed (e.g. active pool is USDCTokenPoolProxy and reverts), skip validation.
 			}
 		}
 		ops := make([]mcms_types.BatchOperation, 0)
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, evmChain, evm_contract.FunctionInput[struct{}]{
+		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 		})
@@ -126,7 +82,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		}
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			_, alreadySupported := supportedSet[remoteChainSelector]
-			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, evmChain, ConfigureTokenPoolForRemoteChainInput{
+			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:               input.ChainSelector,
 				TokenPoolAddress:            input.TokenPoolAddress,
 				AdvancedPoolHooks:           input.AdvancedPoolHooks,
@@ -144,91 +100,3 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: ops}, nil
 	},
 )
-
-// discoverRemoteChainFromActivePool builds a RemoteChainConfig for a chain that the active pool supports but
-// the operator did not explicitly list (AutoMigrateRemoteChains). It reads the remote token and remote pool from the active
-// pool (on the local chain) and the remote token's decimals from the remote chain. Rate limits are intentionally
-// omitted: ConfigureTokenPoolForRemoteChain imports them (and the active pool's remote pools) per-chain via
-// importConfigFromActivePool, which also rebases pre-1.6.1 inbound limits using RemoteDecimals.
-func discoverRemoteChainFromActivePool(
-	b cldf_ops.Bundle,
-	chains chain.BlockChains,
-	localChain evm.Chain,
-	localChainSelector uint64,
-	activePool common.Address,
-	remoteChainSelector uint64,
-) (tokens.RemoteChainConfig[[]byte, string], error) {
-	var zero tokens.RemoteChainConfig[[]byte, string]
-	// Auto-discovery only supports EVM remotes (we read the remote token's ERC20 decimals below). A non-EVM
-	// remote (e.g. Solana) will not be present in EVMChains and errors here; operators must list such remotes
-	// explicitly in RemoteChains, which the caller skips before reaching discovery.
-	remoteChain, ok := chains.EVMChains()[remoteChainSelector]
-	if !ok {
-		return zero, fmt.Errorf("remote chain with selector %d not found among EVM chains; non-EVM remotes must be listed explicitly in remoteChains for auto-migrate", remoteChainSelector)
-	}
-
-	// Force fresh execution: these read the active pool's mutable remote config and must reflect
-	// current on-chain state rather than an idempotent cached result from earlier in the bundle.
-	remoteTokenReport, err := cldf_ops.ExecuteOperation(
-		b,
-		token_pool.GetRemoteToken, localChain,
-		evm_contract.FunctionInput[uint64]{
-			ChainSelector: localChainSelector,
-			Address:       activePool,
-			Args:          remoteChainSelector,
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
-	)
-	if err != nil {
-		return zero, fmt.Errorf("failed to get remote token from active pool: %w", err)
-	}
-
-	remoteToken := remoteTokenReport.Output
-	if len(remoteToken) == 0 {
-		return zero, fmt.Errorf("active pool has no remote token registered for chain %d", remoteChainSelector)
-	}
-
-	remotePoolsReport, err := cldf_ops.ExecuteOperation(
-		b,
-		token_pool.GetRemotePools, localChain,
-		evm_contract.FunctionInput[uint64]{
-			ChainSelector: localChainSelector,
-			Address:       activePool,
-			Args:          remoteChainSelector,
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
-	)
-	if err != nil {
-		return zero, fmt.Errorf("failed to get remote pools from active pool: %w", err)
-	}
-
-	remotePools := remotePoolsReport.Output
-	if len(remotePools) == 0 {
-		return zero, fmt.Errorf("active pool has no remote pool registered for chain %d", remoteChainSelector)
-	}
-
-	remotePool := remotePools[0]
-	if len(remotePool) == 0 {
-		return zero, fmt.Errorf("active pool's remote pool for chain %d is empty", remoteChainSelector)
-	}
-
-	decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.GetDecimals, remoteChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: remoteChainSelector,
-		Address:       common.BytesToAddress(remoteToken),
-	})
-	if err != nil {
-		return zero, fmt.Errorf(
-			"failed to get decimals for remote token %s on chain %d (only ERC20-compatible tokens are supported for auto-migrate): %w",
-			common.BytesToAddress(remoteToken).Hex(), remoteChainSelector, err,
-		)
-	}
-
-	// NOTE: getRemotePools can return >1 address during a remote-side upgrade. `RemotePool` only needs
-	// one valid (already-registered) address — ConfigureTokenPoolForRemoteChain re-reads and registers
-	// the full list (deduping this one), so picking [0] drops nothing.
-	return tokens.RemoteChainConfig[[]byte, string]{
-		RemoteDecimals: decimalsReport.Output,
-		RemoteToken:    remoteToken,
-		RemotePool:     remotePool,
-	}, nil
-}

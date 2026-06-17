@@ -275,17 +275,17 @@ func TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate(t *testing.
 
 	// RegistryAddress + TokenAddress are set, so the active-pool supported-chains check runs. The active
 	// pool (old pool A) supports chain B, which is absent from RemoteChains and the flag is off → error.
+	chainA := s.env.BlockChains.EVMChains()[s.selA]
 	_, err := cldf_ops.ExecuteSequence(
 		s.env.OperationsBundle,
 		evmtokensseq.ConfigureTokenPoolForRemoteChains,
-		s.env.BlockChains,
+		chainA,
 		evmtokensseq.ConfigureTokenPoolForRemoteChainsInput{
-			ChainSelector:           s.selA,
-			TokenPoolAddress:        s.oldPoolAddrA, // unused before the error returns
-			RegistryAddress:         s.tarAddrA,
-			TokenAddress:            s.tokAddrA,
-			RemoteChains:            nil,
-			AutoMigrateRemoteChains: false,
+			ChainSelector:    s.selA,
+			TokenPoolAddress:   s.oldPoolAddrA, // unused before the error returns
+			RegistryAddress:    s.tarAddrA,
+			TokenAddress:       s.tokAddrA,
+			RemoteChains:       nil,
 		},
 	)
 	require.Error(t, err)
