@@ -308,6 +308,7 @@ func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]b
 	if err := binary.Write(buf, binary.BigEndian, uint32(finalityConfig)); err != nil {
 		return nil, err
 	}
+	buf.Write([]byte{0, 0, 0, 0, 0, 0, 0}) // to ensure length match
 	return buf.Bytes(), nil
 }
 
