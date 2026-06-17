@@ -242,7 +242,9 @@ func (c *SolanaCCTPChainAdapter) USDCType() adapters.USDCType {
 	return adapters.Canonical
 }
 
-// PoolAddress returns the Solana pool signer bytes. For Solana token pools, the signer PDA identifies the remote pool.
+// PoolAddress returns the Solana pool config PDA bytes. The pool config PDA is the canonical
+// pool identifier encoded in CCIP cross-chain messages and must be registered as the remote
+// pool address on counterpart EVM token pools.
 func (c *SolanaCCTPChainAdapter) PoolAddress(d datastore.DataStore, b chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error) {
 	tokenPool, err := datastore_utils.FindAndFormatRef(d, registeredPoolRef, chainSelector, sol_utils.ToAddress)
 	if err != nil {
@@ -253,11 +255,11 @@ func (c *SolanaCCTPChainAdapter) PoolAddress(d datastore.DataStore, b chain.Bloc
 	if err != nil {
 		return nil, err
 	}
-	poolSigner, err := sol_token_utils.TokenPoolSignerAddress(tokenMint, tokenPool)
+	poolConfigPDA, err := sol_token_utils.TokenPoolConfigAddress(tokenMint, tokenPool)
 	if err != nil {
-		return nil, fmt.Errorf("failed to derive Solana pool signer: %w", err)
+		return nil, fmt.Errorf("failed to derive Solana pool config PDA: %w", err)
 	}
-	return poolSigner.Bytes(), nil
+	return poolConfigPDA.Bytes(), nil
 }
 
 // TokenAddress returns the Solana USDC mint bytes for the configured CCTP pool.

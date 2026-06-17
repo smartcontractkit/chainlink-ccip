@@ -51,6 +51,8 @@ type PostProposalLaneSanity interface {
 	// Keys are display labels; values are source-chain token addresses.
 	AvailableTransferTokens(env cldf.Environment, source, dest uint64) (map[string]string, error)
 
+	FeeTokenName(env cldf.Environment, source uint64, tokenAddr string) (string, error)
+
 	// EncodeReceiverAddress encodes receiverAddress for delivery on destSel.
 	// Called only when an explicit receiver override is provided.
 	EncodeReceiverAddress(env cldf.Environment, destSel uint64, receiverAddress string) ([]byte, error)
@@ -374,7 +376,7 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 		addLaneFailureSummary(failed, srcSel, destSel, allFeeTokensSummaryLabel)
 		return fmt.Errorf("failed message probes: %s", buildLaneFailureSummary(failed))
 	}
-	extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
+	extraArgs, err := destAdapter.GetExtraArgs(receiver, family, testadapters.NewFinalityExtraArg(1))
 	if err != nil {
 		lggr.Warnf("%s: extra args %s→%s: %v",
 			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)
@@ -386,7 +388,11 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 	messageData := []byte("lane-sanity-check")
 
 	for _, feeToken := range feeTokens {
-		feeLabel := formatFeeTokenLogLabel(feeToken)
+		feeTokenName, err := provider.FeeTokenName(env, srcSel, feeToken)
+		if err != nil {
+			return fmt.Errorf("error getting fee token %s name on chain %d : %w", feeToken, srcSel, err)
+		}
+		feeLabel := formatFeeTokenLogLabel(feeTokenName)
 
 		msg, err := srcAdapter.BuildMessage(testadapters.MessageComponents{
 			DestChainSelector: destSel,

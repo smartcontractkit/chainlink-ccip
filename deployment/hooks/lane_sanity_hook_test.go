@@ -40,6 +40,10 @@ func (s *stubLaneSanityProvider) ApplySenderPrivateKey(
 	return nil
 }
 
+func (s *stubLaneSanityProvider) FeeTokenName(env cldf.Environment, source uint64, tokenAddr string) (string, error) {
+	return "MOCK" + tokenAddr, nil
+}
+
 func (s *stubLaneSanityProvider) AvailableTransferTokens(
 	env cldf.Environment,
 	source, dest uint64,

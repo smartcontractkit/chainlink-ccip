@@ -90,7 +90,7 @@ func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 	sel2 := chainsel.TEST_90000002.Selector
 
 	registry := newAggregatorConfigRegistry()
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 
 	tests := []struct {
 		name        string
@@ -219,7 +219,7 @@ func TestGenerateAggregatorConfig_BuildsCorrectConfig(t *testing.T) {
 		BlockChains: newTestBlockChains([]uint64{sel1, sel2, sel3}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
@@ -265,7 +265,7 @@ func TestGenerateAggregatorConfig_ScanError(t *testing.T) {
 		BlockChains: newTestBlockChains([]uint64{sel1}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: "default",
@@ -302,7 +302,7 @@ func TestGenerateAggregatorConfig_ResolveAddressError(t *testing.T) {
 		BlockChains: newTestBlockChains([]uint64{sel1}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
@@ -326,7 +326,7 @@ func TestGenerateAggregatorConfig_CommitteeNotFound(t *testing.T) {
 		BlockChains: newTestBlockChains([]uint64{sel1}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: "default",
@@ -391,7 +391,7 @@ func TestGenerateAggregatorConfig_DuplicateSourceChainAcrossDestinationsSucceeds
 		BlockChains: newTestBlockChains([]uint64{destChainA, destChainB, sourceChain}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
@@ -444,7 +444,7 @@ func TestGenerateAggregatorConfig_DuplicateQualifierOnSameChainFails(t *testing.
 		BlockChains: newTestBlockChains([]uint64{sel1}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
@@ -503,7 +503,7 @@ func TestGenerateAggregatorConfig_DuplicateSourceChain_DifferentSigners_ReturnsE
 		BlockChains: newTestBlockChains([]uint64{destChainA, destChainB, sourceChain}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
@@ -561,7 +561,7 @@ func TestGenerateAggregatorConfig_DuplicateSourceChain_DifferentThreshold_Return
 		BlockChains: newTestBlockChains([]uint64{destChainA, destChainB, sourceChain}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: qualifier,
@@ -580,7 +580,7 @@ func TestGenerateAggregatorConfig_MissingAdapterForFamily(t *testing.T) {
 		BlockChains: newTestBlockChains([]uint64{sel1}),
 	}
 
-	cs := changesets.GenerateAggregatorConfig(registry)
+	cs := changesets.GenerateAggregatorConfig(registry, newTestChainFamilyRegistry())
 	_, err := cs.Apply(env, changesets.GenerateAggregatorConfigInput{
 		ServiceIdentifier:  "test-aggregator",
 		CommitteeQualifier: "default",
