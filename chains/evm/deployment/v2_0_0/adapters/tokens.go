@@ -9,10 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
 	tpBindingsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
@@ -125,13 +127,25 @@ func (t *TokenAdapter) GetActivePool(e deployment.Environment, chainSelector uin
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
-	registry, err := t.EVMTokenBase.GetTokenAdminRegistryAddress(e.DataStore, chainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from datastore on chain %d: %w", chainSelector, err)
-	}
+
 	token, err := t.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, tokenRef, chainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token address from ref %v on chain %d: %w", tokenRef, chainSelector, err)
+	}
+
+	var registry common.Address
+	if datastore_utils.IsAddressRefEmpty(regRef) {
+		if addr, err := t.EVMTokenBase.GetTokenAdminRegistryAddress(e.DataStore, chainSelector); err != nil {
+			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from datastore on chain %d: %w", chainSelector, err)
+		} else {
+			registry = addr
+		}
+	} else {
+		if addr, err := datastore_utils.FindAndFormatRef(e.DataStore, regRef, chainSelector, datastore_utils_evm.ToNonZeroEVMAddress); err != nil {
+			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from ref %v on chain %d: %w", regRef, chainSelector, err)
+		} else {
+			registry = addr
+		}
 	}
 
 	report, err := cldf_ops.ExecuteOperation(

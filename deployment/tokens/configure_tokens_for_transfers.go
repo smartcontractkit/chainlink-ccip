@@ -52,16 +52,22 @@ type TokenTransferConfig struct {
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
-	// AutoMigrateRemoteChains, when true, instructs the configure step to carry forward all remote chains that the
-	// currently-active pool supports but that are not explicitly listed in RemoteChains. Discovered chains
-	// (and their rate limits, remote pools, and remote tokens) are imported from the active pool; any chain
-	// listed explicitly in RemoteChains takes precedence over its discovered config. When false (the default),
-	// the configure step requires RemoteChains to include every chain the active pool supports and errors
-	// otherwise. Only used by adapters that implement TokenPoolMigrator (currently EVM v2.0.0).
+	// AutoMigrateRemoteChains, when true, runs discovery in this changeset (before the adapter sequence):
+	// it reads the pool currently registered in the TAR, enumerates its supported remote chains, and fills
+	// in any missing RemoteChains entries (token, pool, decimals). Rate limits are imported later by
+	// ConfigureTokenPoolForRemoteChain from the active pool. Explicit RemoteChains entries take precedence.
+	// Requires an adapter implementing TokenPoolMigrator (EVM v2.0.0 today).
 	//
-	// Discovery resolves each remote chain's token decimals through that chain family's adapter, so it works for
-	// EVM and non-EVM remotes (e.g. Solana) alike. Remote addresses read from the active pool are converted to
-	// each family's canonical form via the AddressNormalizer registry before being resolved.
+	// When false (default), this changeset does not discover remotes. Upgrade safety is enforced downstream
+	// by ConfigureTokenPoolForRemoteChains (EVM v2.0.0), which errors if RemoteChains omits a chain the
+	// active pool already supports.
+	//
+	// Discovery resolves remote token decimals via each remote chain family's adapter; remote pool addresses
+	// are normalized via the AddressNormalizer registry before ResolveTokenPoolRef.
+	//
+	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
+	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
+	// explicitly in that case.
 	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
 }
 
@@ -247,7 +253,6 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
 			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
 			TimelockAddress:               timelockAddress,
-			AutoMigrateRemoteChains:       token.AutoMigrateRemoteChains,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
