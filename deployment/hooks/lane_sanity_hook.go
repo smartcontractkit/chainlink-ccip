@@ -376,7 +376,7 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 		addLaneFailureSummary(failed, srcSel, destSel, allFeeTokensSummaryLabel)
 		return fmt.Errorf("failed message probes: %s", buildLaneFailureSummary(failed))
 	}
-	extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
+	extraArgs, err := destAdapter.GetExtraArgs(receiver, family, testadapters.NewFinalityExtraArg(1))
 	if err != nil {
 		lggr.Warnf("%s: extra args %s→%s: %v",
 			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)

@@ -1,7 +1,9 @@
 package testadapter
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/xssnick/tonutils-go/tlb"
 
@@ -180,6 +183,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 				if err != nil {
 					return 0, messageID, fmt.Errorf("failed to approve tokens: %w", err)
 				}
+				break
 			}
 		}
 		tx, err := r.CcipSend(sender, destChainSelector, msg)
@@ -265,6 +269,32 @@ func (a *EVMAdapter) NativeFeeToken() string {
 	return "0x0"
 }
 
+func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+	var finalityConfig protocol.Finality
+	gasLimit := new(big.Int).SetUint64(100_000)
+	for _, opt := range opts {
+		switch opt.Name {
+		case testadapters.ExtraArgFinality:
+			finalityConfig = protocol.Finality(opt.Value.(uint32))
+		case testadapters.ExtraArgGasLimit:
+			gasLimit = opt.Value.(*big.Int)
+		case testadapters.ExtraArgOOO:
+			// no op
+		default:
+			return nil, fmt.Errorf("unknown extra arg option: %s", opt.Name)
+		}
+	}
+	buf := new(bytes.Buffer)
+	genericExtraArgsV3Tag := []byte{0xa6, 0x9d, 0xd4, 0xaa}
+	buf.Write(genericExtraArgsV3Tag)
+	// Write gasLimit (uint32, big-endian)
+	binary.Write(buf, binary.BigEndian, gasLimit)
+
+	// Write blockConfirmations (uint32, big-endian)
+	binary.Write(buf, binary.BigEndian, finalityConfig)
+	return buf.Bytes(), nil
+}
+
 func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
@@ -274,6 +304,10 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		}
 		for _, opt := range opts {
 			switch opt.Name {
+			case testadapters.ExtraArgFinality:
+				if opt.Value.(uint32) > 0 {
+					return a.serializeExtraArgsV3(opts...)
+				}
 			case testadapters.ExtraArgGasLimit:
 				extraArgs.GasLimit = opt.Value.(*big.Int)
 			case testadapters.ExtraArgOOO:
