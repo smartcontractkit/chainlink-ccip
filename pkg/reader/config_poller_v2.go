@@ -519,7 +519,6 @@ func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSele
 
 	// Add the source chain to the knownSourceChains map for the destination chain
 	c.knownSourceChains[sourceChain] = struct{}{}
-	return
 }
 
 // getKnownSourceChainsForDestChain retrieves all currently tracked source chains for the destination chain.
