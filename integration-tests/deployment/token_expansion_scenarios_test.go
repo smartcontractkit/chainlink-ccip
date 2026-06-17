@@ -15,12 +15,16 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	erc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
+	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	lrpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
+	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -45,6 +49,7 @@ import (
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 
 	// Registers SolanaAddressNormalizer (v1_6_0 sequences do not import v1_0_0 adapters).
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
@@ -1473,10 +1478,171 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			})
 		})
 	})
+
+	// Scenario6 exercises AutoMigrateRemoteChains end-to-end across chain families: a legacy EVM pool connected
+	// to a Solana remote is upgraded to v2.0 with an empty RemoteChains map; the changeset must discover the
+	// Solana lane (token, pool, decimals) and carry it forward onto the new pool.
+	t.Run("Scenario6_AutoMigrateDiscoversSolanaRemote", func(t *testing.T) {
+		const evmTokenSymbol = "S6_EVM_TOK"
+		const solTokenSymbol = "S6_SOL_TOK"
+		const evmPoolQual = "S6_EVM_POOL"
+		const newEvmPoolQual = "S6_NEW_EVM_POOL"
+		evmDecimals := uint8(18)
+		svmDecimals := uint8(9)
+		maxSupply := uint64(1e6)
+		preMint := uint64(1e5)
+		defaultRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 100, Rate: 10, IsEnabled: true}
+
+		// v2.0 pool deployment requires v2.0 core on the EVM chain (migration-test order).
+		v2CoreDS := datastore.NewMemoryDataStore()
+		DeployChainContractsV2_0_0(t, env, v2CoreDS, evmChainSel)
+		MergeAddresses(t, env, v2CoreDS)
+
+		// Deploy a legacy EVM v1.5.1 BurnMint pool connected to a Solana v1.6.0 LockRelease pool, registered in
+		// each chain's TokenAdminRegistry.
+		connectOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 6 connect"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				evmChainSel: {
+					TokenPoolVersion: v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "Scenario6 EVM Token", Symbol: evmTokenSymbol, Decimals: evmDecimals,
+						Type: bnmERC20ops.ContractType, Supply: &maxSupply, PreMint: &preMint,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: evmPoolQual,
+						PoolType:           cciputils.BurnMintTokenPool.String(),
+					},
+					TokenTransferConfig: &tokensapi.TokenTransferConfig{
+						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							solChainSel: {OutboundRateLimiterConfig: &defaultRL},
+						},
+					},
+				},
+				solChainSel: {
+					TokenPoolVersion: v1_6_0_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "Scenario6 SOL Token", Symbol: solTokenSymbol, Decimals: svmDecimals,
+						Type:                   solanautils.SPLTokens,
+						ExternalAdmin:          solana.NewWallet().PublicKey().String(),
+						DisableFreezeAuthority: true,
+						Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+						PreMint:                &preMint,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: "",
+						PoolType:           cciputils.LockReleaseTokenPool.String(),
+					},
+					TokenTransferConfig: &tokensapi.TokenTransferConfig{
+						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, connectOut.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, connectOut.MCMSTimelockProposals, false)
+
+		// Validate that the token and pool addresses were saved to the datastore.
+		evmTokAddr := assertTokenExists(t, env, evmChainSel, evmTokenSymbol, "Scenario6 EVM Token", evmDecimals)
+		oldPoolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: evmChainSel,
+			Qualifier:     evmPoolQual,
+			Type:          datastore.ContractType(cciputils.BurnMintTokenPool),
+		})
+		require.NoError(t, err)
+
+		// Validate that the old pool has the expected Solana remote token and pool before the upgrade.
+		oldPool, err := bnmpool.NewBurnMintTokenPool(oldPoolAddr, evmChain.Client)
+		require.NoError(t, err)
+		oldRemoteToken, err := oldPool.GetRemoteToken(&bind.CallOpts{Context: t.Context()}, solChainSel)
+		require.NoError(t, err)
+		require.NotEmpty(t, oldRemoteToken)
+		oldRemotePools, err := oldPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, solChainSel)
+		require.NoError(t, err)
+		require.NotEmpty(t, oldRemotePools)
+
+		// Upgrade to v2.0 with AutoMigrateRemoteChains and no RemoteChains — Solana must be discovered.
+		upgradeOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: cciputils.Version_2_0_0,
+			MCMS:                NewDefaultInputForMCMS("Scenario 6 upgrade"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				evmChainSel: {
+					TokenPoolVersion: bnmOpsV2_0_0.Version,
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: newEvmPoolQual,
+						PoolType:           bnmOpsV2_0_0.ContractType.String(),
+						TokenRef:           &datastore.AddressRef{Address: evmTokAddr.Hex()},
+					},
+					TokenTransferConfig: &tokensapi.TokenTransferConfig{
+						AutoMigrateRemoteChains: true,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, upgradeOut.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, upgradeOut.MCMSTimelockProposals, false)
+
+		// Validate that the new pool was saved to the datastore
+		newPoolRef := datastore.AddressRef{
+			ChainSelector: evmChainSel,
+			Type:          datastore.ContractType(bnmOpsV2_0_0.ContractType),
+			Version:       bnmOpsV2_0_0.Version,
+			Qualifier:     newEvmPoolQual,
+		}
+		newPoolAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, newPoolRef, evmChainSel, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err)
+		require.NotEqual(t, oldPoolAddr, newPoolAddr, "new pool must be a distinct contract from the old pool")
+
+		// Validate that the new v2.0 pool has the same Solana remote token and pool carried forward, and that
+		// Solana is in the supported chains list even though we did not explicitly configure it on the v2.0
+		// side (AutoMigrateRemoteChains should have discovered and carried it forward).
+		newPool, err := tokenpoolV2_0_0.NewTokenPool(newPoolAddr, evmChain.Client)
+		require.NoError(t, err)
+		newSupported, err := newPool.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Contains(t, newSupported, solChainSel, "auto-migrated pool should support Solana without it being listed")
+		gotRemoteToken, err := newPool.GetRemoteToken(&bind.CallOpts{Context: t.Context()}, solChainSel)
+		require.NoError(t, err)
+		require.True(t, bytes.Equal(oldRemoteToken, gotRemoteToken), "remote Solana token should be carried forward")
+		gotRemotePools, err := newPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, solChainSel)
+		require.NoError(t, err)
+		require.Contains(t, gotRemotePools, oldRemotePools[0], "remote Solana pool should be carried forward")
+
+		// Outbound is exact in local (18) decimals. Inbound is imported from the v1.5.1 active pool (stored in
+		// remote 9-decimal units) and rebased to local decimals; allow float ULP like the EVM-only migration test.
+		const rlTolerance = int64(1e9)
+		rl, err := newPool.GetCurrentRateLimiterState(&bind.CallOpts{Context: t.Context()}, solChainSel, false)
+		require.NoError(t, err)
+		require.True(t, rl.OutboundRateLimiterState.IsEnabled, "outbound rate limit should be enabled")
+		RequireBigIntsEqual(t, tokensapi.ScaleFloatToBigInt(defaultRL.Capacity, int(evmDecimals), 0), rl.OutboundRateLimiterState.Capacity, "outbound capacity")
+		RequireBigIntsEqual(t, tokensapi.ScaleFloatToBigInt(defaultRL.Rate, int(evmDecimals), 0), rl.OutboundRateLimiterState.Rate, "outbound rate")
+		require.True(t, rl.InboundRateLimiterState.IsEnabled, "inbound rate limit should be enabled")
+		expInboundCap := tokensapi.ScaleFloatToBigInt(defaultRL.Capacity, int(svmDecimals), 0.10)
+		expInboundRate := tokensapi.ScaleFloatToBigInt(defaultRL.Rate, int(svmDecimals), 0.10)
+		svmToEvm := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(evmDecimals-svmDecimals)), nil)
+		expInboundCap.Mul(expInboundCap, svmToEvm)
+		expInboundRate.Mul(expInboundRate, svmToEvm)
+		RequireBigIntsApprox(t, expInboundCap, rl.InboundRateLimiterState.Capacity, rlTolerance, "inbound capacity")
+		RequireBigIntsApprox(t, expInboundRate, rl.InboundRateLimiterState.Rate, rlTolerance, "inbound rate")
+
+		// Ensure that the active pool in the TAR is switched to the new v2.0 pool
+		tarAddr, err := evmAdapter.GetTokenAdminRegistryAddress(env.DataStore, evmChainSel)
+		require.NoError(t, err)
+		tar, err := tarbindings.NewTokenAdminRegistry(tarAddr, evmChain.Client)
+		require.NoError(t, err)
+		cfgAfter, err := tar.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, evmTokAddr)
+		require.NoError(t, err)
+		require.Equal(t, newPoolAddr, cfgAfter.TokenPool, "TAR should be switched to the new v2.0 pool")
+	})
 }
 
 // ---------------------------------------------------------------------------
-// Scenario 6: MCMS batches do NOT execute immediately, so the changeset should
+// Scenario 7: MCMS batches do NOT execute immediately, so the changeset should
 // not perform validation assuming on-chain state changes have already occurred
 // within the same batch until the batch is executed. This is relevant to token
 // expansion flows where multiple changesets in the same batch update the Token
