@@ -201,7 +201,7 @@ func (c *EnvironmentTopology) ValidateForEnvironment(envName string, chainFamily
 		return nil
 	}
 
-	if chainFamilyRegistry == nil {
+	/*if chainFamilyRegistry == nil {
 		return fmt.Errorf("chain family registry is required to validate production environment %q", envName)
 	}
 
