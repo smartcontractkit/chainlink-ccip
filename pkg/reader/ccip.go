@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -326,6 +327,15 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	return expectedNextSeqNum, nil
 }
 
+const readerLogFrequency = 30 * time.Minute
+
+var (
+	nextSeqNumLastLog                         atomic.Pointer[time.Time]
+	getChainsFeeComponentsAccessorLastLog     atomic.Pointer[time.Time]
+	wrappedNativeTokenPriceAccessorLastLog    atomic.Pointer[time.Time]
+	wrappedNativeTokenPriceChainConfigLastLog atomic.Pointer[time.Time]
+)
+
 // NextSeqNum returns the current sequence numbers for chains.
 // This always fetches fresh data directly from contracts to ensure accuracy.
 // Critical for proper message sequencing.
@@ -341,35 +351,58 @@ func (r *ccipChainReader) NextSeqNum(
 	}
 
 	res := make(map[cciptypes.ChainSelector]cciptypes.SeqNum, len(chains))
+	var (
+		configNotFound  []cciptypes.ChainSelector
+		disabledChains  []cciptypes.ChainSelector
+		onRampMissing   []cciptypes.ChainSelector
+		routerMissing   []cciptypes.ChainSelector
+		minSeqNrMissing []cciptypes.ChainSelector
+	)
 	for _, chain := range chains {
 		cfg, exists := cfgs[chain]
 		if !exists {
-			lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
+			configNotFound = append(configNotFound, chain)
 			continue
 		}
 
 		if !cfg.IsEnabled {
-			lggr.Infof("source chain %d is disabled, chain is skipped.", chain)
+			disabledChains = append(disabledChains, chain)
 			continue
 		}
 
 		if len(cfg.OnRamp) == 0 {
-			lggr.Errorf("onRamp misconfigured for chain %d, chain is skipped: %x", chain, cfg.OnRamp)
+			onRampMissing = append(onRampMissing, chain)
 			continue
 		}
 
 		if len(cfg.Router) == 0 {
-			lggr.Errorf("router is empty for chain %d, chain is skipped: %v", chain, cfg.Router)
+			routerMissing = append(routerMissing, chain)
 			continue
 		}
 
 		if cfg.MinSeqNr == 0 {
-			lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
+			minSeqNrMissing = append(minSeqNrMissing, chain)
 			continue
 		}
 
 		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
 	}
+
+	logutil.LogWhenExceedFrequency(&nextSeqNumLastLog, readerLogFrequency, func() {
+		if len(configNotFound) > 0 {
+			lggr.Debugw("source chain config not found, chains skipped", "chains", configNotFound)
+		}
+		if len(disabledChains) > 0 {
+			lggr.Debugw("source chains disabled, chains skipped", "chains", disabledChains)
+		}
+		if len(onRampMissing) > 0 || len(routerMissing) > 0 || len(minSeqNrMissing) > 0 {
+			lggr.Errorw("misconfigured source chains skipped in NextSeqNum",
+				"onRampMissing", onRampMissing,
+				"routerMissing", routerMissing,
+				"minSeqNrMissing", minSeqNrMissing,
+			)
+		}
+	})
 
 	return res, err
 }
@@ -411,7 +444,9 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 		func(chain cciptypes.ChainSelector) {
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
-				lggr.Errorw("failed to get chain accessor", "chain", chain, "err", err)
+				logutil.LogWhenExceedFrequency(&getChainsFeeComponentsAccessorLastLog, readerLogFrequency, func() {
+					lggr.Debugw("failed to get chain accessor", "chain", chain, "err", err)
+				})
 				return
 			}
 
@@ -469,7 +504,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
-				lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
+				logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceAccessorLastLog, readerLogFrequency, func() {
+					lggr.Debugw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
+				})
 				return
 			}
 
@@ -478,7 +515,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting chain config for native token address", "chain", chain)
 				} else {
-					lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
+					logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceChainConfigLastLog, readerLogFrequency, func() {
+						lggr.Debugw("failed to get chain config for native token address", "chain", chain, "err", err)
+					})
 				}
 				return
 			}

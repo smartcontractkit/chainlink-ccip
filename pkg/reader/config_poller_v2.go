@@ -266,6 +266,13 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 				destChain, c.destChainSelector)
 	}
 
+	_, err := getChainAccessor(c.chainAccessors, c.destChainSelector)
+	if err != nil {
+		c.lggr.Errorw("no chain accessor for dest chain; cannot track or refresh source configs",
+			"destChain", c.destChainSelector)
+		return nil, fmt.Errorf("no chain accessor for dest chain %s", c.destChainSelector)
+	}
+
 	// Ensure we're not trying to fetch source chain configs for the destination chain itself
 	filteredSourceChains := filterOutChainSelector(sourceChains, c.destChainSelector)
 	if len(filteredSourceChains) == 0 {
@@ -274,11 +281,7 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 
 	// Add any new source chains to list of tracked source chains for background refreshing
 	for _, chain := range filteredSourceChains {
-		if !c.trackSourceChainForDest(chain) {
-			c.lggr.Warnw("Could not track source chain for background refreshing",
-				"destChain", c.destChainSelector,
-				"sourceChain", chain)
-		}
+		c.trackSourceChainForDest(chain)
 	}
 
 	destChainCache := c.getOrCreateChainCache(c.destChainSelector)
@@ -419,7 +422,6 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	// Use chainAccessor to fetch ChainConfigSnapshot (and SourceChainConfigs if destChain)
 	accessor, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
-		c.lggr.Errorw("Failed to get chain accessor", "chain", chainSel, "error", err)
 		return fmt.Errorf("failed to get chain accessor for %s: %w", chainSel, err)
 	}
 
@@ -504,23 +506,12 @@ func (c *configPollerV2) getChainsToRefresh() []cciptypes.ChainSelector {
 //
 // Parameters:
 //   - sourceChain: The source chain selector to track for the configured destination chain
-//
-// Returns true if the source chain was successfully tracked, false if validation failed
-// or if the source chain was already being tracked.
-func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSelector) bool {
+func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSelector) {
 	if c.destChainSelector == sourceChain {
 		c.lggr.Debugw("Skipping tracking source chain - destination chain is the same as source chain",
 			"destChain", c.destChainSelector,
 			"sourceChain", sourceChain)
-		return false
-	}
-
-	// Check if we have a chain accessor for the dest chain. We always should.
-	if _, exists := c.chainAccessors[c.destChainSelector]; !exists {
-		c.lggr.Errorw("Cannot track source chain - no chain accessor for dest chain",
-			"destChain", c.destChainSelector,
-			"sourceChain", sourceChain)
-		return false
+		return
 	}
 
 	c.Lock()
@@ -528,7 +519,6 @@ func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSele
 
 	// Add the source chain to the knownSourceChains map for the destination chain
 	c.knownSourceChains[sourceChain] = struct{}{}
-	return true
 }
 
 // getKnownSourceChainsForDestChain retrieves all currently tracked source chains for the destination chain.
