@@ -78,7 +78,7 @@ func processSourceChainConfigResults(
 
 					v, err := sourceChainResults[i].GetResult()
 					if err != nil {
-						lggr.Errorw("Failed to get source chain config from result",
+						lggr.Warnw("Failed to get source chain config from result",
 							"chain", chain,
 							"error", err)
 						continue
