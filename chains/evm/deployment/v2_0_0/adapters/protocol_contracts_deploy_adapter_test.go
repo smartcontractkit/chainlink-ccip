@@ -1,6 +1,8 @@
 package adapters_test
 
 import (
+	"math"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -102,6 +104,41 @@ func TestEVMProtocolContractsDeployAdapter_Validation(t *testing.T) {
 				in.FamilyExtras = map[string]any{adapters.ProtocolContractsExecutorCcvAllowlistEnabledExtra: "nope"}
 			},
 			wantErrSub: "must be a bool",
+		},
+		{
+			name: "FamilyExtras offRampGasForCallExactCheck wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsOffRampGasForCallExactCheckExtra: "nope"}
+			},
+			wantErrSub: "must be an integer",
+		},
+		{
+			name: "FamilyExtras onRampMaxUsdCentsPerMessage out of range",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsOnRampMaxUSDCentsPerMessageExtra: int64(math.MaxUint32) + 1}
+			},
+			wantErrSub: "must be in [0,",
+		},
+		{
+			name: "FamilyExtras feeQuoterMaxFeeJuelsPerMsg wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsFeeQuoterMaxFeeJuelsPerMsgExtra: int64(5)}
+			},
+			wantErrSub: "must be a base-10 integer string",
+		},
+		{
+			name: "FamilyExtras feeQuoterUsdPerLink unparseable string",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsFeeQuoterUSDPerLINKExtra: "not-a-number"}
+			},
+			wantErrSub: "must be a base-10 integer string",
+		},
+		{
+			name: "FamilyExtras rmnRemoteLegacyRmn wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsRMNRemoteLegacyRMNExtra: 42}
+			},
+			wantErrSub: "must be a string",
 		},
 	}
 
@@ -307,4 +344,99 @@ func TestEVMProtocolContractsDeployAdapter_ExecutorOverrides(t *testing.T) {
 			require.Equal(t, tc.wantMaxCCVs, maxCCVs.Output)
 		})
 	}
+}
+
+// TestEVMProtocolContractsDeployAdapter_ContractParamOverrides proves the
+// optional per-contract deploy params (OffRamp gas, OnRamp max message fee,
+// FeeQuoter prices/multipliers, RMNRemote legacy address) are applied from
+// FamilyExtras. It sets every override and reads back the on-chain static
+// configs that expose them — including the big.Int MaxFeeJuelsPerMsg, which must
+// be passed as a base-10 string.
+func TestEVMProtocolContractsDeployAdapter_ContractParamOverrides(t *testing.T) {
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{testChainSelector}),
+	)
+	require.NoError(t, err)
+	e.DataStore = datastore.NewMemoryDataStore().Seal()
+
+	evmChain := e.BlockChains.EVMChains()[testChainSelector]
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, evmChain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
+			ChainSelector:  testChainSelector,
+			Args: create2_factory.ConstructorArgs{
+				AllowList: []common.Address{evmChain.DeployerKey.From},
+			},
+		}, nil,
+	)
+	require.NoError(t, err)
+
+	adapter := &adapters.EVMProtocolContractsDeployAdapter{}
+
+	wantMaxFeeJuels, ok := new(big.Int).SetString("300000000000000000000", 10)
+	require.True(t, ok)
+
+	in := ccvdeploymentadapters.ProtocolContractsDeployInput{
+		ChainSelector:    testChainSelector,
+		DeployerContract: create2FactoryRef.Address,
+		DeployerKeyOwned: true,
+		Executors: []ccvdeploymentadapters.ExecutorDeployParams{
+			{Version: executor.Version, Qualifier: "default"},
+		},
+		FamilyExtras: map[string]any{
+			adapters.ProtocolContractsFeeAggregatorExtra:                           testFeeAggregator,
+			adapters.ProtocolContractsOffRampGasForCallExactCheckExtra:             int64(7000),
+			adapters.ProtocolContractsOffRampMaxGasBufferToUpdateStateExtra:        int64(15000),
+			adapters.ProtocolContractsOnRampMaxUSDCentsPerMessageExtra:             int64(50000),
+			adapters.ProtocolContractsFeeQuoterMaxFeeJuelsPerMsgExtra:              "300000000000000000000",
+			adapters.ProtocolContractsFeeQuoterLINKPremiumMultiplierWeiPerEthExtra: int64(800000000000000000),
+			adapters.ProtocolContractsFeeQuoterWETHPremiumMultiplierWeiPerEthExtra: int64(1100000000000000000),
+			adapters.ProtocolContractsFeeQuoterUSDPerLINKExtra:                     "16000000000000000000",
+			adapters.ProtocolContractsFeeQuoterUSDPerWETHExtra:                     "2500000000000000000000",
+			adapters.ProtocolContractsRMNRemoteLegacyRMNExtra:                      "0x000000000000000000000000000000000000bEEF",
+		},
+	}
+
+	report, err := cldf_ops.ExecuteSequence(
+		e.OperationsBundle, adapter.DeployProtocolContracts(), e.BlockChains, in,
+	)
+	require.NoError(t, err)
+
+	addrByType := make(map[datastore.ContractType]string)
+	for _, ref := range report.Output.Addresses {
+		addrByType[ref.Type] = ref.Address
+	}
+
+	offRampStatic, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle, offramp.GetStaticConfig, evmChain,
+		contract_utils.FunctionInput[struct{}]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(addrByType[datastore.ContractType(offramp.ContractType)]),
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint16(7000), offRampStatic.Output.GasForCallExactCheck)
+	require.Equal(t, uint32(15000), offRampStatic.Output.MaxGasBufferToUpdateState)
+
+	onRampStatic, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle, onramp.GetStaticConfig, evmChain,
+		contract_utils.FunctionInput[struct{}]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(addrByType[datastore.ContractType(onramp.ContractType)]),
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint32(50000), onRampStatic.Output.MaxUSDCentsPerMessage)
+
+	feeQuoterStatic, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle, fee_quoter.GetStaticConfig, evmChain,
+		contract_utils.FunctionInput[struct{}]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(addrByType[datastore.ContractType(fee_quoter.ContractType)]),
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, 0, wantMaxFeeJuels.Cmp(feeQuoterStatic.Output.MaxFeeJuelsPerMsg))
 }

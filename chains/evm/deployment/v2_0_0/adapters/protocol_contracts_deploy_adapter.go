@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"fmt"
+	"math"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -42,6 +44,23 @@ const (
 	// (10 and false respectively) when its key is absent.
 	ProtocolContractsExecutorMaxCCVsPerMsgExtra       = "executorMaxCCVsPerMsg"
 	ProtocolContractsExecutorCcvAllowlistEnabledExtra = "executorCcvAllowlistEnabled"
+
+	// The remaining keys override individual contract deploy params. All are
+	// optional; an absent key leaves the corresponding deploy default in place.
+	// The FeeQuoter price fields are big.Int and must be passed as base-10
+	// strings because TOML integers are limited to int64.
+	ProtocolContractsRMNRemoteLegacyRMNExtra = "rmnRemoteLegacyRmn"
+
+	ProtocolContractsOffRampGasForCallExactCheckExtra      = "offRampGasForCallExactCheck"
+	ProtocolContractsOffRampMaxGasBufferToUpdateStateExtra = "offRampMaxGasBufferToUpdateState"
+
+	ProtocolContractsOnRampMaxUSDCentsPerMessageExtra = "onRampMaxUsdCentsPerMessage"
+
+	ProtocolContractsFeeQuoterMaxFeeJuelsPerMsgExtra              = "feeQuoterMaxFeeJuelsPerMsg"
+	ProtocolContractsFeeQuoterLINKPremiumMultiplierWeiPerEthExtra = "feeQuoterLinkPremiumMultiplierWeiPerEth"
+	ProtocolContractsFeeQuoterWETHPremiumMultiplierWeiPerEthExtra = "feeQuoterWethPremiumMultiplierWeiPerEth"
+	ProtocolContractsFeeQuoterUSDPerLINKExtra                     = "feeQuoterUsdPerLink"
+	ProtocolContractsFeeQuoterUSDPerWETHExtra                     = "feeQuoterUsdPerWeth"
 )
 
 // EVMProtocolContractsDeployAdapter implements
@@ -118,6 +137,9 @@ func toEVMProtocolDeployInput(input ccvdeploymentadapters.ProtocolContractsDeplo
 	params.MockReceivers = nil
 	params.OnRamp.FeeAggregator = feeAggregator
 	params.Executors = protocolExecutorParams(input.Executors, feeAggregator, executorOverrides)
+	if err := applyProtocolContractParamOverrides(&params, input.FamilyExtras); err != nil {
+		return sequences.DeployChainContractsInput{}, err
+	}
 
 	return toEVMDeployInput(ccvadapters.DeployChainContractsInput{
 		ChainSelector:     input.ChainSelector,
@@ -197,23 +219,16 @@ func protocolContractsExecutorOverrides(extras map[string]any) (executorDeployOv
 	}
 	overrides.allowedFinality = allowedFinality
 
-	if raw, ok := extras[ProtocolContractsExecutorMaxCCVsPerMsgExtra]; ok {
-		n, ok := asInt64(raw)
-		if !ok {
-			return overrides, fmt.Errorf("FamilyExtras[%q] must be an integer, got %T", ProtocolContractsExecutorMaxCCVsPerMsgExtra, raw)
-		}
-		if n < 0 || n > 255 {
-			return overrides, fmt.Errorf("FamilyExtras[%q] must be in [0, 255], got %d", ProtocolContractsExecutorMaxCCVsPerMsgExtra, n)
-		}
-		maxCCVs := uint8(n)
+	if v, ok, err := extraBoundedInt(extras, ProtocolContractsExecutorMaxCCVsPerMsgExtra, math.MaxUint8); err != nil {
+		return overrides, err
+	} else if ok {
+		maxCCVs := uint8(v)
 		overrides.maxCCVsPerMsg = &maxCCVs
 	}
 
-	if raw, ok := extras[ProtocolContractsExecutorCcvAllowlistEnabledExtra]; ok {
-		enabled, ok := raw.(bool)
-		if !ok {
-			return overrides, fmt.Errorf("FamilyExtras[%q] must be a bool, got %T", ProtocolContractsExecutorCcvAllowlistEnabledExtra, raw)
-		}
+	if enabled, ok, err := extraBool(extras, ProtocolContractsExecutorCcvAllowlistEnabledExtra); err != nil {
+		return overrides, err
+	} else if ok {
 		overrides.ccvAllowlistEnabled = &enabled
 	}
 
@@ -225,30 +240,147 @@ func protocolContractsExecutorOverrides(extras map[string]any) (executorDeployOv
 // default applies). When either key is present it builds the finality.Config
 // from ExecutorBlockDepth (integer, 0-65535) and ExecutorWaitForSafe (bool).
 func protocolContractsExecutorFinality(extras map[string]any) (*finality.Config, error) {
-	rawDepth, hasDepth := extras[ProtocolContractsExecutorBlockDepthExtra]
-	rawSafe, hasSafe := extras[ProtocolContractsExecutorWaitForSafeExtra]
+	depth, hasDepth, err := extraBoundedInt(extras, ProtocolContractsExecutorBlockDepthExtra, math.MaxUint16)
+	if err != nil {
+		return nil, err
+	}
+	safe, hasSafe, err := extraBool(extras, ProtocolContractsExecutorWaitForSafeExtra)
+	if err != nil {
+		return nil, err
+	}
 	if !hasDepth && !hasSafe {
 		return nil, nil
 	}
-	cfg := finality.Config{}
-	if hasDepth {
-		depth, ok := asInt64(rawDepth)
-		if !ok {
-			return nil, fmt.Errorf("FamilyExtras[%q] must be an integer, got %T", ProtocolContractsExecutorBlockDepthExtra, rawDepth)
-		}
-		if depth < 0 || depth > 65535 {
-			return nil, fmt.Errorf("FamilyExtras[%q] must be in [0, 65535], got %d", ProtocolContractsExecutorBlockDepthExtra, depth)
-		}
-		cfg.BlockDepth = uint16(depth)
+	return &finality.Config{
+		BlockDepth:  uint16(depth),
+		WaitForSafe: safe,
+	}, nil
+}
+
+// applyProtocolContractParamOverrides applies the optional contract-parameter
+// FamilyExtras overrides onto the default DeployContractParams. Each override is
+// applied only when its key is present; absent keys leave the deploy default.
+func applyProtocolContractParamOverrides(params *ccvadapters.DeployContractParams, extras map[string]any) error {
+	if v, ok, err := extraString(extras, ProtocolContractsRMNRemoteLegacyRMNExtra); err != nil {
+		return err
+	} else if ok {
+		params.RMNRemote.LegacyRMN = v
 	}
-	if hasSafe {
-		safe, ok := rawSafe.(bool)
-		if !ok {
-			return nil, fmt.Errorf("FamilyExtras[%q] must be a bool, got %T", ProtocolContractsExecutorWaitForSafeExtra, rawSafe)
-		}
-		cfg.WaitForSafe = safe
+
+	if v, ok, err := extraBoundedInt(extras, ProtocolContractsOffRampGasForCallExactCheckExtra, math.MaxUint16); err != nil {
+		return err
+	} else if ok {
+		params.OffRamp.GasForCallExactCheck = uint16(v)
 	}
-	return &cfg, nil
+
+	if v, ok, err := extraBoundedInt(extras, ProtocolContractsOffRampMaxGasBufferToUpdateStateExtra, math.MaxUint32); err != nil {
+		return err
+	} else if ok {
+		params.OffRamp.MaxGasBufferToUpdateState = uint32(v)
+	}
+
+	if v, ok, err := extraBoundedInt(extras, ProtocolContractsOnRampMaxUSDCentsPerMessageExtra, math.MaxUint32); err != nil {
+		return err
+	} else if ok {
+		params.OnRamp.MaxUSDCentsPerMessage = uint32(v)
+	}
+
+	if v, ok, err := extraBoundedInt(extras, ProtocolContractsFeeQuoterLINKPremiumMultiplierWeiPerEthExtra, math.MaxInt64); err != nil {
+		return err
+	} else if ok {
+		params.FeeQuoter.LINKPremiumMultiplierWeiPerEth = uint64(v)
+	}
+
+	if v, ok, err := extraBoundedInt(extras, ProtocolContractsFeeQuoterWETHPremiumMultiplierWeiPerEthExtra, math.MaxInt64); err != nil {
+		return err
+	} else if ok {
+		params.FeeQuoter.WETHPremiumMultiplierWeiPerEth = uint64(v)
+	}
+
+	if v, ok, err := extraBigInt(extras, ProtocolContractsFeeQuoterMaxFeeJuelsPerMsgExtra); err != nil {
+		return err
+	} else if ok {
+		params.FeeQuoter.MaxFeeJuelsPerMsg = v
+	}
+
+	if v, ok, err := extraBigInt(extras, ProtocolContractsFeeQuoterUSDPerLINKExtra); err != nil {
+		return err
+	} else if ok {
+		params.FeeQuoter.USDPerLINK = v
+	}
+
+	if v, ok, err := extraBigInt(extras, ProtocolContractsFeeQuoterUSDPerWETHExtra); err != nil {
+		return err
+	} else if ok {
+		params.FeeQuoter.USDPerWETH = v
+	}
+
+	return nil
+}
+
+// extraBoundedInt reads an optional integer FamilyExtras value, validating it is
+// within [0, max]. The bool return is false when the key is absent.
+func extraBoundedInt(extras map[string]any, key string, max int64) (int64, bool, error) {
+	raw, present := extras[key]
+	if !present {
+		return 0, false, nil
+	}
+	n, ok := asInt64(raw)
+	if !ok {
+		return 0, false, fmt.Errorf("FamilyExtras[%q] must be an integer, got %T", key, raw)
+	}
+	if n < 0 || n > max {
+		return 0, false, fmt.Errorf("FamilyExtras[%q] must be in [0, %d], got %d", key, max, n)
+	}
+	return n, true, nil
+}
+
+// extraBigInt reads an optional base-10 integer string FamilyExtras value into a
+// big.Int. Wei-denominated values that exceed int64 must be passed as strings
+// because TOML integers are limited to int64. The bool return is false when the
+// key is absent.
+func extraBigInt(extras map[string]any, key string) (*big.Int, bool, error) {
+	raw, present := extras[key]
+	if !present {
+		return nil, false, nil
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return nil, false, fmt.Errorf("FamilyExtras[%q] must be a base-10 integer string, got %T", key, raw)
+	}
+	v, ok := new(big.Int).SetString(s, 10)
+	if !ok {
+		return nil, false, fmt.Errorf("FamilyExtras[%q] must be a base-10 integer string, got %q", key, s)
+	}
+	return v, true, nil
+}
+
+// extraString reads an optional string FamilyExtras value. The bool return is
+// false when the key is absent.
+func extraString(extras map[string]any, key string) (string, bool, error) {
+	raw, present := extras[key]
+	if !present {
+		return "", false, nil
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return "", false, fmt.Errorf("FamilyExtras[%q] must be a string, got %T", key, raw)
+	}
+	return s, true, nil
+}
+
+// extraBool reads an optional bool FamilyExtras value. The bool ok return is
+// false when the key is absent.
+func extraBool(extras map[string]any, key string) (value bool, ok bool, err error) {
+	raw, present := extras[key]
+	if !present {
+		return false, false, nil
+	}
+	b, isBool := raw.(bool)
+	if !isBool {
+		return false, false, fmt.Errorf("FamilyExtras[%q] must be a bool, got %T", key, raw)
+	}
+	return b, true, nil
 }
 
 // asInt64 coerces the common numeric types produced by TOML/JSON decoders.
