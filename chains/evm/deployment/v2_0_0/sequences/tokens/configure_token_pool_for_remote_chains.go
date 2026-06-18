@@ -7,12 +7,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -44,7 +44,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				ChainSelector: input.ChainSelector,
 				Address:       input.RegistryAddress,
 				Args:          input.TokenAddress,
-			})
+			}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[common.Address], evm.Chain]())
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for supported-chains check: %w", err)
 			}
@@ -53,7 +53,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 					ChainSelector: input.ChainSelector,
 					Address:       activePool,
-				})
+				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
 				if err == nil {
 					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
 					supportedChains := supportedChainsReport.Output

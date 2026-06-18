@@ -17,17 +17,17 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	evmchangesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -260,7 +260,7 @@ func assertAdapterDefaultsOnChain(
 
 	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.GetFee, evmChain, contract_utils.FunctionInput[committee_verifier.GetFeeArgs]{
 		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier),
-		Args:          committee_verifier.GetFeeArgs{DestChainSelector: remoteSelector},
+		Args: committee_verifier.GetFeeArgs{DestChainSelector: remoteSelector},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, cvDefaults.FeeUSDCents, verifierFee.Output.FeeUSDCents)
@@ -442,4 +442,41 @@ func TestChainFamilyAdapter_DefaultsAppliedOnChainViaConfigureChainsForLanesFrom
 		localSelector,
 		remoteSelector,
 	)
+}
+
+func TestChainFamilyAdapter_ValidateNOPsTopology(t *testing.T) {
+	adapter := &evmadapters.ChainFamilyAdapter{}
+	const chainSelector = "5009297550715157269"
+
+	tests := []struct {
+		name     string
+		nopCount int
+		wantErr  string
+	}{
+		{
+			name:     "fewer than the minimum is rejected",
+			nopCount: 14,
+			wantErr:  `chain "5009297550715157269" requires at least 15 unique NOPs for production environments, got 14`,
+		},
+		{
+			name:     "exactly the minimum is allowed",
+			nopCount: 15,
+		},
+		{
+			name:     "more than the minimum is allowed",
+			nopCount: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := adapter.ValidateNOPsTopology(chainSelector, tt.nopCount)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Equal(t, tt.wantErr, err.Error())
+		})
+	}
 }

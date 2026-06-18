@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -17,6 +18,8 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/exp/maps"
 
+	evm_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
@@ -26,6 +29,7 @@ import (
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -1146,4 +1150,39 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 		TokenPriceUpdates: tokenPriceUpdates,
 		GasPriceUpdates:   gasPriceUpdates,
 	}, nil
+}
+
+func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) (common.Address, *semver.Version, error) {
+	onRampAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(onramp.ContractType),
+		Version:       onramp.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to find onramp address for chain selector %d: %w", chainSelector, err)
+	}
+
+	chain, ok := chains.EVMChains()[chainSelector]
+	if !ok {
+		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
+	}
+
+	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
+	}
+	dynamicConfig, err := onrampContract.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to call GetDynamicConfig on onramp contract for chain selector %d: %w", chainSelector, err)
+	}
+
+	fqAddress := dynamicConfig.FeeQuoter
+	if fqAddress == (common.Address{}) {
+		return common.Address{}, nil, fmt.Errorf("fee quoter address is zero in onramp dynamic config for chain selector %d", chainSelector)
+	}
+	_, fqVersion, err := evm_utils.TypeAndVersion(fqAddress, chain.Client)
+	if err != nil {
+		return fqAddress, nil, fmt.Errorf("failed to get type and version for fee quoter at address %s on chain selector %d: %w", fqAddress.Hex(), chainSelector, err)
+	}
+	return fqAddress, fqVersion, nil
 }

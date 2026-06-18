@@ -26,34 +26,58 @@ The corresponding git tag will be `contracts-ccip-v<version>` for chainlink-ccip
 and `contracts-v<version>` for chainlink-evm.
 
 ```sh
-$ forge install smartcontractkit/chainlink-evm@contracts-v<version>
-$ forge install smartcontractkit/chainlink-ccip@contracts-ccip-v<version>
+forge install smartcontractkit/chainlink-evm@contracts-v1.5.0
+forge install smartcontractkit/chainlink-ccip@contracts-ccip-v2.0.0
+forge install foundry-rs/forge-std@v1.16.1
 ```
 
-Add the following remappings
+CCIP contracts also depend on OpenZeppelin and Chainlink ACE packages that are distributed via npm.
+Install the versions listed in `package.json` for the CCIP release you are using:
+
+```sh
+pnpm add @chainlink/ace@1.0.0
+pnpm add @openzeppelin/contracts-4.8.3@npm:@openzeppelin/contracts@4.8.3
+pnpm add @openzeppelin/contracts-5.3.0@npm:@openzeppelin/contracts@5.3.0
+```
+
+Add the following remappings to `remappings.txt`:
 
 ```
-@chainlink/contracts/=lib/smartcontractkit/chainlink-evm/contracts/
-@chainlink/contracts-ccip/contracts/=lib/smartcontractkit/chainlink-ccip/chains/evm/contracts/
+forge-std/=lib/forge-std/src/
+@chainlink/contracts/=lib/chainlink-evm/contracts/
+@chainlink/contracts-ccip/contracts/=lib/chainlink-ccip/chains/evm/contracts/
+@chainlink/policy-management/=node_modules/@chainlink/ace/packages/policy-management/src/
+@openzeppelin/contracts@4.8.3=node_modules/@openzeppelin/contracts-4.8.3
+@openzeppelin/contracts@5.3.0=node_modules/@openzeppelin/contracts-5.3.0
 ```
-#### NPM
+
+#### (P)NPM
 
 ```sh
 # pnpm
-$ pnpm add @chainlink/contracts
-$ pnpm add @chainlink/contracts-ccip
+pnpm add @chainlink/contracts@1.5.0
+pnpm add @chainlink/contracts-ccip@2.0.0
+pnpm add @chainlink/ace@1.0.0
+pnpm add @openzeppelin/contracts-4.8.3@npm:@openzeppelin/contracts@4.8.3
+pnpm add @openzeppelin/contracts-5.3.0@npm:@openzeppelin/contracts@5.3.0
 ```
 ```sh
 # npm
-$ npm install @chainlink/contracts --save
-$ npm install @chainlink/contracts-ccip --save
+npm install @chainlink/contracts@1.5.0 --save
+npm install @chainlink/contracts-ccip@2.0.0 --save
+npm install @chainlink/ace@1.0.0 --save
+npm install @openzeppelin/contracts-4.8.3@npm:@openzeppelin/contracts@4.8.3 --save
+npm install @openzeppelin/contracts-5.3.0@npm:@openzeppelin/contracts@5.3.0 --save
 ```
 
-Add the following remappings
+Add the following remappings to `remappings.txt`:
 
 ```
 @chainlink/contracts/=node_modules/@chainlink/contracts/
 @chainlink/contracts-ccip/contracts/=node_modules/@chainlink/contracts-ccip/contracts/
+@chainlink/policy-management/=node_modules/@chainlink/ace/packages/policy-management/src/
+@openzeppelin/contracts@4.8.3=node_modules/@openzeppelin/contracts-4.8.3
+@openzeppelin/contracts@5.3.0=node_modules/@openzeppelin/contracts-5.3.0
 ```
 
 ### Directory Structure
@@ -90,19 +114,13 @@ It lives in `contracts/test/mocks/MockRouter.sol`.
 
 ### Remapping
 
-This repository uses [Solidity remappings](https://docs.soliditylang.org/en/v0.8.20/using-the-compiler.html#compiler-remapping) to resolve imports, 
-which are defined in the `remappings.txt` file.
+This repository uses [Solidity remappings](https://docs.soliditylang.org/en/v0.8.20/using-the-compiler.html#compiler-remapping) to resolve imports.
 
-Please see the Installation section above for the correct remappings based on your installation method.
+The `remappings.txt` file in this directory contains the remappings used when developing CCIP itself via npm.
+When consuming CCIP in another project, use the remappings from the Installation section above, which additionally include the `@chainlink/contracts-ccip/contracts/` prefix.
 
-If required, you can remap dependencies used within CCIP contracts, e.g. Openzeppelin contracts,
-by adding the following to your `remappings.txt` file:
-
-```
-@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/=node_modules/@openzeppelin/contracts/
-@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/=node_modules/@openzeppelin/contracts/
-```
-
+CCIP contracts import versioned OpenZeppelin packages using aliases such as `@openzeppelin/contracts@5.3.0`.
+The remappings above map those aliases to the corresponding npm package directories (for example, `@openzeppelin/contracts-5.3.0`).
 This allows you to use a wide range of versions of Openzeppelin in your project without conflicts.
 
 ### Changesets
@@ -122,8 +140,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## License
 
-The CCIP repo is licensed under the [BUSL-1.1](./src/v0.8/ccip/LICENSE.md) license, however, there are a few exceptions
-
-- `contracts/applications/*` is licensed under the [MIT](./src/v0.8/ccip/LICENSE-MIT.md) license
-- `contracts/interfaces/*` is licensed under the [MIT](./src/v0.8/ccip/LICENSE-MIT.md) license
-- `contracts/libraries/{Client.sol, Internal.sol}` is licensed under the [MIT](./src/v0.8/ccip/LICENSE-MIT.md) license
+The CCIP contracts are licensed under the [BUSL-1.1](./contracts/LICENSE.md) license.
+See [v2.0-CCIP-License-grants](./contracts/v2.0-CCIP-License-grants.md) for additional use grants.

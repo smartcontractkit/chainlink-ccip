@@ -48,13 +48,13 @@ func (c DeployChainContractsCfg) resolvePerChainCfg(sel uint64) DeployChainContr
 	return c.ChainOverrides[sel]
 }
 
-func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
+func DeployChainContracts(registry *adapters.DeployChainContractsRegistry, chainFamilyRegistry *adapters.ChainFamilyRegistry) deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
 	mcmsReaderRegistry := changesets.GetRegistry()
 	validate := func(e deployment.Environment, cfg changesets.WithMCMS[DeployChainContractsCfg]) error {
 		if cfg.Cfg.Topology == nil {
 			return fmt.Errorf("topology is required")
 		}
-		if err := cfg.Cfg.Topology.ValidateForEnvironment(e.Name); err != nil {
+		if err := cfg.Cfg.Topology.ValidateForEnvironment(e.Name, chainFamilyRegistry); err != nil {
 			return fmt.Errorf("topology validation failed: %w", err)
 		}
 

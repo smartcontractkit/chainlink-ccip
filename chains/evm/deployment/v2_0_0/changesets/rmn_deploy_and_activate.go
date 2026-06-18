@@ -6,6 +6,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -52,7 +53,7 @@ func applyDeployAndActivateRMN(
 ) (cldf_deployment.ChangesetOutput, error) {
 	evmChains := e.BlockChains.EVMChains()
 	outputDS := datastore.NewMemoryDataStore()
-	builder := changesets.NewOutputBuilder(e, mcmsRegistry).WithDataStore(outputDS)
+	allBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
 
 	for _, sel := range input.Cfg.ChainSels {
 		chain := evmChains[sel]
@@ -71,10 +72,13 @@ func applyDeployAndActivateRMN(
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to add address to datastore: %w", addErr)
 			}
 		}
-		builder = builder.WithBatchOps(report.Output.BatchOps)
+		allBatchOps = append(allBatchOps, report.Output.BatchOps...)
 	}
 
-	return builder.Build(input.MCMS)
+	return changesets.NewOutputBuilder(e, mcmsRegistry).
+		WithDataStore(outputDS).
+		WithBatchOps(allBatchOps).
+		Build(input.MCMS)
 }
 
 func validateActivateRMNAddresses(addresses []datastore.AddressRef, chainSelector uint64) error {

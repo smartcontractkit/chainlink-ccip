@@ -13,11 +13,14 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/require"
+
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
+	bnmERC20Bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	bnmERC20Operations "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -36,22 +39,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	bnmERC20Bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
-
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, qualifiers []string) {
-	// For EVM only, set the timelock admin
-	var timelockAdmin common.Address
-	chain1, ok := e.BlockChains.EVMChains()[selector]
-	if ok {
-		timelockAdmin = chain1.DeployerKey.From
-	}
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	cs := mcmsapi.DeployMCMS(dReg, nil)
@@ -66,7 +59,6 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
 					Qualifier:        ptr.String(qualifier),
-					TimelockAdmin:    timelockAdmin,
 				},
 			},
 		})
@@ -83,7 +75,6 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
 					Qualifier:        ptr.String(qualifier),
-					TimelockAdmin:    timelockAdmin,
 				},
 			},
 		})
@@ -99,7 +90,8 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	timelockSigner := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
-		common_utils.CLLQualifier)
+		common_utils.CLLQualifier,
+	)
 	mcmSigner := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
@@ -226,7 +218,8 @@ func SolanaTransferMCMSContracts(t *testing.T, e *cldf_deployment.Environment, s
 	timelockSigner := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
-		qualifier)
+		qualifier,
+	)
 	mcmSigner := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
@@ -487,15 +480,17 @@ func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cu
 
 func RequireBigIntsEqual(t *testing.T, want, got *big.Int, msg string) {
 	t.Helper()
-	w := want
-	if w == nil {
-		w = big.NewInt(0)
-	}
-	g := got
-	if g == nil {
-		g = big.NewInt(0)
-	}
-	require.Zero(t, w.Cmp(g), "%s: want %s got %s", msg, w.String(), g.String())
+	require.NotNil(t, got, msg)
+	require.Zero(t, want.Cmp(got), "%s: want %s got %s", msg, want.String(), got.String())
+}
+
+// RequireBigIntsApprox asserts |want-got| <= tolerance. Used for rate-limit values where GenerateTPRLConfigs'
+// float64 x1.1 premium introduces sub-token rounding noise that differs across pool-version code paths.
+func RequireBigIntsApprox(t *testing.T, want, got *big.Int, tolerance int64, msg string) {
+	t.Helper()
+	require.NotNil(t, got, msg)
+	diff := new(big.Int).Abs(new(big.Int).Sub(want, got))
+	require.LessOrEqualf(t, diff.Cmp(big.NewInt(tolerance)), 0, "%s: want ~%s got %s (diff %s > tolerance %d)", msg, want, got, diff, tolerance)
 }
 
 func NewRandHex(t *testing.T, nBytes int) string {
