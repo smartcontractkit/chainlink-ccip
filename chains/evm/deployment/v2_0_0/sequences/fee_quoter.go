@@ -53,12 +53,14 @@ var (
 	}
 
 	l2LowTrafficChain = map[uint64]struct{}{
-		chain_selectors.PLUME_MAINNET.Selector:                     {},
-		chain_selectors.PLUME_TESTNET_SEPOLIA.Selector:             {},
-		chain_selectors.ETHEREUM_MAINNET_MANTLE_1.Selector:         {},
-		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_MANTLE_1.Selector: {},
-		chain_selectors.INK_TESTNET_SEPOLIA.Selector:               {},
-		chain_selectors.ETHEREUM_MAINNET_INK_1.Selector:            {},
+		chain_selectors.PLUME_MAINNET.Selector:                       {},
+		chain_selectors.PLUME_TESTNET_SEPOLIA.Selector:               {},
+		chain_selectors.ETHEREUM_MAINNET_MANTLE_1.Selector:           {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_MANTLE_1.Selector:   {},
+		chain_selectors.INK_TESTNET_SEPOLIA.Selector:                 {},
+		chain_selectors.ETHEREUM_MAINNET_INK_1.Selector:              {},
+		chain_selectors.ETHEREUM_MAINNET_UNICHAIN_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_UNICHAIN_1.Selector: {},
 	}
 
 	l2HighTrafficChain = map[uint64]struct{}{
