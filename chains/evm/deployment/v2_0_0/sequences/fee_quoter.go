@@ -68,6 +68,8 @@ var (
 		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     {},
 		chain_selectors.POLYGON_MAINNET.Selector:                     {},
 		chain_selectors.POLYGON_TESTNET_AMOY.Selector:                {},
+		chain_selectors.ETHEREUM_MAINNET_UNICHAIN_1.Selector:         {},
+		chain_selectors.ETHEREUM_TESTNET_SEPOLIA_UNICHAIN_1.Selector: {},
 	}
 )
 
