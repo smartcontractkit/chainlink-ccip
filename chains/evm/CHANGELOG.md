@@ -1,3 +1,47 @@
+## 2.0.0
+
+CCIP 2.0.0 is a major release that introduces various new concepts and improvements to the CCIP ecosystem.
+
+
+### New Features
+
+- Cross Chain Verifiers (CCVs)
+  - CCVs allow for composable security within CCIP. The v1 CCIP DON is now called the CommitteeVerifier and is still the safe, default option.
+  - Token Developer Attestations (TDAs) are supported natively through CCVs. The current USDC CCTP and Lombard TDAs are now the CCTPVerifier and LombardVerifier respectively.
+  - Verifiers are permissionless and require no registration. See BaseVerifier.sol for a basic blueprint of a verifier.
+  - Verifiers use VersionedVerifierResolvers to allow for future upgrades of verifiers without having to redeploy the verifier itself, as redeploying a verifier would change its address, which is customer facing. 
+  - It is up to each verifier to publish the proofs of their verifications. Some examples would be:
+    - Post signed payloads offchain to a public location 
+    - Have an API to fetch proofs
+    - Post the proof on the destination chain (ZK proofs, Merkle proofs, etc.)
+- Executors
+  - Executors are permissionless entities that are paid on the source chain to execute the message on the destination chain.
+    - They consist of both a source chain contract that handles billing and permissions, plus an offchain component that initiates the execution on the destination chain.
+  - Executors rely on the published verifications of CCVs to determine if a message is valid and can be executed.
+  - Because executors are permissionless, all execution on the destination chain is fully permissionless as well. This means users can execute any verified message themselves without any delays.
+    - If no automated execution is desired, users should specify the `NO_EXECUTION_TAG` as executor in their ExtraArgs. This does not prevent any entity from executing the message, but does mean there is no execution related payment on the source chain.
+    - To guarantee no execution, a private verifier can be used: if the proofs are not published, no executor can execute the message.
+- Pools v2
+  - The CCIP v2 release introduce a new Token Pool interface, which adds a few functions that make all aspects of token pools fully self-serve.
+    - `lockOrBurn` and `releaseOrMint` have extra parameters to support the new features: Custom Finality and token pool arguments.
+    - `getRequiredCCVs` gets the CCV config for a pool, allowing pools to enforce their own security requirements.
+    - `getTokenTransferFeeConfig` & `getFee` allow pools to charge fees and set their destination gas/calldata overheads.
+  - Rate limits refresh to their full capacity when you change the rate limit configuration.
+    - Previously, changing the rate limit configuration only filled the pool at the normal rate. The new behavior allows for immediate use of the new rate limit.
+  - The default pool implementation introduces two new pool hooks: `_preflightCheck` and `_postflightCheck`. These hooks allow for custom logic to be executed in `lockOrBurn` and `releaseOrMint`.
+  - All pools that hold tokens now use a LockBox contract to hold the tokens instead of the pool itself. This allows for easier upgrades of token pools without having to migrate liquidity.
+    - This also allows for liquidity management through the LockBox, which is especially useful if liquidity is managed per remote chain. A SiloedLockRelease pool can be configured with a LockBox per silo, potentially with different ownership per LockBox.
+- Custom Finality
+  - This version allows for custom finality settings, meaning Faster Than Finality (FTF) is possible.
+  - FTF is always opt-in. The sender, token pool, verifier, executor and receiver must all explicitly opt into any non-finalized finality setting.
+  - WARNING: if all entities on the source chain allow FTF, but the receiver does not, the message will be stuck until the receiver is configured to allow FTF. This likely won't be possible for V1 receivers, as most contracts are not upgradable, meaning the message and any (token) contents might be stuck forever. Please use caution when using FTF.
+- Chain agnostic message format
+  - CCIP v2 encodes each message in a chain-agnostic format. This greatly simplifies offchain systems, but also allows us to calculate a consistent message ID on the source chain. This message ID is the single identifier needed across the entire message lifecycle.
+  - Verifiers only have to attest to the message ID as that is the hash of the chain agnostic encoding of the message.
+- A new CrossChainToken contract has been added. It's a basic burnable/mintable ERC20 that is compatible with CCIP.
+  - BaseERC20 is a new token that does not implement burning or minting. Generally, we advise to use CrossChainToken instead.
+
+
 ## 1.6.4
 
 CCIP 1.6.4 is a minor release that overhauls the USDC Token Pool to add support for CCTP V2 and enable easier future
@@ -18,22 +62,6 @@ Token Pools will be migrated to this in the near future.
 
 - [#1134](https://github.com/smartcontractkit/chainlink-ccip/pull/1134) - **USDCTokenPoolProxy** - A versatile new dispatcher
 contract which allows USDC to be sent using different mechanisms based on the destination chain including CCTP V1, CCTP V2, and Lock/Mint.
-
-## 2.0.0 - UNRELEASED
-
-CCIP 2.0.0 is a major release that introduces various new concepts and improvements to the CCIP ecosystem.
-
-
-### New Features
-
-
-### Changes and Improvements
-
-#### Token Pools
-
-- Rate limits refresh to their full capacity when you change the rate limit configuration. [#1429](https://github.com/smartcontractkit/chainlink-ccip/pull/1429)
-  - Previously, changing the rate limit configuration only filled the pool at the normal rate. The new behavior allows for immediate use of the new rate limit.
-
 
 ## 1.6.3
 
