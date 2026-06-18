@@ -34,8 +34,8 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
+	seq2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	cciphooks "github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
@@ -443,7 +443,7 @@ func (e *EVMLaneSanityProvider) feeQuoterV2(env cldf.Environment, srcSel uint64)
 	if !ok {
 		return nil, fmt.Errorf("chain %d not in environment", srcSel)
 	}
-	fqAddr, fqVer, err := sequences.GetFeeQuoterAddressAndVersionFromOnRamp(env.DataStore, srcSel, env.BlockChains)
+	fqAddr, fqVer, err := seq2_0.GetFeeQuoterAddressAndVersionFromOnRamp(env.DataStore, srcSel, env.BlockChains)
 	if err != nil {
 		return nil, fmt.Errorf("fee quoter on chain %d: %w", srcSel, err)
 	}
