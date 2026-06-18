@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 
 	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 )
@@ -66,6 +67,41 @@ func TestEVMProtocolContractsDeployAdapter_Validation(t *testing.T) {
 				in.FamilyExtras = map[string]any{adapters.ProtocolContractsFeeAggregatorExtra: 42}
 			},
 			wantErrSub: "must be a string hex address",
+		},
+		{
+			name: "FamilyExtras executorBlockDepth wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsExecutorBlockDepthExtra: "nope"}
+			},
+			wantErrSub: "must be an integer",
+		},
+		{
+			name: "FamilyExtras executorWaitForSafe wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsExecutorWaitForSafeExtra: "nope"}
+			},
+			wantErrSub: "must be a bool",
+		},
+		{
+			name: "FamilyExtras executorMaxCCVsPerMsg wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsExecutorMaxCCVsPerMsgExtra: "nope"}
+			},
+			wantErrSub: "must be an integer",
+		},
+		{
+			name: "FamilyExtras executorMaxCCVsPerMsg out of range",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsExecutorMaxCCVsPerMsgExtra: int64(256)}
+			},
+			wantErrSub: "must be in [0, 255]",
+		},
+		{
+			name: "FamilyExtras executorCcvAllowlistEnabled wrong type",
+			mutate: func(in *ccvdeploymentadapters.ProtocolContractsDeployInput) {
+				in.FamilyExtras = map[string]any{adapters.ProtocolContractsExecutorCcvAllowlistEnabledExtra: "nope"}
+			},
+			wantErrSub: "must be a bool",
 		},
 	}
 
@@ -155,4 +191,120 @@ func TestEVMProtocolContractsDeployAdapter_HappyPath(t *testing.T) {
 	// Committee verifiers are deployed separately — none should appear here.
 	require.False(t, deployed[datastore.ContractType(committee_verifier.ContractType)],
 		"committee verifier must not be deployed by the protocol-only adapter")
+}
+
+// TestEVMProtocolContractsDeployAdapter_ExecutorOverrides proves the executor's
+// deploy-time config (allowed finality, max CCVs per message, CCV allowlist) is
+// set from the FamilyExtras overrides. Executors validate the requested finality
+// in getFee and are never reconfigured by the lane-configuration changesets, so
+// deploy time is the only opportunity to set these (e.g. wait-for-safe).
+func TestEVMProtocolContractsDeployAdapter_ExecutorOverrides(t *testing.T) {
+	tests := []struct {
+		name          string
+		extras        map[string]any
+		wantFinality  [4]byte
+		wantMaxCCVs   uint8
+		wantAllowlist bool
+	}{
+		{
+			name:          "defaults when unset",
+			extras:        map[string]any{adapters.ProtocolContractsFeeAggregatorExtra: testFeeAggregator},
+			wantFinality:  finality.Config{BlockDepth: 1}.Raw(),
+			wantMaxCCVs:   10,
+			wantAllowlist: false,
+		},
+		{
+			name: "all overrides applied",
+			extras: map[string]any{
+				adapters.ProtocolContractsFeeAggregatorExtra:               testFeeAggregator,
+				adapters.ProtocolContractsExecutorBlockDepthExtra:          int64(1),
+				adapters.ProtocolContractsExecutorWaitForSafeExtra:         true,
+				adapters.ProtocolContractsExecutorMaxCCVsPerMsgExtra:       int64(5),
+				adapters.ProtocolContractsExecutorCcvAllowlistEnabledExtra: true,
+			},
+			wantFinality:  finality.Config{BlockDepth: 1, WaitForSafe: true}.Raw(),
+			wantMaxCCVs:   5,
+			wantAllowlist: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{testChainSelector}),
+			)
+			require.NoError(t, err)
+			e.DataStore = datastore.NewMemoryDataStore().Seal()
+
+			evmChain := e.BlockChains.EVMChains()[testChainSelector]
+
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(
+				e.OperationsBundle, create2_factory.Deploy, evmChain,
+				contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
+					ChainSelector:  testChainSelector,
+					Args: create2_factory.ConstructorArgs{
+						AllowList: []common.Address{evmChain.DeployerKey.From},
+					},
+				}, nil,
+			)
+			require.NoError(t, err)
+
+			adapter := &adapters.EVMProtocolContractsDeployAdapter{}
+
+			in := ccvdeploymentadapters.ProtocolContractsDeployInput{
+				ChainSelector:    testChainSelector,
+				DeployerContract: create2FactoryRef.Address,
+				DeployerKeyOwned: true,
+				Executors: []ccvdeploymentadapters.ExecutorDeployParams{
+					{Version: executor.Version, Qualifier: "default"},
+				},
+				FamilyExtras: tc.extras,
+			}
+
+			report, err := cldf_ops.ExecuteSequence(
+				e.OperationsBundle, adapter.DeployProtocolContracts(), e.BlockChains, in,
+			)
+			require.NoError(t, err)
+
+			var executorAddr string
+			for _, ref := range report.Output.Addresses {
+				if ref.Type == datastore.ContractType(executor.ContractType) {
+					executorAddr = ref.Address
+					break
+				}
+			}
+			require.NotEmpty(t, executorAddr, "executor must be deployed")
+
+			finalityCfg, err := cldf_ops.ExecuteOperation(
+				e.OperationsBundle, executor.GetAllowedFinalityConfig, evmChain,
+				contract_utils.FunctionInput[struct{}]{
+					ChainSelector: evmChain.Selector,
+					Address:       common.HexToAddress(executorAddr),
+				},
+			)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantFinality, finalityCfg.Output)
+
+			dynamicCfg, err := cldf_ops.ExecuteOperation(
+				e.OperationsBundle, executor.GetDynamicConfig, evmChain,
+				contract_utils.FunctionInput[struct{}]{
+					ChainSelector: evmChain.Selector,
+					Address:       common.HexToAddress(executorAddr),
+				},
+			)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantAllowlist, dynamicCfg.Output.CcvAllowlistEnabled)
+
+			maxCCVs, err := cldf_ops.ExecuteOperation(
+				e.OperationsBundle, executor.GetMaxCCVsPerMessage, evmChain,
+				contract_utils.FunctionInput[struct{}]{
+					ChainSelector: evmChain.Selector,
+					Address:       common.HexToAddress(executorAddr),
+				},
+			)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantMaxCCVs, maxCCVs.Output)
+		})
+	}
 }
