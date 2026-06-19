@@ -329,14 +329,21 @@ func maybeApplyTokenTransferFeeConfig(
 	}
 
 	// Fee Quoter resolution part 2: get the current fee quoter from the on ramp
-	adapter, ok := feeRegistry.GetFeeAdapter(fam, onRampRef.Version)
+	onRampAdp, ok := feeRegistry.GetFeeAdapter(fam, onRampRef.Version)
 	if !ok {
 		e.Logger.Warnf("No fee adapter found for chain selector %d, version %s, skipping token transfer fee config for remote chain selector %d", src, onRampRef.Version, dst)
 		return emptyReport, nil
 	}
-	feeRef, err := adapter.GetFeeContractRef(e, onRampRef, src, dst)
+	feeRef, err := onRampAdp.GetFeeContractRef(e, onRampRef, src, dst)
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+
+	// Fee Quoter resolution part 3: use the fee quoter version for read/write operations.
+	// A v1.6 OnRamp may point at a v2.0 FeeQuoter, so the on ramp adapter alone is not sufficient.
+	feeQuoterAdp, ok := feeRegistry.GetFeeAdapter(fam, feeRef.Version)
+	if !ok {
+		return emptyReport, fmt.Errorf("no fee adapter found for chain selector %d and fee quoter version %s", src, feeRef.Version)
 	}
 
 	// NOTE: the TokenTransferFeeConfig for token pools is V2-focused and
@@ -346,7 +353,7 @@ func maybeApplyTokenTransferFeeConfig(
 	// at the moment, but realistically speaking this should not an issue
 	// since we've never had the need to modify it after we initially set
 	// it to MaxUint32.
-	onChainConfig, err := adapter.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
+	onChainConfig, err := feeQuoterAdp.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -388,7 +395,7 @@ func maybeApplyTokenTransferFeeConfig(
 	// Apply the token transfer fee config
 	result, err := cldf_ops.ExecuteSequence(
 		e.OperationsBundle,
-		adapter.SetTokenTransferFee(e, feeRef),
+		feeQuoterAdp.SetTokenTransferFee(e, feeRef),
 		e.BlockChains,
 		fees.SetTokenTransferFeeSequenceInput{
 			Selector: src,
