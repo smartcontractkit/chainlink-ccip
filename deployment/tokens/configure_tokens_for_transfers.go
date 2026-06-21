@@ -55,18 +55,23 @@ type TokenTransferConfig struct {
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
 	// automatically with (token, pool, decimals). Rate limits are imported later by ConfigureTokenPoolForRemoteChain
 	// from the active pool. Explicit RemoteChains entries take precedence. Requires an adapter implementing the
-	// TokenPoolMigrator interface. If the pool does not exist in the TAR or has already been migrated, then this
-	// knob has no effect.
+	// TokenPoolMigrator interface. This knob has no effect if any of the following are true:
+	//  (1) There is no active pool in TAR for the token
+	//  (2) The active pool in TAR is already the target pool
+	//  (3) The active pool in TAR is already v2.0.0 or higher
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
 	// explicitly in that case.
 	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
-	// AutoMigrateFeeConfigs is only applicable when migrating a pre-V2 pool to V2 and AutoMigrateRemoteChains is true.
-	// It reads token transfer fee settings from the legacy lane (onRamp / fee quoter) for each supported remote chain
-	// and fills in any missing TokenTransferFeeConfig entries on RemoteChains. A user-provided tokenTransferFeeConfig
-	// input on a remote chain takes precedence. Requires an adapter implementing TokenPoolMigrator. If the pool does
-	// not exist in TAR or has already been migrated, then this knob has no effect.
+	// AutoMigrateFeeConfigs is only applicable when migrating a pre-V2 pool to V2. When true, legacy fees are read
+	// from the fee quoter (v1.6.x) or on ramp (v1.5.x). A user-provided tokenTransferFeeConfig input on a remote chain
+	// takes precedence - values from the user are merged with the imported values. Requires an adapter implementing
+	// TokenPoolMigrator. Legacy fees are never imported unless this flag is set. This knob has no effect if any of
+	// the following are true:
+	//  (1) There is no active pool in TAR for the token
+	//  (2) The active pool in TAR is already the target pool
+	//  (3) The active pool in TAR is already v2.0.0 or higher
 	//
 	// Coupling: fee discovery only runs for remote chains already present in remoteChains (explicit YAML entries
 	// or entries added by autoMigrateRemoteChains). Setting autoMigrateFeeConfigs alone with an empty remoteChains
@@ -257,7 +262,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			}
 			if token.AutoMigrateFeeConfigs {
 				for _, remoteSelector := range allRemotes {
-					if rc, ok := remoteChains[remoteSelector]; ok && rc.TokenTransferFeeConfig == nil {
+					if rc, ok := remoteChains[remoteSelector]; ok {
 						if fullTokenRef.Address == "" {
 							return nil, nil, nil, fmt.Errorf("token address is required to discover token transfer fee config for remote chain selector %d on chain selector %d", remoteSelector, selector)
 						}
@@ -265,19 +270,25 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 						if err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", selector, remoteSelector, err)
 						}
-						feeCfg, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selector, remoteSelector, fullTokenRef.Address)
+						fqCfg, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selector, remoteSelector, fullTokenRef.Address)
 						if err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to discover token transfer fee config for remote chain selector %d on chain selector %d: %w", remoteSelector, selector, err)
 						}
-						partial := PartialTokenTransferFeeConfig{}.Populate(TokenTransferFeeConfig{
-							DestGasOverhead:               feeCfg.DestGasOverhead,
-							DestBytesOverhead:             feeCfg.DestBytesOverhead,
-							DefaultFinalityFeeUSDCents:    feeCfg.MinFeeUSDCents,
+						tpCfg := TokenTransferFeeConfig{
+							DestGasOverhead:               fqCfg.DestGasOverhead,
+							DestBytesOverhead:             fqCfg.DestBytesOverhead,
+							DefaultFinalityFeeUSDCents:    fqCfg.MinFeeUSDCents,
 							CustomFinalityFeeUSDCents:     0,
-							DefaultFinalityTransferFeeBps: feeCfg.DeciBps,
+							DefaultFinalityTransferFeeBps: fqCfg.DeciBps,
 							CustomFinalityTransferFeeBps:  0,
-							IsEnabled:                     feeCfg.IsEnabled,
-						})
+							IsEnabled:                     fqCfg.IsEnabled,
+						}
+						var partial PartialTokenTransferFeeConfig
+						if rc.TokenTransferFeeConfig != nil {
+							partial = partial.Populate(rc.TokenTransferFeeConfig.MergeWith(tpCfg))
+						} else {
+							partial = partial.Populate(tpCfg)
+						}
 						rc.TokenTransferFeeConfig = &partial
 						remoteChains[remoteSelector] = rc
 					}
