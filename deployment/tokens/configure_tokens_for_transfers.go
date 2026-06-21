@@ -51,38 +51,27 @@ type TokenTransferConfig struct {
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
-	// AutoMigrateRemoteChains, when true, runs discovery in this changeset (before the adapter sequence):
+	// AutoMigrateRemoteChains, when true, runs remote chain discovery in this changeset (before the adapter sequence):
 	// it reads the pool currently registered in the TAR, enumerates its supported remote chains, and fills
 	// in any missing RemoteChains entries (token, pool, decimals). Rate limits are imported later by
 	// ConfigureTokenPoolForRemoteChain from the active pool. Explicit RemoteChains entries take precedence.
-	// Requires an adapter implementing TokenPoolMigrator (EVM v2.0.0 today).
-	//
-	// When false (default), this changeset does not discover remotes. Upgrade safety is enforced downstream
-	// by ConfigureTokenPoolForRemoteChains (EVM v2.0.0), which errors if RemoteChains omits a chain the
-	// active pool already supports.
-	//
-	// Discovery resolves remote token decimals via each remote chain family's adapter; remote pool addresses
-	// are normalized via the AddressNormalizer registry before ResolveTokenPoolRef.
+	// Requires an adapter implementing TokenPoolMigrator. If the pool does not exist in the TAR or has already
+	// been migrated, then this knob has no effect.
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
 	// explicitly in that case.
-	//
-	// Upgrade-only: no-op when the TAR-registered active pool is the same as the target pool (extend),
-	// when there is no registered active pool, or when the active pool is already >= v2.0.0 (legacy→v2 upgrade only).
 	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
 	// AutoMigrateFeeConfigs, when true, runs fee discovery in this changeset (before the adapter sequence):
 	// on pool upgrade it reads token transfer fee settings from the legacy lane (onRamp / fee quoter) for each
 	// supported remote chain and fills in any missing TokenTransferFeeConfig entries on remoteChains. Explicit
 	// tokenTransferFeeConfig on a remote chain takes precedence. Requires an adapter implementing TokenPoolMigrator.
+	// If the pool does not exist in TAR or has already been migrated, then this knob has no effect.
 	//
 	// Coupling: fee discovery only runs for remote chains already present in remoteChains (explicit YAML entries
 	// or entries added by autoMigrateRemoteChains). Setting autoMigrateFeeConfigs alone with an empty remoteChains
 	// map does not discover fees, even though the active pool's supported chains are enumerated internally.
 	// For a legacy→v2 upgrade with empty remoteChains, set autoMigrateRemoteChains alongside autoMigrateFeeConfigs.
-	//
-	// Upgrade-only: no-op when the TAR-registered active pool is the same as the target pool (extend), when there
-	// is no active pool, or when the active pool is already >= v2.0.0 (fees are not on the legacy lane).
 	AutoMigrateFeeConfigs bool `yaml:"autoMigrateFeeConfigs" json:"autoMigrateFeeConfigs"`
 }
 
