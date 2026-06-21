@@ -51,27 +51,26 @@ type TokenTransferConfig struct {
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
-	// AutoMigrateRemoteChains, when true, runs remote chain discovery in this changeset (before the adapter sequence):
-	// it reads the pool currently registered in the TAR, enumerates its supported remote chains, and fills
-	// in any missing RemoteChains entries (token, pool, decimals). Rate limits are imported later by
-	// ConfigureTokenPoolForRemoteChain from the active pool. Explicit RemoteChains entries take precedence.
-	// Requires an adapter implementing TokenPoolMigrator. If the pool does not exist in the TAR or has already
-	// been migrated, then this knob has no effect.
+	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
+	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
+	// automatically with (token, pool, decimals). Rate limits are imported later by ConfigureTokenPoolForRemoteChain
+	// from the active pool. Explicit RemoteChains entries take precedence. Requires an adapter implementing the
+	// TokenPoolMigrator interface. If the pool does not exist in the TAR or has already been migrated, then this
+	// knob has no effect.
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
 	// explicitly in that case.
 	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
-	// AutoMigrateFeeConfigs, when true, runs fee discovery in this changeset (before the adapter sequence):
-	// on pool upgrade it reads token transfer fee settings from the legacy lane (onRamp / fee quoter) for each
-	// supported remote chain and fills in any missing TokenTransferFeeConfig entries on remoteChains. Explicit
-	// tokenTransferFeeConfig on a remote chain takes precedence. Requires an adapter implementing TokenPoolMigrator.
-	// If the pool does not exist in TAR or has already been migrated, then this knob has no effect.
+	// AutoMigrateFeeConfigs is only applicable when migrating a pre-V2 pool to V2 and AutoMigrateRemoteChains is true.
+	// It reads token transfer fee settings from the legacy lane (onRamp / fee quoter) for each supported remote chain
+	// and fills in any missing TokenTransferFeeConfig entries on RemoteChains. A user-provided tokenTransferFeeConfig
+	// input on a remote chain takes precedence. Requires an adapter implementing TokenPoolMigrator. If the pool does
+	// not exist in TAR or has already been migrated, then this knob has no effect.
 	//
 	// Coupling: fee discovery only runs for remote chains already present in remoteChains (explicit YAML entries
 	// or entries added by autoMigrateRemoteChains). Setting autoMigrateFeeConfigs alone with an empty remoteChains
 	// map does not discover fees, even though the active pool's supported chains are enumerated internally.
-	// For a legacy→v2 upgrade with empty remoteChains, set autoMigrateRemoteChains alongside autoMigrateFeeConfigs.
 	AutoMigrateFeeConfigs bool `yaml:"autoMigrateFeeConfigs" json:"autoMigrateFeeConfigs"`
 }
 
