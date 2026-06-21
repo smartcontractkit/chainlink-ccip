@@ -257,8 +257,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			}
 			if token.AutoMigrateFeeConfigs {
 				for _, remoteSelector := range allRemotes {
-					rc, ok := remoteChains[remoteSelector]
-					if ok && rc.TokenTransferFeeConfig == nil {
+					if rc, ok := remoteChains[remoteSelector]; ok && rc.TokenTransferFeeConfig == nil {
 						if fullTokenRef.Address == "" {
 							return nil, nil, nil, fmt.Errorf("token address is required to discover token transfer fee config for remote chain selector %d on chain selector %d", remoteSelector, selector)
 						}
@@ -300,10 +299,16 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			timelockAddress = timelockRef.Address
 		}
 
+		// NOTE: the top-level changeset already applies the fee configs so we set
+		// `TokenTransferFeeConfig` to nil BEFORE calling the lower-level sequence
+		// to prevent it from applying the fee configs again.
+		remoteChainsWithoutFeeConfigs := stripFeeConfigsFromRemoteChains(remoteChains)
+
+		// Configure pool remotes (fees excluded)
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
 			ChainSelector:                 selector,
 			TokenPoolAddress:              tokenPool.Address,
-			RemoteChains:                  remoteChains,
+			RemoteChains:                  remoteChainsWithoutFeeConfigs,
 			ExternalAdmin:                 token.ExternalAdmin,
 			RegistryAddress:               registryAddr,
 			TokenRef:                      fullTokenRef,
@@ -325,23 +330,36 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			}
 		}
 
+		// Apply fee configs
 		for remoteSelector, inCfg := range remoteChains {
-			feeBatchOps, feeReports, err := applyTokenTransferFeeConfig(
-				e,
-				selector,
-				remoteSelector,
-				tokenPool,
-				fullTokenRef,
-				inCfg,
-			)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to apply token transfer fee config for remote chain selector %d: %w", remoteSelector, err)
+			if inCfg.TokenTransferFeeConfig != nil {
+				feeBatchOps, feeReports, err := applyTokenTransferFeeConfig(
+					e,
+					selector,
+					remoteSelector,
+					tokenPool,
+					fullTokenRef,
+					*inCfg.TokenTransferFeeConfig,
+				)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to apply token transfer fee config for remote chain selector %d: %w", remoteSelector, err)
+				}
+				batchOps = append(batchOps, feeBatchOps...)
+				reports = append(reports, feeReports...)
 			}
-			batchOps = append(batchOps, feeBatchOps...)
-			reports = append(reports, feeReports...)
 		}
 	}
+
 	return batchOps, reports, ds, nil
+}
+
+func stripFeeConfigsFromRemoteChains(in map[uint64]RemoteChainConfig[[]byte, string]) map[uint64]RemoteChainConfig[[]byte, string] {
+	out := make(map[uint64]RemoteChainConfig[[]byte, string], len(in))
+	for sel, rc := range in {
+		rc.TokenTransferFeeConfig = nil
+		out[sel] = rc
+	}
+	return out
 }
 
 func applyTokenTransferFeeConfig(
@@ -349,11 +367,8 @@ func applyTokenTransferFeeConfig(
 	src, dst uint64,
 	fullSrcPoolRef datastore.AddressRef,
 	fullSrcTokenRef datastore.AddressRef,
-	srcToDstConfig RemoteChainConfig[[]byte, string],
+	srcToDstFeeCfg PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	if srcToDstConfig.TokenTransferFeeConfig == nil {
-		return nil, nil, nil
-	}
 	if fullSrcPoolRef.Version == nil {
 		return nil, nil, fmt.Errorf("token pool version is required to apply token transfer fee config for chain selector %d and remote chain selector %d", src, dst)
 	}
@@ -361,10 +376,10 @@ func applyTokenTransferFeeConfig(
 	// NOTE: fee configs are applied differently based on the pool version:
 	//   Pre-V2 pools: apply the fee config on the fee quoter / onRamp (legacy lane).
 	//   On V2+ pools: apply the fee config on the token pool via TokenFeeAdapter.
-	if partial := srcToDstConfig.TokenTransferFeeConfig; fullSrcPoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
-		return applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, partial)
+	if fullSrcPoolRef.Version.LessThan(utils.Version_2_0_0) {
+		return applyTokenTransferFeeConfigOnFeeQuoter(e, src, dst, fullSrcTokenRef, srcToDstFeeCfg)
 	} else {
-		return applyTokenTransferFeeConfigOnFeeQuoter(e, src, dst, fullSrcTokenRef, partial)
+		return applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, srcToDstFeeCfg)
 	}
 }
 
@@ -372,7 +387,7 @@ func applyTokenTransferFeeConfigOnTokenPool(
 	e cldf.Environment,
 	src, dst uint64,
 	fullSrcPoolRef datastore.AddressRef,
-	partial *PartialTokenTransferFeeConfig,
+	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	feeAdapter, err := ResolveTokenFeeAdapter(e, src, fullSrcPoolRef)
 	if err != nil {
@@ -431,7 +446,7 @@ func applyTokenTransferFeeConfigOnFeeQuoter(
 	e cldf.Environment,
 	src, dst uint64,
 	fullSrcTokenRef datastore.AddressRef,
-	partial *PartialTokenTransferFeeConfig,
+	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, src, dst)
 	if err != nil {
