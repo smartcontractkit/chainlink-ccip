@@ -28,6 +28,8 @@ import (
 	evmonrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	sequencesV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
@@ -36,6 +38,7 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -426,6 +429,58 @@ func NewDefaultDeploymentConfigForEVM(version *semver.Version) mcmsapi.ContractD
 		PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 		GasForCallExactCheck:                    uint16(5000),
 		TokenDecimals:                           18,
+	}
+}
+
+func NewLaneChainDefinitionForV2(chainSelector, remoteChainSelector uint64) lanes.ChainDefinition {
+	return lanes.ChainDefinition{
+		Selector: chainSelector,
+		CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+			{
+				CommitteeVerifier: []datastore.AddressRef{
+					{
+						ChainSelector: chainSelector,
+						Type:          datastore.ContractType(committee_verifier.ContractType),
+						Version:       committee_verifier.Version,
+						Qualifier:     "alpha",
+					},
+					{
+						ChainSelector: chainSelector,
+						Type:          datastore.ContractType(sequencesV2_0_0.CommitteeVerifierResolverType),
+						Version:       common_utils.Version_2_0_0,
+					},
+				},
+				RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+					remoteChainSelector: testsetupV2_0_0.CreateBasicCommitteeVerifierRemoteChainConfig(),
+				},
+			},
+		},
+		DefaultInboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: chainSelector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+				Qualifier:     "alpha",
+			},
+		},
+		DefaultOutboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: chainSelector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+				Qualifier:     "alpha",
+			},
+		},
+		DefaultExecutor: datastore.AddressRef{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(sequencesV2_0_0.ExecutorProxyType),
+			Version:       executor.Version,
+			Qualifier:     "default",
+		},
+		FeeQuoterDestChainConfig: testsetupV2_0_0.CreateBasicFeeQuoterDestChainConfig(),
+		ExecutorDestChainConfig:  testsetupV2_0_0.CreateBasicExecutorDestChainConfig(),
+		AddressBytesLength:       20,
+		BaseExecutionGasCost:     80_000,
 	}
 }
 
