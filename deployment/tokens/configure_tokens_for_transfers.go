@@ -310,10 +310,14 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			timelockAddress = timelockRef.Address
 		}
 
-		// NOTE: the top-level changeset already applies the fee configs so we set
-		// `TokenTransferFeeConfig` to nil BEFORE calling the lower-level sequence
-		// to prevent it from applying the fee configs again.
-		remoteChainsWithoutFeeConfigs := stripFeeConfigsFromRemoteChains(remoteChains)
+		// NOTE: this changeset already applies the fee configs so we set
+		// `TokenTransferFeeConfig` to nil BEFORE calling the lower-level
+		// sequence to prevent it from applying the fee configs again.
+		remoteChainsWithoutFeeConfigs := make(map[uint64]RemoteChainConfig[[]byte, string], len(remoteChains))
+		for sel, rc := range remoteChains {
+			rc.TokenTransferFeeConfig = nil
+			remoteChainsWithoutFeeConfigs[sel] = rc
+		}
 
 		// Configure pool remotes (fees excluded)
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
@@ -362,15 +366,6 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 	}
 
 	return batchOps, reports, ds, nil
-}
-
-func stripFeeConfigsFromRemoteChains(in map[uint64]RemoteChainConfig[[]byte, string]) map[uint64]RemoteChainConfig[[]byte, string] {
-	out := make(map[uint64]RemoteChainConfig[[]byte, string], len(in))
-	for sel, rc := range in {
-		rc.TokenTransferFeeConfig = nil
-		out[sel] = rc
-	}
-	return out
 }
 
 func applyTokenTransferFeeConfig(
