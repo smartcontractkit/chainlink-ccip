@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -50,7 +49,7 @@ func (a *FeesAdapter) validateFeeRef(feeRef datastore.AddressRef) error {
 	return nil
 }
 
-func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
+func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
 	if onRampRef.Type.String() != routerops.ContractType.String() {
 		return datastore.AddressRef{}, fmt.Errorf("unexpected contract type for Router address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), routerops.ContractType)
 	}
@@ -65,7 +64,7 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, onRampRef datastore.
 		ccip_router.SetProgramID(routerPubkey)
 	}
 
-	chain, ok := e.BlockChains.SolanaChains()[src]
+	chain, ok := chains.SolanaChains()[src]
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("solana chain not found for selector %d", src)
 	}
@@ -76,12 +75,12 @@ func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, onRampRef datastore.
 	}
 
 	var routerConfig ccip_router.Config
-	if err := chain.GetAccountDataBorshInto(e.GetContext(), routerConfigPDA, &routerConfig); err != nil {
+	if err := chain.GetAccountDataBorshInto(b.GetContext(), routerConfigPDA, &routerConfig); err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to read Router config for router %s on chain selector %d: %w", routerPubkey, src, err)
 	}
 
 	fqRef, err := datastore_utils.FindAndFormatRef(
-		e.DataStore,
+		ds,
 		datastore.AddressRef{
 			Type:          datastore.ContractType(fqops.ContractType),
 			Address:       routerConfig.FeeQuoter.String(),
@@ -101,13 +100,13 @@ func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) f
 	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
 }
 
-func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, feeRef datastore.AddressRef, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {
+func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chains cldf_chain.BlockChains, feeRef datastore.AddressRef, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {
 	err := a.validateFeeRef(feeRef)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("invalid FeeQuoter address ref for src %d and dst %d: %w", src, dst, err)
 	}
 
-	chain, ok := e.BlockChains.SolanaChains()[src]
+	chain, ok := chains.SolanaChains()[src]
 	if !ok {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("solana chain not found for selector %d", src)
 	}
@@ -127,12 +126,12 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, feeRe
 
 	// NOTE: ErrNotFound is expected if no config has been set on-chain yet - we return a zeroed config in that case
 	var cfg fee_quoter.PerChainPerTokenConfig
-	err = chain.GetAccountDataBorshInto(e.GetContext(), remoteBillingPDA, &cfg)
+	err = chain.GetAccountDataBorshInto(b.GetContext(), remoteBillingPDA, &cfg)
 	if err != nil && !errors.Is(err, rpc.ErrNotFound) {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to deserialize PerChainPerTokenConfig (src = %d, dst = %d, token = %s, pda = %s): %w", src, dst, token, remoteBillingPDA, err)
 	}
 
-	e.Logger.Infof("Fetched on-chain token transfer fee config for src %d, dst %d, token %s: %+v", src, dst, token, cfg)
+	b.Logger.Infof("Fetched on-chain token transfer fee config for src %d, dst %d, token %s: %+v", src, dst, token, cfg)
 	return fees.TokenTransferFeeArgs{
 		DestBytesOverhead: cfg.TokenTransferConfig.DestBytesOverhead,
 		DestGasOverhead:   cfg.TokenTransferConfig.DestGasOverhead,
@@ -143,7 +142,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, feeRe
 	}, nil
 }
 
-func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment, feeRef datastore.AddressRef) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastore.AddressRef) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenTransferFee",
 		utils.Version_1_6_0,
@@ -222,13 +221,13 @@ func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoter
 	return a.sol.GetFeeQuoterDestChainConfig()
 }
 
-func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, feeRef datastore.AddressRef, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error) {
+func (a *FeesAdapter) GetOnchainDestChainConfig(b operations.Bundle, chains cldf_chain.BlockChains, feeRef datastore.AddressRef, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error) {
 	err := a.validateFeeRef(feeRef)
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("invalid FeeQuoter address ref for src %d and dst %d: %w", src, dst, err)
 	}
 
-	chain, ok := e.BlockChains.SolanaChains()[src]
+	chain, ok := chains.SolanaChains()[src]
 	if !ok {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("solana chain not found for selector %d", src)
 	}
@@ -243,7 +242,7 @@ func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, feeRef datas
 	}
 
 	var destChainAccount fee_quoter.DestChain
-	err = chain.GetAccountDataBorshInto(e.GetContext(), destChainPDA, &destChainAccount)
+	err = chain.GetAccountDataBorshInto(b.GetContext(), destChainPDA, &destChainAccount)
 	if err != nil {
 		if errors.Is(err, rpc.ErrNotFound) {
 			return lanes.FeeQuoterDestChainConfig{}, nil
@@ -254,7 +253,7 @@ func (a *FeesAdapter) GetOnchainDestChainConfig(e cldf.Environment, feeRef datas
 	return solseq.ReverseTranslateFQ(destChainAccount.Config), nil
 }
 
-func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment, feeRef datastore.AddressRef) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(ds datastore.DataStore, feeRef datastore.AddressRef) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"ApplyDestChainConfigUpdatesSolana",
 		utils.Version_1_6_0,
@@ -277,7 +276,7 @@ func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment, feeRef dat
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to parse FeeQuoter address %q for chain selector %d: %w", feeRef.Address, src, err)
 			}
 
-			offRampAddr, err := a.sol.GetOffRampAddress(e.DataStore, src)
+			offRampAddr, err := a.sol.GetOffRampAddress(ds, src)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get OffRamp address for chain %d: %w", src, err)
 			}
