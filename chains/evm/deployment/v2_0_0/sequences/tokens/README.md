@@ -10,7 +10,7 @@ This package contains the sequences used to configure tokens and token pools for
 
 3. **ConfigureTokenPoolForRemoteChain** – For a single remote chain: optionally **imports rate limiter and remote pool config from the active pool**, then applies CCV config, rate limiters, and remote chain config (add/update chain, remote pools). When `tokenTransferFeeConfig` is set on the remote chain input, applies it on the **v2 token pool** only (merge with on-chain pool state or defaults; no legacy lane import). Fee config runs **after** the remote chain exists on the pool.
 
-   The **`ConfigureTokensForTransfers` changeset** strips fee config from sequence input and applies fees after configure (including legacy-lane discovery via `autoMigrateFeeConfigs`). Direct callers (e.g. CCTP) that invoke this sequence with explicit fee config still use the pool-only apply path above.
+   The **`ConfigureTokensForTransfers` changeset** strips fee config from sequence input and applies fees after configure (including legacy-lane discovery and merge when `autoMigrateRemoteChains` is enabled). Direct callers (e.g. CCTP) that invoke this sequence with explicit fee config still use the pool-only apply path above.
 
 ## Importing config from prior pool versions
 
