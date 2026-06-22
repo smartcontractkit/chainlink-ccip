@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
 
-const minProductionChainNOPs = 15
+const minProductionChainNOPs = 9
 
 // EnvironmentTopology holds all environment-specific configuration that cannot be inferred
 // from the datastore. This serves as the single source of truth for the desired state of both off-chain
