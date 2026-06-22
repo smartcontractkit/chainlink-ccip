@@ -20,7 +20,7 @@ import (
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	erc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
+	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	lrpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
@@ -40,6 +40,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -1481,7 +1484,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 
 	// Scenario6 exercises AutoMigrateRemoteChains end-to-end across chain families: a legacy EVM pool connected
 	// to a Solana remote is upgraded to v2.0 with an empty RemoteChains map; the changeset must discover the
-	// Solana lane (token, pool, decimals) and carry it forward onto the new pool.
+	// Solana remote (token, pool, decimals, rate limits, and legacy lane fees) and carry it forward onto the new pool.
 	t.Run("Scenario6_AutoMigrateDiscoversSolanaRemote", func(t *testing.T) {
 		const evmTokenSymbol = "S6_EVM_TOK"
 		const solTokenSymbol = "S6_SOL_TOK"
@@ -1497,6 +1500,23 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		v2CoreDS := datastore.NewMemoryDataStore()
 		DeployChainContractsV2_0_0(t, env, v2CoreDS, evmChainSel)
 		MergeAddresses(t, env, v2CoreDS)
+
+		// Wire CCIP lanes between EVM and Solana. Required for legacy fee import during auto-migrate
+		// (ResolveFeeAdapter / FeeQuoter reads on EVM -> Solana).
+		env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
+		laneConnectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), changesets.GetRegistry()).Apply(*env, lanes.ConnectChainsConfig{
+			MCMS: NewDefaultInputForMCMS("Scenario 6 lanes"),
+			Lanes: []lanes.LaneConfig{
+				{
+					Version: v1_6_0_scenarios,
+					ChainA:  lanes.ChainDefinition{Selector: solChainSel},
+					ChainB:  lanes.ChainDefinition{Selector: evmChainSel},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, laneConnectOut.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, laneConnectOut.MCMSTimelockProposals, false)
 
 		// Deploy a legacy EVM v1.5.1 BurnMint pool connected to a Solana v1.6.0 LockRelease pool, registered in
 		// each chain's TokenAdminRegistry.
@@ -1565,16 +1585,56 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, oldRemotePools)
 
+		// Seed legacy lane fees for EVM → Solana before upgrade (auto-migrate imports from FeeQuoter).
+		env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
+		feeSeedOut, err := fees.SetTokenTransferFee().Apply(*env, fees.SetTokenTransferFeeInput{
+			MCMS: NewDefaultInputForMCMS("Scenario 6 seed fees"),
+			Args: []fees.TokenTransferFeeForSrc{
+				{
+					Selector: evmChainSel,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: solChainSel,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: evmTokAddr.Hex(),
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
+										DestBytesOverhead: cciputils.NewOptional(uint32(150_000)),
+										DestGasOverhead:   cciputils.NewOptional(uint32(50_000)),
+										MinFeeUSDCents:    cciputils.NewOptional(uint32(17)),
+										IsEnabled:         cciputils.NewOptional(true),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		testhelpers.ProcessTimelockProposals(t, *env, feeSeedOut.MCMSTimelockProposals, false)
+
+		// Ensure the fee config was set
+		feeAdapter, fqRef, err := fees.ResolveFeeAdapter(env.OperationsBundle, env.BlockChains, env.DataStore, evmChainSel, solChainSel)
+		require.NoError(t, err)
+		legacyFee, err := feeAdapter.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqRef, evmChainSel, solChainSel, evmTokAddr.Hex())
+		require.NoError(t, err)
+		require.Equal(t, uint32(150_000), legacyFee.DestBytesOverhead)
+		require.Equal(t, uint32(50_000), legacyFee.DestGasOverhead)
+		require.Equal(t, uint32(17), legacyFee.MinFeeUSDCents)
+		require.True(t, legacyFee.IsEnabled)
+
 		// Upgrade to v2.0 with AutoMigrateRemoteChains and no RemoteChains — Solana must be discovered.
+		env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
 		upgradeOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 			ChainAdapterVersion: cciputils.Version_2_0_0,
 			MCMS:                NewDefaultInputForMCMS("Scenario 6 upgrade"),
 			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 				evmChainSel: {
-					TokenPoolVersion: bnmOpsV2_0_0.Version,
+					TokenPoolVersion: cciputils.Version_2_0_0,
 					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 						TokenPoolQualifier: newEvmPoolQual,
-						PoolType:           bnmOpsV2_0_0.ContractType.String(),
+						PoolType:           cciputils.BurnMintTokenPool.String(),
 						TokenRef:           &datastore.AddressRef{Address: evmTokAddr.Hex()},
 					},
 					TokenTransferConfig: &tokensapi.TokenTransferConfig{
@@ -1590,8 +1650,8 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		// Validate that the new pool was saved to the datastore
 		newPoolRef := datastore.AddressRef{
 			ChainSelector: evmChainSel,
-			Type:          datastore.ContractType(bnmOpsV2_0_0.ContractType),
-			Version:       bnmOpsV2_0_0.Version,
+			Type:          datastore.ContractType(cciputils.BurnMintTokenPool),
+			Version:       cciputils.Version_2_0_0,
 			Qualifier:     newEvmPoolQual,
 		}
 		newPoolAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, newPoolRef, evmChainSel, evm_datastore_utils.ToEVMAddress)
@@ -1612,6 +1672,26 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		gotRemotePools, err := newPool.GetRemotePools(&bind.CallOpts{Context: t.Context()}, solChainSel)
 		require.NoError(t, err)
 		require.Contains(t, gotRemotePools, oldRemotePools[0], "remote Solana pool should be carried forward")
+
+		// Legacy lane fees should be imported from FeeQuoter onto the new v2.0 pool for EVM -> Solana.
+		expectedFee := tokensapi.PartialTokenTransferFeeConfig{}.MergeWith(tokensapi.TokenTransferFeeConfig{
+			DestGasOverhead:               legacyFee.DestGasOverhead,
+			DestBytesOverhead:             legacyFee.DestBytesOverhead,
+			DefaultFinalityFeeUSDCents:    legacyFee.MinFeeUSDCents,
+			CustomFinalityFeeUSDCents:     0,
+			DefaultFinalityTransferFeeBps: legacyFee.DeciBps,
+			CustomFinalityTransferFeeBps:  0,
+			IsEnabled:                     legacyFee.IsEnabled,
+		})
+		gotFee, err := newPool.GetTokenTransferFeeConfig(&bind.CallOpts{Context: t.Context()}, common.Address{}, solChainSel, finality.RawWaitForFinality, []byte{})
+		require.NoError(t, err)
+		require.Equal(t, expectedFee.DefaultFinalityFeeUSDCents, gotFee.FinalityFeeUSDCents, "finality fee USD cents")
+		require.Equal(t, expectedFee.DestGasOverhead, gotFee.DestGasOverhead, "dest gas overhead")
+		require.Equal(t, expectedFee.DestBytesOverhead, gotFee.DestBytesOverhead, "dest bytes overhead")
+		require.Equal(t, expectedFee.IsEnabled, gotFee.IsEnabled, "fee config enabled")
+		require.Equal(t, expectedFee.DefaultFinalityTransferFeeBps, gotFee.FinalityTransferFeeBps, "finality transfer fee bps")
+		require.Equal(t, expectedFee.CustomFinalityTransferFeeBps, gotFee.FastFinalityTransferFeeBps, "fast finality transfer fee bps")
+		require.Equal(t, expectedFee.CustomFinalityFeeUSDCents, gotFee.FastFinalityFeeUSDCents, "fast finality fee USD cents")
 
 		// Outbound is exact in local (18) decimals. Inbound is imported from the v1.5.1 active pool (stored in
 		// remote 9-decimal units) and rebased to local decimals; allow float ULP like the EVM-only migration test.
