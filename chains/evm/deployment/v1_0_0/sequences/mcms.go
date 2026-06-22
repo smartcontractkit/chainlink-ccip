@@ -168,42 +168,9 @@ var SeqGrantAdminRoleOfTimelockToTimelock = cldf_ops.NewSequence(
 			return output, fmt.Errorf("caller %s is not admin on timelock contract %s: %w", chain.DeployerKey.From, in.TimelockAddress, err)
 		}
 
-		newAdminTimelockHasRole, err := timelock.HasRole(nil, ops.ADMIN_ROLE.ID, in.NewAdminTimelockAddress)
-		if err != nil {
-			b.Logger.Errorf("failed to check whether new timelock owner %s is admin on timelock contract %s: %v", in.NewAdminTimelockAddress, in.TimelockAddress, err)
-			return output, fmt.Errorf("failed to check whether new timelock owner %s is admin on timelock contract %s: %w", in.NewAdminTimelockAddress, in.TimelockAddress, err)
+		if err := TransferTimelockAdminTo(b, chain, in.ChainSelector, in.TimelockAddress, in.NewAdminTimelockAddress); err != nil {
+			return sequences.OnChainOutput{}, err
 		}
-
-		// Grant admin role to new admin Timelock
-		if !newAdminTimelockHasRole {
-			_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, chain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
-				ChainSelector: in.ChainSelector,
-				Address:       in.TimelockAddress,
-				Args: ops.OpGrantRoleTimelockInput{
-					RoleID:  ops.ADMIN_ROLE.ID,
-					Account: in.NewAdminTimelockAddress,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to new admin timelock on chain %d: %w", in.ChainSelector, err)
-			}
-			b.Logger.Infof("Granted Admin role on Timelock %s to Timelock %s on chain %s", in.TimelockAddress, in.NewAdminTimelockAddress, chain)
-		} else {
-			b.Logger.Infof("Timelock %s is already admin on Timelock %s on chain %s", in.NewAdminTimelockAddress, in.TimelockAddress, chain)
-		}
-
-		// Renounce admin role from Deployer EOA
-		_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, chain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
-			ChainSelector: in.ChainSelector,
-			Address:       in.TimelockAddress,
-			Args: ops.OpRenounceRoleTimelockInput{
-				RoleID: ops.ADMIN_ROLE.ID,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to renounce admin role on timelock contract on chain %d: %w", in.ChainSelector, err)
-		}
-		b.Logger.Infof("Renounced Admin role on Timelock %s on chain %s", in.TimelockAddress, chain)
 
 		return sequences.OnChainOutput{}, nil
 	})

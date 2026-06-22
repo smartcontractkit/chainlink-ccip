@@ -241,30 +241,15 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			//   "transfer" = grantRole(ADMIN_ROLE, finalAdmin)
 			//   "accept"   = renounceRole(ADMIN_ROLE) by the deployer — both happen in the same changeset.
 			if finalAdmin != evmChain.DeployerKey.From {
-				_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, evmChain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
-					ChainSelector: in.ChainSelector,
-					Address:       common.HexToAddress(timelockAddr.Address),
-					Args: ops.OpGrantRoleTimelockInput{
-						RoleID:  ops.ADMIN_ROLE.ID,
-						Account: finalAdmin,
-					},
-				})
-				if err != nil {
-					return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s on timelock on chain %d: %w", finalAdmin, in.ChainSelector, err)
+				if err := seq.TransferTimelockAdminTo(
+					b,
+					evmChain,
+					in.ChainSelector,
+					common.HexToAddress(timelockAddr.Address),
+					finalAdmin,
+				); err != nil {
+					return sequtil.OnChainOutput{}, fmt.Errorf("failed to transfer timelock admin on chain %d: %w", in.ChainSelector, err)
 				}
-				b.Logger.Infof("Granted Admin role on Timelock %s to %s on chain %s", timelockAddr.Address, finalAdmin, evmChain.Name)
-
-				_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, evmChain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
-					ChainSelector: in.ChainSelector,
-					Address:       common.HexToAddress(timelockAddr.Address),
-					Args: ops.OpRenounceRoleTimelockInput{
-						RoleID: ops.ADMIN_ROLE.ID,
-					},
-				})
-				if err != nil {
-					return sequtil.OnChainOutput{}, fmt.Errorf("failed to renounce admin role on timelock on chain %d: %w", in.ChainSelector, err)
-				}
-				b.Logger.Infof("Deployer renounced Admin role on Timelock %s on chain %s", timelockAddr.Address, evmChain.Name)
 			}
 
 			mcmOwnershipBatchOps, err := seq.TransferAndAcceptOwnership(
