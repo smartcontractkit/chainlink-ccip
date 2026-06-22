@@ -267,6 +267,18 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 				b.Logger.Infof("Deployer renounced Admin role on Timelock %s on chain %s", timelockAddr.Address, evmChain.Name)
 			}
 
+			mcmOwnershipBatchOps, err := seq.TransferDeployedMCMsToTimelock(
+				b,
+				evmChain,
+				in.ChainSelector,
+				common.HexToAddress(timelockAddr.Address),
+				[]cldf_datastore.AddressRef{proposerAddr, bypasserAddr, cancellerAddr},
+			)
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to transfer MCM ownership to timelock on chain %d: %w", in.ChainSelector, err)
+			}
+			output.BatchOps = append(output.BatchOps, mcmOwnershipBatchOps...)
+
 			return output, nil
 		})
 }

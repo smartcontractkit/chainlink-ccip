@@ -70,6 +70,9 @@ func TestTransferOwnership(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
+	if len(output.MCMSTimelockProposals) > 0 {
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	}
 	ds := output.DataStore
 	require.NoError(t, ds.Merge(env.DataStore))
 	env.DataStore = ds.Seal()
@@ -96,12 +99,11 @@ func TestTransferOwnership(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
-	addresses, err := output.DataStore.Addresses().Fetch()
-	require.NoError(t, err)
-	for _, addr := range addresses {
-		t.Logf("Adding address %s of type %s on chain %d to datastore", addr.Address, addr.Type, addr.ChainSelector)
-		require.NoError(t, ds.Addresses().Add(addr))
+	if len(output.MCMSTimelockProposals) > 0 {
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 	}
+	require.NoError(t, ds.Merge(output.DataStore.Seal()))
+	env.DataStore = ds.Seal()
 
 	// deploy router on both chains, then transfer ownership to the timelock
 	routerAddrs := make(map[uint64]common.Address)

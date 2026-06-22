@@ -167,7 +167,7 @@ func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSRea
 			reports = append(reports, report.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, mcmsRegistryForDeploy(mcmsRegistry)).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
@@ -336,10 +336,49 @@ func deployMCMSApply(
 			reports = append(reports, deployReport.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		if err := ds.Merge(e.DataStore); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge existing datastore into MCMS deployment output: %w", err)
+		}
+		buildEnv := e
+		buildEnv.DataStore = ds.Seal()
+
+		return changesets.NewOutputBuilder(buildEnv, mcmsRegistryForDeploy(mcmsRegistry)).
 			WithReports(reports).
 			WithDataStore(ds).
 			WithBatchOps(batchOps).
-			Build(cfg.MCMS)
+			Build(mcmsInputForDeployment(cfg, batchOps))
 	}
+}
+
+func mcmsRegistryForDeploy(registry *changesets.MCMSReaderRegistry) *changesets.MCMSReaderRegistry {
+	if registry != nil {
+		return registry
+	}
+	return changesets.GetRegistry()
+}
+
+// mcmsInputForDeployment returns MCMS proposal input for deploy output. When ownership
+// accept batch operations are produced and the caller did not supply MCMS config, a
+// default bypass proposal is used so timelock can accept MCM contract ownership.
+func mcmsInputForDeployment(cfg MCMSDeploymentConfig, batchOps []mcmstypes.BatchOperation) mcms.Input {
+	if len(batchOps) == 0 || cfg.MCMS.TimelockAction != "" {
+		return cfg.MCMS
+	}
+
+	mcmsInput := cfg.MCMS
+	mcmsInput.TimelockAction = mcmstypes.TimelockActionBypass
+	mcmsInput.TimelockDelay = mcmstypes.MustParseDuration("0s")
+	mcmsInput.ValidUntil = 3759765795
+	if mcmsInput.Qualifier == "" {
+		for _, chainCfg := range cfg.Chains {
+			if chainCfg.Qualifier != nil {
+				mcmsInput.Qualifier = *chainCfg.Qualifier
+				break
+			}
+		}
+	}
+	if mcmsInput.Description == "" {
+		mcmsInput.Description = "Accept MCM contract ownership on timelock"
+	}
+	return mcmsInput
 }

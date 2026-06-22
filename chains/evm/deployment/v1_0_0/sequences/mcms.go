@@ -6,7 +6,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -18,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 )
 
@@ -298,6 +299,56 @@ var SeqAcceptMCMOwnershipFromTimelock = cldf_ops.NewSequence(
 		}
 		return output, nil
 	})
+
+// TransferDeployedMCMsToTimelock transfers Ownable2Step ownership of deployed MCM contracts
+// from the deployer to the given timelock. Transfer is executed on-chain immediately;
+// accept ownership is returned as MCMS batch operations for the timelock to execute.
+func TransferDeployedMCMsToTimelock(
+	b cldf_ops.Bundle,
+	chain cldf_evm.Chain,
+	chainSelector uint64,
+	timelock common.Address,
+	mcmContracts []datastore.AddressRef,
+) ([]types.BatchOperation, error) {
+	var batchOps []types.BatchOperation
+	for _, ref := range mcmContracts {
+		addr := common.HexToAddress(ref.Address)
+		owner, ownable, err := LoadOwnableContract(addr, chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load MCM contract %s (%s): %w", ref.Address, ref.Type, err)
+		}
+		if owner == timelock {
+			b.Logger.Infof("MCM %s at %s is already owned by timelock %s, skipping ownership transfer",
+				ref.Type, ref.Address, timelock.Hex())
+			continue
+		}
+
+		ownershipInput := ops.OpTransferOwnershipInput{
+			ChainSelector:   chainSelector,
+			Address:         addr,
+			ProposedOwner:   timelock,
+			ContractType:    cldf.ContractType(ref.Type),
+			TimelockAddress: timelock,
+		}
+		deps := ops.OpEVMOwnershipDeps{Chain: chain, OwnableC: ownable}
+
+		transferReport, err := cldf_ops.ExecuteOperation(b, ops.OpTransferOwnership, deps, ownershipInput)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transfer MCM %s ownership to timelock on chain %d: %w", ref.Type, chainSelector, err)
+		}
+		acceptReport, err := cldf_ops.ExecuteOperation(b, ops.OpAcceptOwnership, deps, ownershipInput)
+		if err != nil {
+			return nil, fmt.Errorf("failed to accept MCM %s ownership on timelock on chain %d: %w", ref.Type, chainSelector, err)
+		}
+
+		batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{transferReport.Output, acceptReport.Output})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create batch operation from MCM ownership writes: %w", err)
+		}
+		batchOps = append(batchOps, batch)
+	}
+	return batchOps, nil
+}
 
 func LoadOwnableContract(addr common.Address, client bind.ContractBackend) (common.Address, ops.OwnershipTranferable, error) {
 	// Just using the ownership interface from here.

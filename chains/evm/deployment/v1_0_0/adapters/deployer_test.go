@@ -11,6 +11,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -25,6 +27,21 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
+
+func applyDeployMCMSAndAcceptOwnership(
+	t *testing.T,
+	env *cldf_deployment.Environment,
+	cs cldf_deployment.ChangeSetV2[deployops.MCMSDeploymentConfig],
+	cfg deployops.MCMSDeploymentConfig,
+) cldf_deployment.ChangesetOutput {
+	t.Helper()
+	output, err := cs.Apply(*env, cfg)
+	require.NoError(t, err)
+	if len(output.MCMSTimelockProposals) > 0 {
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	}
+	return output
+}
 
 func TestDeployMCMS(t *testing.T) {
 	t.Parallel()
@@ -42,7 +59,7 @@ func TestDeployMCMS(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 	cs := deployops.DeployMCMS(dReg, nil)
 
-	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+	output := applyDeployMCMSAndAcceptOwnership(t, env, cs, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
@@ -62,7 +79,6 @@ func TestDeployMCMS(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 	env.DataStore = output.DataStore.Seal()
 	// filter addresses for the test chain selector
@@ -131,6 +147,12 @@ func TestDeployMCMS(t *testing.T) {
 	selfAdmin, err := timelockC.HasRole(&bind.CallOpts{Context: t.Context()}, adminRoleAdmin, timelockAddr)
 	require.NoError(t, err)
 	require.True(t, selfAdmin, "CLLCCIP timelock should be self-governed")
+
+	for _, ref := range [][]datastore.AddressRef{proposerRef, bypasserRef, cancellerRef} {
+		owner, _, err := seq.LoadOwnableContract(common.HexToAddress(ref[0].Address), evmChain1.Client)
+		require.NoError(t, err)
+		require.Equal(t, timelockAddr, owner, "MCM %s should be owned by CLLCCIP timelock", ref[0].Type)
+	}
 }
 
 // TestDeployMCMS_TimelockAdminRoleTransfer verifies the admin-role logic inside DeployMCMS:
@@ -169,7 +191,7 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	})
 
 	t.Run("CLLCCIP bootstrap is self-governed", func(t *testing.T) {
-		output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		output := applyDeployMCMSAndAcceptOwnership(t, env, cs, deployops.MCMSDeploymentConfig{
 			AdapterVersion: deployops.MCMSVersion,
 			Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 				selector: {
@@ -181,7 +203,6 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 				},
 			},
 		})
-		require.NoError(t, err)
 		env.DataStore = output.DataStore.Seal()
 
 		timelockRef := env.DataStore.Addresses().Filter(
@@ -227,7 +248,7 @@ func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
 	cs := deployops.DeployMCMS(dReg, nil)
 
 	// Step 1: deploy the CLLCCIP MCMS instance
-	cllOutput, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+	cllOutput := applyDeployMCMSAndAcceptOwnership(t, env, cs, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector: {
@@ -239,7 +260,6 @@ func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err)
 	require.NoError(t, cllOutput.DataStore.Merge(env.DataStore))
 	env.DataStore = cllOutput.DataStore.Seal()
 
@@ -254,7 +274,7 @@ func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
 
 	// Step 2: deploy a second (non-CLLCCIP) MCMS instance.
 	// The deployer should automatically pick the CLLCCIP timelock as the admin.
-	rmnOutput, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+	rmnOutput := applyDeployMCMSAndAcceptOwnership(t, env, cs, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector: {
@@ -266,7 +286,6 @@ func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err)
 	require.NoError(t, rmnOutput.DataStore.Merge(env.DataStore))
 	env.DataStore = rmnOutput.DataStore.Seal()
 
@@ -311,7 +330,7 @@ func TestUpdateMCMSConfig(t *testing.T) {
 
 	// deploy one set of timelock and MCMS contracts on each chain
 	deployMCMS := deployops.DeployMCMS(dReg, nil)
-	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
+	output := applyDeployMCMSAndAcceptOwnership(t, env, deployMCMS, deployops.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
@@ -330,7 +349,6 @@ func TestUpdateMCMSConfig(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 	env.DataStore = output.DataStore.Seal()
 
@@ -412,6 +430,8 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
+	require.NotEmpty(t, output.MCMSTimelockProposals)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// check that MCMS configs are updated correctly
 	for _, sel := range []uint64{selector1, selector2} {
@@ -450,7 +470,7 @@ func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 	deployMCMS := deployops.DeployMCMS(dReg, nil)
 
 	// Step 1: deploy CLLCCIP on both chains (bootstrap — each self-governed).
-	cllOutput, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
+	cllOutput := applyDeployMCMSAndAcceptOwnership(t, env, deployMCMS, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
@@ -469,7 +489,6 @@ func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err)
 	require.Greater(t, len(cllOutput.Reports), 0)
 	require.NoError(t, cllOutput.DataStore.Merge(env.DataStore))
 	env.DataStore = cllOutput.DataStore.Seal()
@@ -488,7 +507,7 @@ func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 
 	// Step 2: deploy a second MCMS set (testQual) with CLLCCIP already in datastore.
 	// DeployMCMS should automatically use CLLCCIP timelock as admin.
-	testOutput, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
+	testOutput := applyDeployMCMSAndAcceptOwnership(t, env, deployMCMS, deployops.MCMSDeploymentConfig{
 		AdapterVersion: deployops.MCMSVersion,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
@@ -507,7 +526,6 @@ func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err)
 	require.Greater(t, len(testOutput.Reports), 0)
 	require.NoError(t, testOutput.DataStore.Merge(env.DataStore))
 	env.DataStore = testOutput.DataStore.Seal()
