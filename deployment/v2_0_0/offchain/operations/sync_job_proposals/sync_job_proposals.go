@@ -108,9 +108,6 @@ var SyncJobProposals = operations.NewOperation(
 				continue
 			}
 			for jobID, localJob := range nopJobs {
-				if localJob.Mode != shared.NOPModeCL {
-					continue
-				}
 				if localJob.JDJobID == "" {
 					continue
 				}
@@ -129,10 +126,6 @@ var SyncJobProposals = operations.NewOperation(
 			}
 
 			for jobID, localJob := range nopJobs {
-				if localJob.Mode != shared.NOPModeCL {
-					continue
-				}
-
 				if localJob.JDJobID == "" {
 					e.Logger.Debugw("Skipping job without JD job ID",
 						"nopAlias", nopAlias,
