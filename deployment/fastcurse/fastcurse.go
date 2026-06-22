@@ -31,8 +31,6 @@ type RMNCurseConfig struct {
 	MCMS mcms.Input
 }
 
-// CurseActionInput represent a curse action to be applied on a chain (ChainSelector) with a specific SubjectToCurse derived from the SubjectChainSelector
-// The curse action will by applied by calling the Curse method on the RMNRemote contract on the chain (ChainSelector)
 type CurseActionInput struct {
 	IsGlobalCurse        bool
 	ChainSelector        uint64
