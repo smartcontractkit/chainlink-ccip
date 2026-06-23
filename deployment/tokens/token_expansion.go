@@ -393,7 +393,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 						allRemotes[remoteSelector] = remoteConfig
 					}
 				}
-				if len(input.TokenTransferConfig.RemoteChains) != 0 {
+				// Reach the configure step when remote chains are explicitly listed OR when AutoMigrateRemoteChains
+				// is set (the latter discovers the active pool's remote chains downstream, so an empty RemoteChains
+				// is valid and must not be skipped here).
+				if len(input.TokenTransferConfig.RemoteChains) != 0 || input.TokenTransferConfig.AutoMigrateRemoteChains {
 					allTokenConfigs[selector] = *input.TokenTransferConfig
 				}
 			}

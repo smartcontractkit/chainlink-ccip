@@ -22,6 +22,20 @@
 - **INV-SRC-4**: Token amount must be non-zero if a token transfer is included.
 - **INV-SRC-5**: `executionGasLimit` in the encoded message must reflect the actual gas budget required for destination-chain execution. It must be the sum of: base execution gas, CCV verification gas (from all CCV receipts), pool gas overhead (from pool receipt), and user-specified gas limit. A zero `executionGasLimit` for a message that requires execution on the destination is invalid and must not be emitted.
 - **INV-SRC-6**: The message send operation must consume or invalidate the state it reads (sequence number, configuration) such that the same state cannot be used to produce a second message. If the send operation is non-atomic, the state mutation (sequence number increment) must be committed before or atomically with the message finalization. Stale state must not be reusable.
+- **INV-SRC-7**: The main message-sent event (`CCIPMessageSent`) must include all the following.
+  - **Destination chain selector** — the chain selector of the chain the message is sent to.
+  - **Sender** — the account that initiated the send.
+  - **Message ID** — the unique identifier for this message. See INV-ID-1.
+  - **Fee token** — the token used to pay the message fee.
+  - **Token amount before pool fees** — the transferred token amount before pool fee deductions. Zero if there is no token transfer.
+  - **Encoded message** — the wire-format message payload. See ENCODING_INVARIANTS.md.
+  - **Receipts** — one entry per fee recipient (CCVs, pool, executor, network). Each receipt contains:
+    - **Issuer** — the entity this receipt is for. For token receipts this is the pool, not the token.
+    - **Destination gas limit** — gas budget on the destination for this entity's work.
+    - **Destination byte overhead** — byte overhead on the destination for this entity's work.
+    - **Fee amount** — fee paid to this entity, in the fee token's smallest denomination.
+    - **Extra args** — source-chain extra args for this entity. May be empty.
+  - **Verifier blobs** — one offchain data blob per CCV. May differ from the verifier data submitted on the destination chain. May be empty.
 
 ---
 

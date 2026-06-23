@@ -107,6 +107,68 @@ func TestActivateRMN_Apply(t *testing.T) {
 	require.NotEqual(t, legacyARM, armReport.Output)
 }
 
+func TestActivateRMN_AccumulatesBatchOpsAcrossChains(t *testing.T) {
+	const (
+		chainSelectorA = uint64(5009297550715157269)
+		chainSelectorB = uint64(4949039107694359620)
+	)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelectorA, chainSelectorB}),
+	)
+	require.NoError(t, err)
+
+	ds := datastore.NewMemoryDataStore()
+	for _, sel := range []uint64{chainSelectorA, chainSelectorB} {
+		chain := e.BlockChains.EVMChains()[sel]
+		deployer := chain.DeployerKey.From
+		b := e.OperationsBundle
+
+		proxyRef, deployErr := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+			ChainSelector:  sel,
+			Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
+		}, nil)
+		require.NoError(t, deployErr)
+		require.NoError(t, ds.Addresses().Add(proxyRef))
+
+		_, ultraFastAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+		for _, ref := range ultraFastAddrs {
+			require.NoError(t, ds.Addresses().Add(ref))
+		}
+
+		_, rmnMCMSAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
+		for _, ref := range rmnMCMSAddrs {
+			require.NoError(t, ds.Addresses().Add(ref))
+		}
+	}
+	e.DataStore = ds.Seal()
+
+	mcmsRegistry := cs_core.GetRegistry()
+	out, err := changesets.ActivateRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+		MCMS: mcms.Input{
+			Qualifier:      common_utils.RMNTimelockQualifier,
+			TimelockAction: mcms_types.TimelockActionSchedule,
+			TimelockDelay:  mcms_types.MustParseDuration("0s"),
+			ValidUntil:     3759765795,
+		},
+		Cfg: changesets.ActivateRMNCfg{
+			ChainSels: []uint64{chainSelectorA, chainSelectorB},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, out.MCMSTimelockProposals, 1)
+
+	proposal := out.MCMSTimelockProposals[0]
+	require.Len(t, proposal.Operations, 2, "proposal should include acceptOwnership for each chain")
+	chainSelectors := make([]uint64, 0, len(proposal.Operations))
+	for _, op := range proposal.Operations {
+		chainSelectors = append(chainSelectors, uint64(op.ChainSelector))
+		require.Len(t, op.Transactions, 1, "each chain should have one acceptOwnership transaction")
+	}
+	require.ElementsMatch(t, []uint64{chainSelectorA, chainSelectorB}, chainSelectors)
+}
+
 func TestActivateRMN_MissingRMNMCMS(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
@@ -223,4 +285,3 @@ func deployMCMSInstanceForTest(
 
 	return timelockAddr, addresses
 }
-

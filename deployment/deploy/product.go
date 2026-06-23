@@ -118,6 +118,8 @@ type LaneVersionResolver interface {
 // of pool contracts is orthogonal).
 type AddressNormalizer interface {
 	NormalizeAddress(address string) (string, error)
+	BytesToString(address []byte) (string, error)
+	StringToBytes(address string) ([]byte, error)
 }
 
 type addressNormalizerID string

@@ -2,7 +2,9 @@ package chainaccessor
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 func processConfigResults(
@@ -78,9 +82,15 @@ func processSourceChainConfigResults(
 
 					v, err := sourceChainResults[i].GetResult()
 					if err != nil {
-						lggr.Errorw("Failed to get source chain config from result",
-							"chain", chain,
-							"error", err)
+						if isNoBindingsError(err) {
+							lggr.Debugw("no bindings for source chain config, ignore if chain is disabled",
+								"chain", chain,
+								"error", err)
+						} else {
+							lggr.Errorw("Failed to get source chain config from result",
+								"chain", chain,
+								"error", err)
+						}
 						continue
 					}
 
@@ -338,3 +348,10 @@ func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
 
 // resultProcessor defines a function type for processing individual results
 type resultProcessor func(any) error
+
+func isNoBindingsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, contractreader.ErrNoBindings) || strings.Contains(err.Error(), "no bindings")
+}

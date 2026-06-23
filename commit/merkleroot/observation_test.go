@@ -390,6 +390,14 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 	nextSeqNums := map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345, 7: 608, 19: 7713}
 	supportedChains := mapset.NewSet(knownSourceChains...)
 
+	liveLane := func(rmnDisabled bool) readerpkg.StaticSourceChainConfig {
+		return readerpkg.StaticSourceChainConfig{
+			IsEnabled:                 true,
+			OnRamp:                    []byte{0x01},
+			IsRMNVerificationDisabled: rmnDisabled,
+		}
+	}
+
 	testCases := []struct {
 		name      string
 		expResult []plugintypes.SeqNumChain
@@ -401,15 +409,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4): {
-							IsRMNVerificationDisabled: true,
-						},
-						cciptypes.ChainSelector(7): {
-							IsRMNVerificationDisabled: true,
-						},
-						cciptypes.ChainSelector(19): {
-							IsRMNVerificationDisabled: true,
-						},
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  liveLane(true),
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -432,15 +434,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4): {
-							IsRMNVerificationDisabled: true,
-						},
-						cciptypes.ChainSelector(7): {
-							IsRMNVerificationDisabled: true,
-						},
-						cciptypes.ChainSelector(19): {
-							IsRMNVerificationDisabled: false,
-						},
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  liveLane(true),
+						cciptypes.ChainSelector(19): liveLane(false),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -462,12 +458,8 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4): {
-							IsRMNVerificationDisabled: true,
-						},
-						cciptypes.ChainSelector(19): {
-							IsRMNVerificationDisabled: true,
-						},
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -489,15 +481,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4): {
-							IsRMNVerificationDisabled: false,
-						},
-						cciptypes.ChainSelector(7): {
-							IsRMNVerificationDisabled: false,
-						},
-						cciptypes.ChainSelector(19): {
-							IsRMNVerificationDisabled: true,
-						},
+						cciptypes.ChainSelector(4):  liveLane(false),
+						cciptypes.ChainSelector(7):  liveLane(false),
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -519,15 +505,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4): {
-							IsRMNVerificationDisabled: false,
-						},
-						cciptypes.ChainSelector(7): {
-							IsRMNVerificationDisabled: false,
-						},
-						cciptypes.ChainSelector(19): {
-							IsRMNVerificationDisabled: true,
-						},
+						cciptypes.ChainSelector(4):  liveLane(false),
+						cciptypes.ChainSelector(7):  liveLane(false),
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, cciptypes.ChainSelector(19)).
 					RunAndReturn(
@@ -539,6 +519,54 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				return ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "disabled source chain is skipped without querying",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  {IsEnabled: false, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+						cciptypes.ChainSelector(19): liveLane(true),
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.NotEqual(t, cciptypes.ChainSelector(7), chain)
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "source chain without onRamp is skipped without querying",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  {IsEnabled: true, IsRMNVerificationDisabled: true},
+						cciptypes.ChainSelector(19): liveLane(true),
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.NotEqual(t, cciptypes.ChainSelector(7), chain)
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
 				plugintypes.NewSeqNumChain(19, 7713),
 			},
 		},
@@ -581,8 +609,8 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		ccipReader := reader_mock.NewMockCCIPReader(t)
 		ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, hungRPCChains).
 			Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-				cciptypes.ChainSelector(4): {IsRMNVerificationDisabled: true},
-				cciptypes.ChainSelector(7): {IsRMNVerificationDisabled: true},
+				cciptypes.ChainSelector(4): liveLane(true),
+				cciptypes.ChainSelector(7): liveLane(true),
 			}, nil)
 		ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 			RunAndReturn(func(callCtx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
@@ -611,6 +639,50 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		result := o.ObserveLatestOnRampSeqNums(ctx)
 		assert.Equal(t, []plugintypes.SeqNumChain{plugintypes.NewSeqNumChain(7, 608)}, result)
 	})
+}
+
+func Test_isLiveOffRampSourceLane(t *testing.T) {
+	live := readerpkg.StaticSourceChainConfig{
+		IsEnabled:                 true,
+		OnRamp:                    []byte{0x01},
+		IsRMNVerificationDisabled: true,
+	}
+	assert.True(t, isLiveOffRampSourceLane(live, true))
+	assert.False(t, isLiveOffRampSourceLane(live, false))
+	assert.False(t, isLiveOffRampSourceLane(readerpkg.StaticSourceChainConfig{
+		IsEnabled: false, OnRamp: []byte{0x01},
+	}, true))
+	assert.False(t, isLiveOffRampSourceLane(readerpkg.StaticSourceChainConfig{
+		IsEnabled: true,
+	}, true))
+}
+
+func Test_classifyOffRampSourceLanes(t *testing.T) {
+	const (
+		live         cciptypes.ChainSelector = 1
+		disabled     cciptypes.ChainSelector = 2
+		noConfig     cciptypes.ChainSelector = 3
+		noOnRamp     cciptypes.ChainSelector = 4
+		rmnMisconfig cciptypes.ChainSelector = 5
+		liveTwo      cciptypes.ChainSelector = 6
+	)
+
+	supported := []cciptypes.ChainSelector{live, disabled, noConfig, noOnRamp, rmnMisconfig, liveTwo}
+	cfgs := map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+		live:         {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		disabled:     {IsEnabled: false, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		noOnRamp:     {IsEnabled: true, IsRMNVerificationDisabled: true},
+		rmnMisconfig: {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: false},
+		liveTwo:      {IsEnabled: true, OnRamp: []byte{0x02}, IsRMNVerificationDisabled: true},
+		// noConfig deliberately absent from the map
+	}
+
+	c := classifyOffRampSourceLanes(supported, cfgs)
+
+	assert.Equal(t, []cciptypes.ChainSelector{live, liveTwo}, c.live)
+	assert.Equal(t, []cciptypes.ChainSelector{noConfig, noOnRamp}, c.skippedNotALane)
+	assert.Equal(t, []cciptypes.ChainSelector{disabled}, c.skippedDisabled)
+	assert.Equal(t, []cciptypes.ChainSelector{rmnMisconfig}, c.rmnMisconfigured)
 }
 
 func Test_ObserveMerkleRoots(t *testing.T) {

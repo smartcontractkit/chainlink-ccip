@@ -111,8 +111,12 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	standardResultsCopy := extractStandardChainConfigResults(batchResult, standardOffRampRequestCount)
 	standardConfigs, err := processConfigResults(lggr, l.chainSelector, destChainSelector, standardResultsCopy)
 	if err != nil {
-		// Log error but don't return yet and attempt to process source chain configs
-		lggr.Errorw("failed to process standard chain config results", "err", err)
+		if isNoBindingsError(err) {
+			lggr.Debugw("no bindings while processing chain config snapshot, ignore if contracts are not synced yet",
+				"err", err)
+		} else {
+			lggr.Errorw("failed to process chain config snapshot results", "err", err)
+		}
 		standardConfigs = cciptypes.ChainConfigSnapshot{}
 	}
 

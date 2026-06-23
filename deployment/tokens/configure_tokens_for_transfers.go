@@ -13,6 +13,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -51,6 +52,23 @@ type TokenTransferConfig struct {
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
+	// AutoMigrateRemoteChains, when true, runs discovery in this changeset (before the adapter sequence):
+	// it reads the pool currently registered in the TAR, enumerates its supported remote chains, and fills
+	// in any missing RemoteChains entries (token, pool, decimals). Rate limits are imported later by
+	// ConfigureTokenPoolForRemoteChain from the active pool. Explicit RemoteChains entries take precedence.
+	// Requires an adapter implementing TokenPoolMigrator (EVM v2.0.0 today).
+	//
+	// When false (default), this changeset does not discover remotes. Upgrade safety is enforced downstream
+	// by ConfigureTokenPoolForRemoteChains (EVM v2.0.0), which errors if RemoteChains omits a chain the
+	// active pool already supports.
+	//
+	// Discovery resolves remote token decimals via each remote chain family's adapter; remote pool addresses
+	// are normalized via the AddressNormalizer registry before ResolveTokenPoolRef.
+	//
+	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
+	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
+	// explicitly in that case.
+	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -92,6 +110,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 }
 
 func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, mcmsInput mcms.Input, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
+	normalizerRegistry := deploy.GetAddressNormalizerRegistry()
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -144,6 +163,69 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			}
 		}
 
+		if token.AutoMigrateRemoteChains {
+			localMigrator, ok := adapter.(TokenPoolMigrator)
+			if !ok {
+				return nil, nil, nil, fmt.Errorf("adapter for chain selector %d does not support token pool migration, which is required for auto-migrating remote chains", selector)
+			}
+			activePool, err := localMigrator.GetActivePool(e, selector, token.RegistryRef, fullTokenRef)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to get active pool for token pool on chain selector %d: %w", selector, err)
+			}
+			allRemotes := []uint64{}
+			if len(activePool) > 0 {
+				// An empty active pool means the token has no currently-registered pool (e.g. a brand-new token)
+				// so there are no remotes to carry forward and allRemotes stays nil (the loop below is a no-op).
+				if supported, err := localMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
+				} else {
+					allRemotes = supported
+				}
+			}
+			for _, remoteSelector := range allRemotes {
+				if _, ok := remoteChains[remoteSelector]; !ok {
+					remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remoteNormalizer, ok := normalizerRegistry.GetAddressNormalizer(remoteFamily)
+					if !ok {
+						return nil, nil, nil, fmt.Errorf("no address normalizer found for chain family %s of remote chain selector %d", remoteFamily, remoteSelector)
+					}
+					remoteTokenBytes, err := localMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to get remote token for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remotePoolBytes, err := localMigrator.GetRemotePool(e, selector, activePool, remoteSelector)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remotePoolAddr, err := remoteNormalizer.BytesToString(remotePoolBytes)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to normalize remote pool address for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remotePoolRef, err := ResolveTokenPoolRef(e, tokenRegistry, remoteSelector, datastore.AddressRef{Address: remotePoolAddr})
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to resolve token pool ref for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remoteAdapter, _, err := ResolveAdapter(tokenRegistry, remoteSelector, remotePoolRef.Version)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to resolve adapter for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remoteTokenDecimals, err := remoteAdapter.DeriveTokenDecimals(e, remoteSelector, remotePoolRef, remoteTokenBytes)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to derive remote token decimals for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remoteChains[remoteSelector] = RemoteChainConfig[[]byte, string]{
+						// We only need to set a few fields here - the other ones will be imported later downstream
+						RemoteDecimals: remoteTokenDecimals,
+						RemoteToken:    remoteTokenBytes,
+						RemotePool:     remotePoolBytes,
+					}
+				}
+			}
+		}
+
 		// Resolve the timelock address if a liquidity migration is requested.
 		var timelockAddress string
 		if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
@@ -188,7 +270,8 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			srcPoolVers := tokenPool.Version
 			srcTokenRef := fullTokenRef
 			srcSelector := selector
-			output, err := maybeApplyTokenTransferFeeConfig(e,
+			output, err := maybeApplyTokenTransferFeeConfig(
+				e,
 				srcPoolVers,
 				srcSelector,
 				dstSelector,
@@ -246,14 +329,21 @@ func maybeApplyTokenTransferFeeConfig(
 	}
 
 	// Fee Quoter resolution part 2: get the current fee quoter from the on ramp
-	adapter, ok := feeRegistry.GetFeeAdapter(fam, onRampRef.Version)
+	onRampAdp, ok := feeRegistry.GetFeeAdapter(fam, onRampRef.Version)
 	if !ok {
 		e.Logger.Warnf("No fee adapter found for chain selector %d, version %s, skipping token transfer fee config for remote chain selector %d", src, onRampRef.Version, dst)
 		return emptyReport, nil
 	}
-	feeRef, err := adapter.GetFeeContractRef(e, onRampRef, src, dst)
+	feeRef, err := onRampAdp.GetFeeContractRef(e, onRampRef, src, dst)
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+
+	// Fee Quoter resolution part 3: use the fee quoter version for read/write operations.
+	// A v1.6 OnRamp may point at a v2.0 FeeQuoter, so the on ramp adapter alone is not sufficient.
+	feeQuoterAdp, ok := feeRegistry.GetFeeAdapter(fam, feeRef.Version)
+	if !ok {
+		return emptyReport, fmt.Errorf("no fee adapter found for chain selector %d and fee quoter version %s", src, feeRef.Version)
 	}
 
 	// NOTE: the TokenTransferFeeConfig for token pools is V2-focused and
@@ -263,7 +353,7 @@ func maybeApplyTokenTransferFeeConfig(
 	// at the moment, but realistically speaking this should not an issue
 	// since we've never had the need to modify it after we initially set
 	// it to MaxUint32.
-	onChainConfig, err := adapter.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
+	onChainConfig, err := feeQuoterAdp.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -303,8 +393,9 @@ func maybeApplyTokenTransferFeeConfig(
 	}
 
 	// Apply the token transfer fee config
-	result, err := cldf_ops.ExecuteSequence(e.OperationsBundle,
-		adapter.SetTokenTransferFee(e, feeRef),
+	result, err := cldf_ops.ExecuteSequence(
+		e.OperationsBundle,
+		feeQuoterAdp.SetTokenTransferFee(e, feeRef),
 		e.BlockChains,
 		fees.SetTokenTransferFeeSequenceInput{
 			Selector: src,

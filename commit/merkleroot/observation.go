@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -39,6 +40,53 @@ import (
 
 var ErrSignaturesNotProvidedByLeader = errors.New("rmn signatures were not provided by the leader, " +
 	"in most cases this indicates that the RMN nodes did not include any chain in their response")
+
+const skippedLanesLogFrequency = 30 * time.Minute
+
+var lastSkippedLanesLog atomic.Pointer[time.Time]
+
+// isLiveOffRampSourceLane reports whether the offramp has an enabled inbound lane from sourceChain.
+func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool) bool {
+	return exists && cfg.IsEnabled && len(cfg.OnRamp) > 0
+}
+
+// offRampLaneClassification buckets source chains by their offramp lane status.
+type offRampLaneClassification struct {
+	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
+	live []cciptypes.ChainSelector
+	// skippedNotALane have no offramp config or no onRamp configured.
+	skippedNotALane []cciptypes.ChainSelector
+	// skippedDisabled have an offramp config but are disabled.
+	skippedDisabled []cciptypes.ChainSelector
+	// rmnMisconfigured are live lanes that unexpectedly have RMN verification enabled.
+	rmnMisconfigured []cciptypes.ChainSelector
+}
+
+// classifyOffRampSourceLanes buckets the supported source chains based on their offramp source chain
+// config. Only "live" lanes should be queried for onRamp seq nums, the other buckets are skipped and
+// exist for logging.
+func classifyOffRampSourceLanes(
+	supported []cciptypes.ChainSelector,
+	cfgs map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig,
+) offRampLaneClassification {
+	var c offRampLaneClassification
+	for _, sourceChain := range supported {
+		cfg, ok := cfgs[sourceChain]
+		switch {
+		case !ok:
+			c.skippedNotALane = append(c.skippedNotALane, sourceChain)
+		case !cfg.IsEnabled:
+			c.skippedDisabled = append(c.skippedDisabled, sourceChain)
+		case len(cfg.OnRamp) == 0:
+			c.skippedNotALane = append(c.skippedNotALane, sourceChain)
+		case !cfg.IsRMNVerificationDisabled:
+			c.rmnMisconfigured = append(c.rmnMisconfigured, sourceChain)
+		default:
+			c.live = append(c.live, sourceChain)
+		}
+	}
+	return c
+}
 
 // ObservationQuorum requires "across all chains" at least 2F+1 observations.
 func (p *Processor) ObservationQuorum(
@@ -581,22 +629,28 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
+	classification := classifyOffRampSourceLanes(supportedSourceChains, sourceChainsCfg)
+
+	if len(classification.skippedNotALane) > 0 || len(classification.skippedDisabled) > 0 {
+		logutil.LogWhenExceedFrequency(&lastSkippedLanesLog, skippedLanesLogFrequency, func() {
+			lggr.Debugw("skipping onRamp seq num observations for non-live lanes",
+				"noConfigOrOnRamp", classification.skippedNotALane,
+				"disabled", classification.skippedDisabled,
+			)
+		})
+	}
+	if len(classification.rmnMisconfigured) > 0 {
+		lggr.Warnw("rmn enablement is misconfigured on these lanes, skipping observations",
+			"sources", classification.rmnMisconfigured,
+		)
+	}
+
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(classification.live))
 
 	wg := &sync.WaitGroup{}
-	for _, sourceChain := range supportedSourceChains {
+	for _, sourceChain := range classification.live {
 		wg.Go(func() {
-			// RMN should never be enabled on any source chain lane
-			// if it is misconfigured, we skip observations to avoid impact to the report
-			if _, ok := sourceChainsCfg[sourceChain]; !ok {
-				lggr.Warnw("source chain config not found, skipping observations", "source", sourceChain)
-				return
-			}
-			if !sourceChainsCfg[sourceChain].IsRMNVerificationDisabled {
-				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
-				return
-			}
 			chainCtx, chainCancel := rpctimeout.Context(ctx)
 			defer chainCancel()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(chainCtx, sourceChain)
