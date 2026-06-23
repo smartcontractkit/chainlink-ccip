@@ -336,19 +336,30 @@ func TestSyncJobProposals_ListProposalsError_RecordsErrorAndContinues(t *testing
 	assert.Contains(t, report.Output.Errors[0].Error, "JD unavailable")
 }
 
-func TestSyncJobProposals_StandaloneModeJobs_Skipped(t *testing.T) {
+func TestSyncJobProposals_StandaloneModeJobs(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 
 	job := shared.JobInfo{
 		Spec:     "type = 'ccv'",
 		JDJobID:  "jd-job-1",
+		NodeID:   "node-1",
 		JobID:    "nop-1-default-executor",
 		NOPAlias: "nop-1",
 		Mode:     shared.NOPModeStandalone,
+		Proposals: map[string]shared.ProposalRevision{
+			"prop-1": {ProposalID: "prop-1", Revision: 1, Status: shared.JobProposalStatusPending, Spec: "type = 'ccv'"},
+		},
 	}
 	require.NoError(t, offchain.SaveJob(ds, job))
 
 	mockClient := ccvmocks.NewMockJDClient(t)
+	mockClient.EXPECT().ListProposals(mock.Anything, mock.Anything).Return(
+		&jobv1.ListProposalsResponse{
+			Proposals: []*jobv1.Proposal{
+				{Id: "prop-1", JobId: "jd-job-1", Revision: 1, Status: jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED, Spec: "type = 'ccv'"},
+			},
+		}, nil,
+	)
 
 	bundle := newTestBundle(t)
 	env := newTestEnvironmentWithDataStore(t, ds.Seal(), []string{"node-1"})
@@ -359,10 +370,20 @@ func TestSyncJobProposals_StandaloneModeJobs_Skipped(t *testing.T) {
 	}, SyncJobProposalsInput{})
 
 	require.NoError(t, err)
-	assert.Empty(t, report.Output.StatusChanges)
+	require.Len(t, report.Output.StatusChanges, 1)
+	assert.Equal(t, shared.NOPAlias("nop-1"), report.Output.StatusChanges[0].NOPAlias)
+	assert.Equal(t, shared.JobID("nop-1-default-executor"), report.Output.StatusChanges[0].JobID)
+	assert.Equal(t, shared.JobProposalStatusPending, report.Output.StatusChanges[0].OldStatus)
+	assert.Equal(t, shared.JobProposalStatusApproved, report.Output.StatusChanges[0].NewStatus)
 	assert.Empty(t, report.Output.SpecDrifts)
 	assert.Empty(t, report.Output.OrphanedJobs)
 	assert.Empty(t, report.Output.Errors)
+
+	updatedJob, err := offchain.GetJob(report.Output.DataStore.Seal(), "nop-1", "nop-1-default-executor")
+	require.NoError(t, err)
+	assert.Equal(t, shared.NOPModeStandalone, updatedJob.Mode)
+	assert.Equal(t, shared.JobProposalStatusApproved, updatedJob.LatestStatus())
+	assert.Equal(t, "prop-1", updatedJob.ActiveProposalID)
 }
 
 func TestSyncJobProposals_JobWithoutJDJobID_Skipped(t *testing.T) {
