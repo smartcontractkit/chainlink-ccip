@@ -950,11 +950,6 @@ func (l *DefaultAccessor) GetOffRampSourceChainsConfig(
 	panic("implement me")
 }
 
-func (l *DefaultAccessor) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	// TODO(NONEVM-1865): implement
-	panic("implement me")
-}
-
 func (l *DefaultAccessor) GetRMNCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	// TODO(NONEVM-1865): implement
 	panic("implement me")

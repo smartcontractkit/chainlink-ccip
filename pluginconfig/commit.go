@@ -15,12 +15,10 @@ import (
 
 // We use this default value when the config is not set for a specific chain.
 const (
-	defaultRMNSignaturesTimeout               = 0
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
-	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
 	defaultInflightPriceCheckRetries          = 5
 	defaultAsyncObserverSyncFreq              = 5 * time.Second
@@ -34,7 +32,6 @@ type TokenInfo = cciptypes.TokenInfo
 // This is posted onchain as part of the OCR configuration process of the commit plugin.
 // Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
 // method on the ReportingPluginFactory interface.
-// WARN: The JSON encoding of this struct is a hard dependency for RMN.
 type CommitOffchainConfig struct {
 	// RemoteGasPriceBatchWriteFrequency is the frequency at which the commit plugin
 	// should write gas prices to the remote chain.
@@ -62,21 +59,10 @@ type CommitOffchainConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
 
-	// RMNSignaturesTimeout is the timeout for RMN signature verification.
-	// Typically set to `MaxQueryDuration - e`, where e some small duration.
-	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
-
-	// RMNEnabled is a flag to enable/disable RMN signature verification.
-	// WARN: This is a hard dependency for RMN including the json encoding of CommitOffchainConfig.
-	RMNEnabled bool `json:"rmnEnabled"`
-
 	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
 	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
 	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
-
-	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
-	SignObservationPrefix string `json:"signObservationPrefix"`
 
 	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
@@ -128,23 +114,18 @@ type CommitOffchainConfig struct {
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
 	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
 	// Disable by setting to 0.
-	// NOTE:
-	//  * this can only be used if RMNEnabled == false.
-	//  * if MaxMerkleRootsPerReport is non-zero, MultipleReportsEnabled should be set to true.
+	// NOTE: if MaxMerkleRootsPerReport is non-zero, MultipleReportsEnabled should be set to true.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
 
 	// MaxPricesPerReport is the maximum number of token and/or gas prices that may be included in a single report.
 	// Price data will not be included with MerkleRoots when this value is set.
 	// Disable by setting to 0.
-	// NOTE:
-	//  * this can only be used if RMNEnabled == false.
-	//  * if MaxPricesPerReport is non-zero, MultipleReportsEnabled should be set to true.
+	// NOTE: if MaxPricesPerReport is non-zero, MultipleReportsEnabled should be set to true.
 	MaxPricesPerReport uint64 `json:"maxPricesPerReport"`
 
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
 	// in order to avoid delays when there are reports from multiple sources.
-	// NOTE: this can only be used if RMNEnabled == false.
 	MultipleReportsEnabled bool `json:"multipleReports"`
 
 	// PopulateTxHashEnabled enables populating the TxHash field in message headers.
@@ -179,10 +160,6 @@ func (c *CommitOffchainConfig) applyDefaults() {
 
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		c.RemoteGasPriceBatchWriteFrequency = *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency)
-	}
-
-	if c.SignObservationPrefix == "" {
-		c.SignObservationPrefix = defaultSignObservationPrefix
 	}
 
 	if c.TransmissionDelayMultiplier == 0 {
@@ -220,9 +197,6 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
 		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 	}
-	// RMN has been deprecated. Hardcode the configuration to avoid bringing down CCIP 1.6.
-	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
-	c.RMNEnabled = false
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -251,20 +225,12 @@ func (c *CommitOffchainConfig) Validate() error {
 		return fmt.Errorf("newMsgScanBatchSize not set")
 	}
 
-	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
-		return fmt.Errorf("rmnSignaturesTimeout not set")
-	}
-
 	if c.MaxReportTransmissionCheckAttempts == 0 {
 		return fmt.Errorf("maxReportTransmissionCheckAttempts not set")
 	}
 
 	if c.MaxMerkleTreeSize == 0 {
 		return fmt.Errorf("maxMerkleTreeSize not set")
-	}
-
-	if c.SignObservationPrefix == "" {
-		return fmt.Errorf("signObservationPrefix not set")
 	}
 
 	if !c.MerkleRootAsyncObserverDisabled &&
@@ -280,17 +246,8 @@ func (c *CommitOffchainConfig) Validate() error {
 	}
 
 	// Options for multiple reports. These settings were added so that Solana can be configured
-	// to split merkle roots across multiple reports. The functions do not support RMN, so it is
-	// an error to use them unless RMNEnabled == false.
+	// to split merkle roots across multiple reports.
 	var errs []error
-	if c.RMNEnabled {
-		if c.MultipleReportsEnabled {
-			errs = append(errs, fmt.Errorf("multipleReports do not support RMN, RMNEnabled cannot be true"))
-		}
-		if c.MaxMerkleRootsPerReport != 0 {
-			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport does not support RMN, RMNEnabled cannot be true"))
-		}
-	}
 	if c.MaxMerkleRootsPerReport != 0 && !c.MultipleReportsEnabled {
 		errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport cannot be used without MultipleReportsEnabled"))
 	}

@@ -32,7 +32,7 @@ func TestReportBuilders(t *testing.T) {
 					SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 					MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 				},
-				{ // this one is blessed.
+				{
 					ChainSel:      3,
 					OnRampAddress: []byte{1, 2, 3},
 					SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),

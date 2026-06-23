@@ -262,7 +262,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "we are in the building report next phase but leader said we want to retry rmn sigs",
+			name: "report intervals selected preserves transmission check attempts",
 			prevOutcome: Outcome{
 				OutcomeType:                     ReportIntervalsSelected,
 				ReportTransmissionCheckAttempts: 123, // <--- random value to verify if the same outcome is sent
@@ -650,7 +650,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "consensus merkle roots are reported without RMN filtering",
+			name: "consensus merkle roots are reported",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
@@ -731,7 +731,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "invalid RMN signatures in query do not affect merkle root outcome",
+			name: "empty query does not affect merkle root outcome",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},

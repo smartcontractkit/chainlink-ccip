@@ -289,9 +289,9 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 
 func Test_IsStaleReportMerkleRoots(t *testing.T) {
 	sourceChainConfig := map[ccipocr3.ChainSelector]reader2.StaticSourceChainConfig{
-		10: {IsRMNVerificationDisabled: false, IsEnabled: true},
-		20: {IsRMNVerificationDisabled: false, IsEnabled: true},
-		30: {IsRMNVerificationDisabled: true, IsEnabled: true},
+		10: {IsEnabled: true},
+		20: {IsEnabled: true},
+		30: {IsEnabled: true},
 	}
 
 	testCases := []struct {
@@ -367,17 +367,10 @@ func Test_IsStaleReportMerkleRoots(t *testing.T) {
 			rep := ccipocr3.CommitPluginReport{}
 			chains := make([]ccipocr3.ChainSelector, 0, len(tc.onRampNextSeqNum))
 			for _, snc := range tc.onRampNextSeqNum {
-				if sourceChainConfig[snc.ChainSel].IsRMNVerificationDisabled {
-					rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, ccipocr3.MerkleRootChain{
-						ChainSel:     snc.ChainSel,
-						SeqNumsRange: ccipocr3.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-					})
-				} else {
-					rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, ccipocr3.MerkleRootChain{
-						ChainSel:     snc.ChainSel,
-						SeqNumsRange: ccipocr3.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-					})
-				}
+				rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, ccipocr3.MerkleRootChain{
+					ChainSel:     snc.ChainSel,
+					SeqNumsRange: ccipocr3.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+				})
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
@@ -391,7 +384,6 @@ func Test_IsStaleReportMerkleRoots(t *testing.T) {
 				ccipReader: reader,
 			}
 			report := ccipocr3.CommitPluginReport{
-				BlessedMerkleRoots:   rep.BlessedMerkleRoots,
 				UnblessedMerkleRoots: rep.UnblessedMerkleRoots,
 			}
 			err := p.isStaleReport(ctx, 1, report)
@@ -453,7 +445,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 				ccipReader: reader,
 			}
 			report := ccipocr3.CommitPluginReport{
-				BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
+				UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
 			err := p.isStaleReport(ctx, tc.reportSeqNum, report)
 			if tc.shouldBeStale {

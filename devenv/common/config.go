@@ -78,10 +78,7 @@ var (
 			TokenPriceBatchWriteFrequency:      *config.MustNewDuration(TokenPriceBatchWriteFrequency),
 			NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
 			MaxReportTransmissionCheckAttempts: 5,
-			RMNEnabled:                         false,
-			RMNSignaturesTimeout:               30 * time.Minute,
 			MaxMerkleTreeSize:                  merklemulti.MaxNumberTreeLeaves,
-			SignObservationPrefix:              "chainlink ccip 1.6 rmn observation",
 			MerkleRootAsyncObserverDisabled:    false,
 			MerkleRootAsyncObserverSyncFreq:    4 * time.Second,
 			MerkleRootAsyncObserverSyncTimeout: 12 * time.Second,
@@ -199,10 +196,7 @@ var (
 		TokenPriceBatchWriteFrequency:      *config.MustNewDuration(TokenPriceBatchWriteFrequency),
 		NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
 		MaxReportTransmissionCheckAttempts: 10,
-		RMNSignaturesTimeout:               6900 * time.Millisecond,
-		RMNEnabled:                         true,
 		MaxMerkleTreeSize:                  merklemulti.MaxNumberTreeLeaves,
-		SignObservationPrefix:              "chainlink ccip 1.6 rmn observation",
 		// TransmissionDelayMultiplier for non-ETH (i.e, typically fast) chains should be pretty aggressive.
 		// e.g assuming a 2s blocktime, 15 seconds is ~8 blocks.
 		TransmissionDelayMultiplier:        TransmissionDelayMultiplier,

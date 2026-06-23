@@ -51,7 +51,7 @@ func Test_maxQueryLength(t *testing.T) {
 }
 
 func Test_maxObservationLength(t *testing.T) {
-	const maxContractsPerChain = 6 // router/onramp/offramp/rmnHome/rmnRemote/priceRegistry
+	const maxContractsPerChain = 6 // router/onramp/offramp/rmnRemote/priceRegistry/nonceManager
 
 	merkleRootObs := merkleroot.Observation{
 		MerkleRoots:        make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),

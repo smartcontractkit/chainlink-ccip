@@ -45,14 +45,12 @@ func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool)
 
 // offRampLaneClassification buckets source chains by their offramp lane status.
 type offRampLaneClassification struct {
-	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
+	// live lanes are enabled and have an onRamp configured.
 	live []cciptypes.ChainSelector
 	// skippedNotALane have no offramp config or no onRamp configured.
 	skippedNotALane []cciptypes.ChainSelector
 	// skippedDisabled have an offramp config but are disabled.
 	skippedDisabled []cciptypes.ChainSelector
-	// rmnMisconfigured are live lanes that unexpectedly have RMN verification enabled.
-	rmnMisconfigured []cciptypes.ChainSelector
 }
 
 // classifyOffRampSourceLanes buckets the supported source chains based on their offramp source chain
@@ -72,8 +70,6 @@ func classifyOffRampSourceLanes(
 			c.skippedDisabled = append(c.skippedDisabled, sourceChain)
 		case len(cfg.OnRamp) == 0:
 			c.skippedNotALane = append(c.skippedNotALane, sourceChain)
-		case !cfg.IsRMNVerificationDisabled:
-			c.rmnMisconfigured = append(c.rmnMisconfigured, sourceChain)
 		default:
 			c.live = append(c.live, sourceChain)
 		}
@@ -438,11 +434,6 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				"disabled", classification.skippedDisabled,
 			)
 		})
-	}
-	if len(classification.rmnMisconfigured) > 0 {
-		lggr.Warnw("rmn enablement is misconfigured on these lanes, skipping observations",
-			"sources", classification.rmnMisconfigured,
-		)
 	}
 
 	mu := &sync.Mutex{}

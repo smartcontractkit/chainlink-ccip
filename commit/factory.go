@@ -106,7 +106,6 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 	}
 }
 
-//nolint:gocyclo
 func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	lggr := logutil.WithPluginConstants(p.baseLggr, "Commit", p.donID, config.OracleID, config.ConfigDigest)
@@ -118,11 +117,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	lggr.Infow("Commit Offchain Config", "offchainConfig", offchainConfig)
 
-	if offchainConfig.RMNEnabled {
-		// we do this here to utilize logger without passing it downstream
-		lggr.Warnw("RMN has been deprecated, RMNEnabled is being set to false", "rmnEnabled", offchainConfig.RMNEnabled)
-		offchainConfig.RMNEnabled = false
-	}
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}

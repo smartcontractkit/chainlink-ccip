@@ -47,11 +47,3 @@ packages:
             AddressCodec:
             CommitPluginCodec:
             ChainAccessor:
-    github.com/smartcontractkit/libocr/networking:
-        interfaces:
-            PeerGroupFactory:
-                config:
-                    dir: mocks/libocr_networking/
-            PeerGroup:
-                config:
-                    dir: mocks/libocr_networking/

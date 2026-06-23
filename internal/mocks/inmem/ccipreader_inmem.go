@@ -191,10 +191,6 @@ func (r InMemoryCCIPReader) DiscoverContracts(
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	return cciptypes.RemoteConfig{}, nil
-}
-
 func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	return cciptypes.CurseInfo{
 		CursedSourceChains: map[cciptypes.ChainSelector]bool{},

@@ -10,7 +10,6 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/smartcontractkit/chain-selectors v1.0.100
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6
 	github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.43.0
