@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	jobpb "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
@@ -253,23 +252,11 @@ func TestApplyVerifierConfig_HappyPathBuildsJobSpecs(t *testing.T) {
 	topo := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
-			{Id: "node-1", Name: "nop1"},
-			{Id: "node-2", Name: "nop2"},
-		}}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
-			chainConfig("node-1", "90000001"),
-			chainConfig("node-2", "90000001"),
-		}}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -332,23 +319,12 @@ func TestApplyVerifierConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 	topo := newVerifierTopology([]string{"nop1", "nop2", "nop3"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
-			{Id: "node-1", Name: "nop1"},
-			{Id: "node-2", Name: "nop2"},
-			{Id: "node-3", Name: "nop3"},
-		}}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
-			chainConfig("node-1", "90000001"),
-		}}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2", "node-3"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "nop2"},
+		{nodeID: "node-3", nopAlias: "nop3"},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -506,21 +482,10 @@ func TestApplyVerifierConfig_UsesAllCommitteeChains(t *testing.T) {
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
-			{Id: "node-1", Name: "nop1"},
-		}}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
-			chainConfig("node-1", "90000001"),
-		}}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{

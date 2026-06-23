@@ -7,13 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/mocks"
-	jobpb "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -23,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
@@ -41,67 +37,6 @@ func newExecutorTestEnvWithDS(t *testing.T, selectors []uint64, ds datastore.Dat
 			operations.NewMemoryReporter(),
 		),
 	}
-}
-
-type mockJDNode struct {
-	nodeID   string
-	nopAlias string
-	chainIDs []string
-}
-
-// expectJDInteractions sets up the expected interactions with the mock Job Distributor client for the given nodes.
-func expectJDInteractions(t *testing.T, mockJD *mocks.MockClient, nodes []mockJDNode, expectRevoke bool) []string {
-	t.Helper()
-	return expectJDInteractionsWithProposeJob(t, mockJD, nodes, expectRevoke, nil)
-}
-
-// expectJDInteractionsWithProposeJob sets up the expected interactions with the mock Job Distributor client for the given nodes, allowing for a custom function to be called on each ProposeJob request.
-func expectJDInteractionsWithProposeJob(
-	t *testing.T,
-	mockJD *mocks.MockClient,
-	nodes []mockJDNode,
-	expectRevoke bool,
-	onPropose func(*jobpb.ProposeJobRequest),
-) []string {
-	t.Helper()
-
-	nodeIDs := make([]string, 0, len(nodes))
-	jdNodes := make([]*nodev1.Node, 0, len(nodes))
-	chainConfigs := make([]*nodev1.ChainConfig, 0)
-	for _, node := range nodes {
-		nodeIDs = append(nodeIDs, node.nodeID)
-		jdNodes = append(jdNodes, &nodev1.Node{Id: node.nodeID, Name: node.nopAlias})
-		for _, chainID := range node.chainIDs {
-			chainConfigs = append(chainConfigs, chainConfig(node.nodeID, chainID))
-		}
-	}
-
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{Nodes: jdNodes}, nil,
-	)
-	if len(chainConfigs) > 0 {
-		mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-			&nodev1.ListNodeChainConfigsResponse{ChainConfigs: chainConfigs}, nil,
-		)
-	}
-	proposeExpectation := mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).RunAndReturn(
-		func(_ context.Context, req *jobpb.ProposeJobRequest, _ ...grpc.CallOption) (*jobpb.ProposeJobResponse, error) {
-			if onPropose != nil {
-				onPropose(req)
-			}
-			return &jobpb.ProposeJobResponse{
-				Proposal: &jobpb.Proposal{Id: "proposal-" + req.NodeId, JobId: "job-" + req.NodeId, Spec: req.Spec, Revision: 1},
-			}, nil
-		},
-	)
-	if onPropose == nil {
-		proposeExpectation.Maybe()
-	}
-	if expectRevoke {
-		mockJD.EXPECT().RevokeJob(mock.Anything, mock.Anything).Return(&jobpb.RevokeJobResponse{}, nil)
-	}
-
-	return nodeIDs
 }
 
 func TestApplyExecutorConfig_GeneratesValidJobSpec(t *testing.T) {
@@ -135,29 +70,11 @@ func TestApplyExecutorConfig_GeneratesValidJobSpec(t *testing.T) {
 	topo.IndexerAddress = []string{"http://indexer:8100", "http://indexer:8101"}
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{
-			Nodes: []*nodev1.Node{
-				{Id: "node-1", Name: "nop1"},
-				{Id: "node-2", Name: "nop2"},
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				chainConfig("node-1", "90000001"),
-				chainConfig("node-1", "90000002"),
-				chainConfig("node-2", "90000001"),
-				chainConfig("node-2", "90000002"),
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001", "90000002"}},
+	}, false)
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
