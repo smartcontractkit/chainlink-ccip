@@ -190,16 +190,15 @@ func Test_maxOutcomeLength(t *testing.T) {
 
 func Test_maxReportLength(t *testing.T) {
 	rep := ccipocr3.CommitPluginReport{
-		BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
+		UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
 		PriceUpdates: ccipocr3.PriceUpdates{
 			TokenPriceUpdates: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
 			GasPriceUpdates:   make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
 		},
-		RMNSignatures: make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
 	}
 
-	for i := range rep.BlessedMerkleRoots {
-		rep.BlessedMerkleRoots[i] = ccipocr3.MerkleRootChain{
+	for i := range rep.UnblessedMerkleRoots {
+		rep.UnblessedMerkleRoots[i] = ccipocr3.MerkleRootChain{
 			ChainSel:      math.MaxUint64,
 			OnRampAddress: make([]byte, 40),
 			SeqNumsRange:  ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),

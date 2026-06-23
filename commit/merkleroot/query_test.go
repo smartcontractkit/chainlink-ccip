@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func TestProcessor_Query(t *testing.T) {
@@ -44,9 +43,6 @@ func TestProcessor_Query(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := Processor{
 				lggr: logger.Test(t),
-				offchainCfg: pluginconfig.CommitOffchainConfig{
-					RMNEnabled: true,
-				},
 			}
 
 			q, err := p.Query(ctx, tc.prevOutcome)

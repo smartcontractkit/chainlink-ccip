@@ -32,9 +32,6 @@ const (
 	// Its primary purpose is to assist in defining the limits below.
 	estimatedMaxNumberOfSourceChains = 900
 
-	// Estimated maximum number of RMN nodes the system will support.
-	estimatedMaxRmnNodesCount = 256
-
 	// Estimated maximum number of priced tokens that the Commit DON supports.
 	// This value does not indicate a system limitation but just an estimation to properly tune the OCR parameters.
 	// The value can be adjusted as needed.
@@ -54,7 +51,7 @@ const (
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
-	maxReportLength = 128_2933
+	maxReportLength = 1_245_057
 
 	// maxReportCount is set very high because some chains may require many reports per round.
 	maxReportCount = 1000

@@ -43,7 +43,6 @@ func Test_Processor_Outcome(t *testing.T) {
 		bigF                               int
 		destChainSel                       cciptypes.ChainSelector
 		maxMerkleTreeSize                  uint64
-		rmnEnabled                         bool
 		multipleReports                    bool
 		maxReportTransmissionCheckAttempts int
 		expOutcome                         Outcome
@@ -87,7 +86,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 256,
-			rmnEnabled:        false,
 			expOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
@@ -145,7 +143,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 256,
-			rmnEnabled:        false,
 			expOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
@@ -194,7 +191,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 256,
-			rmnEnabled:        false,
 			expOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
@@ -248,7 +244,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10, // <------ notice that this will lead to range truncation
-			rmnEnabled:        false,
 			expOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
@@ -294,7 +289,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10,
-			rmnEnabled:        true,
 			expOutcome: Outcome{
 				OutcomeType: ReportEmpty,
 			},
@@ -369,7 +363,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10,
-			rmnEnabled:        true,
 			expOutcome: Outcome{
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
@@ -424,7 +417,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:                               1,
 			destChainSel:                       chainD,
 			maxMerkleTreeSize:                  20,
-			rmnEnabled:                         true,
 			maxReportTransmissionCheckAttempts: 5,
 			expOutcome: Outcome{
 				OutcomeType: ReportInFlight,
@@ -475,7 +467,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:                               1,
 			destChainSel:                       chainD,
 			maxMerkleTreeSize:                  20,
-			rmnEnabled:                         true,
 			maxReportTransmissionCheckAttempts: 5,
 			expOutcome: Outcome{
 				OutcomeType: ReportTransmitted,
@@ -519,7 +510,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:                               1,
 			destChainSel:                       chainD,
 			maxMerkleTreeSize:                  20,
-			rmnEnabled:                         true,
 			multipleReports:                    true,
 			maxReportTransmissionCheckAttempts: 5,
 			expOutcome: Outcome{
@@ -572,7 +562,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:                               1,
 			destChainSel:                       chainD,
 			maxMerkleTreeSize:                  20,
-			rmnEnabled:                         true,
 			maxReportTransmissionCheckAttempts: 10, // <-----------------
 			expOutcome: Outcome{
 				OutcomeType: ReportTransmissionFailed, // <----------- we don't want to retry checking
@@ -629,7 +618,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10,
-			rmnEnabled:        true,
 			expOutcome: Outcome{
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
@@ -711,7 +699,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10,
-			rmnEnabled:        true,
 			expOutcome: Outcome{
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
@@ -793,7 +780,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10,
-			rmnEnabled:        true,
 			expOutcome: Outcome{
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
@@ -875,7 +861,6 @@ func Test_Processor_Outcome(t *testing.T) {
 			bigF:              1,
 			destChainSel:      chainD,
 			maxMerkleTreeSize: 10,
-			rmnEnabled:        true,
 			expOutcome: Outcome{
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
@@ -923,7 +908,6 @@ func Test_Processor_Outcome(t *testing.T) {
 				destChain: tc.destChainSel,
 				offchainCfg: pluginconfig.CommitOffchainConfig{
 					MaxMerkleTreeSize:                  tc.maxMerkleTreeSize,
-					RMNEnabled:                         tc.rmnEnabled,
 					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
 					MultipleReportsEnabled:             tc.multipleReports,
 				},

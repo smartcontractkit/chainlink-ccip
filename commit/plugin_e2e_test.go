@@ -254,7 +254,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
-			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
+			assert.Equal(t, tc.expOutcome, decodedOutcome)
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
@@ -454,7 +454,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
-			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
+			assert.Equal(t, tc.expOutcome, decodedOutcome)
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
@@ -703,16 +703,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			require.NoError(t, err)
-			require.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
+			require.Equal(t, tc.expOutcome, decodedOutcome)
 
 			require.Len(t, res.Transmitted, tc.expTransmittedReportLen)
 		})
 	}
-}
-
-// normalizeOutcome converts empty slices to nil or nil slices to empty where needed.
-func normalizeOutcome(o committypes.Outcome) committypes.Outcome {
-	return o
 }
 
 func prepareCcipReaderMock(
