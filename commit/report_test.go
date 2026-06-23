@@ -166,15 +166,13 @@ func TestPluginReports(t *testing.T) {
 			},
 			expReports: []ccipocr3.CommitPluginReport{
 				{
-					BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      3,
 							OnRampAddress: []byte{1, 2, 3},
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 						},
-					},
-					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      2,
 							OnRampAddress: []byte{1, 2, 3},
@@ -190,11 +188,9 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					RMNSignatures: nil,
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{
-				RemoteF: 123,
 				MerkleRoots: []ccipocr3.MerkleRootChain{
 					{
 						ChainSel:      2,

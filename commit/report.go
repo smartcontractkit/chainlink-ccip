@@ -17,10 +17,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
@@ -79,7 +77,6 @@ func (p *Plugin) Reports(
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
 		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
-		"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
 	)
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
@@ -140,8 +137,7 @@ func (p *Plugin) validateReport(
 			plugincommon.NewErrValidatingReport(fmt.Errorf("decode report: %w, report: %x", err, r.Report))
 	}
 
-	var reportInfo cciptypes.CommitReportInfo
-	if reportInfo, err = cciptypes.DecodeCommitReportInfo(r.Info); err != nil {
+	if _, err = cciptypes.DecodeCommitReportInfo(r.Info); err != nil {
 		return cciptypes.CommitPluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("decode report info: %w", err))
 	}
@@ -167,24 +163,6 @@ func (p *Plugin) validateReport(
 			lggr.Warnw("invalid seqNumsRange", "unblessed root", root)
 			return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("invalid seqNumsRange")
 		}
-	}
-
-	seen := make(map[cciptypes.RMNECDSASignature]struct{})
-	for _, sig := range decodedReport.RMNSignatures {
-
-		if _, ok := seen[sig]; ok {
-			lggr.Warnw("duplicate RMN signature", "sig", sig)
-			return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("duplicate RMN signature")
-		}
-		seen[sig] = struct{}{}
-	}
-
-	if p.offchainCfg.RMNEnabled &&
-		len(decodedReport.BlessedMerkleRoots) > 0 &&
-		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		lggr.Debugf("report with insufficient RMN signatures %d < %d+1",
-			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
-		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("insufficient RMN signatures")
 	}
 
 	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
@@ -229,18 +207,6 @@ func (p *Plugin) validateReport(
 	err = p.isStaleReport(ctx, seqNr, decodedReport)
 	if err != nil {
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrStaleReport(fmt.Sprintf("%v", err))
-	}
-
-	err = merkleroot.ValidateRootBlessings(
-		ctx,
-		p.ccipReader,
-		decodedReport.BlessedMerkleRoots,
-		decodedReport.UnblessedMerkleRoots,
-	)
-	if err != nil {
-		lggr.Errorw("report not accepted due to root blessings validation error", "err", err)
-		err = plugincommon.NewErrInvalidReport(fmt.Sprintf("root blessings validation: %v", err))
-		return cciptypes.CommitPluginReport{}, err
 	}
 
 	return decodedReport, nil
