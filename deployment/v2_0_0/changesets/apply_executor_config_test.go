@@ -8,6 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -17,9 +18,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	jobpb "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
@@ -205,7 +209,7 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 func TestApplyExecutorConfig_HappyPathBuildsJobSpecs(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockExecutorConfigAdapter{
+	executorAdapter := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
 			"pool1": {sel1},
 		},
@@ -219,10 +223,28 @@ func TestApplyExecutorConfig_HappyPathBuildsJobSpecs(t *testing.T) {
 	}
 
 	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
 	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+			{Id: "node-1", Name: "nop1"},
+			{Id: "node-2", Name: "nop2"},
+		}}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
+			chainConfig("node-1", "90000001"),
+			chainConfig("node-2", "90000001"),
+		}}, nil,
+	)
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
+	)
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1", "node-2"}
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
@@ -295,7 +317,7 @@ func TestApplyExecutorConfig_UsesAllDeployedChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	mock := &mockExecutorConfigAdapter{
+	executorAdapter := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
 			"pool1": {sel1},
 		},
@@ -309,10 +331,26 @@ func TestApplyExecutorConfig_UsesAllDeployedChains(t *testing.T) {
 	}
 
 	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+			{Id: "node-1", Name: "nop1"},
+		}}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
+			chainConfig("node-1", "90000001"),
+		}}, nil,
+	)
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
+	)
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1"}
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
@@ -326,7 +364,7 @@ func TestApplyExecutorConfig_UsesAllDeployedChains(t *testing.T) {
 func TestApplyExecutorConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockExecutorConfigAdapter{
+	executorAdapter := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
 			"pool1": {sel1},
 		},
@@ -340,10 +378,28 @@ func TestApplyExecutorConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 	}
 
 	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
 	topo := newMinimalTopology([]string{"nop1", "nop2", "nop3"}, "pool1", shared.NOPModeStandalone)
 	env := newTestExecutorEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+			{Id: "node-1", Name: "nop1"},
+			{Id: "node-2", Name: "nop2"},
+			{Id: "node-3", Name: "nop3"},
+		}}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
+			chainConfig("node-1", "90000001"),
+		}}, nil,
+	)
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
+	)
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1", "node-2", "node-3"}
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
@@ -439,7 +495,7 @@ func TestApplyExecutorConfig_PerChainNOPsIncludesAllChains(t *testing.T) {
 	sel2Str := fmt.Sprintf("%d", sel2)
 	sel3Str := fmt.Sprintf("%d", sel3)
 
-	mock := &mockExecutorConfigAdapter{
+	executorAdapter := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
 			"pool1": {sel1, sel2, sel3},
 		},
@@ -451,7 +507,7 @@ func TestApplyExecutorConfig_PerChainNOPsIncludesAllChains(t *testing.T) {
 	}
 
 	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
 	topo := newTopologyWithChainConfigs(
 		[]string{"exec1", "exec2"},
@@ -465,6 +521,28 @@ func TestApplyExecutorConfig_PerChainNOPsIncludesAllChains(t *testing.T) {
 	)
 
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2, sel3})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+			{Id: "node-1", Name: "exec1"},
+			{Id: "node-2", Name: "exec2"},
+		}}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
+			chainConfig("node-1", "90000001"),
+			chainConfig("node-1", "90000002"),
+			chainConfig("node-1", "90000003"),
+			chainConfig("node-2", "90000001"),
+			chainConfig("node-2", "90000002"),
+			chainConfig("node-2", "90000003"),
+		}}, nil,
+	)
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
+	)
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1", "node-2"}
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
@@ -487,7 +565,7 @@ func TestApplyExecutorConfig_AllChainsNOPsGetAllChains(t *testing.T) {
 	sel1Str := fmt.Sprintf("%d", sel1)
 	sel2Str := fmt.Sprintf("%d", sel2)
 
-	mock := &mockExecutorConfigAdapter{
+	executorAdapter := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
 			"pool1": {sel1, sel2},
 		},
@@ -498,7 +576,7 @@ func TestApplyExecutorConfig_AllChainsNOPsGetAllChains(t *testing.T) {
 	}
 
 	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
 	topo := newTopologyWithChainConfigs(
 		[]string{"exec1", "exec2"},
@@ -510,6 +588,26 @@ func TestApplyExecutorConfig_AllChainsNOPsGetAllChains(t *testing.T) {
 		},
 	)
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+			{Id: "node-1", Name: "exec1"},
+			{Id: "node-2", Name: "exec2"},
+		}}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
+			chainConfig("node-1", "90000001"),
+			chainConfig("node-1", "90000002"),
+			chainConfig("node-2", "90000001"),
+			chainConfig("node-2", "90000002"),
+		}}, nil,
+	)
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
+	)
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1", "node-2"}
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
@@ -533,7 +631,7 @@ func TestApplyExecutorConfig_ExecutorPoolFieldMatchesChainPool(t *testing.T) {
 	sel1Str := fmt.Sprintf("%d", sel1)
 	sel2Str := fmt.Sprintf("%d", sel2)
 
-	mock := &mockExecutorConfigAdapter{
+	executorAdapter := &mockExecutorConfigAdapter{
 		deployedChains: map[string][]uint64{
 			"pool1": {sel1, sel2},
 		},
@@ -544,7 +642,7 @@ func TestApplyExecutorConfig_ExecutorPoolFieldMatchesChainPool(t *testing.T) {
 	}
 
 	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, executorAdapter)
 
 	topo := newTopologyWithChainConfigs(
 		[]string{"exec1", "exec2"},
@@ -557,6 +655,26 @@ func TestApplyExecutorConfig_ExecutorPoolFieldMatchesChainPool(t *testing.T) {
 	)
 
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{
+			{Id: "node-1", Name: "exec1"},
+			{Id: "node-2", Name: "exec2"},
+		}}, nil,
+	)
+	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
+		&nodev1.ListNodeChainConfigsResponse{ChainConfigs: []*nodev1.ChainConfig{
+			chainConfig("node-1", "90000001"),
+			chainConfig("node-1", "90000002"),
+			chainConfig("node-2", "90000001"),
+			chainConfig("node-2", "90000002"),
+		}}, nil,
+	)
+	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
+		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
+	)
+	env.Offchain = mockJD
+	env.NodeIDs = []string{"node-1", "node-2"}
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,

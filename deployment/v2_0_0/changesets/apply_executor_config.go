@@ -117,8 +117,7 @@ func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry, chainFamilyR
 			nopsToValidate = getExecutorPoolNOPAliases(pool)
 		}
 
-		clNOPs := filterCLModeNOPs(nopsToValidate, cfg.Topology.NOPTopology.NOPs)
-		if err := validateExecutorChainSupport(e, pool, clNOPs, selectors); err != nil {
+		if err := validateExecutorChainSupport(e, pool, nopsToValidate, selectors); err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
 
@@ -415,17 +414,6 @@ func buildNOPModes(nops []offchain.NOPConfig) map[shared.NOPAlias]shared.NOPMode
 		nopModes[shared.NOPAlias(nop.Alias)] = mode
 	}
 	return nopModes
-}
-
-func filterCLModeNOPs(aliases []shared.NOPAlias, nops []offchain.NOPConfig) []shared.NOPAlias {
-	modeByAlias := buildNOPModes(nops)
-	filtered := make([]shared.NOPAlias, 0, len(aliases))
-	for _, alias := range aliases {
-		if mode, ok := modeByAlias[alias]; ok && mode == shared.NOPModeCL {
-			filtered = append(filtered, alias)
-		}
-	}
-	return filtered
 }
 
 func getAllNOPAliases(nops []offchain.NOPConfig) []shared.NOPAlias {

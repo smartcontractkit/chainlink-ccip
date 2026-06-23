@@ -154,30 +154,11 @@ func TestApplyVerifierConfig_PassesWhenNOPSupportsExtraChains(t *testing.T) {
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{
-			Nodes: []*nodev1.Node{
-				{Id: "node-1", Name: "nop1"},
-				{Id: "node-2", Name: "nop2"},
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				chainConfig("node-1", "90000001"),
-				chainConfig("node-1", "90000002"),
-				chainConfig("node-1", "90000003"),
-				chainConfig("node-2", "90000001"),
-				chainConfig("node-2", "90000002"),
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002", "90000003"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001", "90000002"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -189,7 +170,7 @@ func TestApplyVerifierConfig_PassesWhenNOPSupportsExtraChains(t *testing.T) {
 	assert.NotNil(t, output.DataStore)
 }
 
-func TestApplyVerifierConfig_SkipsChainSupportValidationForStandaloneNOPs(t *testing.T) {
+func TestApplyVerifierConfig_StandaloneNOPsProposeJobsViaJD(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
 	verifierAdapter := &mockVerifierJobConfigAdapter{
@@ -209,6 +190,14 @@ func TestApplyVerifierConfig_SkipsChainSupportValidationForStandaloneNOPs(t *tes
 	topo := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 
+	capture := &proposeJobCapture{}
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractionsWithProposeJob(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001"}},
+	}, false, capture.capture)
+
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
 		Topology:                 topo,
@@ -217,6 +206,7 @@ func TestApplyVerifierConfig_SkipsChainSupportValidationForStandaloneNOPs(t *tes
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, output.DataStore)
+	assert.NotEmpty(t, capture.get(), "standalone NOPs should propose jobs via JD")
 }
 
 func TestApplyVerifierConfig_PassesWhenNonTargetNOPMissingChainSupport(t *testing.T) {
@@ -247,27 +237,11 @@ func TestApplyVerifierConfig_PassesWhenNonTargetNOPMissingChainSupport(t *testin
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
 
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{
-			Nodes: []*nodev1.Node{
-				{Id: "node-1", Name: "nop1"},
-				{Id: "node-2", Name: "nop2"},
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				chainConfig("node-1", "90000001"),
-				chainConfig("node-1", "90000002"),
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+		{nodeID: "node-2", nopAlias: "nop2"},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -378,61 +352,11 @@ func TestApplyExecutorConfig_PassesWhenNOPSupportsExtraChains(t *testing.T) {
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{
-			Nodes: []*nodev1.Node{
-				{Id: "node-1", Name: "nop1"},
-				{Id: "node-2", Name: "nop2"},
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				chainConfig("node-1", "90000001"),
-				chainConfig("node-1", "90000002"),
-				chainConfig("node-1", "90000003"),
-				chainConfig("node-2", "90000001"),
-				chainConfig("node-2", "90000002"),
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2"}
-
-	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
-	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
-		Topology:          topo,
-		ExecutorQualifier: "pool1",
-	})
-	require.NoError(t, err)
-	assert.NotNil(t, output.DataStore)
-}
-
-func TestApplyExecutorConfig_SkipsChainSupportValidationForStandaloneNOPs(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-
-	executorAdapter := &mockExecutorConfigAdapter{
-		deployedChains: map[string][]uint64{
-			"pool1": {sel1},
-		},
-		chainConfigs: map[uint64]adapters.ExecutorChainConfig{
-			sel1: {
-				OffRampAddress:       "0xOffRamp",
-				RmnAddress:           "0xRmn",
-				ExecutorProxyAddress: "0xExecutorProxy",
-			},
-		},
-	}
-
-	registry := adapters.NewExecutorConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, executorAdapter)
-
-	topo := newMinimalTopology([]string{"nop1", "nop2"}, "pool1", shared.NOPModeStandalone)
-	env := newTestExecutorEnv(t, []uint64{sel1})
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002", "90000003"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001", "90000002"}},
+	}, false)
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
@@ -472,27 +396,11 @@ func TestApplyExecutorConfig_PassesWhenNonTargetNOPMissingChainSupport(t *testin
 	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
 
 	mockJD := mocks.NewMockClient(t)
-	mockJD.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{
-			Nodes: []*nodev1.Node{
-				{Id: "node-1", Name: "nop1"},
-				{Id: "node-2", Name: "nop2"},
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{
-				chainConfig("node-1", "90000001"),
-				chainConfig("node-1", "90000002"),
-			},
-		}, nil,
-	)
-	mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "job-1"}}, nil,
-	)
 	env.Offchain = mockJD
-	env.NodeIDs = []string{"node-1", "node-2"}
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+		{nodeID: "node-2", nopAlias: "nop2"},
+	}, false)
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
@@ -924,19 +832,11 @@ func TestApplyVerifierConfig_RevokeOrphanedJobsDoesNotAffectOtherCommittees(t *t
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeCL)
 	env := newVerifierTestEnv(t, []uint64{sel1})
 	env.DataStore = ds.Seal()
-	env.Offchain = mocks.NewMockClient(t)
-	env.NodeIDs = []string{"node-1"}
-	env.Offchain.(*mocks.MockClient).EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop1"}}}, nil,
-	)
-	env.Offchain.(*mocks.MockClient).EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{chainConfig("node-1", "90000001")},
-		}, nil,
-	)
-	env.Offchain.(*mocks.MockClient).EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "prop-1"}}, nil,
-	)
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -986,19 +886,11 @@ func TestApplyExecutorConfig_RevokeOrphanedJobsDoesNotAffectVerifierJobs(t *test
 	topo := newMinimalTopology([]string{"nop1"}, "pool1", shared.NOPModeCL)
 	env := newTestExecutorEnv(t, []uint64{sel1})
 	env.DataStore = ds.Seal()
-	env.Offchain = mocks.NewMockClient(t)
-	env.NodeIDs = []string{"node-1"}
-	env.Offchain.(*mocks.MockClient).EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodesResponse{Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop1"}}}, nil,
-	)
-	env.Offchain.(*mocks.MockClient).EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
-		&nodev1.ListNodeChainConfigsResponse{
-			ChainConfigs: []*nodev1.ChainConfig{chainConfig("node-1", "90000001")},
-		}, nil,
-	)
-	env.Offchain.(*mocks.MockClient).EXPECT().ProposeJob(mock.Anything, mock.Anything).Return(
-		&jobpb.ProposeJobResponse{Proposal: &jobpb.Proposal{Id: "prop-1"}}, nil,
-	)
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyExecutorConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{

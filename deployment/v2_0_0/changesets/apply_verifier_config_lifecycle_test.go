@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
@@ -93,7 +94,7 @@ func newVerifierTopologyWithAggregators(
 func TestApplyVerifierConfig_GeneratesValidJobSpec(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -104,10 +105,15 @@ func TestApplyVerifierConfig_GeneratesValidJobSpec(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -137,7 +143,7 @@ func TestApplyVerifierConfig_GeneratesValidJobSpec(t *testing.T) {
 func TestApplyVerifierConfig_PreservesExistingJobSpecs(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -148,7 +154,7 @@ func TestApplyVerifierConfig_PreservesExistingJobSpecs(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
@@ -157,6 +163,11 @@ func TestApplyVerifierConfig_PreservesExistingJobSpecs(t *testing.T) {
 		NOPAlias: shared.NOPAlias("existing-nop"),
 	}))
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
@@ -180,7 +191,7 @@ func TestApplyVerifierConfig_PreservesExistingJobSpecs(t *testing.T) {
 func TestApplyVerifierConfig_MultipleAggregators(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -191,7 +202,7 @@ func TestApplyVerifierConfig_MultipleAggregators(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	aggregators := []offchain.AggregatorConfig{
 		{Name: "agg-primary", Address: "ws://agg1:9090"},
@@ -200,6 +211,11 @@ func TestApplyVerifierConfig_MultipleAggregators(t *testing.T) {
 	}
 	topo := newVerifierTopologyWithAggregators([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone, aggregators, nil)
 	env := newVerifierTestEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -227,7 +243,7 @@ func TestApplyVerifierConfig_MultipleAggregators(t *testing.T) {
 func TestApplyVerifierConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -238,7 +254,7 @@ func TestApplyVerifierConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
@@ -246,6 +262,8 @@ func TestApplyVerifierConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 		JobID:    shared.JobID("removed-nop-agg-1-c1-verifier"),
 		NOPAlias: shared.NOPAlias("removed-nop"),
 		Mode:     shared.NOPModeStandalone,
+		NodeID:   "node-2",
+		JDJobID:  "jd-removed",
 	}))
 	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
 		Spec:     "other-committee-job-spec",
@@ -254,6 +272,12 @@ func TestApplyVerifierConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 		Mode:     shared.NOPModeStandalone,
 	}))
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "removed-nop"},
+	}, true)
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
@@ -278,7 +302,7 @@ func TestApplyVerifierConfig_RemovesOrphanedJobSpecs(t *testing.T) {
 func TestApplyVerifierConfig_PreservesOrphanedJobSpecsWhenRevokeOrphanedJobsFalse(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -289,7 +313,7 @@ func TestApplyVerifierConfig_PreservesOrphanedJobSpecsWhenRevokeOrphanedJobsFals
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
@@ -299,6 +323,11 @@ func TestApplyVerifierConfig_PreservesOrphanedJobSpecsWhenRevokeOrphanedJobsFals
 		Mode:     shared.NOPModeStandalone,
 	}))
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
@@ -319,7 +348,7 @@ func TestApplyVerifierConfig_PreservesOrphanedJobSpecsWhenRevokeOrphanedJobsFals
 func TestApplyVerifierConfig_TargetNOPsScopingPreservesUntargetedJobs(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -330,7 +359,7 @@ func TestApplyVerifierConfig_TargetNOPsScopingPreservesUntargetedJobs(t *testing
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, offchain.SaveJob(ds, shared.JobInfo{
@@ -344,6 +373,12 @@ func TestApplyVerifierConfig_TargetNOPsScopingPreservesUntargetedJobs(t *testing
 		NOPAlias: shared.NOPAlias("nop2"),
 	}))
 	env := newVerifierTestEnvWithDS(t, []uint64{sel1}, ds.Seal())
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "nop2"},
+	}, false)
 
 	topo := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
@@ -371,7 +406,7 @@ func TestApplyVerifierConfig_OnlyIncludesCommitteeChains(t *testing.T) {
 	sel2 := chainsel.TEST_90000002.Selector
 	sel3 := chainsel.TEST_90000003.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCV1",
@@ -388,7 +423,7 @@ func TestApplyVerifierConfig_OnlyIncludesCommitteeChains(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	chainConfigs := map[string]offchain.ChainCommitteeConfig{
 		fmt.Sprintf("%d", sel1): {NOPAliases: []string{"nop1"}, Threshold: 1},
@@ -396,6 +431,11 @@ func TestApplyVerifierConfig_OnlyIncludesCommitteeChains(t *testing.T) {
 	}
 	topo := newVerifierTopologyWithAggregators([]string{"nop1"}, "c1", nil, shared.NOPModeStandalone, nil, chainConfigs)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2, sel3})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -420,7 +460,7 @@ func TestApplyVerifierConfig_FiltersChainsPerNOPMembership(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCV1",
@@ -437,7 +477,7 @@ func TestApplyVerifierConfig_FiltersChainsPerNOPMembership(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	chainConfigs := map[string]offchain.ChainCommitteeConfig{
 		fmt.Sprintf("%d", sel1): {NOPAliases: []string{"nop1"}, Threshold: 1},
@@ -445,6 +485,12 @@ func TestApplyVerifierConfig_FiltersChainsPerNOPMembership(t *testing.T) {
 	}
 	topo := newVerifierTopologyWithAggregators([]string{"nop1", "nop2"}, "c1", nil, shared.NOPModeStandalone, nil, chainConfigs)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000002"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -472,7 +518,7 @@ func TestApplyVerifierConfig_FiltersChainsPerNOPMembership(t *testing.T) {
 func TestApplyVerifierConfig_SkipsNOPsNotInAnyChainConfig(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -483,7 +529,7 @@ func TestApplyVerifierConfig_SkipsNOPsNotInAnyChainConfig(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	chainConfigs := map[string]offchain.ChainCommitteeConfig{
 		fmt.Sprintf("%d", sel1): {NOPAliases: []string{"nop1"}, Threshold: 1},
@@ -507,6 +553,12 @@ func TestApplyVerifierConfig_SkipsNOPsNotInAnyChainConfig(t *testing.T) {
 		ExecutorPools: map[string]offchain.ExecutorPoolConfig{},
 	}
 	env := newVerifierTestEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+		{nodeID: "node-2", nopAlias: "nop-not-in-committee"},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	output, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -528,7 +580,7 @@ func TestApplyVerifierConfig_SkipsNOPsNotInAnyChainConfig(t *testing.T) {
 func TestApplyVerifierConfig_SkipsUnchangedJobSpecs(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCommitteeVerifier",
@@ -539,10 +591,15 @@ func TestApplyVerifierConfig_SkipsUnchangedJobSpecs(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -573,7 +630,7 @@ func TestApplyVerifierConfig_UpdatesJobsWhenChainRemoved(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCV1",
@@ -590,10 +647,15 @@ func TestApplyVerifierConfig_UpdatesJobsWhenChainRemoved(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	topo := newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1, sel2}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -632,7 +694,7 @@ func TestApplyVerifierConfig_RemovesJobWhenNOPRemovedFromCommittee(t *testing.T)
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCV1",
@@ -649,10 +711,16 @@ func TestApplyVerifierConfig_RemovesJobWhenNOPRemovedFromCommittee(t *testing.T)
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	topoBoth := newVerifierTopology([]string{"nop1", "nop2"}, "c1", []uint64{sel1, sel2}, shared.NOPModeStandalone)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001", "90000002"}},
+	}, true)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{
@@ -693,7 +761,7 @@ func TestApplyVerifierConfig_CreatesJobWhenNOPAddedToCommittee(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	mock := &mockVerifierJobConfigAdapter{
+	verifierAdapter := &mockVerifierJobConfigAdapter{
 		chainConfigs: map[uint64]*adapters.VerifierContractAddresses{
 			sel1: {
 				CommitteeVerifierAddress: "0xCV1",
@@ -710,7 +778,7 @@ func TestApplyVerifierConfig_CreatesJobWhenNOPAddedToCommittee(t *testing.T) {
 		},
 	}
 	registry := adapters.NewVerifierConfigRegistry()
-	registry.Register(chainsel.FamilyEVM, mock)
+	registry.Register(chainsel.FamilyEVM, verifierAdapter)
 
 	chainConfigsNOP1Only := map[string]offchain.ChainCommitteeConfig{
 		fmt.Sprintf("%d", sel1): {NOPAliases: []string{"nop1"}, Threshold: 1},
@@ -718,6 +786,12 @@ func TestApplyVerifierConfig_CreatesJobWhenNOPAddedToCommittee(t *testing.T) {
 	}
 	topoNOP1Only := newVerifierTopologyWithAggregators([]string{"nop1", "nop2"}, "c1", nil, shared.NOPModeStandalone, nil, chainConfigsNOP1Only)
 	env := newVerifierTestEnv(t, []uint64{sel1, sel2})
+	mockJD := mocks.NewMockClient(t)
+	env.Offchain = mockJD
+	env.NodeIDs = expectJDInteractions(t, mockJD, []mockJDNode{
+		{nodeID: "node-1", nopAlias: "nop1", chainIDs: []string{"90000001", "90000002"}},
+		{nodeID: "node-2", nopAlias: "nop2", chainIDs: []string{"90000001", "90000002"}},
+	}, false)
 
 	cs := changesets.ApplyVerifierConfig(registry, newTestChainFamilyRegistry())
 	firstOutput, err := cs.Apply(env, changesets.ApplyVerifierConfigInput{

@@ -138,8 +138,7 @@ func ApplyVerifierConfig(registry *adapters.VerifierConfigRegistry, chainFamilyR
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
 		}
 
-		clNOPs := filterCLModeNOPs(nopsToValidate, cfg.Topology.NOPTopology.NOPs)
-		if err := validateVerifierChainSupport(e, clNOPs, committee); err != nil {
+		if err := validateVerifierChainSupport(e, nopsToValidate, committee); err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
 
