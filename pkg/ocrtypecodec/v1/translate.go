@@ -8,12 +8,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
@@ -23,105 +21,6 @@ type protoTranslator struct{}
 
 func newProtoTranslator() *protoTranslator {
 	return &protoTranslator{}
-}
-
-func (t *protoTranslator) rmnSignaturesToProto(sigs *rmn.ReportSignatures) []*ocrtypecodecpb.SignatureEcdsa {
-	var pbSigs []*ocrtypecodecpb.SignatureEcdsa
-	if len(sigs.Signatures) > 0 {
-		pbSigs = make([]*ocrtypecodecpb.SignatureEcdsa, len(sigs.Signatures))
-	}
-
-	for i, sig := range sigs.Signatures {
-		pbSigs[i] = &ocrtypecodecpb.SignatureEcdsa{
-			R: sig.R,
-			S: sig.S,
-		}
-	}
-	return pbSigs
-}
-
-func (t *protoTranslator) rmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.SignatureEcdsa) []*rmnpb.EcdsaSignature {
-	sigs := make([]*rmnpb.EcdsaSignature, len(pbSigs))
-	for i := range pbSigs {
-		sigs[i] = &rmnpb.EcdsaSignature{
-			R: pbSigs[i].GetR(),
-			S: pbSigs[i].GetS(),
-		}
-	}
-	return sigs
-}
-
-func (t *protoTranslator) ccipRmnSignaturesToProto(
-	sigs []cciptypes.RMNECDSASignature,
-) []*ocrtypecodecpb.SignatureEcdsa {
-	pbSigs := make([]*ocrtypecodecpb.SignatureEcdsa, len(sigs))
-	for i, sig := range sigs {
-		pbSigs[i] = &ocrtypecodecpb.SignatureEcdsa{
-			R: sig.R[:],
-			S: sig.S[:],
-		}
-	}
-	return pbSigs
-}
-
-func (t *protoTranslator) ccipRmnSignaturesFromProto(
-	pbSigs []*ocrtypecodecpb.SignatureEcdsa,
-) ([]cciptypes.RMNECDSASignature, error) {
-	var sigs []cciptypes.RMNECDSASignature
-	if len(pbSigs) > 0 {
-		sigs = make([]cciptypes.RMNECDSASignature, len(pbSigs))
-	}
-
-	for i := range pbSigs {
-		if len(pbSigs[i].GetR()) != 32 || len(pbSigs[i].GetS()) != 32 {
-			return nil, fmt.Errorf("signature must be 32 bytes: %v", pbSigs[i])
-		}
-		sigs[i] = cciptypes.RMNECDSASignature{
-			R: cciptypes.Bytes32(pbSigs[i].GetR()),
-			S: cciptypes.Bytes32(pbSigs[i].GetS()),
-		}
-	}
-	return sigs, nil
-}
-
-func (t *protoTranslator) laneUpdatesToProto(
-	rmnLaneUpdates []*rmnpb.FixedDestLaneUpdate,
-) []*ocrtypecodecpb.DestChainUpdate {
-	pbLaneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, len(rmnLaneUpdates))
-	for i, lu := range rmnLaneUpdates {
-		pbLaneUpdates[i] = &ocrtypecodecpb.DestChainUpdate{
-			LaneSource: &ocrtypecodecpb.SourceChainMeta{
-				SourceChainSelector: lu.LaneSource.SourceChainSelector,
-				OnrampAddress:       lu.LaneSource.OnrampAddress,
-			},
-			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: lu.ClosedInterval.MinMsgNr,
-				MaxMsgNr: lu.ClosedInterval.MaxMsgNr,
-			},
-			Root: lu.Root,
-		}
-	}
-	return pbLaneUpdates
-}
-
-func (t *protoTranslator) laneUpdatesFromProto(
-	pbLaneUpdates []*ocrtypecodecpb.DestChainUpdate,
-) []*rmnpb.FixedDestLaneUpdate {
-	laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, len(pbLaneUpdates))
-	for i := range pbLaneUpdates {
-		laneUpdates[i] = &rmnpb.FixedDestLaneUpdate{
-			LaneSource: &rmnpb.LaneSource{
-				SourceChainSelector: pbLaneUpdates[i].LaneSource.SourceChainSelector,
-				OnrampAddress:       pbLaneUpdates[i].LaneSource.OnrampAddress,
-			},
-			ClosedInterval: &rmnpb.ClosedInterval{
-				MinMsgNr: pbLaneUpdates[i].SeqNumRange.MinMsgNr,
-				MaxMsgNr: pbLaneUpdates[i].SeqNumRange.MaxMsgNr,
-			},
-			Root: pbLaneUpdates[i].Root,
-		}
-	}
-	return laneUpdates
 }
 
 func (t *protoTranslator) merkleRootsToProto(
@@ -173,30 +72,6 @@ func (t *protoTranslator) merkleRootsFromProto(
 	return merkleRoots, nil
 }
 
-func (t *protoTranslator) rmnEnabledChainsToProto(rmnEnabled map[cciptypes.ChainSelector]bool) map[uint64]bool {
-	var rmnEnabledChains map[uint64]bool
-	if len(rmnEnabled) > 0 {
-		rmnEnabledChains = make(map[uint64]bool, len(rmnEnabled))
-	}
-
-	for k, v := range rmnEnabled {
-		rmnEnabledChains[uint64(k)] = v
-	}
-	return rmnEnabledChains
-}
-
-func (t *protoTranslator) rmnEnabledChainsFromProto(rmnEnabledChains map[uint64]bool) map[cciptypes.ChainSelector]bool {
-	var rmnEnabled map[cciptypes.ChainSelector]bool
-	if len(rmnEnabledChains) > 0 {
-		rmnEnabled = make(map[cciptypes.ChainSelector]bool, len(rmnEnabledChains))
-	}
-
-	for k, v := range rmnEnabledChains {
-		rmnEnabled[cciptypes.ChainSelector(k)] = v
-	}
-	return rmnEnabled
-}
-
 func (t *protoTranslator) seqNumChainToProto(snc []plugintypes.SeqNumChain) []*ocrtypecodecpb.SeqNumChain {
 	pbSnc := make([]*ocrtypecodecpb.SeqNumChain, len(snc))
 	for i, s := range snc {
@@ -221,60 +96,6 @@ func (t *protoTranslator) seqNumChainFromProto(pbSnc []*ocrtypecodecpb.SeqNumCha
 		}
 	}
 	return snc
-}
-
-func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg cciptypes.RemoteConfig) *ocrtypecodecpb.RmnRemoteConfig {
-	var rmnRemoteConfigSignersPB []*ocrtypecodecpb.RemoteSignerInfo
-	if len(rmnRemoteCfg.Signers) > 0 {
-		rmnRemoteConfigSignersPB = make([]*ocrtypecodecpb.RemoteSignerInfo, len(rmnRemoteCfg.Signers))
-	}
-
-	for i, s := range rmnRemoteCfg.Signers {
-		rmnRemoteConfigSignersPB[i] = &ocrtypecodecpb.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		}
-	}
-
-	return &ocrtypecodecpb.RmnRemoteConfig{
-		ContractAddress:  rmnRemoteCfg.ContractAddress,
-		ConfigDigest:     rmnRemoteCfg.ConfigDigest[:],
-		Signers:          rmnRemoteConfigSignersPB,
-		FSign:            rmnRemoteCfg.FSign,
-		ConfigVersion:    rmnRemoteCfg.ConfigVersion,
-		RmnReportVersion: rmnRemoteCfg.RmnReportVersion[:],
-	}
-}
-
-func (t *protoTranslator) rmnRemoteConfigFromProto(
-	pbRmnRemoteCfg *ocrtypecodecpb.RmnRemoteConfig,
-) (cciptypes.RemoteConfig, error) {
-	var rmnSigners []cciptypes.RemoteSignerInfo
-	if len(pbRmnRemoteCfg.Signers) > 0 {
-		rmnSigners = make([]cciptypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
-	}
-	for i, s := range pbRmnRemoteCfg.Signers {
-		rmnSigners[i] = cciptypes.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		}
-	}
-	if len(pbRmnRemoteCfg.ConfigDigest) != 32 {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("config digest must be 32 bytes: %v", pbRmnRemoteCfg.ConfigDigest)
-	}
-	if len(pbRmnRemoteCfg.RmnReportVersion) != 32 {
-		return cciptypes.RemoteConfig{}, fmt.Errorf(
-			"rmn report version must be 32 bytes: %v", pbRmnRemoteCfg.RmnReportVersion)
-	}
-
-	return cciptypes.RemoteConfig{
-		ContractAddress:  pbRmnRemoteCfg.ContractAddress,
-		ConfigDigest:     cciptypes.Bytes32(pbRmnRemoteCfg.ConfigDigest),
-		Signers:          rmnSigners,
-		FSign:            pbRmnRemoteCfg.FSign,
-		ConfigVersion:    pbRmnRemoteCfg.ConfigVersion,
-		RmnReportVersion: cciptypes.Bytes32(pbRmnRemoteCfg.RmnReportVersion),
-	}, nil
 }
 
 func (t *protoTranslator) fChainToProto(fChain map[cciptypes.ChainSelector]int) map[uint64]int32 {

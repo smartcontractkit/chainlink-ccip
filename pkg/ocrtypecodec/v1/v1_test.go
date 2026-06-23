@@ -250,7 +250,6 @@ type resultData struct {
 
 type dataGenerator struct {
 	name                 string
-	numRmnNodes          int
 	numSourceChains      int
 	numPricedTokens      int
 	numContractsPerChain int
@@ -261,7 +260,6 @@ type dataGenerator struct {
 var (
 	smallGen = dataGenerator{
 		name:                 "small",
-		numRmnNodes:          4,
 		numSourceChains:      8,
 		numPricedTokens:      8,
 		numContractsPerChain: 12,
@@ -625,14 +623,6 @@ func genMerkleRootChain(n int) []cciptypes.MerkleRootChain {
 	return mrcs
 }
 
-func genRmnEnabledChains(n int) map[cciptypes.ChainSelector]bool {
-	m := make(map[cciptypes.ChainSelector]bool)
-	for range n {
-		m[cciptypes.ChainSelector(rand.Uint64())] = rand.Int()%2 == 0
-	}
-	return m
-}
-
 func genSeqNumChain(n int) []plugintypes.SeqNumChain {
 	chains := make([]plugintypes.SeqNumChain, n)
 	for i := range n {
@@ -642,25 +632,6 @@ func genSeqNumChain(n int) []plugintypes.SeqNumChain {
 		}
 	}
 	return chains
-}
-
-func genRmnRemoteConfig(numSigners int) cciptypes.RemoteConfig {
-	rmnSigners := make([]cciptypes.RemoteSignerInfo, numSigners)
-	for i := range numSigners {
-		rmnSigners[i] = cciptypes.RemoteSignerInfo{
-			OnchainPublicKey: randomBytes(20),
-			NodeIndex:        rand.Uint64(),
-		}
-	}
-
-	return cciptypes.RemoteConfig{
-		ContractAddress:  randomBytes(40),
-		ConfigDigest:     randomBytes32(),
-		Signers:          rmnSigners,
-		FSign:            rand.Uint64(),
-		ConfigVersion:    rand.Uint32(),
-		RmnReportVersion: randomBytes32(),
-	}
 }
 
 func randBigInt() cciptypes.BigInt {

@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-
 //nolint:dupl // test cases can be similar, we don't want to overcomplicate with functions for deduping
 func Test_Processor_Outcome(t *testing.T) {
 	const (
@@ -981,7 +980,6 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 
 func Test_reportRangesOutcome(t *testing.T) {
 	lggr := logger.Test(t)
-
 
 	testCases := []struct {
 		name                 string
