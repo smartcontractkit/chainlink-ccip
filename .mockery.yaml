@@ -13,15 +13,10 @@ packages:
         interfaces:
             ChainSupport:
             PluginProcessor:
-    github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
-        interfaces:
-            Controller:
-            Stream:
     github.com/smartcontractkit/chainlink-ccip/pkg/reader:
         interfaces:
             CCIPReader:
             PriceReader:
-            RMNHome:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/cache:
         interfaces:
             TimeProvider:
