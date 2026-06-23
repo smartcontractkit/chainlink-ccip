@@ -201,6 +201,8 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 					} else {
 						e.Logger.Infof("Active pool on chain selector %d is already v2.0.0 or higher, skipping auto-migration of remote chains", selector)
 					}
+				} else {
+					e.Logger.Infof("Active pool on chain selector %d is already the target pool, skipping auto-migration of remote chains", selector)
 				}
 			}
 			for _, remoteSelector := range allRemotes {
