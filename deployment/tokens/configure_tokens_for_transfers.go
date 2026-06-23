@@ -53,15 +53,27 @@ type TokenTransferConfig struct {
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
 	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
-	// automatically with (token, pool, decimals). Legacy lane fees are read from the fee quoter (v1.6.x) or on
-	// ramp (v1.5.x) and merged with any user-provided tokenTransferFeeConfig on each remote (set YAML fields win;
-	// unset fields are imported). Remote chains listed in YAML without remoteToken/remotePool are backfilled from
-	// the active pool; explicit remoteToken/remotePool values are preserved. Rate limits are imported later by
-	// ConfigureTokenPoolForRemoteChain from the active pool. Requires an adapter implementing the TokenPoolMigrator
-	// interface. This knob has no effect if any of the following are true:
+	// automatically with (token, pool, decimals). Legacy lane fees are read from the fee quoter or onramp (v1.5.x)
+	// and merged with any user-provided tokenTransferFeeConfig on each remote (set YAML fields win; unset fields
+	// are imported). Rate limits are imported later by ConfigureTokenPoolForRemoteChain from the active pool.
+	// Requires an adapter implementing the TokenPoolMigrator interface. This knob has no effect if any of the
+	// following are true:
 	//  (1) There is no active pool in TAR for the token
-	//  (2) The active pool in TAR is already the target pool
+	//  (2) The active pool in TAR is already the target pool (extend mode)
 	//  (3) The active pool in TAR is already v2.0.0 or higher
+	//
+	// YAML precedence during upgrade (per remote chain):
+	//  - Remote not listed: fully discovered from the active pool (token, pool, decimals, fees).
+	//  - Remote listed with empty remoteToken AND remotePool: backfill connectivity from the active pool;
+	//    YAML overrides fees and other fields.
+	//  - Remote listed with explicit remoteToken and/or remotePool: those values are used as-is (coordinated
+	//    retarget); legacy active-pool refs are not overwritten.
+	//  - Remote listed but not supported by the legacy active pool: not enriched by discovery; you must
+	//    provide full connectivity in YAML.
+	//
+	// Fee discovery requires connected CCIP lanes (OnRamp/FeeQuoter resolvable per remote). Discovery failures
+	// abort the entire changeset. When legacy lanes have no configured fees, default fee values may still be
+	// written to the new v2 pool during auto-migrate.
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
