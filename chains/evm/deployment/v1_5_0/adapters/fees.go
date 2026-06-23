@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -43,7 +42,7 @@ func (a *FeesAdapter) validateFeeRef(feeRef datastore.AddressRef) error {
 	return nil
 }
 
-func (a *FeesAdapter) GetFeeContractRef(e cldf.Environment, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
+func (a *FeesAdapter) GetFeeContractRef(_ operations.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
 	if err := a.validateFeeRef(onRampRef); err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
@@ -55,13 +54,13 @@ func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) f
 	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
 }
 
-func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, feeRef datastore.AddressRef, src uint64, dst uint64, token string) (fees.TokenTransferFeeArgs, error) {
+func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chains cldf_chain.BlockChains, feeRef datastore.AddressRef, src uint64, dst uint64, token string) (fees.TokenTransferFeeArgs, error) {
 	err := a.validateFeeRef(feeRef)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
 
-	chain, ok := e.BlockChains.EVMChains()[src]
+	chain, ok := chains.EVMChains()[src]
 	if !ok {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("chain with selector %d not defined", src)
 	}
@@ -79,12 +78,12 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, feeRe
 
 	// This gets the token transfer fee config for the given token from the EVM2EVMOnRamp contract
 	// https://sepolia.etherscan.io/address/0xf9765c80F6448e6d4d02BeF4a6b4152131A2F513#code#F1#L719
-	cfg, err := onRamp.GetTokenTransferFeeConfig(&bind.CallOpts{Context: e.GetContext()}, common.HexToAddress(token))
+	cfg, err := onRamp.GetTokenTransferFeeConfig(&bind.CallOpts{Context: b.GetContext()}, common.HexToAddress(token))
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get token transfer fee config from OnRamp at %s for src %d, dst %d, token %s: %w", onRampAddr.Hex(), src, dst, token, err)
 	}
 
-	e.Logger.Infof("Fetched on-chain token transfer fee config for src %d, dst %d, token %s: %+v", src, dst, token, cfg)
+	b.Logger.Infof("Fetched on-chain token transfer fee config for src %d, dst %d, token %s: %+v", src, dst, token, cfg)
 	return fees.TokenTransferFeeArgs{
 		DestBytesOverhead: cfg.DestBytesOverhead,
 		DestGasOverhead:   cfg.DestGasOverhead,
@@ -95,7 +94,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, feeRe
 	}, nil
 }
 
-func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment, feeRef datastore.AddressRef) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastore.AddressRef) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenTransferFee",
 		utils.Version_1_5_0,
@@ -175,12 +174,12 @@ func (a *FeesAdapter) GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoter
 }
 
 // GetOnchainDestChainConfig is not supported for v1.5 (no FeeQuoter contract).
-func (a *FeesAdapter) GetOnchainDestChainConfig(_ cldf.Environment, _ datastore.AddressRef, _, _ uint64) (lanes.FeeQuoterDestChainConfig, error) {
+func (a *FeesAdapter) GetOnchainDestChainConfig(_ operations.Bundle, _ cldf_chain.BlockChains, _ datastore.AddressRef, _, _ uint64) (lanes.FeeQuoterDestChainConfig, error) {
 	return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("FeeQuoter dest chain config reads are not supported for v1.5 (no FeeQuoter contract)")
 }
 
 // ApplyDestChainConfigUpdates is not supported for v1.5 (no FeeQuoter contract).
-func (a *FeesAdapter) ApplyDestChainConfigUpdates(e cldf.Environment, feeRef datastore.AddressRef) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeesAdapter) ApplyDestChainConfigUpdates(_ datastore.DataStore, _ datastore.AddressRef) *operations.Sequence[fees.ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"ApplyDestChainConfigUpdatesV1_5",
 		utils.Version_1_5_0,

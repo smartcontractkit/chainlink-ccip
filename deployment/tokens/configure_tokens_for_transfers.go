@@ -297,7 +297,6 @@ func maybeApplyTokenTransferFeeConfig(
 ) (cldf_ops.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput], error) {
 	// Helper vars
 	emptyReport := cldf_ops.SequenceReport[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput]{}
-	feeRegistry := fees.GetRegistry()
 
 	// NOTE: for pre-v2 pools, token transfer fees can only be set on the fee quoter. For
 	// v2 pools, token transfer fees can be set on both the fee quoter or the token pool.
@@ -316,34 +315,14 @@ func maybeApplyTokenTransferFeeConfig(
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get chain selector family for selector %d: %w", src, err)
 	}
-
-	// Fee Quoter resolution part 1: get the current on ramp from the router
-	resolver, ok := feeRegistry.GetFeeResolver(fam)
-	if !ok {
+	if _, ok := fees.GetRegistry().GetFeeResolver(fam); !ok {
 		e.Logger.Warnf("No fee resolver found for chain selector %d, skipping token transfer fee config for remote chain selector %d", src, dst)
 		return emptyReport, nil
 	}
-	onRampRef, err := resolver.GetOnRampRef(e, src, dst)
-	if err != nil {
-		return emptyReport, fmt.Errorf("failed to resolve fee ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
-	}
 
-	// Fee Quoter resolution part 2: get the current fee quoter from the on ramp
-	onRampAdp, ok := feeRegistry.GetFeeAdapter(fam, onRampRef.Version)
-	if !ok {
-		e.Logger.Warnf("No fee adapter found for chain selector %d, version %s, skipping token transfer fee config for remote chain selector %d", src, onRampRef.Version, dst)
-		return emptyReport, nil
-	}
-	feeRef, err := onRampAdp.GetFeeContractRef(e, onRampRef, src, dst)
+	feeQuoterAdp, feeRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, src, dst)
 	if err != nil {
-		return emptyReport, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
-	}
-
-	// Fee Quoter resolution part 3: use the fee quoter version for read/write operations.
-	// A v1.6 OnRamp may point at a v2.0 FeeQuoter, so the on ramp adapter alone is not sufficient.
-	feeQuoterAdp, ok := feeRegistry.GetFeeAdapter(fam, feeRef.Version)
-	if !ok {
-		return emptyReport, fmt.Errorf("no fee adapter found for chain selector %d and fee quoter version %s", src, feeRef.Version)
+		return emptyReport, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 
 	// NOTE: the TokenTransferFeeConfig for token pools is V2-focused and
@@ -353,7 +332,7 @@ func maybeApplyTokenTransferFeeConfig(
 	// at the moment, but realistically speaking this should not an issue
 	// since we've never had the need to modify it after we initially set
 	// it to MaxUint32.
-	onChainConfig, err := feeQuoterAdp.GetOnchainTokenTransferFeeConfig(e, feeRef, src, dst, srcTokRef.Address)
+	onChainConfig, err := feeQuoterAdp.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, feeRef, src, dst, srcTokRef.Address)
 	if err != nil {
 		return emptyReport, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -395,7 +374,7 @@ func maybeApplyTokenTransferFeeConfig(
 	// Apply the token transfer fee config
 	result, err := cldf_ops.ExecuteSequence(
 		e.OperationsBundle,
-		feeQuoterAdp.SetTokenTransferFee(e, feeRef),
+		feeQuoterAdp.SetTokenTransferFee(e.DataStore, feeRef),
 		e.BlockChains,
 		fees.SetTokenTransferFeeSequenceInput{
 			Selector: src,
