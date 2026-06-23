@@ -34,7 +34,7 @@ func (p *Processor) Outcome(
 
 	tStart := time.Now()
 
-	outcome, nextState, err := p.getOutcome(lggr, prevOutcome, query, aos)
+	outcome, nextState, err := p.getOutcome(lggr, prevOutcome, aos)
 	if err != nil {
 		lggr.Errorw("outcome failed with error", "err", err)
 		return Outcome{}, err
@@ -48,7 +48,6 @@ func (p *Processor) Outcome(
 func (p *Processor) getOutcome(
 	lggr logger.Logger,
 	previousOutcome Outcome,
-	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, processorState, error) {
 	nextState := previousOutcome.nextState()
@@ -263,9 +262,6 @@ func getConsensusObservation(
 			)
 	}
 
-	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs
-	rmnRemoteConfigs := map[cciptypes.ChainSelector][]cciptypes.RemoteConfig{destChain: aggObs.RMNRemoteConfigs}
-
 	// Get consensus using strict 2fChain+1 threshold.
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	fChain := consensus.MakeMultiThreshold(fChains, consensus.F)
@@ -275,20 +271,16 @@ func getConsensusObservation(
 		return consensusObservation{}, fmt.Errorf("no consensus value for fDestChain(%d): %v", fDestChain, fChain)
 	}
 
-	consensusObs := consensusObservation{
-		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
-		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
+	return consensusObservation{
+		MerkleRoots: consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		OnRampMaxSeqNums: consensus.GetOrderedConsensus(
 			lggr,
 			"OnRamp Max Seq Nums",
 			aggObs.OnRampMaxSeqNums,
 			fChain),
 		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(lggr, uint(fDestChain), aggObs.OffRampNextSeqNums),
-		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
 		FChain:             fChains,
-	}
-
-	return consensusObs, nil
+	}, nil
 }
 
 // getOffRampNextSequenceNumbersConsensus accepts a list of offramp sequence number observations per chain

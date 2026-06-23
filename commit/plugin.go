@@ -25,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -58,7 +57,6 @@ type Plugin struct {
 	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
-	rmnHomeReader       readerpkg.RMNHome
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	destChain           cciptypes.ChainSelector
@@ -85,9 +83,6 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
-	rmnHomeReader readerpkg.RMNHome,
-	rmnCrypto cciptypes.RMNCrypto,
-	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	reporter metrics.Reporter,
 	addressCodec cciptypes.AddressCodec,
@@ -116,17 +111,6 @@ func NewPlugin(
 		destChain,
 	)
 
-	rmnController := rmn.NewController(
-		logutil.WithComponent(lggr, "RMNController"),
-		rmnCrypto,
-		offchainCfg.SignObservationPrefix,
-		rmnPeerClient,
-		rmnHomeReader,
-		observationsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
-		reportsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
-		reporter,
-	)
-
 	merkleRootProcessor := merkleroot.NewProcessor(
 		reportingCfg.OracleID,
 		oracleIDToP2pID,
@@ -138,9 +122,6 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		rmnController,
-		rmnCrypto,
-		rmnHomeReader,
 		reporter,
 		addressCodec,
 	)
@@ -189,7 +170,6 @@ func NewPlugin(
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,
-		rmnHomeReader:       rmnHomeReader,
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
 		chainSupport:        chainSupport,
@@ -630,54 +610,7 @@ func (p *Plugin) Close() error {
 		p.ccipReader,
 	}
 
-	// Chains without RMN don't initialize the RMNHomeReader
-	// TODO Consider initializing rmnHomeReader anyway but using some noop implementation
-	if p.rmnHomeReader != nil {
-		closeable = append(closeable, p.rmnHomeReader)
-	}
-
 	return services.CloseAll(closeable...)
-}
-
-// Assuming that we have to delegate a specific amount of time to the observation requests and the report requests.
-// We define some percentages in order to help us calculate the time we have to delegate to each request timer.
-const (
-	observationDurationPercentage = 0.55
-	reportDurationPercentage      = 0.4
-	// remaining 5% for other query processing
-
-	maxAllowedObservationTimeout = 3 * time.Second
-	maxAllowedReportTimeout      = 2 * time.Second
-)
-
-func observationsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Duration {
-	// we have queryCapacityForObservations to make the initial observation request and potentially a secondary request
-	queryCapacityForObservations := time.Duration(observationDurationPercentage * float64(maxQueryDuration))
-
-	// we divide in two parts one for the initial observation and one for the retry
-	queryCapacityForInitialObservations := queryCapacityForObservations / 2
-
-	// if the capacity is greater than the maximum allowed we return the max allowed
-	if queryCapacityForInitialObservations < maxAllowedObservationTimeout {
-		return queryCapacityForObservations
-	}
-
-	return maxAllowedObservationTimeout
-}
-
-func reportsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Duration {
-	// we have queryCapacityForReports to make the initial reports request and potentially a secondary request
-	queryCapacityForReports := time.Duration(reportDurationPercentage * float64(maxQueryDuration))
-
-	// we divide in two parts one for the initial signatures request and one for the retry
-	queryCapacityForInitialObservations := queryCapacityForReports / 2
-
-	// if the capacity is greater than the maximum allowed we return the max allowed
-	if queryCapacityForInitialObservations < maxAllowedReportTimeout {
-		return queryCapacityForInitialObservations
-	}
-
-	return maxAllowedReportTimeout
 }
 
 // Interface compatibility checks.

@@ -14,14 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -306,37 +304,8 @@ var (
 )
 
 func (d *dataGenerator) commitQuery() committypes.Query {
-	sigs := make([]*serialization.EcdsaSignature, d.numRmnNodes)
-	for i := 0; i < d.numRmnNodes; i++ {
-		sigs[i] = &serialization.EcdsaSignature{
-			R: randomBytes(32),
-			S: randomBytes(32),
-		}
-	}
-
-	laneUpdates := make([]*serialization.FixedDestLaneUpdate, d.numSourceChains)
-	for i := 0; i < d.numSourceChains; i++ {
-		laneUpdates[i] = &serialization.FixedDestLaneUpdate{
-			LaneSource: &serialization.LaneSource{
-				SourceChainSelector: rand.Uint64(),
-				OnrampAddress:       randomBytes(40),
-			},
-			ClosedInterval: &serialization.ClosedInterval{
-				MinMsgNr: rand.Uint64(),
-				MaxMsgNr: rand.Uint64(),
-			},
-			Root: randomBytes(32),
-		}
-	}
-
 	return committypes.Query{
-		MerkleRootQuery: merkleroot.Query{
-			RetryRMNSignatures: rand.Uint32()%2 == 0,
-			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  sigs,
-				LaneUpdates: laneUpdates,
-			},
-		},
+		MerkleRootQuery: merkleroot.Query{},
 		TokenPriceQuery: tokenprice.Query{},
 		ChainFeeQuery:   chainfee.Query{},
 	}
@@ -345,7 +314,6 @@ func (d *dataGenerator) commitQuery() committypes.Query {
 func (d *dataGenerator) commitObservation() committypes.Observation {
 	fChain := make(map[cciptypes.ChainSelector]int, d.numSourceChains)
 	merkleRoots := genMerkleRootChain(d.numSourceChains)
-	rmnEnabledChains := genRmnEnabledChains(d.numSourceChains)
 	onRampMaxSeqNums := genSeqNumChain(d.numSourceChains)
 	offRampNextSeqNums := genSeqNumChain(d.numSourceChains)
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, d.numSourceChains)
@@ -386,10 +354,8 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 	return committypes.Observation{
 		MerkleRootObs: merkleroot.Observation{
 			MerkleRoots:        merkleRoots,
-			RMNEnabledChains:   rmnEnabledChains,
 			OnRampMaxSeqNums:   onRampMaxSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
-			RMNRemoteConfig:    genRmnRemoteConfig(d.numRmnNodes),
 			FChain:             fChain,
 		},
 		TokenPriceObs: tokenprice.Observation{
@@ -412,14 +378,6 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 }
 
 func (d *dataGenerator) commitOutcome() committypes.Outcome {
-	rmnReportSigs := make([]cciptypes.RMNECDSASignature, d.numRmnNodes)
-	for i := 0; i < d.numRmnNodes; i++ {
-		rmnReportSigs[i] = cciptypes.RMNECDSASignature{
-			R: randomBytes32(),
-			S: randomBytes32(),
-		}
-	}
-
 	tokenPrices := make(cciptypes.TokenPriceMap)
 	for i := 0; i < d.numPricedTokens; i++ {
 		tokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
@@ -438,11 +396,8 @@ func (d *dataGenerator) commitOutcome() committypes.Outcome {
 			OutcomeType:                     merkleroot.OutcomeType(rand.Int() % 128),
 			RangesSelectedForReport:         genChainRanges(d.numSourceChains),
 			RootsToReport:                   genMerkleRootChain(d.numSourceChains),
-			RMNEnabledChains:                genRmnEnabledChains(d.numSourceChains),
 			OffRampNextSeqNums:              genSeqNumChain(d.numSourceChains),
 			ReportTransmissionCheckAttempts: uint(rand.Intn(128)),
-			RMNReportSignatures:             rmnReportSigs,
-			RMNRemoteCfg:                    genRmnRemoteConfig(d.numRmnNodes),
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
 			TokenPrices: tokenPrices,

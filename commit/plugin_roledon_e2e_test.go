@@ -134,8 +134,6 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 				}
 				deps.ccipReader.EXPECT().NextSeqNum(mock.Anything, s.sourceChains).Return(nextSeqNums, nil)
 
-				deps.ccipReader.EXPECT().GetRMNRemoteConfig(mock.Anything).Return(cciptypes.RemoteConfig{FSign: 1234}, nil)
-
 				deps.priceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, s.destChain).Return(nil, nil)
 
 				deps.ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, s.sourceChains).Return(nil)
@@ -420,9 +418,6 @@ func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID, in
 		deps.msgHasher,
 		deps.lggr,
 		deps.homeChainReader,
-		deps.rmnHomeReader,
-		nil,
-		nil,
 		ocr3types.ReportingPluginConfig{
 			OracleID: oracleID,
 			N:        len(s.oracles),
@@ -466,7 +461,6 @@ type oracleMockDependencySet struct {
 	msgHasher       *mocks.MessageHasher
 	lggr            logger.Logger
 	homeChainReader *mockinternalreader.MockHomeChain
-	rmnHomeReader   *mockreader.MockRMNHome
 	addressCodec    *ccipocr3.MockAddressCodec
 	reportBuilder   builder.ReportBuilderFunc
 }
@@ -515,7 +509,6 @@ func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) 
 			msgHasher:       mocks.NewMessageHasher(),
 			lggr:            logger.Test(t),
 			homeChainReader: mockinternalreader.NewMockHomeChain(t),
-			rmnHomeReader:   mockreader.NewMockRMNHome(t),
 			addressCodec:    ccipocr3.NewMockAddressCodec(t),
 			reportBuilder:   reportBuilder,
 		}

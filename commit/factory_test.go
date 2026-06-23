@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -33,40 +32,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 )
 
 func Test_maxQueryLength(t *testing.T) {
-	// This test will verify that the maxQueryLength constant is set to a proper value.
-
-	sigs := make([]*rmnpb.EcdsaSignature, estimatedMaxRmnNodesCount)
-	for i := range sigs {
-		sigs[i] = &rmnpb.EcdsaSignature{R: make([]byte, 32), S: make([]byte, 32)}
-	}
-
-	laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, estimatedMaxNumberOfSourceChains)
-	for i := range laneUpdates {
-		laneUpdates[i] = &rmnpb.FixedDestLaneUpdate{
-			LaneSource: &rmnpb.LaneSource{
-				SourceChainSelector: math.MaxUint64,
-				OnrampAddress:       make([]byte, 40),
-			},
-			ClosedInterval: &rmnpb.ClosedInterval{
-				MinMsgNr: math.MaxUint64,
-				MaxMsgNr: math.MaxUint64,
-			},
-			Root: make([]byte, 32),
-		}
-	}
-
 	q := committypes.Query{
-		MerkleRootQuery: merkleroot.Query{
-			RetryRMNSignatures: true,
-			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  sigs,
-				LaneUpdates: laneUpdates,
-			},
-		},
+		MerkleRootQuery: merkleroot.Query{},
 		TokenPriceQuery: tokenprice.Query{},
 		ChainFeeQuery:   chainfee.Query{},
 	}
@@ -74,10 +44,9 @@ func Test_maxQueryLength(t *testing.T) {
 	b, err := ocrtypecodec.DefaultCommitCodec.EncodeQuery(q)
 	require.NoError(t, err)
 
-	// We set twice the size, for extra safety while making breaking changes between oracle versions.
-	const testOffset = 10
-	assert.Greater(t, maxQueryLength, 2*len(b)-testOffset)
-	assert.Less(t, maxQueryLength, 2*len(b)+testOffset)
+	const headroom = 1024
+	assert.Greater(t, maxQueryLength, len(b))
+	assert.Less(t, maxQueryLength, len(b)+headroom)
 	require.Less(t, maxQueryLength, ocr3types.MaxMaxQueryLength)
 }
 
@@ -88,15 +57,7 @@ func Test_maxObservationLength(t *testing.T) {
 		MerkleRoots:        make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
 		OnRampMaxSeqNums:   make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
 		OffRampNextSeqNums: make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
-		RMNRemoteConfig: ccipocr3.RemoteConfig{
-			ContractAddress:  make([]byte, 20),
-			ConfigDigest:     [32]byte{},
-			Signers:          make([]ccipocr3.RemoteSignerInfo, estimatedMaxRmnNodesCount),
-			FSign:            math.MaxUint64,
-			ConfigVersion:    math.MaxUint32,
-			RmnReportVersion: [32]byte{},
-		},
-		FChain: make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+		FChain:             make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
 	}
 
 	for i := range merkleRootObs.MerkleRoots {
@@ -119,13 +80,6 @@ func Test_maxObservationLength(t *testing.T) {
 		merkleRootObs.OffRampNextSeqNums[i] = plugintypes.SeqNumChain{
 			ChainSel: math.MaxUint64,
 			SeqNum:   math.MaxUint64,
-		}
-	}
-
-	for i := range merkleRootObs.RMNRemoteConfig.Signers {
-		merkleRootObs.RMNRemoteConfig.Signers[i] = ccipocr3.RemoteSignerInfo{
-			OnchainPublicKey: make([]byte, 40),
-			NodeIndex:        math.MaxUint64,
 		}
 	}
 
@@ -181,15 +135,6 @@ func Test_maxOutcomeLength(t *testing.T) {
 			RootsToReport:                   make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
 			OffRampNextSeqNums:              make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
 			ReportTransmissionCheckAttempts: math.MaxUint64,
-			RMNReportSignatures:             make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
-			RMNRemoteCfg: ccipocr3.RemoteConfig{
-				ContractAddress:  make([]byte, 20),
-				ConfigDigest:     [32]byte{},
-				Signers:          make([]ccipocr3.RemoteSignerInfo, estimatedMaxRmnNodesCount),
-				FSign:            math.MaxUint64,
-				ConfigVersion:    math.MaxUint32,
-				RmnReportVersion: [32]byte{},
-			},
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
 			TokenPrices: make(ccipocr3.TokenPriceMap, estimatedMaxNumberOfSourceChains),
@@ -222,12 +167,6 @@ func Test_maxOutcomeLength(t *testing.T) {
 		}
 	}
 
-	for i := range maxOutc.MerkleRootOutcome.RMNRemoteCfg.Signers {
-		maxOutc.MerkleRootOutcome.RMNRemoteCfg.Signers[i] = ccipocr3.RemoteSignerInfo{
-			OnchainPublicKey: make([]byte, 40),
-			NodeIndex:        math.MaxUint64,
-		}
-	}
 	for i := range estimatedMaxNumberOfPricedTokens {
 		tokenID := ccipocr3.UnknownEncodedAddress(generateStringWithCounter(i, 20))
 		maxOutc.TokenPriceOutcome.TokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)

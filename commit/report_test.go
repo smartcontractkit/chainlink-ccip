@@ -150,8 +150,6 @@ func TestPluginReports(t *testing.T) {
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
 						},
 					},
-					RMNRemoteCfg:     ccipocr3.RemoteConfig{FSign: 123},
-					RMNEnabledChains: map[ccipocr3.ChainSelector]bool{3: true, 2: false},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: ccipocr3.TokenPriceMap{

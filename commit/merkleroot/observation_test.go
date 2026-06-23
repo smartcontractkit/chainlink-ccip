@@ -126,9 +126,7 @@ func TestObservation(t *testing.T) {
 					{ChainSel: destChain, SeqNumRange: cciptypes.SeqNumRange{5, 10}},
 				},
 			},
-			query: Query{
-				RetryRMNSignatures: true,
-			},
+			query: Query{},
 			setupMocks: func() {
 				mockObserver.EXPECT().ObserveMerkleRoots(mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
 					{

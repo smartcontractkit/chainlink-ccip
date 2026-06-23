@@ -3,7 +3,6 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,9 +22,6 @@ import (
 )
 
 var (
-	rmnLatencyBucketsMilliseconds = []float64{
-		5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
-	}
 	promProcessorOutputCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_commit_processor_output_sizes",
@@ -68,22 +64,6 @@ var (
 		[]string{"chainFamily", "chainID", "sourceChainFamily", "sourceChain",
 			"method", "source_network_name", "dest_network_name"},
 	)
-	promMerkleProcessorRmnReportLatency = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "ccip_commit_merkle_processor_rmn_report_latency_ms",
-			Help:    "This metric tracks the client-observed latency of building an full RMN report with signatures",
-			Buckets: rmnLatencyBucketsMilliseconds,
-		},
-		[]string{"chainID", "success"},
-	)
-	promRmnControllerRmnRequestLatency = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "ccip_commit_rmn_controller_rmn_request_latency_ms",
-			Help:    "This metric tracks the client-observed latency of a single RMN request",
-			Buckets: rmnLatencyBucketsMilliseconds,
-		},
-		[]string{"method", "nodeID", "error"},
-	)
 	promCommitLatestRoundID = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_commit_latest_round_id",
 		Help: "The latest round ID observed by the commit plugin",
@@ -103,9 +83,6 @@ type PromReporter struct {
 	bhClient    beholder.Client
 	chainFamily string
 	chainID     string
-	// Prometheus components
-	merkleProcessorRmnReportHistogram *prometheus.HistogramVec
-	rmnControllerRmnRequestHistogram  *prometheus.HistogramVec
 
 	processorLatencyHistogram *prometheus.HistogramVec
 	processorOutputCounter    *prometheus.CounterVec
@@ -166,9 +143,6 @@ func NewPromReporter(
 		bhClient:    bhClient,
 		chainFamily: chainFamily,
 		chainID:     chainID,
-
-		merkleProcessorRmnReportHistogram: promMerkleProcessorRmnReportLatency,
-		rmnControllerRmnRequestHistogram:  promRmnControllerRmnRequestLatency,
 
 		sequenceNumbers:        promSequenceNumbers,
 		commitLatestRound:      promCommitLatestRoundID,
@@ -286,16 +260,6 @@ func (p *PromReporter) trackMaxSequenceNumber(
 		"destChainFamily", p.chainFamily,
 		"maxSeqNr", maxSeqNr,
 	)
-}
-
-func (p *PromReporter) TrackRmnReport(latency float64, success bool) {
-	successStr := strconv.FormatBool(success)
-	p.merkleProcessorRmnReportHistogram.WithLabelValues(p.chainID, successStr).Observe(latency)
-}
-
-func (p *PromReporter) TrackRmnRequest(method string, latency float64, nodeID uint64, err string) {
-	nodeIDStr := strconv.FormatUint(nodeID, 10)
-	p.rmnControllerRmnRequestHistogram.WithLabelValues(method, nodeIDStr, err).Observe(latency)
 }
 
 func (p *PromReporter) TrackProcessorLatency(

@@ -6,11 +6,8 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -18,26 +15,20 @@ import (
 )
 
 // Processor is the processor responsible for
-// reading next messages and building merkle roots for them,
-// It's setup to use RMN to query which messages to include in the merkle root and ensures
-// the newly built merkle roots are the same as RMN roots.
+// reading next messages and building merkle roots for them.
 type Processor struct {
 	oracleID        commontypes.OracleID
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg     pluginconfig.CommitOffchainConfig
 	destChain       cciptypes.ChainSelector
 	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
-	lggr                   logger.Logger
-	observer               Observer
-	ccipReader             readerpkg.CCIPReader
-	reportingCfg           ocr3types.ReportingPluginConfig
-	chainSupport           plugincommon.ChainSupport
-	rmnController          rmn.Controller
-	rmnControllerCfgDigest cciptypes.Bytes32
-	rmnCrypto              cciptypes.RMNCrypto
-	rmnHomeReader          readerpkg.RMNHome
-	metricsReporter        MetricsReporter
-	addressCodec           cciptypes.AddressCodec
+	lggr            logger.Logger
+	observer        Observer
+	ccipReader      readerpkg.CCIPReader
+	reportingCfg    ocr3types.ReportingPluginConfig
+	chainSupport    plugincommon.ChainSupport
+	metricsReporter MetricsReporter
+	addressCodec    cciptypes.AddressCodec
 }
 
 // NewProcessor creates a new Processor
@@ -52,9 +43,6 @@ func NewProcessor(
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	chainSupport plugincommon.ChainSupport,
-	rmnController rmn.Controller,
-	rmnCrypto cciptypes.RMNCrypto,
-	rmnHomeReader readerpkg.RMNHome,
 	metricsReporter MetricsReporter,
 	addressCodec cciptypes.AddressCodec,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
@@ -88,9 +76,6 @@ func NewProcessor(
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
 		chainSupport:    chainSupport,
-		rmnController:   rmnController,
-		rmnCrypto:       rmnCrypto,
-		rmnHomeReader:   rmnHomeReader,
 		metricsReporter: metricsReporter,
 		addressCodec:    addressCodec,
 	}
@@ -100,9 +85,5 @@ func NewProcessor(
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}
 
 func (p *Processor) Close() error {
-	if !p.offchainCfg.RMNEnabled {
-		return nil
-	}
-
-	return services.CloseAll(p.rmnController, p.rmnHomeReader, p.observer)
+	return p.observer.Close()
 }

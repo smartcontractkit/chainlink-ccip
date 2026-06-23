@@ -140,7 +140,7 @@ func (p *Processor) getObservation(
 	}
 }
 
-// Observer is an interface for observing data from the offRamp, onRamp, RMN remote config, etc...
+// Observer is an interface for observing data from the offRamp, onRamp, etc...
 type Observer interface {
 	// ObserveOffRampNextSeqNums observes the next OffRamp sequence numbers for each source chain.
 	// If the destination chain is cursed it returns nil or
@@ -155,11 +155,6 @@ type Observer interface {
 	// ObserveMerkleRoots computes and returns the merkle roots for the provided sequence number ranges.
 	// NOTE: Make sure that caller supports the provided chains.
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
-
-	// ObserveRMNRemoteCfg observes the RMN remote config from the configured destination chain.
-	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
-	// NOTE: Make sure that caller supports the destination chain.
-	ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig
 
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
 	// if external calls are made, if values are cached, etc...
@@ -289,11 +284,6 @@ func (o *asyncObserver) ObserveLatestOnRampSeqNums(_ context.Context) []pluginty
 func (o *asyncObserver) ObserveMerkleRoots(
 	ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain {
 	return o.syncObserver.ObserveMerkleRoots(ctx, ranges)
-}
-
-// ObserveRMNRemoteCfg observes the RMN Remote Config by directly calling the base observer since this value is cached.
-func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
-	return o.syncObserver.ObserveRMNRemoteCfg(ctx)
 }
 
 // ObserveFChain observes the FChain by directly calling the base observer since this value is cached.
@@ -636,35 +626,6 @@ func (o observerImpl) computeMerkleRoot(
 	root := tree.Root()
 	lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
 	return root, nil
-}
-
-// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
-// NOTE: At least two external calls are made.
-func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
-	lggr := logutil.WithContextValues(ctx, o.lggr)
-
-	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
-	if err != nil {
-		lggr.Errorw("call to SupportsDestChain failed", "err", err)
-		return cciptypes.RemoteConfig{}
-	}
-
-	if !supportsDestChain {
-		lggr.Debugw("cannot observe RMN remote config since destination chain is not supported")
-		return cciptypes.RemoteConfig{}
-	}
-
-	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
-	if err != nil {
-		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
-			// destination chain not supported
-			return cciptypes.RemoteConfig{}
-		}
-		// legitimate error
-		lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
-		return cciptypes.RemoteConfig{}
-	}
-	return rmnRemoteCfg
 }
 
 // ObserveFChain observes the FChain for each supported chain.

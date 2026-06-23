@@ -22,9 +22,6 @@ type Reporter interface {
 	TrackObservation(obs committypes.Observation, round uint64)
 	TrackOutcome(outcome committypes.Outcome, round uint64)
 
-	TrackRmnReport(latency float64, success bool)
-	TrackRmnRequest(method string, latency float64, nodeID uint64, err string)
-
 	TrackProcessorLatency(processor string, method plugincommon.MethodType, latency time.Duration, err error)
 	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
 
@@ -42,10 +39,6 @@ type Noop struct{}
 func (n *Noop) TrackObservation(committypes.Observation, uint64) {}
 
 func (n *Noop) TrackOutcome(committypes.Outcome, uint64) {}
-
-func (n *Noop) TrackRmnReport(float64, bool) {}
-
-func (n *Noop) TrackRmnRequest(string, float64, uint64, string) {}
 
 func (n *Noop) TrackProcessorLatency(string, plugincommon.MethodType, time.Duration, error) {}
 

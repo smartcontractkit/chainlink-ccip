@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -41,19 +40,17 @@ const (
 	// The value can be adjusted as needed.
 	estimatedMaxNumberOfPricedTokens = 14_445
 
-	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
-	// that assumes estimatedMaxNumberOfSourceChains source chains and
-	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
+	// maxQueryLength is set with headroom above an empty merkle root processor query.
 	// check factory_test for the calculation
-	maxQueryLength = 242_869
+	maxQueryLength = 1_024
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 650_307
+	maxObservationLength = 636_100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 700_620
+	maxOutcomeLength = 668_500
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
@@ -76,8 +73,6 @@ type PluginFactory struct {
 	chainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	extendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters               map[cciptypes.ChainSelector]types.ContractWriter
-	rmnPeerClient              rmn.PeerClient
-	rmnCrypto                  cciptypes.RMNCrypto
 }
 
 type CommitPluginFactoryParams struct {
@@ -93,8 +88,6 @@ type CommitPluginFactoryParams struct {
 	ChainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ExtendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters            map[cciptypes.ChainSelector]types.ContractWriter
-	RmnPeerClient              rmn.PeerClient
-	RmnCrypto                  cciptypes.RMNCrypto
 }
 
 // NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
@@ -113,8 +106,6 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		chainAccessors:             params.ChainAccessors,
 		extendedReaders:            params.ExtendedReaders,
 		chainWriters:               params.ContractWriters,
-		rmnPeerClient:              params.RmnPeerClient,
-		rmnCrypto:                  params.RmnCrypto,
 	}
 }
 
@@ -148,34 +139,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.extendedReaders))
 	for chain, cr := range p.extendedReaders {
 		readerFacades[chain] = cr
-	}
-
-	// Bind the RMNHome contract
-	var rmnHomeReader readerpkg.RMNHome
-	if offchainConfig.RMNEnabled {
-		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
-		rmnCr, ok := p.extendedReaders[p.homeChainSelector]
-		if !ok {
-			return nil,
-				ocr3types.ReportingPluginInfo{},
-				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
-		}
-
-		rmnHomeReader, err = readerpkg.NewRMNHomeChainReader(
-			ctx,
-			lggr,
-			readerpkg.HomeChainPollingInterval,
-			p.homeChainSelector,
-			rmnHomeAddress,
-			rmnCr,
-		)
-		if err != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
-		}
-
-		if err := rmnHomeReader.Start(ctx); err != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome: %w", err)
-		}
 	}
 
 	if err := validateOcrConfig(p.ocrConfig.Config); err != nil {
@@ -256,9 +219,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.msgHasher,
 			lggr,
 			p.homeChainReader,
-			rmnHomeReader,
-			p.rmnCrypto,
-			p.rmnPeerClient,
 			config,
 			metricsReporter,
 			p.addrCodec,

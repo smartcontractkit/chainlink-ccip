@@ -262,52 +262,6 @@ func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// ObserveRMNRemoteCfg provides a mock function with given fields: ctx
-func (_m *MockObserver) ObserveRMNRemoteCfg(ctx context.Context) ccipocr3.RemoteConfig {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ObserveRMNRemoteCfg")
-	}
-
-	var r0 ccipocr3.RemoteConfig
-	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.RemoteConfig); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(ccipocr3.RemoteConfig)
-	}
-
-	return r0
-}
-
-// MockObserver_ObserveRMNRemoteCfg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ObserveRMNRemoteCfg'
-type MockObserver_ObserveRMNRemoteCfg_Call struct {
-	*mock.Call
-}
-
-// ObserveRMNRemoteCfg is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockObserver_Expecter) ObserveRMNRemoteCfg(ctx interface{}) *MockObserver_ObserveRMNRemoteCfg_Call {
-	return &MockObserver_ObserveRMNRemoteCfg_Call{Call: _e.mock.On("ObserveRMNRemoteCfg", ctx)}
-}
-
-func (_c *MockObserver_ObserveRMNRemoteCfg_Call) Run(run func(ctx context.Context)) *MockObserver_ObserveRMNRemoteCfg_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockObserver_ObserveRMNRemoteCfg_Call) Return(_a0 ccipocr3.RemoteConfig) *MockObserver_ObserveRMNRemoteCfg_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockObserver_ObserveRMNRemoteCfg_Call) RunAndReturn(run func(context.Context) ccipocr3.RemoteConfig) *MockObserver_ObserveRMNRemoteCfg_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // NewMockObserver creates a new instance of MockObserver. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockObserver(t interface {

@@ -10,19 +10,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-var rmnRemoteCfg = testhelpers.CreateRMNRemoteCfg()
 
 //nolint:dupl // test cases can be similar, we don't want to overcomplicate with functions for deduping
 func Test_Processor_Outcome(t *testing.T) {
@@ -278,9 +273,7 @@ func Test_Processor_Outcome(t *testing.T) {
 				OutcomeType:                     ReportIntervalsSelected,
 				ReportTransmissionCheckAttempts: 123, // <--- random value to verify if the same outcome is sent
 			},
-			q: Query{
-				RetryRMNSignatures: true,
-			},
+			q: Query{},
 			observations: []func(testCase) Observation{
 				func(tc testCase) Observation {
 					return Observation{
@@ -313,38 +306,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
-			q: Query{
-				RMNSignatures: &rmn.ReportSignatures{
-					Signatures: []*rmnpb.EcdsaSignature{
-						{R: bytes32a[:], S: bytes32b[:]},
-						{R: bytes32a[:], S: bytes32b[:]},
-					},
-					LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainA,
-								OnrampAddress:       []byte{0xa},
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 10,
-								MaxMsgNr: 15,
-							},
-							Root: bytes32a[:],
-						},
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainF,
-								OnrampAddress:       []byte{0xb},
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 10,
-								MaxMsgNr: 20,
-							},
-							Root: bytes32b[:],
-						},
-					},
-				},
-			},
+			q: Query{},
 			observations: []func(testCase) Observation{
 				func(tc testCase) Observation {
 					return Observation{
@@ -379,14 +341,6 @@ func Test_Processor_Outcome(t *testing.T) {
 								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 20),
 								MerkleRoot:    bytes32b,
 							},
-						},
-						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-							chainA: true,
-							chainB: true,
-							chainC: true,
-							chainD: true,
-							chainE: true,
-							chainF: true,
 						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
@@ -631,27 +585,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
-			q: Query{
-				RMNSignatures: &rmn.ReportSignatures{
-					Signatures: []*rmnpb.EcdsaSignature{
-						{R: bytes32a[:], S: bytes32b[:]},
-						{R: bytes32a[:], S: bytes32b[:]},
-					},
-					LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainA,
-								OnrampAddress:       []byte{0xa},
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 10,
-								MaxMsgNr: 15,
-							},
-							Root: bytes32a[:],
-						},
-					},
-				},
-			},
+			q: Query{},
 			observations: []func(testCase) Observation{
 				func(tc testCase) Observation {
 					return Observation{
@@ -680,12 +614,6 @@ func Test_Processor_Outcome(t *testing.T) {
 								SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
 								MerkleRoot:    bytes32a,
 							},
-						},
-						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-							chainA: true,
-							chainB: false,
-							chainC: false,
-							chainD: true,
 						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
@@ -739,38 +667,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
-			q: Query{
-				RMNSignatures: &rmn.ReportSignatures{
-					Signatures: []*rmnpb.EcdsaSignature{
-						{R: bytes32a[:], S: bytes32b[:]},
-						{R: bytes32a[:], S: bytes32b[:]},
-					},
-					LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainA,
-								OnrampAddress:       []byte{0xa},
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 10,
-								MaxMsgNr: 20,
-							},
-							Root: bytes32a[:],
-						},
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainD,
-								OnrampAddress:       []byte{0xd},
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 13,
-								MaxMsgNr: 23,
-							},
-							Root: bytes32a[:],
-						},
-					},
-				},
-			},
+			q: Query{},
 			observations: []func(testCase) Observation{
 				func(tc testCase) Observation {
 					return Observation{
@@ -799,12 +696,6 @@ func Test_Processor_Outcome(t *testing.T) {
 								SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
 								MerkleRoot:    bytes32a,
 							},
-						},
-						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-							chainA: true,
-							chainB: false,
-							chainC: false,
-							chainD: true,
 						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
@@ -858,38 +749,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
-			q: Query{
-				RMNSignatures: &rmn.ReportSignatures{
-					Signatures: []*rmnpb.EcdsaSignature{
-						{R: bytes32a[:], S: bytes32b[:]},
-						{R: bytes32a[:], S: bytes32b[:]},
-					},
-					LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainA,
-								OnrampAddress:       []byte{0xa},
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 10,
-								MaxMsgNr: 20,
-							},
-							Root: bytes32a[:],
-						},
-						{
-							LaneSource: &rmnpb.LaneSource{
-								SourceChainSelector: chainD,
-								OnrampAddress:       []byte("this is not an address  <------------------"),
-							},
-							ClosedInterval: &rmnpb.ClosedInterval{
-								MinMsgNr: 13,
-								MaxMsgNr: 23,
-							},
-							Root: bytes32a[:],
-						},
-					},
-				},
-			},
+			q: Query{},
 			observations: []func(testCase) Observation{
 				func(tc testCase) Observation {
 					return Observation{
@@ -918,12 +778,6 @@ func Test_Processor_Outcome(t *testing.T) {
 								SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
 								MerkleRoot:    bytes32a,
 							},
-						},
-						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-							chainA: true,
-							chainB: false,
-							chainC: false,
-							chainD: true,
 						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
@@ -1006,12 +860,6 @@ func Test_Processor_Outcome(t *testing.T) {
 								SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
 								MerkleRoot:    bytes32a,
 							},
-						},
-						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-							chainA: true,
-							chainB: false,
-							chainC: false,
-							chainD: true,
 						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
@@ -1120,9 +968,6 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 					MerkleRoot:   cciptypes.Bytes32{2},
 				},
 			},
-			RMNRemoteConfig: map[cciptypes.ChainSelector]cciptypes.RemoteConfig{
-				cciptypes.ChainSelector(1): rmnRemoteCfg,
-			},
 		}
 
 		lggr := logger.Test(t)
@@ -1137,7 +982,6 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 func Test_reportRangesOutcome(t *testing.T) {
 	lggr := logger.Test(t)
 
-	destChain := cciptypes.ChainSelector(4)
 
 	testCases := []struct {
 		name                 string
@@ -1157,9 +1001,6 @@ func Test_reportRangesOutcome(t *testing.T) {
 				},
 				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 					1: 18, // off ramp next is 18, on ramp max is 20 so new msgs are: [18, 19, 20]
-				},
-				RMNRemoteConfig: map[cciptypes.ChainSelector]cciptypes.RemoteConfig{
-					destChain: rmnRemoteCfg,
 				},
 			},
 			merkleTreeSizeLimit: 256, // default limit should be used
@@ -1185,9 +1026,6 @@ func Test_reportRangesOutcome(t *testing.T) {
 					1: 18,  // off ramp next is 18, on ramp max is 20 so new msgs are: [18, 19, 20]
 					2: 995, // off ramp next is 995, on ramp max is 1000 so new msgs are: [995, 996, 997, 998, 999, 1000]
 					3: 500, // off ramp next is 500, we have new messages up to 10000 (default limit applied)
-				},
-				RMNRemoteConfig: map[cciptypes.ChainSelector]cciptypes.RemoteConfig{
-					destChain: rmnRemoteCfg,
 				},
 			},
 			merkleTreeSizeLimit: 5,

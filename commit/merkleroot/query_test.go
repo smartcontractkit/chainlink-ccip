@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -30,7 +29,6 @@ func TestProcessor_Query(t *testing.T) {
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: ccipocr3.ChainSelector(1), SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 				},
-				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
 		},
 		{
