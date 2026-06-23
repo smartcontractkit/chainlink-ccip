@@ -92,7 +92,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 	deployRegistry := deployapi.GetRegistry()
 	lanesRegistry := lanes.GetLaneAdapterRegistry()
 	mcmsRegistry := changesets.GetRegistry()
-	feesRegistry := fees.GetRegistry()
 
 	// Registration happens automatically, so the `Register...`
 	// calls below aren't needed, but are left here for clarity
@@ -608,28 +607,15 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, err)
 			testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
 
-			// Get fee resolver
-			feeResolver, ok := feesRegistry.GetFeeResolver(chainsel.FamilyEVM)
-			require.True(t, ok, "EVM fee resolver should be registered")
-
-			// Get the fee quoter contract on EVM chain A
-			onRampA, err := feeResolver.GetOnRampRef(*env, evmA.Chain.Selector, evmB.Chain.Selector)
-			require.NoError(t, err)
-			feeAdapterA, ok := feesRegistry.GetFeeAdapter(chainsel.FamilyEVM, onRampA.Version)
-			require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampA.Version))
-			fqA, err := feeAdapterA.GetFeeContractRef(*env, onRampA, evmA.Chain.Selector, evmB.Chain.Selector)
+			// Resolve fee adapters by on-chain fee contract version (not on-ramp version)
+			feeAdapterA, fqA, err := fees.ResolveFeeAdapter(env.OperationsBundle, env.BlockChains, env.DataStore, evmA.Chain.Selector, evmB.Chain.Selector)
 			require.NoError(t, err)
 
-			// Get the fee quoter contract on EVM chain B
-			onRampB, err := feeResolver.GetOnRampRef(*env, evmB.Chain.Selector, evmA.Chain.Selector)
-			require.NoError(t, err)
-			feeAdapterB, ok := feesRegistry.GetFeeAdapter(chainsel.FamilyEVM, onRampB.Version)
-			require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampB.Version))
-			fqB, err := feeAdapterB.GetFeeContractRef(*env, onRampB, evmB.Chain.Selector, evmA.Chain.Selector)
+			feeAdapterB, fqB, err := fees.ResolveFeeAdapter(env.OperationsBundle, env.BlockChains, env.DataStore, evmB.Chain.Selector, evmA.Chain.Selector)
 			require.NoError(t, err)
 
 			// Make sure EVM chain A was set
-			feeA, err := feeAdapterA.GetOnchainTokenTransferFeeConfig(*env, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
+			feeA, err := feeAdapterA.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
 			require.NoError(t, err)
 			expectedFeeA := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(evmA.Chain.Selector, evmB.Chain.Selector)
 			expectedFeeA.DeciBps = evmInitDeciBpsA.Value
@@ -641,7 +627,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.Equal(t, expectedFeeA.DeciBps, feeA.DeciBps)
 
 			// Make sure EVM chain B fee config was set
-			feeB, err := feeAdapterB.GetOnchainTokenTransferFeeConfig(*env, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
+			feeB, err := feeAdapterB.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
 			require.NoError(t, err)
 			expectedFeeB := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(evmB.Chain.Selector, evmA.Chain.Selector)
 			expectedFeeB.DeciBps = evmInitDeciBpsB.Value
@@ -763,7 +749,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
 
 				// Verify that the fee config on chain A for transfers to chain B matches what we set in the input, merged with any defaults from the adapter
-				feeA, err = feeAdapterA.GetOnchainTokenTransferFeeConfig(*env, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
+				feeA, err = feeAdapterA.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
 				require.NoError(t, err)
 				feeDefaultsA := tokensapi.GetDefaultChainAgnosticTokenTransferFeeConfig(evmA.Chain.Selector, evmB.Chain.Selector)
 				evmA.FeeConfig.DefaultFinalityTransferFeeBps = evmInitDeciBpsA // seed value should still be present
@@ -776,7 +762,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, uint32(math.MaxUint32), feeA.MaxFeeUSDCents)
 
 				// Verify that the fee config on chain B for transfers to chain A matches what we set in the input, merged with any defaults from the adapter
-				feeB, err = feeAdapterB.GetOnchainTokenTransferFeeConfig(*env, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
+				feeB, err = feeAdapterB.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
 				require.NoError(t, err)
 				feeDefaultsB := tokensapi.GetDefaultChainAgnosticTokenTransferFeeConfig(evmB.Chain.Selector, evmA.Chain.Selector)
 				evmB.FeeConfig.DefaultFinalityTransferFeeBps = evmInitDeciBpsB // seed value should still be present
@@ -821,10 +807,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 				testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
 
 				// Verify configs were reset
-				feeA, err = feeAdapterA.GetOnchainTokenTransferFeeConfig(*env, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
+				feeA, err = feeAdapterA.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqA, evmA.Chain.Selector, evmB.Chain.Selector, tokA.Hex())
 				require.NoError(t, err)
 				require.False(t, feeA.IsEnabled, "fee should be disabled after reset")
-				feeB, err = feeAdapterB.GetOnchainTokenTransferFeeConfig(*env, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
+				feeB, err = feeAdapterB.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqB, evmB.Chain.Selector, evmA.Chain.Selector, tokB.Hex())
 				require.NoError(t, err)
 				require.False(t, feeB.IsEnabled, "fee should be disabled after reset")
 			}
@@ -1312,24 +1298,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 					results := env.DataStore.Addresses().Filter(filters...)
 					require.Len(t, results, 1, fmt.Sprintf("token address for symbol %q on chain selector %d should be found in datastore", src.tok.Symbol, src.sel))
 					token := results[0].Address
-					fam, err := chainsel.GetSelectorFamily(src.sel)
-					require.NoError(t, err)
 
-					// Get the on ramp contract on the source chain
-					feeResolver, ok := feesRegistry.GetFeeResolver(fam)
-					require.True(t, ok, "EVM fee resolver should be registered")
-					onRampSrc, err := feeResolver.GetOnRampRef(*env, src.sel, dst.sel)
-					require.NoError(t, err)
-
-					// Get the fee contract on the source chain
-					feeAdapter, ok := feesRegistry.GetFeeAdapter(fam, onRampSrc.Version)
-					require.True(t, ok, fmt.Sprintf("fee adapter for version %q should be registered", onRampSrc.Version))
-					fqSrc, err := feeAdapter.GetFeeContractRef(*env, onRampSrc, src.sel, dst.sel)
+					feeAdapter, fqSrc, err := fees.ResolveFeeAdapter(env.OperationsBundle, env.BlockChains, env.DataStore, src.sel, dst.sel)
 					require.NoError(t, err)
 
 					// Verify token transfer fee config is correct
 					expectedFee := src.fee.MergeWith(tokensapi.GetDefaultChainAgnosticTokenTransferFeeConfig(src.sel, dst.sel))
-					actualFee, err := feeAdapter.GetOnchainTokenTransferFeeConfig(*env, fqSrc, src.sel, dst.sel, token)
+					actualFee, err := feeAdapter.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, fqSrc, src.sel, dst.sel, token)
 					require.NoError(t, err)
 					require.Equal(t, expectedFee.DefaultFinalityTransferFeeBps, actualFee.DeciBps)
 					require.Equal(t, expectedFee.DefaultFinalityFeeUSDCents, actualFee.MinFeeUSDCents)
