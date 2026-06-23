@@ -238,7 +238,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	metricsReporter.TrackLooppProviderSupported(p.looppCCIPProviderSupported)
 
 	reportBuilder, err := builder.NewReportBuilder(
-		offchainConfig.RMNEnabled,
 		offchainConfig.MaxMerkleRootsPerReport,
 		offchainConfig.MaxPricesPerReport,
 	)

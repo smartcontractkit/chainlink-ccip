@@ -506,7 +506,7 @@ func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) 
 		s.oracleIDToPeerID[s.oracles[i]] = peerID
 		s.peerIDToOracleID[peerID] = s.oracles[i]
 
-		reportBuilder, err := builder.NewReportBuilder(false, 0, 0)
+		reportBuilder, err := builder.NewReportBuilder(0, 0)
 		require.NoError(t, err)
 		s.oracleDependencies[s.oracles[i]] = oracleMockDependencySet{
 			ccipReader:      mockreader.NewMockCCIPReader(t),

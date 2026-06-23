@@ -95,7 +95,7 @@ func TestReportBuilders(t *testing.T) {
 				}
 				require.Equal(t, report.PriceUpdates, priceUpdates)
 
-				roots := append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...)
+				roots := report.UnblessedMerkleRoots
 				require.Len(t, roots, 4)
 			},
 		},
@@ -117,7 +117,7 @@ func TestReportBuilders(t *testing.T) {
 					assert.Equal(t, report.PriceUpdates, priceUpdates)
 				}
 
-				roots := append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...)
+				roots := report.UnblessedMerkleRoots
 				assert.Len(t, roots, 1)
 			},
 		},
@@ -127,7 +127,7 @@ func TestReportBuilders(t *testing.T) {
 			maxPrices:       3, // chosen to have one report with both gas and token prices.
 			expectedReports: 5,
 			checkReport: func(t *testing.T, i int, report ccipocr3.CommitPluginReport) {
-				numRoots := len(report.BlessedMerkleRoots) + len(report.UnblessedMerkleRoots)
+				numRoots := len(report.UnblessedMerkleRoots)
 				numPrices := len(report.PriceUpdates.TokenPriceUpdates) + len(report.PriceUpdates.GasPriceUpdates)
 
 				if i < 3 {
@@ -151,7 +151,7 @@ func TestReportBuilders(t *testing.T) {
 			maxRoots:        3, // chosen to have one remainder report.
 			expectedReports: 6,
 			checkReport: func(t *testing.T, i int, report ccipocr3.CommitPluginReport) {
-				numRoots := len(report.BlessedMerkleRoots) + len(report.UnblessedMerkleRoots)
+				numRoots := len(report.UnblessedMerkleRoots)
 				numPrices := len(report.PriceUpdates.TokenPriceUpdates) + len(report.PriceUpdates.GasPriceUpdates)
 
 				if i < 3 {
@@ -256,21 +256,9 @@ func Test_buildMultipleMerkleRootReports_priceOnlyOutcome(t *testing.T) {
 func Test_buildOneReport(t *testing.T) {
 	lggr := logger.Test(t)
 
-	blessedMerkleRoots := []ccipocr3.MerkleRootChain{
+	merkleRoots := []ccipocr3.MerkleRootChain{
 		{ChainSel: 1, MerkleRoot: mustMakeBytes("0x0102030405060708090102030405060708090102030405060708090102030405")},
-	}
-	unblessedMerkleRoots := []ccipocr3.MerkleRootChain{
 		{ChainSel: 2, MerkleRoot: mustMakeBytes("0x0202030405060708090102030405060708090102030405060708090102030405")},
-	}
-	rmnSignatures := []ccipocr3.RMNECDSASignature{
-		{
-			R: [32]byte{0x01},
-			S: [32]byte{0x02},
-		},
-		{
-			R: [32]byte{0x02},
-			S: [32]byte{0x03},
-		},
 	}
 	priceUpdates := ccipocr3.PriceUpdates{
 		TokenPriceUpdates: []ccipocr3.TokenPrice{
@@ -284,10 +272,7 @@ func Test_buildOneReport(t *testing.T) {
 	testcases := []struct {
 		name              string
 		merkleOutcomeType merkleroot.OutcomeType
-		blessedRoots      []ccipocr3.MerkleRootChain
-		unblessedRoots    []ccipocr3.MerkleRootChain
-		rmnSignatures     []ccipocr3.RMNECDSASignature
-		rmnRemoteFSign    uint64
+		merkleRoots       []ccipocr3.MerkleRootChain
 		priceUpdates      ccipocr3.PriceUpdates
 		reportEmpty       bool
 	}{
@@ -303,48 +288,30 @@ func Test_buildOneReport(t *testing.T) {
 			reportEmpty:       false,
 		},
 		{
-			name:              "merkle outcome with blessed and unblessed roots, no price updates",
+			name:              "merkle outcome with roots, no price updates",
 			merkleOutcomeType: merkleroot.ReportGenerated,
-			blessedRoots:      blessedMerkleRoots,
-			unblessedRoots:    unblessedMerkleRoots,
-			rmnRemoteFSign:    1,
-			rmnSignatures:     rmnSignatures,
+			merkleRoots:       merkleRoots,
 			reportEmpty:       false,
 		},
 		{
-			name:              "merkle outcome with blessed and unblessed roots, with price updates",
+			name:              "merkle outcome with roots, with price updates",
 			merkleOutcomeType: merkleroot.ReportGenerated,
-			blessedRoots:      blessedMerkleRoots,
-			unblessedRoots:    unblessedMerkleRoots,
+			merkleRoots:       merkleRoots,
 			priceUpdates:      priceUpdates,
 			reportEmpty:       false,
 		},
 		{
 			name:              "merkle outcome ReportInFlight, no price updates",
 			merkleOutcomeType: merkleroot.ReportInFlight,
-
-			// notice that blessed and unblessed roots are still set since they're
-			// set in the merkle outcome.
-			// However, they wouldn't be included in the report.
-			blessedRoots:   blessedMerkleRoots,
-			unblessedRoots: unblessedMerkleRoots,
-			rmnRemoteFSign: 1,
-			rmnSignatures:  rmnSignatures,
-			reportEmpty:    true,
+			merkleRoots:       merkleRoots,
+			reportEmpty:       true,
 		},
 		{
 			name:              "merkle outcome ReportInFlight, with price updates",
 			merkleOutcomeType: merkleroot.ReportInFlight,
-
-			// notice that blessed and unblessed roots are still set since they're
-			// set in the merkle outcome.
-			// However, they wouldn't be included in the report.
-			blessedRoots:   blessedMerkleRoots,
-			unblessedRoots: unblessedMerkleRoots,
-			rmnRemoteFSign: 1,
-			rmnSignatures:  rmnSignatures,
-			priceUpdates:   priceUpdates,
-			reportEmpty:    false,
+			merkleRoots:       merkleRoots,
+			priceUpdates:      priceUpdates,
+			reportEmpty:       false,
 		},
 	}
 
@@ -353,10 +320,7 @@ func Test_buildOneReport(t *testing.T) {
 			report := buildOneReport(
 				lggr,
 				tt.merkleOutcomeType,
-				tt.blessedRoots,
-				tt.unblessedRoots,
-				tt.rmnSignatures,
-				tt.rmnRemoteFSign,
+				tt.merkleRoots,
 				tt.priceUpdates,
 			)
 
@@ -364,6 +328,8 @@ func Test_buildOneReport(t *testing.T) {
 				require.True(t, report.Report.IsEmpty())
 			} else {
 				require.NotNil(t, report)
+				require.Empty(t, report.Report.BlessedMerkleRoots)
+				require.Nil(t, report.Report.RMNSignatures)
 			}
 		})
 	}
@@ -392,7 +358,6 @@ func mustMakeBytes(byteStr string) ccipocr3.Bytes32 {
 
 func TestNewReportBuilder(t *testing.T) {
 	type args struct {
-		RMNEnabled              bool
 		MaxPricesPerReport      uint64
 		MaxMerkleRootsPerReport uint64
 	}
@@ -403,9 +368,8 @@ func TestNewReportBuilder(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "RMN enabled",
+			name: "standard report",
 			args: args{
-				RMNEnabled:              true,
 				MaxPricesPerReport:      0,
 				MaxMerkleRootsPerReport: 0,
 			},
@@ -413,39 +377,8 @@ func TestNewReportBuilder(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "RMN enabled with max prices",
+			name: "with prices",
 			args: args{
-				RMNEnabled:              true,
-				MaxPricesPerReport:      1,
-				MaxMerkleRootsPerReport: 0,
-			},
-			want:    nil,
-			wantErr: assert.Error,
-		},
-		{
-			name: "RMN enabled with max roots",
-			args: args{
-				RMNEnabled:              true,
-				MaxPricesPerReport:      0,
-				MaxMerkleRootsPerReport: 1,
-			},
-			want:    nil,
-			wantErr: assert.Error,
-		},
-		{
-			name: "RMN disabled",
-			args: args{
-				RMNEnabled:              false,
-				MaxPricesPerReport:      0,
-				MaxMerkleRootsPerReport: 0,
-			},
-			want:    buildStandardReport,
-			wantErr: assert.NoError,
-		},
-		{
-			name: "RMN disabled with prices",
-			args: args{
-				RMNEnabled:              false,
 				MaxPricesPerReport:      1,
 				MaxMerkleRootsPerReport: 0,
 			},
@@ -453,9 +386,8 @@ func TestNewReportBuilder(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "RMN disabled with prices and roots",
+			name: "with prices and roots",
 			args: args{
-				RMNEnabled:              false,
 				MaxPricesPerReport:      1,
 				MaxMerkleRootsPerReport: 1,
 			},
@@ -463,9 +395,8 @@ func TestNewReportBuilder(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "RMN disabled with roots",
+			name: "with roots",
 			args: args{
-				RMNEnabled:              false,
 				MaxPricesPerReport:      0,
 				MaxMerkleRootsPerReport: 1,
 			},
@@ -475,15 +406,15 @@ func TestNewReportBuilder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewReportBuilder(tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)
-			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v, %v)",
-				tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)) {
+			got, err := NewReportBuilder(tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)
+			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v)",
+				tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)) {
 				return
 			}
 			wantFunc := reflect.ValueOf(tt.want).Pointer()
 			gotFunc := reflect.ValueOf(got).Pointer()
-			assert.Equalf(t, wantFunc, gotFunc, "NewReportBuilder(%v, %v, %v)",
-				tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
+			assert.Equalf(t, wantFunc, gotFunc, "NewReportBuilder(%v, %v)",
+				tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
 		})
 	}
 }
