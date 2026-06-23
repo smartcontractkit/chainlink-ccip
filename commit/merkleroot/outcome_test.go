@@ -304,13 +304,12 @@ func Test_Processor_Outcome(t *testing.T) {
 			maxMerkleTreeSize: 10,
 			rmnEnabled:        true,
 			expOutcome: Outcome{
-				OutcomeType:                     ReportIntervalsSelected,
-				ReportTransmissionCheckAttempts: 123,
+				OutcomeType: ReportEmpty,
 			},
 			expErr: false,
 		},
 		{
-			name: "outcome of merkle roots and rmn signatures checking",
+			name: "outcome of merkle roots consensus",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
@@ -433,18 +432,6 @@ func Test_Processor_Outcome(t *testing.T) {
 						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 20),
 						MerkleRoot:    bytes32b,
 					},
-				},
-				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-					chainA: true,
-					chainB: true,
-					chainC: true,
-					chainD: true,
-					chainE: true,
-					chainF: true,
-				},
-				RMNReportSignatures: []cciptypes.RMNECDSASignature{
-					{R: bytes32a, S: bytes32b},
-					{R: bytes32a, S: bytes32b},
 				},
 			},
 			expErr: false,
@@ -640,7 +627,7 @@ func Test_Processor_Outcome(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "if one signed root is missing then we make progress with the non-rmn roots",
+			name: "all consensus merkle roots are included in the outcome",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
@@ -720,6 +707,12 @@ func Test_Processor_Outcome(t *testing.T) {
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
 					{
+						ChainSel:      chainA,
+						OnRampAddress: []byte{0xa},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 20),
+						MerkleRoot:    bytes32a,
+					},
+					{
 						ChainSel:      chainB,
 						OnRampAddress: []byte{0xb},
 						SeqNumsRange:  cciptypes.NewSeqNumRange(11, 21),
@@ -731,22 +724,18 @@ func Test_Processor_Outcome(t *testing.T) {
 						SeqNumsRange:  cciptypes.NewSeqNumRange(12, 22),
 						MerkleRoot:    bytes32a,
 					},
-				},
-				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-					chainA: true,
-					chainB: false,
-					chainC: false,
-					chainD: true,
-				},
-				RMNReportSignatures: []cciptypes.RMNECDSASignature{
-					{R: bytes32a, S: bytes32b},
-					{R: bytes32a, S: bytes32b},
+					{
+						ChainSel:      chainD,
+						OnRampAddress: []byte{0xd},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
+						MerkleRoot:    bytes32a,
+					},
 				},
 			},
 			expErr: false,
 		},
 		{
-			name: "if all signed roots are present we make progress with both rmn and non-rmn roots",
+			name: "consensus merkle roots are reported without RMN filtering",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
@@ -861,21 +850,11 @@ func Test_Processor_Outcome(t *testing.T) {
 						MerkleRoot:    bytes32a,
 					},
 				},
-				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-					chainA: true,
-					chainB: false,
-					chainC: false,
-					chainD: true,
-				},
-				RMNReportSignatures: []cciptypes.RMNECDSASignature{
-					{R: bytes32a, S: bytes32b},
-					{R: bytes32a, S: bytes32b},
-				},
 			},
 			expErr: false,
 		},
 		{
-			name: "if the leader sent one wrong root then we make progress only with the non-rmn roots",
+			name: "invalid RMN signatures in query do not affect merkle root outcome",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
@@ -966,6 +945,12 @@ func Test_Processor_Outcome(t *testing.T) {
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
 					{
+						ChainSel:      chainA,
+						OnRampAddress: []byte{0xa},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 20),
+						MerkleRoot:    bytes32a,
+					},
+					{
 						ChainSel:      chainB,
 						OnRampAddress: []byte{0xb},
 						SeqNumsRange:  cciptypes.NewSeqNumRange(11, 21),
@@ -977,22 +962,18 @@ func Test_Processor_Outcome(t *testing.T) {
 						SeqNumsRange:  cciptypes.NewSeqNumRange(12, 22),
 						MerkleRoot:    bytes32a,
 					},
-				},
-				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-					chainA: true,
-					chainB: false,
-					chainC: false,
-					chainD: true,
-				},
-				RMNReportSignatures: []cciptypes.RMNECDSASignature{
-					{R: bytes32a, S: bytes32b},
-					{R: bytes32a, S: bytes32b},
+					{
+						ChainSel:      chainD,
+						OnRampAddress: []byte{0xd},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
+						MerkleRoot:    bytes32a,
+					},
 				},
 			},
 			expErr: false,
 		},
 		{
-			name: "if query is empty then progress should be made with rmn-disabled chains",
+			name: "empty query still reports all consensus merkle roots",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
@@ -1052,6 +1033,12 @@ func Test_Processor_Outcome(t *testing.T) {
 				OutcomeType: ReportGenerated,
 				RootsToReport: []cciptypes.MerkleRootChain{
 					{
+						ChainSel:      chainA,
+						OnRampAddress: []byte{0xa},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 20),
+						MerkleRoot:    bytes32a,
+					},
+					{
 						ChainSel:      chainB,
 						OnRampAddress: []byte{0xb},
 						SeqNumsRange:  cciptypes.NewSeqNumRange(11, 21),
@@ -1063,14 +1050,13 @@ func Test_Processor_Outcome(t *testing.T) {
 						SeqNumsRange:  cciptypes.NewSeqNumRange(12, 22),
 						MerkleRoot:    bytes32a,
 					},
+					{
+						ChainSel:      chainD,
+						OnRampAddress: []byte{0xd},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(13, 23),
+						MerkleRoot:    bytes32a,
+					},
 				},
-				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-					chainA: true,
-					chainB: false,
-					chainC: false,
-					chainD: true,
-				},
-				RMNReportSignatures: []cciptypes.RMNECDSASignature{},
 			},
 			expErr: false,
 		},
@@ -1118,7 +1104,6 @@ func Test_Processor_Outcome(t *testing.T) {
 }
 
 func Test_buildMerkleRootsOutcome(t *testing.T) {
-	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 
@@ -1142,10 +1127,8 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 
 		lggr := logger.Test(t)
 		for range rounds {
-			report1, err := buildMerkleRootsOutcome(rmn.ReportSignatures{}, false, lggr, obs, Outcome{}, mockAddrCodec)
-			require.NoError(t, err)
-			report2, err := buildMerkleRootsOutcome(rmn.ReportSignatures{}, false, lggr, obs, Outcome{}, mockAddrCodec)
-			require.NoError(t, err)
+			report1 := buildMerkleRootsOutcome(lggr, obs, Outcome{})
+			report2 := buildMerkleRootsOutcome(lggr, obs, Outcome{})
 			require.Equal(t, report1, report2)
 		}
 	})
@@ -1188,7 +1171,6 @@ func Test_reportRangesOutcome(t *testing.T) {
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: 1, SeqNum: 18},
 				},
-				RMNRemoteCfg: rmnRemoteCfg,
 			},
 		},
 		{
@@ -1221,14 +1203,13 @@ func Test_reportRangesOutcome(t *testing.T) {
 					{ChainSel: 2, SeqNum: 995},
 					{ChainSel: 3, SeqNum: 500},
 				},
-				RMNRemoteCfg: rmnRemoteCfg,
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			outcome := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain)
+			outcome := reportRangesOutcome(lggr, tc.consensusObservation, tc.merkleTreeSizeLimit)
 			require.Equal(t, tc.expectedOutcome, outcome)
 		})
 	}
