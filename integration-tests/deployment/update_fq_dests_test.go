@@ -73,10 +73,10 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 	srcOnRampRef := datastore.AddressRef{ChainSelector: src, Type: datastore.ContractType(onramp.ContractType), Version: utils.Version_1_6_0}
 	srcOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, srcOnRampRef, src, datastore_utils.FullRef)
 	require.NoError(t, err)
-	srcFQ, err := evmFeesAdapter.GetFeeContractRef(*e, srcOnRampRef, src, dst)
+	srcFQ, err := evmFeesAdapter.GetFeeContractRef(e.OperationsBundle, e.BlockChains, e.DataStore, srcOnRampRef, src, dst)
 	require.NoError(t, err)
 
-	initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, srcFQ, src, dst)
+	initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, srcFQ, src, dst)
 	require.NoError(t, err)
 	require.True(t, initialCfg.IsEnabled)
 
@@ -108,7 +108,7 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, srcFQ, src, dst)
+	updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, srcFQ, src, dst)
 	require.NoError(t, err)
 	require.True(t, updatedCfg.IsEnabled)
 	require.Equal(t, newMaxDataBytes, updatedCfg.MaxDataBytes, "MaxDataBytes should be updated")
@@ -171,10 +171,10 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 		evmOnRampRef := datastore.AddressRef{ChainSelector: evmSel, Type: datastore.ContractType(onramp.ContractType), Version: utils.Version_1_6_0}
 		evmOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, evmOnRampRef, evmSel, datastore_utils.FullRef)
 		require.NoError(t, err)
-		evmFQ, err := evmFeesAdapter.GetFeeContractRef(*e, evmOnRampRef, evmSel, solSel)
+		evmFQ, err := evmFeesAdapter.GetFeeContractRef(e.OperationsBundle, e.BlockChains, e.DataStore, evmOnRampRef, evmSel, solSel)
 		require.NoError(t, err)
 
-		initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, evmFQ, evmSel, solSel)
+		initialCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, evmFQ, evmSel, solSel)
 		require.NoError(t, err)
 		require.True(t, initialCfg.IsEnabled)
 
@@ -205,7 +205,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 			})
 		require.NoError(t, err)
 
-		updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(*e, evmFQ, evmSel, solSel)
+		updatedCfg, err := evmFeesAdapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, evmFQ, evmSel, solSel)
 		require.NoError(t, err)
 		require.True(t, updatedCfg.IsEnabled)
 		require.Equal(t, newMaxDataBytes, updatedCfg.MaxDataBytes, "MaxDataBytes should be updated")
@@ -217,10 +217,10 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 		solOnRampRef := datastore.AddressRef{ChainSelector: solSel, Type: datastore.ContractType(router.ContractType), Version: utils.Version_1_6_0}
 		solOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, solOnRampRef, solSel, datastore_utils.FullRef)
 		require.NoError(t, err)
-		solFQ, err := solFeesAdapter.GetFeeContractRef(*e, solOnRampRef, solSel, evmSel)
+		solFQ, err := solFeesAdapter.GetFeeContractRef(e.OperationsBundle, e.BlockChains, e.DataStore, solOnRampRef, solSel, evmSel)
 		require.NoError(t, err)
 
-		initialCfg, err := solFeesAdapter.GetOnchainDestChainConfig(*e, solFQ, solSel, evmSel)
+		initialCfg, err := solFeesAdapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, solFQ, solSel, evmSel)
 		require.NoError(t, err)
 		require.True(t, initialCfg.IsEnabled)
 
@@ -251,7 +251,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 			})
 		require.NoError(t, err)
 
-		updatedCfg, err := solFeesAdapter.GetOnchainDestChainConfig(*e, solFQ, solSel, evmSel)
+		updatedCfg, err := solFeesAdapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, solFQ, solSel, evmSel)
 		require.NoError(t, err)
 		require.True(t, updatedCfg.IsEnabled)
 		require.Equal(t, newMaxDataBytes, updatedCfg.MaxDataBytes, "MaxDataBytes should be updated")
