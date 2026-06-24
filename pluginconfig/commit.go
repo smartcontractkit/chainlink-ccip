@@ -59,10 +59,18 @@ type CommitOffchainConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
 
+	// TODO(remove-blessing): compat only; ignored by commit plugin.
+	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+	// TODO(remove-blessing): compat only; ignored by commit plugin.
+	RMNEnabled bool `json:"rmnEnabled"`
+
 	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
 	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
 	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
+
+	// TODO(remove-blessing): compat only; ignored by commit plugin.
+	SignObservationPrefix string `json:"signObservationPrefix"`
 
 	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
@@ -197,6 +205,8 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
 		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 	}
+
+	c.RMNEnabled = false
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here

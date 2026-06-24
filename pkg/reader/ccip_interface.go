@@ -219,6 +219,10 @@ type CCIPReader interface {
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]cciptypes.TimestampedBig
 
+	// GetRMNRemoteConfig reads the RMN remote contract on the destination chain and returns the remote config.
+	// TODO(remove-blessing): delete once chainlink drops GetRMNRemoteConfig.
+	GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error)
+
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
 	GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error)

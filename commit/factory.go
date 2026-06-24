@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -85,11 +86,17 @@ type CommitPluginFactoryParams struct {
 	ChainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ExtendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters            map[cciptypes.ChainSelector]types.ContractWriter
+	// TODO(remove-blessing): delete once chainlink stops passing RmnPeerClient/RmnCrypto.
+	RmnPeerClient rmn.PeerClient
+	RmnCrypto     cciptypes.RMNCrypto
 }
 
 // NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
 // the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
 func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
+	_ = params.RmnPeerClient
+	_ = params.RmnCrypto
+
 	return &PluginFactory{
 		baseLggr:                   params.Lggr,
 		donID:                      params.DonID,
