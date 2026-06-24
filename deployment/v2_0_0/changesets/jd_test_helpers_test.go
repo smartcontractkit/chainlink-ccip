@@ -62,7 +62,7 @@ func expectJDInteractionsWithProposeJob(
 	if len(chainConfigs) > 0 {
 		mockJD.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
 			&nodev1.ListNodeChainConfigsResponse{ChainConfigs: chainConfigs}, nil,
-		)
+		).Maybe()
 	}
 	proposeExpectation := mockJD.EXPECT().ProposeJob(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, req *jobpb.ProposeJobRequest, _ ...grpc.CallOption) (*jobpb.ProposeJobResponse, error) {

@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/operations/fetch_signing_keys"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
 
 // internalStubOffchain satisfies offchain.Client for tests that only need a
@@ -88,6 +89,36 @@ func TestSignerFromJDIfMissing_NotFoundInJD(t *testing.T) {
 	signer, ok := signerFromJDIfMissing(nil, "nop1", chainsel.FamilyEVM, keys)
 	assert.Empty(t, signer)
 	assert.False(t, ok)
+}
+
+// ---- filterCLModeNOPs ----
+
+func TestFilterCLModeNOPs_SkipsStandalone(t *testing.T) {
+	got := filterCLModeNOPs(
+		[]shared.NOPAlias{"nop1", "nop2", "nop3"},
+		[]offchain.NOPConfig{
+			{Alias: "nop1", Mode: shared.NOPModeCL},
+			{Alias: "nop2", Mode: shared.NOPModeStandalone},
+			{Alias: "nop3", Mode: shared.NOPModeCL},
+		},
+	)
+	assert.Equal(t, []shared.NOPAlias{"nop1", "nop3"}, got)
+}
+
+func TestFilterCLModeNOPs_TreatsMissingAsNotCL(t *testing.T) {
+	got := filterCLModeNOPs(
+		[]shared.NOPAlias{"nop1", "nopGhost"},
+		[]offchain.NOPConfig{{Alias: "nop1", Mode: shared.NOPModeCL}},
+	)
+	assert.Equal(t, []shared.NOPAlias{"nop1"}, got)
+}
+
+func TestFilterCLModeNOPs_DefaultModeIsCL(t *testing.T) {
+	got := filterCLModeNOPs(
+		[]shared.NOPAlias{"nop1"},
+		[]offchain.NOPConfig{{Alias: "nop1"}},
+	)
+	assert.Equal(t, []shared.NOPAlias{"nop1"}, got)
 }
 
 // ---- fetchSigningKeysForNOPsByFamilies ----

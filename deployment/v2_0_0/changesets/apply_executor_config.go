@@ -117,7 +117,8 @@ func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry, chainFamilyR
 			nopsToValidate = getExecutorPoolNOPAliases(pool)
 		}
 
-		if err := validateExecutorChainSupport(e, pool, nopsToValidate, selectors); err != nil {
+		clNOPs := filterCLModeNOPs(nopsToValidate, cfg.Topology.NOPTopology.NOPs)
+		if err := validateExecutorChainSupport(e, pool, clNOPs, selectors); err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
 
@@ -414,6 +415,20 @@ func buildNOPModes(nops []offchain.NOPConfig) map[shared.NOPAlias]shared.NOPMode
 		nopModes[shared.NOPAlias(nop.Alias)] = mode
 	}
 	return nopModes
+}
+
+// filterCLModeNOPs keeps only aliases whose topology NOP has Mode == NOPModeCL.
+// Used only for JD chain-config support validation; standalone bootstraps do not
+// register CL-style chain configs in JD.
+func filterCLModeNOPs(aliases []shared.NOPAlias, nops []offchain.NOPConfig) []shared.NOPAlias {
+	modeByAlias := buildNOPModes(nops)
+	filtered := make([]shared.NOPAlias, 0, len(aliases))
+	for _, alias := range aliases {
+		if mode, ok := modeByAlias[alias]; ok && mode == shared.NOPModeCL {
+			filtered = append(filtered, alias)
+		}
+	}
+	return filtered
 }
 
 func getAllNOPAliases(nops []offchain.NOPConfig) []shared.NOPAlias {
