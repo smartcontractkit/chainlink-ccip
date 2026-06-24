@@ -283,6 +283,11 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
 			AllowedFinalityConfig:    allowedFinality,
 			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
+			// The CCTP-through-CCV pool is not a replacement for the USDCTokenPoolProxy; it is a
+			// separate pool that runs alongside the proxy. The upgrade-safety check would incorrectly
+			// require cctpThroughCCVRemoteChainConfigs to include lock-release chains, which the CCV
+			// pool intentionally does not handle.
+			SkipActivePoolSupportedChainsCheck: true,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)
