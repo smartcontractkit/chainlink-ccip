@@ -25,6 +25,10 @@ type ConfigureTokenPoolForRemoteChainsInput struct {
 	RemoteChains      map[uint64]tokens.RemoteChainConfig[[]byte, string]
 	RegistryAddress   common.Address
 	TokenAddress      common.Address
+	// SkipActivePoolSupportedChainsCheck disables the upgrade-safety check that requires remoteChains
+	// to cover all chains the currently-registered pool supports. Set this when the pool being configured
+	// is not a direct replacement for the registered pool (e.g. CCTP-through-CCV alongside USDCTokenPoolProxy).
+	SkipActivePoolSupportedChainsCheck bool
 }
 
 // ConfigureTokenPoolForRemoteChains runs the supported-chains check once (when registry/token set) then calls
@@ -54,7 +58,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 					ChainSelector: input.ChainSelector,
 					Address:       activePool,
 				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
-				if err == nil {
+				if err == nil && !input.SkipActivePoolSupportedChainsCheck {
 					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
