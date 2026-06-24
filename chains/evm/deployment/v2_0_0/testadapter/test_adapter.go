@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 	"github.com/xssnick/tonutils-go/tlb"
 
@@ -270,7 +269,7 @@ func (a *EVMAdapter) NativeFeeToken() string {
 }
 
 func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]byte, error) {
-	var finalityConfig protocol.Finality
+	var finalityConfig uint32
 	gasLimit := new(big.Int).SetUint64(100_000)
 
 	for _, opt := range opts {
@@ -280,7 +279,7 @@ func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]b
 			if !ok {
 				return nil, fmt.Errorf("finality must be uint32, got %T", opt.Value)
 			}
-			finalityConfig = protocol.Finality(v)
+			finalityConfig = v
 		case testadapters.ExtraArgGasLimit:
 			v, ok := opt.Value.(*big.Int)
 			if !ok || v == nil {
