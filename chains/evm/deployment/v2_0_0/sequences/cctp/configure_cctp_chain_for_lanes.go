@@ -761,9 +761,7 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 			Args:          arg.RemoteChainSelector,
 		})
 		if err != nil {
-			// Not yet configured (RemoteChainNotSupported) or unreadable — include it.
-			toUpdateConfigs = append(toUpdateConfigs, arg)
-			continue
+			return nil, fmt.Errorf("failed to get remote chain config for selector %d from CCTPVerifier: %w", arg.RemoteChainSelector, err)
 		}
 		current := currentReport.Output.RemoteChainConfig
 		if current.Router != arg.Router ||
@@ -793,9 +791,7 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 			Args:          arg.ChainSelector,
 		})
 		if err != nil {
-			// Not yet configured (UnknownDomain) or unreadable — include it.
-			toUpdateDomains = append(toUpdateDomains, arg)
-			continue
+			return nil, fmt.Errorf("failed to get domain for chain %d from CCTPVerifier: %w", arg.ChainSelector, err)
 		}
 		current := currentReport.Output
 		if current.AllowedCallerOnDest != arg.AllowedCallerOnDest ||
@@ -857,9 +853,7 @@ func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 			Args:          update.DestChainSelector,
 		})
 		if err != nil {
-			// Domain not yet set (UnknownDomain) or unreadable — include it.
-			toUpdate = append(toUpdate, update)
-			continue
+			return nil, fmt.Errorf("failed to get domain for chain %d from CCTP V2 token pool: %w", update.DestChainSelector, err)
 		}
 		current := currentReport.Output
 		if current.AllowedCaller == update.AllowedCaller &&
@@ -895,9 +889,7 @@ func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 			Args:          update.DestChainSelector,
 		})
 		if err != nil {
-			// Domain not yet set (UnknownDomain) or unreadable — include it.
-			toUpdate = append(toUpdate, update)
-			continue
+			return nil, fmt.Errorf("failed to get domain for chain %d from CCTP V1 token pool: %w", update.DestChainSelector, err)
 		}
 		current := currentReport.Output
 		if current.AllowedCaller == update.AllowedCaller &&

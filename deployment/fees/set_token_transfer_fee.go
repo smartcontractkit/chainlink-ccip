@@ -113,7 +113,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 			feeGroups := map[datastore.AddressRefKey]FeeGroup{}
 			for _, dst := range src.Settings {
 				// Version inference part 1: we use the router contract to infer the currently configured on ramp
-				onRampRef, err := srcResolver.GetOnRampRef(e, src.Selector, dst.Selector)
+				onRampRef, err := srcResolver.GetOnRampRef(e.OperationsBundle, e.BlockChains, e.DataStore, src.Selector, dst.Selector)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get OnRamp address ref from Router for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
@@ -123,7 +123,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				}
 
 				// Version inference part 2: we use the on ramp to get the currently configure fee contract (e.g. EVM2EVMOnRamp for v1.5.x and FeeQuoter for v1.6.x and v2.0.x)
-				feeQuoterRef, err := onRampAdp.GetFeeContractRef(e, onRampRef, src.Selector, dst.Selector)
+				feeQuoterRef, err := onRampAdp.GetFeeContractRef(e.OperationsBundle, e.BlockChains, e.DataStore, onRampRef, src.Selector, dst.Selector)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get fee contract ref for src %d and dst %d: %w", src.Selector, dst.Selector, err)
 				}
@@ -167,7 +167,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				}
 				report, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle,
-					group.adapter.SetTokenTransferFee(e, group.fqRefDS),
+					group.adapter.SetTokenTransferFee(e.DataStore, group.fqRefDS),
 					e.BlockChains,
 					SetTokenTransferFeeSequenceInput{
 						Selector: src.Selector,
@@ -191,7 +191,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
-	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, fq, src, dst, cfg.Address)
+	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fq, src, dst, cfg.Address)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
 	}
