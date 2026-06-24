@@ -44,17 +44,52 @@ message ExecOutcome {
 }
 
 message MerkleRootQuery {
-  reserved 1, 2;
-  reserved "retry_rmn_signatures", "rmn_signatures";
+  bool retry_rmn_signatures = 1 [deprecated = true];
+  ReportSignatures rmn_signatures = 2 [deprecated = true];
+}
+
+// Deprecated: retained for protobuf wire/API compatibility.
+message ReportSignatures {
+  repeated SignatureEcdsa signatures = 1 [deprecated = true];
+  repeated DestChainUpdate lane_updates = 2 [deprecated = true];
+}
+
+// Deprecated: retained for protobuf wire/API compatibility.
+message SignatureEcdsa {
+  bytes r = 1 [deprecated = true];
+  bytes s = 2 [deprecated = true];
+}
+
+// Deprecated: retained for protobuf wire/API compatibility.
+message DestChainUpdate {
+  SourceChainMeta lane_source = 1 [deprecated = true];
+  SeqNumRange seq_num_range = 2 [deprecated = true];
+  bytes root = 3 [deprecated = true]; // bytes32
 }
 
 message MerkleRootObservation {
   repeated MerkleRootChain merkle_roots = 1;
-  reserved 2, 5;
-  reserved "rmn_enabled_chains", "rmn_remote_config";
+  map<uint64, bool> rmn_enabled_chains = 2 [deprecated = true]; // chainSelector to bool
   repeated SeqNumChain on_ramp_max_seq_nums = 3;
   repeated SeqNumChain off_ramp_next_seq_nums = 4;
+  RmnRemoteConfig rmn_remote_config = 5 [deprecated = true];
   map<uint64, int32> f_chain = 6; // chainSelector to f
+}
+
+// Deprecated: retained for protobuf wire/API compatibility.
+message RmnRemoteConfig {
+  bytes contract_address = 1 [deprecated = true];
+  bytes config_digest = 2 [deprecated = true];
+  repeated RemoteSignerInfo signers = 3 [deprecated = true];
+  uint64 f_sign = 4 [deprecated = true];
+  uint32 config_version = 5 [deprecated = true];
+  bytes rmn_report_version = 6 [deprecated = true];
+}
+
+// Deprecated: retained for protobuf wire/API compatibility.
+message RemoteSignerInfo {
+  bytes onchain_public_key = 1 [deprecated = true];
+  uint64 node_index = 2 [deprecated = true];
 }
 
 message TokenPriceObservation {
@@ -104,10 +139,11 @@ message MerkleRootOutcome {
   int32 outcome_type = 1;
   repeated ChainRange ranges_selected_for_report = 2;
   repeated MerkleRootChain roots_to_report = 3;
-  reserved 4, 7, 8;
-  reserved "rmn_enabled_chains", "rmn_report_signatures", "rmn_remote_cfg";
+  map<uint64, bool> rmn_enabled_chains = 4 [deprecated = true]; // chainSelector to bool
   repeated SeqNumChain off_ramp_next_seq_nums = 5;
   uint32 report_transmission_check_attempts = 6;
+  repeated SignatureEcdsa rmn_report_signatures = 7 [deprecated = true];
+  RmnRemoteConfig rmn_remote_cfg = 8 [deprecated = true];
 }
 
 message TokenPriceOutcome {
@@ -235,6 +271,12 @@ message SeqNumChain {
 message ChainRange {
   uint64 chain_sel = 1;
   SeqNumRange seq_num_range = 2;
+}
+
+// Deprecated: retained for protobuf wire/API compatibility.
+message SourceChainMeta {
+  uint64 source_chain_selector = 1 [deprecated = true];
+  bytes onramp_address = 2 [deprecated = true];
 }
 
 message MerkleRootChain {
