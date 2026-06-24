@@ -83,7 +83,10 @@ func (r *noopRMNHome) GetOffChainConfig(_ cciptypes.Bytes32) (cciptypes.Bytes, e
 	return nil, nil
 }
 
-func (r *noopRMNHome) GetAllConfigDigests() (cciptypes.Bytes32, cciptypes.Bytes32) {
+func (r *noopRMNHome) GetAllConfigDigests() (
+	activeConfigDigest cciptypes.Bytes32,
+	candidateConfigDigest cciptypes.Bytes32,
+) {
 	return cciptypes.Bytes32{}, cciptypes.Bytes32{}
 }
 
