@@ -1674,6 +1674,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		require.Contains(t, gotRemotePools, oldRemotePools[0], "remote Solana pool should be carried forward")
 
 		// Legacy lane fees should be imported from FeeQuoter onto the new v2.0 pool for EVM -> Solana.
+		// expectedFee mirrors discovery merge; apply merges again but Populate sets all fields so values are unchanged.
 		expectedFee := tokensapi.PartialTokenTransferFeeConfig{}.MergeWith(tokensapi.TokenTransferFeeConfig{
 			DestGasOverhead:               legacyFee.DestGasOverhead,
 			DestBytesOverhead:             legacyFee.DestBytesOverhead,

@@ -63,8 +63,6 @@ Before configuring each remote chain, **ConfigureTokenPoolForRemoteChains** ensu
 
 This keeps “configure for transfers” aligned with the active pool’s supported chains when upgrading.
 
-When `GetSupportedChains` on the active pool reverts (e.g. the registered pool is a **USDCTokenPoolProxy** that does not implement the 2.0.0 interface), this validation is skipped. That is separate from the **`ConfigureTokensForTransfers` changeset** `autoMigrateRemoteChains` path, which requires `getSupportedChains` on the active pool and fails if the call cannot succeed — list remotes explicitly in that case.
-
 ## Auto-migrate edge cases (`autoMigrateRemoteChains`)
 
 When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChains: true` during a pre-v2 → v2 pool upgrade, remote connectivity and legacy fees are discovered in the changeset (not in these sequences). Rate limits are still imported here via `importConfigFromActivePool` as described above. Fees are applied by the changeset after configure.
@@ -83,7 +81,6 @@ When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChai
 - Requires connected CCIP lanes (OnRamp/FeeQuoter resolvable per discovered remote). **Failures abort the entire changeset** — there is no partial apply.
 - When legacy lanes have no meaningful fee config, the fee adapter may return defaults that are still written to the new v2 pool. This differs from runs without auto-migrate, where no fee transactions are emitted.
 
-### USDCTokenPoolProxy / pools without `getSupportedChains`
+### Pools without `getSupportedChains` (e.g. USDCTokenPoolProxy)
 
-- **Changeset auto-migrate:** discovery calls `getSupportedChains` on the TAR-registered active pool and **fails** if the pool does not implement it (e.g. USDCTokenPoolProxy). List remote chains explicitly instead.
-- **Sequence upgrade-safety check:** `GetSupportedChains` on the active pool is best-effort; if the call reverts, validation is skipped (see Supported-chains validation above).
+Discovery calls `getSupportedChains` on the TAR-registered active pool and **fails** if the pool does not implement it. List remote chains explicitly instead.

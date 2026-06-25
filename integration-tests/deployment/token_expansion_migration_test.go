@@ -376,6 +376,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	newPoolA, err := tokenpoolV2_0_0.NewTokenPool(newPoolAddrA, chainA.Client)
 	require.NoError(t, err)
 
+	// Apply the fee override (if any) to the legacy lane fee to compute the expected merged result.
 	var yamlPartial tokensapi.PartialTokenTransferFeeConfig
 	if opts != nil && opts.feeOverride != nil {
 		yamlPartial = *opts.feeOverride
@@ -390,9 +391,13 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		IsEnabled:                     legacyFee.IsEnabled,
 	}
 
+	// expectedFee mirrors the discovery merge (YAML + legacy lane). Apply merges again with on-chain pool
+	// state or defaults, but auto-migrate Populate sets every field so that second merge is a no-op for values.
+	expectedFee := yamlPartial.MergeWith(legacyTpCfg)
+
+	// Validate that the new pool's fee config matches the expected merge of legacy + YAML.
 	gotFee, err := newPoolA.GetTokenTransferFeeConfig(&bind.CallOpts{Context: t.Context()}, common.Address{}, selB, finality.RawWaitForFinality, []byte{})
 	require.NoError(t, err)
-	expectedFee := yamlPartial.MergeWith(legacyTpCfg)
 	require.Equal(t, expectedFee.DefaultFinalityFeeUSDCents, gotFee.FinalityFeeUSDCents, "finality fee USD cents")
 	require.Equal(t, expectedFee.DestGasOverhead, gotFee.DestGasOverhead, "dest gas overhead")
 	require.Equal(t, expectedFee.DestBytesOverhead, gotFee.DestBytesOverhead, "dest bytes overhead")
