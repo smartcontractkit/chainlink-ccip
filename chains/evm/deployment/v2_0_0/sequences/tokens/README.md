@@ -74,8 +74,8 @@ When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChai
 
 | Situation | Behavior |
 |-----------|----------|
-| Remote **not listed** in YAML | Fully discovered from the legacy active pool (token, pool, decimals, fees). |
-| Remote listed, **no** `remoteToken` / `remotePool` | Backfill connectivity from the active pool; YAML overrides fees and other fields. |
+| Remote **not listed** in YAML | Fully discovered from the legacy active pool (token, pool, decimals); fees imported only when legacy FeeQuoter lane config is enabled. |
+| Remote listed, **no** `remoteToken` / `remotePool` | Backfill connectivity from the active pool; YAML overrides fees and other fields when `tokenTransferFeeConfig` is set (`isEnabled` required). |
 | Remote listed with **explicit** `remoteToken` and/or `remotePool` | YAML wins (coordinated retarget); legacy refs are not overwritten. |
 | Remote listed but **not** on the legacy active pool | Not enriched by discovery; provide full connectivity in YAML. |
 

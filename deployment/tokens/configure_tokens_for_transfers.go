@@ -63,17 +63,18 @@ type TokenTransferConfig struct {
 	//  (3) The active pool in TAR is already v2.0.0 or higher
 	//
 	// YAML precedence during upgrade (per remote chain):
-	//  - Remote not listed: fully discovered from the active pool (token, pool, decimals, fees).
+	//  - Remote not listed: fully discovered from the active pool (token, pool, decimals); fees are
+	//    imported only when the legacy FeeQuoter lane config is enabled for that token/lane.
 	//  - Remote listed with empty remoteToken AND remotePool: backfill connectivity from the active pool;
-	//    YAML overrides fees and other fields.
+	//    YAML overrides fees and other fields when tokenTransferFeeConfig is set (isEnabled required).
 	//  - Remote listed with explicit remoteToken and/or remotePool: those values are used as-is (coordinated
 	//    retarget); legacy active-pool refs are not overwritten.
 	//  - Remote listed but not supported by the legacy active pool: not enriched by discovery; you must
 	//    provide full connectivity in YAML.
 	//
 	// Fee discovery requires connected CCIP lanes (OnRamp/FeeQuoter resolvable per remote). Discovery failures
-	// abort the entire changeset. When legacy lanes have no configured fees, default fee values may still be
-	// written to the new v2 pool during auto-migrate.
+	// abort the entire changeset. If legacy lane fees are disabled and YAML omits tokenTransferFeeConfig,
+	// no fee transactions are emitted on the new v2 pool.
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
