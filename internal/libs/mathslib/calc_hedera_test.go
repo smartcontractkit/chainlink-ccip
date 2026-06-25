@@ -27,9 +27,9 @@ var (
 // TestHederaWeibarFix_FourCellMatrix covers the bidirectional x
 // {with, without fix} matrix from hedera-fees-investigation-v2.md:
 //
-//	                         X -> Hedera                   Hedera -> X
-//	  Without fix      10^10x inflated bug          Correct baseline
-//	  With fix         Correct                      Correct, no regression
+//	                       X -> Hedera                   Hedera -> X
+//	Without fix      10^10x inflated bug          Correct baseline
+//	With fix         Correct                      Correct, no regression
 //
 // The Hedera-side fixtures reproduce the exact unit mismatch in the note:
 // Hedera RPC reports gas in weibar, while FeeQuoter.getTokenPrice(WHBAR) is in
@@ -60,10 +60,10 @@ var (
 // exercise the same Hedera branch; TestHederaWeibarFix_TestnetCovered asserts
 // that the testnet selector takes that branch too.
 func TestHederaWeibarFix_FourCellMatrix(t *testing.T) {
-	hederaGasWeibar := big.NewInt(1_100_000_000_000)         // 1.1e12 weibar (live Hedera gasPrice)
-	hbarUsdPerFeeCoin := MustBigIntSetString("7671684", 20)  // 7.671684e26 (live WHBAR getTokenPrice)
-	sepoliaGasWei := big.NewInt(20_000_000_000)              // 2e10 (20 gwei)
-	ethUsdPerFeeCoin := MustBigIntSetString("3", 21)         // 3e21 (ETH @ $3,000)
+	hederaGasWeibar := big.NewInt(1_100_000_000_000)        // 1.1e12 weibar (live Hedera gasPrice)
+	hbarUsdPerFeeCoin := MustBigIntSetString("7671684", 20) // 7.671684e26 (live WHBAR getTokenPrice)
+	sepoliaGasWei := big.NewInt(20_000_000_000)             // 2e10 (20 gwei)
+	ethUsdPerFeeCoin := MustBigIntSetString("3", 21)        // 3e21 (ETH @ $3,000)
 
 	cases := []struct {
 		cell      string
