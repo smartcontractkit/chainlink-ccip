@@ -185,10 +185,6 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	return nil
 }
 
-func (r InMemoryCCIPReader) GetRMNRemoteConfig(_ context.Context) (cciptypes.RemoteConfig, error) {
-	return cciptypes.RemoteConfig{}, nil
-}
-
 func (r InMemoryCCIPReader) DiscoverContracts(
 	ctx context.Context,
 	supportedChains, allChains []cciptypes.ChainSelector) (cciptypes.ContractAddresses, error) {

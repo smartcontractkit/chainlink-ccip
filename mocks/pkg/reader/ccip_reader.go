@@ -640,62 +640,6 @@ func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run fun
 	return _c
 }
 
-// GetRMNRemoteConfig provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context) (ccipocr3.RemoteConfig, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRMNRemoteConfig")
-	}
-
-	var r0 ccipocr3.RemoteConfig
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.RemoteConfig, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.RemoteConfig); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(ccipocr3.RemoteConfig)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockCCIPReader_GetRMNRemoteConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRMNRemoteConfig'
-type MockCCIPReader_GetRMNRemoteConfig_Call struct {
-	*mock.Call
-}
-
-// GetRMNRemoteConfig is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockCCIPReader_Expecter) GetRMNRemoteConfig(ctx interface{}) *MockCCIPReader_GetRMNRemoteConfig_Call {
-	return &MockCCIPReader_GetRMNRemoteConfig_Call{Call: _e.mock.On("GetRMNRemoteConfig", ctx)}
-}
-
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetRMNRemoteConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Return(_a0 ccipocr3.RemoteConfig, _a1 error) *MockCCIPReader_GetRMNRemoteConfig_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.Context) (ccipocr3.RemoteConfig, error)) *MockCCIPReader_GetRMNRemoteConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetRmnCurseInfo provides a mock function with given fields: ctx
 func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context) (ccipocr3.CurseInfo, error) {
 	ret := _m.Called(ctx)

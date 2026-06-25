@@ -59,9 +59,9 @@ type CommitOffchainConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
 
-	// TODO(remove-blessing): compat only; ignored by commit plugin.
+	// RMNSignaturesTimeout is retained for on-chain OCR config JSON compatibility only.
 	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
-	// TODO(remove-blessing): compat only; ignored by commit plugin.
+	// RMNEnabled is retained for on-chain OCR config JSON compatibility only.
 	RMNEnabled bool `json:"rmnEnabled"`
 
 	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
@@ -69,7 +69,7 @@ type CommitOffchainConfig struct {
 	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
 
-	// TODO(remove-blessing): compat only; ignored by commit plugin.
+	// SignObservationPrefix is retained for on-chain OCR config JSON compatibility only.
 	SignObservationPrefix string `json:"signObservationPrefix"`
 
 	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
