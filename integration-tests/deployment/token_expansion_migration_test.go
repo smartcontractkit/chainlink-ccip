@@ -58,94 +58,154 @@ type legacyBnMPair struct {
 
 // autoMigrateUpgradeOpts configures optional YAML overrides for runAutoMigrateUpgrade.
 type autoMigrateUpgradeOpts struct {
-	feeOverride    *tokensapi.PartialTokenTransferFeeConfig
-	explicitRemote bool // list chain B with explicit remoteToken/remotePool from the legacy pair
+	feeOverrideCfg *tokensapi.PartialTokenTransferFeeConfig
+	explicitRemote bool
 }
 
-// TestTokenExpansionMigration_AutoMigrate exercises the AutoMigrateRemoteChains upgrade path: it deploys
-// a legacy BurnMint pool pair, seeds legacy lane fees, then upgrades chain A's pool to v2.0 with an EMPTY
-// RemoteChains map. The new pool must inherit chain B (token, remote pool, rate limits, and legacy fees
-// carried forward from the active pool / FeeQuoter), and the TokenAdminRegistry must switch to the new pool.
-//
-// Both legacy versions are covered: v1.5.1 (< 1.6.1) stores inbound rate limits in remote/source decimals and
-// is rebased on import; v1.6.1 (>= 1.6.1) stores them in local decimals and is imported as-is. With chain A at
-// 18 decimals and chain B at 6 decimals, both paths must converge (within float ULP) on the same on-chain
-// values for the new pool, which validates the inbound decimal rebasing end-to-end.
+// TestTokenExpansionMigration_AutoMigrate exercises AutoMigrateRemoteChains upgrades from legacy BnM
+// pools to v2.0.0: full remote discovery from an empty RemoteChains map, partial YAML fee merge, and
+// explicit remote token/pool refs. v1.5.1 and v1.6.1 are covered (inbound RL decimal rebasing vs the
+// native local decimals).
 func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 	cases := []struct {
 		name           string
 		oldPoolVersion *semver.Version
+		autoMigrateOpt *autoMigrateUpgradeOpts
 	}{
-		{"v1_5_1_to_v2_0_0", cciputils.Version_1_5_1},
-		{"v1_6_1_to_v2_0_0", cciputils.Version_1_6_1},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			runAutoMigrateUpgrade(t, tc.oldPoolVersion, nil)
-		})
-	}
-}
-
-// TestTokenExpansionMigration_AutoMigrate_PartialYAMLMerge verifies that explicit YAML fee overrides merge
-// with legacy lane fees imported by AutoMigrateRemoteChains: set fields win, unset fields are imported from
-// the legacy FeeQuoter. Remote token/pool are backfilled from the active pool; chain B must still be listed
-// as a counterpart when A lists B in RemoteChains. Both legacy pool versions are covered (v1.5.1 rebases
-// inbound rate limits on import; v1.6.1 stores them in local decimals).
-func TestTokenExpansionMigration_AutoMigrate_PartialYAMLMerge(t *testing.T) {
-	cases := []struct {
-		name           string
-		oldPoolVersion *semver.Version
-	}{
-		{"v1_5_1_to_v2_0_0", cciputils.Version_1_5_1},
-		{"v1_6_1_to_v2_0_0", cciputils.Version_1_6_1},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			runAutoMigrateUpgrade(t, tc.oldPoolVersion, &autoMigrateUpgradeOpts{
-				feeOverride: &tokensapi.PartialTokenTransferFeeConfig{
+		{
+			name:           "v1_5_1_to_v2_0_0/full_discovery",
+			oldPoolVersion: cciputils.Version_1_5_1,
+			autoMigrateOpt: nil,
+		},
+		{
+			name:           "v1_6_1_to_v2_0_0/full_discovery",
+			oldPoolVersion: cciputils.Version_1_6_1,
+			autoMigrateOpt: nil,
+		},
+		{
+			name:           "v1_5_1_to_v2_0_0/explicit_remote_refs",
+			oldPoolVersion: cciputils.Version_1_5_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{explicitRemote: true},
+		},
+		{
+			name:           "v1_6_1_to_v2_0_0/explicit_remote_refs",
+			oldPoolVersion: cciputils.Version_1_6_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{explicitRemote: true},
+		},
+		{
+			name:           "v1_5_1_to_v2_0_0/partial_yaml_fee_merge",
+			oldPoolVersion: cciputils.Version_1_5_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{
+				feeOverrideCfg: &tokensapi.PartialTokenTransferFeeConfig{
 					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
 				},
-			})
+			},
+		},
+		{
+			name:           "v1_6_1_to_v2_0_0/partial_yaml_fee_merge",
+			oldPoolVersion: cciputils.Version_1_6_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{
+				feeOverrideCfg: &tokensapi.PartialTokenTransferFeeConfig{
+					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runAutoMigrateUpgrade(t, tc.oldPoolVersion, tc.autoMigrateOpt)
 		})
 	}
-}
-
-// TestTokenExpansionMigration_AutoMigrate_PreservesExplicitRemoteRefs verifies that when remoteToken and
-// remotePool are set in YAML, auto-migrate uses them (backfill is skipped) and the upgrade still succeeds.
-func TestTokenExpansionMigration_AutoMigrate_PreservesExplicitRemoteRefs(t *testing.T) {
-	runAutoMigrateUpgrade(t, cciputils.Version_1_6_1, &autoMigrateUpgradeOpts{explicitRemote: true})
 }
 
 // TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate is the negative case: when
-// AutoMigrateRemoteChains is false (the default), configuring a v2.0 pool over an existing active pool must
-// still error if RemoteChains does not include every chain the active pool supports. This preserves the
-// pre-existing upgrade-safety check. We invoke the ConfigureTokenPoolForRemoteChains sequence directly with
-// an empty RemoteChains so the active pool's supported chain (B) is missing.
+// AutoMigrateRemoteChains is false (the default), configuring a v2.0.0 pool over an existing
+// active pool must still error if `RemoteChains` doesn't include every chain that the active
+// pool supports (i.e. the original behavior before the auto migrate flag was introduced). We
+// invoke ConfigureTokenPoolForRemoteChains directly with an empty RemoteChains so the active
+// pool's supported chain (B) is missing.
 func TestTokenExpansionMigration_RequiresAllChainsWithoutAutoMigrate(t *testing.T) {
 	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_1)
-
-	// RegistryAddress + TokenAddress are set, so the active-pool supported-chains check runs. The active
-	// pool (old pool A) supports chain B, which is absent from RemoteChains and the flag is off → error.
-	chainA := s.env.BlockChains.EVMChains()[s.selA]
 	_, err := cldf_ops.ExecuteSequence(
 		s.env.OperationsBundle,
 		evmtokensseq.ConfigureTokenPoolForRemoteChains,
-		chainA,
+		s.env.BlockChains.EVMChains()[s.selA],
 		evmtokensseq.ConfigureTokenPoolForRemoteChainsInput{
 			ChainSelector:    s.selA,
-			TokenPoolAddress: s.oldPoolAddrA, // unused before the error returns
+			TokenPoolAddress: common.HexToAddress("0x000000000000000000000000000000000000dEaD"),
 			RegistryAddress:  s.tarAddrA,
 			TokenAddress:     s.tokAddrA,
 			RemoteChains:     nil,
 		},
 	)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "remoteChains must include all active pool supported chains")
+	require.ErrorContains(t, err, "remoteChains must include all active pool supported chains")
+}
+
+// TestTokenExpansionMigration_ExtendPoolDoesNotRequireAllRemotes is the extend case: when the active
+// pool in TAR is already the v2 pool being configured, RemoteChains may list only new remotes and
+// must not be rejected for omitting chains the pool already supports.
+func TestTokenExpansionMigration_ExtendPoolDoesNotRequireAllRemotes(t *testing.T) {
+	const newPoolQualA = "MIG_EXTEND_NEW_POOL_A"
+
+	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_6_1)
+	e, selA := s.env, s.selA
+
+	// Migrate chain A's pool to v2.0 using AutoMigrateRemoteChains (remotes, rate limits, and legacy fees)
+	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
+	upgradeOut, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: cciputils.Version_2_0_0,
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selA: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      cciputils.Version_2_0_0,
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: newPoolQualA,
+					PoolType:           bnmOpsV2_0_0.ContractType.String(),
+					TokenRef:           &datastore.AddressRef{Address: s.tokAddrA.Hex()},
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					AutoMigrateRemoteChains: true,
+					RemoteChains:            nil,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, e, upgradeOut.DataStore)
+
+	// Ensure the new v2.0 pool was added to the datastore.
+	newPoolAddrA, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: selA,
+		Type:          datastore.ContractType(bnmOpsV2_0_0.ContractType),
+		Version:       bnmOpsV2_0_0.Version,
+		Qualifier:     newPoolQualA,
+	}, selA, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+
+	// At this point, the pool is already migrated, so calling ConfigureTokenPoolForRemoteChains again
+	// on the pool should NOT require every remote chain to be listed. Instead, we are now in "extend"
+	// mode (i.e. you only need to list the new remotes you want to add to the pool).
+	chainA := e.BlockChains.EVMChains()[selA]
+	_, err = cldf_ops.ExecuteSequence(
+		e.OperationsBundle,
+		evmtokensseq.ConfigureTokenPoolForRemoteChains,
+		chainA,
+		evmtokensseq.ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    selA,
+			TokenPoolAddress: newPoolAddrA,
+			RegistryAddress:  s.tarAddrA,
+			TokenAddress:     s.tokAddrA,
+			RemoteChains:     nil,
+		},
+	)
+	require.NoError(t, err)
 }
 
 // setupLegacyConnectedBnMPair deploys v2.0 core contracts on two chains, then deploys a legacy
-// (oldPoolVersion) BurnMint token+pool pair, connects them bidirectionally, and registers each in its
-// TokenAdminRegistry. It returns the resolved addresses for use in upgrade tests.
+// (oldPoolVersion) BurnMint token+pool pair, connects them bidirectionally, and registers each
+// in its TokenAdminRegistry. It returns the resolved addresses for use in upgrade tests.
 func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) legacyBnMPair {
 	t.Helper()
 
@@ -331,11 +391,11 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		},
 	}
 
-	// Allows us to test the code path for explicit fee configs and/or explicit remote chains
-	if opts != nil && (opts.feeOverride != nil || opts.explicitRemote) {
+	// Handle additional test options: fee override and/or explicit remoteToken/remotePool
+	if opts != nil && (opts.feeOverrideCfg != nil || opts.explicitRemote) {
 		rc := tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{}
-		if opts.feeOverride != nil {
-			rc.TokenTransferFeeConfig = opts.feeOverride
+		if opts.feeOverrideCfg != nil {
+			rc.TokenTransferFeeConfig = opts.feeOverrideCfg
 		}
 		if opts.explicitRemote {
 			rc.RemoteToken = &datastore.AddressRef{Address: s.tokAddrB.Hex()}
@@ -378,8 +438,8 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 
 	// Apply the fee override (if any) to the legacy lane fee to compute the expected merged result.
 	var yamlPartial tokensapi.PartialTokenTransferFeeConfig
-	if opts != nil && opts.feeOverride != nil {
-		yamlPartial = *opts.feeOverride
+	if opts != nil && opts.feeOverrideCfg != nil {
+		yamlPartial = *opts.feeOverrideCfg
 	}
 	legacyTpCfg := tokensapi.TokenTransferFeeConfig{
 		DestGasOverhead:               legacyFee.DestGasOverhead,
@@ -405,7 +465,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	require.Equal(t, expectedFee.DefaultFinalityTransferFeeBps, gotFee.FinalityTransferFeeBps, "finality transfer fee bps")
 	require.Equal(t, expectedFee.CustomFinalityTransferFeeBps, gotFee.FastFinalityTransferFeeBps, "fast finality transfer fee bps")
 	require.Equal(t, expectedFee.CustomFinalityFeeUSDCents, gotFee.FastFinalityFeeUSDCents, "fast finality fee USD cents")
-	if opts != nil && opts.feeOverride != nil {
+	if opts != nil && opts.feeOverrideCfg != nil {
 		legacyOnlyFee := tokensapi.PartialTokenTransferFeeConfig{}.MergeWith(legacyTpCfg)
 		require.NotEqual(t, legacyOnlyFee, expectedFee, "YAML fee override should change at least one resolved field vs legacy-only import")
 	}
