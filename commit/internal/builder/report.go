@@ -104,8 +104,7 @@ func buildStandardReport(
 	outcome committypes.Outcome,
 	_ pluginconfig.CommitOffchainConfig,
 ) ([]Report, error) {
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(outcome.MerkleRootOutcome.RootsToReport))
-	unblessedMerkleRoots = append(unblessedMerkleRoots, outcome.MerkleRootOutcome.RootsToReport...)
+	unblessedMerkleRoots := outcome.MerkleRootOutcome.RootsToReport
 
 	priceUpdates := cciptypes.PriceUpdates{
 		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
