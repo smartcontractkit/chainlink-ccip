@@ -82,7 +82,9 @@ When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChai
 ### Fee discovery
 
 - Requires connected CCIP lanes (OnRamp/FeeQuoter resolvable per discovered remote). **Failures abort the entire changeset** — there is no partial apply.
-- When legacy lanes have no meaningful fee config, the fee adapter may return defaults that are still written to the new v2 pool. This differs from runs without auto-migrate, where no fee transactions are emitted.
+- Legacy lane fees are imported **only when the legacy FeeQuoter config is enabled** for that token/lane. If legacy fees are disabled and YAML omits `tokenTransferFeeConfig`, **no fee transactions** are emitted on the new v2 pool.
+- When YAML includes `tokenTransferFeeConfig`, **`isEnabled` must be set** (omit the block entirely if you do not want to configure fees). During upgrade with legacy fees enabled, YAML fields merge over the discovered legacy values; with legacy fees disabled, YAML alone defines the config.
+- Without `autoMigrateRemoteChains`, omitted `tokenTransferFeeConfig` leaves fees untouched (same as before).
 
 ### Pools without `getSupportedChains` (e.g. USDCTokenPoolProxy)
 

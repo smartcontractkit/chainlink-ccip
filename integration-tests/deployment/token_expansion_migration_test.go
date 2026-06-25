@@ -58,14 +58,15 @@ type legacyBnMPair struct {
 
 // autoMigrateUpgradeOpts configures optional YAML overrides for runAutoMigrateUpgrade.
 type autoMigrateUpgradeOpts struct {
-	feeOverrideCfg *tokensapi.PartialTokenTransferFeeConfig
-	explicitRemote bool
+	feeOverrideCfg    *tokensapi.PartialTokenTransferFeeConfig
+	explicitRemote    bool
+	skipLegacyFeeSeed bool
 }
 
 // TestTokenExpansionMigration_AutoMigrate exercises AutoMigrateRemoteChains upgrades from legacy BnM
-// pools to v2.0.0: full remote discovery from an empty RemoteChains map, partial YAML fee merge, and
-// explicit remote token/pool refs. v1.5.1 and v1.6.1 are covered (inbound RL decimal rebasing vs the
-// native local decimals).
+// pools to v2.0.0: full remote discovery from an empty RemoteChains map, partial YAML fee cfg merge,
+// explicit remote token/pool refs, and no legacy fee import when legacy FQ lane fees aren't enabled.
+// v1.5.1 and v1.6.1 are covered (inbound RL decimal rebasing vs the native local decimals).
 func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -93,10 +94,21 @@ func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 			autoMigrateOpt: &autoMigrateUpgradeOpts{explicitRemote: true},
 		},
 		{
+			name:           "v1_5_1_to_v2_0_0/no_legacy_fees",
+			oldPoolVersion: cciputils.Version_1_5_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{skipLegacyFeeSeed: true},
+		},
+		{
+			name:           "v1_6_1_to_v2_0_0/no_legacy_fees",
+			oldPoolVersion: cciputils.Version_1_6_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{skipLegacyFeeSeed: true},
+		},
+		{
 			name:           "v1_5_1_to_v2_0_0/partial_yaml_fee_merge",
 			oldPoolVersion: cciputils.Version_1_5_1,
 			autoMigrateOpt: &autoMigrateUpgradeOpts{
 				feeOverrideCfg: &tokensapi.PartialTokenTransferFeeConfig{
+					IsEnabled:                  cciputils.NewOptional(true),
 					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
 				},
 			},
@@ -106,6 +118,7 @@ func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 			oldPoolVersion: cciputils.Version_1_6_1,
 			autoMigrateOpt: &autoMigrateUpgradeOpts{
 				feeOverrideCfg: &tokensapi.PartialTokenTransferFeeConfig{
+					IsEnabled:                  cciputils.NewOptional(true),
 					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
 				},
 			},
@@ -335,6 +348,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 
 	const newPoolQualA = "MIG_NEW_POOL_A"
 
+	skipLegacyFeeSeed := opts != nil && opts.skipLegacyFeeSeed
 	s := setupLegacyConnectedBnMPair(t, oldPoolVersion)
 	e, selA, selB := s.env, s.selA, s.selB
 	chainA := e.BlockChains.EVMChains()[selA]
@@ -345,36 +359,44 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	// Get fee adapter for chain A -> B.
 	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
 	require.NoError(t, err)
-	partialFee := fees.UnresolvedTokenTransferFeeArgs{
-		MinFeeUSDCents:    cciputils.NewOptional(uint32(17)),
-		DestGasOverhead:   cciputils.NewOptional(uint32(50_000)),
-		DestBytesOverhead: cciputils.NewOptional(uint32(150_000)),
-		IsEnabled:         cciputils.NewOptional(true),
-	}
 
-	// Seed legacy lane fees for chain A -> B (direct sequence, no MCMS — deployer-owned contracts).
-	resolvedFee := partialFee.Resolve(feeAdapter.GetDefaultTokenTransferFeeConfig(selA, selB))
-	_, err = cldf_ops.ExecuteSequence(
-		e.OperationsBundle,
-		feeAdapter.SetTokenTransferFee(e.DataStore, fqRef),
-		e.BlockChains,
-		fees.SetTokenTransferFeeSequenceInput{
-			Selector: selA,
-			Settings: map[uint64]map[string]*fees.TokenTransferFeeArgs{
-				selB: {s.tokAddrA.Hex(): resolvedFee},
+	var legacyFee fees.TokenTransferFeeArgs
+	if skipLegacyFeeSeed {
+		legacyFee, err = feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selA, selB, s.tokAddrA.Hex())
+		require.NoError(t, err)
+		require.False(t, legacyFee.IsEnabled, "legacy lane fees should be disabled before upgrade")
+	} else {
+		partialFee := fees.UnresolvedTokenTransferFeeArgs{
+			DestBytesOverhead: cciputils.NewOptional(uint32(150_000)),
+			DestGasOverhead:   cciputils.NewOptional(uint32(50_000)),
+			MinFeeUSDCents:    cciputils.NewOptional(uint32(17)),
+			IsEnabled:         cciputils.NewOptional(true),
+		}
+
+		// Seed legacy lane fees for chain A -> B (direct sequence, no MCMS — deployer-owned contracts).
+		resolvedFee := partialFee.Resolve(feeAdapter.GetDefaultTokenTransferFeeConfig(selA, selB))
+		_, err = cldf_ops.ExecuteSequence(
+			e.OperationsBundle,
+			feeAdapter.SetTokenTransferFee(e.DataStore, fqRef),
+			e.BlockChains,
+			fees.SetTokenTransferFeeSequenceInput{
+				Selector: selA,
+				Settings: map[uint64]map[string]*fees.TokenTransferFeeArgs{
+					selB: {s.tokAddrA.Hex(): resolvedFee},
+				},
 			},
-		},
-	)
-	require.NoError(t, err)
+		)
+		require.NoError(t, err)
 
-	// FeeQuoter should have been seeded with the values above for chain A -> B.
-	legacyFee, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selA, selB, s.tokAddrA.Hex())
-	require.NoError(t, err)
-	require.Equal(t, resolvedFee.MinFeeUSDCents, legacyFee.MinFeeUSDCents)
-	require.Equal(t, resolvedFee.DestGasOverhead, legacyFee.DestGasOverhead)
-	require.Equal(t, resolvedFee.DestBytesOverhead, legacyFee.DestBytesOverhead)
-	require.Equal(t, resolvedFee.IsEnabled, legacyFee.IsEnabled)
-	require.True(t, legacyFee.IsEnabled, "seeded legacy fee config should be enabled")
+		// FeeQuoter should have been seeded with the values above for chain A -> B.
+		legacyFee, err = feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selA, selB, s.tokAddrA.Hex())
+		require.NoError(t, err)
+		require.Equal(t, resolvedFee.MinFeeUSDCents, legacyFee.MinFeeUSDCents)
+		require.Equal(t, resolvedFee.DestGasOverhead, legacyFee.DestGasOverhead)
+		require.Equal(t, resolvedFee.DestBytesOverhead, legacyFee.DestBytesOverhead)
+		require.Equal(t, resolvedFee.IsEnabled, legacyFee.IsEnabled)
+		require.True(t, legacyFee.IsEnabled, "seeded legacy fee config should be enabled")
+	}
 	perChain := map[uint64]tokensapi.TokenExpansionInputPerChain{
 		selA: {
 			SkipOwnershipTransfer: true,
@@ -437,37 +459,40 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	require.NoError(t, err)
 
 	// Apply the fee override (if any) to the legacy lane fee to compute the expected merged result.
-	var yamlPartial tokensapi.PartialTokenTransferFeeConfig
-	if opts != nil && opts.feeOverrideCfg != nil {
-		yamlPartial = *opts.feeOverrideCfg
-	}
-	legacyTpCfg := tokensapi.TokenTransferFeeConfig{
-		DestGasOverhead:               legacyFee.DestGasOverhead,
-		DestBytesOverhead:             legacyFee.DestBytesOverhead,
-		DefaultFinalityFeeUSDCents:    legacyFee.MinFeeUSDCents,
-		CustomFinalityFeeUSDCents:     0,
-		DefaultFinalityTransferFeeBps: legacyFee.DeciBps,
-		CustomFinalityTransferFeeBps:  0,
-		IsEnabled:                     legacyFee.IsEnabled,
-	}
-
-	// expectedFee mirrors the discovery merge (YAML + legacy lane). Apply merges again with on-chain pool
-	// state or defaults, but auto-migrate Populate sets every field so that second merge is a no-op for values.
-	expectedFee := yamlPartial.MergeWith(legacyTpCfg)
-
-	// Validate that the new pool's fee config matches the expected merge of legacy + YAML.
 	gotFee, err := newPoolA.GetTokenTransferFeeConfig(&bind.CallOpts{Context: t.Context()}, common.Address{}, selB, finality.RawWaitForFinality, []byte{})
 	require.NoError(t, err)
-	require.Equal(t, expectedFee.DefaultFinalityFeeUSDCents, gotFee.FinalityFeeUSDCents, "finality fee USD cents")
-	require.Equal(t, expectedFee.DestGasOverhead, gotFee.DestGasOverhead, "dest gas overhead")
-	require.Equal(t, expectedFee.DestBytesOverhead, gotFee.DestBytesOverhead, "dest bytes overhead")
-	require.Equal(t, expectedFee.IsEnabled, gotFee.IsEnabled, "fee config enabled")
-	require.Equal(t, expectedFee.DefaultFinalityTransferFeeBps, gotFee.FinalityTransferFeeBps, "finality transfer fee bps")
-	require.Equal(t, expectedFee.CustomFinalityTransferFeeBps, gotFee.FastFinalityTransferFeeBps, "fast finality transfer fee bps")
-	require.Equal(t, expectedFee.CustomFinalityFeeUSDCents, gotFee.FastFinalityFeeUSDCents, "fast finality fee USD cents")
-	if opts != nil && opts.feeOverrideCfg != nil {
-		legacyOnlyFee := tokensapi.PartialTokenTransferFeeConfig{}.MergeWith(legacyTpCfg)
-		require.NotEqual(t, legacyOnlyFee, expectedFee, "YAML fee override should change at least one resolved field vs legacy-only import")
+	if skipLegacyFeeSeed {
+		require.False(t, gotFee.IsEnabled, "pool fee should stay disabled when legacy fees were never enabled")
+	} else {
+		var yamlPartial tokensapi.PartialTokenTransferFeeConfig
+		if opts != nil && opts.feeOverrideCfg != nil {
+			yamlPartial = *opts.feeOverrideCfg
+		}
+		legacyTpCfg := tokensapi.TokenTransferFeeConfig{
+			DestGasOverhead:               legacyFee.DestGasOverhead,
+			DestBytesOverhead:             legacyFee.DestBytesOverhead,
+			DefaultFinalityFeeUSDCents:    legacyFee.MinFeeUSDCents,
+			CustomFinalityFeeUSDCents:     0,
+			DefaultFinalityTransferFeeBps: legacyFee.DeciBps,
+			CustomFinalityTransferFeeBps:  0,
+			IsEnabled:                     legacyFee.IsEnabled,
+		}
+
+		// expectedFee mirrors the discovery merge (YAML + legacy lane). Apply merges again with on-chain pool
+		// state or defaults, but auto-migrate Populate sets every field so that second merge is a no-op for values.
+		expectedFee := yamlPartial.MergeWith(legacyTpCfg)
+
+		require.Equal(t, expectedFee.DefaultFinalityFeeUSDCents, gotFee.FinalityFeeUSDCents, "finality fee USD cents")
+		require.Equal(t, expectedFee.DestGasOverhead, gotFee.DestGasOverhead, "dest gas overhead")
+		require.Equal(t, expectedFee.DestBytesOverhead, gotFee.DestBytesOverhead, "dest bytes overhead")
+		require.Equal(t, expectedFee.IsEnabled, gotFee.IsEnabled, "fee config enabled")
+		require.Equal(t, expectedFee.DefaultFinalityTransferFeeBps, gotFee.FinalityTransferFeeBps, "finality transfer fee bps")
+		require.Equal(t, expectedFee.CustomFinalityTransferFeeBps, gotFee.FastFinalityTransferFeeBps, "fast finality transfer fee bps")
+		require.Equal(t, expectedFee.CustomFinalityFeeUSDCents, gotFee.FastFinalityFeeUSDCents, "fast finality fee USD cents")
+		if opts != nil && opts.feeOverrideCfg != nil {
+			legacyOnlyFee := tokensapi.PartialTokenTransferFeeConfig{}.MergeWith(legacyTpCfg)
+			require.NotEqual(t, legacyOnlyFee, expectedFee, "YAML fee override should change at least one resolved field vs legacy-only import")
+		}
 	}
 
 	// The new pool supports chain B (discovered from the active pool, or backfilled when listed for a fee override).

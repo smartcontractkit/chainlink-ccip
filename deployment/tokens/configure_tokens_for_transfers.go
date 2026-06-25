@@ -254,18 +254,9 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", selector, remoteSelector, err)
 				}
-				fqCfg, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selector, remoteSelector, fullTokenRef.Address)
+				legacyTTFC, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selector, remoteSelector, fullTokenRef.Address)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to discover token transfer fee config for remote chain selector %d on chain selector %d: %w", remoteSelector, selector, err)
-				}
-				tpCfg := TokenTransferFeeConfig{
-					DestGasOverhead:               fqCfg.DestGasOverhead,
-					DestBytesOverhead:             fqCfg.DestBytesOverhead,
-					DefaultFinalityFeeUSDCents:    fqCfg.MinFeeUSDCents,
-					CustomFinalityFeeUSDCents:     0,
-					DefaultFinalityTransferFeeBps: fqCfg.DeciBps,
-					CustomFinalityTransferFeeBps:  0,
-					IsEnabled:                     fqCfg.IsEnabled,
 				}
 
 				// Migrate remote pool + token + decimals
@@ -285,16 +276,23 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 					}
 				}
 
-				// Migrate fee configs
-				var partial PartialTokenTransferFeeConfig
-				if rc.TokenTransferFeeConfig != nil {
-					partial = partial.Populate(rc.TokenTransferFeeConfig.MergeWith(tpCfg))
-				} else {
-					partial = partial.Populate(tpCfg)
+				// Migrate fee config
+				feeCfg, err := rc.TokenTransferFeeConfig.ResolveForAutoMigrate(TokenTransferFeeConfig{
+					DestGasOverhead:               legacyTTFC.DestGasOverhead,
+					DestBytesOverhead:             legacyTTFC.DestBytesOverhead,
+					DefaultFinalityFeeUSDCents:    legacyTTFC.MinFeeUSDCents,
+					CustomFinalityFeeUSDCents:     0,
+					DefaultFinalityTransferFeeBps: legacyTTFC.DeciBps,
+					CustomFinalityTransferFeeBps:  0,
+					IsEnabled:                     legacyTTFC.IsEnabled,
+				})
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf(
+						"failed to resolve auto-migrated fee config for chain selector %d and remote chain selector %d: %w",
+						selector, remoteSelector, err,
+					)
 				}
-
-				// Update the remote chain config with the migrated fields
-				rc.TokenTransferFeeConfig = &partial
+				rc.TokenTransferFeeConfig = feeCfg
 				remoteChains[remoteSelector] = rc
 			}
 		}
