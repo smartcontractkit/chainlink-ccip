@@ -483,6 +483,10 @@ func importConfigFromActivePool(
 		// Configuration import from another 2.0.0 pool is not currently supported
 		return nil, nil
 	}
+	if tav.Version.GreaterThanEqual(semver.MustParse("1.7.0")) {
+		// Configuration import from another 2.0.0 pool is not currently supported
+		return nil, nil
+	}
 	var cfg *activePoolImportedConfig
 	var importErr error
 	if tav.Version.LessThan(semver.MustParse("1.5.1")) {
