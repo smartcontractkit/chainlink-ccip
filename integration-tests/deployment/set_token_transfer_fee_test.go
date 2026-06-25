@@ -109,14 +109,14 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	srcOnRampRef := datastore.AddressRef{ChainSelector: src, Type: datastore.ContractType(router.ContractType), Version: utils.Version_1_6_0}
 	srcOnRampRef, err = datastore_utils.FindAndFormatRef(env.DataStore, srcOnRampRef, src, datastore_utils.FullRef)
 	require.NoError(t, err)
-	srcFQ, err := solFeesAdapter.GetFeeContractRef(*env, srcOnRampRef, src, dst)
+	srcFQ, err := solFeesAdapter.GetFeeContractRef(env.OperationsBundle, env.BlockChains, env.DataStore, srcOnRampRef, src, dst)
 	require.NoError(t, err)
 
 	// Get the FQ on the destination
 	dstOnRampRef := datastore.AddressRef{ChainSelector: dst, Type: datastore.ContractType(onrampV1_6.ContractType), Version: utils.Version_1_6_0}
 	dstOnRampRef, err = datastore_utils.FindAndFormatRef(env.DataStore, dstOnRampRef, dst, datastore_utils.FullRef)
 	require.NoError(t, err)
-	dstFQ, err := evmFeesAdapter.GetFeeContractRef(*env, dstOnRampRef, dst, src)
+	dstFQ, err := evmFeesAdapter.GetFeeContractRef(env.OperationsBundle, env.BlockChains, env.DataStore, dstOnRampRef, dst, src)
 	require.NoError(t, err)
 
 	// Set the token transfer fee config for LINK
@@ -165,7 +165,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm that the config was correctly set on the source
-	srcCfg, err := solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, srcFQ, src, dst, srcTokenAddress)
+	srcCfg, err := solFeesAdapter.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	srcSensibleDefaults := solFeesAdapter.GetDefaultTokenTransferFeeConfig(src, dst)
 	require.Equal(t, srcCfg.DestBytesOverhead, srcSensibleDefaults.DestBytesOverhead)
@@ -176,7 +176,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.True(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was correctly set on the destination
-	dstCfg, err := evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dstFQ, dst, src, dstTokenAddress)
+	dstCfg, err := evmFeesAdapter.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	dstSensibleDefaults := evmFeesAdapter.GetDefaultTokenTransferFeeConfig(dst, src)
 	require.Equal(t, dstCfg.DestBytesOverhead, dstSensibleDefaults.DestBytesOverhead)
@@ -228,12 +228,12 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm that the config was disabled on the source
-	srcCfg, err = solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, srcFQ, src, dst, srcTokenAddress)
+	srcCfg, err = solFeesAdapter.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	require.False(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was disabled on the destination
-	dstCfg, err = evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dstFQ, dst, src, dstTokenAddress)
+	dstCfg, err = evmFeesAdapter.GetOnchainTokenTransferFeeConfig(env.OperationsBundle, env.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	require.False(t, dstCfg.IsEnabled)
 }
@@ -327,7 +327,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	srcOnRampRef := datastore.AddressRef{ChainSelector: src, Type: datastore.ContractType(onrampV1_6.ContractType), Version: utils.Version_1_6_0}
 	srcOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, srcOnRampRef, src, datastore_utils.FullRef)
 	require.NoError(t, err)
-	srcFQ, err := evmFeesAdapterV1_6_0.GetFeeContractRef(*e, srcOnRampRef, src, dst)
+	srcFQ, err := evmFeesAdapterV1_6_0.GetFeeContractRef(e.OperationsBundle, e.BlockChains, e.DataStore, srcOnRampRef, src, dst)
 	require.NoError(t, err)
 	require.True(t, srcFQ.Version.Equal(utils.Version_2_0_0), "Expected v1.6 OnRamp to be connected to v2.0 FeeQuoter after upgrade, but got version %s", srcFQ.Version.String())
 
@@ -335,7 +335,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	dstOnRampRef := datastore.AddressRef{ChainSelector: dst, Type: datastore.ContractType(onrampV1_6.ContractType), Version: utils.Version_1_6_0}
 	dstOnRampRef, err = datastore_utils.FindAndFormatRef(e.DataStore, dstOnRampRef, dst, datastore_utils.FullRef)
 	require.NoError(t, err)
-	dstFQ, err := evmFeesAdapterV1_6_0.GetFeeContractRef(*e, dstOnRampRef, dst, src)
+	dstFQ, err := evmFeesAdapterV1_6_0.GetFeeContractRef(e.OperationsBundle, e.BlockChains, e.DataStore, dstOnRampRef, dst, src)
 	require.NoError(t, err)
 	require.True(t, dstFQ.Version.Equal(utils.Version_2_0_0), "Expected v1.6 OnRamp to be connected to v2.0 FeeQuoter after upgrade, but got version %s", dstFQ.Version.String())
 
@@ -386,7 +386,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 
 	// Confirm that the config was correctly set on the source
-	srcCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, srcFQ, src, dst, srcTokenAddress)
+	srcCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	srcSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(src, dst)
 	require.Equal(t, srcCfg.DestBytesOverhead, srcSensibleDefaults.DestBytesOverhead)
@@ -395,7 +395,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	require.True(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was correctly set on the destination
-	dstCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, dstFQ, dst, src, dstTokenAddress)
+	dstCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	dstSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(dst, src)
 	require.Equal(t, dstCfg.DestBytesOverhead, dstSensibleDefaults.DestBytesOverhead)
@@ -489,12 +489,12 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 
 	// Confirm that the config was disabled on the source
-	srcCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, srcFQ, src, dst, srcTokenAddress)
+	srcCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
 	require.False(t, srcCfg.IsEnabled)
 
 	// Confirm that the config was disabled on the destination
-	dstCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(*e, dstFQ, dst, src, dstTokenAddress)
+	dstCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	require.False(t, dstCfg.IsEnabled)
 }

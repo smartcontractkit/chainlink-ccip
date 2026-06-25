@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -26,19 +25,19 @@ type feeAdapterID string
 
 // FeeResolver defines the interface for fee resolvers that can infer the appropriate fee adapter version based on the chain family.
 type FeeResolver interface {
-	GetOnRampRef(e cldf.Environment, src uint64, dst uint64) (datastore.AddressRef, error)
+	GetOnRampRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src uint64, dst uint64) (datastore.AddressRef, error)
 }
 
 // FeeAdapter defines the interface for fee adapters.
 type FeeAdapter interface {
-	GetFeeContractRef(e cldf.Environment, onRamp datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error)
+	GetFeeContractRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRamp datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error)
 
-	SetTokenTransferFee(e cldf.Environment, fq datastore.AddressRef) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	GetOnchainTokenTransferFeeConfig(e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
+	SetTokenTransferFee(ds datastore.DataStore, fq datastore.AddressRef) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetOnchainTokenTransferFeeConfig(b cldf_ops.Bundle, chains cldf_chain.BlockChains, fq datastore.AddressRef, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
 
-	ApplyDestChainConfigUpdates(e cldf.Environment, fq datastore.AddressRef) *cldf_ops.Sequence[ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	GetOnchainDestChainConfig(e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error)
+	ApplyDestChainConfigUpdates(ds datastore.DataStore, fq datastore.AddressRef) *cldf_ops.Sequence[ApplyDestChainConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetOnchainDestChainConfig(b cldf_ops.Bundle, chains cldf_chain.BlockChains, fq datastore.AddressRef, src uint64, dst uint64) (lanes.FeeQuoterDestChainConfig, error)
 	GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig
 }
 

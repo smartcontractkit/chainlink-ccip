@@ -186,23 +186,62 @@ tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM,
 
 ### FeeAdapter
 
-Handles token transfer fee configuration and retrieval.
+Handles token transfer fee configuration and retrieval, plus FeeQuoter destination chain config reads/writes.
 
-**Source:** [fees/product.go](../fees/product.go)
+**Source:** [fees/product.go](../fees/product.go), [fees/defaults.go](../fees/defaults.go)
 **Registry:** `FeeAdapterRegistry` via `fees.GetRegistry()`
-**Key:** `chainFamily-version`
+**Key:** `chainFamily-version` (adapters); `chainFamily` (resolvers)
+
+Adapters take explicit dependencies instead of `Environment`: `Bundle` (logger + context), `BlockChains`, and `DataStore`. Changesets decompose `Environment` at the call site; private helpers may still accept `Environment` and decompose internally.
+
+#### FeeResolver
+
+Infers the on-ramp for a lane from on-chain state (via the router). Registered per chain family in `chains/<family>/deployment/v1_0_0/adapters/fees.go`.
+
+```go
+type FeeResolver interface {
+    GetOnRampRef(b Bundle, chains BlockChains, ds DataStore, src uint64, dst uint64) (datastore.AddressRef, error)
+}
+```
+
+**Registration:**
+```go
+fees.GetRegistry().RegisterFeeResolver(chain_selectors.FamilyEVM, &EVMFeeResolver{})
+```
+
+#### FeeAdapter
 
 ```go
 type FeeAdapter interface {
+    // GetFeeContractRef resolves the fee contract (OnRamp for v1.5, FeeQuoter for v1.6+/v2) from an on-ramp ref.
+    GetFeeContractRef(b Bundle, chains BlockChains, ds DataStore, onRamp datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error)
+
     // SetTokenTransferFee returns a sequence that sets per-token transfer fees for each destination chain.
-    SetTokenTransferFee(e Environment) *Sequence[SetTokenTransferFeeSequenceInput, OnChainOutput, BlockChains]
+    SetTokenTransferFee(ds DataStore, fq datastore.AddressRef) *Sequence[SetTokenTransferFeeSequenceInput, OnChainOutput, BlockChains]
 
     // GetOnchainTokenTransferFeeConfig reads the current on-chain fee configuration for a token on a lane.
-    GetOnchainTokenTransferFeeConfig(e Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
+    GetOnchainTokenTransferFeeConfig(b Bundle, chains BlockChains, fq datastore.AddressRef, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
 
     // GetDefaultTokenTransferFeeConfig returns default fee configuration for a token on a lane.
     GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
+
+    // ApplyDestChainConfigUpdates returns a sequence that updates FeeQuoter destination chain configs.
+    ApplyDestChainConfigUpdates(ds DataStore, fq datastore.AddressRef) *Sequence[ApplyDestChainConfigSequenceInput, OnChainOutput, BlockChains]
+
+    // GetOnchainDestChainConfig reads the current FeeQuoter destination chain config for a lane.
+    GetOnchainDestChainConfig(b Bundle, chains BlockChains, fq datastore.AddressRef, src uint64, dst uint64) (FeeQuoterDestChainConfig, error)
+
+    // GetDefaultDestChainConfig returns default destination chain config for a lane.
+    GetDefaultDestChainConfig(src, dst uint64) FeeQuoterDestChainConfig
 }
+```
+
+#### ResolveFeeAdapter
+
+Shared helper in [fees/defaults.go](../fees/defaults.go) that performs the full lane lookup: router → on-ramp → fee contract → adapter (using the **fee contract version**, not the on-ramp version).
+
+```go
+func ResolveFeeAdapter(b Bundle, chains BlockChains, ds DataStore, src, dst uint64) (FeeAdapter, datastore.AddressRef, error)
 ```
 
 **Registration:**
