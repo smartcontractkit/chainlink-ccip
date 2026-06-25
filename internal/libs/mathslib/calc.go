@@ -9,6 +9,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
+// weibarPerTinybar = 10^10 is the conversion factor from Hedera's EVM JSON-RPC
+// gas-price unit (weibar, 1e-18 HBAR) to its true atomic unit (tinybar, 1e-8 HBAR).
+// See the Hedera branch of CalculateUsdPerUnitGas for the unit reasoning.
+var weibarPerTinybar = big.NewInt(1e10)
+
+func isHederaSelector(s ccipocr3.ChainSelector) bool {
+	return uint64(s) == chainsel.HEDERA_MAINNET.Selector ||
+		uint64(s) == chainsel.HEDERA_TESTNET.Selector
+}
+
 // Deviates checks if x1 and x2 deviates based on the provided ppb (parts per billion)
 // ppb is calculated based on the smaller value of the two
 // e.g, if x1 > x2, deviation_parts_per_billion = ((x1 - x2) / x2) * 1e9
@@ -43,14 +53,26 @@ func CalculateUsdPerUnitGas(
 
 	switch family {
 	case chainsel.FamilyEVM:
+		// Hedera is EVM-compatible at the JSON-RPC layer but its native HBAR has 8
+		// decimals (tinybar), not 18. `eth_gasPrice` returns weibar (1e-18 HBAR)
+		// for ETH-tooling compatibility, while usdPerFeeCoin is denominated in
+		// "1e18 USD per 1e18 atomic units" where atomic = tinybar
+		// (CCIPHome.tokenInfo[HBAR].Decimals = 8). Normalize weibar→tinybar
+		// (divide by 10^10) before the standard EVM math; without this the
+		// product overshoots by exactly 10^10.
+		gasPrice := sourceGasPrice
+		if isHederaSelector(sourceChainSelector) {
+			gasPrice = new(big.Int).Div(sourceGasPrice, weibarPerTinybar)
+		}
+
 		// In EVM, sourceGasPrice is denoted in wei/gas.
 		// Eth has 18 decimals, usdPerFeeCoin represents 1e18 USD * 1e18 / wei.
 		// To get 1e18 USD/gas, we have
-		//   sourceGasPrice * usdPerFeeCoin / 1e18
+		//   gasPrice * usdPerFeeCoin / 1e18
 		//     = (wei / gas) * (1e18 USD * 1e18 / wei) / 1e18
 		//     = 1e18 USD * 1e18 / gas / 1e18
 		//     = 1e18 USD / gas
-		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		tmp := new(big.Int).Mul(gasPrice, usdPerFeeCoin)
 		return new(big.Int).Div(tmp, big.NewInt(1e18)), nil
 
 	case chainsel.FamilySolana:
