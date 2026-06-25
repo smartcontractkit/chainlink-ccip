@@ -6,7 +6,7 @@ This package contains the sequences used to configure tokens and token pools for
 
 1. **ConfigureTokensForTransfers** – Top-level sequence. Validates the pool supports the token, sets min block confirmations, then calls **ConfigureTokenPoolForRemoteChains** with the full `RemoteChains` map, and finally registers the token with the TokenAdminRegistry.
 
-2. **ConfigureTokenPoolForRemoteChains** – When `RegistryAddress` and `TokenAddress` are set (upgrade path), validates that `RemoteChains` includes every chain currently supported by the **active pool** (the pool currently registered for that token). Then calls **ConfigureTokenPoolForRemoteChain** once per remote chain.
+2. **ConfigureTokenPoolForRemoteChains** – When `RegistryAddress` and `TokenAddress` are set and the active pool differs from `TokenPoolAddress` (upgrade path), validates that `RemoteChains` includes every chain currently supported by the **active pool** (the pool currently registered for that token). When the active pool is already the pool being configured (extend path), that check is skipped so you only need to list new remotes. Then calls **ConfigureTokenPoolForRemoteChain** once per remote chain.
 
 3. **ConfigureTokenPoolForRemoteChain** – For a single remote chain: optionally **imports rate limiter and remote pool config from the active pool**, then applies CCV config, rate limiters, and remote chain config (add/update chain, remote pools). When `tokenTransferFeeConfig` is set on the remote chain input, applies it on the **v2 token pool** only (merge with on-chain pool state or defaults; no legacy lane import). Fee config runs **after** the remote chain exists on the pool.
 
@@ -53,15 +53,18 @@ The active pool’s **type and version** (from `typeAndVersion()`) decide which 
 
 - **Active pool version ≥ 2.0.0** → No import (returns `nil`).
 
-### Supported-chains validation (upgrade path)
+### Supported-chains validation (upgrade vs extend)
 
-Before configuring each remote chain, **ConfigureTokenPoolForRemoteChains** ensures the input doesn’t drop any chain the current deployment relies on:
+Before configuring each remote chain, **ConfigureTokenPoolForRemoteChains** can ensure the input doesn’t drop any chain the current deployment relies on when **replacing** the registered pool:
 
-- When `RegistryAddress` and `TokenAddress` are set, it gets the **active pool** from the registry and calls **GetSupportedChains** on it.
-- It then checks that every chain in that list appears in **RemoteChains**.
-- If any active-pool chain is missing from `RemoteChains`, the sequence fails with an error so you don’t accidentally omit config for a chain that was previously supported.
+- When `RegistryAddress` and `TokenAddress` are set, it gets the **active pool** from the registry.
+- **Extend** (`activePool == TokenPoolAddress`): the check is skipped. `RemoteChains` may list only new remotes; existing supported chains do not need to be repeated.
+- **Upgrade** (`activePool != TokenPoolAddress` and active pool is non-zero): it calls **GetSupportedChains** on the active pool and requires every chain in that list to appear in **RemoteChains**. If any are missing, the sequence fails so you don’t accidentally omit config for a chain that was previously supported.
+- **Net-new** (no active pool): the check is skipped.
+- Set **`SkipActivePoolSupportedChainsCheck`** to bypass the upgrade check (e.g. CCTP parallel-pool setups where the configured pool is not a direct TAR replacement).
+- If **GetSupportedChains** on the active pool fails (e.g. USDCTokenPoolProxy), validation is skipped best-effort.
 
-This keeps “configure for transfers” aligned with the active pool’s supported chains when upgrading.
+This keeps “configure for transfers” aligned with the active pool’s supported chains when upgrading to a different pool, without requiring a full remote list when extending an already-registered pool.
 
 ## Auto-migrate edge cases (`autoMigrateRemoteChains`)
 
