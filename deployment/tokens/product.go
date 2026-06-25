@@ -333,6 +333,10 @@ type ConfigureTokenForTransfersInput struct {
 	// TimelockAddress is the MCMS timelock address, resolved by the changeset from MCMS config.
 	// Required when a liquidity migration is triggered.
 	TimelockAddress string
+	// SkipActivePoolSupportedChainsCheck disables the upgrade-safety check that requires remoteChains
+	// to cover all chains the currently-registered pool supports. Set this when the pool being configured
+	// is not a direct replacement for the registered pool (e.g. CCTP-through-CCV alongside USDCTokenPoolProxy).
+	SkipActivePoolSupportedChainsCheck bool
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore

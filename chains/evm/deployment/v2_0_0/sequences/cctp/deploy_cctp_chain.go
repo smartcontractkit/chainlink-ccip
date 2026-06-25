@@ -567,7 +567,8 @@ func applyCCTPAuthorizedCallerWrites(
 	return writes, nil
 }
 
-// setCCTPVerifierResolverInbound sets the CCTPVerifier as the inbound implementation on the resolver. Returns writes to append.
+// setCCTPVerifierResolverInbound sets the CCTPVerifier as the inbound implementation on the resolver,
+// skipping the write if the on-chain state already matches.
 func setCCTPVerifierResolverInbound(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
@@ -580,12 +581,26 @@ func setCCTPVerifierResolverInbound(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get version tag from CCTPVerifier: %w", err)
 	}
+	desired := versioned_verifier_resolver.InboundImplementationArgs{
+		Version:  versionTagReport.Output,
+		Verifier: cctpVerifierAddr,
+	}
+	currentReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllInboundImplementations, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chain.Selector,
+		Address:       resolverAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get inbound implementations from CCTPVerifierResolver: %w", err)
+	}
+	for _, cur := range currentReport.Output {
+		if cur.Version == desired.Version && cur.Verifier == desired.Verifier {
+			return nil, nil
+		}
+	}
 	report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
 		ChainSelector: chain.Selector,
 		Address:       resolverAddr,
-		Args: []versioned_verifier_resolver.InboundImplementationArgs{
-			{Version: versionTagReport.Output, Verifier: cctpVerifierAddr},
-		},
+		Args:          []versioned_verifier_resolver.InboundImplementationArgs{desired},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set inbound implementation on CCTPVerifierResolver: %w", err)

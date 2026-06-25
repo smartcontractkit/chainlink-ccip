@@ -1,7 +1,10 @@
 package mcms
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
 	"time"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -38,6 +41,25 @@ func (c *Input) Validate() error {
 	// this is to prevent proposals from being created with a ValidUntil that is already expired
 	if c.ValidUntil < uint32(time.Now().Add(10*time.Minute).UTC().Unix()) {
 		return fmt.Errorf("failed to validate MCMS input: ValidUntil must be in the future")
+	}
+	return nil
+}
+
+func (c *Input) PopulateDefaults() error {
+	if c.TimelockAction == "" {
+		c.TimelockAction = mcms_types.TimelockActionSchedule
+	}
+	if c.ValidUntil == 0 {
+		// Randomise ValidUntil so duplicate payloads get distinct operation IDs in timelock.
+		randUint, err := rand.Int(rand.Reader, new(big.Int).SetUint64(24*60*60))
+		if err != nil {
+			return fmt.Errorf("failed to generate random number: %w", err)
+		}
+		randDiff := randUint.Uint64()
+		if randDiff > math.MaxUint32 {
+			return fmt.Errorf("generated random number %d exceeds max uint32", randDiff)
+		}
+		c.ValidUntil = uint32(math.MaxUint32 - randDiff)
 	}
 	return nil
 }

@@ -149,6 +149,10 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get timelock addresses: %w", err)
 	}
+	err = input.PopulateDefaults()
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate defaults: %w", err)
+	}
 	chainMetadata, err := b.getChainMetadata(input, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain metadata: %w", err)

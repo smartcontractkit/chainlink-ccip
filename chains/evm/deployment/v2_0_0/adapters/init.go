@@ -1,8 +1,6 @@
 package adapters
 
 import (
-	"strings"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -21,12 +19,10 @@ import (
 	offrampv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
 	onrampv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
-	ccvdeploymentadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
-	"github.com/smartcontractkit/chainlink-ccv/deployment/shared"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool_factory"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/verification"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
@@ -58,16 +54,6 @@ import (
 func init() {
 	v := semver.MustParse("2.0.0")
 
-	// EVM chain-type and address registration for the ccv deployment layer.
-	shared.RegisterChainTypeFamily(nodev1.ChainType_CHAIN_TYPE_EVM, chainsel.FamilyEVM)
-	shared.RegisterAddressNormalizer(chainsel.FamilyEVM, func(addr string) string {
-		lower := strings.ToLower(addr)
-		if !strings.HasPrefix(lower, "0x") {
-			return "0x" + lower
-		}
-		return lower
-	})
-
 	// CCIP deployment registrations
 	evmAdapter := evmseqV1_6.EVMAdapter{}
 	evmFeesAdapterV2_0 := NewFeesAdapter(&evmAdapter)
@@ -94,15 +80,6 @@ func init() {
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
 	ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyEVM, &ChainFamilyAdapter{})
 
-	// Register all EVM ccv adapter implementations into the ccv singleton registries.
-	ccvdeploymentadapters.GetAggregatorRegistry().Register(chainsel.FamilyEVM, &EVMCCVAggregatorConfigAdapter{})
-	ccvdeploymentadapters.GetExecutorRegistry().Register(chainsel.FamilyEVM, &EVMCCVExecutorConfigAdapter{})
-	ccvdeploymentadapters.GetVerifierRegistry().Register(chainsel.FamilyEVM, &EVMCCVVerifierConfigAdapter{})
-	ccvdeploymentadapters.GetIndexerRegistry().Register(chainsel.FamilyEVM, &EVMCCVIndexerConfigAdapter{})
-	ccvdeploymentadapters.GetTokenVerifierRegistry().Register(chainsel.FamilyEVM, &EVMCCVTokenVerifierConfigAdapter{})
-	ccvdeploymentadapters.GetCommitteeVerifierOnchainRegistry().Register(chainsel.FamilyEVM, &EVMCCVCommitteeVerifierOnchainAdapter{})
-	ccvdeploymentadapters.GetCommitteeVerifierDeployRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierDeployAdapter{})
-	ccvdeploymentadapters.GetProtocolContractsDeployRegistry().Register(chainsel.FamilyEVM, &EVMProtocolContractsDeployAdapter{})
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
 	ccvadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyEVM, &EVMExecutorConfigAdapter{})
 	ccvadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyEVM, &EVMVerifierJobConfigAdapter{})

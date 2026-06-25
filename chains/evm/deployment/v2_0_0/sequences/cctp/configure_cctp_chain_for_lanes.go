@@ -283,6 +283,11 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
 			AllowedFinalityConfig:    allowedFinality,
 			RemoteChains:             cctpThroughCCVRemoteChainConfigs,
+			// The CCTP-through-CCV pool is not a replacement for the USDCTokenPoolProxy; it is a
+			// separate pool that runs alongside the proxy. The upgrade-safety check would incorrectly
+			// require cctpThroughCCVRemoteChainConfigs to include lock-release chains, which the CCV
+			// pool intentionally does not handle.
+			SkipActivePoolSupportedChainsCheck: true,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)
@@ -743,27 +748,72 @@ func applyUSDCTokenPoolProxyMechanismWrites(b cldf_ops.Bundle, chain evm.Chain, 
 	return []contract_utils.WriteOutput{report.Output}, nil
 }
 
-// applyCCTPVerifierWrites applies remote chain config and set-domains on the CCTPVerifier.
+// applyCCTPVerifierWrites applies remote chain config and set-domains on the CCTPVerifier,
+// skipping entries whose on-chain state already matches the desired config.
 func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress common.Address, setDomainArgs []cctp_verifier.SetDomainArgs, remoteChainConfigArgs []cctp_verifier.RemoteChainConfigArgs) ([]contract_utils.WriteOutput, error) {
 	writes := make([]contract_utils.WriteOutput, 0)
-	remoteConfigReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.ApplyRemoteChainConfigUpdates, chain, contract_utils.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
-		ChainSelector: chain.Selector,
-		Address:       verifierAddress,
-		Args:          remoteChainConfigArgs,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply remote chain config updates on CCTPVerifier: %w", err)
+
+	toUpdateConfigs := make([]cctp_verifier.RemoteChainConfigArgs, 0, len(remoteChainConfigArgs))
+	for _, arg := range remoteChainConfigArgs {
+		currentReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetRemoteChainConfig, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       verifierAddress,
+			Args:          arg.RemoteChainSelector,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get remote chain config for selector %d from CCTPVerifier: %w", arg.RemoteChainSelector, err)
+		}
+		current := currentReport.Output.RemoteChainConfig
+		if current.Router != arg.Router ||
+			current.FeeUSDCents != arg.FeeUSDCents ||
+			current.GasForVerification != arg.GasForVerification ||
+			current.PayloadSizeBytes != arg.PayloadSizeBytes {
+			toUpdateConfigs = append(toUpdateConfigs, arg)
+		}
 	}
-	writes = append(writes, remoteConfigReport.Output)
-	domainsReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetDomains, chain, contract_utils.FunctionInput[[]cctp_verifier.SetDomainArgs]{
-		ChainSelector: chain.Selector,
-		Address:       verifierAddress,
-		Args:          setDomainArgs,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set domains on CCTPVerifier: %w", err)
+	if len(toUpdateConfigs) > 0 {
+		remoteConfigReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.ApplyRemoteChainConfigUpdates, chain, contract_utils.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       verifierAddress,
+			Args:          toUpdateConfigs,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply remote chain config updates on CCTPVerifier: %w", err)
+		}
+		writes = append(writes, remoteConfigReport.Output)
 	}
-	writes = append(writes, domainsReport.Output)
+
+	toUpdateDomains := make([]cctp_verifier.SetDomainArgs, 0, len(setDomainArgs))
+	for _, arg := range setDomainArgs {
+		currentReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetDomain, chain, contract_utils.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       verifierAddress,
+			Args:          arg.ChainSelector,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get domain for chain %d from CCTPVerifier: %w", arg.ChainSelector, err)
+		}
+		current := currentReport.Output
+		if current.AllowedCallerOnDest != arg.AllowedCallerOnDest ||
+			current.AllowedCallerOnSource != arg.AllowedCallerOnSource ||
+			current.MintRecipientOnDest != arg.MintRecipientOnDest ||
+			current.DomainIdentifier != arg.DomainIdentifier ||
+			current.Enabled != arg.Enabled {
+			toUpdateDomains = append(toUpdateDomains, arg)
+		}
+	}
+	if len(toUpdateDomains) > 0 {
+		domainsReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetDomains, chain, contract_utils.FunctionInput[[]cctp_verifier.SetDomainArgs]{
+			ChainSelector: chain.Selector,
+			Address:       verifierAddress,
+			Args:          toUpdateDomains,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set domains on CCTPVerifier: %w", err)
+		}
+		writes = append(writes, domainsReport.Output)
+	}
+
 	return writes, nil
 }
 
@@ -803,9 +853,7 @@ func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 			Args:          update.DestChainSelector,
 		})
 		if err != nil {
-			// Domain not yet set (UnknownDomain) or unreadable — include it.
-			toUpdate = append(toUpdate, update)
-			continue
+			return nil, fmt.Errorf("failed to get domain for chain %d from CCTP V2 token pool: %w", update.DestChainSelector, err)
 		}
 		current := currentReport.Output
 		if current.AllowedCaller == update.AllowedCaller &&
@@ -841,9 +889,7 @@ func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 			Args:          update.DestChainSelector,
 		})
 		if err != nil {
-			// Domain not yet set (UnknownDomain) or unreadable — include it.
-			toUpdate = append(toUpdate, update)
-			continue
+			return nil, fmt.Errorf("failed to get domain for chain %d from CCTP V1 token pool: %w", update.DestChainSelector, err)
 		}
 		current := currentReport.Output
 		if current.AllowedCaller == update.AllowedCaller &&

@@ -47,6 +47,9 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 }
 
 func (r *EVMMCMSReader) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	if input.Qualifier == "" {
+		input.Qualifier = utils.CLLQualifier
+	}
 	timelockRef := datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
@@ -58,6 +61,9 @@ func (r *EVMMCMSReader) GetTimelockRef(e deployment.Environment, chainSelector u
 }
 
 func (r *EVMMCMSReader) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	if input.Qualifier == "" {
+		input.Qualifier = utils.CLLQualifier
+	}
 	// find mcms address
 	// populate contract type from TimelockAction
 	var addrType datastore.ContractType
