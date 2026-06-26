@@ -427,6 +427,9 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
+				// Return without PendingSigner: nothing changed on-chain, so callers must not
+				// sequence Accept (a leftover PendingAdministrator from an earlier register is
+				// unrelated and would cause Accept to validate against stale TAR state).
 				return TokenAdminRegistryOut{}, nil
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
@@ -584,6 +587,8 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			chain.Selector,
 			common_utils.CLLQualifier,
 		)
+		// Administrator already matches the caller's target; accept is unnecessary even if
+		// PendingAdministrator is stale (e.g. a third-party key from an earlier register).
 		if !currentAdmin.IsZero() && !input.Admin.IsZero() && currentAdmin == input.Admin {
 			b.Logger.Info("Token admin registry already has the requested admin, skipping accept admin role for token admin registry")
 			return sequences.OnChainOutput{}, nil
@@ -600,6 +605,10 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			}
 			pendingAdmin = input.Admin
 		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
+			// MCMS batches don't execute immediately: Register may have queued an override to
+			// timelock/deployer while on-chain PendingAdministrator still shows a prior third
+			// party. Trust input.Admin (the intended accept signer from orchestration) when the
+			// admin slot is not yet settled.
 			if currentAdmin.IsZero() && !input.Admin.IsZero() && (input.Admin == timelockSigner || input.Admin == chain.DeployerKey.PublicKey()) {
 				pendingAdmin = input.Admin
 			} else {
@@ -665,6 +674,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		}
 		if currentAdmin == input.Admin {
 			b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
+			// Same as Register no-op: do not set PendingSigner when no transfer was initiated.
 			return TokenAdminRegistryOut{}, nil
 		}
 		// sign as the current admin to transfer
