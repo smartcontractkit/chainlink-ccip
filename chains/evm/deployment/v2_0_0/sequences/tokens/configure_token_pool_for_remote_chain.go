@@ -792,6 +792,10 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		resolvedConfig = desiredTokenTransferFeeConfig.MergeWith(defaultConfig)
 	}
 
+	if !resolvedConfig.IsEnabled && !currentConfig.IsEnabled {
+		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
+	}
+
 	if resolvedConfig == currentConfig {
 		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
 	}

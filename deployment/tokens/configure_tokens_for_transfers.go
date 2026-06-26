@@ -425,6 +425,11 @@ func applyTokenTransferFeeConfigOnTokenPool(
 		requestedConfig = partial.MergeWith(defaultConfig)
 	}
 
+	if !requestedConfig.IsEnabled && !onChainConfig.IsEnabled {
+		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since pool fee override is already disabled", src, dst)
+		return nil, nil, nil
+	}
+
 	if requestedConfig == onChainConfig {
 		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
 		return nil, nil, nil
@@ -503,6 +508,11 @@ func applyTokenTransferFeeConfigOnFeeQuoter(
 			IsEnabled:         partial.IsEnabled.GetOrDefault(defaultConfig.IsEnabled),
 			MaxFeeUSDCents:    defaultConfig.MaxFeeUSDCents,
 		}
+	}
+
+	if !requestedConfig.IsEnabled && !onChainConfig.IsEnabled {
+		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since legacy lane fee config is already disabled", src, dst)
+		return nil, nil, nil
 	}
 
 	if requestedConfig == onChainConfig {
