@@ -198,6 +198,30 @@ func (cfg PartialTokenTransferFeeConfig) MergeWith(fallbacks TokenTransferFeeCon
 	}
 }
 
+// ResolveForAutoMigrate returns the fee config to store during autoMigrateRemoteChains discovery.
+// p may be nil when YAML omitted tokenTransferFeeConfig.
+func (p *PartialTokenTransferFeeConfig) ResolveForAutoMigrate(legacy TokenTransferFeeConfig) (*PartialTokenTransferFeeConfig, error) {
+	if legacy.IsEnabled {
+		var partial PartialTokenTransferFeeConfig
+		if p == nil {
+			partial = partial.Populate(legacy)
+			return &partial, nil
+		}
+		if _, ok := p.IsEnabled.Get(); ok {
+			partial = partial.Populate(p.MergeWith(legacy))
+			return &partial, nil
+		}
+		return nil, fmt.Errorf("tokenTransferFeeConfig must set isEnabled")
+	}
+	if p == nil {
+		return nil, nil
+	}
+	if _, ok := p.IsEnabled.Get(); !ok {
+		return nil, fmt.Errorf("tokenTransferFeeConfig must set isEnabled")
+	}
+	return p, nil
+}
+
 // TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
 type TokenTransferFeeConfig struct {
 	DefaultFinalityTransferFeeBps uint16 `yaml:"defaultFinalityTransferFeeBps" json:"defaultFinalityTransferFeeBps"`

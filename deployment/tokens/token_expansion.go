@@ -393,9 +393,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 						allRemotes[remoteSelector] = remoteConfig
 					}
 				}
-				// Reach the configure step when remote chains are explicitly listed OR when AutoMigrateRemoteChains
-				// is set (the latter discovers the active pool's remote chains downstream, so an empty RemoteChains
-				// is valid and must not be skipped here).
+				// When no remote chains are given but `autoMigrateRemoteChains` is true, then we should still
+				// proceed to the configure step since remote chain configs (including legacy lane fees) will be
+				// auto-populated via the token pool migrator interface.
 				if len(input.TokenTransferConfig.RemoteChains) != 0 || input.TokenTransferConfig.AutoMigrateRemoteChains {
 					allTokenConfigs[selector] = *input.TokenTransferConfig
 				}
