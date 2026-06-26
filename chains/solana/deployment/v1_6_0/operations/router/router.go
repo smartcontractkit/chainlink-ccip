@@ -427,7 +427,7 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
-				return TokenAdminRegistryOut{PendingSigner: input.Admin}, nil
+				return TokenAdminRegistryOut{}, nil
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 			// there is already an admin registered, we need to transfer
@@ -584,6 +584,10 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			chain.Selector,
 			common_utils.CLLQualifier,
 		)
+		if !currentAdmin.IsZero() && !input.Admin.IsZero() && currentAdmin == input.Admin {
+			b.Logger.Info("Token admin registry already has the requested admin, skipping accept admin role for token admin registry")
+			return sequences.OnChainOutput{}, nil
+		}
 		if pendingAdmin.IsZero() {
 			// if there is no pending admin, we assume the authority is timelock
 			// but we need to confirm that timelock is indeed the authority
@@ -596,7 +600,11 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			}
 			pendingAdmin = input.Admin
 		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
-			return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
+			if currentAdmin.IsZero() && !input.Admin.IsZero() && (input.Admin == timelockSigner || input.Admin == chain.DeployerKey.PublicKey()) {
+				pendingAdmin = input.Admin
+			} else {
+				return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
+			}
 		}
 		// sign as the pending admin to accept
 		// when there is no pending admin, we assume the authority is timelock
@@ -657,7 +665,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		}
 		if currentAdmin == input.Admin {
 			b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
-			return TokenAdminRegistryOut{PendingSigner: input.Admin}, nil
+			return TokenAdminRegistryOut{}, nil
 		}
 		// sign as the current admin to transfer
 		tempIx, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
