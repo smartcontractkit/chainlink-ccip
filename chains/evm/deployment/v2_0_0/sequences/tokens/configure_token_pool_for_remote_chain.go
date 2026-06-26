@@ -749,16 +749,20 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
 	}
 
-	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-		ChainSelector: input.ChainSelector,
-		Address:       input.TokenPoolAddress,
-		Args: token_pool.GetTokenTransferFeeConfigArgs{
-			Arg0:              common.Address{},            // unused
-			DestChainSelector: remoteChainSelector,         // this IS used
-			Arg2:              finality.RawWaitForFinality, // unused
-			Arg3:              []byte{},                    // unused
+	report, err := cldf_ops.ExecuteOperation(
+		b, token_pool.GetTokenTransferFeeConfig, chain,
+		evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenPoolAddress,
+			Args: token_pool.GetTokenTransferFeeConfigArgs{
+				Arg0:              common.Address{},            // unused
+				DestChainSelector: remoteChainSelector,         // this IS used
+				Arg2:              finality.RawWaitForFinality, // unused
+				Arg3:              []byte{},                    // unused
+			},
 		},
-	})
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
+	)
 	if err != nil {
 		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
 	}
