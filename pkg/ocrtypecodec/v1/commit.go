@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
@@ -43,18 +42,8 @@ func NewCommitCodecProto() *CommitCodecProto {
 }
 
 func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) {
-	if query.MerkleRootQuery.RMNSignatures == nil {
-		query.MerkleRootQuery.RMNSignatures = &rmn.ReportSignatures{}
-	}
-
 	pbQ := &ocrtypecodecpb.CommitQuery{
-		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{
-			RetryRmnSignatures: query.MerkleRootQuery.RetryRMNSignatures,
-			RmnSignatures: &ocrtypecodecpb.ReportSignatures{
-				Signatures:  c.tr.rmnSignaturesToProto(query.MerkleRootQuery.RMNSignatures),
-				LaneUpdates: c.tr.laneUpdatesToProto(query.MerkleRootQuery.RMNSignatures.LaneUpdates),
-			},
-		},
+		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{},
 	}
 
 	return proto.Marshal(pbQ)
@@ -70,29 +59,19 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 		return committypes.Query{}, fmt.Errorf("proto unmarshal query: %w", err)
 	}
 
-	q := committypes.Query{
-		MerkleRootQuery: merkleroot.Query{
-			RetryRMNSignatures: pbQ.GetMerkleRootQuery().GetRetryRmnSignatures(),
-			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  c.tr.rmnSignaturesFromProto(pbQ.GetMerkleRootQuery().GetRmnSignatures().GetSignatures()),
-				LaneUpdates: c.tr.laneUpdatesFromProto(pbQ.GetMerkleRootQuery().GetRmnSignatures().GetLaneUpdates()),
-			},
-		},
+	return committypes.Query{
+		MerkleRootQuery: merkleroot.Query{},
 		TokenPriceQuery: tokenprice.Query{},
 		ChainFeeQuery:   chainfee.Query{},
-	}
-
-	return q, nil
+	}, nil
 }
 
 func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation) ([]byte, error) {
 	pbObs := &ocrtypecodecpb.CommitObservation{
 		MerkleRootObs: &ocrtypecodecpb.MerkleRootObservation{
 			MerkleRoots:        c.tr.merkleRootsToProto(observation.MerkleRootObs.MerkleRoots),
-			RmnEnabledChains:   c.tr.rmnEnabledChainsToProto(observation.MerkleRootObs.RMNEnabledChains),
 			OnRampMaxSeqNums:   c.tr.seqNumChainToProto(observation.MerkleRootObs.OnRampMaxSeqNums),
 			OffRampNextSeqNums: c.tr.seqNumChainToProto(observation.MerkleRootObs.OffRampNextSeqNums),
-			RmnRemoteConfig:    c.tr.rmnRemoteConfigToProto(observation.MerkleRootObs.RMNRemoteConfig),
 			FChain:             c.tr.fChainToProto(observation.MerkleRootObs.FChain),
 		},
 		TokenPriceObs: &ocrtypecodecpb.TokenPriceObservation{
@@ -134,17 +113,11 @@ func (c *CommitCodecProto) DecodeObservation(data []byte) (obs committypes.Obser
 	if err != nil {
 		return obs, fmt.Errorf("merkle roots from proto: %w", err)
 	}
-	rmnRemoteCfg, err := c.tr.rmnRemoteConfigFromProto(pbObs.GetMerkleRootObs().GetRmnRemoteConfig())
-	if err != nil {
-		return obs, fmt.Errorf("rmn remote config from proto: %w", err)
-	}
 	return committypes.Observation{
 		MerkleRootObs: merkleroot.Observation{
 			MerkleRoots:        merkleRoots,
-			RMNEnabledChains:   c.tr.rmnEnabledChainsFromProto(pbObs.GetMerkleRootObs().GetRmnEnabledChains()),
 			OnRampMaxSeqNums:   c.tr.seqNumChainFromProto(pbObs.GetMerkleRootObs().GetOnRampMaxSeqNums()),
 			OffRampNextSeqNums: c.tr.seqNumChainFromProto(pbObs.GetMerkleRootObs().GetOffRampNextSeqNums()),
-			RMNRemoteConfig:    rmnRemoteCfg,
 			FChain:             c.tr.fChainFromProto(pbObs.GetMerkleRootObs().GetFChain()),
 		},
 		TokenPriceObs: tokenprice.Observation{
@@ -175,11 +148,8 @@ func (c *CommitCodecProto) EncodeOutcome(outcome committypes.Outcome) ([]byte, e
 			OutcomeType:                     int32(outcome.MerkleRootOutcome.OutcomeType),
 			RangesSelectedForReport:         c.tr.chainRangeToProto(outcome.MerkleRootOutcome.RangesSelectedForReport),
 			RootsToReport:                   c.tr.merkleRootsToProto(outcome.MerkleRootOutcome.RootsToReport),
-			RmnEnabledChains:                c.tr.rmnEnabledChainsToProto(outcome.MerkleRootOutcome.RMNEnabledChains),
 			OffRampNextSeqNums:              c.tr.seqNumChainToProto(outcome.MerkleRootOutcome.OffRampNextSeqNums),
 			ReportTransmissionCheckAttempts: uint32(outcome.MerkleRootOutcome.ReportTransmissionCheckAttempts),
-			RmnReportSignatures:             c.tr.ccipRmnSignaturesToProto(outcome.MerkleRootOutcome.RMNReportSignatures),
-			RmnRemoteCfg:                    c.tr.rmnRemoteConfigToProto(outcome.MerkleRootOutcome.RMNRemoteCfg),
 		},
 		TokenPriceOutcome: &ocrtypecodecpb.TokenPriceOutcome{
 			TokenPrices: c.tr.feedTokenPricesToProto(outcome.TokenPriceOutcome.TokenPrices),
@@ -210,28 +180,15 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 	if err != nil {
 		return committypes.Outcome{}, fmt.Errorf("merkle roots from proto: %w", err)
 	}
-	sigs, err := c.tr.ccipRmnSignaturesFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnReportSignatures())
-	if err != nil {
-		return committypes.Outcome{}, fmt.Errorf("rmn report signatures from proto: %w", err)
-	}
-	rmnRemoteCfg, err := c.tr.rmnRemoteConfigFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnRemoteCfg())
-	if err != nil {
-		return committypes.Outcome{}, fmt.Errorf("rmn remote config from proto: %w", err)
-	}
 	return committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType: merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
 			RangesSelectedForReport: c.tr.chainRangeFromProto(
 				pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport(),
 			),
-			RootsToReport: rootsToReport,
-			RMNEnabledChains: c.tr.rmnEnabledChainsFromProto(
-				pbOutcome.GetMerkleRootOutcome().GetRmnEnabledChains(),
-			),
+			RootsToReport:                   rootsToReport,
 			OffRampNextSeqNums:              c.tr.seqNumChainFromProto(pbOutcome.GetMerkleRootOutcome().GetOffRampNextSeqNums()),
 			ReportTransmissionCheckAttempts: uint(pbOutcome.GetMerkleRootOutcome().GetReportTransmissionCheckAttempts()),
-			RMNReportSignatures:             sigs,
-			RMNRemoteCfg:                    rmnRemoteCfg,
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
 			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.GetTokenPriceOutcome().GetTokenPrices()),

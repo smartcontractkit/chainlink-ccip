@@ -105,8 +105,8 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
 
 			// Case 2: the RegisterTokenAdminRegistry operation has MCMS batches and the proposed admin
-			// is timelock - in this case we bundle Register and Accept into the same MCMS batch.
-			case hasMCMSProposal && isTimelockPendingAdmin:
+			// is timelock or deployer - in this case we bundle Register and Accept into the same MCMS batch.
+			case hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
 				atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)

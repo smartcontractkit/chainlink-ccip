@@ -436,14 +436,8 @@ func AddNodesToContracts(
 	}
 
 	for _, chain := range remoteSelectors {
-		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
-			if ocrParams.CommitOffChainConfig != nil {
-				ocrParams.CommitOffChainConfig.RMNEnabled = false
-			}
-			return ocrParams
-		}
-		commitOCRConfigs[chain] = DeriveOCRParamsForCommit(SimulationTest, ccipHomeSelector, nil, ocrOverride)
-		execOCRConfigs[chain] = DeriveOCRParamsForExec(SimulationTest, nil, ocrOverride)
+		commitOCRConfigs[chain] = DeriveOCRParamsForCommit(SimulationTest, ccipHomeSelector, nil, nil)
+		execOCRConfigs[chain] = DeriveOCRParamsForExec(SimulationTest, nil, nil)
 
 		chainConfigs[chain] = ChainConfig{
 			Readers: readers,

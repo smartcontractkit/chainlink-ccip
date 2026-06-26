@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -33,31 +32,26 @@ const (
 	// Its primary purpose is to assist in defining the limits below.
 	estimatedMaxNumberOfSourceChains = 900
 
-	// Estimated maximum number of RMN nodes the system will support.
-	estimatedMaxRmnNodesCount = 256
-
 	// Estimated maximum number of priced tokens that the Commit DON supports.
 	// This value does not indicate a system limitation but just an estimation to properly tune the OCR parameters.
 	// The value can be adjusted as needed.
 	estimatedMaxNumberOfPricedTokens = 14_445
 
-	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
-	// that assumes estimatedMaxNumberOfSourceChains source chains and
-	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
+	// maxQueryLength is set with headroom above an empty merkle root processor query.
 	// check factory_test for the calculation
-	maxQueryLength = 242_869
+	maxQueryLength = 1_024
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 650_307
+	maxObservationLength = 636_100
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 700_620
+	maxOutcomeLength = 668_500
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
-	maxReportLength = 128_2933
+	maxReportLength = 1_245_057
 
 	// maxReportCount is set very high because some chains may require many reports per round.
 	maxReportCount = 1000
@@ -76,8 +70,6 @@ type PluginFactory struct {
 	chainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	extendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters               map[cciptypes.ChainSelector]types.ContractWriter
-	rmnPeerClient              rmn.PeerClient
-	rmnCrypto                  cciptypes.RMNCrypto
 }
 
 type CommitPluginFactoryParams struct {
@@ -93,8 +85,6 @@ type CommitPluginFactoryParams struct {
 	ChainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	ExtendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters            map[cciptypes.ChainSelector]types.ContractWriter
-	RmnPeerClient              rmn.PeerClient
-	RmnCrypto                  cciptypes.RMNCrypto
 }
 
 // NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
@@ -113,12 +103,9 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		chainAccessors:             params.ChainAccessors,
 		extendedReaders:            params.ExtendedReaders,
 		chainWriters:               params.ContractWriters,
-		rmnPeerClient:              params.RmnPeerClient,
-		rmnCrypto:                  params.RmnCrypto,
 	}
 }
 
-//nolint:gocyclo
 func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	lggr := logutil.WithPluginConstants(p.baseLggr, "Commit", p.donID, config.OracleID, config.ConfigDigest)
@@ -130,11 +117,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	lggr.Infow("Commit Offchain Config", "offchainConfig", offchainConfig)
 
-	if offchainConfig.RMNEnabled {
-		// we do this here to utilize logger without passing it downstream
-		lggr.Warnw("RMN has been deprecated, RMNEnabled is being set to false", "rmnEnabled", offchainConfig.RMNEnabled)
-		offchainConfig.RMNEnabled = false
-	}
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}
@@ -148,34 +130,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.extendedReaders))
 	for chain, cr := range p.extendedReaders {
 		readerFacades[chain] = cr
-	}
-
-	// Bind the RMNHome contract
-	var rmnHomeReader readerpkg.RMNHome
-	if offchainConfig.RMNEnabled {
-		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
-		rmnCr, ok := p.extendedReaders[p.homeChainSelector]
-		if !ok {
-			return nil,
-				ocr3types.ReportingPluginInfo{},
-				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
-		}
-
-		rmnHomeReader, err = readerpkg.NewRMNHomeChainReader(
-			ctx,
-			lggr,
-			readerpkg.HomeChainPollingInterval,
-			p.homeChainSelector,
-			rmnHomeAddress,
-			rmnCr,
-		)
-		if err != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
-		}
-
-		if err := rmnHomeReader.Start(ctx); err != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome: %w", err)
-		}
 	}
 
 	if err := validateOcrConfig(p.ocrConfig.Config); err != nil {
@@ -238,7 +192,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	metricsReporter.TrackLooppProviderSupported(p.looppCCIPProviderSupported)
 
 	reportBuilder, err := builder.NewReportBuilder(
-		offchainConfig.RMNEnabled,
 		offchainConfig.MaxMerkleRootsPerReport,
 		offchainConfig.MaxPricesPerReport,
 	)
@@ -257,9 +210,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.msgHasher,
 			lggr,
 			p.homeChainReader,
-			rmnHomeReader,
-			p.rmnCrypto,
-			p.rmnPeerClient,
 			config,
 			metricsReporter,
 			p.addrCodec,
