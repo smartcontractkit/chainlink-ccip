@@ -239,7 +239,6 @@ func Test_mergeTokenTransferFeeConfig(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := mergeTokenTransferFeeConfig(tt.desired, tt.imported)
 			require.NotNil(t, got)

@@ -2,6 +2,7 @@ package sequences_test
 
 import (
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -498,10 +499,8 @@ func requireContractOwner(
 	require.NoError(t, err, "LoadOwnableContract for %s/%s at %s", ct, qualifier, addr)
 	owner, err := ownable.Owner(nil)
 	require.NoError(t, err, "Owner() for %s/%s at %s", ct, qualifier, addr)
-	for _, vo := range validOwners {
-		if owner == vo {
-			return
-		}
+	if slices.Contains(validOwners, owner) {
+		return
 	}
 	require.Failf(t, "unexpected owner",
 		"%s/%s at %s: owner %s not in valid set %v", ct, qualifier, addr, owner, validOwners)

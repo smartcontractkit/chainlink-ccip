@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -74,10 +75,10 @@ func (a *EVMTokenBase) DeployTokenVerify(e deployment.Environment, input tokensa
 		return nil
 	}
 
-	if err := utils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
-		return err
-	}
-	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
+	if err := errors.Join(
+		utils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"),
+		utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"),
+	); err != nil {
 		return err
 	}
 
