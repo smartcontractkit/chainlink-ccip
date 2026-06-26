@@ -2,6 +2,13 @@
 
 set -e
 
+# Ensure anchor-go v0.2.3 is installed. It requires Go <= 1.22 to compile,
+# so we pin GOTOOLCHAIN=go1.20 for the install step.
+if ! command -v anchor-go &>/dev/null; then
+  echo "anchor-go not found, installing v0.2.3..."
+  GOTOOLCHAIN=go1.20 go install github.com/gagliardetto/anchor-go@v0.2.3
+fi
+
 function generate_bindings() {
   local idl_path_str="$1"
   IFS='/' read -r -a idl_path <<< "${idl_path_str}"
