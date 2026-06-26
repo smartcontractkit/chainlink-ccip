@@ -1,8 +1,8 @@
 package changesets
 
 // Internal tests for package-private helpers that cannot be reached from the
-// external _test package (convertTopologyMonitoring, mustDecodeHex,
-// signerFromJDIfMissing, fetchSigningKeysForNOPsByFamilies, deriveFamiliesFromSelectors).
+// external _test package (signerFromJDIfMissing, fetchSigningKeysForNOPsByFamilies,
+// deriveFamiliesFromSelectors).
 
 import (
 	"context"
@@ -35,25 +35,6 @@ type internalStubOffchain struct {
 }
 
 var _ cldf_offchain.Client = (*internalStubOffchain)(nil)
-
-// ---- convertTopologyMonitoring ----
-
-func TestConvertTopologyMonitoring_NilReturnsEmpty(t *testing.T) {
-	result := convertTopologyMonitoring(nil)
-	assert.False(t, result.Enabled)
-	assert.Empty(t, result.Type)
-}
-
-// ---- mustDecodeHex ----
-
-func TestMustDecodeHex_ValidHex(t *testing.T) {
-	b := mustDecodeHex("deadbeef")
-	require.Equal(t, []byte{0xde, 0xad, 0xbe, 0xef}, b)
-}
-
-func TestMustDecodeHex_InvalidHexPanics(t *testing.T) {
-	require.Panics(t, func() { mustDecodeHex("ZZZZ") })
-}
 
 // ---- signerFromJDIfMissing ----
 
