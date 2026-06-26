@@ -75,9 +75,14 @@ When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChai
 | Situation | Behavior |
 |-----------|----------|
 | Remote **not listed** in YAML | Fully discovered from the legacy active pool (token, pool, decimals); fees imported only when legacy FeeQuoter lane config is enabled. |
-| Remote listed, **no** `remoteToken` / `remotePool` | Backfill connectivity from the active pool; YAML overrides fees and other fields when `tokenTransferFeeConfig` is set (`isEnabled` required). |
-| Remote listed with **explicit** `remoteToken` and/or `remotePool` | YAML wins (coordinated retarget); legacy refs are not overwritten. |
+| Remote listed, **both** `remoteToken` and `remotePool` empty | Backfill token, pool, and decimals from the active pool; YAML overrides fees and other fields when `tokenTransferFeeConfig` is set (`isEnabled` required). |
+| Remote listed with **only one** of `remoteToken` / `remotePool` | No connectivity backfill: the set field is kept, the missing field is **not** imported. Provide both explicitly or leave both empty. |
+| Remote listed with **both** `remoteToken` and `remotePool` set | YAML wins (coordinated retarget); legacy refs are not overwritten. |
 | Remote listed but **not** on the legacy active pool | Not enriched by discovery; provide full connectivity in YAML. |
+
+### When discovery is skipped
+
+`autoMigrateRemoteChains` is ignored (info log, no error) when there is no legacy active pool to migrate from, the TAR active pool is already the target pool (extend), or the active pool is already v2.0.0+. In those cases, configure remotes and fees explicitly in `RemoteChains`. Remove the flag from YAML after a one-time pre-v2 → v2 upgrade.
 
 ### Fee discovery
 

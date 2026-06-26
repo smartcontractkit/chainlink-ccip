@@ -62,13 +62,21 @@ type TokenTransferConfig struct {
 	//  (2) The active pool in TAR is already the target pool (extend mode)
 	//  (3) The active pool in TAR is already v2.0.0 or higher
 	//
+	// When discovery is skipped, the changeset logs at info level and does not error. Remote chains,
+	// connectivity, and fees are taken only from explicit RemoteChains YAML (same as autoMigrateRemoteChains: false).
+	// Remove the flag after a one-time upgrade to avoid confusion.
+	//
 	// YAML precedence during upgrade (per remote chain):
 	//  - Remote not listed: fully discovered from the active pool (token, pool, decimals); fees are
-	//    imported only when the legacy FeeQuoter lane config is enabled for that token/lane.
-	//  - Remote listed with empty remoteToken AND remotePool: backfill connectivity from the active pool;
-	//    YAML overrides fees and other fields when tokenTransferFeeConfig is set (isEnabled required).
-	//  - Remote listed with explicit remoteToken and/or remotePool: those values are used as-is (coordinated
-	//    retarget); legacy active-pool refs are not overwritten.
+	//    imported only when the legacy FeeQuoter/onRamp lane config is enabled for that token/lane.
+	//  - Remote listed with empty remoteToken AND empty remotePool: backfill token, pool, and decimals
+	//    from the active pool; YAML overrides fees and other fields when tokenTransferFeeConfig is set
+	//    (isEnabled required).
+	//  - Remote listed with only one of remoteToken or remotePool set: no connectivity backfill — the
+	//    provided field is kept as-is and the missing field is not imported from the legacy pool.
+	//    Provide both refs explicitly or leave both empty for full backfill.
+	//  - Remote listed with both remoteToken and remotePool set: YAML wins (coordinated retarget);
+	//    legacy active-pool refs are not overwritten.
 	//  - Remote listed but not supported by the legacy active pool: not enriched by discovery; you must
 	//    provide full connectivity in YAML.
 	//
