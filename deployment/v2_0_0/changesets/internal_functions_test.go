@@ -1,8 +1,8 @@
 package changesets
 
 // Internal tests for package-private helpers that cannot be reached from the
-// external _test package (convertTopologyMonitoring, signerFromJDIfMissing,
-// fetchSigningKeysForNOPsByFamilies, deriveFamiliesFromSelectors).
+// external _test package (signerFromJDIfMissing, fetchSigningKeysForNOPsByFamilies,
+// deriveFamiliesFromSelectors).
 
 import (
 	"context"
@@ -35,14 +35,6 @@ type internalStubOffchain struct {
 }
 
 var _ cldf_offchain.Client = (*internalStubOffchain)(nil)
-
-// ---- convertTopologyMonitoring ----
-
-func TestConvertTopologyMonitoring_NilReturnsEmpty(t *testing.T) {
-	result := convertTopologyMonitoring(nil)
-	assert.False(t, result.Enabled)
-	assert.Empty(t, result.Type)
-}
 
 // ---- signerFromJDIfMissing ----
 
