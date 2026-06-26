@@ -91,20 +91,10 @@ type CommitOffchainConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
 
-	// RMNSignaturesTimeout is the timeout for RMN signature verification.
-	// Typically set to `MaxQueryDuration - e`, where e some small duration.
-	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
-
-	// RMNEnabled is a flag to enable/disable RMN signature verification.
-	RMNEnabled bool `json:"rmnEnabled"`
-
 	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
 	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
 	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
-
-	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
-	SignObservationPrefix string `json:"signObservationPrefix"`
 }
 
 // ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.

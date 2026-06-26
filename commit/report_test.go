@@ -150,8 +150,6 @@ func TestPluginReports(t *testing.T) {
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
 						},
 					},
-					RMNRemoteCfg:     ccipocr3.RemoteConfig{FSign: 123},
-					RMNEnabledChains: map[ccipocr3.ChainSelector]bool{3: true, 2: false},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: ccipocr3.TokenPriceMap{
@@ -166,15 +164,13 @@ func TestPluginReports(t *testing.T) {
 			},
 			expReports: []ccipocr3.CommitPluginReport{
 				{
-					BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      3,
 							OnRampAddress: []byte{1, 2, 3},
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 						},
-					},
-					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      2,
 							OnRampAddress: []byte{1, 2, 3},
@@ -190,11 +186,9 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					RMNSignatures: nil,
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{
-				RemoteF: 123,
 				MerkleRoots: []ccipocr3.MerkleRootChain{
 					{
 						ChainSel:      2,
@@ -228,7 +222,7 @@ func TestPluginReports(t *testing.T) {
 	cfg := pluginconfig.CommitOffchainConfig{}
 	err := cfg.ApplyDefaultsAndValidate()
 	require.NoError(t, err)
-	reportBuilder, err := builder.NewReportBuilder(cfg.RMNEnabled, cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
+	reportBuilder, err := builder.NewReportBuilder(cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
 	require.NoError(t, err)
 
 	for _, tc := range testCases {
@@ -295,9 +289,9 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 
 func Test_IsStaleReportMerkleRoots(t *testing.T) {
 	sourceChainConfig := map[ccipocr3.ChainSelector]reader2.StaticSourceChainConfig{
-		10: {IsRMNVerificationDisabled: false, IsEnabled: true},
-		20: {IsRMNVerificationDisabled: false, IsEnabled: true},
-		30: {IsRMNVerificationDisabled: true, IsEnabled: true},
+		10: {IsEnabled: true},
+		20: {IsEnabled: true},
+		30: {IsEnabled: true},
 	}
 
 	testCases := []struct {
@@ -373,17 +367,10 @@ func Test_IsStaleReportMerkleRoots(t *testing.T) {
 			rep := ccipocr3.CommitPluginReport{}
 			chains := make([]ccipocr3.ChainSelector, 0, len(tc.onRampNextSeqNum))
 			for _, snc := range tc.onRampNextSeqNum {
-				if sourceChainConfig[snc.ChainSel].IsRMNVerificationDisabled {
-					rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, ccipocr3.MerkleRootChain{
-						ChainSel:     snc.ChainSel,
-						SeqNumsRange: ccipocr3.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-					})
-				} else {
-					rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, ccipocr3.MerkleRootChain{
-						ChainSel:     snc.ChainSel,
-						SeqNumsRange: ccipocr3.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-					})
-				}
+				rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, ccipocr3.MerkleRootChain{
+					ChainSel:     snc.ChainSel,
+					SeqNumsRange: ccipocr3.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+				})
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
@@ -397,7 +384,6 @@ func Test_IsStaleReportMerkleRoots(t *testing.T) {
 				ccipReader: reader,
 			}
 			report := ccipocr3.CommitPluginReport{
-				BlessedMerkleRoots:   rep.BlessedMerkleRoots,
 				UnblessedMerkleRoots: rep.UnblessedMerkleRoots,
 			}
 			err := p.isStaleReport(ctx, 1, report)
@@ -459,7 +445,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 				ccipReader: reader,
 			}
 			report := ccipocr3.CommitPluginReport{
-				BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
+				UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
 			err := p.isStaleReport(ctx, tc.reportSeqNum, report)
 			if tc.shouldBeStale {
