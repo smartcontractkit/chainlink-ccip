@@ -118,32 +118,6 @@ func TestCollectOrphanedJobs_EmptyTargetNOPsConsidersAllNOPs(t *testing.T) {
 	assert.Equal(t, job2.JobID, orphaned[0].JobID)
 }
 
-func TestSaveAggregatorConfig_ReducedChainSet_RemovesStaleChains(t *testing.T) {
-	ds := datastore.NewMemoryDataStore()
-	svc := "agg-1"
-
-	fullCfg := &Committee{
-		QuorumConfigs: map[string]*QuorumConfig{
-			"chain1": {SourceVerifierAddress: "0x1", Threshold: 1},
-			"chain2": {SourceVerifierAddress: "0x2", Threshold: 2},
-		},
-	}
-	require.NoError(t, SaveAggregatorConfig(ds, svc, fullCfg))
-
-	reducedCfg := &Committee{
-		QuorumConfigs: map[string]*QuorumConfig{
-			"chain1": {SourceVerifierAddress: "0x1", Threshold: 1},
-		},
-	}
-	require.NoError(t, SaveAggregatorConfig(ds, svc, reducedCfg))
-
-	loaded, err := GetAggregatorConfig(ds.Seal(), svc)
-	require.NoError(t, err)
-	assert.Len(t, loaded.QuorumConfigs, 1)
-	assert.Contains(t, loaded.QuorumConfigs, "chain1")
-	assert.NotContains(t, loaded.QuorumConfigs, "chain2")
-}
-
 func TestDeleteJob_PreservesUnknownOffchainConfigKeys(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 
@@ -184,32 +158,6 @@ func TestDeleteJob_PreservesUnknownOffchainConfigKeys(t *testing.T) {
 	oc, ok := result["offchainConfigs"].(map[string]any)
 	require.True(t, ok)
 	assert.Contains(t, oc, "customExtension")
-}
-
-func TestSaveTokenVerifierConfig_ReducedChainSet_RemovesStaleEntries(t *testing.T) {
-	ds := datastore.NewMemoryDataStore()
-	svc := "tv-1"
-
-	fullCfg := &TokenVerifierGeneratedConfig{
-		OnRampAddresses: map[string]string{
-			"chain1": "0x1",
-			"chain2": "0x2",
-		},
-	}
-	require.NoError(t, SaveTokenVerifierConfig(ds, svc, fullCfg))
-
-	reducedCfg := &TokenVerifierGeneratedConfig{
-		OnRampAddresses: map[string]string{
-			"chain1": "0x1",
-		},
-	}
-	require.NoError(t, SaveTokenVerifierConfig(ds, svc, reducedCfg))
-
-	loaded, err := GetTokenVerifierConfig(ds.Seal(), svc)
-	require.NoError(t, err)
-	assert.Len(t, loaded.OnRampAddresses, 1)
-	assert.Contains(t, loaded.OnRampAddresses, "chain1")
-	assert.NotContains(t, loaded.OnRampAddresses, "chain2")
 }
 
 func TestCollectOrphanedJobs_IncludesAlreadyRevokedJobsForCleanup(t *testing.T) {

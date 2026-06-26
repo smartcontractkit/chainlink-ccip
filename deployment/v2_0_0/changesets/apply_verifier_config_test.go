@@ -22,6 +22,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 )
 
+func makeTestNOPAliases(count int) []string {
+	aliases := make([]string, count)
+	for i := range aliases {
+		aliases[i] = fmt.Sprintf("nop%d", i+1)
+	}
+	return aliases
+}
+
 var _ adapters.VerifierConfigAdapter = (*mockVerifierJobConfigAdapter)(nil)
 
 type mockVerifierJobConfigAdapter struct {
