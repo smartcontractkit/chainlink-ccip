@@ -32,6 +32,7 @@ func encodeReports(
 	reportCodec cciptypes.CommitPluginCodec,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
 	var encodedReports []ocr3types.ReportPlus[[]byte]
+
 	// Encode the reports and report info
 	for _, report := range reports {
 		// the report builder should not include empty reports.
