@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
 
 func mustVersion(t *testing.T, v string) *semver.Version {
@@ -31,6 +33,58 @@ func globalAction(t *testing.T, chain uint64, version string) CurseActionInput {
 		IsGlobalCurse: true,
 		ChainSelector: chain,
 		Version:       mustVersion(t, version),
+	}
+}
+
+func TestValidateVersions(t *testing.T) {
+	tests := []struct {
+		name           string
+		actions        []CurseActionInput
+		expectError    bool
+		errorSubstring string
+	}{
+		{
+			name: "valid versions",
+			actions: []CurseActionInput{
+				laneAction(t, 1, 2, "1.6.0"),
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid versions",
+			actions: []CurseActionInput{
+				{
+					ChainSelector:        1,
+					SubjectChainSelector: 1,
+					Version:              nil,
+					IsGlobalCurse:        false,
+				},
+			},
+			expectError:    true,
+			errorSubstring: "missing version",
+		},
+		{
+			name: "global curse is not subject to version validation",
+			actions: []CurseActionInput{
+				{
+					IsGlobalCurse: true,
+					ChainSelector: 1,
+					Version:       nil,
+				},
+			},
+			expectError: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := RMNCurseConfig{CurseActions: tt.actions}
+			err := validateVersions(cfg)
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }
 
@@ -159,4 +213,32 @@ func TestApplyUncurse_EnforcesBidirectionalV16Validation(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "uncurse validation failed")
 	require.Contains(t, err.Error(), "unidirectional lane")
+}
+
+func TestApplyCurse_AllowAsymmetricLaneCurses(t *testing.T) {
+	cfg := RMNCurseConfig{
+		CurseActions: []CurseActionInput{
+			laneAction(t, testChain1Selector, testChain2Selector, "1.6.0"),
+		},
+		AllowAsymmetricLaneCurses: true,
+	}
+
+	cr := newTestCurseRegistry(false)
+	env := newTestEnvironment(t)
+	_, err := applyCurse(cr, changesets.GetRegistry())(env, cfg)
+	require.NoError(t, err)
+}
+
+func TestApplyUncurse_AllowAsymmetricLaneCurses(t *testing.T) {
+	cfg := RMNCurseConfig{
+		CurseActions: []CurseActionInput{
+			laneAction(t, testChain1Selector, testChain2Selector, "1.6.0"),
+		},
+		AllowAsymmetricLaneCurses: true,
+	}
+
+	cr := newTestCurseRegistry(true)
+	env := newTestEnvironment(t)
+	_, err := applyUncurse(cr, changesets.GetRegistry())(env, cfg)
+	require.NoError(t, err)
 }
