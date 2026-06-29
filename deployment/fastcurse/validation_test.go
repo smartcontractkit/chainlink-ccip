@@ -51,7 +51,7 @@ func TestValidateVersions(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "invalid versions",
+			name: "missing version",
 			actions: []CurseActionInput{
 				{
 					ChainSelector:        1,
