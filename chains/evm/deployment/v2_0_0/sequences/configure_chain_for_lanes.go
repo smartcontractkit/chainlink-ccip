@@ -762,6 +762,17 @@ func configureCommitteeVerifierAsDest(
 
 	signatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(cv.RemoteChains))
 	for remoteSelector, remoteConfig := range cv.RemoteChains {
+		// Signature-config writes are opt-in. An empty SignatureConfig (no signers
+		// and zero threshold) means the caller is not managing the signature quorum
+		// through this sequence — e.g. the topology-free lane changesets, which
+		// configure resolver routing and remote-chain settings here but delegate
+		// signer/threshold management to the dedicated committee changesets
+		// (AddNOPToCommittee / Increase- / DecreaseThreshold via
+		// CommitteeVerifierOnchainAdapter.ApplySignatureConfigs). Skipping the write
+		// when empty avoids clobbering an existing on-chain quorum on re-runs.
+		if len(remoteConfig.SignatureConfig.Signers) == 0 && remoteConfig.SignatureConfig.Threshold == 0 {
+			continue
+		}
 		signers := make([]common.Address, 0, len(remoteConfig.SignatureConfig.Signers))
 		for _, signer := range remoteConfig.SignatureConfig.Signers {
 			signers = append(signers, common.HexToAddress(signer))
