@@ -82,10 +82,12 @@ func TestValidateVersions(t *testing.T) {
 			err := validateVersions(cfg)
 			if tt.expectError {
 				require.Error(t, err)
+				if tt.errorSubstring != "" {
+					require.Contains(t, err.Error(), tt.errorSubstring)
+				}
 			} else {
 				require.NoError(t, err)
 			}
-		})
 	}
 }
 
