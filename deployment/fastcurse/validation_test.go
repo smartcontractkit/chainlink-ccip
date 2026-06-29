@@ -90,6 +90,7 @@ func TestValidateVersions(t *testing.T) {
 			}
 		})
 	}
+}
 
 func TestValidateBidirectionalCursing(t *testing.T) {
 	tests := []struct {
