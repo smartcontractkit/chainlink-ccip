@@ -88,8 +88,8 @@ func TestValidateVersions(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
 	}
-}
 
 func TestValidateBidirectionalCursing(t *testing.T) {
 	tests := []struct {
