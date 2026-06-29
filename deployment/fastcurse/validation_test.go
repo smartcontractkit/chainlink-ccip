@@ -64,7 +64,7 @@ func TestValidateVersions(t *testing.T) {
 			errorSubstring: "missing version",
 		},
 		{
-			name: "global curse is not subject to version validation",
+			name: "global curse requires a version",
 			actions: []CurseActionInput{
 				{
 					IsGlobalCurse: true,
@@ -72,7 +72,8 @@ func TestValidateVersions(t *testing.T) {
 					Version:       nil,
 				},
 			},
-			expectError: false,
+			expectError:    true,
+			errorSubstring: "missing version",
 		},
 	}
 	for _, tt := range tests {
