@@ -590,50 +590,6 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	return result
 }
 
-// buildSigners converts internal signer representation to RMN signer info format
-func (r *ccipChainReader) buildSigners(signers []cciptypes.Signer) []cciptypes.RemoteSignerInfo {
-	result := make([]cciptypes.RemoteSignerInfo, 0, len(signers))
-	for _, s := range signers {
-		result = append(result, cciptypes.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		})
-	}
-	return result
-}
-
-func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
-	if err != nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
-	}
-
-	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
-	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
-	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
-	if err != nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("unable to getChainAccessor: %w", err)
-	}
-	proxyContractAddress, err := destChainAccessor.GetContractAddress(consts.ContractNameRMNRemote)
-	if err != nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
-	}
-
-	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, r.destChain, proxyContractAddress)
-	if err != nil {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
-	}
-
-	return cciptypes.RemoteConfig{
-		ContractAddress:  rmnRemoteAddress,
-		ConfigDigest:     config.RMNRemote.VersionedConfig.Config.RMNHomeContractConfigDigest,
-		Signers:          r.buildSigners(config.RMNRemote.VersionedConfig.Config.Signers),
-		FSign:            config.RMNRemote.VersionedConfig.Config.FSign,
-		ConfigVersion:    config.RMNRemote.VersionedConfig.Version,
-		RmnReportVersion: config.RMNRemote.DigestHeader.DigestHeader,
-	}, nil
-}
-
 // GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
@@ -689,7 +645,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	// Get from cache
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
-		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+		return nil, fmt.Errorf("get chain config: %w", err)
 	}
 
 	resp := make(cciptypes.ContractAddresses)
@@ -1001,32 +957,6 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigsViaAccessor(
 	}
 
 	return sourceChainConfigsMap, nil
-}
-
-// getARM gets the RMN remote address from the RMN proxy address.
-// See: https://github.com/smartcontractkit/chainlink/blob/3c7817c566c5d0aa14519c679fa85b227ac97cc5/contracts/src/v0.8/ccip/rmn/ARMProxy.sol#L40-L44
-//
-//nolint:lll
-func (r *ccipChainReader) getRMNRemoteAddress(
-	ctx context.Context,
-	chain cciptypes.ChainSelector,
-	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	chainAccessor, err := getChainAccessor(r.accessors, chain)
-	if err != nil {
-		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
-	}
-	err = chainAccessor.Sync(ctx, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
-	if err != nil {
-		return nil, fmt.Errorf("sync RMN proxy contract: %w", err)
-	}
-
-	// Get the address from cache instead of making a contract call
-	config, err := r.configPoller.GetChainConfig(ctx, chain)
-	if err != nil {
-		return nil, fmt.Errorf("get chain config: %w", err)
-	}
-
-	return config.RMNProxy.RemoteAddress, nil
 }
 
 func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {

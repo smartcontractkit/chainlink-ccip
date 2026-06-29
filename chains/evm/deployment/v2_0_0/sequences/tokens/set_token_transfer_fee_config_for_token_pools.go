@@ -18,7 +18,7 @@ import (
 var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 	"set-token-transfer-fee-config-for-token-pools",
 	utils.Version_2_0_0,
-	"Sets token transfer fee configs for token pools. Takes a map of pool address to a map of dest chain selector to fee config (or nil to disable the fee config for that dest).",
+	"Sets token transfer fee configs for token pools. Takes a map of pool address to a map of dest chain selector to fee config (nil or IsEnabled false disables the pool override for that dest).",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input tokens.SetTokenTransferFeeSequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.Selector]
 		if !ok {
@@ -43,7 +43,7 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 			}
 
 			for dst, fee := range cfg {
-				if fee == nil {
+				if fee == nil || !fee.IsEnabled {
 					args.DisableTokenTransferFeeConfigs = append(args.DisableTokenTransferFeeConfigs, dst)
 				} else {
 					args.TokenTransferFeeConfigArgs = append(

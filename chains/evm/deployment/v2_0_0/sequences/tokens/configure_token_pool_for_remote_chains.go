@@ -43,6 +43,14 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// USDCTokenPoolProxy (so the router uses the proxy). The proxy does not implement
 		// getSupportedChains like a 2.0.0 TokenPool and may revert—so we treat this check as
 		// best-effort and skip validation when the call fails.
+		//
+		// This best-effort check should only fire in the case of pool upgrades NOT pool extensions.
+		// If the pool is already migrated and we only want to connect new pools to it then the code
+		// should NOT require the operator to list every single remote chain. Instead we should only
+		// need to specify the pools we want to add. With that said this best-effort check will only
+		// fire if #1 the active pool is non-zero, #2 the active pool is different from the provided
+		// pool, and #3 the active pool supports `getSupportedChains`. The operator can override the
+		// supported chains check entirely by setting SkipActivePoolSupportedChainsCheck to true.
 		if input.RegistryAddress != (common.Address{}) && input.TokenAddress != (common.Address{}) {
 			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
 				ChainSelector: input.ChainSelector,
@@ -53,13 +61,12 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for supported-chains check: %w", err)
 			}
 			activePool := tokenConfigReport.Output.TokenPool
-			if activePool != (common.Address{}) {
+			if !input.SkipActivePoolSupportedChainsCheck && activePool != (common.Address{}) && activePool != input.TokenPoolAddress {
 				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 					ChainSelector: input.ChainSelector,
 					Address:       activePool,
 				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
-				if err == nil && !input.SkipActivePoolSupportedChainsCheck {
-					// Validate that remoteChains includes all chains the active pool already supports (upgrade safety).
+				if err == nil {
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
 						if _, ok := input.RemoteChains[sel]; !ok {

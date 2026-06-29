@@ -77,7 +77,7 @@ func (t *TokenAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) 
 }
 
 func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment, poolAddress string, src uint64, dst uint64) (tokens.TokenTransferFeeConfig, error) {
-	chain, ok := e.BlockChains.EVMChains()[src]
+	evmChain, ok := e.BlockChains.EVMChains()[src]
 	if !ok {
 		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("chain with selector %d not defined", src)
 	}
@@ -94,13 +94,9 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 
 	report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		token_pool.GetTokenTransferFeeConfig,
-		chain,
-		contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: src,
-			Address:       addr,
-			Args:          args,
-		},
+		token_pool.GetTokenTransferFeeConfig, evmChain,
+		contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{ChainSelector: src, Address: addr, Args: args},
+		cldf_ops.WithForceExecute[contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
 	)
 	if err != nil {
 		return tokens.TokenTransferFeeConfig{}, fmt.Errorf("failed to get on-chain token transfer fee config for pool %s on chain selector %d for dest chain selector %d: %w", poolAddress, src, dst, err)

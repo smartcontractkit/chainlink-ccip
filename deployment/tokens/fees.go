@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -13,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -248,4 +250,30 @@ func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overr
 	}
 
 	return cfg
+}
+
+func ResolveTokenFeeAdapter(e deployment.Environment, sel uint64, poolRef datastore.AddressRef) (TokenFeeAdapter, error) {
+	registry := GetTokenAdapterRegistry()
+
+	fam, err := chainsel.GetSelectorFamily(sel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain selector family for selector %d: %w", sel, err)
+	}
+
+	ref, err := ResolveTokenPoolRef(e, registry, sel, poolRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token pool ref: %w", err)
+	}
+
+	tokAdapter, ok := registry.GetTokenAdapter(fam, ref.Version)
+	if !ok {
+		return nil, fmt.Errorf("no token adapter found for chain family %s and pool ref %s", datastore_utils.SprintRef(poolRef), fam)
+	}
+
+	feeAdapter, ok := tokAdapter.(TokenFeeAdapter)
+	if !ok {
+		return nil, fmt.Errorf("token adapter for chain family %s and pool ref %s does not implement TokenFeeAdapter", datastore_utils.SprintRef(poolRef), fam)
+	}
+
+	return feeAdapter, nil
 }

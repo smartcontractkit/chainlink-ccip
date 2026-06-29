@@ -15,13 +15,8 @@ import (
 
 func (p *Processor) ValidateObservation(
 	_ Outcome,
-	q Query,
+	_ Query,
 	ao plugincommon.AttributedObservation[Observation]) error {
-
-	if q.RetryRMNSignatures && !ao.Observation.IsEmpty() {
-		return fmt.Errorf("observation should be empty when retrying getting rmn signature")
-	}
-
 	obs := ao.Observation
 	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("validate FChain: %w", err)
@@ -46,14 +41,6 @@ func (p *Processor) ValidateObservation(
 
 	if err := validateObservedOffRampMaxSeqNums(obs.OffRampNextSeqNums, ao.OracleID, supportsDestChain); err != nil {
 		return fmt.Errorf("validate OffRampNextSeqNums: %w", err)
-	}
-
-	// Don't need to validate RMNRemoteConfig if RMN is disabled.
-	if p.offchainCfg.RMNEnabled {
-		if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
-			p.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
-			return fmt.Errorf("validate RMNRemoteConfig: %w", err)
-		}
 	}
 
 	return nil
@@ -161,50 +148,6 @@ func validateObservedOffRampMaxSeqNums(
 		}
 
 		seenChains.Add(seqNumChain.ChainSel)
-	}
-
-	return nil
-}
-
-func validateRMNRemoteConfig(
-	observer commontypes.OracleID,
-	supportsDestChain bool,
-	rmnRemoteConfig cciptypes.RemoteConfig,
-) error {
-	if rmnRemoteConfig.IsEmpty() {
-		return nil
-	}
-
-	if !supportsDestChain {
-		return fmt.Errorf("oracle %d does not support dest chain, but has observed an RMNRemoteConfig", observer)
-	}
-
-	if rmnRemoteConfig.ConfigDigest.IsEmpty() {
-		return fmt.Errorf("empty ConfigDigest")
-	}
-
-	if rmnRemoteConfig.RmnReportVersion.IsEmpty() {
-		return fmt.Errorf("empty RmnReportVersion")
-	}
-
-	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.FSign+1 {
-		return fmt.Errorf("not enough signers to cover F+1 threshold")
-	}
-
-	if rmnRemoteConfig.ContractAddress.IsZeroOrEmpty() {
-		return fmt.Errorf("empty ContractAddress: %s", rmnRemoteConfig.ContractAddress)
-	}
-
-	seenNodeIndexes := mapset.NewSet[uint64]()
-	for _, signer := range rmnRemoteConfig.Signers {
-		if len(signer.OnchainPublicKey) == 0 {
-			return fmt.Errorf("empty signer OnchainPublicKey")
-		}
-
-		if seenNodeIndexes.Contains(signer.NodeIndex) {
-			return fmt.Errorf("duplicate NodeIndex %d", signer.NodeIndex)
-		}
-		seenNodeIndexes.Add(signer.NodeIndex)
 	}
 
 	return nil

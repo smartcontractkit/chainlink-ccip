@@ -239,17 +239,6 @@ func (o *observedCCIPReader) GetChainFeePriceUpdate(
 	return res
 }
 
-func (o *observedCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error) {
-	return withObservedQueryAndResult(
-		o,
-		"GetRMNRemoteConfig",
-		func() (cciptypes.RemoteConfig, error) {
-			return o.CCIPReader.GetRMNRemoteConfig(ctx)
-		},
-		nil,
-	)
-}
-
 func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	return withObservedQueryAndResult(
 		o,
