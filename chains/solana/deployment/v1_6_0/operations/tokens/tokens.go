@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -8,7 +9,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -219,6 +222,96 @@ var CreateTokenMultisig = operations.NewOperation(
 			},
 		}, nil
 	})
+
+type ExtendTokenPoolLookupTableParams struct {
+	Router    solana.PublicKey
+	TokenMint solana.PublicKey
+	Accounts  []solana.PublicKey
+}
+
+var ExtendTokenPoolLookupTable = operations.NewOperation(
+	"solana-token:extend-token-pool-lookup-table",
+	Version,
+	"Extends the token pool address lookup table with additional accounts",
+	func(b operations.Bundle, chain cldf_solana.Chain, input ExtendTokenPoolLookupTableParams) (sequences.OnChainOutput, error) {
+		ctx := b.GetContext()
+
+		if input.TokenMint.IsZero() {
+			return sequences.OnChainOutput{}, errors.New("token mint is zero")
+		}
+		if input.Router.IsZero() {
+			return sequences.OnChainOutput{}, errors.New("router is zero")
+		}
+		if len(input.Accounts) == 0 {
+			b.Logger.Info("no accounts provided - skipping token pool lookup table extension")
+			return sequences.OnChainOutput{}, nil
+		}
+		if chain.DeployerKey == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("solana deployer key is nil for chain selector '%d'", chain.Selector)
+		}
+
+		tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find token admin registry PDA: %w", err)
+		}
+
+		var tokenAdminRegistry ccip_common.TokenAdminRegistry
+		if err := chain.GetAccountDataBorshInto(ctx, tokenAdminRegistryPDA, &tokenAdminRegistry); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry at '%s': %w", tokenAdminRegistryPDA.String(), err)
+		}
+
+		lookupTable := tokenAdminRegistry.LookupTable
+		if lookupTable.IsZero() {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"token pool lookup table is not set for token '%s' on router '%s'; run configure-for-transfers / set-pool first",
+				input.TokenMint.String(), input.Router.String(),
+			)
+		}
+
+		existingEntries, err := common.GetAddressLookupTable(ctx, chain.Client, lookupTable)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool lookup table at '%s': %w", lookupTable.String(), err)
+		}
+
+		seen := make(map[solana.PublicKey]bool, len(existingEntries))
+		for _, entry := range existingEntries {
+			seen[entry] = true
+		}
+
+		toAdd := make([]solana.PublicKey, 0, len(input.Accounts))
+		for _, acct := range input.Accounts {
+			if acct.IsZero() {
+				return sequences.OnChainOutput{}, fmt.Errorf("account to add is zero")
+			}
+			if !seen[acct] {
+				toAdd = append(toAdd, acct)
+				seen[acct] = true
+			}
+		}
+
+		if len(toAdd) == 0 {
+			b.Logger.Infof(
+				"all %d account(s) already present in token pool lookup table at '%s' - nothing to extend",
+				len(input.Accounts), lookupTable.String(),
+			)
+			return sequences.OnChainOutput{}, nil
+		}
+
+		b.Logger.Infof(
+			"extending token pool lookup table at '%s' with %d account(s)",
+			lookupTable.String(), len(toAdd),
+		)
+
+		if err := common.ExtendLookupTable(ctx, chain.Client, lookupTable, *chain.DeployerKey, toAdd); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to extend token pool lookup table at '%s': %w", lookupTable.String(), err)
+		}
+		if err := common.AwaitSlotChange(ctx, chain.Client); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to await slot change after extending token pool lookup table: %w", err)
+		}
+
+		return sequences.OnChainOutput{}, nil
+	},
+)
 
 var UpsertTokenMetadata = operations.NewOperation(
 	"solana-token:upsert-metadata",
