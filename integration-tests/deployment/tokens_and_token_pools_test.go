@@ -1299,7 +1299,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ManualRegistrationMultisigExtendsLookupTable", func(t *testing.T) {
-			env.OperationsBundle = operations.NewBundle(t.Context(), env.OperationsBundle.Logger, operations.NewMemoryReporter())
+			env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
 
 			solbnm := solTestData[0]
 			externalAdmin := solana.MustPublicKeyFromBase58(solbnm.Token.ExternalAdmin)
