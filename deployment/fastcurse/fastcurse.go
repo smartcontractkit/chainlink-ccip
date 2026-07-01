@@ -23,8 +23,10 @@ type GlobalCurseOnNetworkInput struct {
 type RMNCurseConfig struct {
 	CurseActions []CurseActionInput
 	// Use this if you want to include curse subject even when they are already cursed (CurseChangeset) or already uncursed (UncurseChangeset)
-	Force  bool
-	Reason string
+	Force bool
+	// Use this if you want to allow asymmetric lane curses. Useful when a chain is unreachable or stalled and we want to curse subjects on other chains.
+	AllowAsymmetricLaneCurses bool
+	Reason                    string
 	// MCMS configures the resulting proposal.
 	MCMS mcms.Input
 }
@@ -182,8 +184,17 @@ func filterSubjectsToCurse(e cldf.Environment, force bool, selector uint64, curs
 
 func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
-		if err := validateBidirectionalLaneActions(cfg); err != nil {
+		if err := validateVersions(cfg); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("curse validation failed: %w", err)
+		}
+		if cfg.AllowAsymmetricLaneCurses {
+			// If allow asymmetric lane curses is enabled, we skip bidirectional lane validation to allow asymmetric lane curses.
+			// This is useful when a chain is unreachable or stalled and we want to curse subjects on other chains.
+			e.Logger.Infof("Allow asymmetric lane curses is enabled, skipping bidirectional lane validation")
+		} else {
+			if err := validateBidirectionalLaneActions(cfg); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("curse validation failed: %w", err)
+			}
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -224,8 +235,18 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 
 func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
-		if err := validateBidirectionalLaneActions(cfg); err != nil {
+		if err := validateVersions(cfg); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("uncurse validation failed: %w", err)
+		}
+
+		if cfg.AllowAsymmetricLaneCurses {
+			// If allow asymmetric lane curses is enabled, we skip bidirectional lane validation to allow asymmetric lane curses.
+			// This is useful when a chain is unreachable or stalled and we want to uncurse subjects on other chains.
+			e.Logger.Infof("Allow asymmetric lane curses is enabled, skipping bidirectional lane validation")
+		} else {
+			if err := validateBidirectionalLaneActions(cfg); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("uncurse validation failed: %w", err)
+			}
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)

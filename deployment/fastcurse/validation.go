@@ -16,6 +16,20 @@ type curseActionInfo struct {
 	subjectSelector uint64
 }
 
+// validateVersions validates that curse actions specify a version.
+// A version is required to select the correct adapter implementation.
+func validateVersions(cfg RMNCurseConfig) error {
+	for _, action := range cfg.CurseActions {
+		if action.Version == nil {
+			if action.IsGlobalCurse {
+				return fmt.Errorf("global curse action missing version: chain %d", action.ChainSelector)
+			}
+			return fmt.Errorf("lane curse action missing version: chain %d -> %d", action.ChainSelector, action.SubjectChainSelector)
+		}
+	}
+	return nil
+}
+
 // validateBidirectionalLaneActions validates that lane curses/uncurses are only applied bidirectionally.
 //
 // Business rule:
