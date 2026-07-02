@@ -3,6 +3,7 @@ package tokens
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	token_metadata "github.com/gagliardetto/metaplex-go/clients/token-metadata"
@@ -224,9 +225,15 @@ var CreateTokenMultisig = operations.NewOperation(
 	})
 
 type ExtendTokenPoolLookupTableParams struct {
-	Router    solana.PublicKey
-	TokenMint solana.PublicKey
-	Accounts  []solana.PublicKey
+	// AllowDuplicates indicates whether to allow duplicate accounts in the lookup
+	// table. When false (the default), then any duplicate account in the Accounts
+	// slice will be ignored AND any account that is already present in the lookup
+	// table will be ignored. If this is true, then *all* accounts in the Accounts
+	// slice will be added to the lookup table, even if they are already present.
+	AllowDuplicates bool
+	TokenMint       solana.PublicKey
+	Router          solana.PublicKey
+	Accounts        []solana.PublicKey
 }
 
 var ExtendTokenPoolLookupTable = operations.NewOperation(
@@ -268,24 +275,37 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 			)
 		}
 
-		existingEntries, err := common.GetAddressLookupTable(ctx, chain.Client, lookupTable)
+		lutState, err := common.GetAddressLookupTableState(ctx, chain.Client, lookupTable)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool lookup table at '%s': %w", lookupTable.String(), err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool lookup table at %q: %w", lookupTable.String(), err)
+		}
+		if !lutState.IsActive() {
+			return sequences.OnChainOutput{}, fmt.Errorf("token pool lookup table at %q is not active", lookupTable.String())
+		}
+		if lutState.Authority == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("token pool lookup table at %q has no authority set", lookupTable.String())
+		}
+		if !lutState.Authority.Equals(chain.DeployerKey.PublicKey()) {
+			return sequences.OnChainOutput{}, fmt.Errorf("expected token pool lookup table at %q to have authority %q (deployer key), but it is %q", lookupTable.String(), chain.DeployerKey.PublicKey().String(), lutState.Authority.String())
 		}
 
-		seen := make(map[solana.PublicKey]bool, len(existingEntries))
-		for _, entry := range existingEntries {
-			seen[entry] = true
+		seen := make(map[solana.PublicKey]bool, len(lutState.Addresses))
+		if !input.AllowDuplicates {
+			for _, entry := range lutState.Addresses {
+				seen[entry] = true
+			}
 		}
 
-		toAdd := make([]solana.PublicKey, 0, len(input.Accounts))
-		for _, acct := range input.Accounts {
+		toAdd := make(solana.PublicKeySlice, 0, len(input.Accounts))
+		for i, acct := range input.Accounts {
 			if acct.IsZero() {
-				return sequences.OnChainOutput{}, fmt.Errorf("account to add is zero")
+				return sequences.OnChainOutput{}, fmt.Errorf("account at index %d is zero", i)
 			}
 			if !seen[acct] {
-				toAdd = append(toAdd, acct)
-				seen[acct] = true
+				toAdd.Append(acct)
+				if !input.AllowDuplicates {
+					seen[acct] = true
+				}
 			}
 		}
 
@@ -298,8 +318,8 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 		}
 
 		b.Logger.Infof(
-			"extending token pool lookup table at '%s' with %d account(s)",
-			lookupTable.String(), len(toAdd),
+			"extending token pool lookup table at '%s' with account(s): %s",
+			lookupTable.String(), strings.Join(toAdd.ToBase58(), ", "),
 		)
 
 		if err := common.ExtendLookupTable(ctx, chain.Client, lookupTable, *chain.DeployerKey, toAdd); err != nil {
