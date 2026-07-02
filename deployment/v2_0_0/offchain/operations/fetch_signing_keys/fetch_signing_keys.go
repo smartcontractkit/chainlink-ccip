@@ -22,6 +22,13 @@ type FetchSigningKeysInput struct {
 
 type FetchSigningKeysOutput struct {
 	SigningKeysByNOP SigningKeysByNOP
+	// RawPubKeyByNOP maps NOP alias -> raw uncompressed secp256k1 public key (hex, no
+	// 0x prefix). A standalone (bootstrap-based) node pushes the same key for every
+	// chain family it declares (which is always 1 family at most),
+	// so lane-config code can derive a signer address for a
+	// family the NOP never declared directly from this, rather than only being able to
+	// translate between families the NOP already has an OnchainSigningAddress for.
+	RawPubKeyByNOP map[string]string
 }
 
 type FetchSigningKeysDeps struct {
@@ -40,6 +47,7 @@ var FetchNOPSigningKeys = operations.NewOperation(
 
 		output := FetchSigningKeysOutput{
 			SigningKeysByNOP: make(SigningKeysByNOP),
+			RawPubKeyByNOP:   make(map[string]string),
 		}
 
 		if len(input.NOPAliases) == 0 {
@@ -115,6 +123,14 @@ var FetchNOPSigningKeys = operations.NewOperation(
 				"nodeId", chainConfig.NodeId,
 				"chainFamily", chainFamily,
 				"signerAddress", signerAddress)
+
+			if rawPubKey := chainConfig.Ocr2Config.OcrKeyBundle.OnchainSigningPubKey; rawPubKey != "" {
+				normalized := strings.ToLower(strings.TrimPrefix(rawPubKey, "0x"))
+				if existing, ok := output.RawPubKeyByNOP[nopAlias]; ok && existing != normalized {
+					return output, fmt.Errorf("NOP %q has conflicting raw public keys across chain configs: %s vs %s — a standalone node registers one key for every chain it declares", nopAlias, existing, normalized)
+				}
+				output.RawPubKeyByNOP[nopAlias] = normalized
+			}
 		}
 
 		return output, nil
