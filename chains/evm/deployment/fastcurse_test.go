@@ -156,6 +156,7 @@ func TestFastCurse(t *testing.T) {
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			chain1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -456,6 +457,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	}
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains:         mcmsChainInput,
 	})
 	require.NoError(t, err)

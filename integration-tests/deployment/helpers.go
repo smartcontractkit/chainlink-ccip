@@ -55,6 +55,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 	for _, qualifier := range qualifiers {
 		output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
 			AdapterVersion: version,
+			MCMS:           testhelpers.MCMSInputForQualifier(qualifier),
 			Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
 				selector: {
 					Canceller:        testhelpers.SingleGroupMCMS(),

@@ -51,6 +51,7 @@ func TestTransferOwnership(t *testing.T) {
 	// Deploy CLLCCIP (bootstrap).
 	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: deploy.MCMSVersion,
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -80,6 +81,7 @@ func TestTransferOwnership(t *testing.T) {
 	// Deploy a second MCMS set (RMNMCMS) so we can transfer ownership to it later.
 	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: deploy.MCMSVersion,
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.RMNTimelockQualifier),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),

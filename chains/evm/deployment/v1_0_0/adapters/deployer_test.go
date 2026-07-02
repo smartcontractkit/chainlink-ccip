@@ -173,6 +173,24 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 	cs := deployops.DeployMCMS(dReg, nil)
 
+	t.Run("defaults to schedule proposal using chain qualifier", func(t *testing.T) {
+		output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+			AdapterVersion: deployops.MCMSVersion,
+			Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+				selector: {
+					Canceller:        testhelpers.SingleGroupMCMS(),
+					Bypasser:         testhelpers.SingleGroupMCMS(),
+					Proposer:         testhelpers.SingleGroupMCMS(),
+					TimelockMinDelay: big.NewInt(0),
+					Qualifier:        ptr.String(utils.CLLQualifier),
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, output.MCMSTimelockProposals, 1)
+		require.Equal(t, mcms_types.TimelockActionSchedule, output.MCMSTimelockProposals[0].Action)
+	})
+
 	t.Run("non-CLLCCIP with no CLLCCIP deployed fails", func(t *testing.T) {
 		_, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
 			AdapterVersion: deployops.MCMSVersion,
