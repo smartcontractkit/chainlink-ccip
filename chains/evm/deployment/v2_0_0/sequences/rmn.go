@@ -128,6 +128,9 @@ var RmnUncurse = cldf_ops.NewSequence(
 type ActivateRMNInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
+	// CurseAdmins are optional additional authorized callers added at deploy time.
+	// The Ultra Fast Curse RBACTimelock is always included.
+	CurseAdmins []common.Address
 }
 
 // DeployAndActivateRMN runs the RMN v2 activation flow on a single EVM chain.
@@ -153,12 +156,16 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock as an initial curse admin.
+		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
+		curseAdmins := make([]common.Address, 0, 1+len(input.CurseAdmins))
+		curseAdmins = append(curseAdmins, ultraFastCurseTimeLock)
+		curseAdmins = append(curseAdmins, input.CurseAdmins...)
+
 		rmnRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmnops.ConstructorArgs{
-				CurseAdmins: []common.Address{ultraFastCurseTimeLock},
+				CurseAdmins: curseAdmins,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
