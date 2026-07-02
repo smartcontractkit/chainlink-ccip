@@ -264,7 +264,7 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 
 		var tokenAdminRegistry ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(ctx, tokenAdminRegistryPDA, &tokenAdminRegistry); err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry at '%s': %w", tokenAdminRegistryPDA.String(), err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token admin registry account at '%s': %w", tokenAdminRegistryPDA.String(), err)
 		}
 
 		lookupTable := tokenAdminRegistry.LookupTable
@@ -277,7 +277,7 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 
 		lutState, err := common.GetAddressLookupTableState(ctx, chain.Client, lookupTable)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool lookup table at %q: %w", lookupTable.String(), err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse addresses from lookup table state at %q: %w", lookupTable.String(), err)
 		}
 		if !lutState.IsActive() {
 			return sequences.OnChainOutput{}, fmt.Errorf("token pool lookup table at %q is not active", lookupTable.String())
