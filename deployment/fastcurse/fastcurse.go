@@ -31,8 +31,6 @@ type RMNCurseConfig struct {
 	MCMS mcms.Input
 }
 
-// CurseActionInput represent a curse action to be applied on a chain (ChainSelector) with a specific SubjectToCurse derived from the SubjectChainSelector
-// The curse action will by applied by calling the Curse method on the RMNRemote contract on the chain (ChainSelector)
 type CurseActionInput struct {
 	IsGlobalCurse        bool
 	ChainSelector        uint64
@@ -251,6 +249,7 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		performedUncurse := false
 		// Group curse actions by chain selector
 		grouped, err := cr.groupRMNSubjectBySelector(e, cfg.CurseActions)
 		if err != nil {
@@ -288,8 +287,12 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to curse subjects on chain with selector %d: %w", selector, err)
 			}
+			performedUncurse = true
 			batchOps = append(batchOps, unCurseReport.Output.BatchOps...)
 			reports = append(reports, unCurseReport.ExecutionReports...)
+		}
+		if len(cfg.CurseActions) > 0 && !performedUncurse {
+			return cldf.ChangesetOutput{}, fmt.Errorf("uncurse skipped all actions: no subjects are currently cursed on chain")
 		}
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).

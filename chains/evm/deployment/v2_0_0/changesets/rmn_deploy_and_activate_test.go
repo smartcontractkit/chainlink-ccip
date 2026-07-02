@@ -107,6 +107,116 @@ func TestActivateRMN_Apply(t *testing.T) {
 	require.NotEqual(t, legacyARM, armReport.Output)
 }
 
+func TestActivateRMN_WithAdditionalCurseAdmins(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+	b := e.OperationsBundle
+	additionalCurser := common.HexToAddress("0x1111111111111111111111111111111111111111")
+
+	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+		ChainSelector:  chainSelector,
+		Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
+	}, nil)
+	require.NoError(t, err)
+
+	ultraFastTimelockAddr, ultraFastAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+	_, rmnMCMSAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(proxyRef))
+	for _, ref := range ultraFastAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	for _, ref := range rmnMCMSAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	e.DataStore = ds.Seal()
+
+	mcmsRegistry := cs_core.GetRegistry()
+	out, err := changesets.ActivateRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+		MCMS: mcms.Input{
+			Qualifier:      common_utils.RMNTimelockQualifier,
+			TimelockAction: mcms_types.TimelockActionSchedule,
+			TimelockDelay:  mcms_types.MustParseDuration("0s"),
+			ValidUntil:     3759765795,
+		},
+		Cfg: changesets.ActivateRMNCfg{
+			ChainSels: []uint64{chainSelector},
+			CurseAdmins: map[uint64][]common.Address{
+				chainSelector: {additionalCurser},
+			},
+		},
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
+
+	rmnAddrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	require.Len(t, rmnAddrs, 1)
+
+	rmnC, err := rmnops.NewRMNContract(common.HexToAddress(rmnAddrs[0].Address), chain.Client)
+	require.NoError(t, err)
+	callers, err := rmnC.GetAllAuthorizedCallers(nil)
+	require.NoError(t, err)
+	require.Contains(t, callers, ultraFastTimelockAddr, "Ultra Fast Curse timelock must be a curse admin")
+	require.Contains(t, callers, additionalCurser, "configured curse admin must be authorized at deploy time")
+}
+
+func TestActivateRMN_ValidateCurseAdmins(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	mcmsRegistry := cs_core.GetRegistry()
+	changeset := changesets.ActivateRMN(mcmsRegistry)
+
+	t.Run("zero address", func(t *testing.T) {
+		err := changeset.VerifyPreconditions(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+			Cfg: changesets.ActivateRMNCfg{
+				ChainSels: []uint64{chainSelector},
+				CurseAdmins: map[uint64][]common.Address{
+					chainSelector: {common.Address{}},
+				},
+			},
+		})
+		require.ErrorContains(t, err, "curse admin address cannot be zero")
+	})
+
+	t.Run("duplicate address", func(t *testing.T) {
+		addr := common.HexToAddress("0x1111111111111111111111111111111111111111")
+		err := changeset.VerifyPreconditions(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+			Cfg: changesets.ActivateRMNCfg{
+				ChainSels: []uint64{chainSelector},
+				CurseAdmins: map[uint64][]common.Address{
+					chainSelector: {addr, addr},
+				},
+			},
+		})
+		require.ErrorContains(t, err, "duplicate curse admin")
+	})
+
+	t.Run("chain not in ChainSels", func(t *testing.T) {
+		err := changeset.VerifyPreconditions(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+			Cfg: changesets.ActivateRMNCfg{
+				ChainSels: []uint64{chainSelector},
+				CurseAdmins: map[uint64][]common.Address{
+					99999: {common.HexToAddress("0x1111111111111111111111111111111111111111")},
+				},
+			},
+		})
+		require.ErrorContains(t, err, "not in ChainSels")
+	})
+}
+
 func TestActivateRMN_AccumulatesBatchOpsAcrossChains(t *testing.T) {
 	const (
 		chainSelectorA = uint64(5009297550715157269)

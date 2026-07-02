@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -18,6 +19,9 @@ import (
 // ActivateRMNCfg configures the ActivateRMN changeset.
 type ActivateRMNCfg struct {
 	ChainSels []uint64
+	// CurseAdmins are optional additional authorized callers (cursers) added at RMN deploy
+	// time, keyed by chain selector. The Ultra Fast Curse RBACTimelock is always included.
+	CurseAdmins map[uint64][]common.Address
 }
 
 var ActivateRMN = func(mcmsRegistry *changesets.MCMSReaderRegistry) cldf_deployment.ChangeSetV2[changesets.WithMCMS[ActivateRMNCfg]] {
@@ -33,6 +37,9 @@ func validateActivateRMN(e cldf_deployment.Environment, input changesets.WithMCM
 	if len(input.Cfg.ChainSels) == 0 {
 		return fmt.Errorf("at least one chain selector is required")
 	}
+	if err := validateActivateRMNCurseAdmins(input.Cfg.CurseAdmins, input.Cfg.ChainSels); err != nil {
+		return err
+	}
 	evmChains := e.BlockChains.EVMChains()
 	for _, sel := range input.Cfg.ChainSels {
 		if _, ok := evmChains[sel]; !ok {
@@ -41,6 +48,32 @@ func validateActivateRMN(e cldf_deployment.Environment, input changesets.WithMCM
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(sel))
 		if err := validateActivateRMNAddresses(addresses, sel); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func validateActivateRMNCurseAdmins(curseAdmins map[uint64][]common.Address, chainSels []uint64) error {
+	if len(curseAdmins) == 0 {
+		return nil
+	}
+	chainSet := make(map[uint64]struct{}, len(chainSels))
+	for _, sel := range chainSels {
+		chainSet[sel] = struct{}{}
+	}
+	for sel, addrs := range curseAdmins {
+		if _, ok := chainSet[sel]; !ok {
+			return fmt.Errorf("curse admins configured for chain %d which is not in ChainSels", sel)
+		}
+		seen := make(map[common.Address]struct{}, len(addrs))
+		for _, addr := range addrs {
+			if addr == (common.Address{}) {
+				return fmt.Errorf("curse admin address cannot be zero for chain %d", sel)
+			}
+			if _, dup := seen[addr]; dup {
+				return fmt.Errorf("duplicate curse admin %s for chain %d", addr.Hex(), sel)
+			}
+			seen[addr] = struct{}{}
 		}
 	}
 	return nil
@@ -62,6 +95,7 @@ func applyDeployAndActivateRMN(
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployAndActivateRMN, chain, sequences.ActivateRMNInput{
 			ChainSelector:     sel,
 			ExistingAddresses: addresses,
+			CurseAdmins:       input.Cfg.CurseAdmins[sel],
 		})
 		if err != nil {
 			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to activate RMN on chain %d: %w", sel, err)

@@ -455,12 +455,12 @@ func TestChainFamilyAdapter_ValidateNOPsTopology(t *testing.T) {
 	}{
 		{
 			name:     "fewer than the minimum is rejected",
-			nopCount: 14,
-			wantErr:  `chain "5009297550715157269" requires at least 15 unique NOPs for production environments, got 14`,
+			nopCount: 8,
+			wantErr:  `chain "5009297550715157269" requires at least 9 unique NOPs for production environments, got 8`,
 		},
 		{
 			name:     "exactly the minimum is allowed",
-			nopCount: 15,
+			nopCount: 9,
 		},
 		{
 			name:     "more than the minimum is allowed",

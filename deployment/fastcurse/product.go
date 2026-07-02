@@ -127,6 +127,9 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 		if err != nil {
 			return nil, err
 		}
+		if s.Version == nil {
+			return nil, fmt.Errorf("lane curse action missing version: chain %d -> %d", s.ChainSelector, s.SubjectChainSelector)
+		}
 		adapter, ok := cr.GetCurseAdapter(family, s.Version)
 		if !ok {
 			return nil, fmt.Errorf("no curse adapter registered for chain family '%s' and RMN version '%s'",

@@ -167,7 +167,7 @@ func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSRea
 			reports = append(reports, report.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, mcmsRegistryForDeploy(mcmsRegistry)).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
@@ -336,10 +336,78 @@ func deployMCMSApply(
 			reports = append(reports, deployReport.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		if err := ds.Merge(e.DataStore); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge existing datastore into MCMS deployment output: %w", err)
+		}
+		buildEnv := e
+		buildEnv.DataStore = ds.Seal()
+
+		mcmsInput, err := mcmsInputForDeployment(cfg, batchOps)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
+		return changesets.NewOutputBuilder(buildEnv, mcmsRegistryForDeploy(mcmsRegistry)).
 			WithReports(reports).
 			WithDataStore(ds).
 			WithBatchOps(batchOps).
-			Build(cfg.MCMS)
+			Build(mcmsInput)
 	}
+}
+
+func mcmsRegistryForDeploy(registry *changesets.MCMSReaderRegistry) *changesets.MCMSReaderRegistry {
+	if registry != nil {
+		return registry
+	}
+	return changesets.GetRegistry()
+}
+
+// mcmsInputForDeployment returns MCMS proposal input for deploy output. When ownership
+// accept batch operations are produced and the caller did not supply MCMS config, a
+// schedule proposal is built using the deployed MCMS timelock qualifier from chain config.
+func mcmsInputForDeployment(cfg MCMSDeploymentConfig, batchOps []mcmstypes.BatchOperation) (mcms.Input, error) {
+	if len(batchOps) == 0 {
+		return cfg.MCMS, nil
+	}
+
+	input := cfg.MCMS
+	if input.TimelockAction == "" {
+		input.TimelockAction = mcmstypes.TimelockActionSchedule
+		input.TimelockDelay = mcmstypes.MustParseDuration("0s")
+	}
+	if input.Qualifier == "" {
+		qualifier, err := deploymentQualifier(cfg)
+		if err != nil {
+			return mcms.Input{}, err
+		}
+		input.Qualifier = qualifier
+	}
+	if input.Description == "" {
+		input.Description = "Accept MCM contract ownership on timelock"
+	}
+	return input, nil
+}
+
+func deploymentQualifier(cfg MCMSDeploymentConfig) (string, error) {
+	var qualifier string
+	for _, chainCfg := range cfg.Chains {
+		if chainCfg.Qualifier == nil || *chainCfg.Qualifier == "" {
+			continue
+		}
+		if qualifier == "" {
+			qualifier = *chainCfg.Qualifier
+			continue
+		}
+		if qualifier != *chainCfg.Qualifier {
+			return "", fmt.Errorf(
+				"all chains in MCMS deployment must share the same qualifier when MCMS input is omitted",
+			)
+		}
+	}
+	if qualifier == "" {
+		return "", errors.New(
+			"MCMS qualifier is required when deploy produces ownership transfer operations and cannot be inferred from chain config",
+		)
+	}
+	return qualifier, nil
 }
