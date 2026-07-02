@@ -768,8 +768,8 @@ github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers v0.0.0-2026030423
 github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers v0.0.0-20260304234246-843d03f2badc/go.mod h1:YyK80jgNa1/qrTsgZO2s4Cp0gnBa0+5JtcjEDg8gZyE=
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260409211238-5b99921cbc7c h1:7V+V3R//Z/g1kiz/to9MGT4KmcSTcbv2YSsRDD0RN5A=
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260409211238-5b99921cbc7c/go.mod h1:Jqt53s27Tr0jDl8mdBXg1xhu6F8Fci8JOuq43tgHOM8=
-github.com/smartcontractkit/chainlink-protos/job-distributor v0.18.0 h1:q+VDPcxWrj5k9QizSYfUOSMnDH3Sd5HvbPguZOgfXTY=
-github.com/smartcontractkit/chainlink-protos/job-distributor v0.18.0/go.mod h1:/dVVLXrsp+V0AbcYGJo3XMzKg3CkELsweA/TTopCsKE=
+github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0 h1:+KOmrq2mAgfKvEvBa89WzzdbX7InVDCZ8HJWix1/5f4=
+github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0/go.mod h1:2ahgl5bI9+fMCD+dBC785Lak38Tb7ApdTe5I8a09Qp0=
 github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b h1:QuI6SmQFK/zyUlVWEf0GMkiUYBPY4lssn26nKSd/bOM=
 github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b/go.mod h1:qSTSwX3cBP3FKQwQacdjArqv0g6QnukjV4XuzO6UyoY=
 github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 h1:hhevsu8k7tlDRrYZmgAh7V4avGQDMvus1bwIlial3Ps=
