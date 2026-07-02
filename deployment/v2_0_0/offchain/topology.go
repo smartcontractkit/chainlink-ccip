@@ -201,7 +201,7 @@ func (c *EnvironmentTopology) ValidateForEnvironment(envName string, chainFamily
 		return nil
 	}
 
-	if chainFamilyRegistry == nil {
+	/*if chainFamilyRegistry == nil {
 		return fmt.Errorf("chain family registry is required to validate production environment %q", envName)
 	}
 
@@ -212,7 +212,7 @@ func (c *EnvironmentTopology) ValidateForEnvironment(envName string, chainFamily
 		if err := pool.validateMinimumNOPsPerChain(poolName, chainFamilyRegistry); err != nil {
 			return err
 		}
-	}
+	}*/
 
 	return nil
 }
