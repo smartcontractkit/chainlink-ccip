@@ -257,7 +257,7 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 
 		var tokenAdminRegistry ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(ctx, tokenAdminRegistryPDA, &tokenAdminRegistry); err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry at '%s': %w", tokenAdminRegistryPDA.String(), err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token admin registry account at '%s': %w", tokenAdminRegistryPDA.String(), err)
 		}
 
 		lookupTable := tokenAdminRegistry.LookupTable
