@@ -22,6 +22,9 @@ type Input struct {
 	TimelockAction mcms_types.TimelockAction
 	// Qualifier is a string used to qualify the MCMS + Timelock contract addresses.
 	Qualifier string
+	// ChainQualifiers overrides Qualifier for specific chain selectors when resolving MCMS metadata.
+	// Used when a multi-chain proposal needs different MCMS instances on different chains.
+	ChainQualifiers map[uint64]string
 	// Description is a human-readable description of the proposal.
 	Description string
 }
