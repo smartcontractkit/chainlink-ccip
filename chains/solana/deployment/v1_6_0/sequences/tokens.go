@@ -485,6 +485,27 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				}
 				result.Addresses = append(result.Addresses, createTokenMultisigOutput.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, createTokenMultisigOutput.Output.BatchOps...)
+
+				var msigAddr string
+				if len(createTokenMultisigOutput.Output.Addresses) == 0 {
+					return sequences.OnChainOutput{}, fmt.Errorf("create token multisig did not return a multisig address")
+				} else {
+					msigAddr = createTokenMultisigOutput.Output.Addresses[0].Address
+				}
+
+				msigPubkey, err := solana.PublicKeyFromBase58(msigAddr)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse multisig address '%s' as Solana public key: %w", msigAddr, err)
+				}
+
+				_, err = operations.ExecuteOperation(b, tokensops.ExtendTokenPoolLookupTable, chains.SolanaChains()[chain.Selector], tokensops.ExtendTokenPoolLookupTableParams{
+					Router:    solana.PublicKeyFromBytes(routerAddr),
+					TokenMint: tokenMint,
+					Accounts:  []solana.PublicKey{msigPubkey},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to extend token pool lookup table with multisig: %w", err)
+				}
 			}
 
 			// Manual registration can be used on tokens that aren't in the datastore
