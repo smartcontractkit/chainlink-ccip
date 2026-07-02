@@ -16,6 +16,9 @@ func IfSubjectEqual(s, other Subject) bool {
 type CurseInput struct {
 	Subjects      []Subject
 	ChainSelector uint64
+	// MCMSQualifier is the proposal-level MCMS qualifier from the changeset config.
+	// Sui uses it to choose fast CurserCap curse vs slow OwnerCap curse encoding.
+	MCMSQualifier string
 }
 
 // GlobalCurseSubject is defined here - https://github.com/smartcontractkit/chainlink-ccip/blob/main/chains/evm/contracts/rmn/RMNRemote.sol#L12
