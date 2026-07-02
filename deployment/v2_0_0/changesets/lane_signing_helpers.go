@@ -197,8 +197,8 @@ func signerAddressForNOPAlias(
 // identical bytes and differ only in string formatting, so they are freely
 // interconvertible in both directions.
 var addressClassFamilies = map[string]bool{
-	"evm":    true,
-	"solana": true,
+	chainsel.FamilyEVM:    true,
+	chainsel.FamilySolana: true,
 }
 
 // rawPubKeySourceFamily is a synthetic "family" tag used only as a translation source,
@@ -211,10 +211,10 @@ const rawPubKeySourceFamily = "xxx_notarealfamily_raw_pubkey"
 // whose signer identity is the full uncompressed secp256k1 public key, hex-encoded with
 // no per-family formatting differences. Members are interchangeable as-is.
 var rawPubKeyClassFamilies = map[string]bool{
-	"aptos":               true,
-	"stellar":             true,
-	"canton":              true,
-	rawPubKeySourceFamily: true,
+	chainsel.FamilyAptos:   true,
+	chainsel.FamilyStellar: true,
+	chainsel.FamilyCanton:  true,
+	rawPubKeySourceFamily:  true,
 }
 
 // translateFromKnownFamily tries to derive localFamily's signer address from whichever
@@ -327,9 +327,9 @@ func decodeAddressHex(s string) ([]byte, error) {
 // node's prior art in its Solana OCR2 keyring).
 func formatAddressForFamily(addr []byte, family string) (string, error) {
 	switch family {
-	case "evm":
+	case chainsel.FamilyEVM:
 		return gethcommon.BytesToAddress(addr).Hex(), nil
-	case "solana":
+	case chainsel.FamilySolana:
 		return strings.ToLower(hex.EncodeToString(addr)), nil
 	default:
 		return "", fmt.Errorf("unsupported address-class family %q", family)
