@@ -270,7 +270,7 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 
 		existingEntries, err := common.GetAddressLookupTable(ctx, chain.Client, lookupTable)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool lookup table at '%s': %w", lookupTable.String(), err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse addresses from lookup table state at '%s': %w", lookupTable.String(), err)
 		}
 
 		seen := make(map[solana.PublicKey]bool, len(existingEntries))
