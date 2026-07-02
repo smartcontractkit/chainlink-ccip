@@ -181,6 +181,13 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	fcs := deployops.FinalizeDeployMCMS(dReg, nil)
 	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: version,
+		MCMS: mcms.Input{
+			Qualifier:      qualifier,
+			TimelockAction: mcms_types.TimelockActionSchedule,
+			TimelockDelay:  mcms_types.MustParseDuration("0s"),
+			ValidUntil:     math.MaxUint32,
+			Description:    "Accept MCM contract ownership on timelock",
+		},
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector: {
 				Canceller:        SingleGroupMCMS(),

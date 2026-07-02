@@ -914,33 +914,12 @@ func ensureTimelockSelfGoverned(
 	}
 
 	if !adminHasRole {
-		_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpGrantRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpGrantRoleTimelockInput]{
-			ChainSelector: chain.Selector,
-			Address:       timelockAddr,
-			Args: mcms_ops.OpGrantRoleTimelockInput{
-				RoleID:  mcms_ops.ADMIN_ROLE.ID,
-				Account: newAdmin,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to grant ADMIN_ROLE to %s on timelock %s: %w", newAdmin, timelockAddr, err)
+		if err := mcms_seq.GrantTimelockAdminRole(b, chain, chain.Selector, timelockAddr, newAdmin); err != nil {
+			return err
 		}
-		b.Logger.Infof("Granted ADMIN_ROLE on timelock %s to %s", timelockAddr, newAdmin)
 	}
 
-	_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpRenounceRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpRenounceRoleTimelockInput]{
-		ChainSelector: chain.Selector,
-		Address:       timelockAddr,
-		Args: mcms_ops.OpRenounceRoleTimelockInput{
-			RoleID: mcms_ops.ADMIN_ROLE.ID,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to renounce deployer ADMIN_ROLE on timelock %s: %w", timelockAddr, err)
-	}
-	b.Logger.Infof("Renounced deployer ADMIN_ROLE on timelock %s", timelockAddr)
-
-	return nil
+	return mcms_seq.RenounceDeployerTimelockAdmin(b, chain, chain.Selector, timelockAddr)
 }
 
 // getMockReceiverVerifiers finds the required and optional verifier addresses given the mock receiver

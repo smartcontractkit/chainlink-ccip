@@ -30,7 +30,7 @@ import (
 )
 
 // minProductionChainNOPs is the minimum number of NOPs we must have for a production chain.
-const minProductionChainNOPs = 15
+const minProductionChainNOPs = 9
 
 // ChainFamilyAdapter is the adapter for chains of the EVM family.
 type ChainFamilyAdapter struct{}

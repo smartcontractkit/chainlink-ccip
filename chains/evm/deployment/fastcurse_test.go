@@ -156,6 +156,7 @@ func TestFastCurse(t *testing.T) {
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			chain1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -299,6 +300,12 @@ func TestFastCurse(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, isCursed, "subject on chain1 should be uncursed on rmnremote in chain2")
 	t.Logf("Subjects successfully uncursed %x on chain1 %d and %x on chain2 %d", adv1_5_0.SelectorToSubject(chain2), chain1, adv1_6_0.SelectorToSubject(chain1), chain2)
+
+	// Uncursing again should fail because nothing is cursed on chain.
+	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
+	_, err = uncurseChangeset.Apply(*env, curseCfg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "uncurse skipped all actions")
 }
 
 func TestFastCurseGlobalCurseOnChain(t *testing.T) {
@@ -450,6 +457,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	}
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains:         mcmsChainInput,
 	})
 	require.NoError(t, err)

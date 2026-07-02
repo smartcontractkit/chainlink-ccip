@@ -128,6 +128,9 @@ var RmnUncurse = cldf_ops.NewSequence(
 type ActivateRMNInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
+	// CurseAdmins are optional additional authorized callers added at deploy time.
+	// The Ultra Fast Curse RBACTimelock is always included.
+	CurseAdmins []common.Address
 }
 
 // DeployAndActivateRMN runs the RMN v2 activation flow on a single EVM chain.
@@ -153,12 +156,16 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock as an initial curse admin.
+		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
+		curseAdmins := make([]common.Address, 0, 1+len(input.CurseAdmins))
+		curseAdmins = append(curseAdmins, ultraFastCurseTimeLock)
+		curseAdmins = append(curseAdmins, input.CurseAdmins...)
+
 		rmnRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmnops.ConstructorArgs{
-				CurseAdmins: []common.Address{ultraFastCurseTimeLock},
+				CurseAdmins: curseAdmins,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -171,7 +178,15 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		output.Addresses = append(output.Addresses, rmnRef)
 
 		// 2. Transfer RMN ownership to RMNMCMS timelock.
-		ownershipBatchOps, err := transferRMNOwnershipToTimelock(b, chain, rmnAddr, rmnTimelock)
+		ownershipBatchOps, err := mcms_seq.TransferAndAcceptOwnership(b, chain, []mcms_ops.OpTransferOwnershipInput{
+			{
+				ChainSelector:   chain.Selector,
+				Address:         rmnAddr,
+				ProposedOwner:   rmnTimelock,
+				ContractType:    rmnops.ContractType,
+				TimelockAddress: rmnTimelock,
+			},
+		})
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -215,46 +230,6 @@ func pointRMNProxyAtRMN(
 		return nil, fmt.Errorf("failed to set RMN on RMNProxy on chain %d: %w", chain.Selector, err)
 	}
 	return []contract.WriteOutput{setRMNReport.Output}, nil
-}
-
-func transferRMNOwnershipToTimelock(
-	b cldf_ops.Bundle,
-	chain evm.Chain,
-	rmnAddr, rmnTimelock common.Address,
-) ([]mcms_types.BatchOperation, error) {
-	owner, ownable, err := mcms_seq.LoadOwnableContract(rmnAddr, chain.Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load RMN ownable contract %s: %w", rmnAddr.Hex(), err)
-	}
-	if owner == rmnTimelock {
-		b.Logger.Infof("RMN %s on chain %d is already owned by RMNMCMS timelock %s",
-			rmnAddr.Hex(), chain.Selector, rmnTimelock.Hex())
-		return nil, nil
-	}
-
-	ownershipInput := mcms_ops.OpTransferOwnershipInput{
-		ChainSelector:   chain.Selector,
-		Address:         rmnAddr,
-		ProposedOwner:   rmnTimelock,
-		ContractType:    rmnops.ContractType,
-		TimelockAddress: rmnTimelock,
-	}
-	deps := mcms_ops.OpEVMOwnershipDeps{Chain: chain, OwnableC: ownable}
-
-	transferReport, err := cldf_ops.ExecuteOperation(b, mcms_ops.OpTransferOwnership, deps, ownershipInput)
-	if err != nil {
-		return nil, fmt.Errorf("failed to transfer RMN ownership to RMNMCMS on chain %d: %w", chain.Selector, err)
-	}
-	acceptReport, err := cldf_ops.ExecuteOperation(b, mcms_ops.OpAcceptOwnership, deps, ownershipInput)
-	if err != nil {
-		return nil, fmt.Errorf("failed to accept RMN ownership on RMNMCMS timelock on chain %d: %w", chain.Selector, err)
-	}
-
-	batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{transferReport.Output, acceptReport.Output})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create batch operation from RMN ownership writes: %w", err)
-	}
-	return []mcms_types.BatchOperation{batch}, nil
 }
 
 func resolveTimelockAddress(refs []datastore.AddressRef, chainSelector uint64, qualifier string) (common.Address, error) {
