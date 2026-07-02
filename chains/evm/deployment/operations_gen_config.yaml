@@ -463,6 +463,8 @@ contracts:
     functions:
       - name: applyAuthorizedCallerUpdates
         access: owner
+      - name: getAllAuthorizedCallers
+        access: public
 
   - contract_name: USDCTokenPoolProxy
     version: "2.0.0"
