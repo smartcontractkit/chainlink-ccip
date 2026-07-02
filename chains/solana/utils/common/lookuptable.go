@@ -143,10 +143,19 @@ func SetupLookupTable(ctx context.Context, client *rpc.Client, admin solana.Priv
 	return table, nil
 }
 
-func GetAddressLookupTable(ctx context.Context, client *rpc.Client, lookupTablePublicKey solana.PublicKey) ([]solana.PublicKey, error) {
+func GetAddressLookupTableState(ctx context.Context, client *rpc.Client, lookupTablePublicKey solana.PublicKey) (*addresslookuptable.AddressLookupTableState, error) {
 	lookupTableState, err := addresslookuptable.GetAddressLookupTableStateWithOpts(ctx, client, lookupTablePublicKey, &rpc.GetAccountInfoOpts{
 		Commitment: rpc.CommitmentConfirmed,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return lookupTableState, nil
+}
+
+func GetAddressLookupTable(ctx context.Context, client *rpc.Client, lookupTablePublicKey solana.PublicKey) ([]solana.PublicKey, error) {
+	lookupTableState, err := GetAddressLookupTableState(ctx, client, lookupTablePublicKey)
 	if err != nil {
 		return []solana.PublicKey{}, err
 	}
