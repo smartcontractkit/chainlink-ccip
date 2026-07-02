@@ -219,6 +219,10 @@ contracts:
         access: public
       - name: setDynamicConfig
         access: owner
+      - name: transferOwnership
+        access: owner
+      - name: acceptOwnership
+        access: public
 
   - contract_name: OffRamp
     package_name: offramp
