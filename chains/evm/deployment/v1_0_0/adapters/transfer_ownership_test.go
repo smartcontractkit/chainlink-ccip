@@ -80,9 +80,10 @@ func TestTransferOwnership(t *testing.T) {
 	env.DataStore = ds.Seal()
 
 	// Deploy a second MCMS set (RMNMCMS) so we can transfer ownership to it later.
+	// MCM multisigs are owned by the CLLCCIP timelock, so accept-ownership proposals use CLLCCIP.
 	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
-		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.RMNTimelockQualifier),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),

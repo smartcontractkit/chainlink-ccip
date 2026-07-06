@@ -257,12 +257,12 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 				evmChain,
 				seq.OwnershipInputsFromRefs(
 					in.ChainSelector,
-					common.HexToAddress(timelockAddr.Address),
+					finalAdmin,
 					[]cldf_datastore.AddressRef{proposerAddr, bypasserAddr, cancellerAddr},
 				),
 			)
 			if err != nil {
-				return sequtil.OnChainOutput{}, fmt.Errorf("failed to transfer MCM ownership to timelock on chain %d: %w", in.ChainSelector, err)
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to transfer MCM ownership to CLLCCIP timelock on chain %d: %w", in.ChainSelector, err)
 			}
 			output.BatchOps = append(output.BatchOps, mcmOwnershipBatchOps...)
 
