@@ -98,6 +98,7 @@ jobs:
           - name: "CCIPReader Test"
             run: "TestCCIPReader|Test_GetChainFeePriceUpdates|Test_GetWrappedNativeTokenPriceUSD"
             timeout: 12m
+            go_parallel: 1
           - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
             run: "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$"
             timeout: 20m
@@ -267,8 +268,12 @@ jobs:
             echo "No tests matched -run '$run'"
             exit 1
           fi
-          echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run '${run}'"
-          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} -run "$run"
+          parallel_flag=""
+          if [ -n "${{ matrix.type.go_parallel }}" ]; then
+            parallel_flag="-parallel=${{ matrix.type.go_parallel }}"
+          fi
+          echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run '${run}'"
+          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run "$run"
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
