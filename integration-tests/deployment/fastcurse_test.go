@@ -212,6 +212,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	cs := deploy.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			chain1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),

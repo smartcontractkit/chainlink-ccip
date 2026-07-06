@@ -27,6 +27,8 @@ import (
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 var (
@@ -60,6 +62,17 @@ func SingleGroupMCMS() mcmstypes.Config {
 		panic(err)
 	}
 	return c
+}
+
+// MCMSInputForQualifier returns a schedule-based MCMS input suitable for test deployments.
+func MCMSInputForQualifier(qualifier string) mcms_utils.Input {
+	return mcms_utils.Input{
+		Qualifier:      qualifier,
+		TimelockAction: mcmstypes.TimelockActionSchedule,
+		TimelockDelay:  mcmstypes.MustParseDuration("0s"),
+		ValidUntil:     3759765795,
+		Description:    "Accept MCM contract ownership on timelock",
+	}
 }
 
 func SingleGroupMCMSTwoSigners() mcmstypes.Config {

@@ -167,7 +167,7 @@ func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSRea
 			reports = append(reports, report.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, mcmsRegistryForDeploy(mcmsRegistry)).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
@@ -336,10 +336,50 @@ func deployMCMSApply(
 			reports = append(reports, deployReport.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		if err := ds.Merge(e.DataStore); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge existing datastore into MCMS deployment output: %w", err)
+		}
+		buildEnv := e
+		buildEnv.DataStore = ds.Seal()
+
+		mcmsInput, err := mcmsInputForDeployment(cfg, batchOps)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
+		return changesets.NewOutputBuilder(buildEnv, mcmsRegistryForDeploy(mcmsRegistry)).
 			WithReports(reports).
 			WithDataStore(ds).
 			WithBatchOps(batchOps).
-			Build(cfg.MCMS)
+			Build(mcmsInput)
 	}
+}
+
+func mcmsRegistryForDeploy(registry *changesets.MCMSReaderRegistry) *changesets.MCMSReaderRegistry {
+	if registry != nil {
+		return registry
+	}
+	return changesets.GetRegistry()
+}
+
+// mcmsInputForDeployment returns MCMS proposal input for deploy output. When ownership
+// accept batch operations are produced and the caller did not supply MCMS config, a
+// schedule proposal is built using the CLLCCIP MCMS qualifier.
+func mcmsInputForDeployment(cfg MCMSDeploymentConfig, batchOps []mcmstypes.BatchOperation) (mcms.Input, error) {
+	if len(batchOps) == 0 {
+		return cfg.MCMS, nil
+	}
+
+	input := cfg.MCMS
+	if input.TimelockAction == "" {
+		input.TimelockAction = mcmstypes.TimelockActionSchedule
+		input.TimelockDelay = mcmstypes.MustParseDuration("0s")
+	}
+	if input.Qualifier == "" {
+		input.Qualifier = utils.CLLQualifier
+	}
+	if input.Description == "" {
+		input.Description = "Accept MCM contract ownership on CLLCCIP timelock"
+	}
+	return input, nil
 }

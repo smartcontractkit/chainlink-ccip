@@ -55,6 +55,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 	for _, qualifier := range qualifiers {
 		output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
 			AdapterVersion: version,
+			MCMS:           testhelpers.MCMSInputForQualifier(qualifier),
 			Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
 				selector: {
 					Canceller:        testhelpers.SingleGroupMCMS(),
@@ -67,6 +68,9 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 		})
 		require.NoError(t, err)
 		require.Greater(t, len(output.Reports), 0)
+		if len(output.MCMSTimelockProposals) > 0 {
+			testhelpers.ProcessTimelockProposals(t, *e, output.MCMSTimelockProposals, false)
+		}
 		require.NoError(t, output.DataStore.Merge(e.DataStore))
 		e.DataStore = output.DataStore.Seal()
 		finalizeOutput, err := fcs.Apply(*e, mcmsapi.MCMSDeploymentConfig{

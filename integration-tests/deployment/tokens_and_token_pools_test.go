@@ -13,6 +13,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
+	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
@@ -69,7 +70,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 	require.NoError(t, err)
 
 	// Setup test environment
-	env, err := environment.New(t.Context(),
+	env, err := environment.New(
+		t.Context(),
 		environment.WithSolanaContainer(t, []uint64{solChainSel}, programsPath, solanaProgramIDs),
 		environment.WithEVMSimulated(t, []uint64{evmChainSelA, evmChainSelB}),
 	)
@@ -878,7 +880,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				// Verify that DeriveTokenAddress can derive the token address if it is given the pool PDA instead of the pool program ID
 				svmTokenAdapter, adapterOk := tokensapi.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilySolana, cciputils.Version_1_6_0)
 				require.True(t, adapterOk, "v1.6.0 Solana token adapter should be registered")
-				derived, err := svmTokenAdapter.DeriveTokenAddress(*env,
+				derived, err := svmTokenAdapter.DeriveTokenAddress(
+					*env,
 					data.Chain.Selector,
 					datastore.AddressRef{Address: tokenPoolStatePDA.String()},
 				)
@@ -972,11 +975,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 							TokenRef: datastore.AddressRef{
 								Qualifier: tokenSymbol,
 							},
-							SVMExtraArgs: &tokensapi.SVMExtraArgs{
-								CustomerMintAuthorities: []solana.PublicKey{
-									externalAdmin,
-								},
-							},
 						},
 					},
 				})
@@ -999,17 +997,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
 			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 
-			// Validate the Multisig is stored
-			multisigAdd, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-				ChainSelector: solbnm.Chain.Selector,
-				Version:       cciputils.Version_1_6_0,
-				Qualifier:     tokenSymbol,
-				Type:          "TOKEN_MULTISIG",
-			}, solbnm.Chain.Selector, datastore_utils.FullRef)
-			require.NoError(t, err)
-			multisigPublicKey := solana.MustPublicKeyFromBase58(multisigAdd.Address)
-			require.False(t, multisigPublicKey.IsZero())
-
 			// Run the changeset with a new admin, overriding the previous pending admin
 			newExternalAdmin, _ := solana.NewRandomPrivateKey()
 			output, err = tokensapi.
@@ -1028,11 +1015,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 							TokenRef: datastore.AddressRef{
 								ChainSelector: solbnm.Chain.Selector,
 								Address:       tokenAddr.Address,
-							},
-							SVMExtraArgs: &tokensapi.SVMExtraArgs{
-								CustomerMintAuthorities: []solana.PublicKey{
-									newExternalAdmin.PublicKey(),
-								},
 							},
 						},
 					},
@@ -1314,6 +1296,83 @@ func TestTokensAndTokenPools(t *testing.T) {
 					require.Equal(t, uint32(math.MaxUint32), actualFee.MaxFeeUSDCents)
 				}
 			}
+		})
+
+		t.Run("Validate ManualRegistrationMultisigExtendsLookupTable", func(t *testing.T) {
+			env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
+
+			solbnm := solTestData[0]
+			externalAdmin := solana.MustPublicKeyFromBase58(solbnm.Token.ExternalAdmin)
+			chain := env.BlockChains.SolanaChains()[solbnm.Chain.Selector]
+
+			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solbnm.Chain.Selector,
+				Qualifier:     solbnm.Token.Symbol,
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+
+			tokenPool, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solbnm.Chain.Selector,
+				Type:          datastore.ContractType(cciputils.BurnMintTokenPool),
+				Version:       cciputils.Version_1_6_0,
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+
+			routerAdd, err := solAdapter.GetRouterAddress(env.DataStore, solbnm.Chain.Selector)
+			require.NoError(t, err)
+			routerProgramId := solana.PublicKeyFromBytes(routerAdd)
+
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
+			var tar ccip_common.TokenAdminRegistry
+			require.NoError(t, chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tar))
+			require.False(t, tar.LookupTable.IsZero(), "precondition: token pool lookup table must exist from ConfigureTokenForTransfers")
+
+			lutBefore, err := solcommon.GetAddressLookupTable(t.Context(), chain.Client, tar.LookupTable)
+			require.NoError(t, err)
+			lutLenBefore := len(lutBefore)
+
+			output, err := tokensapi.ManualRegistration().Apply(*env, tokensapi.ManualRegistrationInput{
+				ChainAdapterVersion: cciputils.Version_1_6_0,
+				MCMS:                NewDefaultInputForMCMS("Manual registration multisig LUT extension"),
+				Registrations: []tokensapi.RegisterTokenConfig{
+					{
+						ChainSelector: solbnm.Chain.Selector,
+						ProposedOwner: solbnm.Token.ExternalAdmin,
+						TokenPoolRef: datastore.AddressRef{
+							Address: tokenPool.Address,
+							Type:    datastore.ContractType(solbnm.TokenPoolType),
+						},
+						TokenRef: datastore.AddressRef{
+							Address: tokenAddr.Address,
+						},
+						SVMExtraArgs: &tokensapi.SVMExtraArgs{
+							SkipTokenPoolInit: true,
+							CustomerMintAuthorities: []solana.PublicKey{
+								externalAdmin,
+							},
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+			multisigRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solbnm.Chain.Selector,
+				Version:       cciputils.Version_1_6_0,
+				Qualifier:     solbnm.Token.Symbol,
+				Type:          "TOKEN_MULTISIG",
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+
+			lutAfter, err := solcommon.GetAddressLookupTable(t.Context(), chain.Client, tar.LookupTable)
+			require.NoError(t, err)
+
+			multisigPubkey := solana.MustPublicKeyFromBase58(multisigRef.Address)
+			require.Contains(t, lutAfter, multisigPubkey, "multisig must be present in token pool lookup table entries")
+			require.GreaterOrEqual(t, len(lutAfter), lutLenBefore+1, "token pool lookup table should include the new multisig entry")
 		})
 	})
 }
