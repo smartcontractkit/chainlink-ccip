@@ -564,7 +564,8 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
 			continue
 		}
-		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
+		if !isEVMRemote(remoteChainSelector) {
+			// Non-EVM remotes (e.g. Solana) are not supported by CCIP 2.0 yet, so we don't configure it yet.
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
