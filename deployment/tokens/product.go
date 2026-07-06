@@ -49,29 +49,28 @@ type TokenRefResolver interface {
 }
 
 // RateLimitReaderAdapter is an optional interface that exposes on-chain rate limit reads
-// for a token pool's lane. The OutboundOnly TPRL path uses it twice: once on the local
-// adapter to read the current inbound and pass it through unchanged (when the on-chain
-// setter takes both directions atomically), and once on the counterpart adapter to
-// validate chain B's existing inbound against chain A's new outbound.
+// for a token pool's lane. The OutboundOnly TPRL path uses it to read the current inbound
+// and pass it through unchanged (when the on-chain setter takes both directions atomically),
+// and to validate a counterpart's existing inbound against a new outbound.
 type RateLimitReaderAdapter interface {
-	// GetOnchainInboundRateLimit returns the existing on-chain inbound RateLimiterConfig
-	// for the given lane (chainSelector, remoteSelector) and FastFinality bucket. Adapters
-	// that do not distinguish FastFinality buckets should return an error when called with
-	// fastFinality=true. If no bucket has been configured on-chain for the lane, the adapter
-	// should return a zero-value RateLimiterConfig (IsEnabled=false, Capacity=0, Rate=0) and
-	// no error so the caller can apply its own minimum-threshold checks.
+	// GetOnchainRateLimits returns the existing on-chain outbound and inbound RateLimiterConfig
+	// for the given lane (chainSelector, remoteSelector) and FastFinality bucket. Adapters that do
+	// not distinguish FastFinality buckets should return an error when called with fastFinality=true.
+	// If no bucket has been configured on-chain for the lane, both configs are zero-value
+	// (IsEnabled=false, Capacity=0, Rate=0) with no error.
 	//
-	// tokenRef is the resolved token reference for the pool on chainSelector. Some chain
-	// families (Solana) need the token mint to derive the PDA holding the inbound config;
-	// chain families keyed by pool address alone (EVM) may ignore it.
-	GetOnchainInboundRateLimit(
-		e deployment.Environment,
+	// poolRef and tokenRef may be unresolved filters; ds is used to resolve addresses when needed.
+	// Some chain families (Solana) need the token mint to derive the PDA holding the lane config.
+	GetOnchainRateLimits(
+		b cldf_ops.Bundle,
+		chains cldf_chain.BlockChains,
+		ds datastore.DataStore,
 		chainSelector uint64,
 		poolRef datastore.AddressRef,
 		tokenRef datastore.AddressRef,
 		remoteSelector uint64,
 		fastFinality bool,
-	) (RateLimiterConfig, error)
+	) (OnchainRateLimits, error)
 }
 
 // TokenPoolMigrator is an optional interface implemented by adapters that can read an existing pool's
@@ -155,6 +154,12 @@ type RateLimiterConfig struct {
 	Capacity *big.Int
 	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
 	Rate *big.Int
+}
+
+// OnchainRateLimits is the outbound/inbound rate limiter pair stored on-chain for a remote lane.
+type OnchainRateLimits struct {
+	Outbound RateLimiterConfig
+	Inbound  RateLimiterConfig
 }
 
 // PartialTokenTransferFeeConfig is a version of TokenTransferFeeConfig where all fields are optional. This

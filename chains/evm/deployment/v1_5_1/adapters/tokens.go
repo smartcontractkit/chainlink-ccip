@@ -151,7 +151,7 @@ func (p *poolOpsV151) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolA
 func (p *poolOpsV151) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error) {
 	pool, err := token_pool.NewTokenPool(poolAddr, chain.Client)
 	if err != nil {
-		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate v1.5.1 token pool contract at %s: %w", poolAddr.Hex(), err)
 	}
 	owner, err = pool.Owner(&bind.CallOpts{Context: ctx})
 	if err != nil {
@@ -222,24 +222,47 @@ func (p *poolOpsV151) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV151) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.RateLimiterConfig, error) {
+func (p *poolOpsV151) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.OnchainRateLimits, error) {
 	if ff {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("fast finality buckets are not supported on v1.5.x token pools")
+		return tokensapi.OnchainRateLimits{}, fmt.Errorf("fast finality buckets are not supported on v1.5.x token pools")
 	}
 
-	tp, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	outboundReport, err := cldf_ops.ExecuteOperation(b,
+		tpOps.GetCurrentOutboundRateLimiterState, chain,
+		evm_contract.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args:          remoteSelector,
+		},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+	)
 	if err != nil {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to instantiate token pool v1.5.1 contract: %w", err)
+		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get outbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
-	bucket, err := tp.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector)
+	inboundReport, err := cldf_ops.ExecuteOperation(b,
+		tpOps.GetCurrentInboundRateLimiterState, chain,
+		evm_contract.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args:          remoteSelector,
+		},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+	)
 	if err != nil {
-		return tokensapi.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
+		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
 
-	return tokensapi.RateLimiterConfig{
-		IsEnabled: bucket.IsEnabled,
-		Capacity:  bucket.Capacity,
-		Rate:      bucket.Rate,
+	return tokensapi.OnchainRateLimits{
+		Outbound: tokensapi.RateLimiterConfig{
+			IsEnabled: outboundReport.Output.IsEnabled,
+			Capacity:  outboundReport.Output.Capacity,
+			Rate:      outboundReport.Output.Rate,
+		},
+		Inbound: tokensapi.RateLimiterConfig{
+			IsEnabled: inboundReport.Output.IsEnabled,
+			Capacity:  inboundReport.Output.Capacity,
+			Rate:      inboundReport.Output.Rate,
+		},
 	}, nil
 }
 
