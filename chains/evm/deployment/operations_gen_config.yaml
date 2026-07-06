@@ -479,6 +479,8 @@ contracts:
         access: owner
       - name: setFeeAggregator
         access: owner
+      - name: getFeeAggregator
+        access: public
 
   - contract_name: AdvancedPoolHooksExtractor
     version: "2.0.0"

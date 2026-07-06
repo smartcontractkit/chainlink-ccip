@@ -268,16 +268,25 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			writes = append(writes, siloedPoolWrites...)
 		}
 
-		// Set the fee aggregator on the USDCTokenPoolProxy
-		setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+		// Set the fee aggregator on the USDCTokenPoolProxy, if not already set to the desired address.
+		currentFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       usdcTokenPoolProxyAddress,
-			Args:          feeAggregatorAddress,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on USDCTokenPoolProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee aggregator from USDCTokenPoolProxy: %w", err)
 		}
-		writes = append(writes, setFeeAggregatorReport.Output)
+		if currentFeeAggregatorReport.Output != feeAggregatorAddress {
+			setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+				ChainSelector: chain.Selector,
+				Address:       usdcTokenPoolProxyAddress,
+				Args:          feeAggregatorAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on USDCTokenPoolProxy: %w", err)
+			}
+			writes = append(writes, setFeeAggregatorReport.Output)
+		}
 
 		authorizedCallerWrites, err := applyCCTPAuthorizedCallerWrites(
 			b,
