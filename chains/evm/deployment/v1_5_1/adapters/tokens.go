@@ -297,8 +297,7 @@ func (p *poolOpsV151) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("fast finality buckets are not supported on v1.5.x token pools")
 	}
 
-	outboundReport, err := cldf_ops.ExecuteOperation(
-		b,
+	outboundReport, err := cldf_ops.ExecuteOperation(b,
 		tpOps.GetCurrentOutboundRateLimiterState, chain,
 		evm_contract.FunctionInput[uint64]{
 			ChainSelector: chain.Selector,
@@ -310,8 +309,7 @@ func (p *poolOpsV151) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 	if err != nil {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get outbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
-	inboundReport, err := cldf_ops.ExecuteOperation(
-		b,
+	inboundReport, err := cldf_ops.ExecuteOperation(b,
 		tpOps.GetCurrentInboundRateLimiterState, chain,
 		evm_contract.FunctionInput[uint64]{
 			ChainSelector: chain.Selector,
