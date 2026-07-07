@@ -64,15 +64,15 @@ jobs:
           - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
             run: "^Test_CCIPMessaging_EVM2Solana$"
             timeout: 30m
-            installLoopPlugins: true
+            installLoopPlugins: "solana"
           - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
             run: "^Test_CCIPMessaging_Solana2EVM$"
             timeout: 30m
-            installLoopPlugins: true
+            installLoopPlugins: "solana"
           - name: "Messaging Test Test_CCIPMessaging_MultiExecReports_EVM2Solana"
             run: "^Test_CCIPMessaging_MultiExecReports_EVM2Solana$"
             timeout: 35m
-            installLoopPlugins: true
+            installLoopPlugins: "solana"
           - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
             run: "Test_CCIPBatching_MaxBatchSizeEVM"
             timeout: 12m
@@ -242,9 +242,27 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/chainlink
           go build -o ccip.test .
-      - name: Install LOOP plugins
+      - name: Get LOOP plugin info
         if: matrix.type.installLoopPlugins
+        id: loop_plugin_ref
         run: |
+          plugin='${{ matrix.type.installLoopPlugins }}'
+          file=$GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml
+          ref=$(yq ".plugins.${plugin}[0].gitRef" "$file")
+          binary=$(basename "$(yq ".plugins.${plugin}[0].installPath" "$file")")
+          echo "ref=$ref" >> $GITHUB_OUTPUT
+          echo "binary=$binary" >> $GITHUB_OUTPUT
+      - name: Cache LOOP plugin binary
+        if: matrix.type.installLoopPlugins
+        id: cache_loop_plugin
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/${{ steps.loop_plugin_ref.outputs.binary }}
+          key: ${{ runner.os }}-loop-plugin-${{ matrix.type.installLoopPlugins }}-${{ steps.loop_plugin_ref.outputs.ref }}
+      - name: Install LOOP plugins
+        if: matrix.type.installLoopPlugins && steps.cache_loop_plugin.outputs.cache-hit != 'true'
+        run: |
+          yq -i '.plugins = {"${{ matrix.type.installLoopPlugins }}": .plugins.${{ matrix.type.installLoopPlugins }}}' $GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml
           cd $GITHUB_WORKSPACE/chainlink
           make install-plugins-public
       - name: Setup DB
