@@ -351,6 +351,55 @@ func (a *EVMTokenBase) GetTokenAdminRegistryAddress(ds datastore.DataStore, sele
 	return addr, nil
 }
 
+// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry (regRef) as raw
+// address bytes, or empty bytes when none is registered. The registry is taken from regRef when set, otherwise
+// resolved from the datastore (matching ConfigureTokenForTransfers) so callers need not pass a registry ref.
+// The read uses WithForceExecute because it reflects mutable on-chain state that may have been read (and cached)
+// earlier in this bundle.
+func (a *EVMTokenBase) GetActivePool(e deployment.Environment, chainSelector uint64, regRef datastore.AddressRef, tokenRef datastore.AddressRef) ([]byte, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	token, err := a.ParseNonZeroAddressRef(e.DataStore, tokenRef, chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token address from ref %v on chain %d: %w", tokenRef, chainSelector, err)
+	}
+
+	var registry common.Address
+	if datastore_utils.IsAddressRefEmpty(regRef) {
+		if addr, err := a.GetTokenAdminRegistryAddress(e.DataStore, chainSelector); err != nil {
+			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from datastore on chain %d: %w", chainSelector, err)
+		} else {
+			registry = addr
+		}
+	} else {
+		if addr, err := datastore_utils.FindAndFormatRef(e.DataStore, regRef, chainSelector, datastore_utils_evm.ToNonZeroEVMAddress); err != nil {
+			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from ref %v on chain %d: %w", regRef, chainSelector, err)
+		} else {
+			registry = addr
+		}
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		tarops.GetTokenConfig, evmChain,
+		contract.FunctionInput[common.Address]{ChainSelector: chainSelector, Address: registry, Args: token},
+		cldf_ops.WithForceExecute[contract.FunctionInput[common.Address], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token config from registry %s for token %s on chain %d: %w", registry.Hex(), token.Hex(), chainSelector, err)
+	}
+
+	activePool := report.Output.TokenPool
+	if activePool == (common.Address{}) {
+		return nil, nil // no active pool registered
+	}
+
+	return activePool.Bytes(), nil
+}
+
 // GetTimelockAddressCLL looks up the timelock (RBACTimelock) address from the datastore using the CLL qualifier.
 func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector uint64) (common.Address, error) {
 	filter := datastore.AddressRef{
