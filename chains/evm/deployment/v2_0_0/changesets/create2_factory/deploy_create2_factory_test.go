@@ -94,13 +94,23 @@ func TestDeployCREATE2Factory_NonceNotZero(t *testing.T) {
 	// Update environment with the deployed contract
 	e.DataStore = out1.DataStore.Seal()
 
-	// Second deployment (should fail because nonce is not 0)
-	_, err = create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
+	// Second deployment: the deployer key nonce is no longer 0, so instead of
+	// re-deploying the changeset should discover the already-deployed factory and
+	// record it in the datastore.
+	out2, err := create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
 		ChainSel:  chainSel,
 		AllowList: allowList,
 	})
-	require.Error(t, err, "Should fail when deploying with nonce not 0")
-	require.ErrorContains(t, err, "nonce of the deployer key must be 0, got 1", "Error should mention nonce is not 0")
+	require.NoError(t, err, "Should discover the existing factory when nonce is not 0")
+
+	addrs2, err := out2.DataStore.Addresses().Fetch()
+	require.NoError(t, err, "Failed to fetch addresses from datastore")
+	require.Len(t, addrs2, 1, "Should have recorded one contract")
+
+	// The discovered address must match the originally deployed factory.
+	require.Equal(t, addrs1[0].Address, addrs2[0].Address, "Discovered address should match the originally deployed factory")
+	require.Equal(t, datastore.ContractType(create2_factory_ops.ContractType), addrs2[0].Type, "Contract type should match")
+	require.Equal(t, chainSel, addrs2[0].ChainSelector, "Chain selector should match")
 }
 
 func TestDeployCREATE2Factory_VerifyPreconditions(t *testing.T) {
