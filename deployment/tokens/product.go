@@ -86,9 +86,9 @@ type TokenPoolMigrator interface {
 	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
 	// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
 	GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error)
-	// GetRemotePool returns a remote pool (raw bytes) the pool at poolAddr is linked to for remoteSelector.
-	// A pool may have more than one during a remote-side upgrade; one valid entry is sufficient for the caller.
-	GetRemotePool(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error)
+	// GetRemotePools returns the remote pools (raw bytes) the pool at poolAddr is linked to for remoteSelector.
+	// A pool may have more than one during a remote-side upgrade.
+	GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error)
 }
 
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.

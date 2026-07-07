@@ -19,10 +19,14 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var _ tokensapi.TokenAdapter = &TokenAdapter{}
+var (
+	_ tokensapi.TokenPoolMigrator = &TokenAdapter{}
+	_ tokensapi.TokenAdapter      = &TokenAdapter{}
+)
 
 // TokenAdapter handles EVM token pools at version 1.6.1.
 // It embeds EVMPoolAdapter for shared datastore/TAR/BnM logic and
@@ -67,6 +71,67 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 			return report.Output, nil
 		},
 	)
+}
+
+func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		tpOps.GetSupportedChains, evmChain,
+		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr)},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get supported chains from pool %s on chain %d: %w", common.BytesToAddress(poolAddr).Hex(), chainSelector, err)
+	}
+
+	return report.Output, nil
+}
+
+func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		tpOps.GetRemoteToken, evmChain,
+		evm_contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote token for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
+	}
+
+	if len(report.Output) == 0 {
+		return nil, fmt.Errorf("pool %s has no remote token registered for chain %d", common.BytesToAddress(poolAddr).Hex(), remoteSelector)
+	}
+
+	return report.Output, nil
+}
+
+func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
+	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		tpOps.GetRemotePools, evmChain,
+		evm_contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote pools for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
+	}
+
+	return report.Output, nil
 }
 
 // poolOpsV161 implements PoolOps using v1.6.1 bindings.

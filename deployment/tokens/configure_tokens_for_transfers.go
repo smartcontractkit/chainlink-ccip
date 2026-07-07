@@ -183,15 +183,16 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 		}
 
 		if token.AutoMigrateRemoteChains {
-			localMigrator, ok := adapter.(TokenPoolMigrator)
+			registryMigrator, ok := adapter.(TokenPoolMigrator)
 			if !ok {
 				return nil, nil, nil, fmt.Errorf("adapter for chain selector %d does not support token pool migration, which is required when autoMigrateRemoteChains is enabled", selector)
 			}
-			activePool, err := localMigrator.GetActivePool(e, selector, token.RegistryRef, fullTokenRef)
+			activePool, err := registryMigrator.GetActivePool(e, selector, token.RegistryRef, fullTokenRef)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get active pool for token pool on chain selector %d: %w", selector, err)
 			}
-			allRemotes := []uint64{}
+			var legacyPoolMigrator TokenPoolMigrator
+			var allRemoteSelectors []uint64
 			if len(activePool) > 0 {
 				targetPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
 				if err != nil {
@@ -214,10 +215,21 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 						return nil, nil, nil, fmt.Errorf("active pool version is required for auto-migrate on chain selector %d", selector)
 					}
 					if activePoolRef.Version.LessThan(utils.Version_2_0_0) {
-						if supported, err := localMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+						legacyAdapter, _, err := ResolveAdapter(tokenRegistry, selector, activePoolRef.Version)
+						if err != nil {
+							return nil, nil, nil, fmt.Errorf("failed to resolve adapter for active pool on chain selector %d: %w", selector, err)
+						}
+						legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator)
+						if !ok {
+							return nil, nil, nil, fmt.Errorf(
+								"adapter for active pool version %s on chain selector %d does not support token pool migration",
+								activePoolRef.Version, selector,
+							)
+						}
+						if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
 						} else {
-							allRemotes = supported
+							allRemoteSelectors = supported
 						}
 					} else {
 						e.Logger.Infof("Active pool on chain selector %d is already v2.0.0 or higher, skipping auto-migration of remote chains", selector)
@@ -226,7 +238,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 					e.Logger.Infof("Active pool on chain selector %d is already the target pool, skipping auto-migration of remote chains", selector)
 				}
 			}
-			for _, remoteSelector := range allRemotes {
+			for _, remoteSelector := range allRemoteSelectors {
 				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
@@ -235,13 +247,20 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 				if !ok {
 					return nil, nil, nil, fmt.Errorf("no address normalizer found for chain family %s of remote chain selector %d", remoteFamily, remoteSelector)
 				}
-				remoteTokenBytes, err := localMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
+				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote token for remote chain selector %d: %w", remoteSelector, err)
 				}
-				remotePoolBytes, err := localMigrator.GetRemotePool(e, selector, activePool, remoteSelector)
+				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
+				}
+				if len(remotePools) == 0 {
+					return nil, nil, nil, fmt.Errorf("pool has a remote pool registered for chain %d but no remote pool was returned", remoteSelector)
+				}
+				remotePoolBytes := remotePools[0]
+				if len(remotePoolBytes) == 0 {
+					return nil, nil, nil, fmt.Errorf("pool has a remote pool registered for chain %d but it is the zero address", remoteSelector)
 				}
 				remotePoolAddr, err := remoteNormalizer.BytesToString(remotePoolBytes)
 				if err != nil {
