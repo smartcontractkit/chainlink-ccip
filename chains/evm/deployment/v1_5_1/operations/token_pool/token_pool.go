@@ -129,3 +129,25 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[SetRateLimitAdmin
 		return tp.SetRateLimitAdmin(opts, args.NewAdmin)
 	},
 })
+
+var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uint64, token_pool.RateLimiterTokenBucket, *token_pool.TokenPool]{
+	Name:         "token-pool:get-current-inbound-rate-limiter-state",
+	Version:      Version,
+	Description:  "Calls getCurrentInboundRateLimiterState on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (token_pool.RateLimiterTokenBucket, error) {
+		return tp.GetCurrentInboundRateLimiterState(opts, args)
+	},
+})
+
+var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[uint64, token_pool.RateLimiterTokenBucket, *token_pool.TokenPool]{
+	Name:         "token-pool:get-current-outbound-rate-limiter-state",
+	Version:      Version,
+	Description:  "Calls getCurrentOutboundRateLimiterState on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (token_pool.RateLimiterTokenBucket, error) {
+		return tp.GetCurrentOutboundRateLimiterState(opts, args)
+	},
+})

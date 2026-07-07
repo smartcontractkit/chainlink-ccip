@@ -322,13 +322,13 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 						)
 					}
 					for i, bucket := range tprlRemote.RateLimitBuckets {
-						current, err := localReader.GetOnchainInboundRateLimit(
-							e, selector, tokenPool, tokenFull, remoteSelector, bucket.FastFinality,
+						current, err := localReader.GetOnchainRateLimits(
+							e.OperationsBundle, e.BlockChains, e.DataStore, selector, tokenPool, tokenFull, remoteSelector, bucket.FastFinality,
 						)
 						if err != nil {
-							return cldf.ChangesetOutput{}, fmt.Errorf("failed to read current inbound rate limit for pass-through on outbound-only update (chain %d, remote %d, fastFinality=%v): %w", selector, remoteSelector, bucket.FastFinality, err)
+							return cldf.ChangesetOutput{}, fmt.Errorf("failed to read on-chain rate limits for pass-through on outbound-only update (chain %d, remote %d, fastFinality=%t): %w", selector, remoteSelector, bucket.FastFinality, err)
 						}
-						tprlRemote.RateLimitBuckets[i].InboundRateLimiterConfig = current
+						tprlRemote.RateLimitBuckets[i].InboundRateLimiterConfig = current.Inbound
 					}
 
 					if err := validateOutboundOnlyAgainstCounterpartInbound(
@@ -488,24 +488,25 @@ func validateOutboundOnlyAgainstCounterpartInbound(
 		if !bucket.RateLimit.IsEnabled {
 			return nil
 		}
-		onchainInbound, err := reader.GetOnchainInboundRateLimit(
-			e, counterpartSelector, counterpartPoolRef, counterpartTokenRef, localSelector, bucket.FastFinality,
+		onchainLimits, err := reader.GetOnchainRateLimits(
+			e.OperationsBundle, e.BlockChains, e.DataStore, counterpartSelector, counterpartPoolRef, counterpartTokenRef, localSelector, bucket.FastFinality,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to read on-chain inbound rate limit on counterpart chain selector %d (fastFinality=%v): %w", counterpartSelector, bucket.FastFinality, err)
+			return fmt.Errorf("failed to read on-chain rate limits on counterpart chain selector %d (fastFinality=%t): %w", counterpartSelector, bucket.FastFinality, err)
 		}
+		onchainInbound := onchainLimits.Inbound
 		if !onchainInbound.IsEnabled {
 			return nil // If the counterpart's on-chain inbound is disabled, we allow any outbound to be set since it won't be enforced
 		}
 		if onchainInbound.Capacity == nil || onchainInbound.Capacity.Cmp(requiredInbound.Capacity) < 0 {
 			return fmt.Errorf(
-				"on-chain inbound capacity (%v) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound capacity (%v) for fastFinality=%v",
+				"on-chain inbound capacity (%s) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound capacity (%s) for fastFinality=%t",
 				onchainInbound.Capacity, counterpartSelector, localSelector, requiredInbound.Capacity, bucket.FastFinality,
 			)
 		}
 		if onchainInbound.Rate == nil || onchainInbound.Rate.Cmp(requiredInbound.Rate) < 0 {
 			return fmt.Errorf(
-				"on-chain inbound rate (%v) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound rate (%v) for fastFinality=%v",
+				"on-chain inbound rate (%s) on counterpart chain selector %d for lane from %d is below required 110%% of new outbound rate (%s) for fastFinality=%t",
 				onchainInbound.Rate, counterpartSelector, localSelector, requiredInbound.Rate, bucket.FastFinality,
 			)
 		}
@@ -623,4 +624,34 @@ func GenerateTPRLConfigs(
 		inboundConfig.Rate = ScaleFloatToBigInt(inboundInput.Rate, int(scaleByDecimals), .10)
 	}
 	return outboundConfig, inboundConfig
+}
+
+// NormalizeInboundRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
+// Applied when importing inbound limits from pre-1.6.1 EVM pools, which stored them in
+// source/remote decimals, into a new pool that expects local/destination decimals.
+func NormalizeInboundRateLimiterConfig(cfg RateLimiterConfig, fromDecimals, toDecimals uint8) RateLimiterConfig {
+	if fromDecimals == toDecimals {
+		return cfg
+	}
+	out := cfg
+	out.Capacity = scaleDecimalsInt(cfg.Capacity, fromDecimals, toDecimals)
+	out.Rate = scaleDecimalsInt(cfg.Rate, fromDecimals, toDecimals)
+	return out
+}
+
+// scaleDecimalsInt rescales amount by 10^(toDecimals-fromDecimals).
+func scaleDecimalsInt(amount *big.Int, fromDecimals, toDecimals uint8) *big.Int {
+	if amount == nil {
+		return big.NewInt(0)
+	}
+	out := new(big.Int).Set(amount)
+	if toDecimals > fromDecimals {
+		factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(toDecimals-fromDecimals)), nil)
+		return out.Mul(out, factor)
+	}
+	if fromDecimals > toDecimals {
+		factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(fromDecimals-toDecimals)), nil)
+		return out.Div(out, factor)
+	}
+	return out
 }

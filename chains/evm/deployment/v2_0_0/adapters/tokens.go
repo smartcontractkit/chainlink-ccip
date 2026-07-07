@@ -17,8 +17,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
-	tpBindingsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -381,22 +379,33 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV200) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.RateLimiterConfig, error) {
-	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
-	// reports by input hash, and earlier sequences in the same Apply run may have read this
-	// same lane while it was still uninitialized — caching that stale result.
-	tp, err := tpBindingsV2_0_0.NewTokenPool(poolAddr, chain.Client)
+func (p *poolOpsV200) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.OnchainRateLimits, error) {
+	report, err := cldf_ops.ExecuteOperation(b,
+		token_pool.GetCurrentRateLimiterState, chain,
+		contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args: token_pool.GetCurrentRateLimiterStateArgs{
+				RemoteChainSelector: remoteSelector,
+				FastFinality:        ff,
+			},
+		},
+		cldf_ops.WithForceExecute[contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs], evm.Chain](),
+	)
 	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v2.0.0 token pool contract at %s: %w", poolAddr.Hex(), err)
+		return tokens.OnchainRateLimits{}, fmt.Errorf("failed to get rate limiter state for remote chain %d (fastFinality=%t): %w", remoteSelector, ff, err)
 	}
-	state, err := tp.GetCurrentRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector, ff)
-	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d (fastFinality=%v): %w", remoteSelector, ff, err)
-	}
-	return tokens.RateLimiterConfig{
-		IsEnabled: state.InboundRateLimiterState.IsEnabled,
-		Capacity:  state.InboundRateLimiterState.Capacity,
-		Rate:      state.InboundRateLimiterState.Rate,
+	return tokens.OnchainRateLimits{
+		Outbound: tokens.RateLimiterConfig{
+			IsEnabled: report.Output.OutboundRateLimiterState.IsEnabled,
+			Capacity:  report.Output.OutboundRateLimiterState.Capacity,
+			Rate:      report.Output.OutboundRateLimiterState.Rate,
+		},
+		Inbound: tokens.RateLimiterConfig{
+			IsEnabled: report.Output.InboundRateLimiterState.IsEnabled,
+			Capacity:  report.Output.InboundRateLimiterState.Capacity,
+			Rate:      report.Output.InboundRateLimiterState.Rate,
+		},
 	}, nil
 }
 
