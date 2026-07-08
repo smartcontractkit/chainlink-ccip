@@ -299,10 +299,10 @@ func (d *laneDiscoverer) tokenExcludedRemotes(chainSel uint64, laneVersions map[
 	for _, grp := range groupRemotesByVersion(laneVersions) {
 		importer, ok := d.fqRegistry.GetConfigImporter(chainSel, grp.version)
 		if !ok {
-			return nil, fmt.Errorf("no config importer registered for chain %d lane version %s; cannot evaluate token symbol exclusion", chainSel, grp.version)
+			return nil, fmt.Errorf("no config importer registered for chain %d lane version %s; cannot evaluate token symbol exclusion", chainSel, grp.version.String())
 		}
 		if err := importer.InitializeAdapter(d.env, chainSel); err != nil {
-			return nil, fmt.Errorf("failed to initialize config importer for chain %d version %s: %w", chainSel, grp.version, err)
+			return nil, fmt.Errorf("failed to initialize config importer for chain %d version %s: %w", chainSel, grp.version.String(), err)
 		}
 		tokensPerRemote, err := importer.SupportedTokensPerRemoteChain(d.env, chainSel, grp.remotes)
 		if err != nil {
