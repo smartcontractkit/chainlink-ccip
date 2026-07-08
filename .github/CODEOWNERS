@@ -1,5 +1,5 @@
 # 2024-12-04 - The codeowners file is correct
-* @smartcontractkit/ccip-offchain @smartcontractkit/ccip-onchain
+* @smartcontractkit/ccip-protocol @smartcontractkit/ccip-onchain
 
 # EVM contracts
 /chains/evm @smartcontractkit/ccip-onchain
@@ -13,8 +13,8 @@
 .github/workflows/idl-compatibility-check.yml @smartcontractkit/ccip-onchain-solana
 
 # Deployment tooling
-**/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-offchain
-/devenv @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-offchain
+**/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-protocol
+/devenv @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-protocol @smartcontractkit/ccip-platform
 /chains/evm/deployment @smartcontractkit/ccip-onchain @smartcontractkit/ccip-tooling
 /chains/evm/deployment/**/operations @smartcontractkit/ccip-onchain
 /chains/solana/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain-solana
