@@ -9,22 +9,16 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
-
-	tpBindingsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -113,55 +107,6 @@ func (t *TokenAdapter) GetOnchainTokenTransferFeeConfig(e deployment.Environment
 	}, nil
 }
 
-// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry (regRef) as raw
-// address bytes, or empty bytes when none is registered. The registry is taken from regRef when set, otherwise
-// resolved from the datastore (matching ConfigureTokenForTransfers) so callers need not pass a registry ref.
-// The read uses WithForceExecute because it reflects mutable on-chain state that may have been read (and cached)
-// earlier in this bundle.
-func (t *TokenAdapter) GetActivePool(e deployment.Environment, chainSelector uint64, regRef datastore.AddressRef, tokenRef datastore.AddressRef) ([]byte, error) {
-	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-	if !ok {
-		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
-	}
-
-	token, err := t.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, tokenRef, chainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse token address from ref %v on chain %d: %w", tokenRef, chainSelector, err)
-	}
-
-	var registry common.Address
-	if datastore_utils.IsAddressRefEmpty(regRef) {
-		if addr, err := t.EVMTokenBase.GetTokenAdminRegistryAddress(e.DataStore, chainSelector); err != nil {
-			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from datastore on chain %d: %w", chainSelector, err)
-		} else {
-			registry = addr
-		}
-	} else {
-		if addr, err := datastore_utils.FindAndFormatRef(e.DataStore, regRef, chainSelector, datastore_utils_evm.ToNonZeroEVMAddress); err != nil {
-			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry from ref %v on chain %d: %w", regRef, chainSelector, err)
-		} else {
-			registry = addr
-		}
-	}
-
-	report, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle,
-		token_admin_registry.GetTokenConfig, evmChain,
-		contract.FunctionInput[common.Address]{ChainSelector: chainSelector, Address: registry, Args: token},
-		cldf_ops.WithForceExecute[contract.FunctionInput[common.Address], evm.Chain](),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token config from registry %s for token %s on chain %d: %w", registry.Hex(), token.Hex(), chainSelector, err)
-	}
-
-	activePool := report.Output.TokenPool
-	if activePool == (common.Address{}) {
-		return nil, nil // no active pool registered
-	}
-
-	return activePool.Bytes(), nil
-}
-
 // GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
 func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
@@ -206,10 +151,8 @@ func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector ui
 	return report.Output, nil
 }
 
-// GetRemotePool returns a remote pool (raw bytes) the pool at poolAddr is linked to for remoteSelector. The pool
-// may have more than one during a remote-side upgrade; returning the first valid one is sufficient — the per-chain
-// configure step re-reads and registers the full set, deduping this one.
-func (t *TokenAdapter) GetRemotePool(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+// GetRemotePools returns the remote pools (raw bytes) the pool at poolAddr is linked to for remoteSelector.
+func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -225,16 +168,7 @@ func (t *TokenAdapter) GetRemotePool(e deployment.Environment, chainSelector uin
 		return nil, fmt.Errorf("failed to get remote pools for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
 	}
 
-	remotePools := report.Output
-	if len(remotePools) == 0 {
-		return nil, fmt.Errorf("pool %s has no remote pools registered for chain %d", common.BytesToAddress(poolAddr).Hex(), remoteSelector)
-	}
-	remotePool := remotePools[0]
-	if len(remotePool) == 0 {
-		return nil, fmt.Errorf("pool %s has a remote pool registered for chain %d but it is the zero address", common.BytesToAddress(poolAddr).Hex(), remoteSelector)
-	}
-
-	return remotePool, nil
+	return report.Output, nil
 }
 
 // poolOpsV200 implements PoolOps using v2.0.0 bindings.
@@ -381,22 +315,34 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV200) GetCurrentInboundRateLimit(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.RateLimiterConfig, error) {
-	// Call the contract binding directly rather than cldf_ops Read: the framework caches read
-	// reports by input hash, and earlier sequences in the same Apply run may have read this
-	// same lane while it was still uninitialized — caching that stale result.
-	tp, err := tpBindingsV2_0_0.NewTokenPool(poolAddr, chain.Client)
+func (p *poolOpsV200) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.OnchainRateLimits, error) {
+	report, err := cldf_ops.ExecuteOperation(
+		b,
+		token_pool.GetCurrentRateLimiterState, chain,
+		contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+			ChainSelector: chain.Selector,
+			Address:       poolAddr,
+			Args: token_pool.GetCurrentRateLimiterStateArgs{
+				RemoteChainSelector: remoteSelector,
+				FastFinality:        ff,
+			},
+		},
+		cldf_ops.WithForceExecute[contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs], evm.Chain](),
+	)
 	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to instantiate v2.0.0 token pool contract at %s: %w", poolAddr.Hex(), err)
+		return tokens.OnchainRateLimits{}, fmt.Errorf("failed to get rate limiter state for remote chain %d (fastFinality=%t): %w", remoteSelector, ff, err)
 	}
-	state, err := tp.GetCurrentRateLimiterState(&bind.CallOpts{Context: b.GetContext()}, remoteSelector, ff)
-	if err != nil {
-		return tokens.RateLimiterConfig{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d (fastFinality=%v): %w", remoteSelector, ff, err)
-	}
-	return tokens.RateLimiterConfig{
-		IsEnabled: state.InboundRateLimiterState.IsEnabled,
-		Capacity:  state.InboundRateLimiterState.Capacity,
-		Rate:      state.InboundRateLimiterState.Rate,
+	return tokens.OnchainRateLimits{
+		Outbound: tokens.RateLimiterConfig{
+			IsEnabled: report.Output.OutboundRateLimiterState.IsEnabled,
+			Capacity:  report.Output.OutboundRateLimiterState.Capacity,
+			Rate:      report.Output.OutboundRateLimiterState.Rate,
+		},
+		Inbound: tokens.RateLimiterConfig{
+			IsEnabled: report.Output.InboundRateLimiterState.IsEnabled,
+			Capacity:  report.Output.InboundRateLimiterState.Capacity,
+			Rate:      report.Output.InboundRateLimiterState.Rate,
+		},
 	}, nil
 }
 

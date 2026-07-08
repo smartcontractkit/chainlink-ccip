@@ -597,58 +597,70 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 	)
 }
 
-// GetOnchainInboundRateLimit implements tokenapi.RateLimitReaderAdapter. It needs the token
-// mint to derive the remote-chain config PDA, so tokenRef must resolve to the token (pool
-// qualifiers are independent from token qualifiers and may be empty). Solana pools have a
+// GetOnchainRateLimits implements tokenapi.RateLimitReaderAdapter. It needs the token mint to
+// derive the remote-chain config PDA, so tokenRef must resolve to the token. Solana pools have a
 // single bucket per remote lane; fastFinality=true is not supported.
-func (a *SolanaAdapter) GetOnchainInboundRateLimit(
-	e deployment.Environment,
+func (a *SolanaAdapter) GetOnchainRateLimits(
+	b cldf_ops.Bundle,
+	chains cldf_chain.BlockChains,
+	ds datastore.DataStore,
 	chainSelector uint64,
 	poolRef datastore.AddressRef,
 	tokenRef datastore.AddressRef,
 	remoteSelector uint64,
 	fastFinality bool,
-) (tokenapi.RateLimiterConfig, error) {
+) (tokenapi.OnchainRateLimits, error) {
 	if fastFinality {
-		return tokenapi.RateLimiterConfig{}, fmt.Errorf("Solana token pools do not support fastFinality rate limit buckets")
+		return tokenapi.OnchainRateLimits{}, fmt.Errorf("Solana token pools do not support fastFinality rate limit buckets")
 	}
-	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	chain, ok := chains.SolanaChains()[chainSelector]
 	if !ok {
-		return tokenapi.RateLimiterConfig{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+		return tokenapi.OnchainRateLimits{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
-	tokenAddr, _, err := a.getTokenMintAndTokenProgram(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, tokenRef)
+	tokenAddr, _, err := a.getTokenMintAndTokenProgram(b, chains, ds, chainSelector, tokenRef)
 	if err != nil {
-		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to resolve token mint for ref (%+v): %w", tokenRef, err)
+		return tokenapi.OnchainRateLimits{}, fmt.Errorf("failed to resolve token mint for ref (%s): %w", datastore_utils.SprintRef(tokenRef), err)
+	}
+	fullPoolRef, err := datastore_utils.FindAndFormatRef(ds, poolRef, chain.Selector, datastore_utils.FullRef)
+	if err != nil {
+		return tokenapi.OnchainRateLimits{}, fmt.Errorf("failed to resolve pool ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	}
 	tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
-	tokenPool := solana.MustPublicKeyFromBase58(poolRef.Address)
+	tokenPool := solana.MustPublicKeyFromBase58(fullPoolRef.Address)
 	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, tokenMint, tokenPool)
 	if err != nil {
-		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
+		return tokenapi.OnchainRateLimits{}, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
 	}
 	// The on-chain account is a ChainConfig (8-byte discriminator + BaseChain), not a bare
 	// BaseChain. Decoding into BaseChain consumes the discriminator as the start of the
 	// payload and corrupts the parse. ChainConfig has the same discriminator and layout
 	// across burnmint/lockrelease pools, so either binding decodes any pool's account.
 	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
-	err = chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
+	err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 	if errors.Is(err, rpc.ErrNotFound) {
-		// Pool/lane not configured yet on chain — return a zero RateLimiterConfig so the caller's
-		// 110% check rejects any positive new outbound (the documented behavior in
-		// RateLimitReaderAdapter).
-		return tokenapi.RateLimiterConfig{
+		// Pool/lane not configured yet on chain — return zero configs so callers can treat the
+		// lane as uninitialized (see RateLimitReaderAdapter).
+		disabled := tokenapi.RateLimiterConfig{
 			IsEnabled: false,
 			Capacity:  big.NewInt(0),
 			Rate:      big.NewInt(0),
-		}, nil
+		}
+		return tokenapi.OnchainRateLimits{Outbound: disabled, Inbound: disabled}, nil
 	}
 	if err != nil {
-		return tokenapi.RateLimiterConfig{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chainSelector, remoteSelector, err)
+		return tokenapi.OnchainRateLimits{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chainSelector, remoteSelector, err)
 	}
-	return tokenapi.RateLimiterConfig{
-		IsEnabled: remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled,
-		Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Capacity),
-		Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate),
+	return tokenapi.OnchainRateLimits{
+		Outbound: tokenapi.RateLimiterConfig{
+			IsEnabled: remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Enabled,
+			Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Capacity),
+			Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Rate),
+		},
+		Inbound: tokenapi.RateLimiterConfig{
+			IsEnabled: remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled,
+			Capacity:  new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Capacity),
+			Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate),
+		},
 	}, nil
 }
 
