@@ -847,7 +847,7 @@ func LegacyRateLimitsForAutoMigrate[R any, CCV any](
 	}
 
 	inboundLegacy := legacy.Inbound
-	if !doesPoolUseLocalDecimals(chainFamily, legacyPoolRef.Version, legacyPoolRef.Type.String()) && rc.RemoteDecimals != 0 {
+	if !DoesPoolUseLocalDecimals(chainFamily, legacyPoolRef.Version, legacyPoolRef.Type.String()) && rc.RemoteDecimals != 0 {
 		inboundLegacy = RebaseRateLimiterConfig(legacy.Inbound, rc.RemoteDecimals, localDecimals)
 	}
 

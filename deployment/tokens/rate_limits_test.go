@@ -36,7 +36,7 @@ func TestDoesPoolUseLocalDecimals(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, doesPoolUseLocalDecimals(tt.chainFamily, tt.version, tt.poolType))
+			require.Equal(t, tt.want, DoesPoolUseLocalDecimals(tt.chainFamily, tt.version, tt.poolType))
 		})
 	}
 }
