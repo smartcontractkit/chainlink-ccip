@@ -286,6 +286,12 @@ func (d *laneDiscoverer) tokenExcludedRemotes(chainSel uint64, laneVersions map[
 	if len(d.excludedSymbols) == 0 {
 		return nil, nil
 	}
+	if d.fqRegistry == nil {
+		return nil, fmt.Errorf("fee-quoter/ramp updater registry is required to evaluate token symbol exclusion for chain %d", chainSel)
+	}
+	if d.symbolOf == nil {
+		return nil, fmt.Errorf("token symbol lookup is required to evaluate token symbol exclusion for chain %d", chainSel)
+	}
 
 	// One ConfigImporter read per lane version (not per remote) yields the token addresses
 	// configured for each remote.
