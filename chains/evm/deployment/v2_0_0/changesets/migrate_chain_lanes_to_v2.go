@@ -107,10 +107,15 @@ func MigrateChainLanesToV2(
 			return fmt.Errorf("fee-quoter/ramp updater registry is required")
 		}
 
-		// Cheap, non-RPC checks only: on-chain lane discovery happens in Apply. Confirm each EVM
-		// chain has a lane version resolver so we fail fast on missing wiring. Non-EVM chains (e.g.
-		// Solana) are not migrated by this changeset and are skipped here.
+		// Cheap, non-RPC checks only: on-chain lane discovery happens in Apply. A chain being
+		// migrated must not also be excluded, and each EVM chain must have a lane version resolver
+		// so we fail fast on missing wiring. Non-EVM chains (e.g. Solana) are not migrated by this
+		// changeset and are skipped here.
+		excludedRemotes := newUint64Set(cfg.ExcludedRemoteChains)
 		for _, chainSel := range cfg.ChainSelectors {
+			if _, excluded := excludedRemotes[chainSel]; excluded {
+				return fmt.Errorf("chain %d cannot be in both chainSelectors and excludedRemoteChains", chainSel)
+			}
 			if !isEVMChain(chainSel) {
 				continue
 			}
@@ -189,8 +194,9 @@ func discoverLanesToMigrate(
 }
 
 // run discovers candidate remotes per chain concurrently (the RPC-bound work) — one goroutine per
-// chain, each against its own chain's RPC — then merges them into bidirectional lane pairs
-// sequentially in input order for a deterministic result.
+// chain, each against its own chain's RPC — then merges them into a deduplicated set of
+// bidirectional lane pairs sequentially in input order. The dedup (keyed by canonicalLaneKey)
+// guarantees no overlapping lanes are produced when multiple chains that share a lane are given.
 func (d *laneDiscoverer) run(chainSelectors []uint64) ([]v2changesets.CrossFamilyLanePair, error) {
 	candidates := make([][]uint64, len(chainSelectors))
 	var g errgroup.Group
