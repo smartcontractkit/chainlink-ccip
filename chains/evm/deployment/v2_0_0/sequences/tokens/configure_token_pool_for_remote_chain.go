@@ -147,7 +147,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						input.RemoteChainSelector,
 					)
 				} else {
-					inboundRateLimiterConfig = normalizeInboundRateLimiterConfig(
+					inboundRateLimiterConfig = tokens.NormalizeInboundRateLimiterConfig(
 						inboundRateLimiterConfig,
 						input.RemoteChainConfig.RemoteDecimals,
 						localDecimalsReport.Output,
@@ -603,36 +603,6 @@ func importConfigFromActivePoolV161(
 		DefaultInbound:  tokenBucketToRateLimiterConfig(inboundReport.Output),
 		RemotePools:     remotePoolsReport.Output,
 	}, nil
-}
-
-// normalizeInboundRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
-// Applied when importing inbound limits from pre-1.6.1 EVM pools, which stored them in
-// source/remote decimals, into a new pool that expects local/destination decimals.
-func normalizeInboundRateLimiterConfig(cfg tokens.RateLimiterConfig, fromDecimals, toDecimals uint8) tokens.RateLimiterConfig {
-	if fromDecimals == toDecimals {
-		return cfg
-	}
-	out := cfg
-	out.Capacity = scaleDecimalsInt(cfg.Capacity, fromDecimals, toDecimals)
-	out.Rate = scaleDecimalsInt(cfg.Rate, fromDecimals, toDecimals)
-	return out
-}
-
-// scaleDecimalsInt rescales amount by 10^(toDecimals-fromDecimals).
-func scaleDecimalsInt(amount *big.Int, fromDecimals, toDecimals uint8) *big.Int {
-	if amount == nil {
-		return big.NewInt(0)
-	}
-	out := new(big.Int).Set(amount)
-	if toDecimals > fromDecimals {
-		factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(toDecimals-fromDecimals)), nil)
-		return out.Mul(out, factor)
-	}
-	if fromDecimals > toDecimals {
-		factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(fromDecimals-toDecimals)), nil)
-		return out.Div(out, factor)
-	}
-	return out
 }
 
 // tokenBucketV150ToRateLimiterConfig converts a 1.5.0 (proxy bindings) RateLimiterTokenBucket to tokens.RateLimiterConfig.

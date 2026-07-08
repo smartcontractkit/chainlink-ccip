@@ -129,3 +129,58 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[SetRateLimitAdmin
 		return tp.SetRateLimitAdmin(opts, args.NewAdmin)
 	},
 })
+
+var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uint64, token_pool.RateLimiterTokenBucket, *token_pool.TokenPool]{
+	Name:         "token-pool:get-current-inbound-rate-limiter-state",
+	Version:      Version,
+	Description:  "Calls getCurrentInboundRateLimiterState on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (token_pool.RateLimiterTokenBucket, error) {
+		return tp.GetCurrentInboundRateLimiterState(opts, args)
+	},
+})
+
+var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[uint64, token_pool.RateLimiterTokenBucket, *token_pool.TokenPool]{
+	Name:         "token-pool:get-current-outbound-rate-limiter-state",
+	Version:      Version,
+	Description:  "Calls getCurrentOutboundRateLimiterState on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (token_pool.RateLimiterTokenBucket, error) {
+		return tp.GetCurrentOutboundRateLimiterState(opts, args)
+	},
+})
+
+var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64, *token_pool.TokenPool]{
+	Name:         "token-pool:get-supported-chains",
+	Version:      Version,
+	Description:  "Calls getSupportedChains on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
+		return tp.GetSupportedChains(opts)
+	},
+})
+
+var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *token_pool.TokenPool]{
+	Name:         "token-pool:get-remote-token",
+	Version:      Version,
+	Description:  "Calls getRemoteToken on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([]byte, error) {
+		return tp.GetRemoteToken(opts, args)
+	},
+})
+
+var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *token_pool.TokenPool]{
+	Name:         "token-pool:get-remote-pools",
+	Version:      Version,
+	Description:  "Calls getRemotePools on the contract",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([][]byte, error) {
+		return tp.GetRemotePools(opts, args)
+	},
+})

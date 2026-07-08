@@ -1146,7 +1146,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, routerAddr, "Solana router should be deployed")
 
-			// Regression: SolanaAdapter.GetOnchainInboundRateLimit used to decode the on-chain
+			// Regression: SolanaAdapter.GetOnchainRateLimits used to decode the on-chain
 			// ChainConfig PDA into a bare base_token_pool.BaseChain, ignoring the 8-byte Anchor
 			// discriminator. The decode would silently fail and the function would return a
 			// zero RateLimiterConfig, which in OutboundOnly mode then overwrote the bucket's
@@ -1212,7 +1212,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &postCfg))
 
 				// Solana inbound must be preserved bit-for-bit (the OutboundOnly pass-through).
-				// Before the fix, GetOnchainInboundRateLimit silently returned a zero
+				// Before the fix, GetOnchainRateLimits silently returned a zero inbound
 				// RateLimiterConfig, the bucket's InboundRateLimiterConfig was overwritten
 				// with zeros, and these three assertions failed.
 				require.Equal(t, preCfg.Base.InboundRateLimit.Cfg.Enabled, postCfg.Base.InboundRateLimit.Cfg.Enabled, "Solana inbound IsEnabled must be unchanged by OutboundOnly apply")

@@ -1204,7 +1204,7 @@ func TestTPRL_OutboundOnly_RejectsBelowThresholdV2(t *testing.T) {
 
 // TestTPRL_OutboundOnly_V161 mirrors the v2.0.0 success-path test but on a v1.6.1 pool. v1.6.1
 // pools only support a single default bucket; the test exercises the v1.x adapter path (PoolOps
-// GetCurrentInboundRateLimit pass-through and EVMPoolAdapter.GetOnchainInboundRateLimit).
+// GetCurrentRateLimits pass-through and EVMPoolAdapter.GetOnchainRateLimits).
 func TestTPRL_OutboundOnly_V161(t *testing.T) {
 	const tokenSymb = "TPRL_OBO_V161"
 	const decimalsA, decimalsB = uint8(18), uint8(6)
