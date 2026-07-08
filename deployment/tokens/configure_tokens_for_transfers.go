@@ -742,6 +742,13 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 	tokenAddress string,
 	rc RemoteChainConfig[R, CCV],
 ) (*PartialTokenTransferFeeConfig, error) {
+	input := rc.TokenTransferFeeConfig
+	if input != nil {
+		if enabled, ok := input.IsEnabled.Get(); ok && !enabled {
+			return input, nil
+		}
+	}
+
 	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -768,7 +775,6 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 		IsEnabled:                     legacyTTFC.IsEnabled,
 	}
 
-	input := rc.TokenTransferFeeConfig
 	if legacy.IsEnabled {
 		var partial PartialTokenTransferFeeConfig
 		if input == nil {
