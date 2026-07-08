@@ -306,7 +306,7 @@ func (d *laneDiscoverer) tokenExcludedRemotes(chainSel uint64, laneVersions map[
 		}
 		tokensPerRemote, err := importer.SupportedTokensPerRemoteChain(d.env, chainSel, grp.remotes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read supported tokens for chain %d version %s: %w", chainSel, grp.version, err)
+			return nil, fmt.Errorf("failed to read supported tokens for chain %d version %s: %w", chainSel, grp.version.String(), err)
 		}
 		for remote, tokens := range tokensPerRemote {
 			supportedTokens[remote] = append(supportedTokens[remote], tokens...)
