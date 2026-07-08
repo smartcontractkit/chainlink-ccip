@@ -57,7 +57,7 @@ type TokenTransferConfig struct {
 	// from the fee quoter or onramp (v1.5.x) and merged with any user-provided tokenTransferFeeConfig on each
 	// remote (set YAML fields win; unset fields are imported). Resolved connectivity, rate limits, and migration
 	// metadata are passed to ConfigureTokenForTransfersSequence for on-chain apply.
-	// Requires an adapter implementing the TokenPoolMigrator interface. This knob has no effect if any of the
+	// Requires an adapter implementing the TokenPoolMigrator and RateLimitReaderAdapter interfaces. This knob has no effect if any of the
 	// following are true:
 	//  (1) There is no active pool in TAR for the token
 	//  (2) The active pool in TAR is already the target pool (extend mode)
