@@ -348,7 +348,7 @@ type versionGroup struct {
 }
 
 // groupRemotesByVersion groups remotes by their lane version, skipping remotes with an unknown
-// (nil) version (no importer can be resolved for them; they are migrated defensively).
+// (nil) version (no importer can be resolved for them; they are skipped defensively).
 func groupRemotesByVersion(laneVersions map[uint64]*semver.Version) []versionGroup {
 	byVersion := make(map[string]*versionGroup)
 	for remote, version := range laneVersions {
