@@ -348,7 +348,8 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				}
 
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
-					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
+					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote,
+				)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rate limits for token pool %d on remote chain %d: %w", selector, remoteSelector, err)
 				}
@@ -626,10 +627,29 @@ func GenerateTPRLConfigs(
 	return outboundConfig, inboundConfig
 }
 
-// NormalizeInboundRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
+// doesPoolUseLocalDecimals reports whether rate limit amounts for this pool version/type are
+// configured using local token decimals (true) vs remote/source decimals (false). Used during
+// auto-migrate legacy import; mirrors the scaleByDecimals branch in GenerateTPRLConfigs.
+//
+// TODO: reuse this helper in GenerateTPRLConfigs
+func doesPoolUseLocalDecimals(chainFamily string, poolVersion *semver.Version, poolType string) bool {
+	if chainFamily != chain_selectors.FamilyEVM || poolVersion == nil || poolVersion.GreaterThanEqual(utils.Version_1_6_1) {
+		return true
+	}
+	if poolVersion.Equal(utils.Version_1_6_0) {
+		isBurnMintWithExternalMinter := poolType == utils.BurnMintWithExternalMinterTokenPool.String()
+		isHybridWithExternalMinter := poolType == utils.HybridWithExternalMinterTokenPool.String()
+		if isBurnMintWithExternalMinter || isHybridWithExternalMinter {
+			return true
+		}
+	}
+	return false
+}
+
+// RebaseRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
 // Applied when importing inbound limits from pre-1.6.1 EVM pools, which stored them in
 // source/remote decimals, into a new pool that expects local/destination decimals.
-func NormalizeInboundRateLimiterConfig(cfg RateLimiterConfig, fromDecimals, toDecimals uint8) RateLimiterConfig {
+func RebaseRateLimiterConfig(cfg RateLimiterConfig, fromDecimals, toDecimals uint8) RateLimiterConfig {
 	if fromDecimals == toDecimals {
 		return cfg
 	}

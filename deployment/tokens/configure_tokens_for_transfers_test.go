@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -942,4 +945,197 @@ func TestRemoteChainConfig_GetOutboundInboundRateLimitBuckets(t *testing.T) {
 	ffIB, ok := cfg.GetInboundRateLimitBuckets().FastFinalityBucket()
 	require.True(t, ok)
 	require.Equal(t, 4.0, ffIB.RateLimit.Capacity)
+}
+
+type mockRateLimitReader struct {
+	limits tokens.OnchainRateLimits
+	err    error
+}
+
+func (m *mockRateLimitReader) GetOnchainRateLimits(
+	_ cldf_ops.Bundle,
+	_ cldf_chain.BlockChains,
+	_ datastore.DataStore,
+	_ uint64,
+	_ datastore.AddressRef,
+	_ datastore.AddressRef,
+	_ uint64,
+	_ bool,
+) (tokens.OnchainRateLimits, error) {
+	return m.limits, m.err
+}
+
+func TestLegacyRateLimitsForAutoMigrate(t *testing.T) {
+	remoteSelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	localSelector := chain_selectors.ETHEREUM_MAINNET.Selector
+	const (
+		remoteDecimals = uint8(18)
+		localDecimals  = uint8(6)
+	)
+
+	enabledInbound18 := tokens.RateLimiterConfig{
+		IsEnabled: true,
+		Capacity:  new(big.Int).Mul(big.NewInt(50_000), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+		Rate:      new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+	}
+	enabledInbound6 := tokens.RateLimiterConfig{
+		IsEnabled: true,
+		Capacity:  new(big.Int).Mul(big.NewInt(50_000), new(big.Int).Exp(big.NewInt(10), big.NewInt(6), nil)),
+		Rate:      new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(6), nil)),
+	}
+	enabledOutbound := tokens.RateLimiterConfig{
+		IsEnabled: true,
+		Capacity:  big.NewInt(1_000_000),
+		Rate:      big.NewInt(100),
+	}
+	disabledInbound := tokens.RateLimiterConfig{
+		IsEnabled: false,
+		Capacity:  big.NewInt(0),
+		Rate:      big.NewInt(0),
+	}
+
+	legacyPoolRef := func(version *semver.Version, poolType datastore.ContractType) datastore.AddressRef {
+		return datastore.AddressRef{Version: version, Type: poolType}
+	}
+	omitYAML := func(remoteDecimals uint8) tokens.RemoteChainConfig[struct{}, struct{}] {
+		return tokens.RemoteChainConfig[struct{}, struct{}]{RemoteDecimals: remoteDecimals}
+	}
+
+	tests := []struct {
+		name          string
+		reader        *mockRateLimitReader
+		rc            tokens.RemoteChainConfig[struct{}, struct{}]
+		legacyPoolRef datastore.AddressRef
+		errContains   string
+		wantNil       bool
+		wantOutbound  tokens.RateLimiterConfig
+		wantInbound   tokens.RateLimiterConfig
+	}{
+		{
+			name:          "yaml both set and valid returns nil",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			wantNil:       true,
+			rc: tokens.RemoteChainConfig[struct{}, struct{}]{
+				OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 10},
+				InboundRateLimiterConfig:  &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 10},
+			},
+		},
+		{
+			name:          "yaml both set invalid outbound errors",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			errContains:   "outbound rate limiter config",
+			rc: tokens.RemoteChainConfig[struct{}, struct{}]{
+				OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 10, Rate: 100},
+				InboundRateLimiterConfig:  &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 10},
+			},
+		},
+		{
+			name:          "partial yaml outbound only errors",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			errContains:   "default outbound and inbound rate limits must both be specified together",
+			rc: tokens.RemoteChainConfig[struct{}, struct{}]{
+				OutboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 10},
+			},
+		},
+		{
+			name:          "partial yaml inbound only errors",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			errContains:   "default outbound and inbound rate limits must both be specified together",
+			rc: tokens.RemoteChainConfig[struct{}, struct{}]{
+				InboundRateLimiterConfig: &tokens.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 10},
+			},
+		},
+		{
+			name:          "reader error is wrapped",
+			reader:        &mockRateLimitReader{err: errors.New("rpc down")},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			errContains:   "failed to read on-chain rate limits from legacy pool",
+			rc:            omitYAML(remoteDecimals),
+		},
+		{
+			name:          "yaml omitted enabled legacy passthrough",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_6_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			wantOutbound:  enabledOutbound,
+			wantInbound:   enabledInbound18,
+			rc:            omitYAML(remoteDecimals),
+		},
+		{
+			name:          "yaml omitted disabled legacy still imported",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: disabledInbound}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_6_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			wantOutbound:  enabledOutbound,
+			wantInbound:   disabledInbound,
+			rc:            omitYAML(remoteDecimals),
+		},
+		{
+			name:          "yaml omitted mixed enablement passthrough",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: disabledInbound}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			wantOutbound:  enabledOutbound,
+			wantInbound:   disabledInbound,
+			rc:            omitYAML(remoteDecimals),
+		},
+		{
+			name:          "evm pre-1.6.1 standard pool normalizes inbound",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			wantOutbound:  enabledOutbound,
+			wantInbound:   enabledInbound6,
+			rc:            omitYAML(remoteDecimals),
+		},
+		{
+			name:          "evm v1.6.0 external minter skips inbound normalize",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_6_0, datastore.ContractType(utils.BurnMintWithExternalMinterTokenPool.String())),
+			wantOutbound:  enabledOutbound,
+			wantInbound:   enabledInbound18,
+			rc:            omitYAML(remoteDecimals),
+		},
+		{
+			name:          "remote decimals zero skips inbound normalize",
+			reader:        &mockRateLimitReader{limits: tokens.OnchainRateLimits{Outbound: enabledOutbound, Inbound: enabledInbound18}},
+			legacyPoolRef: legacyPoolRef(utils.Version_1_5_1, datastore.ContractType(utils.BurnMintTokenPool.String())),
+			wantOutbound:  enabledOutbound,
+			wantInbound:   enabledInbound18,
+			rc:            omitYAML(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tokens.LegacyRateLimitsForAutoMigrate(
+				deployment.Environment{},
+				tt.reader,
+				localSelector,
+				remoteSelector,
+				tt.legacyPoolRef,
+				datastore.AddressRef{},
+				localDecimals,
+				tt.rc,
+			)
+			if tt.errContains != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errContains)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantNil {
+				require.Nil(t, got)
+				return
+			}
+			require.NotNil(t, got)
+			require.Equal(t, tt.wantOutbound.IsEnabled, got.Outbound.IsEnabled)
+			require.Equal(t, 0, tt.wantOutbound.Capacity.Cmp(got.Outbound.Capacity))
+			require.Equal(t, 0, tt.wantOutbound.Rate.Cmp(got.Outbound.Rate))
+			require.Equal(t, tt.wantInbound.IsEnabled, got.Inbound.IsEnabled)
+			require.Equal(t, 0, tt.wantInbound.Capacity.Cmp(got.Inbound.Capacity))
+			require.Equal(t, 0, tt.wantInbound.Rate.Cmp(got.Inbound.Rate))
+		})
+	}
 }

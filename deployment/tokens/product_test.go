@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -109,98 +108,6 @@ func TestRegisterTokenAdapter(t *testing.T) {
 				require.NotPanics(t, func() {
 					registry.RegisterTokenAdapter(tt.chainFamily2, tt.version2, &productTest_MockTokenAdapter{})
 				})
-			}
-		})
-	}
-}
-
-func TestPartialTokenTransferFeeConfig_ResolveForAutoMigrate(t *testing.T) {
-	legacyEnabled := tokens.TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: 10,
-		CustomFinalityTransferFeeBps:  20,
-		DefaultFinalityFeeUSDCents:    17,
-		CustomFinalityFeeUSDCents:     30,
-		DestBytesOverhead:             150_000,
-		DestGasOverhead:               50_000,
-		IsEnabled:                     true,
-	}
-	legacyDisabled := tokens.TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: 10,
-		DefaultFinalityFeeUSDCents:    17,
-		DestBytesOverhead:             150_000,
-		DestGasOverhead:               50_000,
-		IsEnabled:                     false,
-	}
-	overrides := tokens.PartialTokenTransferFeeConfig{
-		DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
-		IsEnabled:                  cciputils.NewOptional(true),
-	}
-
-	wantLegacyEnabledMerged := tokens.PartialTokenTransferFeeConfig{}.Populate(overrides.MergeWith(legacyEnabled))
-	wantLegacyEnabled := tokens.PartialTokenTransferFeeConfig{}.Populate(legacyEnabled)
-	tests := []struct {
-		name   string
-		errStr string
-		inputs *tokens.PartialTokenTransferFeeConfig
-		legacy tokens.TokenTransferFeeConfig
-		expect *tokens.PartialTokenTransferFeeConfig
-	}{
-		{
-			name:   "legacy enabled without yaml imports legacy fees",
-			legacy: legacyEnabled,
-			inputs: nil,
-			expect: &wantLegacyEnabled,
-		},
-		{
-			name:   "legacy enabled with yaml merges when isEnabled is set",
-			legacy: legacyEnabled,
-			inputs: &overrides,
-			expect: &wantLegacyEnabledMerged,
-		},
-		{
-			name:   "legacy enabled with yaml requires isEnabled",
-			legacy: legacyEnabled,
-			inputs: &tokens.PartialTokenTransferFeeConfig{
-				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
-			},
-			errStr: "tokenTransferFeeConfig must set isEnabled",
-		},
-		{
-			name:   "legacy disabled without yaml leaves fees unset",
-			legacy: legacyDisabled,
-			inputs: nil,
-			expect: nil,
-		},
-		{
-			name:   "legacy disabled with yaml passes through when isEnabled is set",
-			legacy: legacyDisabled,
-			inputs: &overrides,
-			expect: &overrides,
-		},
-		{
-			name:   "legacy disabled with yaml requires isEnabled",
-			legacy: legacyDisabled,
-			inputs: &tokens.PartialTokenTransferFeeConfig{
-				DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
-			},
-			errStr: "tokenTransferFeeConfig must set isEnabled",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.inputs.ResolveForAutoMigrate(tt.legacy)
-			if tt.errStr != "" {
-				require.EqualError(t, err, tt.errStr)
-				require.Nil(t, got)
-				return
-			}
-			require.NoError(t, err)
-			if tt.expect == nil {
-				require.Nil(t, got)
-			} else {
-				require.NotNil(t, got)
-				require.Equal(t, *tt.expect, *got)
 			}
 		})
 	}
