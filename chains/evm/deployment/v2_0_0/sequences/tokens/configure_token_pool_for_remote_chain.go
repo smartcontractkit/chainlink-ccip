@@ -87,6 +87,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		inbounds := input.RemoteChainConfig.GetInboundRateLimitBuckets()
 		defaultOutboundBucket, defaultOutboundExists := outbounds.DefaultBucket()
 		defaultInboundBucket, defaultInboundExists := inbounds.DefaultBucket()
+		if defaultOutboundExists != defaultInboundExists {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"default outbound and inbound rate limits must both be specified together in deployment input, provided on MigrationMetadata, or fully omitted from both for remote chain %d",
+				input.RemoteChainSelector,
+			)
+		}
 
 		// Resolve default outbound/inbound TPRL limits using the following precedence rules:
 		// (1) if both default buckets are provided in the deployment input → GenerateTPRLConfigs (explicit user input has the highest precedence)
