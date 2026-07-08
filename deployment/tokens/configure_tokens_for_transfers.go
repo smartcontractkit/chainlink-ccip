@@ -806,6 +806,24 @@ func LegacyRateLimitsForAutoMigrate[R any, CCV any](
 	localDecimals uint8,
 	rc RemoteChainConfig[R, CCV],
 ) (*OnchainRateLimits, error) {
+	defaultOutbound, defaultOutboundOk := rc.GetOutboundRateLimitBuckets().DefaultBucket()
+	defaultInbound, defaultInboundOk := rc.GetInboundRateLimitBuckets().DefaultBucket()
+	if defaultOutboundOk != defaultInboundOk {
+		return nil, fmt.Errorf(
+			"default outbound and inbound rate limits must both be specified together in deployment input or fully omitted",
+		)
+	}
+
+	if defaultOutboundOk && defaultInboundOk {
+		if err := defaultOutbound.RateLimit.Validate(); err != nil {
+			return nil, fmt.Errorf("outbound rate limiter config: %w", err)
+		}
+		if err := defaultInbound.RateLimit.Validate(); err != nil {
+			return nil, fmt.Errorf("inbound rate limiter config: %w", err)
+		}
+		return nil, nil
+	}
+
 	legacy, err := reader.GetOnchainRateLimits(
 		e.OperationsBundle,
 		e.BlockChains,
@@ -826,24 +844,6 @@ func LegacyRateLimitsForAutoMigrate[R any, CCV any](
 	chainFamily, err := chain_selectors.GetSelectorFamily(localSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", localSelector, err)
-	}
-
-	defaultOutbound, defaultOutboundOk := rc.GetOutboundRateLimitBuckets().DefaultBucket()
-	defaultInbound, defaultInboundOk := rc.GetInboundRateLimitBuckets().DefaultBucket()
-	if defaultOutboundOk != defaultInboundOk {
-		return nil, fmt.Errorf(
-			"default outbound and inbound rate limits must both be specified together in deployment input or fully omitted",
-		)
-	}
-
-	if defaultOutboundOk && defaultInboundOk {
-		if err := defaultOutbound.RateLimit.Validate(); err != nil {
-			return nil, fmt.Errorf("outbound rate limiter config: %w", err)
-		}
-		if err := defaultInbound.RateLimit.Validate(); err != nil {
-			return nil, fmt.Errorf("inbound rate limiter config: %w", err)
-		}
-		return nil, nil
 	}
 
 	inboundLegacy := legacy.Inbound
