@@ -122,6 +122,9 @@ func applyDeployAndActivateRMN(
 	output.DataStore = outputDS
 	timelockDelay := mcms_types.NewDuration(input.Cfg.TimelockDelay)
 
+	if err := input.MCMS.PopulateDefaults(); err != nil {
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to populate MCMS defaults: %w", err)
+	}
 	if len(rmnBatchOps) > 0 {
 		rmnOut, err := changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithDataStore(outputDS).
