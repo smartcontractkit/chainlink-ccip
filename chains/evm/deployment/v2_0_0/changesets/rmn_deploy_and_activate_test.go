@@ -3,6 +3,7 @@ package changesets_test
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	rmn_proxy_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
@@ -216,6 +217,23 @@ func TestActivateRMN_ValidateCurseAdmins(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "not in ChainSels")
 	})
+}
+
+func TestActivateRMN_ValidateCfgRejectsNegativeTimelockDelay(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	mcmsRegistry := cs_core.GetRegistry()
+	err = changesets.ActivateRMN(mcmsRegistry).VerifyPreconditions(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+		Cfg: changesets.ActivateRMNCfg{
+			ChainSels:     []uint64{chainSelector},
+			TimelockDelay: -time.Hour,
+		},
+	})
+	require.ErrorContains(t, err, "TimelockDelay cannot be negative")
 }
 
 func TestActivateRMN_AccumulatesBatchOpsAcrossChains(t *testing.T) {

@@ -135,7 +135,7 @@ type ActivateRMNInput struct {
 
 // ActivateRMNOutput holds on-chain deploy results and MCMS batch ops split by owning timelock.
 type ActivateRMNOutput struct {
-	sequences.OnChainOutput
+	Addresses       []datastore.AddressRef
 	RMNMCMSBatchOps []mcms_types.BatchOperation
 	CLLCCIPBatchOps []mcms_types.BatchOperation
 }

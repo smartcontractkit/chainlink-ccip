@@ -44,6 +44,9 @@ func validateActivateRMN(e cldf_deployment.Environment, input changesets.WithMCM
 	if err := validateActivateRMNCurseAdmins(input.Cfg.CurseAdmins, input.Cfg.ChainSels); err != nil {
 		return err
 	}
+	if input.Cfg.TimelockDelay < 0 {
+		return fmt.Errorf("TimelockDelay cannot be negative")
+	}
 	evmChains := e.BlockChains.EVMChains()
 	for _, sel := range input.Cfg.ChainSels {
 		if _, ok := evmChains[sel]; !ok {
@@ -216,7 +219,7 @@ func validateCLLCCIPForProxyProposal(e cldf_deployment.Environment, chainSels []
 			common_utils.CLLQualifier,
 		); ref.Address == "" {
 			return fmt.Errorf(
-				"ARMProxy setRMN requires CLLCCIP RBACTimelock (qualifier %q) in datastore for chain %d",
+				"RMNProxy.SetRMN requires CLLCCIP RBACTimelock (qualifier %q) in datastore for chain %d",
 				common_utils.CLLQualifier, sel,
 			)
 		}
