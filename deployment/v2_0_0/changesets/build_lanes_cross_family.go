@@ -43,6 +43,9 @@ type BuildLanesCrossFamilyConfig struct {
 	Lanes      []CrossFamilyLanePair `json:"lanes" yaml:"lanes"`
 	MCMS       mcms.Input            `json:"mcms" yaml:"mcms"`
 	TestRouter *bool                 `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// AllowOnrampOverride permits replacing an existing OnRamp mapping in the production Router
+	// with a different OnRamp address. This should only be used for v2 migrations.
+	AllowOnrampOverride bool `json:"allowOnrampOverride,omitempty" yaml:"allowOnrampOverride,omitempty"`
 }
 
 // UseTestRouter reports whether the test router should be used instead of the production router.
