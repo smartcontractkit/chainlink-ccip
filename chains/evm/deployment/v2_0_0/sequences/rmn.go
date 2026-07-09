@@ -133,27 +133,34 @@ type ActivateRMNInput struct {
 	CurseAdmins []common.Address
 }
 
+// ActivateRMNOutput holds on-chain deploy results and MCMS batch ops split by owning timelock.
+type ActivateRMNOutput struct {
+	sequences.OnChainOutput
+	RMNMCMSBatchOps []mcms_types.BatchOperation
+	CLLCCIPBatchOps []mcms_types.BatchOperation
+}
+
 // DeployAndActivateRMN runs the RMN v2 activation flow on a single EVM chain.
 var DeployAndActivateRMN = cldf_ops.NewSequence(
 	"deploy-and-activate-rmn",
 	rmnops.Version,
 	"Deploy RMN 2.0.0 with Ultra Fast Curse MCMS as curse admin, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
-	func(b cldf_ops.Bundle, chain evm.Chain, input ActivateRMNInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chain evm.Chain, input ActivateRMNInput) (output ActivateRMNOutput, err error) {
 		if input.ChainSelector != chain.Selector {
-			return sequences.OnChainOutput{}, fmt.Errorf("input chain selector %d does not match chain %d",
+			return ActivateRMNOutput{}, fmt.Errorf("input chain selector %d does not match chain %d",
 				input.ChainSelector, chain.Selector)
 		}
 		var writes []contract.WriteOutput
 
 		rmnTimelock, err := resolveTimelockAddress(input.ExistingAddresses, chain.Selector, common_utils.RMNTimelockQualifier)
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return ActivateRMNOutput{}, err
 		}
 
 		ultraFastCurseTimeLock, err := resolveTimelockAddress(
 			input.ExistingAddresses, chain.Selector, common_utils.UltraFastCurseMCMSQualifier)
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return ActivateRMNOutput{}, err
 		}
 
 		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
@@ -169,10 +176,10 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMN on chain %d: %w", chain.Selector, err)
+			return ActivateRMNOutput{}, fmt.Errorf("failed to deploy RMN on chain %d: %w", chain.Selector, err)
 		}
 		if rmnRef.Address == "" {
-			return sequences.OnChainOutput{}, fmt.Errorf("RMN address is empty after deploy on chain %d", chain.Selector)
+			return ActivateRMNOutput{}, fmt.Errorf("RMN address is empty after deploy on chain %d", chain.Selector)
 		}
 		rmnAddr := common.HexToAddress(rmnRef.Address)
 		output.Addresses = append(output.Addresses, rmnRef)
@@ -188,23 +195,25 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return ActivateRMNOutput{}, err
 		}
-		output.BatchOps = append(output.BatchOps, ownershipBatchOps...)
+		output.RMNMCMSBatchOps = append(output.RMNMCMSBatchOps, ownershipBatchOps...)
 
 		// 3. Point RMNProxy at the new RMN (makes the implementation live for CCIP).
 		rmnProxyWrites, err := pointRMNProxyAtRMN(b, chain, input.ExistingAddresses, rmnAddr)
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return ActivateRMNOutput{}, err
 		}
 		writes = append(writes, rmnProxyWrites...)
 
 		if len(writes) > 0 {
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+				return ActivateRMNOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}
-			output.BatchOps = append(output.BatchOps, batch)
+			if len(batch.Transactions) > 0 {
+				output.CLLCCIPBatchOps = append(output.CLLCCIPBatchOps, batch)
+			}
 		}
 
 		return output, nil

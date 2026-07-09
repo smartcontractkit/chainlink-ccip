@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcmslib "github.com/smartcontractkit/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
@@ -313,6 +314,296 @@ func TestActivateRMN_MissingRMNMCMS(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, common_utils.RMNTimelockQualifier)
+}
+
+func TestActivateRMN_CLLCCIPOwnedProxyEmitsDualProposals(t *testing.T) {
+	const (
+		chainSelector = uint64(5009297550715157269)
+		validUntil    = uint32(3759765795)
+	)
+	expectedDelay := mcms_types.NewDuration(0)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+	b := e.OperationsBundle
+
+	legacyARM := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+		ChainSelector:  chainSelector,
+		Args:           rmn_proxy.ConstructorArgs{RMN: legacyARM},
+	}, nil)
+	require.NoError(t, err)
+
+	_, ultraFastAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+	_, rmnMCMSAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
+	cllTimelockAddr, cllAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.CLLQualifier)
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(proxyRef))
+	for _, ref := range ultraFastAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	for _, ref := range rmnMCMSAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	for _, ref := range cllAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	e.DataStore = ds.Seal()
+
+	transferProxyOwnershipToTimelockForTest(
+		t, b, chain, common.HexToAddress(proxyRef.Address), cllTimelockAddr, e, common_utils.CLLQualifier, validUntil,
+	)
+
+	mcmsRegistry := cs_core.GetRegistry()
+	out, err := changesets.ActivateRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+		MCMS: mcms.Input{
+			OverridePreviousRoot: true,
+			ValidUntil:           validUntil,
+		},
+		Cfg: changesets.ActivateRMNCfg{
+			ChainSels: []uint64{chainSelector},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, out.MCMSTimelockProposals, 2)
+
+	rmnProposal, cllProposal := splitActivateRMNProposalsForTest(t, *e, chainSelector, out.MCMSTimelockProposals)
+	require.Equal(t, mcms_types.TimelockActionSchedule, rmnProposal.Action)
+	require.Equal(t, expectedDelay, rmnProposal.Delay)
+	require.Equal(t, mcms_types.TimelockActionSchedule, cllProposal.Action)
+	require.Equal(t, expectedDelay, cllProposal.Delay)
+	require.Len(t, rmnProposal.Operations, 1)
+	require.Len(t, rmnProposal.Operations[0].Transactions, 1)
+	require.Len(t, cllProposal.Operations, 1)
+	require.Len(t, cllProposal.Operations[0].Transactions, 1)
+
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
+
+	proxyC, err := rmn_proxy_bind.NewRMNProxy(common.HexToAddress(proxyRef.Address), chain.Client)
+	require.NoError(t, err)
+	require.Equal(t, cllTimelockAddr, common.HexToAddress(cllProposal.TimelockAddresses[mcms_types.ChainSelector(chainSelector)]))
+
+	rmnAddrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	require.Len(t, rmnAddrs, 1)
+
+	armReport, err := operations.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(proxyRef.Address),
+	})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(rmnAddrs[0].Address), armReport.Output)
+	require.NotEqual(t, legacyARM, armReport.Output)
+
+	proxyOwner, err := proxyC.Owner(nil)
+	require.NoError(t, err)
+	require.Equal(t, cllTimelockAddr, proxyOwner)
+}
+
+func TestActivateRMN_DualProposalsAccumulateBatchOpsAcrossChains(t *testing.T) {
+	const (
+		chainSelectorA = uint64(5009297550715157269)
+		chainSelectorB = uint64(4949039107694359620)
+		validUntil     = uint32(3759765795)
+	)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelectorA, chainSelectorB}),
+	)
+	require.NoError(t, err)
+
+	ds := datastore.NewMemoryDataStore()
+	cllTimelocks := make(map[uint64]common.Address, 2)
+	for _, sel := range []uint64{chainSelectorA, chainSelectorB} {
+		chain := e.BlockChains.EVMChains()[sel]
+		deployer := chain.DeployerKey.From
+		b := e.OperationsBundle
+
+		proxyRef, deployErr := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+			ChainSelector:  sel,
+			Args:           rmn_proxy.ConstructorArgs{RMN: common.HexToAddress("0x3333333333333333333333333333333333333333")},
+		}, nil)
+		require.NoError(t, deployErr)
+		require.NoError(t, ds.Addresses().Add(proxyRef))
+
+		_, ultraFastAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+		for _, ref := range ultraFastAddrs {
+			require.NoError(t, ds.Addresses().Add(ref))
+		}
+
+		_, rmnMCMSAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
+		for _, ref := range rmnMCMSAddrs {
+			require.NoError(t, ds.Addresses().Add(ref))
+		}
+
+		cllTimelockAddr, cllAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.CLLQualifier)
+		cllTimelocks[sel] = cllTimelockAddr
+		for _, ref := range cllAddrs {
+			require.NoError(t, ds.Addresses().Add(ref))
+		}
+
+		e.DataStore = ds.Seal()
+		transferProxyOwnershipToTimelockForTest(
+			t, b, chain, common.HexToAddress(proxyRef.Address), cllTimelockAddr, e, common_utils.CLLQualifier, validUntil,
+		)
+	}
+	e.DataStore = ds.Seal()
+
+	mcmsRegistry := cs_core.GetRegistry()
+	out, err := changesets.ActivateRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+		MCMS: mcms.Input{
+			OverridePreviousRoot: true,
+			ValidUntil:           validUntil,
+		},
+		Cfg: changesets.ActivateRMNCfg{
+			ChainSels: []uint64{chainSelectorA, chainSelectorB},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, out.MCMSTimelockProposals, 2)
+
+	rmnProposal, cllProposal := splitActivateRMNProposalsForTest(t, *e, chainSelectorA, out.MCMSTimelockProposals)
+	require.Len(t, rmnProposal.Operations, 2)
+	require.Len(t, cllProposal.Operations, 2)
+
+	rmnChainSelectors := make([]uint64, 0, len(rmnProposal.Operations))
+	for _, op := range rmnProposal.Operations {
+		rmnChainSelectors = append(rmnChainSelectors, uint64(op.ChainSelector))
+		require.Len(t, op.Transactions, 1)
+	}
+	require.ElementsMatch(t, []uint64{chainSelectorA, chainSelectorB}, rmnChainSelectors)
+
+	cllChainSelectors := make([]uint64, 0, len(cllProposal.Operations))
+	for _, op := range cllProposal.Operations {
+		cllChainSelectors = append(cllChainSelectors, uint64(op.ChainSelector))
+		require.Len(t, op.Transactions, 1)
+		require.Equal(t, cllTimelocks[uint64(op.ChainSelector)].Hex(), cllProposal.TimelockAddresses[op.ChainSelector])
+	}
+	require.ElementsMatch(t, []uint64{chainSelectorA, chainSelectorB}, cllChainSelectors)
+}
+
+func TestActivateRMN_MissingCLLCCIPWhenProxyNotDeployerOwned(t *testing.T) {
+	const validUntil = uint32(3759765795)
+
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+	b := e.OperationsBundle
+
+	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+		ChainSelector:  chainSelector,
+		Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
+	}, nil)
+	require.NoError(t, err)
+
+	_, ultraFastAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+	rmnTimelockAddr, rmnAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(proxyRef))
+	for _, ref := range ultraFastAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	for _, ref := range rmnAddrs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	e.DataStore = ds.Seal()
+
+	transferProxyOwnershipToTimelockForTest(
+		t, b, chain, common.HexToAddress(proxyRef.Address), rmnTimelockAddr, e, common_utils.RMNTimelockQualifier, validUntil,
+	)
+
+	mcmsRegistry := cs_core.GetRegistry()
+	_, err = changesets.ActivateRMN(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
+		MCMS: mcms.Input{ValidUntil: validUntil},
+		Cfg:  changesets.ActivateRMNCfg{ChainSels: []uint64{chainSelector}},
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, common_utils.CLLQualifier)
+}
+
+func transferProxyOwnershipToTimelockForTest(
+	t *testing.T,
+	b operations.Bundle,
+	chain evm.Chain,
+	proxyAddr common.Address,
+	timelockAddr common.Address,
+	e *deployment.Environment,
+	mcmsQualifier string,
+	validUntil uint32,
+) {
+	t.Helper()
+
+	batchOps, err := mcms_seq.TransferAndAcceptOwnership(b, chain, []mcms_ops.OpTransferOwnershipInput{
+		{
+			ChainSelector:   chain.Selector,
+			Address:         proxyAddr,
+			ProposedOwner:   timelockAddr,
+			ContractType:    rmn_proxy.ContractType,
+			TimelockAddress: timelockAddr,
+		},
+	})
+	require.NoError(t, err)
+	if len(batchOps) == 0 {
+		return
+	}
+
+	mcmsRegistry := cs_core.GetRegistry()
+	out, err := cs_core.NewOutputBuilder(*e, mcmsRegistry).
+		WithBatchOps(batchOps).
+		Build(mcms.Input{
+			Qualifier:      mcmsQualifier,
+			TimelockAction: mcms_types.TimelockActionSchedule,
+			TimelockDelay:  mcms_types.MustParseDuration("0s"),
+			ValidUntil:     validUntil,
+		})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
+}
+
+func splitActivateRMNProposalsForTest(
+	t *testing.T,
+	e deployment.Environment,
+	chainSelector uint64,
+	proposals []mcmslib.TimelockProposal,
+) (rmnProposal, cllProposal mcmslib.TimelockProposal) {
+	t.Helper()
+	require.Len(t, proposals, 2)
+
+	mcmsReader, ok := cs_core.GetRegistry().GetMCMSReader("evm")
+	require.True(t, ok)
+
+	rmnTimelockRef, err := mcmsReader.GetTimelockRef(e, chainSelector, mcms.Input{Qualifier: common_utils.RMNTimelockQualifier})
+	require.NoError(t, err)
+	cllTimelockRef, err := mcmsReader.GetTimelockRef(e, chainSelector, mcms.Input{Qualifier: common_utils.CLLQualifier})
+	require.NoError(t, err)
+
+	for _, proposal := range proposals {
+		timelockAddr := proposal.TimelockAddresses[mcms_types.ChainSelector(chainSelector)]
+		switch timelockAddr {
+		case rmnTimelockRef.Address:
+			rmnProposal = proposal
+		case cllTimelockRef.Address:
+			cllProposal = proposal
+		default:
+			t.Fatalf("unexpected timelock address %s in proposal", timelockAddr)
+		}
+	}
+	return rmnProposal, cllProposal
 }
 
 func deployMCMSInstanceForTest(
