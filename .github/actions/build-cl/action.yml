@@ -51,13 +51,12 @@ runs:
       run: |
         export GOPRIVATE=github.com/smartcontractkit/*
         # Drop any stale shallow-clone VCS cache that the Go module cache restore may have
-        # left behind.  A restored shallow clone causes "fatal: shallow file has changed
-        # since we read it" when go get --unshallow races against it.
+        # left behind.
         rm -rf "$(go env GOMODCACHE)/cache/vcs" || true
         if [ -n "${{ inputs.ton_ref }}" ]; then
           for i in 1 2 3; do
             go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }} && break
-            echo "retry $i – unshallow race on chainlink-ton; sleeping 5s"
+            echo "retry $i - unshallow race on chainlink-ton, sleeping 5s"
             sleep 5
           done
         fi
