@@ -139,7 +139,7 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to normalize token ref %s: %w", i, datastore_utils.SprintRef(revocation.TokenRef), err)
 			}
-			tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, cleanRef, revocation.ChainSelector, datastore_utils.FullRef)
+			tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, cleanRef, selector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to resolve token ref %s: %w", i, datastore_utils.SprintRef(cleanRef), err)
 			}
