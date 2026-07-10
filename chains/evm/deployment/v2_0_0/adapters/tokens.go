@@ -11,6 +11,7 @@ import (
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	siloed_lrtp_ops2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -76,7 +77,8 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 			}
 
 			contractRefs := []datastore.AddressRef{input.TokenPoolRef}
-			if input.TokenPoolRef.Type == datastore.ContractType(cciputils.LockReleaseTokenPool) {
+			switch input.TokenPoolRef.Type {
+			case datastore.ContractType(cciputils.LockReleaseTokenPool):
 				lockboxRef, err := datastore_utils.FindAndFormatRef(
 					e.DataStore,
 					datastore.AddressRef{
@@ -95,6 +97,39 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 					)
 				}
 				contractRefs = append(contractRefs, lockboxRef)
+			case datastore.ContractType(cciputils.SiloedLockReleaseTokenPool):
+				lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops2_0_0.GetAllLockBoxConfigs, chain, contract.FunctionInput[struct{}]{
+					ChainSelector: input.ChainSelector,
+					Address:       common.HexToAddress(input.TokenPoolRef.Address),
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"failed to get lockbox configs from siloed lock release pool %s on chain %d: %w",
+						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector, err,
+					)
+				}
+				if len(lockboxConfigsReport.Output) == 0 {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"no lockboxes configured on siloed lock release pool %s on chain %d",
+						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector,
+					)
+				}
+				for _, config := range lockboxConfigsReport.Output {
+					if config.LockBox != (common.Address{}) {
+						contractRefs = append(contractRefs, datastore.AddressRef{
+							ChainSelector: input.ChainSelector,
+							Type:          datastore.ContractType(erc20_lock_box.ContractType),
+							Version:       erc20_lock_box.Version,
+							Address:       config.LockBox.Hex(),
+						})
+					}
+				}
+				if len(contractRefs) == 1 {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"no lockboxes configured on siloed lock release pool %s on chain %d",
+						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector,
+					)
+				}
 			}
 
 			ownershipInput := deployops.TransferOwnershipPerChainInput{
@@ -115,7 +150,8 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 			}
 
 			return result, nil
-		})
+		},
+	)
 }
 
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
