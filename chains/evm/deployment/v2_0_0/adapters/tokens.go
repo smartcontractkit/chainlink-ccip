@@ -60,7 +60,7 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 	return cldf_ops.NewSequence(
 		"evm-v2:update-authorities",
 		cciputils.Version_2_0_0,
-		"Transfer token pool and lock release lockbox ownership to timelock on EVM chain",
+		"Transfer token pool and lock release lockbox(es) ownership to timelock on EVM chain",
 		func(b cldf_ops.Bundle, e *deployment.Environment, input tokens.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
 			chain, ok := e.BlockChains.EVMChains()[input.ChainSelector]
 			if !ok {
@@ -98,9 +98,16 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 				}
 				contractRefs = append(contractRefs, lockboxRef)
 			case datastore.ContractType(cciputils.SiloedLockReleaseTokenPool):
+				poolAddr, err := t.ParseNonZeroAddressRef(e.DataStore, input.TokenPoolRef, input.ChainSelector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"failed to parse token pool address for siloed lock release pool %s on chain %d: %w",
+						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector, err,
+					)
+				}
 				lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops2_0_0.GetAllLockBoxConfigs, chain, contract.FunctionInput[struct{}]{
 					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(input.TokenPoolRef.Address),
+					Address:       poolAddr,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf(
@@ -114,15 +121,20 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector,
 					)
 				}
+				seenLockboxes := cciputils.NewSet[common.Address]()
 				for _, config := range lockboxConfigsReport.Output {
-					if config.LockBox != (common.Address{}) {
-						contractRefs = append(contractRefs, datastore.AddressRef{
-							ChainSelector: input.ChainSelector,
-							Type:          datastore.ContractType(erc20_lock_box.ContractType),
-							Version:       erc20_lock_box.Version,
-							Address:       config.LockBox.Hex(),
-						})
+					if config.LockBox == (common.Address{}) {
+						continue
 					}
+					if seenLockboxes.Add(config.LockBox) {
+						continue
+					}
+					contractRefs = append(contractRefs, datastore.AddressRef{
+						ChainSelector: input.ChainSelector,
+						Type:          datastore.ContractType(erc20_lock_box.ContractType),
+						Version:       erc20_lock_box.Version,
+						Address:       config.LockBox.Hex(),
+					})
 				}
 				if len(contractRefs) == 1 {
 					return sequences.OnChainOutput{}, fmt.Errorf(
