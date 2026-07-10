@@ -126,7 +126,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 		for _, config := range cfg.Tokens {
 			configs[config.ChainSelector] = config
 		}
-		batchOps, reports, ds, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, configs)
+		batchOps, reports, ds, err := processTokenConfigForChain(e, configs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
@@ -138,7 +138,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 	}
 }
 
-func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, mcmsInput mcms.Input, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
+func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
 	normalizerRegistry := deploy.GetAddressNormalizerRegistry()
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)

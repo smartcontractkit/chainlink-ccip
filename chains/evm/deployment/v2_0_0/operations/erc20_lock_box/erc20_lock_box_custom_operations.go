@@ -3,12 +3,13 @@ package erc20_lock_box
 import (
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 type DepositArgs struct {
@@ -42,12 +43,10 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 	IsAllowedCaller: func(erc20LockBox *ERC20LockBoxContract, opts *bind.CallOpts, caller common.Address, args DepositArgs) (bool, error) {
 		callers, err := erc20LockBox.GetAllAuthorizedCallers(opts)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("failed to get authorized callers: %w", err)
 		}
-		for _, authorized := range callers {
-			if authorized == caller {
-				return true, nil
-			}
+		if slices.Contains(callers, caller) {
+			return true, nil
 		}
 		return false, nil
 	},
@@ -62,5 +61,22 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 	},
 	CallContract: func(erc20LockBox *ERC20LockBoxContract, opts *bind.TransactOpts, args DepositArgs) (*types.Transaction, error) {
 		return erc20LockBox.Deposit(opts, args.Token, args.RemoteChainSelector, args.Amount)
+	},
+})
+
+// ApplyAuthorizedCallerUpdatesProposalOnly is identical to ApplyAuthorizedCallerUpdates but
+// forces the operation into an MCMS proposal. Use when lockbox ownership may still be with
+// the deployer during proposal construction (e.g. liquidity migration batched with UpdateAuthorities).
+var ApplyAuthorizedCallerUpdatesProposalOnly = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *ERC20LockBoxContract]{
+	Name:            "erc20-lock-box:apply-authorized-caller-updates-proposal-only",
+	Version:         Version,
+	Description:     "Calls applyAuthorizedCallerUpdates on the contract (proposal-only, never executed directly)",
+	ContractType:    ContractType,
+	ContractABI:     ERC20LockBoxABI,
+	NewContract:     NewERC20LockBoxContract,
+	IsAllowedCaller: contract.NoCallersAllowed[*ERC20LockBoxContract, AuthorizedCallerArgs],
+	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	CallContract: func(c *ERC20LockBoxContract, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+		return c.ApplyAuthorizedCallerUpdates(opts, args)
 	},
 })
