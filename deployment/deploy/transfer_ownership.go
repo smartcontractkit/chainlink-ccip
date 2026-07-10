@@ -151,18 +151,6 @@ func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Inpu
 		return nil, nil, fmt.Errorf("failed to get transfer ownership adapter for chain %d: %w", chainSel, err)
 	}
 
-	for i, contractRef := range addressRefs {
-		normRef, err := TryNormalizeAddressRef(chainSel, contractRef)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), chainSel, err)
-		}
-		fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, normRef, chainSel, datastore_utils.FullRef)
-		if err != nil {
-			return nil, nil, err
-		}
-		addressRefs[i] = fullRef
-	}
-
 	ownershipInput := TransferOwnershipPerChainInput{
 		ChainSelector: chainSel,
 		ContractRef:   addressRefs,
