@@ -47,7 +47,11 @@ func acceptOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *ch
 			}
 			// if partial refs are provided, resolve to full refs
 			for i, contractRef := range perChainInputs.ContractRef {
-				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
+				normRef, err := TryNormalizeAddressRef(perChainInputs.ChainSelector, contractRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), perChainInputs.ChainSelector, err)
+				}
+				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, normRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, err
 				}
@@ -88,7 +92,11 @@ func transferOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *
 			}
 			// if partial refs are provided, resolve to full refs
 			for i, contractRef := range perChainInputs.ContractRef {
-				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
+				normRef, err := TryNormalizeAddressRef(perChainInputs.ChainSelector, contractRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), perChainInputs.ChainSelector, err)
+				}
+				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, normRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, err
 				}
@@ -141,6 +149,18 @@ func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Inpu
 	adapter, err := transferOwnershipReg.GetAdapterByChainSelector(chainSel, MCMSVersion)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get transfer ownership adapter for chain %d: %w", chainSel, err)
+	}
+
+	for i, contractRef := range addressRefs {
+		normRef, err := TryNormalizeAddressRef(chainSel, contractRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), chainSel, err)
+		}
+		fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, normRef, chainSel, datastore_utils.FullRef)
+		if err != nil {
+			return nil, nil, err
+		}
+		addressRefs[i] = fullRef
 	}
 
 	ownershipInput := TransferOwnershipPerChainInput{

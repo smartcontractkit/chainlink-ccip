@@ -8,6 +8,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -134,9 +135,13 @@ func revokeTokenAdminRoleApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry
 			if !ok {
 				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: token adapter for chain family '%s' and version '%v' does not support token admin role revocation", i, family, version)
 			}
-			tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, revocation.TokenRef, revocation.ChainSelector, datastore_utils.FullRef)
+			cleanRef, err := deploy.TryNormalizeAddressRef(selector, revocation.TokenRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to resolve token ref: %w", i, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to normalize token ref %s: %w", i, datastore_utils.SprintRef(revocation.TokenRef), err)
+			}
+			tokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, cleanRef, revocation.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("revocation[%d]: failed to resolve token ref %s: %w", i, datastore_utils.SprintRef(cleanRef), err)
 			}
 
 			// NOTE: if after resolution, the timelock address is still empty, the adapter should fall back to the deployer key
