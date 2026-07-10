@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -13,6 +12,7 @@ import (
 
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -410,13 +410,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		}
 
 		// we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
-		transferOps, transferReports, tokens, err := processTokenConfigForChain(e, allTokenConfigs)
+		transferOps, transferReports, tokenDS, err := processTokenConfigForChain(e, allTokenConfigs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
 		}
 		batchOps = append(batchOps, transferOps...)
 		reports = append(reports, transferReports...)
-		ds.Merge(tokens.Seal())
+		ds.Merge(tokenDS.Seal())
 		mergedDS := datastore.NewMemoryDataStore()
 		mergedDS.Merge(e.DataStore)
 		mergedDS.Merge(ds.Seal())
@@ -464,7 +464,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve adapter and refs for liquidity migration on chain selector %d: %w", selector, err)
 			}
-			if !strings.Contains(fullPoolRef.Type.String(), "LockRelease") {
+			if !utils.IsLockReleasePoolType(fullPoolRef.Type.String()) {
 				e.Logger.Warnf("skipping liquidity migration on chain with selector %d because token pool type %s is not a LockRelease pool", selector, fullPoolRef.Type.String())
 				continue
 			}

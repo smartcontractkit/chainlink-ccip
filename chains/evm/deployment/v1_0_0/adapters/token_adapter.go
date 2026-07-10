@@ -268,15 +268,12 @@ func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.De
 
 // IsBurnMintPoolType returns true if the pool type is one of the burn-mint variants (standard or with from-mint).
 func (a *EVMTokenBase) IsBurnMintPoolType(poolType string) bool {
-	return poolType == cciputils.BurnMintTokenPool.String() ||
-		poolType == cciputils.BurnFromMintTokenPool.String() ||
-		poolType == cciputils.BurnWithFromMintTokenPool.String()
+	return cciputils.IsBurnMintPoolType(poolType)
 }
 
 // IsLockReleasePoolType returns true if the pool type is one of the lock-release variants (standard or siloed).
 func (a *EVMTokenBase) IsLockReleasePoolType(poolType string) bool {
-	return poolType == cciputils.LockReleaseTokenPool.String() ||
-		poolType == cciputils.SiloedLockReleaseTokenPool.String()
+	return cciputils.IsLockReleasePoolType(poolType)
 }
 
 // IsBurnMintTokenType returns true if the token type is one of the burn-mint variants (ERC20 or ERC677).
