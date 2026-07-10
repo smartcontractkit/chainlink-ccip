@@ -9,7 +9,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -45,11 +45,11 @@ func nonCanonicalRemoteChainConfig() adapters.RemoteCCTPChainConfig {
 
 func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) nonCanonicalTestSetup {
 	chain := e.BlockChains.EVMChains()[chainSelector]
+	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
 
 	// Deploy RMN Proxy (use deployer as RMN for test)
 	rmnProxyRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: chain.DeployerKey.From},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy RMN proxy")
@@ -58,7 +58,6 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	// Deploy Router (WrappedNative = zero for test)
 	routerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-		ChainSelector:  chainSelector,
 		Args: router.ConstructorArgs{
 			WrappedNative: common.Address{},
 			RMNProxy:      rmnAddr,
@@ -70,7 +69,6 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	// Deploy TokenAdminRegistry
 	tarRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, tar_ops.Deploy, chain, contract_utils.DeployInput[tar_ops.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(tar_ops.ContractType, *tar_ops.Version),
-		ChainSelector:  chainSelector,
 		Args:           tar_ops.ConstructorArgs{},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy TokenAdminRegistry")

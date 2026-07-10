@@ -5,7 +5,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -27,8 +28,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			deployment.ContractType(input.TokenPoolType),
 			*input.TokenPoolVersion,
 		)
-		tpDeployReport, err := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+		tpDeployReport, err := evmops.ExecuteDeploy(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
 			TypeAndVersion: typeAndVersion,
 			Args: burn_mint_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,

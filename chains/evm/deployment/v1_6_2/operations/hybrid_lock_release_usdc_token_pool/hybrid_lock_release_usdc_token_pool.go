@@ -8,10 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	gobindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
 )
 
 var ContractType cldf_deployment.ContractType = "HybridLockReleaseUSDCTokenPool"
@@ -23,54 +25,62 @@ type WithdrawLiquidityArgs struct {
 	Amount              *big.Int
 }
 
-var GetLockedTokensForChain = contract.NewRead(contract.ReadParams[uint64, *big.Int, *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool]{
-	Name:         "hybrid-lock-release-usdc-token-pool:get-locked-tokens-for-chain",
-	Version:      Version,
-	Description:  "Gets locked token balance for a remote chain selector",
-	ContractType: ContractType,
-	NewContract:  hybrid_lock_release_usdc_token_pool.NewHybridLockReleaseUSDCTokenPool,
-	CallContract: func(pool *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, opts *bind.CallOpts, remoteChainSelector uint64) (*big.Int, error) {
-		return pool.GetLockedTokensForChain(opts, remoteChainSelector)
-	},
-})
+func NewReadGetLockedTokensForChain(c gobindings.HybridLockReleaseUSDCTokenPoolInterface) *cld_ops.Operation[contract.FunctionInput[uint64], *big.Int, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[uint64, *big.Int, gobindings.HybridLockReleaseUSDCTokenPoolInterface]{
+		Name:         "hybrid-lock-release-usdc-token-pool:get-locked-tokens-for-chain",
+		Version:      Version,
+		Description:  "Gets locked token balance for a remote chain selector",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(pool gobindings.HybridLockReleaseUSDCTokenPoolInterface, opts *bind.CallOpts, remoteChainSelector uint64) (*big.Int, error) {
+			return pool.GetLockedTokensForChain(opts, remoteChainSelector)
+		},
+	})
+}
 
-var GetLiquidityProvider = contract.NewRead(contract.ReadParams[uint64, common.Address, *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool]{
-	Name:         "hybrid-lock-release-usdc-token-pool:get-liquidity-provider",
-	Version:      Version,
-	Description:  "Gets the liquidity provider for a remote chain selector",
-	ContractType: ContractType,
-	NewContract:  hybrid_lock_release_usdc_token_pool.NewHybridLockReleaseUSDCTokenPool,
-	CallContract: func(pool *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, opts *bind.CallOpts, remoteChainSelector uint64) (common.Address, error) {
-		return pool.GetLiquidityProvider(opts, remoteChainSelector)
-	},
-})
+func NewReadGetLiquidityProvider(c gobindings.HybridLockReleaseUSDCTokenPoolInterface) *cld_ops.Operation[contract.FunctionInput[uint64], common.Address, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[uint64, common.Address, gobindings.HybridLockReleaseUSDCTokenPoolInterface]{
+		Name:         "hybrid-lock-release-usdc-token-pool:get-liquidity-provider",
+		Version:      Version,
+		Description:  "Gets the liquidity provider for a remote chain selector",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(pool gobindings.HybridLockReleaseUSDCTokenPoolInterface, opts *bind.CallOpts, remoteChainSelector uint64) (common.Address, error) {
+			return pool.GetLiquidityProvider(opts, remoteChainSelector)
+		},
+	})
+}
 
-var ShouldUseLockRelease = contract.NewRead(contract.ReadParams[uint64, bool, *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool]{
-	Name:         "hybrid-lock-release-usdc-token-pool:should-use-lock-release",
-	Version:      Version,
-	Description:  "Returns whether a remote chain selector should use lock-release",
-	ContractType: ContractType,
-	NewContract:  hybrid_lock_release_usdc_token_pool.NewHybridLockReleaseUSDCTokenPool,
-	CallContract: func(pool *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, opts *bind.CallOpts, remoteChainSelector uint64) (bool, error) {
-		return pool.ShouldUseLockRelease(opts, remoteChainSelector)
-	},
-})
+func NewReadShouldUseLockRelease(c gobindings.HybridLockReleaseUSDCTokenPoolInterface) *cld_ops.Operation[contract.FunctionInput[uint64], bool, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[uint64, bool, gobindings.HybridLockReleaseUSDCTokenPoolInterface]{
+		Name:         "hybrid-lock-release-usdc-token-pool:should-use-lock-release",
+		Version:      Version,
+		Description:  "Returns whether a remote chain selector should use lock-release",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(pool gobindings.HybridLockReleaseUSDCTokenPoolInterface, opts *bind.CallOpts, remoteChainSelector uint64) (bool, error) {
+			return pool.ShouldUseLockRelease(opts, remoteChainSelector)
+		},
+	})
+}
 
-var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[WithdrawLiquidityArgs, *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool]{
-	Name:            "hybrid-lock-release-usdc-token-pool:withdraw-liquidity",
-	Version:         Version,
-	Description:     "Withdraws liquidity for a remote chain selector",
-	ContractType:    ContractType,
-	ContractABI:     hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPoolABI,
-	NewContract:     hybrid_lock_release_usdc_token_pool.NewHybridLockReleaseUSDCTokenPool,
-	IsAllowedCaller: contract.OnlyOwner[*hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, WithdrawLiquidityArgs],
-	Validate: func(args WithdrawLiquidityArgs) error {
-		if args.Amount == nil || args.Amount.Sign() <= 0 {
-			return fmt.Errorf("amount must be greater than zero")
-		}
-		return nil
-	},
-	CallContract: func(pool *hybrid_lock_release_usdc_token_pool.HybridLockReleaseUSDCTokenPool, opts *bind.TransactOpts, args WithdrawLiquidityArgs) (*types.Transaction, error) {
-		return pool.WithdrawLiquidity(opts, args.RemoteChainSelector, args.Amount)
-	},
-})
+func NewWriteWithdrawLiquidity(c gobindings.HybridLockReleaseUSDCTokenPoolInterface) *cld_ops.Operation[contract.FunctionInput[WithdrawLiquidityArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[WithdrawLiquidityArgs, gobindings.HybridLockReleaseUSDCTokenPoolInterface]{
+		Name:            "hybrid-lock-release-usdc-token-pool:withdraw-liquidity",
+		Version:         Version,
+		Description:     "Withdraws liquidity for a remote chain selector",
+		ContractType:    ContractType,
+		ContractABI:     gobindings.HybridLockReleaseUSDCTokenPoolABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[gobindings.HybridLockReleaseUSDCTokenPoolInterface, WithdrawLiquidityArgs],
+		Validate: func(args WithdrawLiquidityArgs) error {
+			if args.Amount == nil || args.Amount.Sign() <= 0 {
+				return fmt.Errorf("amount must be greater than zero")
+			}
+			return nil
+		},
+		CallContract: func(pool gobindings.HybridLockReleaseUSDCTokenPoolInterface, opts *bind.TransactOpts, args WithdrawLiquidityArgs) (*types.Transaction, error) {
+			return pool.WithdrawLiquidity(opts, args.RemoteChainSelector, args.Amount)
+		},
+	})
+}

@@ -1,18 +1,18 @@
 package create2_factory
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	create2_factory_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var DeployCREATE2Factory = cldf_deployment.CreateChangeSet(applyDeployCREATE2Factory, verifyDeployCREATE2Factory)
@@ -80,8 +80,7 @@ func applyDeployCREATE2Factory(e cldf_deployment.Environment, cfg DeployCREATE2F
 		}, nil
 	}
 
-	deployReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
-		ChainSelector:  cfg.ChainSel,
+	deployReport, err := evmops.ExecuteDeploy(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: tv,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: cfg.AllowList,

@@ -1,6 +1,8 @@
 package create2_factory_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -8,12 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets/create2_factory"
 	create2_factory_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 func TestConfigureCREATE2Factory_Apply(t *testing.T) {
@@ -29,12 +29,7 @@ func TestConfigureCREATE2Factory_Apply(t *testing.T) {
 	initialAllowList := []common.Address{chain.DeployerKey.From}
 
 	// Deploy CREATE2Factory first
-	deployReport, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle,
-		create2_factory_ops.Deploy,
-		chain,
-		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
-			ChainSelector:  chainSel,
+	deployReport, err := evmops.ExecuteDeploy(e.OperationsBundle, create2_factory_ops.Deploy, chain, contract.DeployInput[create2_factory_ops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *create2_factory_ops.Version),
 			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: initialAllowList,
@@ -170,12 +165,7 @@ func TestConfigureCREATE2Factory_EmptyUpdates(t *testing.T) {
 	chain := e.BlockChains.EVMChains()[chainSel]
 
 	// Deploy CREATE2Factory first
-	deployReport, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle,
-		create2_factory_ops.Deploy,
-		chain,
-		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
-			ChainSelector:  chainSel,
+	deployReport, err := evmops.ExecuteDeploy(e.OperationsBundle, create2_factory_ops.Deploy, chain, contract.DeployInput[create2_factory_ops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *create2_factory_ops.Version),
 			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: []common.Address{chain.DeployerKey.From},

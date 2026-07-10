@@ -3,6 +3,7 @@ package sequences
 import (
 	"encoding/json"
 	"fmt"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"math/big"
 	"slices"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -21,7 +23,6 @@ import (
 
 	evm_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -31,6 +32,8 @@ import (
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	fq_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -148,10 +151,10 @@ type FeeQuoterUpdate struct {
 	ChainSelector                 uint64
 	ExistingAddresses             []datastore.AddressRef
 	ConstructorArgs               fqops.ConstructorArgs
-	PriceUpdates                  fqops.PriceUpdates
-	DestChainConfigs              []fqops.DestChainConfigArgs
+	PriceUpdates                  fq_bindings.InternalPriceUpdates
+	DestChainConfigs              []fq_bindings.FeeQuoterDestChainConfigArgs
 	TokenTransferFeeConfigUpdates fqops.ApplyTokenTransferFeeConfigUpdatesArgs
-	AuthorizedCallerUpdates       fqops.AuthorizedCallerArgs
+	AuthorizedCallerUpdates       fq_bindings.AuthorizedCallersAuthorizedCallerArgs
 }
 
 func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
@@ -192,10 +195,9 @@ var (
 			tokenPriceUpdateBatches := batches.TokenPriceUpdateBatches
 
 			// deploy fee quoter or fetch existing fee quoter address
-			feeQuoterRef, err := contract.MaybeDeployContract(
+			feeQuoterRef, err := evmops.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
-					ChainSelector:  chain.Selector,
 					Args:           input.ConstructorArgs,
 				}, input.ExistingAddresses)
 			if err != nil {
@@ -210,13 +212,9 @@ var (
 			fqAddr := common.HexToAddress(feeQuoterRef.Address)
 			// ApplyDestChainConfigUpdates on FeeQuoter
 			for _, batch := range destChainConfigBatches {
-				feeQuoterReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyDestChainConfigUpdates, chain,
-					contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args:          batch,
-					})
+				feeQuoterReport, err := evmops.ExecuteWrite(
+					b, chain, fqAddr, evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fqops.NewWriteApplyDestChainConfigUpdates, batch,
+				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain "+
 						"config updates to FeeQuoter(%s) on chain %s: %w", fqAddr.Hex(), chain, err)
@@ -227,26 +225,23 @@ var (
 			// update price (gas and token prices batched to avoid block gas limit; paired by step index)
 			priceUpdateSteps := max(len(tokenPriceUpdateBatches), len(gasPriceUpdateBatches))
 			for i := range priceUpdateSteps {
-				var gasBatch []fqops.GasPriceUpdate
+				var gasBatch []fq_bindings.InternalGasPriceUpdate
 				if i < len(gasPriceUpdateBatches) {
 					gasBatch = gasPriceUpdateBatches[i]
 				}
-				var tokenBatch []fqops.TokenPriceUpdate
+				var tokenBatch []fq_bindings.InternalTokenPriceUpdate
 				if i < len(tokenPriceUpdateBatches) {
 					tokenBatch = tokenPriceUpdateBatches[i]
 				}
 				if len(gasBatch) == 0 && len(tokenBatch) == 0 {
 					continue
 				}
-				feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args: fqops.PriceUpdates{
-							GasPriceUpdates:   gasBatch,
-							TokenPriceUpdates: tokenBatch,
-						},
-					})
+				feeQuoterUpdatePricesReport, err := evmops.ExecuteWrite(
+					b, chain, fqAddr, evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fqops.NewWriteUpdatePrices, fq_bindings.InternalPriceUpdates{
+						GasPriceUpdates:   gasBatch,
+						TokenPriceUpdates: tokenBatch,
+					},
+				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to update gas prices on "+
 						"FeeQuoter(%s) on chain %s: %w", fqAddr.Hex(), chain, err)
@@ -256,23 +251,20 @@ var (
 			defaultFeeConfigApplied := false
 			for _, batch := range tokenTransferFeeConfigBatches {
 				// we consider that TokensToUseDefaultFeeConfigs will not have a lot of entries, so we can apply them in the first batch
-				var defaultFeeConfig []fqops.TokenTransferFeeConfigRemoveArgs
+				var defaultFeeConfig []fq_bindings.FeeQuoterTokenTransferFeeConfigRemoveArgs
 				if !defaultFeeConfigApplied {
 					defaultFeeConfig = input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs
 					defaultFeeConfigApplied = true
 				} else {
-					defaultFeeConfig = make([]fqops.TokenTransferFeeConfigRemoveArgs, 0)
+					defaultFeeConfig = make([]fq_bindings.FeeQuoterTokenTransferFeeConfigRemoveArgs, 0)
 				}
-				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
-					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-							TokenTransferFeeConfigArgs:   batch,
-							TokensToUseDefaultFeeConfigs: defaultFeeConfig,
-						},
-					})
+				feeQuoterTokenTransferFeeConfigReport, err := evmops.ExecuteWrite(
+					b, chain, fqAddr, evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fqops.NewWriteApplyTokenTransferFeeConfigUpdates,
+					fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+						TokenTransferFeeConfigArgs:   batch,
+						TokensToUseDefaultFeeConfigs: defaultFeeConfig,
+					},
+				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee "+
 						"config updates to FeeQuoter(%s) on chain %s: %w", fqAddr.Hex(), chain, err)
@@ -282,15 +274,12 @@ var (
 
 			// in case there are still TokensToUseDefaultFeeConfigs that are not applied because they are not included in the batches, we apply them here
 			if len(input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs) > 0 && !defaultFeeConfigApplied {
-				feeQuoterTokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyTokenTransferFeeConfigUpdates, chain,
-					contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
-							TokensToUseDefaultFeeConfigs: input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
-						},
-					})
+				feeQuoterTokenTransferFeeConfigReport, err := evmops.ExecuteWrite(
+					b, chain, fqAddr, evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fqops.NewWriteApplyTokenTransferFeeConfigUpdates,
+					fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+						TokensToUseDefaultFeeConfigs: input.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs,
+					},
+				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee "+
 						"config updates to FeeQuoter(%s) on chain %s: %w", fqAddr.Hex(), chain, err)
@@ -300,13 +289,9 @@ var (
 			// ApplyAuthorizedCallerUpdates on FeeQuoter
 			if len(input.AuthorizedCallerUpdates.AddedCallers) > 0 ||
 				len(input.AuthorizedCallerUpdates.RemovedCallers) > 0 {
-				feeQuoterAuthorizedCallerReport, err := cldf_ops.ExecuteOperation(
-					b, fqops.ApplyAuthorizedCallerUpdates, chain,
-					contract.FunctionInput[fqops.AuthorizedCallerArgs]{
-						ChainSelector: chain.Selector,
-						Address:       fqAddr,
-						Args:          input.AuthorizedCallerUpdates,
-					})
+				feeQuoterAuthorizedCallerReport, err := evmops.ExecuteWrite(
+					b, chain, fqAddr, evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fqops.NewWriteApplyAuthorizedCallerUpdates, input.AuthorizedCallerUpdates,
+				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller "+
 						"updates to FeeQuoter(%s) on chain %s: %w", fqAddr.Hex(), chain, err)
@@ -384,8 +369,8 @@ var (
 				"",
 			)
 			isNewFQV2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
-			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
-			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
+			tokenTransferFeeConfigArgs := make([]fq_bindings.FeeQuoterTokenTransferFeeConfigArgs, 0)
+			allDestChainConfigs := make([]fq_bindings.FeeQuoterDestChainConfigArgs, 0)
 			lastKnownGasPriceUpdates := make(map[uint64]*big.Int)
 			var providedRemoteChains map[uint64]struct{}
 			if len(input.RemoteChainSelectors) > 0 {
@@ -428,9 +413,9 @@ var (
 					output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, priceUpdates.TokenPriceUpdates...)
 				}
 
-				outDestchainCfg := fqops.DestChainConfigArgs{
+				outDestchainCfg := fq_bindings.FeeQuoterDestChainConfigArgs{
 					DestChainSelector: remoteChain,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq_bindings.FeeQuoterDestChainConfig{
 						IsEnabled:                   destChainConfig.IsEnabled,
 						MaxDataBytes:                destChainConfig.MaxDataBytes,
 						MaxPerMsgGasLimit:           destChainConfig.MaxPerMsgGasLimit,
@@ -444,14 +429,14 @@ var (
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
-				tokenTransferFeeCfgs := make([]fqops.TokenTransferFeeConfigSingleTokenArgs, 0)
+				tokenTransferFeeCfgs := make([]fq_bindings.FeeQuoterTokenTransferFeeConfigSingleTokenArgs, 0)
 				for token, transferCfg := range cfg.TokenTransferFeeCfgs {
 					if !transferCfg.IsEnabled {
 						continue
 					}
-					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fqops.TokenTransferFeeConfigSingleTokenArgs{
+					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fq_bindings.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
-						TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+						TokenTransferFeeConfig: fq_bindings.FeeQuoterTokenTransferFeeConfig{
 							FeeUSDCents:       transferCfg.MinFeeUSDCents,
 							DestGasOverhead:   transferCfg.DestGasOverhead,
 							DestBytesOverhead: transferCfg.DestBytesOverhead,
@@ -459,7 +444,7 @@ var (
 						},
 					})
 				}
-				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigArgs{
+				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fq_bindings.FeeQuoterTokenTransferFeeConfigArgs{
 					DestChainSelector:       remoteChain,
 					TokenTransferFeeConfigs: tokenTransferFeeCfgs,
 				})
@@ -479,7 +464,7 @@ var (
 				// if new deployment, adding deployer key as price updater so that
 				// manual gas prices can be set right after deployment if needed
 				output.ConstructorArgs = fqops.ConstructorArgs{
-					StaticConfig: fqops.StaticConfig{
+					StaticConfig: fq_bindings.FeeQuoterStaticConfig{
 						LinkToken:         fqOutput.StaticCfg.LinkToken,
 						MaxFeeJuelsPerMsg: fqOutput.StaticCfg.MaxFeeJuelsPerMsg,
 					},
@@ -488,7 +473,7 @@ var (
 					DestChainConfigArgs:        allDestChainConfigs,
 				}
 			} else {
-				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
+				output.AuthorizedCallerUpdates = fq_bindings.AuthorizedCallersAuthorizedCallerArgs{
 					AddedCallers: fqOutput.PriceUpdaters,
 				}
 				output.TokenTransferFeeConfigUpdates = fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
@@ -587,9 +572,9 @@ var (
 			)
 			isNewFQv2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterV2Ref)
 
-			var staticCfg fqops.StaticConfig
-			var destChainCfgs []fqops.DestChainConfigArgs
-			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
+			var staticCfg fq_bindings.FeeQuoterStaticConfig
+			var destChainCfgs []fq_bindings.FeeQuoterDestChainConfigArgs
+			var tokenTransferFeeConfigArgsForAll []fq_bindings.FeeQuoterTokenTransferFeeConfigArgs
 			var providedRemoteChains map[uint64]struct{}
 			if len(input.RemoteChainSelectors) > 0 {
 				// initialize providedRemoteChains map if remote chain selectors are provided in the input,
@@ -611,7 +596,7 @@ var (
 			output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, lastKnownPriceUpdates.TokenPriceUpdates...)
 			output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, lastKnownPriceUpdates.GasPriceUpdates...)
 			for _, meta := range onRampMetadata {
-				var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
+				var tokenTransferFeeConfigArgs []fq_bindings.FeeQuoterTokenTransferFeeConfigSingleTokenArgs
 
 				// Convert metadata to typed struct if needed
 				onRampCfg, err := datastore_utils.ConvertMetadataToType[seq1_5.OnRampImportConfigSequenceOutput](meta.Metadata)
@@ -637,16 +622,16 @@ var (
 					}
 				}
 				if staticCfg.LinkToken == (common.Address{}) {
-					staticCfg = fqops.StaticConfig{
+					staticCfg = fq_bindings.FeeQuoterStaticConfig{
 						LinkToken:         onRampCfg.StaticConfig.LinkToken,
 						MaxFeeJuelsPerMsg: onRampCfg.StaticConfig.MaxNopFeesJuels,
 					}
 				}
 				chainFamilySelector := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
 
-				destChainCfgs = append(destChainCfgs, fqops.DestChainConfigArgs{
+				destChainCfgs = append(destChainCfgs, fq_bindings.FeeQuoterDestChainConfigArgs{
 					DestChainSelector: onRampCfg.RemoteChainSelector,
-					DestChainConfig: fqops.DestChainConfig{
+					DestChainConfig: fq_bindings.FeeQuoterDestChainConfig{
 						IsEnabled:                   true,
 						MaxDataBytes:                onRampCfg.DynamicConfig.MaxDataBytes,
 						MaxPerMsgGasLimit:           onRampCfg.DynamicConfig.MaxPerMsgGasLimit,
@@ -661,9 +646,9 @@ var (
 					},
 				})
 				for token, tokenCfg := range onRampCfg.TokenTransferFeeConfig {
-					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigSingleTokenArgs{
+					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fq_bindings.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
-						TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+						TokenTransferFeeConfig: fq_bindings.FeeQuoterTokenTransferFeeConfig{
 							FeeUSDCents:       tokenCfg.MinFeeUSDCents,
 							DestGasOverhead:   tokenCfg.DestGasOverhead,
 							DestBytesOverhead: tokenCfg.DestBytesOverhead,
@@ -671,14 +656,14 @@ var (
 						},
 					})
 				}
-				tokenTransferFeeConfigArgsForAll = append(tokenTransferFeeConfigArgsForAll, fqops.TokenTransferFeeConfigArgs{
+				tokenTransferFeeConfigArgsForAll = append(tokenTransferFeeConfigArgsForAll, fq_bindings.FeeQuoterTokenTransferFeeConfigArgs{
 					DestChainSelector:       onRampCfg.RemoteChainSelector,
 					TokenTransferFeeConfigs: tokenTransferFeeConfigArgs,
 				})
 			}
 			if isNewFQv2Deployment {
 				output.ConstructorArgs = fqops.ConstructorArgs{
-					StaticConfig: fqops.StaticConfig{
+					StaticConfig: fq_bindings.FeeQuoterStaticConfig{
 						LinkToken:         staticCfg.LinkToken,
 						MaxFeeJuelsPerMsg: staticCfg.MaxFeeJuelsPerMsg,
 					},
@@ -689,7 +674,7 @@ var (
 			} else {
 				output.DestChainConfigs = destChainCfgs
 				output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs = tokenTransferFeeConfigArgsForAll
-				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
+				output.AuthorizedCallerUpdates = fq_bindings.AuthorizedCallersAuthorizedCallerArgs{
 					AddedCallers: priceUpdaters,
 				}
 			}
@@ -735,13 +720,9 @@ var SequenceRemoveFeeTokens = cldf_ops.NewSequence(
 			}
 
 			fqAddr := common.HexToAddress(chainInput.FeeQuoter20Ref.Address)
-			removeReport, err := cldf_ops.ExecuteOperation(
-				b, fqops.RemoveFeeTokens, chain,
-				contract.FunctionInput[[]common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       fqAddr,
-					Args:          chainInput.FeeTokensToRemove,
-				})
+			removeReport, err := evmops.ExecuteWrite(
+				b, chain, fqAddr, evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fqops.NewWriteRemoveFeeTokens, chainInput.FeeTokensToRemove,
+			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove fee tokens from FeeQuoter(%s) on chain %s: %w",
 					fqAddr.Hex(), chain, err)
@@ -847,22 +828,22 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 
 // mergeFeeQuoterPriceUpdates merges token and gas price updates from two sources. For duplicate
 // destination chain selectors (gas) or source tokens (token prices), values from p16 win.
-func mergeFeeQuoterPriceUpdates(p16, p15 fqops.PriceUpdates) fqops.PriceUpdates {
-	gasByDest := make(map[uint64]fqops.GasPriceUpdate)
+func mergeFeeQuoterPriceUpdates(p16, p15 fq_bindings.InternalPriceUpdates) fq_bindings.InternalPriceUpdates {
+	gasByDest := make(map[uint64]fq_bindings.InternalGasPriceUpdate)
 	for _, u := range p15.GasPriceUpdates {
 		gasByDest[u.DestChainSelector] = u
 	}
 	for _, u := range p16.GasPriceUpdates {
 		gasByDest[u.DestChainSelector] = u
 	}
-	tokenByAddr := make(map[common.Address]fqops.TokenPriceUpdate)
+	tokenByAddr := make(map[common.Address]fq_bindings.InternalTokenPriceUpdate)
 	for _, u := range p15.TokenPriceUpdates {
 		tokenByAddr[u.SourceToken] = u
 	}
 	for _, u := range p16.TokenPriceUpdates {
 		tokenByAddr[u.SourceToken] = u
 	}
-	var out fqops.PriceUpdates
+	var out fq_bindings.InternalPriceUpdates
 	for _, u := range gasByDest {
 		out.GasPriceUpdates = append(out.GasPriceUpdates, u)
 	}
@@ -872,7 +853,7 @@ func mergeFeeQuoterPriceUpdates(p16, p15 fqops.PriceUpdates) fqops.PriceUpdates 
 	return out
 }
 
-func mergeTokenTransferFeeConfigArgs(args1, args2 []fqops.TokenTransferFeeConfigArgs) []fqops.TokenTransferFeeConfigArgs {
+func mergeTokenTransferFeeConfigArgs(args1, args2 []fq_bindings.FeeQuoterTokenTransferFeeConfigArgs) []fq_bindings.FeeQuoterTokenTransferFeeConfigArgs {
 	result := args1
 	// TokenTransferFeeConfigArgs: merge by DestChainSelector
 	if len(result) == 0 {
@@ -894,7 +875,7 @@ func mergeTokenTransferFeeConfigArgs(args1, args2 []fqops.TokenTransferFeeConfig
 	return result
 }
 
-func mergePriceUpdaters(updaters1, updaters2 fqops.AuthorizedCallerArgs) fqops.AuthorizedCallerArgs {
+func mergePriceUpdaters(updaters1, updaters2 fq_bindings.AuthorizedCallersAuthorizedCallerArgs) fq_bindings.AuthorizedCallersAuthorizedCallerArgs {
 	result := updaters1
 	// AddedCallers: merge unique addresses from both outputs
 	addedCallersMap := make(map[common.Address]bool)
@@ -922,11 +903,11 @@ func mergePriceUpdaters(updaters1, updaters2 fqops.AuthorizedCallerArgs) fqops.A
 }
 
 // mergeDestChainConfigs merges two slices of DestChainConfigArgs, giving precedence to the first slice in case of duplicate DestChainSelectors.
-func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.DestChainConfigArgs {
+func mergeDestChainConfigs(cfgs1, cfgs2 []fq_bindings.FeeQuoterDestChainConfigArgs) []fq_bindings.FeeQuoterDestChainConfigArgs {
 	result := cfgs1
 
 	// Create a map of dest chain selectors from cfgs1 which will be skipped when adding from cfgs2
-	destChainMap := make(map[uint64]fqops.DestChainConfigArgs)
+	destChainMap := make(map[uint64]fq_bindings.FeeQuoterDestChainConfigArgs)
 	for _, cfg := range cfgs1 {
 		destChainMap[cfg.DestChainSelector] = cfg
 	}
@@ -943,7 +924,7 @@ func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.Des
 }
 
 func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
-	return (a.StaticConfig == fqops.StaticConfig{}) &&
+	return (a.StaticConfig == fq_bindings.FeeQuoterStaticConfig{}) &&
 		len(a.PriceUpdaters) == 0 &&
 		len(a.TokenTransferFeeConfigArgs) == 0 &&
 		len(a.DestChainConfigArgs) == 0
@@ -956,7 +937,7 @@ func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
 // and adds it to the output. If the chain family has no hardcoded price, it returns empty price updates.
 // Returns an error only for an invalid gas price string in config or failure to resolve the chain family.
 // It is exported for testing.
-func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
+func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fq_bindings.InternalPriceUpdates, err error) {
 	var staticPrice *big.Int
 	if input.AdditionalConfig != nil && input.AdditionalConfig.GasPricesPerRemoteChain != nil {
 		gaspriceStr, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]
@@ -964,7 +945,7 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 			var success bool
 			staticPrice, success = new(big.Int).SetString(gaspriceStr, 10)
 			if !success {
-				return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
+				return fq_bindings.InternalPriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
 			}
 		}
 	}
@@ -972,16 +953,16 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 		// check if static gas price is already hard coded for the chain family
 		chainFamily, err := chain_selectors.GetSelectorFamily(remoteChain)
 		if err != nil {
-			return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
+			return fq_bindings.InternalPriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
 		}
 		var exists bool
 		staticPrice, exists = staticGasPriceByChainFamily[chainFamily]
 		if !exists || staticPrice == nil {
-			return fqops.PriceUpdates{}, nil
+			return fq_bindings.InternalPriceUpdates{}, nil
 		}
 	}
 
-	output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
+	output.GasPriceUpdates = append(output.GasPriceUpdates, fq_bindings.InternalGasPriceUpdate{
 		DestChainSelector: remoteChain,
 		UsdPerUnitGas:     staticPrice,
 	})
@@ -998,27 +979,27 @@ func batched[T any](items []T, batchLen int) [][]T {
 	return slices.Collect(slices.Chunk(items, batchLen))
 }
 
-func batchedDestChainConfigArgs(destChainConfigs []fqops.DestChainConfigArgs) [][]fqops.DestChainConfigArgs {
+func batchedDestChainConfigArgs(destChainConfigs []fq_bindings.FeeQuoterDestChainConfigArgs) [][]fq_bindings.FeeQuoterDestChainConfigArgs {
 	return batched(destChainConfigs, DestChainConfigUpdateBatchLen)
 }
 
-func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigArgs) [][]fqops.TokenTransferFeeConfigArgs {
+func batchedTokenTransferFeeConfigArgs(tokenTransferFeeConfigArgs []fq_bindings.FeeQuoterTokenTransferFeeConfigArgs) [][]fq_bindings.FeeQuoterTokenTransferFeeConfigArgs {
 	return batched(tokenTransferFeeConfigArgs, TokenTransferFeeConfigUpdateBatchLen)
 }
 
-func batchedGasPriceUpdates(gasPriceUpdates []fqops.GasPriceUpdate) [][]fqops.GasPriceUpdate {
+func batchedGasPriceUpdates(gasPriceUpdates []fq_bindings.InternalGasPriceUpdate) [][]fq_bindings.InternalGasPriceUpdate {
 	return batched(gasPriceUpdates, GasPriceUpdateBatchLen)
 }
 
-func batchedTokenPriceUpdates(tokenPriceUpdates []fqops.TokenPriceUpdate) [][]fqops.TokenPriceUpdate {
+func batchedTokenPriceUpdates(tokenPriceUpdates []fq_bindings.InternalTokenPriceUpdate) [][]fq_bindings.InternalTokenPriceUpdate {
 	return batched(tokenPriceUpdates, TokenPriceUpdateBatchLen)
 }
 
 type BatchedFeeQuoterUpdate struct {
-	DestChainConfigBatches        [][]fqops.DestChainConfigArgs
-	TokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs
-	GasPriceUpdateBatches         [][]fqops.GasPriceUpdate
-	TokenPriceUpdateBatches       [][]fqops.TokenPriceUpdate
+	DestChainConfigBatches        [][]fq_bindings.FeeQuoterDestChainConfigArgs
+	TokenTransferFeeConfigBatches [][]fq_bindings.FeeQuoterTokenTransferFeeConfigArgs
+	GasPriceUpdateBatches         [][]fq_bindings.InternalGasPriceUpdate
+	TokenPriceUpdateBatches       [][]fq_bindings.InternalTokenPriceUpdate
 }
 
 // BatchedInputForSequenceFeeQuoterUpdate takes the FeeQuoterUpdate output from the import sequences and checks if the number of dest chain configs, token transfer fee configs, gas price updates, or token price updates exceed the batch length limit for on-chain update.
@@ -1026,10 +1007,10 @@ type BatchedFeeQuoterUpdate struct {
 // This is to avoid hitting block gas limit when there are too many dest chain configs, token transfer fee configs, gas price updates, or token price updates to be updated on-chain.
 // Exported for testing.
 func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) BatchedFeeQuoterUpdate {
-	var destChainConfigBatches [][]fqops.DestChainConfigArgs
-	var tokenTransferFeeConfigBatches [][]fqops.TokenTransferFeeConfigArgs
-	var gasPriceUpdateBatches [][]fqops.GasPriceUpdate
-	var tokenPriceUpdateBatches [][]fqops.TokenPriceUpdate
+	var destChainConfigBatches [][]fq_bindings.FeeQuoterDestChainConfigArgs
+	var tokenTransferFeeConfigBatches [][]fq_bindings.FeeQuoterTokenTransferFeeConfigArgs
+	var gasPriceUpdateBatches [][]fq_bindings.InternalGasPriceUpdate
+	var tokenPriceUpdateBatches [][]fq_bindings.InternalTokenPriceUpdate
 	// check the destchain configs in constructor args, if it needs batching, we send batch 1
 	// in constructor args, and then rest of the batches in ApplyDestChainConfigUpdates,
 	// this is to make sure that if there are a lot of dest chain configs to be updated, we don't run into block gas limit issue
@@ -1073,19 +1054,19 @@ func BatchedInputForSequenceFeeQuoterUpdate(input *FeeQuoterUpdate) BatchedFeeQu
 	}
 }
 
-func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int, inputPrices map[uint64]string) (fqops.PriceUpdates, error) {
-	var tokenPriceUpdates []fqops.TokenPriceUpdate
+func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices map[uint64]*big.Int, inputPrices map[uint64]string) (fq_bindings.InternalPriceUpdates, error) {
+	var tokenPriceUpdates []fq_bindings.InternalTokenPriceUpdate
 	for token, price := range tokenPrices {
 		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
 			// if price is not found or invalid, we just skip adding price update for that token,
 			continue
 		}
-		tokenPriceUpdates = append(tokenPriceUpdates, fqops.TokenPriceUpdate{
+		tokenPriceUpdates = append(tokenPriceUpdates, fq_bindings.InternalTokenPriceUpdate{
 			SourceToken: token,
 			UsdPerToken: price,
 		})
 	}
-	var gasPriceUpdates []fqops.GasPriceUpdate
+	var gasPriceUpdates []fq_bindings.InternalGasPriceUpdate
 	for chainSelector, price := range gasPrices {
 		if price == nil || price.Cmp(big.NewInt(0)) <= 0 {
 			priceStr := "nil"
@@ -1099,20 +1080,20 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 			}
 			family, err := chain_selectors.GetSelectorFamily(chainSelector)
 			if err != nil {
-				return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", chainSelector, err)
+				return fq_bindings.InternalPriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", chainSelector, err)
 			}
 			if _, exists := staticGasPriceByChainFamily[family]; exists {
 				// if the chain family has a hardcoded static price, we skip the error and rely on that static price to be used in the import sequence
 				continue
 			}
-			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d", priceStr, chainSelector)
+			return fq_bindings.InternalPriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d", priceStr, chainSelector)
 		}
-		gasPriceUpdates = append(gasPriceUpdates, fqops.GasPriceUpdate{
+		gasPriceUpdates = append(gasPriceUpdates, fq_bindings.InternalGasPriceUpdate{
 			DestChainSelector: chainSelector,
 			UsdPerUnitGas:     price,
 		})
 	}
-	return fqops.PriceUpdates{
+	return fq_bindings.InternalPriceUpdates{
 		TokenPriceUpdates: tokenPriceUpdates,
 		GasPriceUpdates:   gasPriceUpdates,
 	}, nil
@@ -1133,7 +1114,7 @@ func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelect
 		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
 	}
 
-	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	onrampContract, err := onramp_bindings.NewOnRamp(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
 	}

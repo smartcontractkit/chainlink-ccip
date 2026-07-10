@@ -1,18 +1,19 @@
 package tokens
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	adaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -88,13 +89,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs '%s': must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
 				}
-				report, err := cldf_ops.ExecuteOperation(b,
-					token_pool.GetAdvancedPoolHooks, chain,
-					contract.FunctionInput[struct{}]{
-						ChainSelector: chain.Selector,
-						Address:       tokenPoolAddress,
-					},
-				)
+				report, err := evmops.ExecuteRead(b, chain, tokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetAdvancedPoolHooks, struct{}{})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to read advanced pool hooks address from existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
 				}

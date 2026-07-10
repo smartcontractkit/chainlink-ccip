@@ -1,11 +1,13 @@
 package tokens
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -39,7 +41,7 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 
 			args := token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
 				DisableTokenTransferFeeConfigs: []uint64{},
-				TokenTransferFeeConfigArgs:     []token_pool.TokenTransferFeeConfigArgs{},
+				TokenTransferFeeConfigArgs:     []tp_bindings.TokenPoolTokenTransferFeeConfigArgs{},
 			}
 
 			for dst, fee := range cfg {
@@ -48,9 +50,9 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 				} else {
 					args.TokenTransferFeeConfigArgs = append(
 						args.TokenTransferFeeConfigArgs,
-						token_pool.TokenTransferFeeConfigArgs{
+						tp_bindings.TokenPoolTokenTransferFeeConfigArgs{
 							DestChainSelector: dst,
-							TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
+							TokenTransferFeeConfig: tp_bindings.IPoolV2TokenTransferFeeConfig{
 								FinalityTransferFeeBps:     fee.DefaultFinalityTransferFeeBps,
 								FastFinalityTransferFeeBps: fee.CustomFinalityTransferFeeBps,
 								FinalityFeeUSDCents:        fee.DefaultFinalityFeeUSDCents,
@@ -65,14 +67,7 @@ var SetTokenTransferFeeConfigForTokenPools = operations.NewSequence(
 			}
 
 			if len(args.DisableTokenTransferFeeConfigs) > 0 || len(args.TokenTransferFeeConfigArgs) > 0 {
-				report, err := operations.ExecuteOperation(
-					b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain,
-					contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
-						ChainSelector: src,
-						Address:       addr,
-						Args:          args,
-					},
-				)
+				report, err := evmops.ExecuteWrite(b, chain, addr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewWriteApplyTokenTransferFeeConfigUpdates, args)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute token_pool.ApplyTokenTransferFeeConfigUpdates on %s: %w", chain.String(), err)
 				}

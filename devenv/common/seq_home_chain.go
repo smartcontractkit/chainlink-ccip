@@ -7,18 +7,22 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	cciphomeops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -68,26 +72,25 @@ var AddDONAndSetCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack set candidate call: %w", err)
 			}
-			out, err := operations.ExecuteOperation(
+			out, err := evmops.ExecuteWrite(
 				b,
-				cciphomeops.AddDON,
 				deps.HomeChain,
-				contract.FunctionInput[cciphomeops.AddDONOpInput]{
-					ChainSelector: deps.HomeChain.Selector,
-					Address:       input.CapabilitiesRegistry,
-					Args: cciphomeops.AddDONOpInput{
-						Nodes: don.PeerIDs,
-						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
-							{
-								CapabilityId: CCIPCapabilityID,
-								Config:       encodedSetCandidateCall,
-							},
+				input.CapabilitiesRegistry,
+				capabilities_registry.NewCapabilitiesRegistry,
+				newWriteAddDON,
+				cciphomeops.AddDONOpInput{
+					Nodes: don.PeerIDs,
+					CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+						{
+							CapabilityId: CCIPCapabilityID,
+							Config:       encodedSetCandidateCall,
 						},
-						IsPublic:         don.IsPublic,
-						AcceptsWorkflows: don.AcceptsWorkflows,
-						F:                don.F,
 					},
-				})
+					IsPublic:         don.IsPublic,
+					AcceptsWorkflows: don.AcceptsWorkflows,
+					F:                don.F,
+				},
+			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AddDON for chain with selector %d and plugin type %d: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
@@ -134,25 +137,23 @@ var SetCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack set candidate call: %w", err)
 			}
-			out, err := operations.ExecuteOperation(
+			out, err := evmops.ExecuteWrite(
 				b,
-				cciphomeops.UpdateDON,
 				deps.HomeChain,
-				contract.FunctionInput[cciphomeops.UpdateDONOpInput]{
-					Address:       input.CapabilitiesRegistry,
-					ChainSelector: deps.HomeChain.Selector,
-					Args: cciphomeops.UpdateDONOpInput{
-						ID:    don.ID,
-						Nodes: don.PeerIDs,
-						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
-							{
-								CapabilityId: CCIPCapabilityID,
-								Config:       encodedSetCandidateCall,
-							},
+				input.CapabilitiesRegistry,
+				capabilities_registry.NewCapabilitiesRegistry,
+				newWriteUpdateDON,
+				cciphomeops.UpdateDONOpInput{
+					ID:    don.ID,
+					Nodes: don.PeerIDs,
+					CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+						{
+							CapabilityId: CCIPCapabilityID,
+							Config:       encodedSetCandidateCall,
 						},
-						IsPublic: don.IsPublic,
-						F:        don.F,
 					},
+					IsPublic: don.IsPublic,
+					F:        don.F,
 				},
 			)
 			if err != nil {
@@ -203,25 +204,23 @@ var PromoteCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack promote candidate call: %w", err)
 			}
-			out, err := operations.ExecuteOperation(
+			out, err := evmops.ExecuteWrite(
 				b,
-				cciphomeops.UpdateDON,
 				deps.HomeChain,
-				contract.FunctionInput[cciphomeops.UpdateDONOpInput]{
-					Address:       input.CapabilitiesRegistry,
-					ChainSelector: deps.HomeChain.Selector,
-					Args: cciphomeops.UpdateDONOpInput{
-						ID:    don.ID,
-						Nodes: don.PeerIDs,
-						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
-							{
-								CapabilityId: CCIPCapabilityID,
-								Config:       encodedPromoteCandidateCall,
-							},
+				input.CapabilitiesRegistry,
+				capabilities_registry.NewCapabilitiesRegistry,
+				newWriteUpdateDON,
+				cciphomeops.UpdateDONOpInput{
+					ID:    don.ID,
+					Nodes: don.PeerIDs,
+					CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+						{
+							CapabilityId: CCIPCapabilityID,
+							Config:       encodedPromoteCandidateCall,
 						},
-						IsPublic: don.IsPublic,
-						F:        don.F,
 					},
+					IsPublic: don.IsPublic,
+					F:        don.F,
 				},
 			)
 			if err != nil {
@@ -291,15 +290,13 @@ var ApplyChainConfigUpdatesSequence = operations.NewSequence(
 		}
 		writes := make([]contract.WriteOutput, 0)
 		for _, batch := range batches {
-			out, err := operations.ExecuteOperation(
+			out, err := evmops.ExecuteWrite(
 				b,
-				cciphomeops.ApplyChainConfigUpdates,
 				deps.HomeChain,
-				contract.FunctionInput[cciphomeops.ApplyChainConfigUpdatesOpInput]{
-					Address:       input.CCIPHome,
-					ChainSelector: deps.HomeChain.Selector,
-					Args:          batch,
-				},
+				input.CCIPHome,
+				ccip_home.NewCCIPHome,
+				newWriteApplyChainConfigUpdates,
+				batch,
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute ApplyChainConfigUpdatesOp on CCIPHome: %w", err)
@@ -372,17 +369,15 @@ var SeqAddCapabilityToCapReg = operations.NewSequence(
 		var writes []contract.WriteOutput
 		// Add the capability to the CapabilitiesRegistry contract only if it does not exist
 		if addCapability {
-			out, err := operations.ExecuteOperation(
+			out, err := evmops.ExecuteWrite(
 				b,
-				cciphomeops.AddCapabilities,
 				deps.HomeChain,
-				contract.FunctionInput[cciphomeops.AddCapabilitiesOpInput]{
-					ChainSelector: chain.Selector,
-					Address:       input.CapReg,
-					Args: cciphomeops.AddCapabilitiesOpInput{
-						Capabilities: []capabilities_registry.CapabilitiesRegistryCapability{
-							capabilityToAdd,
-						},
+				input.CapReg,
+				capabilities_registry.NewCapabilitiesRegistry,
+				newWriteAddCapabilities,
+				cciphomeops.AddCapabilitiesOpInput{
+					Capabilities: []capabilities_registry.CapabilitiesRegistryCapability{
+						capabilityToAdd,
 					},
 				},
 			)
@@ -439,16 +434,14 @@ var SeqAddNodeOperatorsToCapReg = operations.NewSequence(
 			nodeOpsToAdd = append(nodeOpsToAdd, nop)
 		}
 		if len(nodeOpsToAdd) > 0 {
-			out, err := operations.ExecuteOperation(
+			out, err := evmops.ExecuteWrite(
 				b,
-				cciphomeops.AddNodeOperators,
 				chain,
-				contract.FunctionInput[cciphomeops.AddNodesOperatorsOpInput]{
-					ChainSelector: chain.Selector,
-					Address:       input.CapReg,
-					Args: cciphomeops.AddNodesOperatorsOpInput{
-						Nodes: nodeOpsToAdd,
-					},
+				input.CapReg,
+				capabilities_registry.NewCapabilitiesRegistry,
+				newWriteAddNodeOperators,
+				cciphomeops.AddNodesOperatorsOpInput{
+					Nodes: nodeOpsToAdd,
 				},
 			)
 			if err != nil {
@@ -513,16 +506,14 @@ var SeqAddNodesToCapReg = operations.NewSequence(
 			return sequences.OnChainOutput{}, nil
 		}
 		b.Logger.Infow("Adding nodes", "chain", chain.String(), "nodes", p2pIDsByNodeOpID)
-		out, err := operations.ExecuteOperation(
+		out, err := evmops.ExecuteWrite(
 			b,
-			cciphomeops.AddNodes,
 			chain,
-			contract.FunctionInput[cciphomeops.AddNodesOpInput]{
-				ChainSelector: chain.Selector,
-				Address:       input.CapReg,
-				Args: cciphomeops.AddNodesOpInput{
-					Nodes: nodeParams,
-				},
+			input.CapReg,
+			capabilities_registry.NewCapabilitiesRegistry,
+			newWriteAddNodes,
+			cciphomeops.AddNodesOpInput{
+				Nodes: nodeParams,
 			},
 		)
 		if err != nil {
@@ -574,4 +565,100 @@ func getNodesByNodeOpIDs(capReg *capabilities_registry.CapabilitiesRegistry, nod
 		return nil, errors.New("failed to get nodes by nop id all node operators")
 	}
 	return p2pIDsByNodeOpID, nil
+}
+
+func newWriteAddDON(c *capabilities_registry.CapabilitiesRegistry) *operations.Operation[contract.FunctionInput[cciphomeops.AddDONOpInput], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[cciphomeops.AddDONOpInput, *capabilities_registry.CapabilitiesRegistry]{
+		Name:            "capabilities-registry:add-don",
+		Version:         cciphomeops.CapabilitiesRegistryVersion,
+		Description:     "Adds a new DON to the CapabilitiesRegistry",
+		ContractType:    cciputils.CapabilitiesRegistry,
+		ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, cciphomeops.AddDONOpInput],
+		Validate:        func(cciphomeops.AddDONOpInput) error { return nil },
+		CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input cciphomeops.AddDONOpInput) (*types.Transaction, error) {
+			return capReg.AddDON(opts, input.Nodes, input.CapabilityConfigurations, input.IsPublic, input.AcceptsWorkflows, input.F)
+		},
+	})
+}
+
+func newWriteUpdateDON(c *capabilities_registry.CapabilitiesRegistry) *operations.Operation[contract.FunctionInput[cciphomeops.UpdateDONOpInput], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[cciphomeops.UpdateDONOpInput, *capabilities_registry.CapabilitiesRegistry]{
+		Name:            "capabilities-registry:update-don",
+		Version:         cciphomeops.CapabilitiesRegistryVersion,
+		Description:     "Updates an existing DON in the CapabilitiesRegistry",
+		ContractType:    cciputils.CapabilitiesRegistry,
+		ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, cciphomeops.UpdateDONOpInput],
+		Validate:        func(cciphomeops.UpdateDONOpInput) error { return nil },
+		CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input cciphomeops.UpdateDONOpInput) (*types.Transaction, error) {
+			return capReg.UpdateDON(opts, input.ID, input.Nodes, input.CapabilityConfigurations, input.IsPublic, input.F)
+		},
+	})
+}
+
+func newWriteAddNodes(c *capabilities_registry.CapabilitiesRegistry) *operations.Operation[contract.FunctionInput[cciphomeops.AddNodesOpInput], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[cciphomeops.AddNodesOpInput, *capabilities_registry.CapabilitiesRegistry]{
+		Name:            "capabilities-registry:add-nodes",
+		Version:         cciphomeops.CapabilitiesRegistryVersion,
+		Description:     "Adds nodes to an existing node operator in the CapabilitiesRegistry",
+		ContractType:    cciputils.CapabilitiesRegistry,
+		ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, cciphomeops.AddNodesOpInput],
+		Validate:        func(cciphomeops.AddNodesOpInput) error { return nil },
+		CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input cciphomeops.AddNodesOpInput) (*types.Transaction, error) {
+			return capReg.AddNodes(opts, input.Nodes)
+		},
+	})
+}
+
+func newWriteAddNodeOperators(c *capabilities_registry.CapabilitiesRegistry) *operations.Operation[contract.FunctionInput[cciphomeops.AddNodesOperatorsOpInput], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[cciphomeops.AddNodesOperatorsOpInput, *capabilities_registry.CapabilitiesRegistry]{
+		Name:            "capabilities-registry:add-node-operators",
+		Version:         cciphomeops.CapabilitiesRegistryVersion,
+		Description:     "Adds new node operators to the CapabilitiesRegistry",
+		ContractType:    cciputils.CapabilitiesRegistry,
+		ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, cciphomeops.AddNodesOperatorsOpInput],
+		Validate:        func(cciphomeops.AddNodesOperatorsOpInput) error { return nil },
+		CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input cciphomeops.AddNodesOperatorsOpInput) (*types.Transaction, error) {
+			return capReg.AddNodeOperators(opts, input.Nodes)
+		},
+	})
+}
+
+func newWriteAddCapabilities(c *capabilities_registry.CapabilitiesRegistry) *operations.Operation[contract.FunctionInput[cciphomeops.AddCapabilitiesOpInput], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[cciphomeops.AddCapabilitiesOpInput, *capabilities_registry.CapabilitiesRegistry]{
+		Name:            "capabilities-registry:add-capability",
+		Version:         cciphomeops.CapabilitiesRegistryVersion,
+		Description:     "Adds a new capability to the CapabilitiesRegistry",
+		ContractType:    cciputils.CapabilitiesRegistry,
+		ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, cciphomeops.AddCapabilitiesOpInput],
+		Validate:        func(cciphomeops.AddCapabilitiesOpInput) error { return nil },
+		CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input cciphomeops.AddCapabilitiesOpInput) (*types.Transaction, error) {
+			return capReg.AddCapabilities(opts, input.Capabilities)
+		},
+	})
+}
+
+func newWriteApplyChainConfigUpdates(c *ccip_home.CCIPHome) *operations.Operation[contract.FunctionInput[cciphomeops.ApplyChainConfigUpdatesOpInput], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[cciphomeops.ApplyChainConfigUpdatesOpInput, *ccip_home.CCIPHome]{
+		Name:            "ccip-home:apply-chain-config-updates",
+		Version:         cciphomeops.CCIPHomeVersion,
+		Description:     "Applies chain config updates to the CCIPHome contract",
+		ContractType:    cciputils.CCIPHome,
+		ContractABI:     ccip_home.CCIPHomeABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*ccip_home.CCIPHome, cciphomeops.ApplyChainConfigUpdatesOpInput],
+		Validate:        func(cciphomeops.ApplyChainConfigUpdatesOpInput) error { return nil },
+		CallContract: func(ccipHome *ccip_home.CCIPHome, opts *bind.TransactOpts, input cciphomeops.ApplyChainConfigUpdatesOpInput) (*types.Transaction, error) {
+			return ccipHome.ApplyChainConfigUpdates(opts, input.RemoteChainRemoves, input.RemoteChainAdds)
+		},
+	})
 }

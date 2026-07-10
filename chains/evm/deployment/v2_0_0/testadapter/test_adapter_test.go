@@ -1,6 +1,7 @@
 package testadapter
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"errors"
 	"math/big"
 	"testing"
@@ -19,7 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/message_hasher"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 
 	op_router "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
@@ -107,9 +108,8 @@ type laneContracts struct {
 func deployLaneContracts(t *testing.T, env *deployment.Environment, chain cldf_evm.Chain, chainSelector uint64) laneContracts {
 	t.Helper()
 
-	create2FactoryRef, err := contract.MaybeDeployContract(env.OperationsBundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(env.OperationsBundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
 		},

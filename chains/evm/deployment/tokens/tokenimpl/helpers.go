@@ -10,9 +10,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
@@ -25,13 +27,9 @@ func revokeDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default admin role constant: %w", err)
 	}
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.RevokeAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args: burn_mint_erc20.RoleAssignment{
-			Role: role,
-			To:   user,
-		},
+	report, err := evmops.ExecuteWrite(b, chain, token, bnm_erc20_bindings.NewBurnMintERC20, burn_mint_erc20.NewWriteRevokeAdminRole, burn_mint_erc20.RoleAssignment{
+		Role: role,
+		To:   user,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to revoke default admin role: %w", err)
@@ -64,13 +62,9 @@ func grantDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, toke
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default admin role constant: %w", err)
 	}
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args: burn_mint_erc20.RoleAssignment{
-			Role: role,
-			To:   user,
-		},
+	report, err := evmops.ExecuteWrite(b, chain, token, bnm_erc20_bindings.NewBurnMintERC20, burn_mint_erc20.NewWriteGrantAdminRole, burn_mint_erc20.RoleAssignment{
+		Role: role,
+		To:   user,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant default admin role: %w", err)
@@ -79,11 +73,7 @@ func grantDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, toke
 }
 
 func grantMintAndBurnRolesBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantMintAndBurnRoles, chain, contract.FunctionInput[common.Address]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args:          pool,
-	})
+	report, err := evmops.ExecuteWrite(b, chain, token, bnm_erc20_bindings.NewBurnMintERC20, burn_mint_erc20.NewWriteGrantMintAndBurnRoles, pool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant mint and burn roles: %w", err)
 	}
@@ -91,11 +81,7 @@ func grantMintAndBurnRolesBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, toke
 }
 
 func setCCIPAdminBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.SetCCIPAdmin, chain, contract.FunctionInput[string]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args:          ccipAdmin.Hex(),
-	})
+	report, err := evmops.ExecuteWrite(b, chain, token, bnm_erc20_bindings.NewBurnMintERC20, burn_mint_erc20.NewWriteSetCCIPAdmin, ccipAdmin.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to set CCIP admin: %w", err)
 	}
@@ -103,13 +89,9 @@ func setCCIPAdminBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, ccipAd
 }
 
 func transferTokensERC20(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args: erc20.TransferArgs{
-			Amount:   scaledAmount,
-			Receiver: to,
-		},
+	report, err := evmops.ExecuteWrite(b, chain, token, erc20_bindings.NewERC20, erc20.NewWriteTransfer, erc20.TransferArgs{
+		Amount:   scaledAmount,
+		Receiver: to,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to transfer ERC20 tokens: %w", err)

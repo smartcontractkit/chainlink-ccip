@@ -1,6 +1,8 @@
 package changesets_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
@@ -12,13 +14,12 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_changeset "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	fq16_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	fq163_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	fq20binding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
@@ -145,18 +146,17 @@ func deployRemoveFeeTokensFixtureWithMultipleFeeQuoter16Versions(
 	deployFeeQuoter160(t, e, ds, chain, chainSel, []common.Address{legacyLinkToken})
 
 	// FQ 1.6.3 is the latest 1.6.x deployment and should be selected by GetFeeQuoterAddress.
-	fq163Out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fq163ops.Deploy, chain, contract.DeployInput[fq163ops.ConstructorArgs]{
-		ChainSelector:  chainSel,
+	fq163Out, err := evmops.ExecuteDeploy(e.OperationsBundle, fq163ops.Deploy, chain, contract.DeployInput[fq163ops.ConstructorArgs]{
 		TypeAndVersion: cldf.NewTypeAndVersion(fq163ops.ContractType, *fq163ops.Version),
 		Args: fq163ops.ConstructorArgs{
-			StaticConfig: fq163ops.StaticConfig{
+			StaticConfig: fq163_bindings.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1e18),
 				LinkToken:                    legacyLinkToken,
 				TokenPriceStalenessThreshold: 3600,
 			},
 			PriceUpdaters: []common.Address{chain.DeployerKey.From},
 			FeeTokens:     []common.Address{legacyLinkToken, legacyWethToken},
-			PremiumMultiplierWeiPerEthArgs: []fq163ops.PremiumMultiplierWeiPerEthArgs{
+			PremiumMultiplierWeiPerEthArgs: []fq163_bindings.FeeQuoterPremiumMultiplierWeiPerEthArgs{
 				{Token: legacyLinkToken, PremiumMultiplierWeiPerEth: 9e17},
 				{Token: legacyWethToken, PremiumMultiplierWeiPerEth: 1e18},
 			},
@@ -178,23 +178,22 @@ func deployFeeQuoter160(
 ) {
 	t.Helper()
 
-	premiumArgs := make([]fq16ops.FeeTokenArgs, 0, len(feeTokens))
+	premiumArgs := make([]fq16_bindings.FeeQuoterFeeTokenArgs, 0, len(feeTokens))
 	for _, token := range feeTokens {
 		multiplier := uint64(1e18)
 		if token == legacyLinkToken {
 			multiplier = 9e17
 		}
-		premiumArgs = append(premiumArgs, fq16ops.FeeTokenArgs{
+		premiumArgs = append(premiumArgs, fq16_bindings.FeeQuoterFeeTokenArgs{
 			Token:                      token,
 			PremiumMultiplierWeiPerEth: multiplier,
 		})
 	}
 
-	fq16Out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fq16ops.Deploy, chain, contract.DeployInput[fq16ops.ConstructorArgs]{
-		ChainSelector:  chainSel,
+	fq16Out, err := evmops.ExecuteDeploy(e.OperationsBundle, fq16ops.Deploy, chain, contract.DeployInput[fq16ops.ConstructorArgs]{
 		TypeAndVersion: cldf.NewTypeAndVersion(fq16ops.ContractType, *fq16ops.Version),
 		Args: fq16ops.ConstructorArgs{
-			StaticConfig: fq16ops.StaticConfig{
+			StaticConfig: fq16_bindings.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1e18),
 				LinkToken:                    legacyLinkToken,
 				TokenPriceStalenessThreshold: 3600,
@@ -246,11 +245,10 @@ func deployFeeQuoter20WithExtraTokens(
 ) common.Address {
 	t.Helper()
 
-	fq20Out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fq20ops.Deploy, chain, contract.DeployInput[fq20ops.ConstructorArgs]{
-		ChainSelector:  chainSel,
+	fq20Out, err := evmops.ExecuteDeploy(e.OperationsBundle, fq20ops.Deploy, chain, contract.DeployInput[fq20ops.ConstructorArgs]{
 		TypeAndVersion: cldf.NewTypeAndVersion(fq20ops.ContractType, *fq20ops.Version),
 		Args: fq20ops.ConstructorArgs{
-			StaticConfig: fq20ops.StaticConfig{
+			StaticConfig: fq20binding.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg: big.NewInt(1e18),
 				LinkToken:         legacyLinkToken,
 			},
@@ -262,18 +260,14 @@ func deployFeeQuoter20WithExtraTokens(
 	require.NoError(t, ds.Addresses().Add(fq20Out.Output))
 
 	tokenPrice := big.NewInt(1e18)
-	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, fq20ops.UpdatePrices, chain, contract.FunctionInput[fq20ops.PriceUpdates]{
-		ChainSelector: chainSel,
-		Address:       fq20Addr,
-		Args: fq20ops.PriceUpdates{
-			TokenPriceUpdates: []fq20ops.TokenPriceUpdate{
+	_, err = evmops.ExecuteWrite(e.OperationsBundle, chain, fq20Addr, evmops.BindAs[fq20binding.FeeQuoterInterface](fq20binding.NewFeeQuoter), fq20ops.NewWriteUpdatePrices, fq20binding.InternalPriceUpdates{
+			TokenPriceUpdates: []fq20binding.InternalTokenPriceUpdate{
 				{SourceToken: legacyLinkToken, UsdPerToken: tokenPrice},
 				{SourceToken: legacyWethToken, UsdPerToken: tokenPrice},
 				{SourceToken: extraFeeToken1, UsdPerToken: tokenPrice},
 				{SourceToken: extraFeeToken2, UsdPerToken: tokenPrice},
 			},
-		},
-	})
+		})
 	require.NoError(t, err)
 
 	return fq20Addr

@@ -5,10 +5,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -36,23 +37,17 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 	semver.MustParse("2.0.0"),
 	"Configures a token pool on an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
-		writes := make([]evm_contract.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 
 		// First, check if the allow-list is enabled
 		if len(input.AllowList) != 0 {
-			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowListEnabled, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
+			allowListEnabledReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewReadGetAllowListEnabled, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
 			if allowListEnabledReport.Output {
 				// Allow-list is enabled, so we first check the current allow-list
-				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowList, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-				})
+				currentAllowListReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewReadGetAllowList, struct{}{})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
@@ -60,13 +55,9 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 				// Apply any updates to the allow-list if they exist
 				if len(adds) != 0 || len(removes) != 0 {
-					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyAllowListUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyAllowListUpdatesArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
-						Args: token_pool.ApplyAllowListUpdatesArgs{
-							Adds:    adds,
-							Removes: removes,
-						},
+					applyAllowListUpdatesReport, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewWriteApplyAllowListUpdates, token_pool.ApplyAllowListUpdatesArgs{
+						Adds:    adds,
+						Removes: removes,
 					})
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -78,19 +69,12 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// Set router if necessary
 		if input.RouterAddress != (common.Address{}) {
-			currentRouterReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRouter, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
+			currentRouterReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewReadGetRouter, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current router from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
 			if currentRouterReport.Output != input.RouterAddress {
-				setRouterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRouter, chain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args:          input.RouterAddress,
-				})
+				setRouterReport, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewWriteSetRouter, input.RouterAddress)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set router on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
@@ -100,19 +84,12 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// Set rate limit admin if necessary
 		if input.RateLimitAdmin != (common.Address{}) {
-			currentRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRateLimitAdmin, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
+			currentRateLimitAdminReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewReadGetRateLimitAdmin, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current rate limit admin from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
 			if currentRateLimitAdminReport.Output != input.RateLimitAdmin {
-				setRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitAdmin, chain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args:          input.RateLimitAdmin,
-				})
+				setRateLimitAdminReport, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, NewTokenPool, token_pool.NewWriteSetRateLimitAdmin, input.RateLimitAdmin)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
@@ -120,7 +97,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 		}
 
-		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

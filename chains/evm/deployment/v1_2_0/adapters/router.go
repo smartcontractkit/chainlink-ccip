@@ -5,13 +5,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -42,7 +44,6 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 				}
 			}
 			tempDS := ds.Seal()
-			// get router from existing addresses
 			routerAddr, err := datastore_utils.FindAndFormatRef(
 				tempDS,
 				datastore.AddressRef{
@@ -66,9 +67,6 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 			}
 			onRampAdds := make([]routerops.OnRamp, 0)
 			offRampAdds := make([]routerops.OffRamp, 0)
-			// this assumes that there is only one onRamp and offRamp per chain,
-			// it will not work with 1.5 system where there can be multiple onRamps and offRamps per chain
-			// for each remote chain selector
 			for _, remoteChainSelector := range input.RemoteChainSelectors {
 				onRampAdds = append(onRampAdds, routerops.OnRamp{
 					DestChainSelector: remoteChainSelector,
@@ -79,15 +77,11 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 					OffRamp:             offRampAddr,
 				})
 			}
-			out, err := cldf_ops.ExecuteOperation(
-				b, routerops.ApplyRampUpdates, c, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
-					ChainSelector: input.ChainSelector,
-					Args: routerops.ApplyRampsUpdatesArgs{
-						OnRampUpdates:  onRampAdds,
-						OffRampRemoves: []routerops.OffRamp{},
-						OffRampAdds:    offRampAdds,
-					},
-					Address: routerAddr,
+			out, err := evmops.ExecuteWrite(
+				b, c, routerAddr, router.NewRouter, routerops.NewWriteApplyRampUpdates, routerops.ApplyRampsUpdatesArgs{
+					OnRampUpdates:  onRampAdds,
+					OffRampRemoves: []routerops.OffRamp{},
+					OffRampAdds:    offRampAdds,
 				},
 			)
 			if err != nil {

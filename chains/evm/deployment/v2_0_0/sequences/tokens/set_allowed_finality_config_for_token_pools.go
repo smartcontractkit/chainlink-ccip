@@ -6,11 +6,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -45,22 +47,14 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", chain.Selector)
 			}
 
-			currentFinalityConfigReport, err := operations.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       addr,
-				Args:          struct{}{},
-			})
+			currentFinalityConfigReport, err := evmops.ExecuteRead(b, chain, addr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetAllowedFinalityConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current finality config for token pool at address %s on chain %d: %w", addr.Hex(), chain.Selector, err)
 			}
 
 			requestedFinalityConfig := finalityConfig.Raw()
 			if !bytes.Equal(currentFinalityConfigReport.Output[:], requestedFinalityConfig[:]) {
-				write, err := operations.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-					ChainSelector: chain.Selector,
-					Address:       addr,
-					Args:          requestedFinalityConfig,
-				})
+				write, err := evmops.ExecuteWrite(b, chain, addr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewWriteSetAllowedFinalityConfig, requestedFinalityConfig)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set finality config for token pool at address %s on chain %d: %w", addr.Hex(), chain.Selector, err)
 				}

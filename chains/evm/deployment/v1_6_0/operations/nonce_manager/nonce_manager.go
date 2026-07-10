@@ -5,9 +5,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 )
 
 var ContractType cldf_deployment.ContractType = "NonceManager"
@@ -34,30 +37,34 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *nonce_manager.NonceManager]{
-	Name:            "nonce-manager:apply-authorized-caller-updates",
-	Version:         Version,
-	Description:     "Applies updates to the list of authorized callers on the NonceManager",
-	ContractType:    ContractType,
-	ContractABI:     nonce_manager.NonceManagerABI,
-	NewContract:     nonce_manager.NewNonceManager,
-	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, AuthorizedCallerArgs],
-	Validate:        func(AuthorizedCallerArgs) error { return nil },
-	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
-		return nonceManager.ApplyAuthorizedCallerUpdates(opts, args)
-	},
-})
+func NewWriteApplyAuthorizedCallerUpdates(c *nonce_manager.NonceManager) *cld_ops.Operation[contract.FunctionInput[AuthorizedCallerArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *nonce_manager.NonceManager]{
+		Name:            "nonce-manager:apply-authorized-caller-updates",
+		Version:         Version,
+		Description:     "Applies updates to the list of authorized callers on the NonceManager",
+		ContractType:    ContractType,
+		ContractABI:     nonce_manager.NonceManagerABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, AuthorizedCallerArgs],
+		Validate:        func(AuthorizedCallerArgs) error { return nil },
+		CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+			return nonceManager.ApplyAuthorizedCallerUpdates(opts, args)
+		},
+	})
+}
 
-var ApplyPreviousRampUpdates = contract.NewWrite(contract.WriteParams[[]PreviousRampsArgs, *nonce_manager.NonceManager]{
-	Name:            "nonce-manager:apply-previous-ramp-updates",
-	Version:         Version,
-	Description:     "Applies updates to the list of previous ramps on the NonceManager",
-	ContractType:    ContractType,
-	ContractABI:     nonce_manager.NonceManagerABI,
-	NewContract:     nonce_manager.NewNonceManager,
-	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, []PreviousRampsArgs],
-	Validate:        func([]PreviousRampsArgs) error { return nil },
-	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
-		return nonceManager.ApplyPreviousRampsUpdates(opts, args)
-	},
-})
+func NewWriteApplyPreviousRampUpdates(c *nonce_manager.NonceManager) *cld_ops.Operation[contract.FunctionInput[[]PreviousRampsArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[[]PreviousRampsArgs, *nonce_manager.NonceManager]{
+		Name:            "nonce-manager:apply-previous-ramp-updates",
+		Version:         Version,
+		Description:     "Applies updates to the list of previous ramps on the NonceManager",
+		ContractType:    ContractType,
+		ContractABI:     nonce_manager.NonceManagerABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, []PreviousRampsArgs],
+		Validate:        func([]PreviousRampsArgs) error { return nil },
+		CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
+			return nonceManager.ApplyPreviousRampsUpdates(opts, args)
+		},
+	})
+}

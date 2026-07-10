@@ -19,13 +19,15 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	adaptersv1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	adaptersv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	routerbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	soladapterv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
@@ -101,9 +103,8 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	var rmnAddress, rmnRemoteAddress common.Address
 	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
 	chain := env.BlockChains.EVMChains()[chain1]
-	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
+	deployRMNOp, err := evmops.ExecuteDeploy(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
-		ChainSelector:  chain.Selector,
 		Args: rmnops1_5.ConstructorArgs{
 			RMNConfig: rmn_contract.RMNConfig{
 				BlessWeightThreshold: 2,
@@ -130,9 +131,8 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	rmnAddress = common.HexToAddress(deployRMNOp.Output.Address)
 	// deploy RMNRemote 1.6 on chain2
 	chain = env.BlockChains.EVMChains()[chain2]
-	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
+	deployRMNRemoteOp, err := evmops.ExecuteDeploy(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
-		ChainSelector:  chain.Selector,
 		Args: rmnremoteops1_6.ConstructorArgs{
 			LocalChainSelector: chain.Selector,
 			LegacyRMN:          utils.RandomAddress(),
@@ -153,8 +153,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		wNative := utils.RandomAddress()
 		rmnProxy := utils.RandomAddress()
 
-		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
-			ChainSelector:  evmChain.Selector,
+		deployRouterOp, err := evmops.ExecuteDeploy(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
 			Args: routerops1_2.ConstructorArgs{
 				WrappedNative: wNative,
@@ -179,29 +178,25 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		} else {
 			destChainSelector = chain1
 		}
-		_, err = cldf_ops.ExecuteOperation(bundle, routerops1_2.ApplyRampUpdates, evmChain, contract.FunctionInput[routerops1_2.ApplyRampsUpdatesArgs]{
-			Address:       common.HexToAddress(routerAddr),
-			ChainSelector: evmChain.Selector,
-			Args: routerops1_2.ApplyRampsUpdatesArgs{
-				OnRampUpdates: []routerops1_2.OnRamp{
-					{
-						DestChainSelector: destChainSelector,
-						OnRamp:            onRamp,
-					},
-					{
-						DestChainSelector: chainsel.SOLANA_MAINNET.Selector,
-						OnRamp:            common.BytesToAddress([]byte(solanaProgramIDs["ccip_router"])),
-					},
+		_, err = evmops.ExecuteWrite(bundle, evmChain, common.HexToAddress(routerAddr), routerbindings.NewRouter, routerops1_2.NewWriteApplyRampUpdates, routerops1_2.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []routerops1_2.OnRamp{
+				{
+					DestChainSelector: destChainSelector,
+					OnRamp:            onRamp,
 				},
-				OffRampAdds: []routerops1_2.OffRamp{
-					{
-						SourceChainSelector: destChainSelector,
-						OffRamp:             offRamp,
-					},
-					{
-						SourceChainSelector: chainsel.SOLANA_MAINNET.Selector,
-						OffRamp:             common.BytesToAddress([]byte(solanaProgramIDs["ccip_offramp"])),
-					},
+				{
+					DestChainSelector: chainsel.SOLANA_MAINNET.Selector,
+					OnRamp:            common.BytesToAddress([]byte(solanaProgramIDs["ccip_router"])),
+				},
+			},
+			OffRampAdds: []routerops1_2.OffRamp{
+				{
+					SourceChainSelector: destChainSelector,
+					OffRamp:             offRamp,
+				},
+				{
+					SourceChainSelector: chainsel.SOLANA_MAINNET.Selector,
+					OffRamp:             common.BytesToAddress([]byte(solanaProgramIDs["ccip_offramp"])),
 				},
 			},
 		})

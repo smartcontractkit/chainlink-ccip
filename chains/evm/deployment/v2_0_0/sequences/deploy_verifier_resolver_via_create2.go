@@ -1,11 +1,14 @@
 package sequences
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	create2_factory_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/create2_factory"
+	vvr_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
@@ -24,7 +27,7 @@ type DeployVerifierResolverViaCREATE2Input struct {
 
 type DeployVerifierResolverViaCREATE2Output struct {
 	Addresses []datastore.AddressRef
-	Writes    []contract_utils.WriteOutput
+	Writes    []contract.WriteOutput
 }
 
 func (i DeployVerifierResolverViaCREATE2Input) Validate() error {
@@ -63,19 +66,15 @@ var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 	"Deploys the VerifierResolver contract via CREATE2Factory",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployVerifierResolverViaCREATE2Input) (output DeployVerifierResolverViaCREATE2Output, err error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]contract_utils.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 
 		// Deploy resolver via CREATE2Factory to ensure deterministic addresses.
 		// Fetch and save the expected address of the resolver.
-		expectedAddressReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract_utils.FunctionInput[create2_factory.ComputeAddressArgs]{
-			Address:       input.CREATE2Factory,
-			ChainSelector: chain.Selector,
-			Args: create2_factory.ComputeAddressArgs{
-				ABI:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.ABI,
-				Bin:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.Bin,
-				ConstructorArgs: []any{},
-				Salt:            input.Qualifier,
-			},
+		expectedAddressReport, err := evmops.ExecuteRead(b, chain, input.CREATE2Factory, create2_factory_bindings.NewCREATE2Factory, create2_factory.NewReadComputeAddress, create2_factory.ComputeAddressArgs{
+			ABI:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.ABI,
+			Bin:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.Bin,
+			ConstructorArgs: []any{},
+			Salt:            input.Qualifier,
 		})
 		if err != nil {
 			return DeployVerifierResolverViaCREATE2Output{}, fmt.Errorf("failed to compute address for resolver: %w", err)
@@ -89,18 +88,14 @@ var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 		})
 
 		// Then, actually deploy and transfer ownership of the resolver to the deployer key.
-		deployAndTransferResolverReport, err := cldf_ops.ExecuteOperation(b, create2_factory.CreateAndTransferOwnership, chain, contract_utils.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CREATE2Factory,
-			Args: create2_factory.CreateAndTransferOwnershipArgs{
-				ComputeAddressArgs: create2_factory.ComputeAddressArgs{
-					ABI:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.ABI,
-					Bin:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.Bin,
-					ConstructorArgs: []any{},
-					Salt:            input.Qualifier,
-				},
-				To: chain.DeployerKey.From,
+		deployAndTransferResolverReport, err := evmops.ExecuteWrite(b, chain, input.CREATE2Factory, create2_factory_bindings.NewCREATE2Factory, create2_factory.NewWriteCreateAndTransferOwnership, create2_factory.CreateAndTransferOwnershipArgs{
+			ComputeAddressArgs: create2_factory.ComputeAddressArgs{
+				ABI:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.ABI,
+				Bin:             versioned_verifier_resolver_latest.VersionedVerifierResolverMetaData.Bin,
+				ConstructorArgs: []any{},
+				Salt:            input.Qualifier,
 			},
+			To: chain.DeployerKey.From,
 		})
 		if err != nil {
 			return DeployVerifierResolverViaCREATE2Output{}, fmt.Errorf("failed to deploy and transfer ownership of resolver: %w", err)
@@ -108,12 +103,8 @@ var DeployVerifierResolverViaCREATE2 = cldf_ops.NewSequence(
 		writes = append(writes, deployAndTransferResolverReport.Output)
 
 		// Finally, accept ownership of the resolver
-		acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.AcceptOwnership, chain, contract_utils.FunctionInput[versioned_verifier_resolver.AcceptOwnershipArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(expectedAddressReport.Output.Hex()),
-			Args: versioned_verifier_resolver.AcceptOwnershipArgs{
-				IsProposedOwner: true,
-			},
+		acceptOwnershipReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(expectedAddressReport.Output.Hex()), vvr_bindings.NewVersionedVerifierResolver, versioned_verifier_resolver.NewWriteAcceptOwnership, versioned_verifier_resolver.AcceptOwnershipArgs{
+			IsProposedOwner: true,
 		})
 		if err != nil {
 			return DeployVerifierResolverViaCREATE2Output{}, fmt.Errorf("failed to accept ownership of resolver: %w", err)

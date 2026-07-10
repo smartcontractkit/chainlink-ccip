@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	bnmERC20Ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmDripOpsV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
@@ -18,6 +19,8 @@ import (
 	bnmDripOpsV1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool"
+	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	tpoolbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -26,10 +29,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
 
 var (
@@ -150,12 +154,12 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	tv, err := cldf_ops.ExecuteOperation(b,
-		type_and_version.GetTypeAndVersion, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       poolAddress,
-		},
+	tv, err := evmops.ExecuteRead(b,
+		chain,
+		poolAddress,
+		type_and_version.NewTypeAndVersionContract,
+		type_and_version.NewReadGetTypeAndVersion,
+		struct{}{},
 	)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to get typeAndVersion for pool %s: %w", address, err)
@@ -170,12 +174,8 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 	// here for simplicity instead of overcomplicating the code with a switch on the
 	// pool version.
 	qualifier := cciputils.DefaultQualifier(poolAddress.Hex(), tv.Output.Type)
-	if token, err := cldf_ops.ExecuteOperation(b,
-		token_pool.GetToken, chain,
-		contract.FunctionInput[any]{
-			ChainSelector: chainSelector,
-			Address:       poolAddress,
-		},
+	if token, err := evmops.ExecuteRead(
+		b, chain, poolAddress, tpoolbindings.NewTokenPool, token_pool.NewReadGetToken, struct{}{},
 	); err != nil {
 		b.Logger.Warnf("failed to get token address from pool at %s: %v; using fallback qualifier %s", poolAddress, err, qualifier)
 	} else {
@@ -204,12 +204,12 @@ func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.Bloc
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	symbolReport, err := cldf_ops.ExecuteOperation(b,
-		erc20.GetSymbol, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       tokenAddress,
-		},
+	symbolReport, err := evmops.ExecuteRead(b,
+		chain,
+		tokenAddress,
+		erc20_bindings.NewERC20,
+		erc20.NewReadGetSymbol,
+		struct{}{},
 	)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to read ERC20 symbol for token %s: %w", address, err)
@@ -380,10 +380,13 @@ func (a *EVMTokenBase) GetActivePool(e deployment.Environment, chainSelector uin
 		}
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
+	report, err := evmops.ExecuteRead(
 		e.OperationsBundle,
-		tarops.GetTokenConfig, evmChain,
-		contract.FunctionInput[common.Address]{ChainSelector: chainSelector, Address: registry, Args: token},
+		evmChain,
+		registry,
+		tarbindings.NewTokenAdminRegistry,
+		tarops.NewReadGetTokenConfig,
+		token,
 		cldf_ops.WithForceExecute[contract.FunctionInput[common.Address], evm.Chain](),
 	)
 	if err != nil {
@@ -454,13 +457,12 @@ func (a *EVMTokenBase) ParseAddressStrings(allowed []string) ([]common.Address, 
 
 // ERC20Decimals returns the decimals of an ERC20 token by calling the getDecimals operation.
 func (a *EVMTokenBase) ERC20Decimals(b cldf_ops.Bundle, ds datastore.DataStore, chain evm.Chain, tokenAddress common.Address) (uint8, error) {
-	decimals, err := cldf_ops.ExecuteOperation(
-		b, erc20.GetDecimals, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       tokenAddress,
-			Args:          struct{}{},
-		},
+	decimals, err := evmops.ExecuteRead(
+		b, chain,
+		tokenAddress,
+		erc20_bindings.NewERC20,
+		erc20.NewReadGetDecimals,
+		struct{}{},
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read ERC20 decimals for token at address %s: %w", tokenAddress, err)

@@ -11,9 +11,12 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -69,10 +72,8 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-			onDCfgReport, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.OnRampAddressRef.Address),
-			})
+			onRampAddr := common.HexToAddress(input.OnRampAddressRef.Address)
+			onDCfgReport, err := evmops.ExecuteRead(b, chain, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onrampops.NewReadGetDynamicConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -80,32 +81,22 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			if existingDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
 				// Update OnRamp's FeeQuoter address
 				existingDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
-				onRampReport, err := cldf_ops.ExecuteOperation(b, onrampops.SetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
-					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(input.OnRampAddressRef.Address),
-					Args:          existingDynamicConfig,
-				})
+				onRampReport, err := evmops.ExecuteWrite(b, chain, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onrampops.NewWriteSetDynamicConfig, existingDynamicConfig)
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}
 				writes = append(writes, onRampReport.Output)
 			}
 			// Similarly, update OffRamp's FeeQuoter address
-			offDCfgReport, err := cldf_ops.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-			})
+			offRampAddr := common.HexToAddress(input.OffRampAddressRef.Address)
+			offDCfgReport, err := evmops.ExecuteRead(b, chain, offRampAddr, evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offrampops.NewReadGetDynamicConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
 			existingOffDynamicConfig := offDCfgReport.Output
 			if existingOffDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
 				existingOffDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
-				offRampReport, err := cldf_ops.ExecuteOperation(b, offrampops.SetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
-					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-					Args:          existingOffDynamicConfig,
-				})
+				offRampReport, err := evmops.ExecuteWrite(b, chain, offRampAddr, evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offrampops.NewWriteSetDynamicConfig, existingOffDynamicConfig)
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}

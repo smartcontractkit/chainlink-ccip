@@ -5,6 +5,9 @@ import (
 	"slices"
 	"testing"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -78,9 +80,8 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			require.NoError(t, err, "Failed to create environment")
 			require.NotNil(t, e, "Environment should be created")
 
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSelector].DeployerKey.From},
 				},
@@ -153,9 +154,8 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		// Deploy to each chain sequentially using the same bundle
 		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, adapters.DeployChainContractsOutput]
 		for _, evmChain := range evmChains {
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  evmChain.Selector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
@@ -205,9 +205,8 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		for _, evmChain := range evmChains {
 			go func(chainSel uint64) {
 				evmChain := evmChains[chainSel]
-				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-					ChainSelector:  evmChain.Selector,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{evmChain.DeployerKey.From},
 					},
@@ -308,9 +307,8 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 		},
 	}
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSelector].DeployerKey.From},
 		},
@@ -422,8 +420,7 @@ func deployMCMSInstanceForTest(
 	require.NotEmpty(t, cancellerReport.Output.Addresses)
 	addresses = append(addresses, cancellerReport.Output.Addresses...)
 
-	timelockRef, err := contract_utils.MaybeDeployContract(b, mcms_ops.OpDeployTimelock, chain, contract_utils.DeployInput[mcms_ops.OpDeployTimelockInput]{
-		ChainSelector:  chain.Selector,
+	timelockRef, err := evmops.MaybeDeployContract(b, mcms_ops.OpDeployTimelock, chain, contract.DeployInput[mcms_ops.OpDeployTimelockInput]{
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployTimelockInput{
@@ -439,8 +436,7 @@ func deployMCMSInstanceForTest(
 	timelockAddr = common.HexToAddress(timelockRef.Address)
 	addresses = append(addresses, timelockRef)
 
-	callProxyRef, err := contract_utils.MaybeDeployContract(b, mcms_ops.OpDeployCallProxy, chain, contract_utils.DeployInput[mcms_ops.OpDeployCallProxyInput]{
-		ChainSelector:  chain.Selector,
+	callProxyRef, err := evmops.MaybeDeployContract(b, mcms_ops.OpDeployCallProxy, chain, contract.DeployInput[mcms_ops.OpDeployCallProxyInput]{
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.CallProxy, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployCallProxyInput{
@@ -519,11 +515,10 @@ func TestDeployChainContracts_DefaultOwnershipTransfer(t *testing.T) {
 	// Pre-deploy both MCMS instances (CLLCCIP and RMNMCMS) before running DeployChainContracts.
 	cllTimelockAddr, rmnTimelockAddr, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+	create2FactoryRef, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, chain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSelector,
 			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
 		}, nil)
 	require.NoError(t, err)
@@ -635,11 +630,10 @@ func TestDeployChainContracts_DefaultOwnershipTransfer_Idempotent(t *testing.T) 
 
 	cllTimelockAddr, _, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+	create2FactoryRef, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, chain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSelector,
 			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
 		}, nil)
 	require.NoError(t, err)
@@ -711,11 +705,10 @@ func TestDeployChainContracts_DeployerKeyOwned(t *testing.T) {
 	// Pre-deploy MCMS so addresses exist, but run with DeployerKeyOwned: true to skip transfer.
 	cllTimelockAddr, _, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+	create2FactoryRef, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, chain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSelector,
 			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
 		}, nil)
 	require.NoError(t, err)
@@ -777,11 +770,10 @@ func TestDeployChainContracts_DefaultTransfer_FailsWithoutMCMS(t *testing.T) {
 	chain := e.BlockChains.EVMChains()[chainSelector]
 	deployer := chain.DeployerKey.From
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+	create2FactoryRef, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, chain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSelector,
 			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
 		}, nil)
 	require.NoError(t, err)

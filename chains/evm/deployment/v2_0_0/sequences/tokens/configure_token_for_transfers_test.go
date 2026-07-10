@@ -1,6 +1,8 @@
 package tokens_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -19,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -44,9 +46,8 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NotNil(t, e, "Environment should be created")
 
 		// Deploy chain contracts
-		create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], evm_contract.DeployInput[create2_factory.ConstructorArgs]{
+		create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
@@ -141,15 +142,13 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2], false)
 
 		// Verify token registration in token admin registry
-		tokenConfigReport, err := operations.ExecuteOperation(
+		tokenConfigReport, err := evmops.ExecuteRead(
 			testsetup.BundleWithFreshReporter(e.OperationsBundle),
-			token_admin_registry.GetTokenConfig,
 			e.BlockChains.EVMChains()[chainSel],
-			evm_contract.FunctionInput[common.Address]{
-				ChainSelector: chainSel,
-				Address:       common.HexToAddress(tokenAdminRegistryAddress),
-				Args:          common.HexToAddress(tokenAddress),
-			},
+			common.HexToAddress(tokenAdminRegistryAddress),
+			tar_bindings.NewTokenAdminRegistry,
+			token_admin_registry.NewReadGetTokenConfig,
+			common.HexToAddress(tokenAddress),
 		)
 		require.NoError(t, err, "ExecuteOperation should not error")
 
@@ -159,14 +158,13 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.Equal(t, common.HexToAddress(tokenPoolAddress), tokenConfigReport.Output.TokenPool, "Token pool address should be set correctly")
 
 		// Verify token address from token pool
-		actualTokenAddress, err := operations.ExecuteOperation(
+		actualTokenAddress, err := evmops.ExecuteRead(
 			testsetup.BundleWithFreshReporter(e.OperationsBundle),
-			token_pool.GetToken,
 			e.BlockChains.EVMChains()[chainSel],
-			evm_contract.FunctionInput[struct{}]{
-				ChainSelector: chainSel,
-				Address:       common.HexToAddress(tokenPoolAddress),
-			},
+			common.HexToAddress(tokenPoolAddress),
+			evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool),
+			token_pool.NewReadGetToken,
+			struct{}{},
 		)
 		require.NoError(t, err, "ExecuteOperation should not error")
 		require.Equal(t, common.HexToAddress(tokenAddress), actualTokenAddress.Output, "Token address should match")
@@ -182,9 +180,8 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NoError(t, err, "Failed to create environment")
 		require.NotNil(t, e, "Environment should be created")
 
-		create2FactoryRef, err := evm_contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], evm_contract.DeployInput[create2_factory.ConstructorArgs]{
+		create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},

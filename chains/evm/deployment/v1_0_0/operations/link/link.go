@@ -8,8 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/link_token"
 )
 
@@ -36,19 +38,21 @@ type GrantMintRoleArgs struct {
 	Minter common.Address
 }
 
-var GrantMintRole = contract.NewWrite(contract.WriteParams[GrantMintRoleArgs, *link_token.LinkToken]{
-	Name:            "link:grant-mint-role",
-	Version:         Version,
-	Description:     "Grants minting permission to an address",
-	ContractType:    ContractType,
-	ContractABI:     link_token.LinkTokenABI,
-	NewContract:     link_token.NewLinkToken,
-	IsAllowedCaller: contract.OnlyOwner[*link_token.LinkToken, GrantMintRoleArgs],
-	Validate:        func(GrantMintRoleArgs) error { return nil },
-	CallContract: func(linkToken *link_token.LinkToken, opts *bind.TransactOpts, args GrantMintRoleArgs) (*types.Transaction, error) {
-		return linkToken.GrantMintRole(opts, args.Minter)
-	},
-})
+func NewWriteGrantMintRole(c *link_token.LinkToken) *cld_ops.Operation[contract.FunctionInput[GrantMintRoleArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[GrantMintRoleArgs, *link_token.LinkToken]{
+		Name:            "link:grant-mint-role",
+		Version:         Version,
+		Description:     "Grants minting permission to an address",
+		ContractType:    ContractType,
+		ContractABI:     link_token.LinkTokenABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*link_token.LinkToken, GrantMintRoleArgs],
+		Validate:        func(GrantMintRoleArgs) error { return nil },
+		CallContract: func(linkToken *link_token.LinkToken, opts *bind.TransactOpts, args GrantMintRoleArgs) (*types.Transaction, error) {
+			return linkToken.GrantMintRole(opts, args.Minter)
+		},
+	})
+}
 
 // MintArgs contains the arguments for minting LINK tokens.
 type MintArgs struct {
@@ -56,16 +60,18 @@ type MintArgs struct {
 	Amount *big.Int
 }
 
-var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *link_token.LinkToken]{
-	Name:            "link:mint",
-	Version:         Version,
-	Description:     "Mints LINK tokens to the specified address",
-	ContractType:    ContractType,
-	ContractABI:     link_token.LinkTokenABI,
-	NewContract:     link_token.NewLinkToken,
-	IsAllowedCaller: contract.AllCallersAllowed[*link_token.LinkToken, MintArgs], // Minter check is done on-chain
-	Validate:        func(MintArgs) error { return nil },
-	CallContract: func(linkToken *link_token.LinkToken, opts *bind.TransactOpts, args MintArgs) (*types.Transaction, error) {
-		return linkToken.Mint(opts, args.To, args.Amount)
-	},
-})
+func NewWriteMint(c *link_token.LinkToken) *cld_ops.Operation[contract.FunctionInput[MintArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[MintArgs, *link_token.LinkToken]{
+		Name:            "link:mint",
+		Version:         Version,
+		Description:     "Mints LINK tokens to the specified address",
+		ContractType:    ContractType,
+		ContractABI:     link_token.LinkTokenABI,
+		Contract:        c,
+		IsAllowedCaller: contract.AllCallersAllowed[*link_token.LinkToken, MintArgs], // Minter check is done on-chain
+		Validate:        func(MintArgs) error { return nil },
+		CallContract: func(linkToken *link_token.LinkToken, opts *bind.TransactOpts, args MintArgs) (*types.Transaction, error) {
+			return linkToken.Mint(opts, args.To, args.Amount)
+		},
+	})
+}

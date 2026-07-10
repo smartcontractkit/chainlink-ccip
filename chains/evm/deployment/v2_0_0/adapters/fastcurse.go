@@ -17,6 +17,7 @@ import (
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmn_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
@@ -71,7 +72,7 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if !ok {
 		return false, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-	rmnC, err := ops.NewRMNContract(rmnAddr, chain.Client)
+	rmnC, err := rmn_bindings.NewRMN(rmnAddr, chain.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate RMN contract at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 	}

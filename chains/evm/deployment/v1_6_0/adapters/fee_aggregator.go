@@ -4,16 +4,17 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -61,12 +62,12 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	}
 
 	onRampAddr := common.HexToAddress(onRampRef.Address)
-	onRamp, err := onrampops.NewOnRampContract(onRampAddr, chain.Client)
+	onRamp, err := onramp_bindings.NewOnRamp(onRampAddr, chain.Client)
 	if err != nil {
 		return "", fmt.Errorf("failed to instantiate OnRamp at %s on chain %d: %w", onRampAddr.Hex(), chainSelector, err)
 	}
 
-	dynamicCfg, err := onRamp.GetDynamicConfig(&bind.CallOpts{Context: e.GetContext()})
+	dynamicCfg, err := onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get OnRamp dynamic config on chain %d: %w", chainSelector, err)
 	}
@@ -112,13 +113,7 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			}
 			onRampAddr := common.HexToAddress(onRampRef.Address)
 
-			readReport, err := operations.ExecuteOperation(
-				b, onrampops.GetDynamicConfig, evmChain,
-				contract.FunctionInput[struct{}]{
-					ChainSelector: evmChain.Selector,
-					Address:       onRampAddr,
-				},
-			)
+	readReport, err := evmops.ExecuteRead(b, evmChain, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onrampops.NewReadGetDynamicConfig, struct{}{})
 			if err != nil {
 				return result, fmt.Errorf("failed to read OnRamp dynamic config on chain %d: %w", input.ChainSelector, err)
 			}
@@ -126,14 +121,9 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			currentCfg := readReport.Output
 			currentCfg.FeeAggregator = newFeeAggregator
 
-			writeReport, err := operations.ExecuteOperation(
-				b, onrampops.SetDynamicConfig, evmChain,
-				contract.FunctionInput[onrampops.DynamicConfig]{
-					ChainSelector: evmChain.Selector,
-					Address:       onRampAddr,
-					Args:          currentCfg,
-				},
-			)
+	writeReport, err := evmops.ExecuteWrite(
+		b, evmChain, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onrampops.NewWriteSetDynamicConfig, currentCfg,
+	)
 			if err != nil {
 				return result, fmt.Errorf("failed to set OnRamp dynamic config on chain %d: %w", input.ChainSelector, err)
 			}

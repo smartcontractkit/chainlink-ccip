@@ -1,13 +1,14 @@
 package changesets_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -27,9 +28,8 @@ const (
 func deployTestCREATE2Factory(t *testing.T, e *deployment.Environment) common.Address {
 	t.Helper()
 	chain := e.BlockChains.EVMChains()[deployVVRTestChainSel]
-	ref, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	ref, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-		ChainSelector:  deployVVRTestChainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
 		},

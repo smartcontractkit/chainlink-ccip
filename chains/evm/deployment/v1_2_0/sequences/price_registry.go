@@ -10,8 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -38,35 +39,21 @@ var PriceRegistryImportConfigSequence = operations.NewSequence(
 
 		gasPrices := make(map[uint64]*big.Int)
 		for _, remoteChainSelector := range input.RemoteChains {
-			gasPricesOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       input.PriceRegistry,
-				Args:          remoteChainSelector,
-			})
+			gasPricesOutput, err := evmops.ExecuteRead(b, chain, input.PriceRegistry, evmops.BindAs[price_registry.PriceRegistryInterface](price_registry.NewPriceRegistry), priceregistryops.NewReadGetDestinationChainGasPrice, remoteChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetDestinationChainGasPriceOp "+
 					"on %s for price registry %s and remote chain %d: %w", chain.String(), input.PriceRegistry.String(), remoteChainSelector, err)
 			}
 			gasPrices[remoteChainSelector] = gasPricesOutput.Output.Value
 		}
-		// get fee tokens
-		feetokensRep, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       input.PriceRegistry,
-			Args:          nil,
-		})
+		feetokensRep, err := evmops.ExecuteRead(b, chain, input.PriceRegistry, evmops.BindAs[price_registry.PriceRegistryInterface](price_registry.NewPriceRegistry), priceregistryops.NewReadGetFeeToken, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
 				"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
 		}
 
-		// get token prices for fee tokens
 		tokenPrices := make(map[common.Address]*big.Int)
-		tokenPriceOutput, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetTokenPrices, chain, contract.FunctionInput[[]common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       input.PriceRegistry,
-			Args:          feetokensRep.Output,
-		})
+		tokenPriceOutput, err := evmops.ExecuteRead(b, chain, input.PriceRegistry, evmops.BindAs[price_registry.PriceRegistryInterface](price_registry.NewPriceRegistry), priceregistryops.NewReadGetTokenPrices, feetokensRep.Output)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetTokenPricesOp "+
 				"on %s for price registry %s and fee tokens %v: %w", chain.String(), input.PriceRegistry.String(), feetokensRep.Output, err)

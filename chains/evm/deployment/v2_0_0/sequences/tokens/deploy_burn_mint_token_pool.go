@@ -1,12 +1,14 @@
 package tokens
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	aph_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/advanced_pool_hooks"
 	"fmt"
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -28,8 +30,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
 
-		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+		hooksDeployReport, err := evmops.ExecuteDeploy(b, advanced_pool_hooks.Deploy, chain, contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
@@ -64,8 +65,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		var tpDeployReport *datastore.AddressRef
 		switch deployment.ContractType(input.TokenPoolType) {
 		case burn_mint_token_pool.ContractType:
-			report, deployErr := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
+			report, deployErr := evmops.ExecuteDeploy(b, burn_mint_token_pool.Deploy, chain, contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: typeAndVersion,
 				Args: burn_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -78,8 +78,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			})
 			tpDeployReport, err = &report.Output, deployErr
 		case burn_from_mint_token_pool.ContractType:
-			report, deployErr := cldf_ops.ExecuteOperation(b, burn_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_from_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
+			report, deployErr := evmops.ExecuteDeploy(b, burn_from_mint_token_pool.Deploy, chain, contract.DeployInput[burn_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: typeAndVersion,
 				Args: burn_from_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -92,8 +91,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			})
 			tpDeployReport, err = &report.Output, deployErr
 		case burn_with_from_mint_token_pool.ContractType:
-			report, deployErr := cldf_ops.ExecuteOperation(b, burn_with_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_with_from_mint_token_pool.ConstructorArgs]{
-				ChainSelector:  input.ChainSel,
+			report, deployErr := evmops.ExecuteDeploy(b, burn_with_from_mint_token_pool.Deploy, chain, contract.DeployInput[burn_with_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: typeAndVersion,
 				Args: burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              constructorArgs.Token,
@@ -130,27 +128,20 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			poolAddr := common.HexToAddress(tpDeployReport.Address)
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
-			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSel,
-				Address:       hooksAddr,
-			})
+			getAuthorizedCallersReport, err := evmops.ExecuteRead(b, chain, hooksAddr, evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks), advanced_pool_hooks.NewReadGetAllAuthorizedCallers, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
 			}
 
 			if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
-				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
-					ChainSelector: input.ChainSel,
-					Address:       hooksAddr,
-					Args: advanced_pool_hooks.AuthorizedCallerArgs{
-						AddedCallers: []common.Address{poolAddr},
-					},
+				applyAuthorizedCallerUpdatesReport, err := evmops.ExecuteWrite(b, chain, hooksAddr, evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks), advanced_pool_hooks.NewWriteApplyAuthorizedCallerUpdates, aph_bindings.AuthorizedCallersAuthorizedCallerArgs{
+					AddedCallers: []common.Address{poolAddr},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
 				}
 
-				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+				batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 				}

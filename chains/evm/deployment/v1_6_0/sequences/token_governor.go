@@ -14,7 +14,8 @@ import (
 
 	tg_bindings "github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -183,9 +184,8 @@ var DeployTokenGovernor = cldf_ops.NewSequence(
 		if input.InitialDefaultAdmin != "" {
 			admin = common.HexToAddress(input.InitialDefaultAdmin)
 		}
-		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
+		tokenGovernorRef, err = evmops.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
 			TypeAndVersion: token_governor.TypeAndVersion,
-			ChainSelector:  chain.Selector,
 			Args: token_governor.ConstructorArgs{
 				Token:               common.HexToAddress(input.Token),
 				InitialDelay:        input.InitialDelay,
@@ -246,13 +246,9 @@ var GrantRole = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("account %s already has role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
 				}
 				// execute GrantRole operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.GrantRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args: token_governor.RoleAssignment{
-						Role: role,
-						To:   tokenGovernorRole.Account,
-					},
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteGrantRole, token_governor.RoleAssignment{
+					Role: role,
+					To:   tokenGovernorRole.Account,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GrantRole on chain %d for token %s: %w", chainSelector, tokenSymbol, err)
@@ -306,13 +302,9 @@ var RevokeRole = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
 				}
 				// execute RevokeRole operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.RevokeRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args: token_governor.RoleAssignment{
-						Role: role,
-						To:   tokenGovernorRole.Account,
-					},
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteRevokeRole, token_governor.RoleAssignment{
+					Role: role,
+					To:   tokenGovernorRole.Account,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RevokeRole on chain %d for token %s: %w", chainSelector, tokenSymbol, err)
@@ -366,13 +358,9 @@ var RenounceRole = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
 				}
 				// execute RenounceRole operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.RenounceRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args: token_governor.RoleAssignment{
-						Role: role,
-						To:   tokenGovernorRole.Account,
-					},
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteRenounceRole, token_governor.RoleAssignment{
+					Role: role,
+					To:   tokenGovernorRole.Account,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RenounceRole on chain %d for token %s: %w", chainSelector, tokenSymbol, err)
@@ -439,11 +427,7 @@ var TransferOwnership = cldf_ops.NewSequence(
 				}
 
 				// execute TransferOwnership operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.TransferOwnership, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args:          newOwner,
-				})
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteTransferOwnership, newOwner)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute TransferOwnership for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
 				}
@@ -481,11 +465,7 @@ var AcceptOwnership = cldf_ops.NewSequence(
 				}
 
 				// execute AcceptOwnership operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptOwnership, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args:          newOwner,
-				})
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteAcceptOwnership, newOwner)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AcceptOwnership for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
 				}
@@ -538,11 +518,7 @@ var BeginDefaultAdminTransfer = cldf_ops.NewSequence(
 				}
 
 				// execute BeginDefaultAdminTransfer operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.BeginDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args:          newAdmin,
-				})
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteBeginDefaultAdminTransfer, newAdmin)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute BeginDefaultAdminTransfer for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
 				}
@@ -580,11 +556,7 @@ var AcceptDefaultAdminTransfer = cldf_ops.NewSequence(
 				}
 
 				// execute AcceptDefaultAdminTransfer operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args:          admin,
-				})
+				report, err := evmops.ExecuteWrite(b, chain, tgAddr, tg_bindings.NewTokenGovernor, token_governor.NewWriteAcceptDefaultAdminTransfer, admin)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AcceptDefaultAdminTransfer for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
 				}

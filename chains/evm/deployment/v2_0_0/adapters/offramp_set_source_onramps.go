@@ -9,13 +9,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 )
 
 var _ ccvadapters.OffRampSourceOnRampSetter = (*ChainFamilyAdapter)(nil)
@@ -41,11 +42,7 @@ func (a *ChainFamilyAdapter) SetOffRampSourceOnRamps(
 		return nil, false, err
 	}
 
-	currentReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, offramp.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       offRampAddr,
-		Args:          update.SourceChainSelector,
-	})
+	currentReport, err := evmops.ExecuteRead(e.OperationsBundle, chain, offRampAddr, evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offramp.NewReadGetSourceChainConfig, update.SourceChainSelector)
 	if err != nil {
 		return nil, false, fmt.Errorf("get source chain config for %d on OffRamp %s: %w",
 			update.SourceChainSelector, offRampAddr, err)
@@ -62,7 +59,7 @@ func (a *ChainFamilyAdapter) SetOffRampSourceOnRamps(
 		return nil, true, nil
 	}
 
-	desired := offramp.SourceChainConfigArgs{
+	desired := offramp_bindings.OffRampSourceChainConfigArgs{
 		Router:              current.Router,
 		SourceChainSelector: update.SourceChainSelector,
 		IsEnabled:           current.IsEnabled,
@@ -71,11 +68,7 @@ func (a *ChainFamilyAdapter) SetOffRampSourceOnRamps(
 		LaneMandatedCCVs:    current.LaneMandatedCCVs,
 	}
 
-	offRampReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, offramp.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
-		ChainSelector: chain.Selector,
-		Address:       offRampAddr,
-		Args:          []offramp.SourceChainConfigArgs{desired},
-	})
+	offRampReport, err := evmops.ExecuteWrite(e.OperationsBundle, chain, offRampAddr, evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offramp.NewWriteApplySourceChainConfigUpdates, []offramp_bindings.OffRampSourceChainConfigArgs{desired})
 	if err != nil {
 		return nil, false, fmt.Errorf("apply source chain config on OffRamp %s: %w", offRampAddr, err)
 	}

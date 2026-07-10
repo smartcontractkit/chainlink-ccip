@@ -15,7 +15,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -23,9 +23,11 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	bnmERC20Operations "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	evmonrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	fq163bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -327,9 +329,9 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 			datastore.AddressRefByChainSelector(selector),
 			datastore.AddressRefByType(datastore.ContractType(fq163ops.ContractType)),
 		) {
-			fq, err := fq163ops.NewFeeQuoterContract(common.HexToAddress(addrRef.Address), chain.Client)
+			fq, err := fq163bindings.NewFeeQuoter(common.HexToAddress(addrRef.Address), chain.Client)
 			require.NoError(t, err, "failed to create FeeQuoter contract instance")
-			tx, err := fq.ApplyAuthorizedCallerUpdates(chain.DeployerKey, fq163ops.AuthorizedCallerArgs{
+			tx, err := fq.ApplyAuthorizedCallerUpdates(chain.DeployerKey, fq163bindings.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers: []common.Address{common.HexToAddress(timelockAddr)},
 			})
 			require.NoError(t, err, "failed to add timelock as FeeQuoter price updater")
@@ -501,11 +503,10 @@ func NewDefaultInputForMCMS(desc string, overrides ...func(*mcms.Input)) mcms.In
 func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cumulativeDS *datastore.MemoryDataStore, chainSel uint64) {
 	t.Helper()
 
-	create2FactoryRef, err := evm_contract.MaybeDeployContract(
+	create2FactoryRef, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel],
-		evm_contract.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},

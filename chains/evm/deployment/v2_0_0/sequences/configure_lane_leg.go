@@ -1,6 +1,8 @@
 package sequences
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -17,8 +19,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	router_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	executor_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -28,6 +32,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	fqc "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 )
 
 // Deprecated: Use ConfigureChainForLanes from the ChainFamilyAdapter instead this is the canonical way to configure lanes for 2.0
@@ -53,17 +59,13 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		destChain := input.Dest
 
 		// Apply OnRamp dest chain configs (only entries that differ from on-chain).
-		onRampArgs := make([]onramp.DestChainConfigArgs, 0, 1)
+		onRampArgs := make([]onramp_bindings.OnRampDestChainConfigArgs, 0, 1)
 		onRampArgs, err := maybeAddOnRampDestChainConfigArg(b, chain, input, onRampArgs)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		if len(onRampArgs) > 0 {
-			onRampReport, err := cldf_ops.ExecuteOperation(b, onramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(sourceOnRamp),
-				Args:          onRampArgs,
-			})
+			onRampReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(sourceOnRamp), evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewWriteApplyDestChainConfigUpdates, onRampArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to OnRamp(%s) on chain %s: %w", sourceOnRamp, chain, err)
 			}
@@ -73,10 +75,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		// Apply Executor dest chain updates (only chains that need to be added/updated).
 		destChainSelectorsPerExecutor := make(map[common.Address][]ExecutorRemoteChainConfigArgs)
 		defaultExecutor := common.HexToAddress(sourceChain.DefaultExecutor.Address)
-		getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       defaultExecutor,
-		})
+		getTargetReport, err := evmops.ExecuteRead(b, chain, defaultExecutor, evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), proxy.NewReadGetTarget, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 		}
@@ -95,12 +94,8 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			if len(toAdd) == 0 {
 				continue
 			}
-			executorReport, err := cldf_ops.ExecuteOperation(b, ExecutorApplyDestChainUpdates, chain, contract.FunctionInput[ExecutorApplyDestChainUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       executorAddr,
-				Args: ExecutorApplyDestChainUpdatesArgs{
-					DestChainSelectorsToAdd: toAdd,
-				},
+			executorReport, err := evmops.ExecuteWrite(b, chain, executorAddr, evmops.BindAs[executor_bindings.ExecutorInterface](executor_bindings.NewExecutor), NewWriteExecutorApplyDestChainUpdates, ExecutorApplyDestChainUpdatesArgs{
+				DestChainSelectorsToAdd: toAdd,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to Executor(%s) on chain %s: %w", executorAddr, chain, err)
@@ -114,7 +109,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to bind fee quoter contract at address %s on chain %s: %w",
 				sourceFeeQuoter, chain.String(), err)
 		}
-		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, 1)
+		feeQuoterArgs := make([]fqc.FeeQuoterDestChainConfigArgs, 0, 1)
 		if !destChain.FeeQuoterDestChainConfig.OverrideExistingConfig {
 			destChainCfg, err := feeQContract.GetDestChainConfig(&bind.CallOpts{
 				Context: b.GetContext(),
@@ -137,11 +132,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			}
 		}
 		if len(feeQuoterArgs) > 0 {
-			feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(sourceFeeQuoter),
-				Args:          feeQuoterArgs,
-			})
+			feeQuoterReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(sourceFeeQuoter), 	evmops.BindAs[fqc.FeeQuoterInterface](fqc.NewFeeQuoter), fee_quoter.NewWriteApplyDestChainConfigUpdates, feeQuoterArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", sourceFeeQuoter, chain, err)
 			}
@@ -149,31 +140,21 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		}
 
 		// UpdatePrices on FeeQuoter (gas prices only, as these are per dest chain)
-		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, 1)
+		gasPriceUpdates := make([]fqc.InternalGasPriceUpdate, 0, 1)
 		if destChain.FeeQuoterDestChainConfig.V2Params != nil && destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas != nil {
-			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(sourceFeeQuoter),
-				Args:          remoteSelector,
-			})
+			gasPriceReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(sourceFeeQuoter), 	evmops.BindAs[fqc.FeeQuoterInterface](fqc.NewFeeQuoter), fee_quoter.NewReadGetDestinationChainGasPrice, remoteSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", sourceFeeQuoter, chain, err)
 			}
 			if destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
-				gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
+				gasPriceUpdates = append(gasPriceUpdates, fqc.InternalGasPriceUpdate{
 					DestChainSelector: remoteSelector,
 					UsdPerUnitGas:     destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas,
 				})
 			}
 		}
 		if len(gasPriceUpdates) > 0 {
-			feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(sourceFeeQuoter),
-				Args: fee_quoter.PriceUpdates{
-					GasPriceUpdates: gasPriceUpdates,
-				},
-			})
+			feeQuoterUpdatePricesReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(sourceFeeQuoter), 	evmops.BindAs[fqc.FeeQuoterInterface](fqc.NewFeeQuoter), fee_quoter.NewWriteUpdatePrices, fqc.InternalPriceUpdates{GasPriceUpdates: gasPriceUpdates})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to update gas prices on FeeQuoter(%s) on chain %s: %w", sourceFeeQuoter, chain, err)
 			}
@@ -186,14 +167,10 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to determine if Router(%s) on chain %s needs on ramp updates: %w", sourceRouter, chain.String(), err)
 		}
 		if len(onRampAdds) > 0 {
-			routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(sourceRouter),
-				Args: router.ApplyRampsUpdatesArgs{
-					OnRampUpdates:  onRampAdds,
-					OffRampRemoves: []router.OffRamp{},
-					OffRampAdds:    []router.OffRamp{},
-				},
+			routerReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(sourceRouter), router_bindings.NewRouter, router.NewWriteApplyRampUpdates, router.ApplyRampsUpdatesArgs{
+				OnRampUpdates:  onRampAdds,
+				OffRampRemoves: []router.OffRamp{},
+				OffRampAdds:    []router.OffRamp{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply ramp updates to Router(%s) on chain %s: %w", sourceRouter, chain, err)
@@ -248,17 +225,13 @@ var ConfigureLaneLegAsDest = cldf_ops.NewSequence(
 		destOffRamp := common.BytesToAddress(destChain.OffRamp).Hex()
 
 		// Apply OffRamp source chain configs (only entries that differ from on-chain).
-		offRampArgs := make([]offramp.SourceChainConfigArgs, 0, 1)
+		offRampArgs := make([]offramp_bindings.OffRampSourceChainConfigArgs, 0, 1)
 		offRampArgs, err := maybeAddSourceChainConfigArg(b, chain, input, offRampArgs)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		if len(offRampArgs) > 0 {
-			offRampReport, err := cldf_ops.ExecuteOperation(b, offramp.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(destOffRamp),
-				Args:          offRampArgs,
-			})
+			offRampReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(destOffRamp), evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offramp.NewWriteApplySourceChainConfigUpdates, offRampArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates to OffRamp(%s) on chain %s: %w", destOffRamp, chain, err)
 			}
@@ -277,14 +250,10 @@ var ConfigureLaneLegAsDest = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		if len(offRampAdds) > 0 {
-			routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(destRouter),
-				Args: router.ApplyRampsUpdatesArgs{
-					OnRampUpdates:  []router.OnRamp{},
-					OffRampRemoves: []router.OffRamp{},
-					OffRampAdds:    offRampAdds,
-				},
+			routerReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(destRouter), router_bindings.NewRouter, router.NewWriteApplyRampUpdates, router.ApplyRampsUpdatesArgs{
+				OnRampUpdates:  []router.OnRamp{},
+				OffRampRemoves: []router.OffRamp{},
+				OffRampAdds:    offRampAdds,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply ramp updates to Router(%s) on chain %s: %w", destRouter, chain, err)
@@ -321,7 +290,7 @@ var ConfigureLaneLegAsDest = cldf_ops.NewSequence(
 
 // maybeAddSourceChainConfigArg fetches current OffRamp source chain config, builds desired arg from input,
 // and appends to offRampArgs only when the lane is enabled and config differs (idempotent).
-func maybeAddSourceChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput, offRampArgs []offramp.SourceChainConfigArgs) ([]offramp.SourceChainConfigArgs, error) {
+func maybeAddSourceChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput, offRampArgs []offramp_bindings.OffRampSourceChainConfigArgs) ([]offramp_bindings.OffRampSourceChainConfigArgs, error) {
 	defaultInboundCCVs := make([]common.Address, 0, len(input.Dest.DefaultInboundCCVs))
 	for _, ccv := range input.Dest.DefaultInboundCCVs {
 		defaultInboundCCVs = append(defaultInboundCCVs, common.HexToAddress(ccv.Address))
@@ -333,7 +302,7 @@ func maybeAddSourceChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lane
 	// always include the default onramp as well
 	// TODO: might need to support multiple onramps in the future
 	onRamps := [][]byte{common.LeftPadBytes(input.Source.OnRamp, 32)}
-	desiredOffRampArg := offramp.SourceChainConfigArgs{
+	desiredOffRampArg := offramp_bindings.OffRampSourceChainConfigArgs{
 		Router:              common.BytesToAddress(input.Dest.Router),
 		SourceChainSelector: input.Source.Selector,
 		IsEnabled:           !input.IsDisabled,
@@ -341,11 +310,7 @@ func maybeAddSourceChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lane
 		DefaultCCVs:         defaultInboundCCVs,
 		LaneMandatedCCVs:    laneMandatedInboundCCVs,
 	}
-	offRampCurrentReport, err := cldf_ops.ExecuteOperation(b, offramp.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: input.Dest.Selector,
-		Address:       common.BytesToAddress(input.Dest.OffRamp),
-		Args:          input.Source.Selector,
-	})
+	offRampCurrentReport, err := evmops.ExecuteRead(b, chain, common.BytesToAddress(input.Dest.OffRamp), evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offramp.NewReadGetSourceChainConfig, input.Source.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source chain config for selector %d from OffRamp(%s) on chain %v: %w", input.Source.Selector, input.Dest.OffRamp, chain, err)
 	}
@@ -384,11 +349,7 @@ func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, inpu
 	}
 	// Apply Router ramp updates (only when there are changes).
 	onRampAdds := make([]router.OnRamp, 0, 1)
-	onRampAddrReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(sourceRouter),
-		Args:          remoteSelector,
-	})
+	onRampAddrReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(sourceRouter), evmops.BindAs[router_bindings.RouterInterface](router_bindings.NewRouter), router.NewReadGetOnRamp, remoteSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get on ramp for dest %d from Router(%s) on chain %s: %w", remoteSelector, sourceRouter, chain, err)
 	}
@@ -442,7 +403,7 @@ func MaybeAddRouterOnRampsAddsConfigArg(b cldf_ops.Bundle, chain evm.Chain, inpu
 
 // maybeAddOnRampDestChainConfigArg fetches current OnRamp dest chain config, builds desired arg from input,
 // and appends to onRampArgs only when config differs (idempotent).
-func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput, onRampArgs []onramp.DestChainConfigArgs) ([]onramp.DestChainConfigArgs, error) {
+func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input lanes.UpdateLanesInput, onRampArgs []onramp_bindings.OnRampDestChainConfigArgs) ([]onramp_bindings.OnRampDestChainConfigArgs, error) {
 	defaultOutboundCCVs := make([]common.Address, 0, len(input.Source.DefaultOutboundCCVs))
 	for _, ccv := range input.Source.DefaultOutboundCCVs {
 		defaultOutboundCCVs = append(defaultOutboundCCVs, common.HexToAddress(ccv.Address))
@@ -451,7 +412,7 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input 
 	for _, ccv := range input.Source.LaneMandatedOutboundCCVs {
 		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.HexToAddress(ccv.Address))
 	}
-	desiredOnRampArg := onramp.DestChainConfigArgs{
+	desiredOnRampArg := onramp_bindings.OnRampDestChainConfigArgs{
 		Router:                    common.BytesToAddress(input.Source.Router),
 		DestChainSelector:         input.Dest.Selector,
 		AddressBytesLength:        input.Dest.AddressBytesLength,
@@ -463,11 +424,7 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input 
 		DefaultExecutor:           common.HexToAddress(input.Source.DefaultExecutor.Address),
 		OffRamp:                   input.Dest.OffRamp,
 	}
-	onRampCurrentReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
-		ChainSelector: input.Source.Selector,
-		Address:       common.BytesToAddress(input.Source.OnRamp),
-		Args:          input.Dest.Selector,
-	})
+	onRampCurrentReport, err := evmops.ExecuteRead(b, chain, common.BytesToAddress(input.Source.OnRamp), evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewReadGetDestChainConfig, input.Dest.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dest chain config for selector %d from OnRamp(%s) on chain %v: %w", input.Dest.Selector, input.Source.OnRamp, chain, err)
 	}
@@ -532,7 +489,7 @@ func feeQuoterDestChainConfigEqual(cur fqc.FeeQuoterDestChainConfig, desired lan
 // maybeAddFeeQuoterDestChainConfigArg fetches current FeeQuoter dest chain config and appends to feeQuoterArgs
 // only when the config differs from desired (idempotent). Call only when OverrideExistingConfig is false.
 // When a desired field is zero, the on-chain value is used so we do not overwrite with zero.
-func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fqc.FeeQuoter, b cldf_ops.Bundle, feeQuoterAddr string, chain evm.Chain, remoteSelector uint64, remoteConfig *lanes.ChainDefinition, feeQuoterArgs []fee_quoter.DestChainConfigArgs) ([]fee_quoter.DestChainConfigArgs, error) {
+func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fqc.FeeQuoter, b cldf_ops.Bundle, feeQuoterAddr string, chain evm.Chain, remoteSelector uint64, remoteConfig *lanes.ChainDefinition, feeQuoterArgs []fqc.FeeQuoterDestChainConfigArgs) ([]fqc.FeeQuoterDestChainConfigArgs, error) {
 	cur, err := feeQContract.GetDestChainConfig(&bind.CallOpts{
 		Context: b.GetContext(),
 	}, remoteSelector)
@@ -580,18 +537,18 @@ func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fqc.FeeQuoter, b cldf_ops
 	if feeQuoterDestChainConfigEqual(cur, desired) {
 		return feeQuoterArgs, nil
 	}
-	return append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
+	return append(feeQuoterArgs, fqc.FeeQuoterDestChainConfigArgs{
 		DestChainSelector: remoteSelector,
 		DestChainConfig:   adapterDestChainConfigToFeeQuoter(desired),
 	}), nil
 }
 
-func adapterDestChainConfigToFeeQuoter(cfg lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig {
+func adapterDestChainConfigToFeeQuoter(cfg lanes.FeeQuoterDestChainConfig) fqc.FeeQuoterDestChainConfig {
 	var linkFeeMultiplierPercent uint8
 	if cfg.V2Params != nil {
 		linkFeeMultiplierPercent = cfg.V2Params.LinkFeeMultiplierPercent
 	}
-	return fee_quoter.DestChainConfig{
+	return fqc.FeeQuoterDestChainConfig{
 		IsEnabled:                   cfg.IsEnabled,
 		MaxDataBytes:                cfg.MaxDataBytes,
 		MaxPerMsgGasLimit:           cfg.MaxPerMsgGasLimit,

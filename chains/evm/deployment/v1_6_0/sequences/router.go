@@ -6,9 +6,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -32,11 +34,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, routerops.ApplyRampUpdates, chain, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
-			})
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, router.NewRouter, routerops.NewWriteApplyRampUpdates, input.UpdatesByChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RouterApplyRampUpdatesOp on %s: %w", chain, err)
 			}

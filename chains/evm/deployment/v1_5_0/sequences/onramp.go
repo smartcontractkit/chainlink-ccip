@@ -15,7 +15,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	priceregistry "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -53,11 +55,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, onramp.OnRampSetTokenTransferFeeConfig, chain, contract.FunctionInput[onramp.SetTokenTransferFeeConfigInput]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
-			})
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, evm_2_evm_onramp.NewEVM2EVMOnRamp, onramp.NewWriteOnRampSetTokenTransferFeeConfig, input.UpdatesByChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampSetTokenTransferFeeConfigOp on %s: %w", chain, err)
 			}
@@ -84,10 +82,7 @@ var (
 			var contractMetaMu sync.Mutex
 			outerGrp, _ := errgroup.WithContext(b.GetContext())
 			outerGrp.SetLimit(10) // limit concurrency across remote chains
-			feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       input.PriceRegistry,
-			})
+			feetokenOut, err := evmops.ExecuteRead(b, chain, input.PriceRegistry, evmops.BindAs[priceregistry.PriceRegistryInterface](priceregistry.NewPriceRegistry), priceregistryops.NewReadGetFeeToken, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
 					"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
@@ -95,18 +90,12 @@ var (
 			feeTokens := feetokenOut.Output
 			for remoteChainSelector, onRampAddress := range input.OnRampsPerRemoteChain {
 				outerGrp.Go(func() error {
-					sCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampStaticConfig, chain, contract.FunctionInput[any]{
-						ChainSelector: chain.Selector,
-						Address:       onRampAddress,
-					})
+					sCfgOut, err := evmops.ExecuteRead(b, chain, onRampAddress, evm_2_evm_onramp.NewEVM2EVMOnRamp, onramp.NewReadOnRampStaticConfig, struct{}{})
 					if err != nil {
 						return fmt.Errorf("failed to execute OnRampStaticConfigOp "+
 							"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
 					}
-					dCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampDynamicConfig, chain, contract.FunctionInput[any]{
-						ChainSelector: chain.Selector,
-						Address:       onRampAddress,
-					})
+					dCfgOut, err := evmops.ExecuteRead(b, chain, onRampAddress, evm_2_evm_onramp.NewEVM2EVMOnRamp, onramp.NewReadOnRampDynamicConfig, struct{}{})
 					if err != nil {
 						return fmt.Errorf("failed to execute OnRampDynamicConfigOp "+
 							"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
@@ -114,11 +103,7 @@ var (
 
 					feeTokenConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig)
 					for _, token := range feeTokens {
-						feeTokenConfigOut, err := operations.ExecuteOperation(b, onramp.OnRampFeeTokenConfig, chain, contract.FunctionInput[common.Address]{
-							ChainSelector: chain.Selector,
-							Address:       onRampAddress,
-							Args:          token,
-						})
+						feeTokenConfigOut, err := evmops.ExecuteRead(b, chain, onRampAddress, evm_2_evm_onramp.NewEVM2EVMOnRamp, onramp.NewReadOnRampFeeTokenConfig, token)
 						if err != nil {
 							return fmt.Errorf("failed to execute OnRampFeeTokenConfigOp "+
 								"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
@@ -134,12 +119,8 @@ var (
 					tokenGrp.SetLimit(10) // limit concurrency to avoid overwhelming the node with requests
 					for _, token := range input.SupportedTokensPerChain[remoteChainSelector] {
 						tokenGrp.Go(func() error {
-							ttfcOut, err := operations.ExecuteOperation(
-								b, onramp.OnRampGetTokenTransferFeeConfig, chain, contract.FunctionInput[common.Address]{
-									ChainSelector: chain.Selector,
-									Address:       onRampAddress,
-									Args:          token,
-								})
+							ttfcOut, err := evmops.ExecuteRead(
+								b, chain, onRampAddress, evm_2_evm_onramp.NewEVM2EVMOnRamp, onramp.NewReadOnRampGetTokenTransferFeeConfig, token)
 							if err != nil {
 								return fmt.Errorf("failed to execute OnRampGetTokenTransferFeeConfigOp "+
 									"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)

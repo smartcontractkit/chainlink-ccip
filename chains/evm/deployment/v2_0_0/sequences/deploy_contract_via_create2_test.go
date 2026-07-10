@@ -1,6 +1,7 @@
 package sequences_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -15,7 +17,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 )
 
@@ -25,13 +26,12 @@ const create2TestChainSel = uint64(5009297550715157269)
 func deployTestCreate2Factory(t *testing.T, e *deployment.Environment) string {
 	t.Helper()
 	chain := e.BlockChains.EVMChains()[create2TestChainSel]
-	ref, err := contract_utils.MaybeDeployContract(
+	ref, err := evmops.MaybeDeployContract(
 		e.OperationsBundle,
 		create2_factory.Deploy,
 		chain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  create2TestChainSel,
 			// Deployer must be in the allow list to call CreateAndTransferOwnership.
 			Args: create2_factory.ConstructorArgs{AllowList: []common.Address{chain.DeployerKey.From}},
 		},

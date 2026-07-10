@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,14 +11,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	fq_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -48,8 +51,8 @@ func (a *FeesAdapter) validateFeeRef(feeRef datastore.AddressRef) error {
 }
 
 func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
-	if onRampRef.Type.String() != onramp.ContractType.String() {
-		return datastore.AddressRef{}, fmt.Errorf("unexpected contract type for OnRamp address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), onramp.ContractType)
+	if onRampRef.Type.String() != onrampops.ContractType.String() {
+		return datastore.AddressRef{}, fmt.Errorf("unexpected contract type for OnRamp address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), onrampops.ContractType)
 	}
 	if !onRampRef.Version.Equal(utils.Version_2_0_0) {
 		return datastore.AddressRef{}, fmt.Errorf("unexpected OnRamp contract version for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Version, utils.Version_2_0_0)
@@ -65,15 +68,11 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", src)
 	}
 
-	report, err := operations.ExecuteOperation(
-		b,
-		onramp.GetDynamicConfig,
-		chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: src,
-			Address:       onRampAddr,
-			Args:          struct{}{},
-		},
+	report, err := evmops.ExecuteRead(
+		b, chain, onRampAddr,
+		evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp),
+		onrampops.NewReadGetDynamicConfig,
+		struct{}{},
 	)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to execute GetDynamicConfig operation for OnRamp at %s on chain selector %d with dst %d: %w", onRampAddr.Hex(), src, dst, err)
@@ -84,15 +83,7 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 		return datastore.AddressRef{}, fmt.Errorf("onRamp at %s on chain selector %d returned zero address for FeeQuoter for dst %d", onRampAddr.Hex(), src, dst)
 	}
 
-	tvReport, err := operations.ExecuteOperation(
-		b,
-		type_and_version.GetTypeAndVersion,
-		chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: src,
-			Address:       fqAddr,
-		},
-	)
+	tvReport, err := evmops.ExecuteRead(b, chain, fqAddr, type_and_version.NewTypeAndVersionContract, type_and_version.NewReadGetTypeAndVersion, struct{}{})
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to get typeAndVersion for FeeQuoter at %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -124,7 +115,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chai
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to convert FeeQuoter address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
-	fq, err := fqops.NewFeeQuoterContract(fqAddr, chain.Client)
+	fq, err := fq_bindings.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -178,7 +169,7 @@ func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastor
 					if feeCfg == nil || !feeCfg.IsEnabled {
 						val.TokensToUseDefaultFeeConfigs = append(
 							val.TokensToUseDefaultFeeConfigs,
-							fqops.TokenTransferFeeConfigRemoveArgs{
+							fq_bindings.FeeQuoterTokenTransferFeeConfigRemoveArgs{
 								DestChainSelector: dst,
 								Token:             token,
 							},
@@ -186,12 +177,12 @@ func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastor
 					} else {
 						val.TokenTransferFeeConfigArgs = append(
 							val.TokenTransferFeeConfigArgs,
-							fqops.TokenTransferFeeConfigArgs{
+							fq_bindings.FeeQuoterTokenTransferFeeConfigArgs{
 								DestChainSelector: dst,
-								TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+								TokenTransferFeeConfigs: []fq_bindings.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 									{
 										Token: token,
-										TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+										TokenTransferFeeConfig: fq_bindings.FeeQuoterTokenTransferFeeConfig{
 											DestBytesOverhead: feeCfg.DestBytesOverhead,
 											DestGasOverhead:   feeCfg.DestGasOverhead,
 											FeeUSDCents:       feeCfg.MinFeeUSDCents,
@@ -249,7 +240,7 @@ func (a *FeesAdapter) GetOnchainDestChainConfig(b operations.Bundle, chains cldf
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to convert FeeQuoter address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
-	fq, err := fqops.NewFeeQuoterContract(fqAddr, chain.Client)
+	fq, err := fq_bindings.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -280,9 +271,9 @@ func (a *FeesAdapter) ApplyDestChainConfigUpdates(_ datastore.DataStore, feeRef 
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert FeeQuoter address ref to EVM address: %w", err)
 			}
 
-			args := map[uint64][]fqops.DestChainConfigArgs{}
+			args := map[uint64][]fq_bindings.FeeQuoterDestChainConfigArgs{}
 			for dst, cfg := range input.Settings {
-				args[src] = append(args[src], fqops.DestChainConfigArgs{
+				args[src] = append(args[src], fq_bindings.FeeQuoterDestChainConfigArgs{
 					DestChainSelector: dst,
 					DestChainConfig:   evmseqV1_6_0.TranslateFQtoV2(cfg),
 				})
@@ -294,19 +285,17 @@ func (a *FeesAdapter) ApplyDestChainConfigUpdates(_ datastore.DataStore, feeRef 
 			}
 
 			writes := make([]contract.WriteOutput, 0, len(args))
-			for selector, updates := range args {
-				report, err := operations.ExecuteOperation(
-					b, fqops.ApplyDestChainConfigUpdates, evmChain,
-					contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-						ChainSelector: selector,
-						Address:       fqAddr,
-						Args:          updates,
-					},
+			for _, updates := range args {
+				writeReport, err := evmops.ExecuteWrite(
+					b, evmChain, fqAddr,
+					evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter),
+					fqops.NewWriteApplyDestChainConfigUpdates,
+					updates,
 				)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates on FeeQuoter 2.0 for chain %d: %w", src, err)
 				}
-				writes = append(writes, report.Output)
+				writes = append(writes, writeReport.Output)
 			}
 
 			var result sequences.OnChainOutput

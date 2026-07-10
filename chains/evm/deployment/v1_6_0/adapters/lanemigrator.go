@@ -12,13 +12,16 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -86,15 +89,11 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error formatting router address ref: %w", err)
 			}
-			var onRampArgs []onrampops.DestChainConfigArgs
-			var offRampArgs []offrampops.SourceChainConfigArgs
+			var onRampArgs []onramp_bindings.OnRampDestChainConfigArgs
+			var offRampArgs []offramp_bindings.OffRampSourceChainConfigArgs
 			for _, remoteChainSelector := range input.RemoteChainSelectors {
 				// get existing destChainConfig for the onRamp
-				existingDestChainCfgOut, err := cldf_ops.ExecuteOperation(b, onrampops.GetDestChainConfig, c, contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       onRampAddr,
-					Args:          remoteChainSelector,
-				})
+				existingDestChainCfgOut, err := evmops.ExecuteRead(b, c, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onrampops.NewReadGetDestChainConfig, remoteChainSelector)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing destChainConfig for onRamp: %w", err)
 				}
@@ -107,11 +106,7 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				existingDestChainCfg.Router = routerAddr
 
 				// get the sourceChainConfig for the offRamp
-				srcChainCfgOut, err := cldf_ops.ExecuteOperation(b, offrampops.GetSourceChainConfig, c, contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
-					Args:          remoteChainSelector,
-				})
+				srcChainCfgOut, err := evmops.ExecuteRead(b, c, offRampAddr, evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offrampops.NewReadGetSourceChainConfig, remoteChainSelector)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing sourceChainConfig for offRamp: %w", err)
 				}
@@ -122,13 +117,13 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				}
 				// update router on offRamp for the remote chain
 				existingSrcChainCfg.Router = routerAddr
-				onRampArgs = append(onRampArgs, onrampops.DestChainConfigArgs{
+				onRampArgs = append(onRampArgs, onramp_bindings.OnRampDestChainConfigArgs{
 					DestChainSelector: remoteChainSelector,
 					Router:            routerAddr,
 					AllowlistEnabled:  existingDestChainCfg.AllowlistEnabled,
 				})
 
-				offRampArgs = append(offRampArgs, offrampops.SourceChainConfigArgs{
+				offRampArgs = append(offRampArgs, offramp_bindings.OffRampSourceChainConfigArgs{
 					SourceChainSelector:       remoteChainSelector,
 					Router:                    routerAddr,
 					IsEnabled:                 existingSrcChainCfg.IsEnabled,
@@ -137,23 +132,13 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				})
 			}
 			//  set the destChainConfig with the updated router
-			writeOutputOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, c, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       onRampAddr,
-				Args:          onRampArgs,
-			})
+			writeOutputOnRamp, err := evmops.ExecuteWrite(b, c, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onrampops.NewWriteApplyDestChainConfigUpdates, onRampArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying destChainConfig update to onRamp: %w", err)
 			}
 			writes = append(writes, writeOutputOnRamp.Output)
 			// now set the sourceChainConfig with the updated router
-			writeOutputOffRamp, err := cldf_ops.ExecuteOperation(
-				b, offrampops.ApplySourceChainConfigUpdates, c,
-				contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
-					Args:          offRampArgs,
-				})
+			writeOutputOffRamp, err := evmops.ExecuteWrite(b, c, offRampAddr, evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offrampops.NewWriteApplySourceChainConfigUpdates, offRampArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying sourceChainConfig update to offRamp: %w", err)
 			}

@@ -11,11 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var (
@@ -63,7 +64,7 @@ type TransferArgs struct {
 //	Factory Contract: https://github.com/tempoxyz/tempo/blob/a20e2e46c7cba6164ef95c91bf83d5fc614750f3/tips/ref-impls/src/TIP20Factory.sol#L1
 //	Token Contract: https://github.com/tempoxyz/tempo/blob/a20e2e46c7cba6164ef95c91bf83d5fc614750f3/tips/ref-impls/src/TIP20.sol#L1
 //	Docs: https://www.mintlify.com/tempoxyz/tempo/protocol/tip20/overview
-func DeployTokenViaFactory(b operations.Bundle, chain evm.Chain, input FactoryDeployArgs) (datastore.AddressRef, []contract.WriteOutput, error) {
+func DeployTokenViaFactory(b cld_ops.Bundle, chain cldf_evm.Chain, input FactoryDeployArgs) (datastore.AddressRef, []contract.WriteOutput, error) {
 	isTempoTestnet := chainsel.TEMPO_TESTNET_MODERATO.Selector == chain.Selector || chainsel.TEMPO_TESTNET.Selector == chain.Selector
 	isTempoMainnet := chainsel.TEMPO_MAINNET.Selector == chain.Selector
 	if !isTempoTestnet && !isTempoMainnet {
@@ -96,11 +97,7 @@ func DeployTokenViaFactory(b operations.Bundle, chain evm.Chain, input FactoryDe
 	}
 
 	b.Logger.Infof("Validating quote token address: %s", input.QuoteToken.Hex())
-	isQuoteTokenValid, err := operations.ExecuteOperation(b, IsTIP20, chain, contract.FunctionInput[common.Address]{
-		ChainSelector: chain.Selector,
-		Address:       factoryAddr,
-		Args:          input.QuoteToken,
-	})
+	isQuoteTokenValid, err := evmops.ExecuteRead(b, chain, factoryAddr, NewTIP20Factory, NewReadIsTIP20, input.QuoteToken)
 	if err != nil {
 		return datastore.AddressRef{}, nil, fmt.Errorf("isTIP20 quote token: %w", err)
 	}
@@ -109,30 +106,22 @@ func DeployTokenViaFactory(b operations.Bundle, chain evm.Chain, input FactoryDe
 	}
 
 	b.Logger.Infof("Deploying TIP-20 token: %+v", input)
-	createTokenReport, err := operations.ExecuteOperation(b, CreateToken, chain, contract.FunctionInput[CreateTokenArgs]{
-		ChainSelector: chain.Selector,
-		Address:       factoryAddr,
-		Args: CreateTokenArgs{
-			QuoteToken: input.QuoteToken,
-			Currency:   input.Currency,
-			Symbol:     input.Symbol,
-			Admin:      input.Admin,
-			Name:       input.Name,
-			Salt:       input.Salt,
-		},
+	createTokenReport, err := evmops.ExecuteWrite(b, chain, factoryAddr, NewTIP20Factory, NewWriteCreateToken, CreateTokenArgs{
+		QuoteToken: input.QuoteToken,
+		Currency:   input.Currency,
+		Symbol:     input.Symbol,
+		Admin:      input.Admin,
+		Name:       input.Name,
+		Salt:       input.Salt,
 	})
 	if err != nil {
 		return datastore.AddressRef{}, nil, fmt.Errorf("createToken: %w", err)
 	}
 
 	b.Logger.Info("Retrieving address of deployed token via factory's getTokenAddress function")
-	tokenAddrReport, err := operations.ExecuteOperation(b, GetTokenAddress, chain, contract.FunctionInput[GetTokenAddressArgs]{
-		ChainSelector: chain.Selector,
-		Address:       factoryAddr,
-		Args: GetTokenAddressArgs{
-			Sender: deployerKey,
-			Salt:   input.Salt,
-		},
+	tokenAddrReport, err := evmops.ExecuteRead(b, chain, factoryAddr, NewTIP20Factory, NewReadGetTokenAddress, GetTokenAddressArgs{
+		Sender: deployerKey,
+		Salt:   input.Salt,
 	})
 	if err != nil {
 		return datastore.AddressRef{}, nil, fmt.Errorf("getTokenAddress after deploy: %w", err)
@@ -150,91 +139,99 @@ func DeployTokenViaFactory(b operations.Bundle, chain evm.Chain, input FactoryDe
 	return tokenRef, []contract.WriteOutput{createTokenReport.Output}, nil
 }
 
-var Transfer = contract.NewWrite(contract.WriteParams[TransferArgs, *TIP20Token]{
-	Name:            "tip20:transfer",
-	Version:         Version,
-	Description:     "Transfer TIP-20 tokens to a specified address",
-	ContractType:    ContractType,
-	ContractABI:     TIP20TokenABI,
-	NewContract:     NewTIP20Token,
-	IsAllowedCaller: contract.AllCallersAllowed[*TIP20Token, TransferArgs],
-	Validate: func(args TransferArgs) error {
-		if args.Amount == nil || args.Amount.Cmp(big.NewInt(0)) <= 0 {
-			return errors.New("amount must be greater than 0")
-		}
-		if args.Receiver == (common.Address{}) {
-			return errors.New("receiver address is required")
-		}
-		return nil
-	},
-	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, args TransferArgs) (*types.Transaction, error) {
-		return token.Transfer(opts, args.Receiver, args.Amount)
-	},
-})
+func NewWriteTransfer(c *TIP20Token) *cld_ops.Operation[contract.FunctionInput[TransferArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[TransferArgs, *TIP20Token]{
+		Name:            "tip20:transfer",
+		Version:         Version,
+		Description:     "Transfer TIP-20 tokens to a specified address",
+		ContractType:    ContractType,
+		ContractABI:     TIP20TokenABI,
+		Contract:        c,
+		IsAllowedCaller: contract.AllCallersAllowed[*TIP20Token, TransferArgs],
+		Validate: func(args TransferArgs) error {
+			if args.Amount == nil || args.Amount.Cmp(big.NewInt(0)) <= 0 {
+				return errors.New("amount must be greater than 0")
+			}
+			if args.Receiver == (common.Address{}) {
+				return errors.New("receiver address is required")
+			}
+			return nil
+		},
+		CallContract: func(token *TIP20Token, opts *bind.TransactOpts, args TransferArgs) (*types.Transaction, error) {
+			return token.Transfer(opts, args.Receiver, args.Amount)
+		},
+	})
+}
 
-var GrantIssuerRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
-	Name:         "tip20:grant-issuer-role",
-	Version:      Version,
-	Description:  "Grants ISSUER_ROLE on a TIP-20 token so the account can mint and burn (e.g. a burn-mint pool on Tempo)",
-	ContractType: ContractType,
-	ContractABI:  TIP20TokenABI,
-	NewContract:  NewTIP20Token,
-	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		return token.HasRole(opts, caller, DefaultAdminRole)
-	},
-	Validate: func(address common.Address) error {
-		if address == (common.Address{}) {
-			return errors.New("account address is required")
-		}
-		return nil
-	},
-	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
-		issuerRole, err := token.ISSUERROLE(&bind.CallOpts{Context: opts.Context})
-		if err != nil {
-			return nil, err
-		}
-		return token.GrantRole(opts, issuerRole, input)
-	},
-})
+func NewWriteGrantIssuerRole(c *TIP20Token) *cld_ops.Operation[contract.FunctionInput[common.Address], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
+		Name:         "tip20:grant-issuer-role",
+		Version:      Version,
+		Description:  "Grants ISSUER_ROLE on a TIP-20 token so the account can mint and burn (e.g. a burn-mint pool on Tempo)",
+		ContractType: ContractType,
+		ContractABI:  TIP20TokenABI,
+		Contract:     c,
+		IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
+			return token.HasRole(opts, caller, DefaultAdminRole)
+		},
+		Validate: func(address common.Address) error {
+			if address == (common.Address{}) {
+				return errors.New("account address is required")
+			}
+			return nil
+		},
+		CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+			issuerRole, err := token.ISSUERROLE(&bind.CallOpts{Context: opts.Context})
+			if err != nil {
+				return nil, err
+			}
+			return token.GrantRole(opts, issuerRole, input)
+		},
+	})
+}
 
-var GrantAdminRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
-	Name:         "tip20:grant-admin-role",
-	Version:      Version,
-	Description:  "Grants DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
-	ContractType: ContractType,
-	ContractABI:  TIP20TokenABI,
-	NewContract:  NewTIP20Token,
-	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		return token.HasRole(opts, caller, DefaultAdminRole)
-	},
-	Validate: func(address common.Address) error {
-		if address == (common.Address{}) {
-			return errors.New("account address is required")
-		}
-		return nil
-	},
-	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
-		return token.GrantRole(opts, DefaultAdminRole, input)
-	},
-})
+func NewWriteGrantAdminRole(c *TIP20Token) *cld_ops.Operation[contract.FunctionInput[common.Address], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
+		Name:         "tip20:grant-admin-role",
+		Version:      Version,
+		Description:  "Grants DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
+		ContractType: ContractType,
+		ContractABI:  TIP20TokenABI,
+		Contract:     c,
+		IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
+			return token.HasRole(opts, caller, DefaultAdminRole)
+		},
+		Validate: func(address common.Address) error {
+			if address == (common.Address{}) {
+				return errors.New("account address is required")
+			}
+			return nil
+		},
+		CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+			return token.GrantRole(opts, DefaultAdminRole, input)
+		},
+	})
+}
 
-var RevokeAdminRole = contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
-	Name:         "tip20:revoke-admin-role",
-	Version:      Version,
-	Description:  "Revokes DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
-	ContractType: ContractType,
-	ContractABI:  TIP20TokenABI,
-	NewContract:  NewTIP20Token,
-	IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		return token.HasRole(opts, caller, DefaultAdminRole)
-	},
-	Validate: func(address common.Address) error {
-		if address == (common.Address{}) {
-			return errors.New("account address is required")
-		}
-		return nil
-	},
-	CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
-		return token.RevokeRole(opts, DefaultAdminRole, input)
-	},
-})
+func NewWriteRevokeAdminRole(c *TIP20Token) *cld_ops.Operation[contract.FunctionInput[common.Address], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[common.Address, *TIP20Token]{
+		Name:         "tip20:revoke-admin-role",
+		Version:      Version,
+		Description:  "Revokes DEFAULT_ADMIN_ROLE on a TIP-20 token (same role id as TIP20RolesAuth bytes32(0))",
+		ContractType: ContractType,
+		ContractABI:  TIP20TokenABI,
+		Contract:     c,
+		IsAllowedCaller: func(token *TIP20Token, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
+			return token.HasRole(opts, caller, DefaultAdminRole)
+		},
+		Validate: func(address common.Address) error {
+			if address == (common.Address{}) {
+				return errors.New("account address is required")
+			}
+			return nil
+		},
+		CallContract: func(token *TIP20Token, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+			return token.RevokeRole(opts, DefaultAdminRole, input)
+		},
+	})
+}

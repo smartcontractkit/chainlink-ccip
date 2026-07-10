@@ -12,13 +12,14 @@ import (
 	seqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	tpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	seqV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
+	gobindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -79,11 +80,14 @@ func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelecto
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
+	report, err := evmops.ExecuteRead(
 		e.OperationsBundle,
-		tpOps.GetSupportedChains, evmChain,
-		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr)},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
+		evmChain,
+		common.BytesToAddress(poolAddr),
+		seqV1_6_1.NewTokenPool,
+		tpOps.NewReadGetSupportedChains,
+		struct{}{},
+		cldf_ops.WithForceExecute[contract.FunctionInput[struct{}], evm.Chain](),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get supported chains from pool %s on chain %d: %w", common.BytesToAddress(poolAddr).Hex(), chainSelector, err)
@@ -98,11 +102,14 @@ func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector ui
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
+	report, err := evmops.ExecuteRead(
 		e.OperationsBundle,
-		tpOps.GetRemoteToken, evmChain,
-		evm_contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+		evmChain,
+		common.BytesToAddress(poolAddr),
+		seqV1_6_1.NewTokenPool,
+		tpOps.NewReadGetRemoteToken,
+		remoteSelector,
+		cldf_ops.WithForceExecute[contract.FunctionInput[uint64], evm.Chain](),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote token for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
@@ -121,11 +128,14 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
+	report, err := evmops.ExecuteRead(
 		e.OperationsBundle,
-		tpOps.GetRemotePools, evmChain,
-		evm_contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+		evmChain,
+		common.BytesToAddress(poolAddr),
+		seqV1_6_1.NewTokenPool,
+		tpOps.NewReadGetRemotePools,
+		remoteSelector,
+		cldf_ops.WithForceExecute[contract.FunctionInput[uint64], evm.Chain](),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote pools for chain %d from pool %s: %w", remoteSelector, common.BytesToAddress(poolAddr).Hex(), err)
@@ -138,14 +148,7 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 type poolOpsV161 struct{}
 
 func (p *poolOpsV161) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
-	res, err := cldf_ops.ExecuteOperation(
-		b,
-		tpOps.GetToken, chain,
-		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-		},
-	)
+	res, err := evmops.ExecuteRead(b, chain, poolAddr, seqV1_6_1.NewTokenPool, tpOps.NewReadGetToken, struct{}{})
 	if err != nil {
 		return common.Address{}, fmt.Errorf("GetToken v1.6.1: %w", err)
 	}
@@ -153,14 +156,7 @@ func (p *poolOpsV161) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr comm
 }
 
 func (p *poolOpsV161) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error) {
-	res, err := cldf_ops.ExecuteOperation(
-		b,
-		tpOps.GetTokenDecimals, chain,
-		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-		},
-	)
+	res, err := evmops.ExecuteRead(b, chain, poolAddr, seqV1_6_1.NewTokenPool, tpOps.NewReadGetTokenDecimals, struct{}{})
 	if err != nil {
 		return 0, fmt.Errorf("GetTokenDecimals v1.6.1: %w", err)
 	}
@@ -168,7 +164,7 @@ func (p *poolOpsV161) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolA
 }
 
 func (p *poolOpsV161) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error) {
-	pool, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	pool, err := gobindings.NewTokenPool(poolAddr, chain.Client)
 	if err != nil {
 		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate v1.6.1 token pool contract at %s: %w", poolAddr.Hex(), err)
 	}
@@ -183,50 +179,38 @@ func (p *poolOpsV161) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolA
 	return owner, rlAdmin, nil
 }
 
-func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error) {
+func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]contract.WriteOutput, error) {
 	bucket, ok := input.GetBucketForFinality(false)
 	if !ok {
 		b.Logger.Warnf("skipping rate limiter config for token pool (%s) on chain %d since no default bucket was provided", datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector)
 		return nil, nil
 	}
 
-	report, err := cldf_ops.ExecuteOperation(b,
-		tpOps.SetChainRateLimiterConfig, chain,
-		evm_contract.FunctionInput[tpOps.SetChainRateLimiterConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-			Args: tpOps.SetChainRateLimiterConfigArgs{
-				OutboundConfig: tpOps.Config{
-					IsEnabled: bucket.OutboundRateLimiterConfig.IsEnabled,
-					Capacity:  bucket.OutboundRateLimiterConfig.Capacity,
-					Rate:      bucket.OutboundRateLimiterConfig.Rate,
-				},
-				InboundConfig: tpOps.Config{
-					IsEnabled: bucket.InboundRateLimiterConfig.IsEnabled,
-					Capacity:  bucket.InboundRateLimiterConfig.Capacity,
-					Rate:      bucket.InboundRateLimiterConfig.Rate,
-				},
-				RemoteChainSelector: input.RemoteChainSelector,
-			},
-		})
+	report, err := evmops.ExecuteWrite(b, chain, poolAddr, seqV1_6_1.NewTokenPool, tpOps.NewWriteSetChainRateLimiterConfig, tpOps.SetChainRateLimiterConfigArgs{
+		OutboundConfig: gobindings.RateLimiterConfig{
+			IsEnabled: bucket.OutboundRateLimiterConfig.IsEnabled,
+			Capacity:  bucket.OutboundRateLimiterConfig.Capacity,
+			Rate:      bucket.OutboundRateLimiterConfig.Rate,
+		},
+		InboundConfig: gobindings.RateLimiterConfig{
+			IsEnabled: bucket.InboundRateLimiterConfig.IsEnabled,
+			Capacity:  bucket.InboundRateLimiterConfig.Capacity,
+			Rate:      bucket.InboundRateLimiterConfig.Rate,
+		},
+		RemoteChainSelector: input.RemoteChainSelector,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("SetChainRateLimiterConfig v1.6.1: %w", err)
 	}
-	return []evm_contract.WriteOutput{report.Output}, nil
+	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b,
-		tpOps.SetRateLimitAdmin, chain,
-		evm_contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-			Args:          newAdmin,
-		})
+func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]contract.WriteOutput, error) {
+	report, err := evmops.ExecuteWrite(b, chain, poolAddr, seqV1_6_1.NewTokenPool, tpOps.NewWriteSetRateLimitAdmin, newAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("SetRateLimitAdmin v1.6.1: %w", err)
 	}
-	return []evm_contract.WriteOutput{report.Output}, nil
+	return []contract.WriteOutput{report.Output}, nil
 }
 
 func (p *poolOpsV161) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.OnchainRateLimits, error) {
@@ -234,28 +218,26 @@ func (p *poolOpsV161) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("fast finality buckets are not supported on v1.6.x token pools")
 	}
 
-	outboundReport, err := cldf_ops.ExecuteOperation(
+	outboundReport, err := evmops.ExecuteRead(
 		b,
-		tpOps.GetCurrentOutboundRateLimiterState, chain,
-		evm_contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-			Args:          remoteSelector,
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+		chain,
+		poolAddr,
+		seqV1_6_1.NewTokenPool,
+		tpOps.NewReadGetCurrentOutboundRateLimiterState,
+		remoteSelector,
+		cldf_ops.WithForceExecute[contract.FunctionInput[uint64], evm.Chain](),
 	)
 	if err != nil {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get outbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
-	inboundReport, err := cldf_ops.ExecuteOperation(
+	inboundReport, err := evmops.ExecuteRead(
 		b,
-		tpOps.GetCurrentInboundRateLimiterState, chain,
-		evm_contract.FunctionInput[uint64]{
-			ChainSelector: chain.Selector,
-			Address:       poolAddr,
-			Args:          remoteSelector,
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+		chain,
+		poolAddr,
+		seqV1_6_1.NewTokenPool,
+		tpOps.NewReadGetCurrentInboundRateLimiterState,
+		remoteSelector,
+		cldf_ops.WithForceExecute[contract.FunctionInput[uint64], evm.Chain](),
 	)
 	if err != nil {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", remoteSelector, err)

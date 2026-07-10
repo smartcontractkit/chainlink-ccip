@@ -1,21 +1,23 @@
 package changesets_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	rmn_proxy_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_bindings "github.com/smartcontractkit/mcms/sdk/evm/bindings"
+	rmn_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
@@ -39,9 +41,8 @@ func TestActivateRMN_Apply(t *testing.T) {
 	b := e.OperationsBundle
 
 	legacyARM := deployer
-	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+	proxyRef, err := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: legacyARM},
 	}, nil)
 	require.NoError(t, err)
@@ -81,7 +82,7 @@ func TestActivateRMN_Apply(t *testing.T) {
 
 	newRMN := common.HexToAddress(rmnAddrs[0].Address)
 
-	rmnC, err := rmnops.NewRMNContract(newRMN, chain.Client)
+	rmnC, err := rmn_bindings.NewRMN(newRMN, chain.Client)
 	require.NoError(t, err)
 	callers, err := rmnC.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err)
@@ -98,10 +99,7 @@ func TestActivateRMN_Apply(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, deployer, proxyOwner, "ARMProxy should be deployer-owned in this test")
 
-	armReport, err := operations.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       proxyAddr,
-	})
+	armReport, err := evmops.ExecuteRead(b, chain, proxyAddr, rmn_proxy_bind.NewRMNProxy, rmn_proxy.NewReadGetRMN, struct{}{})
 	require.NoError(t, err)
 	require.Equal(t, newRMN, armReport.Output, "ARMProxy must point at the new RMN implementation")
 	require.NotEqual(t, legacyARM, armReport.Output)
@@ -119,9 +117,8 @@ func TestActivateRMN_WithAdditionalCurseAdmins(t *testing.T) {
 	b := e.OperationsBundle
 	additionalCurser := common.HexToAddress("0x1111111111111111111111111111111111111111")
 
-	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+	proxyRef, err := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
 	}, nil)
 	require.NoError(t, err)
@@ -160,7 +157,7 @@ func TestActivateRMN_WithAdditionalCurseAdmins(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rmnAddrs, 1)
 
-	rmnC, err := rmnops.NewRMNContract(common.HexToAddress(rmnAddrs[0].Address), chain.Client)
+	rmnC, err := rmn_bindings.NewRMN(common.HexToAddress(rmnAddrs[0].Address), chain.Client)
 	require.NoError(t, err)
 	callers, err := rmnC.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err)
@@ -233,9 +230,8 @@ func TestActivateRMN_AccumulatesBatchOpsAcrossChains(t *testing.T) {
 		deployer := chain.DeployerKey.From
 		b := e.OperationsBundle
 
-		proxyRef, deployErr := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		proxyRef, deployErr := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-			ChainSelector:  sel,
 			Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
 		}, nil)
 		require.NoError(t, deployErr)
@@ -288,9 +284,8 @@ func TestActivateRMN_MissingRMNMCMS(t *testing.T) {
 	deployer := chain.DeployerKey.From
 	b := e.OperationsBundle
 
-	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+	proxyRef, err := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
 	}, nil)
 	require.NoError(t, err)
@@ -330,9 +325,8 @@ func TestActivateRMN_CLLCCIPOwnedProxyEmitsDualProposals(t *testing.T) {
 	b := e.OperationsBundle
 
 	legacyARM := common.HexToAddress("0x2222222222222222222222222222222222222222")
-	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+	proxyRef, err := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: legacyARM},
 	}, nil)
 	require.NoError(t, err)
@@ -391,10 +385,7 @@ func TestActivateRMN_CLLCCIPOwnedProxyEmitsDualProposals(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rmnAddrs, 1)
 
-	armReport, err := operations.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSelector,
-		Address:       common.HexToAddress(proxyRef.Address),
-	})
+	armReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(proxyRef.Address), rmn_proxy_bind.NewRMNProxy, rmn_proxy.NewReadGetRMN, struct{}{})
 	require.NoError(t, err)
 	require.Equal(t, common.HexToAddress(rmnAddrs[0].Address), armReport.Output)
 	require.NotEqual(t, legacyARM, armReport.Output)
@@ -423,9 +414,8 @@ func TestActivateRMN_DualProposalsAccumulateBatchOpsAcrossChains(t *testing.T) {
 		deployer := chain.DeployerKey.From
 		b := e.OperationsBundle
 
-		proxyRef, deployErr := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		proxyRef, deployErr := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-			ChainSelector:  sel,
 			Args:           rmn_proxy.ConstructorArgs{RMN: common.HexToAddress("0x3333333333333333333333333333333333333333")},
 		}, nil)
 		require.NoError(t, deployErr)
@@ -500,9 +490,8 @@ func TestActivateRMN_MissingCLLCCIPWhenProxyNotDeployerOwned(t *testing.T) {
 	deployer := chain.DeployerKey.From
 	b := e.OperationsBundle
 
-	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+	proxyRef, err := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: deployer},
 	}, nil)
 	require.NoError(t, err)
@@ -641,8 +630,7 @@ func deployMCMSInstanceForTest(
 	require.NoError(t, err)
 	addresses = append(addresses, cancellerReport.Output.Addresses...)
 
-	timelockRef, err := contract.MaybeDeployContract(b, mcms_ops.OpDeployTimelock, chain, contract.DeployInput[mcms_ops.OpDeployTimelockInput]{
-		ChainSelector:  chain.Selector,
+	timelockRef, err := evmops.MaybeDeployContract(b, mcms_ops.OpDeployTimelock, chain, contract.DeployInput[mcms_ops.OpDeployTimelockInput]{
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployTimelockInput{
@@ -658,8 +646,7 @@ func deployMCMSInstanceForTest(
 	timelockAddr = common.HexToAddress(timelockRef.Address)
 	addresses = append(addresses, timelockRef)
 
-	callProxyRef, err := contract.MaybeDeployContract(b, mcms_ops.OpDeployCallProxy, chain, contract.DeployInput[mcms_ops.OpDeployCallProxyInput]{
-		ChainSelector:  chain.Selector,
+	callProxyRef, err := evmops.MaybeDeployContract(b, mcms_ops.OpDeployCallProxy, chain, contract.DeployInput[mcms_ops.OpDeployCallProxyInput]{
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.CallProxy, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployCallProxyInput{
@@ -670,13 +657,9 @@ func deployMCMSInstanceForTest(
 	addresses = append(addresses, callProxyRef)
 	callProxyAddr := common.HexToAddress(callProxyRef.Address)
 
-	_, err = operations.ExecuteOperation(b, mcms_ops.OpGrantRoleTimelock, chain, contract.FunctionInput[mcms_ops.OpGrantRoleTimelockInput]{
-		ChainSelector: chain.Selector,
-		Address:       timelockAddr,
-		Args: mcms_ops.OpGrantRoleTimelockInput{
-			RoleID:  mcms_ops.EXECUTOR_ROLE.ID,
-			Account: callProxyAddr,
-		},
+	_, err = evmops.ExecuteWrite(b, chain, timelockAddr, mcms_bindings.NewRBACTimelock, mcms_ops.NewWriteGrantRoleTimelock, mcms_ops.OpGrantRoleTimelockInput{
+		RoleID:  mcms_ops.EXECUTOR_ROLE.ID,
+		Account: callProxyAddr,
 	})
 	require.NoError(t, err)
 

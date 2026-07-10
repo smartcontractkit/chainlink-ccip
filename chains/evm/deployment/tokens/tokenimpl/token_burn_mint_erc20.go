@@ -8,13 +8,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type tokenBurnMintERC20 struct{}
@@ -32,7 +33,7 @@ func (tokenBurnMintERC20) Capabilities() CapabilitySet {
 	}
 }
 
-func (tokenBurnMintERC20) RevokeAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
+func (tokenBurnMintERC20) RevokeAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
 	return revokeDefaultAdminRoleBurnMintERC20(b, chain, token, user)
 }
 
@@ -40,24 +41,23 @@ func (tokenBurnMintERC20) HasAdminRole(ctx context.Context, chain evm.Chain, tok
 	return hasDefaultAdminRoleBurnMintERC20(ctx, chain, token, user)
 }
 
-func (tokenBurnMintERC20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
+func (tokenBurnMintERC20) GrantAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
 	return grantDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }
 
-func (tokenBurnMintERC20) GrantPoolRoles(b operations.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
+func (tokenBurnMintERC20) GrantPoolRoles(b cldf_ops.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
 	return grantMintAndBurnRolesBurnMintERC20(b, chain, token, pool)
 }
 
-func (tokenBurnMintERC20) SetCCIPAdmin(b operations.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
+func (tokenBurnMintERC20) SetCCIPAdmin(b cldf_ops.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
 	return setCCIPAdminBurnMintERC20(b, chain, token, ccipAdmin)
 }
 
-func (tokenBurnMintERC20) Transfer(b operations.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
-	// NOTE: BnM ERC20 tokens inherit from a standard ERC20 implementation, so we can use the same transfer helper function as the plain ERC20 token.
+func (tokenBurnMintERC20) Transfer(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
 	return transferTokensERC20(b, chain, token, to, scaledAmount)
 }
 
-func (tokenBurnMintERC20) Deploy(b operations.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
+func (tokenBurnMintERC20) Deploy(b cldf_ops.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
 	maxSupply := big.NewInt(0)
 	if in.Supply != nil {
 		maxSupply = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*in.Supply), in.Decimals)
@@ -68,10 +68,9 @@ func (tokenBurnMintERC20) Deploy(b operations.Bundle, chain evm.Chain, in tokens
 		preMint = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*in.PreMint), in.Decimals)
 	}
 
-	ref, err := contract.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain,
+	ref, err := evmops.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain,
 		contract.DeployInput[burn_mint_erc20.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20.ContractType, *utils.Version_1_0_0),
-			ChainSelector:  chain.Selector,
 			Qualifier:      &in.Symbol,
 			Args: burn_mint_erc20.ConstructorArgs{
 				Name:      in.Name,

@@ -1,14 +1,14 @@
 package tokens_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -27,6 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	aph_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/advanced_pool_hooks"
+	erc20_lock_box_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 )
 
 func TestDeployLockReleaseTokenPool(t *testing.T) {
@@ -224,9 +227,8 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy CREATE2Factory first
-			create2FactoryRef, err := contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 				},
@@ -248,12 +250,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Deploy token
-			tokenReport, err := operations.ExecuteOperation(
-				e.OperationsBundle,
-				burn_mint_erc20_with_drip.Deploy,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-					ChainSelector:  chainSel,
+			tokenReport, err := evmops.ExecuteDeploy(e.OperationsBundle, burn_mint_erc20_with_drip.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
 					Args: burn_mint_erc20_with_drip.ConstructorArgs{
 						Name:   "Test Token",
@@ -284,95 +281,88 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			lockBoxAddress := poolReport.Output.Addresses[2].Address
 
 			// Check token
-			getTokenReport, err := operations.ExecuteOperation(
+			getTokenReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetToken,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolAddress),
-				},
+				common.HexToAddress(poolAddress),
+				evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool),
+				token_pool.NewReadGetToken,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ConstructorArgs.Token, getTokenReport.Output, "Expected token address to be the same as the deployed token")
 
 			// Check dynamic config
-			getDynamicConfigReport, err := operations.ExecuteOperation(
+			getDynamicConfigReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolAddress),
-				},
+				common.HexToAddress(poolAddress),
+				evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool),
+				token_pool.NewReadGetDynamicConfig,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ConstructorArgs.Router, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")
 			require.Equal(t, getDynamicConfigReport.Output.RateLimitAdmin, input.RateLimitAdmin, "Expected rate limit admin address to be the same as the inputted rate limit admin")
 
 			// Check rmn proxy
-			getRmnProxyReport, err := operations.ExecuteOperation(
+			getRmnProxyReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRmnProxy,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolAddress),
-				},
+				common.HexToAddress(poolAddress),
+				evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool),
+				token_pool.NewReadGetRmnProxy,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ConstructorArgs.RMNProxy, getRmnProxyReport.Output, "Expected rmn proxy address to be the same as the deployed rmn proxy")
 
 			// Check threshold amount for additional ccvs
-			getThresholdAmountReport, err := operations.ExecuteOperation(
+			getThresholdAmountReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetThresholdAmount,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
-				},
+				common.HexToAddress(hooksAddress),
+				evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks),
+				advanced_pool_hooks.NewReadGetThresholdAmount,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ThresholdAmountForAdditionalCCVs, getThresholdAmountReport.Output, "Expected threshold amount for additional ccvs to be the same as the inputted threshold amount for additional ccvs")
 
 			// If a policy engine was configured, ensure it was set.
 			if input.AdvancedPoolHooksConfig.PolicyEngine != (common.Address{}) {
-				getPolicyEngineReport, err := operations.ExecuteOperation(
+				getPolicyEngineReport, err := evmops.ExecuteRead(
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					advanced_pool_hooks.GetPolicyEngine,
 					e.BlockChains.EVMChains()[chainSel],
-					contract.FunctionInput[struct{}]{
-						ChainSelector: chainSel,
-						Address:       common.HexToAddress(hooksAddress),
-					},
+					common.HexToAddress(hooksAddress),
+					evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks),
+					advanced_pool_hooks.NewReadGetPolicyEngine,
+					struct{}{},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				require.Equal(t, input.AdvancedPoolHooksConfig.PolicyEngine, getPolicyEngineReport.Output, "Expected policy engine address to be the same as the inputted policy engine address")
 			}
 
 			// Verify the newly deployed token pool is authorized on the hooks.
-			getAuthorizedCallersReport, err := operations.ExecuteOperation(
+			getAuthorizedCallersReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
-				},
+				common.HexToAddress(hooksAddress),
+				evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks),
+				advanced_pool_hooks.NewReadGetAllAuthorizedCallers,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
 
 			// Check authorized callers on lock box
-			getLockBoxCallersReport, err := operations.ExecuteOperation(
+			getLockBoxCallersReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(lockBoxAddress),
-				},
+				common.HexToAddress(lockBoxAddress),
+				evmops.BindAs[erc20_lock_box_bindings.ERC20LockBoxInterface](erc20_lock_box_bindings.NewERC20LockBox),
+				erc20_lock_box.NewReadGetAllAuthorizedCallers,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, getLockBoxCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")

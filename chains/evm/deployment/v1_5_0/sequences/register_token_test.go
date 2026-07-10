@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	evmcontract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	evmcontract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -65,7 +67,6 @@ func TestRegisterToken(t *testing.T) {
 				token_admin_registry.Deploy,
 				e.BlockChains.EVMChains()[chainSel],
 				evmcontract.DeployInput[token_admin_registry.ConstructorArgs]{
-					ChainSelector:  chainSel,
 					TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 				},
 			)
@@ -118,19 +119,17 @@ func TestRegisterToken(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Checks
-			tokenConfigReport, err := operations.ExecuteOperation(
+			tokenConfigReport, err := evmops.ExecuteRead(
 				operations.NewBundle(
 					e.OperationsBundle.GetContext,
 					e.OperationsBundle.Logger,
 					operations.NewMemoryReporter(),
 				),
-				token_admin_registry.GetTokenConfig,
 				e.BlockChains.EVMChains()[chainSel],
-				evmcontract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       tokenAdminRegistryAddress,
-					Args:          tokenAddress,
-				},
+				tokenAdminRegistryAddress,
+				tar_bindings.NewTokenAdminRegistry,
+				token_admin_registry.NewReadGetTokenConfig,
+				tokenAddress,
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			if input.ExternalAdmin != (common.Address{}) {

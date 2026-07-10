@@ -8,7 +8,9 @@ sidebar_position: 3
 
 Operations are atomic building blocks that perform a single contract interaction. The EVM implementation provides a typed framework for creating read, write, and deploy operations with built-in MCMS support.
 
-**Source:** [utils/operations/contract/](../utils/operations/contract/)
+**Source:** [chainlink-deployments-framework `chain/evm/operations2/contract`](https://github.com/smartcontractkit/chainlink-deployments-framework/tree/main/chain/evm/operations2/contract)
+
+**Helpers:** [utils/operations/](../utils/operations/) (`ExecuteRead`, `ExecuteWrite`, `ExecuteDeploy`, `MaybeDeployContract`, idempotency keys)
 
 ---
 
@@ -18,50 +20,27 @@ Operations are atomic building blocks that perform a single contract interaction
 
 Creates a read-only contract call operation.
 
-**Source:** [utils/operations/contract/read.go](../utils/operations/contract/read.go)
+**Source:** `chainlink-deployments-framework/chain/evm/operations2/contract`
+
+Generated operations export factory functions that take a pre-bound contract:
 
 ```go
-func NewRead[ARGS any, RET any, C any](params ReadParams[ARGS, RET, C]) *Operation[FunctionInput[ARGS], RET, evm.Chain]
+func NewReadGetDestChainConfig(c gobindings.OnRampInterface) *Operation[contract.FunctionInput[uint64], gobindings.GetDestChainConfig, evm.Chain]
 ```
 
-**Parameters:**
+Call sites bind the contract and pass the factory result to `ExecuteOperation` (or use `evmops.ExecuteRead`):
+
 ```go
-type ReadParams[ARGS any, RET any, C any] struct {
-    Name         string                    // Operation ID
-    Version      *semver.Version           // Contract version
-    Description  string
-    ContractType deployment.ContractType
-    NewContract  func(address common.Address, backend bind.ContractBackend) (C, error)
-    CallContract func(contract C, opts *bind.CallOpts, input ARGS) (RET, error)
-}
+report, err := evmops.ExecuteRead(b, chain, onRampAddr, onrampbindings.NewOnRamp, onrampops.NewReadGetDestChainConfig, remoteSelector)
 ```
-
-**Behavior:** Instantiates the contract using `NewContract`, then calls `CallContract` with the provided args. Returns the result directly.
 
 ### NewWrite
 
 Creates a state-modifying contract call operation with automatic MCMS fallback.
 
-**Source:** [utils/operations/contract/write.go](../utils/operations/contract/write.go)
+**Source:** `chainlink-deployments-framework/chain/evm/operations2/contract`
 
-```go
-func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *Operation[FunctionInput[ARGS], WriteOutput, evm.Chain]
-```
-
-**Parameters:**
-```go
-type WriteParams[ARGS any, C any] struct {
-    Name            string
-    Version         *semver.Version
-    Description     string
-    ContractType    deployment.ContractType
-    ContractABI     string
-    NewContract     func(address common.Address, backend bind.ContractBackend) (C, error)
-    IsAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address, input ARGS) (bool, error)
-    Validate        func(input ARGS) error
-    CallContract    func(contract C, opts *bind.TransactOpts, input ARGS) (*eth_types.Transaction, error)
-}
-```
+Write factories take a pre-bound contract (`Contract` field). `IsAllowedCaller` receives the bound contract instance.
 
 **Behavior:**
 1. Validates input via `Validate` (if provided)
@@ -88,35 +67,21 @@ func (o WriteOutput) Executed() bool  // Returns true if executed directly
 
 Creates a contract deployment operation.
 
-**Source:** [utils/operations/contract/deploy.go](../utils/operations/contract/deploy.go)
+**Source:** `chainlink-deployments-framework/chain/evm/operations2/contract`
 
-```go
-func NewDeploy[ARGS any](params DeployParams[ARGS]) *Operation[DeployInput[ARGS], datastore.AddressRef, evm.Chain]
-```
-
-**Parameters:**
-```go
-type DeployParams[ARGS any] struct {
-    Name                     string
-    Version                  *semver.Version
-    Description              string
-    ContractMetadata         *bind.MetaData
-    BytecodeByTypeAndVersion map[string]Bytecode
-    Validate                 func(input ARGS) error
-}
-```
-
-**Behavior:** Deploys the contract using the chain's deployer key. Supports both standard EVM and ZkSync VM bytecodes. Returns a `datastore.AddressRef` with the deployed address, type, and version.
+`DeployInput` no longer includes `ChainSelector` (chain comes from the `evm.Chain` dependency). Use `evmops.MaybeDeployContract` for idempotent deploys.
 
 ### Common Input Type
 
 ```go
 type FunctionInput[ARGS any] struct {
-    Address       common.Address
-    ChainSelector uint64
-    Args          ARGS
+    Args     ARGS
+    GasLimit uint64 `json:"gasLimit,omitempty"`  // optional write/deploy override
+    GasPrice uint64 `json:"gasPrice,omitempty"`
 }
 ```
+
+Use `operations.WithIdempotencyKey` (or `evmops.ContractIdempotencyKey` / `ChainIdempotencyKey` via helpers) to scope report reuse per contract address or chain.
 
 ### Batch Operation Helper
 
@@ -195,36 +160,40 @@ Operations for the Token Governor contract.
 
 ## Creating New Operations
 
-### Read Operation Example
+### Read Operation Example (generated factory)
 
 ```go
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainConfig, *onramp.OnRamp]{
-    Name:         "onramp:getDestChainConfig",
-    Version:      semver.MustParse("1.6.0"),
-    Description:  "Gets the destination chain config for a remote chain",
-    ContractType: "OnRamp",
-    NewContract:  onramp.NewOnRamp,
-    CallContract: func(c *onramp.OnRamp, opts *bind.CallOpts, destChainSelector uint64) (DestChainConfig, error) {
-        return c.GetDestChainConfig(opts, destChainSelector)
-    },
-})
+func NewReadGetDestChainConfig(c gobindings.OnRampInterface) *cld_ops.Operation[contract.FunctionInput[uint64], gobindings.GetDestChainConfig, cldf_evm.Chain] {
+    return contract.NewRead(contract.ReadParams[uint64, gobindings.GetDestChainConfig, gobindings.OnRampInterface]{
+        Name:         "onramp:get-dest-chain-config",
+        Version:      Version,
+        ContractType: ContractType,
+        Contract:     c,
+        CallContract: func(c gobindings.OnRampInterface, opts *bind.CallOpts, destChainSelector uint64) (gobindings.GetDestChainConfig, error) {
+            return c.GetDestChainConfig(opts, destChainSelector)
+        },
+    })
+}
 ```
 
-### Write Operation Example
+### Write Operation Example (generated factory)
 
 ```go
-var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestChainConfigArgs, *onramp.OnRamp]{
-    Name:            "onramp:applyDestChainConfigUpdates",
-    Version:         semver.MustParse("1.6.0"),
-    Description:     "Updates destination chain configurations",
-    ContractType:    "OnRamp",
-    ContractABI:     onramp.OnRampABI,
-    NewContract:     onramp.NewOnRamp,
-    IsAllowedCaller: contract.OnlyOwner[[]DestChainConfigArgs](),
-    CallContract: func(c *onramp.OnRamp, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
-        return c.ApplyDestChainConfigUpdates(opts, args)
-    },
-})
+func NewWriteApplyDestChainConfigUpdates(c gobindings.OnRampInterface) *cld_ops.Operation[contract.FunctionInput[[]gobindings.OnRampDestChainConfigArgs], contract.WriteOutput, cldf_evm.Chain] {
+    return contract.NewWrite(contract.WriteParams[[]gobindings.OnRampDestChainConfigArgs, gobindings.OnRampInterface]{
+        Name:         "onramp:apply-dest-chain-config-updates",
+        Version:      Version,
+        ContractType: ContractType,
+        ContractABI:  gobindings.OnRampMetaData.ABI,
+        Contract:     c,
+        IsAllowedCaller: func(c gobindings.OnRampInterface, opts *bind.CallOpts, caller common.Address, args []gobindings.OnRampDestChainConfigArgs) (bool, error) {
+            return contract.OnlyOwner(c, opts, caller, args)
+        },
+        CallContract: func(c gobindings.OnRampInterface, opts *bind.TransactOpts, args []gobindings.OnRampDestChainConfigArgs) (*types.Transaction, error) {
+            return c.ApplyDestChainConfigUpdates(opts, args)
+        },
+    })
+}
 ```
 
 ### Deploy Operation Example
@@ -242,4 +211,8 @@ var Deploy = contract.NewDeploy(contract.DeployParams[DeployInput]{
 
 ## Code Generation
 
-Many EVM operations are auto-generated from Go bindings (gethwrappers). The generation configuration is in `operations_gen_config.yaml`. Generated operations follow the same `NewRead`/`NewWrite`/`NewDeploy` patterns but are produced automatically from the contract ABI.
+Many EVM operations are auto-generated from gobindings via `operations-gen@v0.1.0`. Configuration is in `operations_gen_config.yaml`. Regenerate with:
+
+```bash
+cd chains/evm && make operations-fast
+```

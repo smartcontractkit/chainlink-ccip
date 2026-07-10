@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	fq20bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	solanasequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
@@ -37,35 +37,7 @@ import (
 
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-
-	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 )
-
-// convertOpsConfigToGobinding converts operations type to gobinding type for test assertions.
-// This helper keeps gobinding imports in tests, not production code.
-func convertOpsConfigToGobinding(cfg evmfqops.DestChainConfig) evmfq.FeeQuoterDestChainConfig {
-	return evmfq.FeeQuoterDestChainConfig{
-		IsEnabled:                         cfg.IsEnabled,
-		MaxNumberOfTokensPerMsg:           cfg.MaxNumberOfTokensPerMsg,
-		MaxDataBytes:                      cfg.MaxDataBytes,
-		MaxPerMsgGasLimit:                 cfg.MaxPerMsgGasLimit,
-		DestGasOverhead:                   cfg.DestGasOverhead,
-		DestGasPerPayloadByteBase:         cfg.DestGasPerPayloadByteBase,
-		DestGasPerPayloadByteHigh:         cfg.DestGasPerPayloadByteHigh,
-		DestGasPerPayloadByteThreshold:    cfg.DestGasPerPayloadByteThreshold,
-		DestDataAvailabilityOverheadGas:   cfg.DestDataAvailabilityOverheadGas,
-		DestGasPerDataAvailabilityByte:    cfg.DestGasPerDataAvailabilityByte,
-		DestDataAvailabilityMultiplierBps: cfg.DestDataAvailabilityMultiplierBps,
-		ChainFamilySelector:               cfg.ChainFamilySelector,
-		EnforceOutOfOrder:                 cfg.EnforceOutOfOrder,
-		DefaultTokenFeeUSDCents:           cfg.DefaultTokenFeeUSDCents,
-		DefaultTokenDestGasOverhead:       cfg.DefaultTokenDestGasOverhead,
-		DefaultTxGasLimit:                 cfg.DefaultTxGasLimit,
-		GasMultiplierWeiPerEth:            cfg.GasMultiplierWeiPerEth,
-		GasPriceStalenessThreshold:        cfg.GasPriceStalenessThreshold,
-		NetworkFeeUSDCents:                cfg.NetworkFeeUSDCents,
-	}
-}
 
 func getFQOverrides() lanesapi.FeeQuoterDestChainConfigOverride {
 	override := lanesapi.FeeQuoterDestChainConfigOverride(func(c *lanesapi.FeeQuoterDestChainConfig) {
@@ -171,7 +143,7 @@ func checkBidirectionalLaneConnectivity(
 	safq := sa.GetFeeQuoterDestChainConfig()
 	override := getFQOverrides()
 	override(&safq)
-	expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(safq))
+	expectedConfig := evmsequences.TranslateFQ(safq)
 	require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 	price, err := feeQuoterOnDest.GetDestinationChainGasPrice(nil, solanaChain.Selector)
@@ -515,7 +487,7 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 		require.Equal(t, expOnRampDest, onRampOnRouter.Bytes(), "onRamp must equal expected")
 
 		if useFeeQuoterV2 {
-			fqContract, err := fqops.NewFeeQuoterContract(common.BytesToAddress(feeQuoterOnSrcAddr), chain.Client)
+			fqContract, err := fq20bindings.NewFeeQuoter(common.BytesToAddress(feeQuoterOnSrcAddr), chain.Client)
 			require.NoError(t, err, "must instantiate FeeQuoter v2")
 			destCfg, err := fqContract.GetDestChainConfig(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get dest chain config from FeeQuoter v2")
@@ -529,7 +501,7 @@ func checkBidirectionalLaneConnectivityEVM2EVM(
 			require.NoError(t, err, "must instantiate feeQuoter 1.6")
 			feeQuoterDestConfig, err := feeQuoterOnSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get dest chain config from feeQuoter")
-			expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(expectedFQCfg))
+			expectedConfig := evmsequences.TranslateFQ(expectedFQCfg)
 			require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 			price, err := feeQuoterOnSrc.GetDestinationChainGasPrice(nil, lane.Dest.Selector)
 			require.NoError(t, err, "must get price from feeQuoter")

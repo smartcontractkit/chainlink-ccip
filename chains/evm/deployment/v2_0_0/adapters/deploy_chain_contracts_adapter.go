@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -10,12 +11,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	executor_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
@@ -75,11 +76,10 @@ func (a *EVMDeployChainContractsAdapter) ResolveDeployAddresses(
 		return ccvadapters.DeployChainResolvedAddresses{DeployerContract: ref.Address}, nil
 	}
 
-	create2Ref, err := contract_utils.MaybeDeployContract(
+		create2Ref, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, evmChain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chainSelector,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{evmChain.DeployerKey.From},
 			},
@@ -229,7 +229,7 @@ func convertExecutors(params []ccvadapters.ExecutorDeployParams) ([]sequences.Ex
 		result = append(result, sequences.ExecutorParams{
 			Version:       ep.Version,
 			MaxCCVsPerMsg: ep.MaxCCVsPerMsg,
-			DynamicConfig: executor.DynamicConfig{
+			DynamicConfig: executor_bindings.ExecutorDynamicConfig{
 				FeeAggregator:         feeAgg,
 				AllowedFinalityConfig: ep.DynamicConfig.AllowedFinalityConfig.Raw(),
 				CcvAllowlistEnabled:   ep.DynamicConfig.CcvAllowlistEnabled,

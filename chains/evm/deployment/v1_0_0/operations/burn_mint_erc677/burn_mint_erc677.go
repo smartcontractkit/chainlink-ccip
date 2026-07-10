@@ -10,11 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 )
 
@@ -80,29 +81,37 @@ func ResolveGrantMintAndBurnRolesAuthority(
 }
 
 // PrepareGrantMintAndBurnRoles plans grantMintAndBurnRoles for the pool on a BurnMintERC677 token.
-// The on-chain function is owner-gated. IsAllowedCaller on GrantMintAndBurnRoles uses AllCallersAllowed
+// The on-chain function is owner-gated. IsAllowedCaller on NewWriteGrantMintAndBurnRoles uses AllCallersAllowed
 // because MCMS simulations often use the deployer key while the token owner is the timelock.
 // When proposalExecutor is set and differs from the deployer, it must be the token owner.
 func PrepareGrantMintAndBurnRoles(
 	b cldf_ops.Bundle,
 	chain cldf_evm.Chain,
-	input contract.FunctionInput[common.Address],
+	tokenAddress common.Address,
+	poolAddress common.Address,
 	proposalExecutor common.Address,
 ) ([]contract.WriteOutput, error) {
 	if proposalExecutor != (common.Address{}) && proposalExecutor != chain.DeployerKey.From {
-		auth, err := ResolveGrantMintAndBurnRolesAuthority(b.GetContext(), chain.Client, input.Address, proposalExecutor)
+		auth, err := ResolveGrantMintAndBurnRolesAuthority(b.GetContext(), chain.Client, tokenAddress, proposalExecutor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate proposal executor %s: %w", proposalExecutor, err)
 		}
 		if auth.Kind != AuthorityOwner {
 			return nil, fmt.Errorf(
 				"proposal executor %s is not the token owner (owner=%s) for token %s; cannot grant mint/burn roles",
-				proposalExecutor, auth.Owner, input.Address,
+				proposalExecutor, auth.Owner, tokenAddress,
 			)
 		}
 	}
 
-	grantReport, err := cldf_ops.ExecuteOperation(b, GrantMintAndBurnRoles, chain, input)
+	grantReport, err := evmops.ExecuteWrite(
+		b,
+		chain,
+		tokenAddress,
+		burn_mint_erc677.NewBurnMintERC677,
+		NewWriteGrantMintAndBurnRoles,
+		poolAddress,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -110,26 +119,26 @@ func PrepareGrantMintAndBurnRoles(
 	return []contract.WriteOutput{grantReport.Output}, nil
 }
 
-var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc677.BurnMintERC677]{
-	Name:         "burn_mint_erc677:grant-mint-and-burn-roles",
-	Version:      cciputils.Version_1_0_0,
-	Description:  "Grant mint and burn roles on BurnMintERC677 (owner-only on-chain)",
-	ContractType: ContractType,
-	ContractABI:  burn_mint_erc677.BurnMintERC677ABI,
-	NewContract:  burn_mint_erc677.NewBurnMintERC677,
-	// On-chain only the owner may call grantMintAndBurnRoles. Do not use OnlyOwner here:
-	// MCMS/timelock flows simulate with the deployer key while ownership is the timelock
-	IsAllowedCaller: contract.AllCallersAllowed[*burn_mint_erc677.BurnMintERC677, common.Address],
-	Validate: func(address common.Address) error {
-		if address == (common.Address{}) {
-			return errors.New("burn and minter address cannot be zero")
-		}
-		return nil
-	},
-	CallContract: func(token *burn_mint_erc677.BurnMintERC677, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
-		return token.GrantMintAndBurnRoles(opts, input)
-	},
-})
+func NewWriteGrantMintAndBurnRoles(c *burn_mint_erc677.BurnMintERC677) *cldf_ops.Operation[contract.FunctionInput[common.Address], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc677.BurnMintERC677]{
+		Name:         "burn_mint_erc677:grant-mint-and-burn-roles",
+		Version:      cciputils.Version_1_0_0,
+		Description:  "Grant mint and burn roles on BurnMintERC677 (owner-only on-chain)",
+		ContractType: ContractType,
+		ContractABI:  burn_mint_erc677.BurnMintERC677ABI,
+		Contract:     c,
+		IsAllowedCaller: contract.AllCallersAllowed[*burn_mint_erc677.BurnMintERC677, common.Address],
+		Validate: func(address common.Address) error {
+			if address == (common.Address{}) {
+				return errors.New("burn and minter address cannot be zero")
+			}
+			return nil
+		},
+		CallContract: func(token *burn_mint_erc677.BurnMintERC677, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+			return token.GrantMintAndBurnRoles(opts, input)
+		},
+	})
+}
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "burn_mint_erc677:deploy",

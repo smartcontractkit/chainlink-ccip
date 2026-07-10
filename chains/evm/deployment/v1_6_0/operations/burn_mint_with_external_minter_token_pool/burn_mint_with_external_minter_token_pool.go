@@ -5,7 +5,7 @@ import (
 
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/burn_mint_with_external_minter_token_pool"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )

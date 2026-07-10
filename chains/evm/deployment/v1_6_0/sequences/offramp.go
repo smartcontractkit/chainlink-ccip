@@ -8,11 +8,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-
+	gobindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -20,7 +21,7 @@ import (
 type OffRampApplySourceChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []offrampops.SourceChainConfigArgs
+	UpdatesByChain []gobindings.OffRampSourceChainConfigArgs
 }
 
 type OffRampImportConfigSequenceInput struct {
@@ -30,9 +31,9 @@ type OffRampImportConfigSequenceInput struct {
 }
 
 type OffRampImportConfigSequenceOutput struct {
-	SourceChainCfgs map[uint64]offrampops.SourceChainConfig
-	StaticConfig    offrampops.StaticConfig
-	DynamicConfig   offrampops.DynamicConfig
+	SourceChainCfgs map[uint64]gobindings.OffRampSourceChainConfig
+	StaticConfig    gobindings.OffRampStaticConfig
+	DynamicConfig   gobindings.OffRampDynamicConfig
 }
 
 var (
@@ -46,11 +47,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
-			})
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, evmops.BindAs[gobindings.OffRampInterface](gobindings.NewOffRamp), offrampops.NewWriteApplySourceChainConfigUpdates, input.UpdatesByChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OffRampApplySourceChainConfigUpdatesOp on %s: %w", chain, err)
 			}
@@ -70,34 +67,24 @@ var (
 		"Imports OffRamp contract configuration from multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input OffRampImportConfigSequenceInput) (sequences.OnChainOutput, error) {
 			output := OffRampImportConfigSequenceOutput{
-				SourceChainCfgs: make(map[uint64]offrampops.SourceChainConfig),
+				SourceChainCfgs: make(map[uint64]gobindings.OffRampSourceChainConfig),
 			}
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, offrampops.GetStaticConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-			})
+			report, err := evmops.ExecuteRead(b, chain, input.Address, evmops.BindAs[gobindings.OffRampInterface](gobindings.NewOffRamp), offrampops.NewReadGetStaticConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetStaticConfig on %s: %w", chain, err)
 			}
 			output.StaticConfig = report.Output
-			out, err := operations.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-			})
+			out, err := evmops.ExecuteRead(b, chain, input.Address, evmops.BindAs[gobindings.OffRampInterface](gobindings.NewOffRamp), offrampops.NewReadGetDynamicConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetDynamicConfig on %s: %w", chain, err)
 			}
 			output.DynamicConfig = out.Output
 			for _, remoteChain := range input.RemoteChains {
-				report, err := operations.ExecuteOperation(b, offrampops.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
-					Args:          remoteChain,
-				})
+				report, err := evmops.ExecuteRead(b, chain, input.Address, evmops.BindAs[gobindings.OffRampInterface](gobindings.NewOffRamp), offrampops.NewReadGetSourceChainConfig, remoteChain)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetSourceChainConfig for chain %d on %s: %w", remoteChain, chain, err)
 				}

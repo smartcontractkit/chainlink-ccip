@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -38,6 +39,7 @@ import (
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmn_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -103,10 +105,11 @@ func init() {
 		rmnops.ContractType,
 		rmnops.Version,
 		NewEVMAuthorizedCallersAdapter(
-			rmnops.ApplyAuthorizedCallerUpdates,
-			rmnops.GetAllAuthorizedCallers,
-			func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-				return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
+			evmops.BindAs[rmn_bindings.RMNInterface](rmn_bindings.NewRMN),
+			rmnops.NewWriteApplyAuthorizedCallerUpdates,
+			rmnops.NewReadGetAllAuthorizedCallers,
+			func(added, removed []common.Address) rmn_bindings.AuthorizedCallersAuthorizedCallerArgs {
+				return rmn_bindings.AuthorizedCallersAuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
 			},
 		),
 	)
