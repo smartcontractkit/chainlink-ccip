@@ -53,7 +53,7 @@ func acceptOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *ch
 				}
 				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, normRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
-					return cldf.ChangesetOutput{}, err
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve contract ref %s for chain %d: %w", datastore_utils.SprintRef(normRef), perChainInputs.ChainSelector, err)
 				}
 				perChainInputs.ContractRef[i] = fullRef
 			}
