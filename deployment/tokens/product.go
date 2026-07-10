@@ -367,16 +367,6 @@ type ConfigureTokenForTransfersInput struct {
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress       string
 	AllowedFinalityConfig finality.Config
-	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool
-	// to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
-	// The old pool is derived from the TokenAdminRegistry. Only used by EVM adapters.
-	LiquidityMigrationAmount *big.Int
-	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with LiquidityMigrationAmount. Only used by EVM adapters.
-	LiquidityMigrationBasisPoints *uint16
-	// TimelockAddress is the MCMS timelock address, resolved by the changeset from MCMS config.
-	// Required when a liquidity migration is triggered.
-	TimelockAddress string
 	// SkipActivePoolSupportedChainsCheck disables the upgrade-safety check that requires remoteChains
 	// to cover all chains the currently-registered pool supports. Set this when the pool being configured
 	// is not a direct replacement for the registered pool (e.g. CCTP-through-CCV alongside USDCTokenPoolProxy).
