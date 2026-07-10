@@ -2,7 +2,6 @@ package changesets
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -24,8 +23,6 @@ type ActivateRMNCfg struct {
 	// CurseAdmins are optional additional authorized callers (cursers) added at RMN deploy
 	// time, keyed by chain selector. The Ultra Fast Curse RBACTimelock is always included.
 	CurseAdmins map[uint64][]common.Address
-	// TimelockDelay is the schedule delay for RMNMCMS and CLLCCIP proposals. Zero means no delay.
-	TimelockDelay time.Duration
 }
 
 var ActivateRMN = func(mcmsRegistry *changesets.MCMSReaderRegistry) cldf_deployment.ChangeSetV2[changesets.WithMCMS[ActivateRMNCfg]] {
@@ -43,9 +40,6 @@ func validateActivateRMN(e cldf_deployment.Environment, input changesets.WithMCM
 	}
 	if err := validateActivateRMNCurseAdmins(input.Cfg.CurseAdmins, input.Cfg.ChainSels); err != nil {
 		return err
-	}
-	if input.Cfg.TimelockDelay < 0 {
-		return fmt.Errorf("TimelockDelay cannot be negative")
 	}
 	evmChains := e.BlockChains.EVMChains()
 	for _, sel := range input.Cfg.ChainSels {
@@ -120,7 +114,6 @@ func applyDeployAndActivateRMN(
 
 	var output cldf_deployment.ChangesetOutput
 	output.DataStore = outputDS
-	timelockDelay := mcms_types.NewDuration(input.Cfg.TimelockDelay)
 
 	if err := input.MCMS.PopulateDefaults(); err != nil {
 		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to populate MCMS defaults: %w", err)
@@ -131,7 +124,6 @@ func applyDeployAndActivateRMN(
 			WithBatchOps(rmnBatchOps).
 			Build(mcmsInputForActivateRMN(
 				input.MCMS,
-				timelockDelay,
 				common_utils.RMNTimelockQualifier,
 				"Accept RMN 2.0 ownership on RMNMCMS timelock",
 			))
@@ -155,7 +147,6 @@ func applyDeployAndActivateRMN(
 			WithBatchOps(cllBatchOps).
 			Build(mcmsInputForActivateRMN(
 				input.MCMS,
-				timelockDelay,
 				common_utils.CLLQualifier,
 				"Point RMNProxy at RMN 2.0 on CLLCCIP timelock",
 			))
@@ -170,16 +161,14 @@ func applyDeployAndActivateRMN(
 
 func mcmsInputForActivateRMN(
 	base mcms.Input,
-	timelockDelay mcms_types.Duration,
 	qualifier, description string,
 ) mcms.Input {
 	return mcms.Input{
 		OverridePreviousRoot: base.OverridePreviousRoot,
-		ValidUntil:             base.ValidUntil,
-		TimelockDelay:          timelockDelay,
-		TimelockAction:         mcms_types.TimelockActionSchedule,
-		Qualifier:              qualifier,
-		Description:            description,
+		ValidUntil:           base.ValidUntil,
+		TimelockAction:       mcms_types.TimelockActionSchedule,
+		Qualifier:            qualifier,
+		Description:          description,
 	}
 }
 

@@ -157,7 +157,6 @@ func (m *cctpTest_MockCCTPChain) USDCType() adapters.USDCType {
 var cctpTest_BasicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,
-	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
 }
 
@@ -645,7 +644,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
 					ValidUntil:           3759765795,
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       "InvalidAction", // Invalid action
 				},
 			},
@@ -660,7 +658,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
 					ValidUntil:           0, // Zero timestamp
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       mcms_types.TimelockActionSchedule,
 				},
 			},

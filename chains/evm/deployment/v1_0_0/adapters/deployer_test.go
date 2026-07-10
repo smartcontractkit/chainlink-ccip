@@ -440,7 +440,6 @@ func TestUpdateMCMSConfig(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            "CLLCCIP",
 			Description:          "update mcms config test",

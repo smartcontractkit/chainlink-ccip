@@ -69,7 +69,6 @@ func MCMSInputForQualifier(qualifier string) mcms_utils.Input {
 	return mcms_utils.Input{
 		Qualifier:      qualifier,
 		TimelockAction: mcmstypes.TimelockActionSchedule,
-		TimelockDelay:  mcmstypes.MustParseDuration("0s"),
 		ValidUntil:     3759765795,
 		Description:    "Accept MCM contract ownership on timelock",
 	}

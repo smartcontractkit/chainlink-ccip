@@ -16,8 +16,6 @@ type Input struct {
 	// ValidUntil is a unix timestamp indicating when the proposal expires.
 	// Root can't be set or executed after this time.
 	ValidUntil uint32
-	// TimelockDelay is the amount of time each operation in the proposal must wait before it can be executed.
-	TimelockDelay mcms_types.Duration
 	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
 	TimelockAction mcms_types.TimelockAction
 	// Qualifier is a string used to qualify the MCMS + Timelock contract addresses.

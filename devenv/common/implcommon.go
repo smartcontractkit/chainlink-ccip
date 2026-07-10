@@ -184,7 +184,6 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 		MCMS: mcms.Input{
 			Qualifier:      qualifier,
 			TimelockAction: mcms_types.TimelockActionSchedule,
-			TimelockDelay:  mcms_types.MustParseDuration("0s"),
 			ValidUntil:     math.MaxUint32,
 			Description:    "Accept MCM contract ownership on timelock",
 		},
@@ -283,7 +282,6 @@ func devenvScheduleMCMSInput(description string) mcms.Input {
 	return mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           math.MaxUint32,
-		TimelockDelay:        mcms_types.MustParseDuration("1s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Qualifier:            cciputils.CLLQualifier,
 		Description:          description,
@@ -738,12 +736,11 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	// This will only store the addresses deployed during this setup.
 	outputDS := datastore.NewMemoryDataStore()
 
-	// A helper to create MCMS inputs with long expirations and short timelock delays.
+	// A helper to create MCMS inputs with long expirations.
 	newInputForMCMS := func(desc string) mcms.Input {
 		return mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           math.MaxUint32,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            cciputils.CLLQualifier,
 			Description:          desc,

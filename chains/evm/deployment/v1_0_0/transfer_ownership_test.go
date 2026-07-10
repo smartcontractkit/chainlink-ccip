@@ -178,7 +178,6 @@ func TestTransferOwnership(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership test",
@@ -239,7 +238,6 @@ func TestTransferOwnership(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership test",
@@ -257,7 +255,6 @@ func TestTransferOwnership(t *testing.T) {
 	transferOwnershipInput.MCMS = mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           3759765795,
-		TimelockDelay:        mcms_types.MustParseDuration("0s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Qualifier:            deploymentutils.RMNTimelockQualifier,
 		Description:          "Transfer ownership test",

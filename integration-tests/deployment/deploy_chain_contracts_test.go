@@ -148,7 +148,6 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            fromQualifier,
 			Description:          "Transfer ownership test",
