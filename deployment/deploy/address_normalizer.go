@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
-// TryNormalizeAddressRef attempts to normalize the given AddressRef.Address based on the provided chain selector.
+// TryNormalizeAddressRef normalizes the given AddressRef.Address based on the provided chain selector.
 func TryNormalizeAddressRef(sel uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
 	if datastore_utils.IsAddressRefEmpty(ref) {
 		return ref, nil
