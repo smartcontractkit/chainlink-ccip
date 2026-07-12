@@ -382,7 +382,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			if input.TokenTransferConfig != nil {
-				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
+				ttConfig := input.TokenTransferConfig
+				for remoteSelector, remoteConfig := range ttConfig.RemoteChains {
 					if _, exists := allRemotes[remoteSelector]; exists {
 						if remoteConfig.RemoteToken == nil {
 							remoteConfig.RemoteToken = allRemotes[remoteSelector].RemoteToken
@@ -398,8 +399,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// When no remote chains are given but `autoMigrateRemoteChains` is true, then we should still
 				// proceed to the configure step since remote chain configs (including legacy lane fees) will be
 				// auto-populated via the token pool migrator interface.
-				if len(input.TokenTransferConfig.RemoteChains) != 0 || input.TokenTransferConfig.AutoMigrateRemoteChains {
-					allTokenConfigs[selector] = *input.TokenTransferConfig
+				isLiquidityMigration := ttConfig.LiquidityMigrationAmount != nil || ttConfig.LiquidityMigrationBasisPoints != nil
+				if len(ttConfig.RemoteChains) != 0 || ttConfig.AutoMigrateRemoteChains || isLiquidityMigration {
+					allTokenConfigs[selector] = *ttConfig
 				}
 			}
 		}
