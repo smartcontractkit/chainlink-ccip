@@ -307,9 +307,8 @@ var SetEventAuthorities = operations.NewOperation(
 )
 
 type SetCurserInput struct {
-	Curser             solana.PublicKey
-	RMNRemote          solana.PublicKey
-	RMNRemoteConfigPDA solana.PublicKey
+	Curser    solana.PublicKey
+	RMNRemote solana.PublicKey
 }
 
 var SetCurser = operations.NewOperation(
@@ -321,11 +320,20 @@ var SetCurser = operations.NewOperation(
 
 		authority := GetAuthority(chain, input.RMNRemote)
 
+		configPDA, _, err := state.FindRMNRemoteConfigPDA(input.RMNRemote)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMNRemoteConfig PDA: %w", err)
+		}
+		cursesPDA, _, err := state.FindRMNRemoteCursesPDA(input.RMNRemote)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMNRemoteCurses PDA: %w", err)
+		}
+
 		ixn, err := rmn163.NewSetCurserInstruction(
 			input.Curser,
-			input.RMNRemoteConfigPDA,
+			configPDA,
+			cursesPDA,
 			authority,
-			solana.SystemProgramID,
 		).ValidateAndBuild()
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set curser instruction: %w", err)

@@ -6,7 +6,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -35,18 +34,12 @@ var SetRMNRemoteCurser = cldf_ops.NewSequence(
 		}
 		rmnPubkey := solana.PublicKeyFromBytes(rmnAddrBytes)
 
-		rmnConfigPDA, _, err := state.FindRMNRemoteConfigPDA(rmnPubkey)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMNRemote config PDA: %w", err)
-		}
-
 		out, err := cldf_ops.ExecuteOperation(b,
 			rmnops.SetCurser,
 			chain,
 			rmnops.SetCurserInput{
-				Curser:             input.Curser,
-				RMNRemote:          rmnPubkey,
-				RMNRemoteConfigPDA: rmnConfigPDA,
+				Curser:    input.Curser,
+				RMNRemote: rmnPubkey,
 			},
 		)
 		if err != nil {
