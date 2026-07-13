@@ -282,7 +282,6 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 		if tokenAddr == (common.Address{}) {
 			continue
 		}
-		tokenAddr := tokenAddr // capture loop variable
 		grp.Go(func() error {
 			poolAddr, err := tokenAdminRegC.GetPool(&bind.CallOpts{
 				Context: grpCtx,

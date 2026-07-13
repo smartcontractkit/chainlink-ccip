@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -163,14 +162,14 @@ func TestFastCurse(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 		},
 	})
@@ -452,7 +451,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			Bypasser:         testhelpers.SingleGroupMCMS(),
 			Proposer:         testhelpers.SingleGroupMCMS(),
 			TimelockMinDelay: big.NewInt(0),
-			Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+			Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 		}
 	}
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
