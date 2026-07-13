@@ -3,7 +3,7 @@ module github.com/smartcontractkit/chainlink-ccip/devenv
 go 1.26.2
 
 replace (
-	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.305.3
+	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.305.5
 	github.com/smartcontractkit/chainlink-ccip => ..
 	github.com/smartcontractkit/chainlink-ccip/chains/evm => ../chains/evm
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
@@ -23,12 +23,12 @@ require (
 	github.com/aws/smithy-go v1.27.3
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/docker/docker v28.5.3-0.20260325154711-31a1689cb0a1+incompatible
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
+	github.com/moby/moby/client v0.5.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
@@ -295,8 +295,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
-	github.com/moby/moby/api v1.54.2 // indirect
-	github.com/moby/moby/client v0.4.0 // indirect
+	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
@@ -341,7 +340,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.14.0 // indirect
 	github.com/prometheus/otlptranslator v0.0.0-20250527173959-2573485683d5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
-	github.com/prometheus/prometheus v0.305.3 // indirect
+	github.com/prometheus/prometheus v0.305.5 // indirect
 	github.com/prometheus/sigv4 v0.2.0 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
