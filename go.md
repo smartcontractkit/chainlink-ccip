@@ -94,8 +94,8 @@ flowchart LR
 	chainlink-ccip/chains/evm --> chainlink-ccip/deployment
 	chainlink-ccip/chains/evm --> chainlink-evm
 	click chainlink-ccip/chains/evm href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-ccip/chains/solana --> chainlink-ccip
 	chainlink-ccip/chains/solana --> chainlink-ccip/chains/solana/gobindings
+	chainlink-ccip/chains/solana --> chainlink-common
 	click chainlink-ccip/chains/solana href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/solana/deployment --> chainlink-ccip/deployment
 	click chainlink-ccip/chains/solana/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
@@ -135,8 +135,6 @@ flowchart LR
 	click chainlink-common/pkg/chipingress href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-common/pkg/monitoring
 	click chainlink-common/pkg/monitoring href "https://github.com/smartcontractkit/chainlink-common"
-	chainlink-common/pkg/values
-	click chainlink-common/pkg/values href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-data-streams
 	click chainlink-data-streams href "https://github.com/smartcontractkit/chainlink-data-streams"
 	chainlink-deployments-framework --> ccip-owner-contracts
@@ -202,7 +200,6 @@ flowchart LR
 	click chainlink-protos/workflows/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-sui --> chainlink-aptos
 	chainlink-sui --> chainlink-ccip
-	chainlink-sui --> chainlink-common/pkg/values
 	click chainlink-sui href "https://github.com/smartcontractkit/chainlink-sui"
 	chainlink-testing-framework/framework --> chainlink-testing-framework/wasp
 	click chainlink-testing-framework/framework href "https://github.com/smartcontractkit/chainlink-testing-framework"
@@ -225,7 +222,6 @@ flowchart LR
 	chainlink-ton/devenv --> chainlink-ton/deployment
 	click chainlink-ton/devenv href "https://github.com/smartcontractkit/chainlink-ton"
 	chainlink-tron/relayer --> chainlink-common
-	chainlink-tron/relayer --> chainlink-common/pkg/values
 	click chainlink-tron/relayer href "https://github.com/smartcontractkit/chainlink-tron"
 	chainlink/deployment
 	click chainlink/deployment href "https://github.com/smartcontractkit/chainlink"
@@ -286,7 +282,6 @@ flowchart LR
 		 chainlink-common/keystore
 		 chainlink-common/pkg/chipingress
 		 chainlink-common/pkg/monitoring
-		 chainlink-common/pkg/values
 	end
 	click chainlink-common-repo href "https://github.com/smartcontractkit/chainlink-common"
 
