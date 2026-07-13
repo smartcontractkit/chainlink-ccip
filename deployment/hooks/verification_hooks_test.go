@@ -352,21 +352,22 @@ func TestRequireVerifiedEnvContractsPreHookForMultipleChainFamilies_PassesRefsTo
 	dom := domain.NewDomain(t.TempDir(), "test")
 	envName := "hooktest"
 
+	v := semver.MustParse("1.0.0")
 	refsInput := []datastore.AddressRef{{
 		Type:    "C",
-		Version: nil,
+		Version: v,
 	}}
 	refs := []datastore.AddressRef{
 		{
 			ChainSelector: chainsel.ETHEREUM_MAINNET.Selector,
 			Type:          "C",
-			Version:       nil,
+			Version:       v,
 			Address:       "0x0000000000000000000000000000000000000001",
 		},
 		{
 			ChainSelector: chainsel.SOLANA_MAINNET.Selector,
 			Type:          "C",
-			Version:       nil,
+			Version:       v,
 			Address:       "0x0000000000000000000000000000000000000002",
 		},
 	}
@@ -592,9 +593,11 @@ func TestNewRequireVerifiedEnvContractsPreHook_FilterRefs_NoMatchingAddressRef(t
 	dom := domain.NewDomain(t.TempDir(), "test")
 	envName := "hooktest"
 
+	v := semver.MustParse("1.0.0")
 	refs := []datastore.AddressRef{{
 		ChainSelector: chainsel.ETHEREUM_MAINNET.Selector,
 		Type:          "OnChain",
+		Version:       v,
 		Address:       "0x0000000000000000000000000000000000000001",
 	}}
 	writeEnvDatastoreWithRefs(t, envName, dom, refs)
