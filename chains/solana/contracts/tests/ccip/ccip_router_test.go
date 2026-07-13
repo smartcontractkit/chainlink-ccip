@@ -6498,7 +6498,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqConfigPDA,
 			)
 			raw.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
-			raw.Append(solana.Meta(getFqTokenConfigPDA(token2.Mint)).WRITE())
+			raw.Append(solana.Meta(getFqPerChainPerTokenConfigBillingPDA(token2.Mint)).WRITE())
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
