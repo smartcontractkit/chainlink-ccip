@@ -329,3 +329,5 @@ require (
 
 // gotron-sdk is not longer maintained
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
+
+replace github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5

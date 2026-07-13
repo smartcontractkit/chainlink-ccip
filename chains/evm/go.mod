@@ -341,3 +341,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5
