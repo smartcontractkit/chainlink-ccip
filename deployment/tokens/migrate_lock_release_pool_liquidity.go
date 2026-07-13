@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -97,7 +98,7 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 
 			var setPoolConfig *MigrationSetPoolConfig
 			if migration.RegistryRef != nil && migration.TokenRef != nil {
-				regRef, err := TryNormalizeAddressRef(migration.ChainSelector, *migration.RegistryRef)
+				regRef, err := deploy.TryNormalizeAddressRef(migration.ChainSelector, *migration.RegistryRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to normalize registry ref address: %w", i, err)
 				}

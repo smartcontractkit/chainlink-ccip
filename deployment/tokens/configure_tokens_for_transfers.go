@@ -138,7 +138,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 
 	var err error
 	for selector, token := range cfg {
-		token.RegistryRef, err = TryNormalizeAddressRef(selector, token.RegistryRef)
+		token.RegistryRef, err = deploy.TryNormalizeAddressRef(selector, token.RegistryRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to normalize registry ref address for chain selector %d: %w", selector, err)
 		}
@@ -685,7 +685,7 @@ func convertRemoteChainConfig(
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize outbound CCV ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -696,7 +696,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVs = append(outCfg.OutboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVs {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize inbound CCV ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -707,7 +707,7 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVs = append(outCfg.InboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.OutboundCCVsToAddAboveThreshold {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize outbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -718,7 +718,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVsToAddAboveThreshold = append(outCfg.OutboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVsToAddAboveThreshold {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize inbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
 		}
