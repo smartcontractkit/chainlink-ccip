@@ -219,8 +219,8 @@ func TestIterateOwnershipCheckers_InvalidRefAndVerifyErrorAreAggregated(t *testi
 	mds := datastore.NewMemoryDataStore()
 	require.NoError(t, mds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: selector,
-		Type:          "T",
-		Version:       nil,
+		Type:          "",
+		Version:       v,
 		Address:       "0x1",
 		Qualifier:     "bad",
 	}))
