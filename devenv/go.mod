@@ -4,6 +4,7 @@ go 1.26.4
 
 replace (
 	github.com/grafana/loki/v3 => github.com/grafana/loki/v3 v3.7.3
+	github.com/hashicorp/memberlist => github.com/grafana/memberlist v0.3.1-0.20251126142931-6f9f62ab6f86
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.313.1
 	github.com/smartcontractkit/chainlink-ccip => ..
 	github.com/smartcontractkit/chainlink-ccip/chains/evm => ../chains/evm

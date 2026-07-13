@@ -228,10 +228,14 @@ jobs:
 
           cd "$GITHUB_WORKSPACE/chainlink"
           update_ccip_modules
+          # chainlink-ccip upgrades pull juno via keystore, which bumps tablewriter to v1.x.
+          # chainlink-ccv still uses the v0.0.5 API; pin until chainlink-ccv migrates.
+          go mod edit -replace=github.com/olekukonko/tablewriter=github.com/olekukonko/tablewriter@v0.0.5
           make gomodtidy
 
           cd "$GITHUB_WORKSPACE/chainlink/integration-tests"
           update_ccip_modules
+          go mod edit -replace=github.com/olekukonko/tablewriter=github.com/olekukonko/tablewriter@v0.0.5
           go mod tidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
