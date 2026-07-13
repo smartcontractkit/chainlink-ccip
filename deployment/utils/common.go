@@ -205,3 +205,8 @@ func CoalescePtr[T any](override, def *T) *T {
 	}
 	return def
 }
+
+// StringPtr returns a pointer to s.
+func StringPtr(s string) *string {
+	return &s
+}

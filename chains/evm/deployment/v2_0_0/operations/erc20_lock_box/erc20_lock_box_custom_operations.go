@@ -45,10 +45,7 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 		if err != nil {
 			return false, fmt.Errorf("failed to get authorized callers: %w", err)
 		}
-		if slices.Contains(callers, caller) {
-			return true, nil
-		}
-		return false, nil
+		return slices.Contains(callers, caller), nil
 	},
 	Validate: func(args DepositArgs) error {
 		if args.Amount == nil || args.Amount.Sign() <= 0 {

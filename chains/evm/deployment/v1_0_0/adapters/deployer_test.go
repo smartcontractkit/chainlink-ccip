@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -67,14 +66,14 @@ func TestDeployMCMS(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(utils.CLLQualifier),
+				Qualifier:        new(utils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(utils.CLLQualifier),
+				Qualifier:        new(utils.CLLQualifier),
 			},
 		},
 	})
@@ -182,7 +181,7 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
-					Qualifier:        ptr.String(utils.CLLQualifier),
+					Qualifier:        utils.StringPtr(utils.CLLQualifier),
 				},
 			},
 		})
@@ -200,7 +199,7 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
-					Qualifier:        ptr.String("no-cllccip"),
+					Qualifier:        utils.StringPtr("no-cllccip"),
 				},
 			},
 		})
@@ -217,7 +216,7 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
 					TimelockMinDelay: big.NewInt(0),
-					Qualifier:        ptr.String(utils.CLLQualifier),
+					Qualifier:        utils.StringPtr(utils.CLLQualifier),
 				},
 			},
 		})

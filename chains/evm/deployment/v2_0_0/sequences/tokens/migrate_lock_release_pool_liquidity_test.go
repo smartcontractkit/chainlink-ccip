@@ -1075,4 +1075,3 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored after both migrations")
 }
-
