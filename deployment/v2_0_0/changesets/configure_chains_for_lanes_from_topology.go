@@ -240,7 +240,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter())
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter(), cfg.AllowOnrampOverride)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -265,6 +265,7 @@ func applyConfigureChains(
 	chains []enrichedChainConfig,
 	mcmsInput mcms.Input,
 	useTestRouter bool,
+	allowOnrampOverride bool,
 ) (deployment.ChangesetOutput, error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -344,8 +345,10 @@ func applyConfigureChains(
 
 		// ── Phase 3: Dispatch ──────────────────────────────────────────────
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-			ChainSelector:       chainCfg.ChainSelector,
-			AllowOnrampOverride: useTestRouter,
+			ChainSelector: chainCfg.ChainSelector,
+			// Overriding an existing prod-router OnRamp mapping is allowed either implicitly on the
+			// test router or explicitly via AllowOnrampOverride (set by migrate_chain_lanes_to_v2).
+			AllowOnrampOverride: useTestRouter || allowOnrampOverride,
 			Router:              routerBytes,
 			OnRamp:              onRampBytes,
 			CommitteeVerifiers:  committeeVerifiers,

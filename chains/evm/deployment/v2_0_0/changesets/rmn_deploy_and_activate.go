@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -14,6 +15,7 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // ActivateRMNCfg configures the ActivateRMN changeset.
@@ -22,6 +24,8 @@ type ActivateRMNCfg struct {
 	// CurseAdmins are optional additional authorized callers (cursers) added at RMN deploy
 	// time, keyed by chain selector. The Ultra Fast Curse RBACTimelock is always included.
 	CurseAdmins map[uint64][]common.Address
+	// TimelockDelay is the schedule delay for RMNMCMS and CLLCCIP proposals. Zero means no delay.
+	TimelockDelay time.Duration
 }
 
 var ActivateRMN = func(mcmsRegistry *changesets.MCMSReaderRegistry) cldf_deployment.ChangeSetV2[changesets.WithMCMS[ActivateRMNCfg]] {
@@ -39,6 +43,9 @@ func validateActivateRMN(e cldf_deployment.Environment, input changesets.WithMCM
 	}
 	if err := validateActivateRMNCurseAdmins(input.Cfg.CurseAdmins, input.Cfg.ChainSels); err != nil {
 		return err
+	}
+	if input.Cfg.TimelockDelay < 0 {
+		return fmt.Errorf("TimelockDelay cannot be negative")
 	}
 	evmChains := e.BlockChains.EVMChains()
 	for _, sel := range input.Cfg.ChainSels {
@@ -86,7 +93,8 @@ func applyDeployAndActivateRMN(
 ) (cldf_deployment.ChangesetOutput, error) {
 	evmChains := e.BlockChains.EVMChains()
 	outputDS := datastore.NewMemoryDataStore()
-	allBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
+	rmnBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
+	cllBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
 
 	for _, sel := range input.Cfg.ChainSels {
 		chain := evmChains[sel]
@@ -106,13 +114,73 @@ func applyDeployAndActivateRMN(
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to add address to datastore: %w", addErr)
 			}
 		}
-		allBatchOps = append(allBatchOps, report.Output.BatchOps...)
+		rmnBatchOps = append(rmnBatchOps, report.Output.RMNMCMSBatchOps...)
+		cllBatchOps = append(cllBatchOps, report.Output.CLLCCIPBatchOps...)
 	}
 
-	return changesets.NewOutputBuilder(e, mcmsRegistry).
-		WithDataStore(outputDS).
-		WithBatchOps(allBatchOps).
-		Build(input.MCMS)
+	var output cldf_deployment.ChangesetOutput
+	output.DataStore = outputDS
+	timelockDelay := mcms_types.NewDuration(input.Cfg.TimelockDelay)
+
+	if err := input.MCMS.PopulateDefaults(); err != nil {
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to populate MCMS defaults: %w", err)
+	}
+	if len(rmnBatchOps) > 0 {
+		rmnOut, err := changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithDataStore(outputDS).
+			WithBatchOps(rmnBatchOps).
+			Build(mcmsInputForActivateRMN(
+				input.MCMS,
+				timelockDelay,
+				common_utils.RMNTimelockQualifier,
+				"Accept RMN 2.0 ownership on RMNMCMS timelock",
+			))
+		if err != nil {
+			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to build RMNMCMS proposal: %w", err)
+		}
+		output.MCMSTimelockProposals = append(output.MCMSTimelockProposals, rmnOut.MCMSTimelockProposals...)
+	}
+
+	// CLLCCIPBatchOps is only populated when SetRMN could not run on-chain (proxy not deployer-owned).
+	if len(cllBatchOps) > 0 {
+		cllChainSels := make([]uint64, 0, len(cllBatchOps))
+		for _, op := range cllBatchOps {
+			cllChainSels = append(cllChainSels, uint64(op.ChainSelector))
+		}
+		if err := validateCLLCCIPForProxyProposal(e, cllChainSels); err != nil {
+			return cldf_deployment.ChangesetOutput{}, err
+		}
+		cllOut, err := changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithDataStore(outputDS).
+			WithBatchOps(cllBatchOps).
+			Build(mcmsInputForActivateRMN(
+				input.MCMS,
+				timelockDelay,
+				common_utils.CLLQualifier,
+				"Point RMNProxy at RMN 2.0 on CLLCCIP timelock",
+			))
+		if err != nil {
+			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to build CLLCCIP proposal: %w", err)
+		}
+		output.MCMSTimelockProposals = append(output.MCMSTimelockProposals, cllOut.MCMSTimelockProposals...)
+	}
+
+	return output, nil
+}
+
+func mcmsInputForActivateRMN(
+	base mcms.Input,
+	timelockDelay mcms_types.Duration,
+	qualifier, description string,
+) mcms.Input {
+	return mcms.Input{
+		OverridePreviousRoot: base.OverridePreviousRoot,
+		ValidUntil:             base.ValidUntil,
+		TimelockDelay:          timelockDelay,
+		TimelockAction:         mcms_types.TimelockActionSchedule,
+		Qualifier:              qualifier,
+		Description:            description,
+	}
 }
 
 func validateActivateRMNAddresses(addresses []datastore.AddressRef, chainSelector uint64) error {
@@ -139,6 +207,25 @@ func validateActivateRMNAddresses(addresses []datastore.AddressRef, chainSelecto
 			"Ultra Fast Curse RBACTimelock (qualifier %q) not found in datastore for chain %d",
 			common_utils.UltraFastCurseMCMSQualifier, chainSelector,
 		)
+	}
+	return nil
+}
+
+func validateCLLCCIPForProxyProposal(e cldf_deployment.Environment, chainSels []uint64) error {
+	for _, sel := range chainSels {
+		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(sel))
+		if ref := datastore_utils.GetAddressRef(
+			addresses,
+			sel,
+			common_utils.RBACTimelock,
+			mcms_ops.MCMSVersion,
+			common_utils.CLLQualifier,
+		); ref.Address == "" {
+			return fmt.Errorf(
+				"RMNProxy.SetRMN requires CLLCCIP RBACTimelock (qualifier %q) in datastore for chain %d",
+				common_utils.CLLQualifier, sel,
+			)
+		}
 	}
 	return nil
 }

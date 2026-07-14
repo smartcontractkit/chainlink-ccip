@@ -348,7 +348,8 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				}
 
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
-					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
+					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote,
+				)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rate limits for token pool %d on remote chain %d: %w", selector, remoteSelector, err)
 				}
@@ -595,41 +596,55 @@ func GenerateTPRLConfigs(
 		outboundConfig.Rate = ScaleFloatToBigInt(outboundInput.Rate, int(localDecimals), 0)
 	}
 
+	scaleByDecimals := remoteDecimals
+	if DoesPoolUseLocalDecimals(chainFamily, poolVersion, poolType) {
+		scaleByDecimals = localDecimals
+	}
+
 	if !inboundInput.IsEnabled {
 		inboundConfig.IsEnabled = false
 		inboundConfig.Capacity = big.NewInt(0)
 		inboundConfig.Rate = big.NewInt(0)
 	} else {
-		// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
-		scaleByDecimals := localDecimals
-
-		// https://github.com/smartcontractkit/chainlink-deployments/blob/cce886554ca0587492955784381321ce817fb6bb/domains/ccip/shared/tokendefaults.go#L1904
-		// Only old EVM pools need to scale by remote decimals on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
-		// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
-		// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
-		if chainFamily == chain_selectors.FamilyEVM && poolVersion.LessThan(utils.Version_1_6_1) {
-			// These custom contracts actually scale by local decimals:
-			//   BurnMintWithExternalMinterTokenPool: https://explorer.plume.org/address/0x770318D51052871DeF5Eb5c452F4fd28B7960C4e?tab=contract
-			//   HybridWithExternalMinterTokenPool: https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code
-			isBurnMintWithExternalMinterTokenPool := poolType == utils.BurnMintWithExternalMinterTokenPool.String()
-			isHybridWithExternalMinterTokenPool := poolType == utils.HybridWithExternalMinterTokenPool.String()
-			if poolVersion.Equal(utils.Version_1_6_0) && (isBurnMintWithExternalMinterTokenPool || isHybridWithExternalMinterTokenPool) {
-				scaleByDecimals = localDecimals
-			} else {
-				scaleByDecimals = remoteDecimals
-			}
-		}
+		// Inbound is scaled at 1.1x the counterpart outbound to absorb minor refill timing skew.
 		inboundConfig.IsEnabled = true
 		inboundConfig.Capacity = ScaleFloatToBigInt(inboundInput.Capacity, int(scaleByDecimals), .10)
 		inboundConfig.Rate = ScaleFloatToBigInt(inboundInput.Rate, int(scaleByDecimals), .10)
 	}
+
 	return outboundConfig, inboundConfig
 }
 
-// NormalizeInboundRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
+// DoesPoolUseLocalDecimals reports whether inbound rate limit floats are scaled using local
+// token decimals (true) vs remote/source decimals (false). Used by GenerateTPRLConfigs and
+// auto-migrate inbound rebase (RebaseRateLimiterConfig).
+func DoesPoolUseLocalDecimals(chainFamily string, poolVersion *semver.Version, poolType string) bool {
+	if chainFamily != chain_selectors.FamilyEVM || poolVersion == nil || poolVersion.GreaterThanEqual(utils.Version_1_6_1) {
+		return true
+	}
+
+	// https://github.com/smartcontractkit/chainlink-deployments/blob/cce886554ca0587492955784381321ce817fb6bb/domains/ccip/shared/tokendefaults.go#L1904
+	// Only old EVM pools need to scale by remote decimals on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
+	// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
+	// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
+	if poolVersion.Equal(utils.Version_1_6_0) {
+		// These custom contracts actually scale by local decimals:
+		//   BurnMintWithExternalMinterTokenPool: https://explorer.plume.org/address/0x770318D51052871DeF5Eb5c452F4fd28B7960C4e?tab=contract
+		//   HybridWithExternalMinterTokenPool: https://etherscan.io/address/0x36a72eD0096B414521C45E3ddC9ed657d1D9c141#code
+		isBurnMintWithExternalMinter := poolType == utils.BurnMintWithExternalMinterTokenPool.String()
+		isHybridWithExternalMinter := poolType == utils.HybridWithExternalMinterTokenPool.String()
+		if isBurnMintWithExternalMinter || isHybridWithExternalMinter {
+			return true
+		}
+	}
+
+	return false
+}
+
+// RebaseRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
 // Applied when importing inbound limits from pre-1.6.1 EVM pools, which stored them in
 // source/remote decimals, into a new pool that expects local/destination decimals.
-func NormalizeInboundRateLimiterConfig(cfg RateLimiterConfig, fromDecimals, toDecimals uint8) RateLimiterConfig {
+func RebaseRateLimiterConfig(cfg RateLimiterConfig, fromDecimals, toDecimals uint8) RateLimiterConfig {
 	if fromDecimals == toDecimals {
 		return cfg
 	}

@@ -24,6 +24,7 @@ import (
 	chains_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	v1_5_1_tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -274,9 +275,8 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 	}
 }
 
-// TestConfigureTokenPoolForRemoteChainUpgradeImport verifies that when configuring a new pool for a remote chain
-// with RegistryAddress and TokenAddress set to an existing token whose active pool is < 2.0.0, rate limits and
-// remote pools are imported from the active pool when the input does not provide them.
+// TestConfigureTokenPoolForRemoteChainUpgradeImport verifies that MigrationMetadata legacy rate limits
+// and remote pools are applied when upgrading to a v2 pool without YAML rate limit floats.
 func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	remoteChainSel := uint64(4949039107694359620)
@@ -415,25 +415,43 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	)
 	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain (1.6.1) should not error")
 
-	// Configure pool A (2.0.0) for remote with RegistryAddress and TokenAddress set but rate limits NOT provided (nil) — should import from pool B
+	// Configure pool A (2.0.0) for remote with legacy RL and remote pools on MigrationMetadata.
+	const legacyDecimals = 18
+	remotePoolBytes := common.LeftPadBytes(common.FromHex("0x456"), 32)
+	legacyRL := &tokens_core.OnchainRateLimits{
+		Outbound: tokens_core.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  tokens_core.ScaleFloatToBigInt(importedOutboundCapacity, legacyDecimals, 0),
+			Rate:      tokens_core.ScaleFloatToBigInt(importedOutboundRate, legacyDecimals, 0),
+		},
+		Inbound: tokens_core.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  tokens_core.ScaleFloatToBigInt(importedInboundCapacity, legacyDecimals, 0),
+			Rate:      tokens_core.ScaleFloatToBigInt(importedInboundRate, legacyDecimals, 0),
+		},
+	}
 	upgradeInput := tokens.ConfigureTokenPoolForRemoteChainInput{
 		ChainSelector:               chainSel,
 		TokenPoolAddress:            poolAAddress,
 		AdvancedPoolHooks:           advancedPoolHooksA,
 		RemoteChainSelector:         remoteChainSel,
-		RegistryAddress:             registryAddress,
-		TokenAddress:                tokenBAddress,
 		RemoteChainAlreadySupported: false,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken:                     common.LeftPadBytes(common.FromHex("0x123"), 32),
-			RemotePool:                      common.LeftPadBytes(common.FromHex("0x456"), 32),
-			OutboundRateLimiterConfig:       nil, // import configs
-			InboundRateLimiterConfig:        nil, // import configs
+			RemotePool:                      remotePoolBytes,
+			OutboundRateLimiterConfig:       nil,
+			InboundRateLimiterConfig:        nil,
 			OutboundCCVs:                    []string{"0x789"},
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
 			TokenTransferFeeConfig:          &feeCfg,
+			MigrationMetadata: tokens_core.MigrationMetadata{
+				LegacyPoolVersion: utils.Version_1_6_1,
+				LegacyPoolType:    string(chains_v161_burn_mint.ContractType),
+				LegacyRemotePools: [][]byte{remotePoolBytes},
+				LegacyRateLimits:  legacyRL,
+			},
 		},
 	}
 	_, err = operations.ExecuteSequence(
@@ -442,9 +460,9 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 		e.BlockChains.EVMChains()[chainSel],
 		upgradeInput,
 	)
-	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain (upgrade import) should not error")
+	require.NoError(t, err, "ConfigureTokenPoolForRemoteChain (upgrade via metadata) should not error")
 
-	// Assert pool A has imported rate limits (enabled and non-zero) and the active pool's remote pool
+	// Assert pool A has migrated rate limits and the legacy remote pool
 	tpA, err := tp_bindings.NewTokenPool(poolAAddress, e.BlockChains.EVMChains()[chainSel].Client)
 	require.NoError(t, err, "Failed to instantiate pool A token pool contract")
 	supportedChains, err := tpA.GetSupportedChains(nil)
@@ -454,19 +472,19 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 
 	stateA, err := tpA.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get current rate limiter state from pool A")
-	require.True(t, stateA.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter should be enabled (imported from active pool)")
+	require.True(t, stateA.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter should be enabled (from migration metadata)")
 	require.True(t, stateA.OutboundRateLimiterState.Rate.Sign() > 0 && stateA.OutboundRateLimiterState.Capacity.Sign() > 0,
-		"Outbound rate and capacity should be non-zero (imported from active pool)")
-	require.True(t, stateA.InboundRateLimiterState.IsEnabled, "Inbound rate limiter should be enabled (imported from active pool)")
+		"Outbound rate and capacity should be non-zero (from migration metadata)")
+	require.True(t, stateA.InboundRateLimiterState.IsEnabled, "Inbound rate limiter should be enabled (from migration metadata)")
 	require.True(t, stateA.InboundRateLimiterState.Rate.Sign() > 0 && stateA.InboundRateLimiterState.Capacity.Sign() > 0,
-		"Inbound rate and capacity should be non-zero (imported from active pool)")
+		"Inbound rate and capacity should be non-zero (from migration metadata)")
 
 	remotePools, err := tpA.GetRemotePools(nil, remoteChainSel)
 	require.NoError(t, err, "Failed to get remote pools from token pool")
-	require.Contains(t, remotePools, common.LeftPadBytes(common.FromHex("0x456"), 32), "Pool A should have the active pool's remote pool")
+	require.Contains(t, remotePools, remotePoolBytes, "Pool A should have the legacy remote pool")
 }
 
-func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *testing.T) {
+func TestConfigureTokenPoolForRemoteChainUpgradeMetadataLegacyInboundDecimals(t *testing.T) {
 	const (
 		chainSel       = uint64(5009297550715157269)
 		remoteChainSel = uint64(4949039107694359620)
@@ -591,25 +609,43 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 	legacyOutbound, err := legacyPool.GetCurrentOutboundRateLimiterState(nil, remoteChainSel)
 	require.NoError(t, err, "legacy outbound limiter should be readable")
 
+	expectedInboundCapacity := scaleByDecimalDiff(legacyInbound.Capacity, remoteDecimals, localDecimals)
+	expectedInboundRate := scaleByDecimalDiff(legacyInbound.Rate, remoteDecimals, localDecimals)
+
 	upgradeInput := tokens.ConfigureTokenPoolForRemoteChainInput{
 		ChainSelector:               chainSel,
 		TokenPoolAddress:            newPool.TokenPoolAddress,
 		AdvancedPoolHooks:           newPool.AdvancedHooksAddress,
 		RemoteChainSelector:         remoteChainSel,
-		RegistryAddress:             registryAddress,
-		TokenAddress:                newPool.TokenAddress,
 		RemoteChainAlreadySupported: false,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken:                     remoteToken,
 			RemotePool:                      remotePool,
 			RemoteDecimals:                  remoteDecimals,
-			OutboundRateLimiterConfig:       nil, // import configs
-			InboundRateLimiterConfig:        nil, // import configs
+			OutboundRateLimiterConfig:       nil,
+			InboundRateLimiterConfig:        nil,
 			OutboundCCVs:                    []string{"0x789"},
 			InboundCCVs:                     []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold: []string{"0xdef"},
 			InboundCCVsToAddAboveThreshold:  []string{"0xace"},
 			TokenTransferFeeConfig:          &feeCfg,
+			MigrationMetadata: tokens_core.MigrationMetadata{
+				LegacyPoolVersion: v1_5_1_burn_mint_token_pool.Version,
+				LegacyPoolType:    string(v1_5_1_burn_mint_token_pool.ContractType),
+				LegacyRemotePools: [][]byte{remotePool},
+				LegacyRateLimits: &tokens_core.OnchainRateLimits{
+					Outbound: tokens_core.RateLimiterConfig{
+						IsEnabled: legacyOutbound.IsEnabled,
+						Capacity:  new(big.Int).Set(legacyOutbound.Capacity),
+						Rate:      new(big.Int).Set(legacyOutbound.Rate),
+					},
+					Inbound: tokens_core.RateLimiterConfig{
+						IsEnabled: legacyInbound.IsEnabled,
+						Capacity:  expectedInboundCapacity,
+						Rate:      expectedInboundRate,
+					},
+				},
+			},
 		},
 	}
 	_, err = operations.ExecuteSequence(
@@ -618,19 +654,17 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImportLegacyInboundDecimals(t *t
 		chain,
 		upgradeInput,
 	)
-	require.NoError(t, err, "v2 ConfigureTokenPoolForRemoteChain migration import should not error")
+	require.NoError(t, err, "v2 ConfigureTokenPoolForRemoteChain migration metadata should not error")
 
 	newPoolBinding, err := tp_bindings.NewTokenPool(newPool.TokenPoolAddress, chain.Client)
 	require.NoError(t, err, "new pool binding should instantiate")
 	newState, err := newPoolBinding.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "new pool rate limiter state should be readable")
 
-	expectedInboundCapacity := scaleByDecimalDiff(legacyInbound.Capacity, remoteDecimals, localDecimals)
-	expectedInboundRate := scaleByDecimalDiff(legacyInbound.Rate, remoteDecimals, localDecimals)
-	requireScaledRateLimiterMatch(t, expectedInboundRate, expectedInboundCapacity, newState.InboundRateLimiterState.Rate, newState.InboundRateLimiterState.Capacity, "Rebased inbound import")
+	requireScaledRateLimiterMatch(t, expectedInboundRate, expectedInboundCapacity, newState.InboundRateLimiterState.Rate, newState.InboundRateLimiterState.Capacity, "Rebased inbound from metadata")
 	require.NotZero(t, legacyInbound.Capacity.Cmp(newState.InboundRateLimiterState.Capacity), "legacy inbound capacity should not be raw-copied")
 
-	requireScaledRateLimiterMatch(t, legacyOutbound.Rate, legacyOutbound.Capacity, newState.OutboundRateLimiterState.Rate, newState.OutboundRateLimiterState.Capacity, "Outbound raw import")
+	requireScaledRateLimiterMatch(t, legacyOutbound.Rate, legacyOutbound.Capacity, newState.OutboundRateLimiterState.Rate, newState.OutboundRateLimiterState.Capacity, "Outbound from metadata")
 }
 
 // TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits verifies ConfigureTokenPoolForRemoteChain TPRL behavior

@@ -352,7 +352,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token pool refs for chain selector %d: %w", selector, err)
 				}
-				mergedPool, err = TryNormalizeAddressRef(selector, mergedPool)
+				mergedPool, err = ccipdeploy.TryNormalizeAddressRef(selector, mergedPool)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize merged token pool ref address for chain selector %d: %w", selector, err)
 				}
@@ -364,7 +364,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
-				mergedToken, err = TryNormalizeAddressRef(selector, mergedToken)
+				mergedToken, err = ccipdeploy.TryNormalizeAddressRef(selector, mergedToken)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize merged token ref address for chain selector %d: %w", selector, err)
 				}
@@ -451,39 +451,6 @@ func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
 	return new(big.Int).Mul(amount, new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil))
 }
 
-// TryNormalizeAddressRef looks up AddressNormalizer registered for selector's chain family and canonicalizes ref.Address when set.
-func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
-	if datastore_utils.IsAddressRefEmpty(ref) {
-		return ref, nil
-	} else {
-		// NOTE: `ref.ChainSelector` is intentionally ignored in favor of `chainSelector`
-		// which comes from the keys of `TokenExpansionInput.TokenExpansionInputPerChain`
-		ref.ChainSelector = chainSelector
-	}
-
-	normalized := ref.Clone()
-	if normalized.Address == "" {
-		return normalized, nil
-	}
-
-	family, err := chain_selectors.GetSelectorFamily(chainSelector)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", chainSelector, err)
-	}
-
-	normalizer, ok := ccipdeploy.GetAddressNormalizerRegistry().GetAddressNormalizer(family)
-	if !ok {
-		return normalized, nil
-	}
-
-	normalized.Address, err = normalizer.NormalizeAddress(ref.Address)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address %s: %w", ref.Address, err)
-	}
-
-	return normalized, nil
-}
-
 // ResolveAdapterAndRefs resolves the token adapter, token pool ref, and token ref for the given
 // chain selector and input refs. It first resolves the token pool ref, then uses that to resolve
 // the adapter, and finally uses the adapter to derive the token address and resolve the token ref.
@@ -526,7 +493,7 @@ func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint
 	}
 
 	// Try to normalize ref.Address before doing any lookups
-	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
+	maybeNormalized, err := ccipdeploy.TryNormalizeAddressRef(sel, ref)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
@@ -568,7 +535,7 @@ func ResolveTokenRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, 
 	}
 
 	// Try to normalize ref.Address before doing any lookups
-	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
+	maybeNormalized, err := ccipdeploy.TryNormalizeAddressRef(sel, ref)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}

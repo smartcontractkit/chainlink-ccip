@@ -272,6 +272,12 @@ func withTestRouter(use bool) func(*changesets.ConfigureChainsForLanesFromTopolo
 	}
 }
 
+func withAllowOnrampOverride(allow bool) func(*changesets.ConfigureChainsForLanesFromTopologyConfig) {
+	return func(cfg *changesets.ConfigureChainsForLanesFromTopologyConfig) {
+		cfg.AllowOnrampOverride = allow
+	}
+}
+
 func newMockAdapter(prefix string, chainAddresses map[uint64]map[string][]byte, executors map[uint64]map[string]string) *mockChainFamilyAdapter {
 	return &mockChainFamilyAdapter{
 		addressPrefix: prefix,
@@ -749,6 +755,70 @@ func TestConfigureChainsForLanesFromTopology_SelectsStandardRouterWhenBothExist(
 		"with UseTestRouter=false and both routers in the datastore, the standard Router should be selected")
 	assert.False(t, evmAdapter.inputs[0].AllowOnrampOverride,
 		"UseTestRouter=false should set AllowOnrampOverride=false on sequence input")
+}
+
+// TestConfigureChainsForLanesFromTopology_AllowOnrampOverrideForcesOverrideOnProdRouter covers the
+// migrate_chain_lanes_to_v2 path: on the production router (UseTestRouter=false), setting
+// AllowOnrampOverride=true must still allow overwriting an existing OnRamp mapping so a lane can be
+// swapped from its pre-2.0 OnRamp to the CCIP 2.0 OnRamp.
+func TestConfigureChainsForLanesFromTopology_AllowOnrampOverrideForcesOverrideOnProdRouter(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+	ds := datastore.NewMemoryDataStore()
+	addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+	env.DataStore = ds.Seal()
+
+	committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+	committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+		contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+			fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+		},
+	})
+
+	evmAdapter := newMockAdapter("evm:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router": {0xaa, 0x01}, "TestRouter": {0xbb, 0x99},
+			"OnRamp": {0xaa, 0x02}, "FeeQuoter": {0xaa, 0x03}, "OffRamp": {0xaa, 0x04},
+		},
+		remoteSelector: {
+			"OnRamp": {0xcc, 0x01}, "OffRamp": {0xcc, 0x02},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, evmAdapter)
+
+	cs := changesets.ConfigureChainsForLanesFromTopology(committeeRegistry, registry, changesetscore.GetRegistry())
+	_, err := cs.Apply(env, lanesTopologyConfig(
+		&offchain.EnvironmentTopology{
+			NOPTopology: &offchain.NOPTopology{
+				NOPs: []offchain.NOPConfig{
+					{Alias: "nop-1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner"}},
+				},
+				Committees: map[string]offchain.CommitteeConfig{
+					"default": {
+						Qualifier: "default",
+						ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+							fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+							fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						},
+					},
+				},
+			},
+		},
+		[]changesets.CrossFamilyLanePair{{ChainA: localSelector, ChainB: remoteSelector}},
+		withTestRouter(false),
+		withAllowOnrampOverride(true),
+	))
+	require.NoError(t, err)
+	require.Len(t, evmAdapter.inputs, 1)
+	assert.Equal(t, []byte{0xaa, 0x01}, evmAdapter.inputs[0].Router,
+		"AllowOnrampOverride must not change router selection: the standard Router is still used")
+	assert.True(t, evmAdapter.inputs[0].AllowOnrampOverride,
+		"AllowOnrampOverride=true should force AllowOnrampOverride on the sequence input even on the prod router")
 }
 
 func TestConfigureChainsForLanesFromTopology_OnlyFetchesSigningKeysForCommitteeNOPs(t *testing.T) {

@@ -203,30 +203,6 @@ func (cfg PartialTokenTransferFeeConfig) MergeWith(fallbacks TokenTransferFeeCon
 	}
 }
 
-// ResolveForAutoMigrate returns the fee config to store during autoMigrateRemoteChains discovery.
-// p may be nil when YAML omitted tokenTransferFeeConfig.
-func (p *PartialTokenTransferFeeConfig) ResolveForAutoMigrate(legacy TokenTransferFeeConfig) (*PartialTokenTransferFeeConfig, error) {
-	if legacy.IsEnabled {
-		var partial PartialTokenTransferFeeConfig
-		if p == nil {
-			partial = partial.Populate(legacy)
-			return &partial, nil
-		}
-		if _, ok := p.IsEnabled.Get(); ok {
-			partial = partial.Populate(p.MergeWith(legacy))
-			return &partial, nil
-		}
-		return nil, fmt.Errorf("tokenTransferFeeConfig must set isEnabled")
-	}
-	if p == nil {
-		return nil, nil
-	}
-	if _, ok := p.IsEnabled.Get(); !ok {
-		return nil, fmt.Errorf("tokenTransferFeeConfig must set isEnabled")
-	}
-	return p, nil
-}
-
 // TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
 type TokenTransferFeeConfig struct {
 	DefaultFinalityTransferFeeBps uint16 `yaml:"defaultFinalityTransferFeeBps" json:"defaultFinalityTransferFeeBps"`
@@ -272,6 +248,43 @@ func (rl RateLimiterConfigFloatInput) Validate() error {
 	return nil
 }
 
+// MigrationMetadata carries programmatic metadata produced during auto-migrate discovery in
+// ConfigureTokensForTransfers. It is chain-agnostic: each family populates only the fields it
+// needs during an upgrade; others leave the struct zero.
+//
+// All resolved legacy import state for auto-migrate (fees, rate limits, remote pool cutover) lives
+// here—not on the YAML-facing fields of RemoteChainConfig. TokenTransferFeeConfig and rate limit
+// float fields on RemoteChainConfig remain user deployment input only.
+//
+// Users must not set this in YAML. A zero value means normal configure with no migration baggage.
+type MigrationMetadata struct {
+	// LegacyPoolVersion is the version of the active pool being upgraded from.
+	LegacyPoolVersion *semver.Version
+
+	// LegacyPoolType is the contract type of the active pool being upgraded from.
+	// EVM uses this with LegacyPoolVersion for inbound rate limit decimal normalization.
+	LegacyPoolType string
+
+	// LegacyRemotePools is the full set of remote pool addresses registered on the legacy active pool
+	// for this lane. EVM v2 uses this for upgrade cutover (inflight message protection).
+	// RemotePool on RemoteChainConfig remains the primary/target pool; this is the extra legacy set.
+	LegacyRemotePools [][]byte
+
+	// LegacyRateLimits holds default-bucket rate limits read from the active pool during auto-migrate
+	// when YAML omits rate limits. Apply passes these through as on-chain bigints (no float conversion).
+	LegacyRateLimits *OnchainRateLimits
+
+	// LegacyTokenTransferFeeConfig holds resolved fee config from auto-migrate discovery.
+	// nil means no fee transactions for this lane (legacy disabled and YAML omitted, or explicit disable).
+	LegacyTokenTransferFeeConfig *PartialTokenTransferFeeConfig
+}
+
+// IsPopulated reports whether auto-migrate discovery populated this metadata
+// (as opposed to a zero-value struct on a normal configure path).
+func (m MigrationMetadata) IsPopulated() bool {
+	return m.LegacyPoolVersion != nil
+}
+
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
@@ -307,6 +320,8 @@ type RemoteChainConfig[R any, CCV any] struct {
 	InboundCCVsToAddAboveThreshold []CCV `yaml:"inboundCCVsToAddAboveThreshold" json:"inboundCCVsToAddAboveThreshold"`
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig *PartialTokenTransferFeeConfig `yaml:"tokenTransferFeeConfig" json:"tokenTransferFeeConfig"`
+	// MigrationMetadata is populated programmatically during auto-migrate discovery. Do not set in YAML.
+	MigrationMetadata MigrationMetadata `yaml:"-" json:"-"`
 }
 
 // GetOutboundRateLimitBuckets returns the outbound RL configuration as a RemoteOutbounds struct. The
