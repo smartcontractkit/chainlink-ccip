@@ -169,7 +169,7 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 	// all versions (v1.5.x, v1.6.x, v2.x.x) so we use the v1.5.x generated bindings
 	// here for simplicity instead of overcomplicating the code with a switch on the
 	// pool version.
-	qualifier := fmt.Sprintf("%s-%s", poolAddress, tv.Output.Type)
+	qualifier := cciputils.DefaultQualifier(poolAddress.Hex(), tv.Output.Type)
 	if token, err := cldf_ops.ExecuteOperation(b,
 		token_pool.GetToken, chain,
 		contract.FunctionInput[any]{

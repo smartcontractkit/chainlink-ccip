@@ -149,6 +149,13 @@ var (
 	Version_2_0_0 = semver.MustParse("2.0.0")
 )
 
+// DefaultQualifier returns a synthetic qualifier constructed from an address and
+// contract type. Used when a qualifier cannot be obtained from the datastore,
+// e.g. when resolving contract refs from on-chain data via typeAndVersion().
+func DefaultQualifier(address string, contractType cldf.ContractType) string {
+	return fmt.Sprintf("%s-%s", address, contractType)
+}
+
 // StripPatchVersion returns a copy of the version with the patch component set
 // to 0, preserving major and minor. Useful for adapter registry lookups where
 // patch versions should not affect compatibility.
