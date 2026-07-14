@@ -91,6 +91,16 @@ func (c *USDCTokenPoolProxyContract) SetFeeAggregator(opts *bind.TransactOpts, a
 	return c.contract.Transact(opts, "setFeeAggregator", args)
 }
 
+func (c *USDCTokenPoolProxyContract) GetFeeAggregator(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getFeeAggregator")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
 type PoolAddresses struct {
 	CctpV1Pool            common.Address
 	CctpV2Pool            common.Address
@@ -199,5 +209,16 @@ var SetFeeAggregator = contract.NewWrite(contract.WriteParams[common.Address, *U
 		args common.Address,
 	) (*types.Transaction, error) {
 		return c.SetFeeAggregator(opts, args)
+	},
+})
+
+var GetFeeAggregator = contract.NewRead(contract.ReadParams[struct{}, common.Address, *USDCTokenPoolProxyContract]{
+	Name:         "usdc-token-pool-proxy:get-fee-aggregator",
+	Version:      Version,
+	Description:  "Calls getFeeAggregator on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolProxyContract,
+	CallContract: func(c *USDCTokenPoolProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetFeeAggregator(opts)
 	},
 })
