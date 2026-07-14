@@ -670,7 +670,6 @@ Configuration for MCMS proposal construction. Included in most changeset inputs.
 type Input struct {
     OverridePreviousRoot bool                     // Override existing MCMS root
     ValidUntil           uint32                   // Unix timestamp for proposal expiry
-    TimelockDelay        mcms_types.Duration      // Delay before operations can execute
     TimelockAction       mcms_types.TimelockAction // schedule, bypass, or cancel
     Qualifier            string                   // Qualifier for MCMS + Timelock addresses
     Description          string                   // Human-readable proposal description
