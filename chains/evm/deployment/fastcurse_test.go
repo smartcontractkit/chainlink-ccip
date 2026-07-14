@@ -161,14 +161,14 @@ func TestFastCurse(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 		},
@@ -448,7 +448,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			Canceller:        testhelpers.SingleGroupMCMS(),
 			Bypasser:         testhelpers.SingleGroupMCMS(),
 			Proposer:         testhelpers.SingleGroupMCMS(),
-			TimelockMinDelay: big.NewInt(0),
+			TimelockMinDelay: big.NewInt(1),
 			Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 		}
 	}
