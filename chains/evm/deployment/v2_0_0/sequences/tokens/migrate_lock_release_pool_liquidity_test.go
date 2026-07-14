@@ -55,7 +55,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
 				Amount:          big.NewInt(100),
-				BasisPoints:     uint16Ptr(5000),
+				BasisPoints:     new(uint16(5000)),
 			},
 			expectedErr: "Amount and BasisPoints are mutually exclusive",
 		},
@@ -76,7 +76,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
-				BasisPoints:     uint16Ptr(0),
+				BasisPoints:     new(uint16(0)),
 			},
 			expectedErr: "BasisPoints must be between 1 and 10000",
 		},
@@ -87,7 +87,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
-				BasisPoints:     uint16Ptr(10001),
+				BasisPoints:     new(uint16(10001)),
 			},
 			expectedErr: "BasisPoints must be between 1 and 10000",
 		},
@@ -119,7 +119,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				ChainSelector:   chainSel,
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
-				BasisPoints:     uint16Ptr(10000),
+				BasisPoints:     new(uint16(10000)),
 			},
 			expectedErr: "OldPoolAddress and NewPoolAddress must be provided",
 		},
@@ -129,7 +129,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				ChainSelector:  chainSel,
 				OldPoolAddress: "0x0000000000000000000000000000000000000001",
 				NewPoolAddress: "0x0000000000000000000000000000000000000002",
-				BasisPoints:    uint16Ptr(10000),
+				BasisPoints:    new(uint16(10000)),
 			},
 			expectedErr: "TimelockAddress must be provided",
 		},
@@ -772,7 +772,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 			ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args:           erc20_lock_box.ConstructorArgs{Token: tokenAddr},
-			Qualifier:      strPtr("chain1"),
+			Qualifier:      new("chain1"),
 		})
 	require.NoError(t, err)
 	lockbox1Addr := common.HexToAddress(lockbox1Report.Output.Address)
@@ -782,7 +782,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 			ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args:           erc20_lock_box.ConstructorArgs{Token: tokenAddr},
-			Qualifier:      strPtr("chain2"),
+			Qualifier:      new("chain2"),
 		})
 	require.NoError(t, err)
 	lockbox2Addr := common.HexToAddress(lockbox2Report.Output.Address)
@@ -1039,12 +1039,4 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored after both migrations")
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
-func uint16Ptr(v uint16) *uint16 {
-	return &v
 }

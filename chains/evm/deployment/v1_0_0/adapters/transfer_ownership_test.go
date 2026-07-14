@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -59,14 +58,14 @@ func TestTransferOwnership(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 		},
 	})
@@ -90,14 +89,14 @@ func TestTransferOwnership(t *testing.T) {
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.RMNTimelockQualifier),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.RMNTimelockQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.RMNTimelockQualifier),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.RMNTimelockQualifier),
 			},
 		},
 	})

@@ -43,6 +43,14 @@ func ParseTypeAndVersion(tvStr string) (string, string, error) {
 	return typeAndVersionValues[0], typeAndVersionValues[1], nil
 }
 
+// Wrap returns fmt.Errorf("%s: %w", msg, err) when err is non-nil.
+func Wrap(err error, msg string) error {
+	if err != nil {
+		return fmt.Errorf("%s: %w", msg, err)
+	}
+	return nil
+}
+
 // ValidateEVMAddress validates that a non-empty string is a valid Ethereum hex address.
 // Returns nil if the address is empty (optional field) or valid.
 func ValidateEVMAddress(addr string, fieldName string) error {
