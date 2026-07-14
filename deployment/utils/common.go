@@ -60,6 +60,21 @@ const (
 	UltraFastCurseMCMSQualifier = "UltraFastCurse"
 )
 
+// IsLockReleasePoolType reports whether poolType is a standard or siloed lock-release pool.
+// HybridLockReleaseUSDCTokenPool and BurnMintWithLockReleaseFlag are intentionally excluded:
+// the former uses the CCTP hybrid migration path; the latter is not a lock-release pool.
+func IsLockReleasePoolType(poolType string) bool {
+	return poolType == LockReleaseTokenPool.String() ||
+		poolType == SiloedLockReleaseTokenPool.String()
+}
+
+// IsBurnMintPoolType reports whether poolType is a standard burn-mint pool variant.
+func IsBurnMintPoolType(poolType string) bool {
+	return poolType == BurnMintTokenPool.String() ||
+		poolType == BurnFromMintTokenPool.String() ||
+		poolType == BurnWithFromMintTokenPool.String()
+}
+
 // familySelectors is a concurrent-safe registry of chain family → 4-byte
 // on-chain selector. It is populated automatically when adapters that implement
 // ChainMetadataProvider are registered via LaneAdapterRegistry.RegisterLaneAdapter.
