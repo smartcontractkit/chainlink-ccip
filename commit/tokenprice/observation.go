@@ -31,25 +31,22 @@ func (p *processor) Observation(
 		p.obs.invalidateCaches(ctx, lggr)
 	}
 
-	var (
-		fChain           map[cciptypes.ChainSelector]int
-		feedTokenPrices  cciptypes.TokenPriceMap
-		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
-	)
-
 	operations := asynclib.AsyncNoErrOperationsMap{
-		"observeFeedTokenPrices": func(ctx context.Context, l logger.Logger) {
-			feedTokenPrices = p.obs.observeFeedTokenPrices(ctx, l)
+		"observeFeedTokenPrices": func(ctx context.Context, l logger.Logger) any {
+			return p.obs.observeFeedTokenPrices(ctx, l)
 		},
-		"observeFeeQuoterTokenUpdates": func(ctx context.Context, l logger.Logger) {
-			feeQuoterUpdates = p.obs.observeFeeQuoterTokenUpdates(ctx, l)
+		"observeFeeQuoterTokenUpdates": func(ctx context.Context, l logger.Logger) any {
+			return p.obs.observeFeeQuoterTokenUpdates(ctx, l)
 		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
+		"observeFChain": func(_ context.Context, l logger.Logger) any {
+			return p.observeFChain(l)
 		},
 	}
 
-	asynclib.WaitForAllNoErrOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
+	results := p.runner.WaitForAll(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
+	feedTokenPrices, _ := results["observeFeedTokenPrices"].(cciptypes.TokenPriceMap)
+	feeQuoterUpdates, _ := results["observeFeeQuoterTokenUpdates"].(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	fChain, _ := results["observeFChain"].(map[cciptypes.ChainSelector]int)
 	now := time.Now().UTC()
 
 	lggr.Infow(
