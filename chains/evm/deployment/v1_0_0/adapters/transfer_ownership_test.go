@@ -63,11 +63,13 @@ func TestTransferOwnershipAddressOnlyRef(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 	ds := output.DataStore
 	require.NoError(t, ds.Merge(env.DataStore))
 	env.DataStore = ds.Seal()
 
-	// Deploy RMN MCMS set (used as the accept-ownership target).
+	// Deploy RMN MCMS set. The per-chain contracts carry the RMN qualifier, but the MCMS input
+	// uses CLLQualifier because the MCM multisigs are owned by the CLL timelock.
 	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
@@ -82,6 +84,7 @@ func TestTransferOwnershipAddressOnlyRef(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 	require.NoError(t, ds.Merge(output.DataStore.Seal()))
 	env.DataStore = ds.Seal()
 
