@@ -3,6 +3,7 @@ package tokens
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -276,9 +277,6 @@ func applyPoolConfigUpdate(
 	if err != nil {
 		return nil, nil, err
 	}
-	_ = family       // used in Task 5 (rate limit scaling)
-	_ = fullTokenRef // used in Task 5 (decimals + on-chain reads)
-
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
 
@@ -324,6 +322,22 @@ func applyPoolConfigUpdate(
 		reports = append(reports, report.ExecutionReports...)
 	}
 
+	// Resolve token decimals once (only when any remote needs rate-limit scaling).
+	var localDecimals uint8
+	for _, remote := range pool.Remotes {
+		if len(remote.RateLimits) > 0 {
+			tokenBytes, err := adapter.AddressRefToBytes(fullTokenRef)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
+			}
+			localDecimals, err = adapter.DeriveTokenDecimals(e, selector, fullPoolRef, tokenBytes)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get token decimals on chain selector %d: %w", selector, err)
+			}
+			break
+		}
+	}
+
 	for _, remote := range pool.Remotes {
 		if remote.TokenTransferFeeConfig != nil {
 			feeBatchOps, feeReports, err := applyPartialFeeConfigOnPool(e, adapter, selector, remote.RemoteChainSelector, fullPoolRef, *remote.TokenTransferFeeConfig)
@@ -333,7 +347,14 @@ func applyPoolConfigUpdate(
 			batchOps = append(batchOps, feeBatchOps...)
 			reports = append(reports, feeReports...)
 		}
-		// Task 5 adds: per-remote rate limits
+		if len(remote.RateLimits) > 0 {
+			rlBatchOps, rlReports, err := applyRateLimitsForRemote(e, adapter, family, selector, remote.RemoteChainSelector, fullPoolRef, fullTokenRef, localDecimals, remote.RateLimits)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to apply rate limits for remote chain selector %d: %w", remote.RemoteChainSelector, err)
+			}
+			batchOps = append(batchOps, rlBatchOps...)
+			reports = append(reports, rlReports...)
+		}
 	}
 
 	return batchOps, reports, nil
@@ -389,4 +410,103 @@ func applyPartialFeeConfigOnPool(
 		return nil, nil, fmt.Errorf("failed to execute set token transfer fee sequence for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 	return result.Output.BatchOps, result.ExecutionReports, nil
+}
+
+// applyRateLimitsForRemote scales the user's per-bucket floats (identical to
+// SetTokenPoolRateLimits: outbound by local decimals, inbound by local decimals with the
+// +10% bump for v2 pools), drops buckets whose on-chain state already matches, and applies
+// the rest through the adapter's SetTokenPoolRateLimits sequence. No counterpart chain is
+// read or validated: this changeset configures exactly what the user wrote.
+//
+// NOTE (PR#2): pre-1.6.1 EVM pools scale inbound values by REMOTE token decimals
+// (DoesPoolUseLocalDecimals == false). Supporting them requires resolving the remote token's
+// decimals, which this purely-local changeset does not do yet. Verify currently gates on
+// version >= 2.0.0, for which local decimals are always correct.
+func applyRateLimitsForRemote(
+	e cldf.Environment,
+	adapter TokenAdapter,
+	family string,
+	selector, remoteSelector uint64,
+	fullPoolRef, fullTokenRef datastore.AddressRef,
+	localDecimals uint8,
+	bucketInputs []RateLimitBucketInput,
+) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+	reader, ok := adapter.(RateLimitReaderAdapter)
+	if !ok {
+		return nil, nil, fmt.Errorf(
+			"adapter for chain selector %d (family %s, version %s) does not implement RateLimitReaderAdapter; cannot perform idempotent rate limit updates",
+			selector, family, fullPoolRef.Version,
+		)
+	}
+
+	buckets := make([]TPRLRateLimitBucket, 0, len(bucketInputs))
+	for _, in := range bucketInputs {
+		outbound, inbound := GenerateTPRLConfigs(
+			in.Outbound, in.Inbound, localDecimals, localDecimals,
+			family, fullPoolRef.Version, fullPoolRef.Type.String(),
+		)
+		current, err := reader.GetOnchainRateLimits(
+			e.OperationsBundle, e.BlockChains, e.DataStore, selector, fullPoolRef, fullTokenRef, remoteSelector, in.FastFinality,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read on-chain rate limits (chain %d, remote %d, fastFinality=%t): %w", selector, remoteSelector, in.FastFinality, err)
+		}
+		if rateLimiterConfigsEqual(current.Outbound, outbound) && rateLimiterConfigsEqual(current.Inbound, inbound) {
+			e.Logger.Infof("Skipping rate limit bucket (fastFinality=%t) for chain %d remote %d since the desired config is the same as the current on-chain config", in.FastFinality, selector, remoteSelector)
+			continue
+		}
+		buckets = append(buckets, TPRLRateLimitBucket{
+			FastFinality:              in.FastFinality,
+			OutboundRateLimiterConfig: outbound,
+			InboundRateLimiterConfig:  inbound,
+		})
+	}
+	if len(buckets) == 0 {
+		return nil, nil, nil
+	}
+
+	tprl := TPRLRemotes{
+		ChainSelector:       selector,
+		RemoteChainSelector: remoteSelector,
+		TokenRef:            fullTokenRef,
+		TokenPoolRef:        fullPoolRef,
+		ExistingDataStore:   e.DataStore,
+		RateLimitBuckets:    buckets,
+	}
+	// Pre-v2 adapters consume the default-bucket scalars rather than RateLimitBuckets;
+	// populate them for forward compatibility with PR#2.
+	for _, b := range buckets {
+		if !b.FastFinality {
+			tprl.OutboundRateLimiterConfig = b.OutboundRateLimiterConfig
+			tprl.InboundRateLimiterConfig = b.InboundRateLimiterConfig
+		}
+	}
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SetTokenPoolRateLimits(), e.BlockChains, tprl)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to set rate limits on pool %s for remote chain %d: %w", fullPoolRef.Address, remoteSelector, err)
+	}
+	return report.Output.BatchOps, report.ExecutionReports, nil
+}
+
+// rateLimiterConfigsEqual compares two rate limiter configs treating nil big.Ints as zero.
+func rateLimiterConfigsEqual(a, b RateLimiterConfig) bool {
+	if a.IsEnabled != b.IsEnabled {
+		return false
+	}
+	zero := big.NewInt(0)
+	aCap, bCap, aRate, bRate := a.Capacity, b.Capacity, a.Rate, b.Rate
+	if aCap == nil {
+		aCap = zero
+	}
+	if bCap == nil {
+		bCap = zero
+	}
+	if aRate == nil {
+		aRate = zero
+	}
+	if bRate == nil {
+		bRate = zero
+	}
+	return aCap.Cmp(bCap) == 0 && aRate.Cmp(bRate) == 0
 }

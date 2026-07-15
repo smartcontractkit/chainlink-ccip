@@ -305,6 +305,13 @@ func setupV2PoolsForConfigure(t *testing.T, tokenSymb string) configureTestEnv {
 	poolB, err := datastore_utils.FindAndFormatRef(e.DataStore, fltrB, selB, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
+	// The simulated backend under-estimates gas for setRateLimitConfig updates that rewrite
+	// existing bucket storage (SSTORE-refund accounting), causing an out-of-gas revert on the
+	// exact estimate. Force a manual gas limit to bypass estimation — matches real-chain
+	// behavior (production RPCs return a correct estimate / apply a buffer). Same fix the
+	// SetTokenPoolRateLimits tests use via forceSimGasLimit.
+	forceSimGasLimit(e, 5_000_000)
+
 	return configureTestEnv{
 		env: e, selA: selA, selB: selB, poolA: poolA, poolB: poolB,
 		clientA: e.BlockChains.EVMChains()[selA].Client, clientB: e.BlockChains.EVMChains()[selB].Client,
@@ -470,4 +477,71 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	require.NoError(t, err)
 	after := currentBlock(t, tc, tc.selA)
 	require.Equal(t, before, after, "no-op fee update must not send transactions")
+}
+
+func TestConfigureTokenPool_RateLimits(t *testing.T) {
+	tc := setupV2PoolsForConfigure(t, "CTP_RL")
+
+	// Unidirectional: configure only pool A's view of the A→B lane. Pool B gets no entry.
+	buckets := []tokensapi.RateLimitBucketInput{
+		{
+			FastFinality: false,
+			Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100},
+			Inbound:      tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 2000, Rate: 200},
+		},
+		{
+			FastFinality: true,
+			Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 500, Rate: 50},
+			Inbound:      tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 600, Rate: 60},
+		},
+	}
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: tc.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+				Remotes: []tokensapi.RemoteConfigUpdate{{
+					RemoteChainSelector: tc.selB,
+					RateLimits:          buckets,
+				}},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	_, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+
+	// Pool A: outbound scaled by local decimals (no bump), inbound scaled with +10% bump.
+	defaultA, ffA := getRateLimits(t, cciputils.Version_2_0_0, tc.poolA, tc.clientA, tc.selB)
+	validateScaledTPRLBucket(t, "default poolA", tc.decimalsA, defaultA, buckets[0].Outbound, buckets[0].Inbound)
+	validateScaledTPRLBucket(t, "fast_finality poolA", tc.decimalsA, ffA, buckets[1].Outbound, buckets[1].Inbound)
+
+	// Pool B: untouched (unidirectional update).
+	defaultB, ffB := getRateLimits(t, cciputils.Version_2_0_0, tc.poolB, tc.clientB, tc.selA)
+	require.False(t, defaultB.OutboundRateLimiterConfig.IsEnabled, "pool B default outbound must remain disabled")
+	require.False(t, ffB.OutboundRateLimiterConfig.IsEnabled, "pool B FF outbound must remain disabled")
+
+	// Idempotency: identical second apply sends no transactions.
+	before := currentBlock(t, tc, tc.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	after := currentBlock(t, tc, tc.selA)
+	require.Equal(t, before, after, "no-op rate limit update must not send transactions")
+
+	// Partial change: modify only the default bucket; the FF bucket write must be skipped
+	// (single-bucket setRateLimitConfig call) and FF state preserved.
+	input.Chains[0].Pools[0].Remotes[0].RateLimits = []tokensapi.RateLimitBucketInput{
+		{
+			FastFinality: false,
+			Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3000, Rate: 300},
+			Inbound:      buckets[0].Inbound,
+		},
+	}
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	defaultA2, ffA2 := getRateLimits(t, cciputils.Version_2_0_0, tc.poolA, tc.clientA, tc.selB)
+	validateScaledTPRLBucket(t, "default poolA after partial", tc.decimalsA, defaultA2,
+		tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3000, Rate: 300}, buckets[0].Inbound)
+	validateScaledTPRLBucket(t, "fast_finality poolA preserved", tc.decimalsA, ffA2, buckets[1].Outbound, buckets[1].Inbound)
 }
