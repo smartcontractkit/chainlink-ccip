@@ -89,7 +89,7 @@ func TestFetchNOPSigningKeys_SingleNOP_EVMSigningKey_ReturnsKey(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Contains(t, report.Output.SigningKeysByNOP, "nop-1")
-	assert.Equal(t, "0xabcd1234", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilyEVM])
+	assert.Equal(t, "abcd1234", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilyEVM])
 }
 
 func TestFetchNOPSigningKeys_MultipleNOPs_DifferentChains_ReturnsAllKeys(t *testing.T) {
@@ -102,10 +102,9 @@ func TestFetchNOPSigningKeys_MultipleNOPs_DifferentChains_ReturnsAllKeys(t *test
 			},
 		}, nil,
 	)
-	// nop-1 has both EVM and Solana chain configs. With the JD fix, both carry the
-	// same EVM address in OnchainSigningAddress (same key → same address). The Solana
-	// reader reads OnchainSigningAddress and normalizes without 0x prefix; the EVM
-	// variant is also registered from the Solana config's OnchainSigningAddress.
+	// nop-1 has both EVM and Solana chain configs. Only EVM is registered as a
+	// SigningIdentityReader, so both configs index the same EVM address under
+	// FamilyEVM. Solana is not indexed (no reader registered for it yet).
 	const nop1EVMAddr = "0xevm-key-1"
 	mockClient.EXPECT().ListNodeChainConfigs(mock.Anything, mock.Anything).Return(
 		&nodev1.ListNodeChainConfigsResponse{
@@ -156,11 +155,12 @@ func TestFetchNOPSigningKeys_MultipleNOPs_DifferentChains_ReturnsAllKeys(t *test
 	require.NoError(t, err)
 	require.Len(t, report.Output.SigningKeysByNOP, 2)
 
-	// EVM address registered under "evm" with 0x prefix.
+	// EVM address registered under "evm" — raw value, no normalization.
 	assert.Equal(t, "0xevm-key-1", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilyEVM])
-	// Solana address is the same bytes, normalized without 0x prefix.
-	assert.Equal(t, "evm-key-1", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilySolana])
-	assert.Equal(t, "0xevm-key-2", report.Output.SigningKeysByNOP["nop-2"][chainsel.FamilyEVM])
+	// Solana family is not indexed — no SigningIdentityReader registered for it.
+	_, hasSolana := report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilySolana]
+	assert.False(t, hasSolana)
+	assert.Equal(t, "evm-key-2", report.Output.SigningKeysByNOP["nop-2"][chainsel.FamilyEVM])
 }
 
 func TestFetchNOPSigningKeys_NOPNotFound_ReturnsError(t *testing.T) {
@@ -308,14 +308,16 @@ func TestFetchNOPSigningKeys_EmptySigningAddress_Skipped(t *testing.T) {
 	}, input)
 
 	require.NoError(t, err)
-	assert.Empty(t, report.Output.SigningKeysByNOP)
+	// The NOP entry is created but no family is indexed (empty OnchainSigningAddress).
+	if nopKeys, ok := report.Output.SigningKeysByNOP["nop-1"]; ok {
+		assert.Empty(t, nopKeys)
+	}
 }
 
 func TestFetchNOPSigningKeys_UnknownChainType_StillIndexesEVM(t *testing.T) {
-	// With the chain-type gate removed, chain configs for unregistered chain types
-	// are no longer skipped. ForEachSigningIdentityReader indexes every registered
-	// reader from the bundle — at minimum EVM (always registered), so the EVM address
-	// is available even from chain types whose own family hasn't registered a reader.
+	// Chain configs for unregistered chain types are not skipped. The EVM reader
+	// (always registered) reads OnchainSigningAddress, so the EVM address is
+	// available even from chain types whose own family hasn't registered a reader.
 	mockClient := ccvmocks.NewMockJDClient(t)
 	mockClient.EXPECT().ListNodes(mock.Anything, mock.Anything).Return(
 		&nodev1.ListNodesResponse{
