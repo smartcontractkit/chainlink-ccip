@@ -371,6 +371,15 @@ type ConfigureTokenForTransfersInput struct {
 	// to cover all chains the currently-registered pool supports. Set this when the pool being configured
 	// is not a direct replacement for the registered pool (e.g. CCTP-through-CCV alongside USDCTokenPoolProxy).
 	SkipActivePoolSupportedChainsCheck bool
+	// TimelockAddress is required when a liquidity migration is requested. It is the MCMS timelock
+	// address that will execute the migration operations.
+	TimelockAddress string
+	// LiquidityMigrationAmount specifies an exact token amount to migrate from the currently-registered
+	// pool before configuring the new one. Mutually exclusive with LiquidityMigrationBasisPoints.
+	LiquidityMigrationAmount *big.Int
+	// LiquidityMigrationBasisPoints specifies a percentage (1-10000, where 10000 = 100%) of the old
+	// pool's balance to migrate. Mutually exclusive with LiquidityMigrationAmount.
+	LiquidityMigrationBasisPoints *uint16
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore
