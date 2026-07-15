@@ -278,16 +278,34 @@ func applyPoolConfigUpdate(
 	}
 	_ = family       // used in Task 5 (rate limit scaling)
 	_ = fullTokenRef // used in Task 5 (decimals + on-chain reads)
-	_ = adapter      // used from Task 2 onward
 
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
 
-	// Task 2 adds: finality config
+	if pool.FinalityConfig != nil {
+		feeAdapter, ok := adapter.(TokenFeeAdapter)
+		if !ok {
+			return nil, nil, fmt.Errorf(
+				"adapter for chain selector %d (family %s, version %s) does not support finality config updates",
+				selector, family, fullPoolRef.Version,
+			)
+		}
+		// The sequence reads the current on-chain finality config and emits no writes
+		// when it already matches the desired value.
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, feeAdapter.SetAllowedFinalityConfig(&e), e.BlockChains, SetAllowedFinalityConfigSequenceInput{
+			Selector: selector,
+			Settings: map[string]finality.Config{fullPoolRef.Address: *pool.FinalityConfig},
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to set finality config on pool %s: %w", fullPoolRef.Address, err)
+		}
+		batchOps = append(batchOps, report.Output.BatchOps...)
+		reports = append(reports, report.ExecutionReports...)
+	}
+
 	// Task 3 adds: rate limit admin / fee admin
 	// Task 4 adds: per-remote fee configs
 	// Task 5 adds: per-remote rate limits
-	_ = fullPoolRef
 
 	return batchOps, reports, nil
 }
