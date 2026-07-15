@@ -45,7 +45,8 @@ func (p *processor) Observation(
 
 	results := p.runner.WaitForAll(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
 	feedTokenPrices, _ := results["observeFeedTokenPrices"].(cciptypes.TokenPriceMap)
-	feeQuoterUpdates, _ := results["observeFeeQuoterTokenUpdates"].(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	feeQuoterUpdatesRaw := results["observeFeeQuoterTokenUpdates"]
+	feeQuoterUpdates, _ := feeQuoterUpdatesRaw.(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
 	fChain, _ := results["observeFChain"].(map[cciptypes.ChainSelector]int)
 	now := time.Now().UTC()
 

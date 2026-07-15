@@ -45,7 +45,7 @@ func TestRunner_ContextIsPropagated(t *testing.T) {
 		"checkCtx": func(ctx context.Context, _ logger.Logger) any {
 			_, ok := ctx.Deadline()
 			assert.True(t, ok, "context should have a deadline")
-			return nil
+			return ok
 		},
 	}
 
@@ -66,15 +66,15 @@ func TestRunner_ContextHonoringOpReturnsOnTimeout(t *testing.T) {
 			case <-ctx.Done():
 			case <-time.After(24 * time.Hour):
 			}
-			return nil
+			return ctx.Err()
 		},
 	}
 
 	results := NewRunner().WaitForAll(ctx, 100*time.Millisecond, ops, lggr)
 
 	assert.LessOrEqual(t, time.Since(start).Milliseconds(), int64(500), "timeout not respected")
-	// The op returned (nil) right as the context was cancelled, so it may or may not be recorded;
-	// either way the call must not have blocked past the timeout, which the assertion above checks.
+	// The op returns as the context is cancelled, so it may or may not be recorded; either way the
+	// call must not have blocked past the timeout, which the assertion above checks.
 	_ = results
 }
 
@@ -119,10 +119,10 @@ func TestRunner_StuckOpNotRespawned(t *testing.T) {
 
 	ops := AsyncNoErrOperationsMap{
 		"stuckOp": func(_ context.Context, _ logger.Logger) any {
-			calls.Add(1)
+			n := calls.Add(1)
 			started <- struct{}{}
 			<-release // ignores ctx: stays in flight across rounds
-			return nil
+			return n
 		},
 	}
 
