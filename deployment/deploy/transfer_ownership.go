@@ -50,8 +50,18 @@ func acceptOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *ch
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), perChainInputs.ChainSelector, err)
 				}
-				if fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, addrRef, perChainInputs.ChainSelector, datastore_utils.FullRef); err == nil {
-					addrRef = fullRef
+				if addrRef.Address != "" {
+					if fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, addrRef, perChainInputs.ChainSelector, datastore_utils.FullRef); err != nil {
+						e.Logger.Warnf("failed to resolve contract ref %s for chain %d - using raw input ref instead: %v", datastore_utils.SprintRef(addrRef), perChainInputs.ChainSelector, err)
+					} else {
+						addrRef = fullRef
+					}
+				} else {
+					if fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, addrRef, perChainInputs.ChainSelector, datastore_utils.FullRef); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve contract ref %s for chain %d: %w", datastore_utils.SprintRef(addrRef), perChainInputs.ChainSelector, err)
+					} else {
+						addrRef = fullRef
+					}
 				}
 				perChainInputs.ContractRef[i] = addrRef
 			}
@@ -93,8 +103,18 @@ func transferOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), perChainInputs.ChainSelector, err)
 				}
-				if fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, addrRef, perChainInputs.ChainSelector, datastore_utils.FullRef); err == nil {
-					addrRef = fullRef
+				if addrRef.Address != "" {
+					if fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, addrRef, perChainInputs.ChainSelector, datastore_utils.FullRef); err != nil {
+						e.Logger.Warnf("failed to resolve contract ref %s for chain %d - using raw input ref instead: %v", datastore_utils.SprintRef(addrRef), perChainInputs.ChainSelector, err)
+					} else {
+						addrRef = fullRef
+					}
+				} else {
+					if fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, addrRef, perChainInputs.ChainSelector, datastore_utils.FullRef); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve contract ref %s for chain %d: %w", datastore_utils.SprintRef(addrRef), perChainInputs.ChainSelector, err)
+					} else {
+						addrRef = fullRef
+					}
 				}
 				perChainInputs.ContractRef[i] = addrRef
 			}
