@@ -303,7 +303,27 @@ func applyPoolConfigUpdate(
 		reports = append(reports, report.ExecutionReports...)
 	}
 
-	// Task 3 adds: rate limit admin / fee admin
+	if pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
+		adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
+		if !ok {
+			return nil, nil, fmt.Errorf(
+				"adapter for chain selector %d (family %s, version %s) does not support admin role updates",
+				selector, family, fullPoolRef.Version,
+			)
+		}
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
+			Selector:       selector,
+			PoolAddress:    fullPoolRef.Address,
+			RateLimitAdmin: pool.RateLimitAdmin,
+			FeeAdmin:       pool.FeeAdmin,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to set admin roles on pool %s: %w", fullPoolRef.Address, err)
+		}
+		batchOps = append(batchOps, report.Output.BatchOps...)
+		reports = append(reports, report.ExecutionReports...)
+	}
+
 	// Task 4 adds: per-remote fee configs
 	// Task 5 adds: per-remote rate limits
 

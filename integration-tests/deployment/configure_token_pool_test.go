@@ -11,6 +11,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
+	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -352,4 +353,61 @@ func currentBlock(t *testing.T, tc configureTestEnv, sel uint64) uint64 {
 	header, err := tc.env.BlockChains.EVMChains()[sel].Client.HeaderByNumber(t.Context(), nil)
 	require.NoError(t, err)
 	return header.Number.Uint64()
+}
+
+func TestConfigureTokenPool_Admins(t *testing.T) {
+	tc := setupV2PoolsForConfigure(t, "CTP_ADM")
+
+	newRateLimitAdmin := "0x1111111111111111111111111111111111111111"
+	newFeeAdmin := "0x2222222222222222222222222222222222222222"
+
+	// Set only the rate limit admin; feeAdmin and router must be untouched.
+	pool, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	preCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: tc.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+				RateLimitAdmin: ptrTo(newRateLimitAdmin),
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+
+	postCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(newRateLimitAdmin), postCfg.RateLimitAdmin)
+	require.Equal(t, preCfg.FeeAdmin, postCfg.FeeAdmin, "feeAdmin must be preserved")
+	require.Equal(t, preCfg.Router, postCfg.Router, "router must be preserved")
+
+	// Now set only the fee admin; the rate limit admin we just set must survive.
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+		FeeAdmin:     ptrTo(newFeeAdmin),
+	}
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(newFeeAdmin), postCfg.FeeAdmin)
+	require.Equal(t, common.HexToAddress(newRateLimitAdmin), postCfg.RateLimitAdmin, "rateLimitAdmin must be preserved")
+
+	// Idempotency: setting both to their current values sends no transactions.
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+		RateLimitAdmin: ptrTo(newRateLimitAdmin),
+		FeeAdmin:       ptrTo(newFeeAdmin),
+	}
+	before := currentBlock(t, tc, tc.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	after := currentBlock(t, tc, tc.selA)
+	require.Equal(t, before, after, "no-op admin update must not send transactions")
 }
