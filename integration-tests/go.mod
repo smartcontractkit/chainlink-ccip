@@ -38,6 +38,7 @@ require (
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee
 	github.com/smartcontractkit/mcms v0.51.0
 	github.com/stretchr/testify v1.11.1
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -359,7 +360,6 @@ require (
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
 // gotron-sdk is not longer maintained

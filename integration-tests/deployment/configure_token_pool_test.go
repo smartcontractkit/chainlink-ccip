@@ -3,18 +3,28 @@ package deployment
 import (
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
+	// sigs.k8s.io/yaml decodes YAML by converting to JSON and using encoding/json, which
+	// honors the json `,string` selector tags. This mirrors how the migrations framework
+	// ultimately populates changeset inputs (YAML node -> JSON -> struct). Plain gopkg.in/yaml.v3
+	// panics on the style-guide-mandated `,string` tag, so it cannot be used here.
+	"sigs.k8s.io/yaml"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
+	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -235,6 +245,16 @@ type configureTestEnv struct {
 // setupV2PoolsForConfigure deploys v2.0.0 chain contracts plus a connected v2 burn-mint
 // token/pool pair on two simulated chains, owned by the deployer key (no MCMS).
 func setupV2PoolsForConfigure(t *testing.T, tokenSymb string) configureTestEnv {
+	return setupV2PoolsForConfigureImpl(t, tokenSymb, false)
+}
+
+// setupV2PoolsForConfigureMCMS is like setupV2PoolsForConfigure but deploys MCMS/timelock and
+// transfers pool ownership to the timelock, so ConfigureTokenPool produces MCMS proposals.
+func setupV2PoolsForConfigureMCMS(t *testing.T, tokenSymb string) configureTestEnv {
+	return setupV2PoolsForConfigureImpl(t, tokenSymb, true)
+}
+
+func setupV2PoolsForConfigureImpl(t *testing.T, tokenSymb string, useMCMS bool) configureTestEnv {
 	t.Helper()
 	const decimalsA = 18
 	const decimalsB = 6
@@ -249,16 +269,28 @@ func setupV2PoolsForConfigure(t *testing.T, tokenSymb string) configureTestEnv {
 	DeployChainContractsV2_0_0(t, e, cumulative, selB)
 	e.DataStore = cumulative.Seal()
 
+	expansionMCMS := mcms.Input{}
+	if useMCMS {
+		// Register the EVM MCMS deployer/reader (idempotent) and deploy MCMS + timelock so the
+		// pool can be timelock-owned and ConfigureTokenPool can emit timelock proposals.
+		deployapi.GetRegistry().RegisterDeployer(chainsel.FamilyEVM, deployapi.MCMSVersion, &evmadapters.EVMDeployer{})
+		changesets.GetRegistry().RegisterMCMSReader(chainsel.FamilyEVM, &evmadapters.EVMMCMSReader{})
+		for _, sel := range []uint64{selA, selB} {
+			DeployMCMS(t, e, sel, []string{cciputils.CLLQualifier})
+		}
+		expansionMCMS = NewDefaultInputForMCMS("configure token pool test setup")
+	}
+
 	disabledOutbound := tokensapi.RateLimiterConfigFloatInput{IsEnabled: false}
 	deployerA := e.BlockChains.EVMChains()[selA].DeployerKey.From
 	deployerB := e.BlockChains.EVMChains()[selB].DeployerKey.From
 
 	expansionOut, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		ChainAdapterVersion: cciputils.Version_2_0_0,
-		MCMS:                mcms.Input{},
+		MCMS:                expansionMCMS,
 		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 			selA: {
-				SkipOwnershipTransfer: true,
+				SkipOwnershipTransfer: !useMCMS,
 				TokenPoolVersion:      bnmOpsV2_0_0.Version,
 				DeployTokenInput: &tokensapi.DeployTokenInput{
 					Name: tokenSymb, Symbol: tokenSymb, Decimals: decimalsA,
@@ -276,7 +308,7 @@ func setupV2PoolsForConfigure(t *testing.T, tokenSymb string) configureTestEnv {
 				},
 			},
 			selB: {
-				SkipOwnershipTransfer: true,
+				SkipOwnershipTransfer: !useMCMS,
 				TokenPoolVersion:      bnmOpsV2_0_0.Version,
 				DeployTokenInput: &tokensapi.DeployTokenInput{
 					Name: tokenSymb, Symbol: tokenSymb, Decimals: decimalsB,
@@ -297,6 +329,10 @@ func setupV2PoolsForConfigure(t *testing.T, tokenSymb string) configureTestEnv {
 	})
 	require.NoError(t, err)
 	MergeAddresses(t, e, expansionOut.DataStore)
+	if useMCMS {
+		// Execute the ownership-transfer proposals so the pools become timelock-owned.
+		testhelpers.ProcessTimelockProposals(t, *e, expansionOut.MCMSTimelockProposals, false)
+	}
 
 	fltrA := datastore.AddressRef{ChainSelector: selA, Type: datastore.ContractType(bnmOpsV2_0_0.ContractType), Version: bnmOpsV2_0_0.Version}
 	poolA, err := datastore_utils.FindAndFormatRef(e.DataStore, fltrA, selA, evm_datastore_utils.ToEVMAddress)
@@ -544,4 +580,178 @@ func TestConfigureTokenPool_RateLimits(t *testing.T) {
 	validateScaledTPRLBucket(t, "default poolA after partial", tc.decimalsA, defaultA2,
 		tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3000, Rate: 300}, buckets[0].Inbound)
 	validateScaledTPRLBucket(t, "fast_finality poolA preserved", tc.decimalsA, ffA2, buckets[1].Outbound, buckets[1].Inbound)
+}
+
+func TestConfigureTokenPool_YAMLRoundTrip(t *testing.T) {
+	const payload = `
+mcms:
+  qualifier: CLL
+input:
+  - selector: "909606746561742123"
+    pools:
+      - tokenPoolRef: { address: '0x1111111111111111111111111111111111111111' }
+        finalityConfig: { waitForSafe: true, blockDepth: 1, waitForFinality: false }
+        rateLimitAdmin: '0x1111111111111111111111111111111111111111'
+        feeAdmin: '0x1111111111111111111111111111111111111111'
+        remotes:
+          - selector: "5548718428018410741"
+            tokenTransferFeeConfig:
+              destBytesOverhead: 320
+              destGasOverhead: 21000
+            rateLimits:
+              - fastFinality: false
+                outbound: { isEnabled: true, capacity: 1000, rate: 100 }
+                inbound: { isEnabled: true, capacity: 1000, rate: 100 }
+              - fastFinality: true
+                outbound: { isEnabled: true, capacity: 1000, rate: 100 }
+                inbound: { isEnabled: true, capacity: 1000, rate: 100 }
+`
+	var input tokensapi.ConfigureTokenPoolInput
+	require.NoError(t, yaml.Unmarshal([]byte(payload), &input))
+
+	require.Len(t, input.Chains, 1)
+	require.Equal(t, chainsel.TEST_90000001.Selector, input.Chains[0].ChainSelector)
+	require.Len(t, input.Chains[0].Pools, 1)
+	pool := input.Chains[0].Pools[0]
+	require.Equal(t, "0x1111111111111111111111111111111111111111", pool.TokenPoolRef.Address)
+	require.NotNil(t, pool.FinalityConfig)
+	require.True(t, pool.FinalityConfig.WaitForSafe)
+	require.Equal(t, uint16(1), pool.FinalityConfig.BlockDepth)
+	require.NotNil(t, pool.RateLimitAdmin)
+	require.NotNil(t, pool.FeeAdmin)
+	require.Len(t, pool.Remotes, 1)
+	remote := pool.Remotes[0]
+	require.Equal(t, chainsel.TEST_90000002.Selector, remote.RemoteChainSelector)
+	require.NotNil(t, remote.TokenTransferFeeConfig)
+	dbo, ok := remote.TokenTransferFeeConfig.DestBytesOverhead.Get()
+	require.True(t, ok)
+	require.Equal(t, uint32(320), dbo)
+	_, ok = remote.TokenTransferFeeConfig.IsEnabled.Get()
+	require.False(t, ok, "unset optional fields must stay unset after unmarshal")
+	require.Len(t, remote.RateLimits, 2)
+	require.False(t, remote.RateLimits[0].FastFinality)
+	require.True(t, remote.RateLimits[1].FastFinality)
+	require.Equal(t, float64(1000), remote.RateLimits[0].Outbound.Capacity)
+}
+
+func TestConfigureTokenPool_RejectsPreV2Pools(t *testing.T) {
+	tc := setupV2PoolsForConfigure(t, "CTP_VER")
+
+	// Explicit version override forces adapter selection for a pre-v2 version; verify must
+	// reject it in PR#1 regardless of what is registered.
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: tc.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+				Version:        semver.MustParse("1.6.1"),
+				RateLimitAdmin: ptrTo("0x2222222222222222222222222222222222222222"),
+			}},
+		}},
+	}
+	err := tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "only v2.0.0+ pools are currently supported")
+}
+
+func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
+	tc := setupV2PoolsForConfigure(t, "CTP_ALL")
+
+	admin := "0x3333333333333333333333333333333333333333"
+	newFinality := finality.Config{BlockDepth: 7}
+	rl := []tokensapi.RateLimitBucketInput{{
+		FastFinality: false,
+		Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100},
+		Inbound:      tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100},
+	}}
+	fee := &tokensapi.PartialTokenTransferFeeConfig{
+		IsEnabled:         cciputils.NewOptional(true),
+		DestBytesOverhead: cciputils.NewOptional(uint32(320)),
+		DestGasOverhead:   cciputils.NewOptional(uint32(21_000)),
+	}
+
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{
+			{
+				ChainSelector: tc.selA,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+					FinalityConfig: &newFinality,
+					RateLimitAdmin: ptrTo(admin),
+					FeeAdmin:       ptrTo(admin),
+					Remotes: []tokensapi.RemoteConfigUpdate{{
+						RemoteChainSelector:    tc.selB,
+						TokenTransferFeeConfig: fee,
+						RateLimits:             rl,
+					}},
+				}},
+			},
+			{
+				ChainSelector: tc.selB,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef: datastore.AddressRef{Address: tc.poolB.Hex()},
+					Remotes: []tokensapi.RemoteConfigUpdate{{
+						RemoteChainSelector: tc.selA,
+						RateLimits:          rl,
+					}},
+				}},
+			},
+		},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	out, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	require.Empty(t, out.MCMSTimelockProposals, "EOA-owned pools must not produce MCMS proposals")
+
+	// Spot-check each feature landed.
+	validateFinalityConfigV2_0_0(t, tc.poolA, tc.clientA, newFinality)
+	pool, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	dynCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(admin), dynCfg.RateLimitAdmin)
+	require.Equal(t, common.HexToAddress(admin), dynCfg.FeeAdmin)
+	defaultA, _ := getRateLimits(t, cciputils.Version_2_0_0, tc.poolA, tc.clientA, tc.selB)
+	validateScaledTPRLBucket(t, "combined default poolA", tc.decimalsA, defaultA, rl[0].Outbound, rl[0].Inbound)
+	defaultB, _ := getRateLimits(t, cciputils.Version_2_0_0, tc.poolB, tc.clientB, tc.selA)
+	validateScaledTPRLBucket(t, "combined default poolB", tc.decimalsB, defaultB, rl[0].Outbound, rl[0].Inbound)
+
+	// Full idempotency across every feature at once.
+	beforeA := currentBlock(t, tc, tc.selA)
+	beforeB := currentBlock(t, tc, tc.selB)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	afterA := currentBlock(t, tc, tc.selA)
+	afterB := currentBlock(t, tc, tc.selB)
+	require.Equal(t, beforeA, afterA, "combined no-op must not send transactions on chain A")
+	require.Equal(t, beforeB, afterB, "combined no-op must not send transactions on chain B")
+}
+
+func TestConfigureTokenPool_MCMSOwnedPool(t *testing.T) {
+	tc := setupV2PoolsForConfigureMCMS(t, "CTP_MCMS")
+
+	newCfg := finality.Config{BlockDepth: 9}
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: NewDefaultInputForMCMS("configure token pool finality"),
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: tc.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+				FinalityConfig: &newCfg,
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	out, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+
+	// Timelock-owned pool: the change is proposed, not executed.
+	require.Len(t, out.MCMSTimelockProposals, 1, "timelock-owned pool must produce an MCMS proposal")
+	validateFinalityConfigV2_0_0(t, tc.poolA, tc.clientA, finality.Config{WaitForFinality: true}) // unchanged until execution
+
+	// Execute the proposal and confirm the change lands.
+	testhelpers.ProcessTimelockProposals(t, *tc.env, out.MCMSTimelockProposals, false)
+	validateFinalityConfigV2_0_0(t, tc.poolA, tc.clientA, newCfg)
 }
