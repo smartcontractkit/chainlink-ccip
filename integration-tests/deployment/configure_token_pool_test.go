@@ -18,6 +18,7 @@ import (
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
+	evm_testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -381,6 +382,7 @@ func TestConfigureTokenPool_FinalityConfig(t *testing.T) {
 	validateFinalityConfigV2_0_0(t, tc.poolB, tc.clientB, finality.Config{WaitForFinality: true})
 
 	// Idempotency: identical second apply sends no transactions (no new blocks mined).
+	refreshBundle(&tc)
 	before := currentBlock(t, tc, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
@@ -396,6 +398,15 @@ func currentBlock(t *testing.T, tc configureTestEnv, sel uint64) uint64 {
 	header, err := tc.env.BlockChains.EVMChains()[sel].Client.HeaderByNumber(t.Context(), nil)
 	require.NoError(t, err)
 	return header.Number.Uint64()
+}
+
+// refreshBundle swaps in a fresh operations reporter, mirroring production where every migration
+// run applies a changeset against a fresh bundle. Idempotency re-applies must use this so they
+// exercise the changeset's read-compare-skip against live on-chain state instead of replaying a
+// memoized sequence report from the prior apply (operations.ExecuteSequence reuses prior successful
+// reports on identical input, which would mask a redundant write/proposal).
+func refreshBundle(tc *configureTestEnv) {
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
 }
 
 func TestConfigureTokenPool_Admins(t *testing.T) {
@@ -448,6 +459,7 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 		RateLimitAdmin: ptrTo(newRateLimitAdmin),
 		FeeAdmin:       ptrTo(newFeeAdmin),
 	}
+	refreshBundle(&tc)
 	before := currentBlock(t, tc, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
@@ -508,6 +520,7 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	require.Equal(t, uint32(50), cfg.FinalityFeeUSDCents, "minFee must be preserved from on-chain")
 
 	// Idempotency: identical partial re-apply sends no transactions.
+	refreshBundle(&tc)
 	before := currentBlock(t, tc, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
@@ -559,6 +572,7 @@ func TestConfigureTokenPool_RateLimits(t *testing.T) {
 	require.False(t, ffB.OutboundRateLimiterConfig.IsEnabled, "pool B FF outbound must remain disabled")
 
 	// Idempotency: identical second apply sends no transactions.
+	refreshBundle(&tc)
 	before := currentBlock(t, tc, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
@@ -719,10 +733,12 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 	validateScaledTPRLBucket(t, "combined default poolB", tc.decimalsB, defaultB, rl[0].Outbound, rl[0].Inbound)
 
 	// Full idempotency across every feature at once.
+	refreshBundle(&tc)
 	beforeA := currentBlock(t, tc, tc.selA)
 	beforeB := currentBlock(t, tc, tc.selB)
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	out, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
+	require.Empty(t, out.MCMSTimelockProposals, "combined no-op must not emit proposals")
 	afterA := currentBlock(t, tc, tc.selA)
 	afterB := currentBlock(t, tc, tc.selB)
 	require.Equal(t, beforeA, afterA, "combined no-op must not send transactions on chain A")
@@ -754,4 +770,12 @@ func TestConfigureTokenPool_MCMSOwnedPool(t *testing.T) {
 	// Execute the proposal and confirm the change lands.
 	testhelpers.ProcessTimelockProposals(t, *tc.env, out.MCMSTimelockProposals, false)
 	validateFinalityConfigV2_0_0(t, tc.poolA, tc.clientA, newCfg)
+
+	// Idempotency (the design's core guarantee, asserted on the output not just block height):
+	// re-applying the now-satisfied config against a fresh bundle must emit ZERO proposals, so
+	// no redundant timelock op / MCMS predecessor conflict is produced.
+	refreshBundle(&tc)
+	out2, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	require.Empty(t, out2.MCMSTimelockProposals, "no-op re-apply must not emit an MCMS proposal")
 }
