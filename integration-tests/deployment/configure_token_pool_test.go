@@ -411,3 +411,63 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 	after := currentBlock(t, tc, tc.selA)
 	require.Equal(t, before, after, "no-op admin update must not send transactions")
 }
+
+func TestConfigureTokenPool_FeeConfig(t *testing.T) {
+	tc := setupV2PoolsForConfigure(t, "CTP_FEE")
+
+	// First apply: enable a fee config on the A→B lane. On-chain config starts disabled
+	// (all-zero), so every field we care about must be provided explicitly here.
+	initial := &tokensapi.PartialTokenTransferFeeConfig{
+		IsEnabled:                  cciputils.NewOptional(true),
+		DestBytesOverhead:          cciputils.NewOptional(uint32(320)),
+		DestGasOverhead:            cciputils.NewOptional(uint32(21_000)),
+		DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(50)),
+	}
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: tc.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+				Remotes: []tokensapi.RemoteConfigUpdate{{
+					RemoteChainSelector:    tc.selB,
+					TokenTransferFeeConfig: initial,
+				}},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	_, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+
+	pool, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	opts := &bind.CallOpts{Context: t.Context()}
+	cfg, err := pool.GetTokenTransferFeeConfig(opts, common.Address{}, tc.selB, [4]byte{}, nil)
+	require.NoError(t, err)
+	require.True(t, cfg.IsEnabled)
+	require.Equal(t, uint32(320), cfg.DestBytesOverhead)
+	require.Equal(t, uint32(21_000), cfg.DestGasOverhead)
+	require.Equal(t, uint32(50), cfg.FinalityFeeUSDCents)
+
+	// Second apply: change ONLY destGasOverhead. All other fields must be preserved
+	// from on-chain state (merge-with-on-chain, not merge-with-defaults).
+	input.Chains[0].Pools[0].Remotes[0].TokenTransferFeeConfig = &tokensapi.PartialTokenTransferFeeConfig{
+		DestGasOverhead: cciputils.NewOptional(uint32(31_000)),
+	}
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	cfg, err = pool.GetTokenTransferFeeConfig(opts, common.Address{}, tc.selB, [4]byte{}, nil)
+	require.NoError(t, err)
+	require.Equal(t, uint32(31_000), cfg.DestGasOverhead, "targeted field must change")
+	require.True(t, cfg.IsEnabled, "isEnabled must be preserved from on-chain")
+	require.Equal(t, uint32(320), cfg.DestBytesOverhead, "destBytesOverhead must be preserved from on-chain")
+	require.Equal(t, uint32(50), cfg.FinalityFeeUSDCents, "minFee must be preserved from on-chain")
+
+	// Idempotency: identical partial re-apply sends no transactions.
+	before := currentBlock(t, tc, tc.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	after := currentBlock(t, tc, tc.selA)
+	require.Equal(t, before, after, "no-op fee update must not send transactions")
+}

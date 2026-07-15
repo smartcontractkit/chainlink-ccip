@@ -324,8 +324,69 @@ func applyPoolConfigUpdate(
 		reports = append(reports, report.ExecutionReports...)
 	}
 
-	// Task 4 adds: per-remote fee configs
-	// Task 5 adds: per-remote rate limits
+	for _, remote := range pool.Remotes {
+		if remote.TokenTransferFeeConfig != nil {
+			feeBatchOps, feeReports, err := applyPartialFeeConfigOnPool(e, adapter, selector, remote.RemoteChainSelector, fullPoolRef, *remote.TokenTransferFeeConfig)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to apply fee config for remote chain selector %d: %w", remote.RemoteChainSelector, err)
+			}
+			batchOps = append(batchOps, feeBatchOps...)
+			reports = append(reports, feeReports...)
+		}
+		// Task 5 adds: per-remote rate limits
+	}
 
 	return batchOps, reports, nil
+}
+
+// applyPartialFeeConfigOnPool merges the user's partial fee config with the CURRENT on-chain
+// config (user-set fields win, everything else keeps its on-chain value) and writes the result
+// only when it differs. This intentionally differs from the token-expansion flow, which merges
+// with chain-agnostic defaults: a partial update here must never reset unrelated fields.
+func applyPartialFeeConfigOnPool(
+	e cldf.Environment,
+	adapter TokenAdapter,
+	src, dst uint64,
+	fullPoolRef datastore.AddressRef,
+	partial PartialTokenTransferFeeConfig,
+) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+	feeAdapter, ok := adapter.(TokenFeeAdapter)
+	if !ok {
+		return nil, nil, fmt.Errorf(
+			"adapter for chain selector %d (version %s) does not support token transfer fee config updates",
+			src, fullPoolRef.Version,
+		)
+	}
+
+	onChainConfig, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e, fullPoolRef.Address, src, dst)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get on-chain fee config for pool %s (dest %d): %w", fullPoolRef.Address, dst, err)
+	}
+
+	requestedConfig := partial.MergeWith(onChainConfig)
+
+	if !requestedConfig.IsEnabled && !onChainConfig.IsEnabled {
+		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since pool fee override is already disabled", src, dst)
+		return nil, nil, nil
+	}
+	if requestedConfig == onChainConfig {
+		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
+		return nil, nil, nil
+	}
+
+	result, err := cldf_ops.ExecuteSequence(
+		e.OperationsBundle,
+		feeAdapter.SetTokenTransferFee(&e),
+		e.BlockChains,
+		SetTokenTransferFeeSequenceInput{
+			Selector: src,
+			Settings: map[string]map[uint64]*TokenTransferFeeConfig{
+				fullPoolRef.Address: {dst: &requestedConfig},
+			},
+		},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to execute set token transfer fee sequence for chain selector %d and remote chain selector %d: %w", src, dst, err)
+	}
+	return result.Output.BatchOps, result.ExecutionReports, nil
 }
