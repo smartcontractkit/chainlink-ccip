@@ -134,12 +134,24 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   /// @param sender The sender address.
   /// @param tokenReceiver The token receiver address.
   /// @param amount The amount to transfer.
-  /// @return rawPayload The encoded payload.
+  /// @return rawPayload The encoded payload, with destinationCaller set to the LombardVerifier under test.
   function _generateValidRawPayload(
     bytes memory destToken,
     bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount
+  ) internal view returns (bytes memory) {
+    return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier));
+  }
+
+  /// @notice Generates a rawPayload with an explicit destinationCaller, for tests that need to exercise an invalid
+  /// destinationCaller.
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller
   ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
@@ -155,7 +167,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       uint256(1), // nonce
       bytes32(uint256(uint160(OWNER))), // sender
       address(0), // recipient (not used in validation)
-      address(0), // destinationCaller (not used in validation)
+      destinationCaller,
       msgBody
     );
 

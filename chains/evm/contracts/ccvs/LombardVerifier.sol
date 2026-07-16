@@ -36,6 +36,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
   error InvalidSender(bytes32 expected, bytes32 actual);
+  error InvalidDestinationCaller(address expected, address actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
 
@@ -303,14 +304,24 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 rawSender;
     bytes32 rawRecipient;
     uint256 amount;
+    address destinationCaller;
     {
-      (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+      bytes memory msgBody;
+      (,,,, destinationCaller, msgBody) =
+        abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
       assembly {
         rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
         rawSender := mload(add(msgBody, 0x41)) // bytes 33..64
         rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
         amount := mload(add(msgBody, 0x81)) // bytes 97..128
       }
+    }
+
+    // The destinationCaller must be this contract. Lombard's mailbox is a generic messaging layer that can carry
+    // messages other than token transfers, so this check is critical to ensure that we are processing a message
+    // addressed to the token bridge, and not some other message on the mailbox.
+    if (destinationCaller != address(this)) {
+      revert InvalidDestinationCaller(address(this), destinationCaller);
     }
 
     {

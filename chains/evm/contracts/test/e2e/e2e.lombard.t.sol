@@ -437,7 +437,7 @@ contract e2e_lombard is OnRampSetup {
     bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount
-  ) internal pure returns (bytes memory) {
+  ) internal view returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
       Internal._leftPadBytesToBytes32(destToken),
@@ -452,7 +452,7 @@ contract e2e_lombard is OnRampSetup {
       uint256(1), // nonce
       bytes32(uint256(uint160(OWNER))), // sender
       address(0), // recipient (not used in validation)
-      address(0), // destinationCaller (not used in validation)
+      address(s_destLombardVerifier), // destinationCaller
       msgBody
     );
 
