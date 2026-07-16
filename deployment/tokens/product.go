@@ -176,6 +176,29 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// Equal compares two RateLimiterConfigs treating nil big.Ints as zero.
+func (a RateLimiterConfig) Equal(b RateLimiterConfig) bool {
+	if a.IsEnabled != b.IsEnabled {
+		return false
+	}
+
+	zero, aCap, bCap, aRate, bRate := big.NewInt(0), a.Capacity, b.Capacity, a.Rate, b.Rate
+	if aCap == nil {
+		aCap = zero
+	}
+	if bCap == nil {
+		bCap = zero
+	}
+	if aRate == nil {
+		aRate = zero
+	}
+	if bRate == nil {
+		bRate = zero
+	}
+
+	return aCap.Cmp(bCap) == 0 && aRate.Cmp(bRate) == 0
+}
+
 // OnchainRateLimits is the outbound/inbound rate limiter pair stored on-chain for a remote lane.
 type OnchainRateLimits struct {
 	Outbound RateLimiterConfig

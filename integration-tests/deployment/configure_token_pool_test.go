@@ -187,14 +187,6 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"finality config is empty"},
 		},
 		{
-			name: "rejects_invalid_rate_limit_admin_address",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef:   poolRef,
-				RateLimitAdmin: ptrTo("not-an-address"),
-			}),
-			errors: []string{"invalid rateLimitAdmin address"},
-		},
-		{
 			name: "rejects_low_dest_bytes_overhead",
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
@@ -465,6 +457,17 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 	require.NoError(t, err)
 	after := currentBlock(t, tc, tc.selA)
 	require.Equal(t, before, after, "no-op admin update must not send transactions")
+
+	// Invalid admin address formats are validated by the EVM SetTokenPoolAdmins sequence at
+	// apply time; the top-level changeset stays chain-agnostic and no longer checks formats.
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+		RateLimitAdmin: ptrTo("not-an-address"),
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	refreshBundle(&tc)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.ErrorContains(t, err, "invalid rate limit admin address")
 }
 
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
@@ -651,15 +654,25 @@ input:
 func TestConfigureTokenPool_RejectsPreV2Pools(t *testing.T) {
 	tc := setupV2PoolsForConfigure(t, "CTP_VER")
 
-	// Explicit version override forces adapter selection for a pre-v2 version; verify must
-	// reject it in PR#1 regardless of what is registered.
+	// Inject a datastore entry whose resolved version is pre-v2 (all-digit address is
+	// checksum-invariant, so it resolves from the datastore without a chain call). Verify
+	// must reject it in PR#1 (v2.0.0+ only), regardless of which adapters are registered.
+	preV2Pool := "0x0000000000000000000000000000000000000001"
+	extra := datastore.NewMemoryDataStore()
+	require.NoError(t, extra.Addresses().Add(datastore.AddressRef{
+		ChainSelector: tc.selA,
+		Address:       preV2Pool,
+		Type:          datastore.ContractType(bnmOpsV2_0_0.ContractType),
+		Version:       semver.MustParse("1.6.1"),
+	}))
+	MergeAddresses(t, tc.env, extra)
+
 	input := tokensapi.ConfigureTokenPoolInput{
 		MCMS: mcms.Input{},
 		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 			ChainSelector: tc.selA,
 			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
-				Version:        semver.MustParse("1.6.1"),
+				TokenPoolRef:   datastore.AddressRef{Address: preV2Pool},
 				RateLimitAdmin: ptrTo("0x2222222222222222222222222222222222222222"),
 			}},
 		}},

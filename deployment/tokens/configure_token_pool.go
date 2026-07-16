@@ -3,10 +3,7 @@ package tokens
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
-	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -46,9 +43,6 @@ type ConfigureTokenPoolPerChain struct {
 type PoolConfigUpdate struct {
 	// TokenPoolRef is a reference to the token pool in the datastore.
 	TokenPoolRef datastore.AddressRef `yaml:"tokenPoolRef" json:"tokenPoolRef"`
-	// Version overrides the pool version resolved from the datastore ref. Only needed when
-	// the datastore entry is missing or ambiguous.
-	Version *semver.Version `yaml:"version,omitempty" json:"version,omitempty"`
 	// FinalityConfig, if set, is the allowed finality config to set on the pool (v2+ only).
 	FinalityConfig *finality.Config `yaml:"finalityConfig,omitempty" json:"finalityConfig,omitempty"`
 	// RateLimitAdmin, if set, is the desired rate limit admin address.
@@ -112,15 +106,14 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 		// limits — must surface before any resolution error from a later pool would mask them.
 		seenPools := make(map[string]struct{})
 		for _, chainCfg := range cfg.Chains {
-			family, err := chain_selectors.GetSelectorFamily(chainCfg.ChainSelector)
-			if err != nil {
+			if _, err := chain_selectors.GetSelectorFamily(chainCfg.ChainSelector); err != nil {
 				return fmt.Errorf("invalid chain selector %d: %w", chainCfg.ChainSelector, err)
 			}
 			if len(chainCfg.Pools) == 0 {
 				return fmt.Errorf("no pools provided for chain selector %d", chainCfg.ChainSelector)
 			}
 			for _, pool := range chainCfg.Pools {
-				if err := validatePoolConfigUpdate(chainCfg.ChainSelector, family, pool); err != nil {
+				if err := validatePoolConfigUpdate(chainCfg.ChainSelector, pool); err != nil {
 					return err
 				}
 				key := fmt.Sprintf("%d|%s", chainCfg.ChainSelector, datastore_utils.SprintRef(pool.TokenPoolRef))
@@ -138,9 +131,6 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 				fullPoolRef, err := ResolveTokenPoolRef(e, registry, chainCfg.ChainSelector, pool.TokenPoolRef)
 				if err != nil {
 					return fmt.Errorf("chain selector %d: failed to resolve token pool ref: %w", chainCfg.ChainSelector, err)
-				}
-				if pool.Version != nil {
-					fullPoolRef.Version = pool.Version
 				}
 				// PR#1 scope: EVM v2.0.0+ pools only. PR#2 adds EVM 1.5.x/1.6.x, PR#3 adds Solana.
 				if fullPoolRef.Version != nil && fullPoolRef.Version.LessThan(utils.Version_2_0_0) {
@@ -160,21 +150,15 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 }
 
 // validatePoolConfigUpdate performs structural (non-resolving) validation of one pool entry.
-func validatePoolConfigUpdate(chainSelector uint64, family string, pool PoolConfigUpdate) error {
+// Address-format validation for admin roles is chain-specific and handled by the EVM
+// SetTokenPoolAdmins sequence, keeping this top-level check chain-agnostic.
+func validatePoolConfigUpdate(chainSelector uint64, pool PoolConfigUpdate) error {
 	if pool.isEmpty() {
 		return fmt.Errorf("pool entry %s on chain selector %d has no fields to update", datastore_utils.SprintRef(pool.TokenPoolRef), chainSelector)
 	}
 	if pool.FinalityConfig != nil {
 		if err := pool.FinalityConfig.Validate(); err != nil {
 			return fmt.Errorf("finality config for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), chainSelector, err)
-		}
-	}
-	if family == chain_selectors.FamilyEVM {
-		if pool.RateLimitAdmin != nil && !common.IsHexAddress(*pool.RateLimitAdmin) {
-			return fmt.Errorf("invalid rateLimitAdmin address %q for pool on chain selector %d", *pool.RateLimitAdmin, chainSelector)
-		}
-		if pool.FeeAdmin != nil && !common.IsHexAddress(*pool.FeeAdmin) {
-			return fmt.Errorf("invalid feeAdmin address %q for pool on chain selector %d", *pool.FeeAdmin, chainSelector)
 		}
 	}
 	seenRemotes := make(map[uint64]struct{})
@@ -206,37 +190,6 @@ func validatePoolConfigUpdate(chainSelector uint64, family string, pool PoolConf
 		}
 	}
 	return nil
-}
-
-// resolvePoolForConfigure resolves the pool ref, applies the optional explicit version
-// override, and resolves the adapter and token ref. It mirrors ResolveAdapterAndRefs but
-// honors PoolConfigUpdate.Version between pool-ref resolution and adapter lookup.
-func resolvePoolForConfigure(
-	e cldf.Environment,
-	reg *TokenAdapterRegistry,
-	sel uint64,
-	pool PoolConfigUpdate,
-) (TokenAdapter, string, datastore.AddressRef, datastore.AddressRef, error) {
-	fullPoolRef, err := ResolveTokenPoolRef(e, reg, sel, pool.TokenPoolRef)
-	if err != nil {
-		return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve token pool ref: %w", err)
-	}
-	if pool.Version != nil {
-		fullPoolRef.Version = pool.Version
-	}
-	adapter, family, err := ResolveAdapter(reg, sel, fullPoolRef.Version)
-	if err != nil {
-		return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve adapter: %w", err)
-	}
-	derivedTokenAddr, err := adapter.DeriveTokenAddress(e, sel, fullPoolRef)
-	if err != nil {
-		return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to derive token address from pool %s: %w", fullPoolRef.Address, err)
-	}
-	fullTokenRef, err := ResolveTokenRef(e, reg, sel, datastore.AddressRef{ChainSelector: sel, Address: derivedTokenAddr})
-	if err != nil {
-		return nil, "", datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve token ref for chain selector %d: %w", sel, err)
-	}
-	return adapter, family, fullPoolRef, fullTokenRef, nil
 }
 
 func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (cldf.ChangesetOutput, error) {
@@ -273,7 +226,7 @@ func applyPoolConfigUpdate(
 	selector uint64,
 	pool PoolConfigUpdate,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	adapter, family, fullPoolRef, fullTokenRef, err := resolvePoolForConfigure(e, registry, selector, pool)
+	adapter, family, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, registry, selector, pool.TokenPoolRef, datastore.AddressRef{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -340,7 +293,7 @@ func applyPoolConfigUpdate(
 
 	for _, remote := range pool.Remotes {
 		if remote.TokenTransferFeeConfig != nil {
-			feeBatchOps, feeReports, err := applyPartialFeeConfigOnPool(e, adapter, selector, remote.RemoteChainSelector, fullPoolRef, *remote.TokenTransferFeeConfig)
+			feeBatchOps, feeReports, err := applyTokenTransferFeeConfig(e, selector, remote.RemoteChainSelector, fullPoolRef, fullTokenRef, *remote.TokenTransferFeeConfig)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to apply fee config for remote chain selector %d: %w", remote.RemoteChainSelector, err)
 			}
@@ -358,58 +311,6 @@ func applyPoolConfigUpdate(
 	}
 
 	return batchOps, reports, nil
-}
-
-// applyPartialFeeConfigOnPool merges the user's partial fee config with the CURRENT on-chain
-// config (user-set fields win, everything else keeps its on-chain value) and writes the result
-// only when it differs. This intentionally differs from the token-expansion flow, which merges
-// with chain-agnostic defaults: a partial update here must never reset unrelated fields.
-func applyPartialFeeConfigOnPool(
-	e cldf.Environment,
-	adapter TokenAdapter,
-	src, dst uint64,
-	fullPoolRef datastore.AddressRef,
-	partial PartialTokenTransferFeeConfig,
-) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	feeAdapter, ok := adapter.(TokenFeeAdapter)
-	if !ok {
-		return nil, nil, fmt.Errorf(
-			"adapter for chain selector %d (version %s) does not support token transfer fee config updates",
-			src, fullPoolRef.Version,
-		)
-	}
-
-	onChainConfig, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e, fullPoolRef.Address, src, dst)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get on-chain fee config for pool %s (dest %d): %w", fullPoolRef.Address, dst, err)
-	}
-
-	requestedConfig := partial.MergeWith(onChainConfig)
-
-	if !requestedConfig.IsEnabled && !onChainConfig.IsEnabled {
-		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since pool fee override is already disabled", src, dst)
-		return nil, nil, nil
-	}
-	if requestedConfig == onChainConfig {
-		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
-		return nil, nil, nil
-	}
-
-	result, err := cldf_ops.ExecuteSequence(
-		e.OperationsBundle,
-		feeAdapter.SetTokenTransferFee(&e),
-		e.BlockChains,
-		SetTokenTransferFeeSequenceInput{
-			Selector: src,
-			Settings: map[string]map[uint64]*TokenTransferFeeConfig{
-				fullPoolRef.Address: {dst: &requestedConfig},
-			},
-		},
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to execute set token transfer fee sequence for chain selector %d and remote chain selector %d: %w", src, dst, err)
-	}
-	return result.Output.BatchOps, result.ExecutionReports, nil
 }
 
 // applyRateLimitsForRemote scales the user's per-bucket floats (identical to
@@ -451,7 +352,7 @@ func applyRateLimitsForRemote(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read on-chain rate limits (chain %d, remote %d, fastFinality=%t): %w", selector, remoteSelector, in.FastFinality, err)
 		}
-		if rateLimiterConfigsEqual(current.Outbound, outbound) && rateLimiterConfigsEqual(current.Inbound, inbound) {
+		if current.Outbound.Equal(outbound) && current.Inbound.Equal(inbound) {
 			e.Logger.Infof("Skipping rate limit bucket (fastFinality=%t) for chain %d remote %d since the desired config is the same as the current on-chain config", in.FastFinality, selector, remoteSelector)
 			continue
 		}
@@ -487,26 +388,4 @@ func applyRateLimitsForRemote(
 		return nil, nil, fmt.Errorf("failed to set rate limits on pool %s for remote chain %d: %w", fullPoolRef.Address, remoteSelector, err)
 	}
 	return report.Output.BatchOps, report.ExecutionReports, nil
-}
-
-// rateLimiterConfigsEqual compares two rate limiter configs treating nil big.Ints as zero.
-func rateLimiterConfigsEqual(a, b RateLimiterConfig) bool {
-	if a.IsEnabled != b.IsEnabled {
-		return false
-	}
-	zero := big.NewInt(0)
-	aCap, bCap, aRate, bRate := a.Capacity, b.Capacity, a.Rate, b.Rate
-	if aCap == nil {
-		aCap = zero
-	}
-	if bCap == nil {
-		bCap = zero
-	}
-	if aRate == nil {
-		aRate = zero
-	}
-	if bRate == nil {
-		bRate = zero
-	}
-	return aCap.Cmp(bCap) == 0 && aRate.Cmp(bRate) == 0
 }
