@@ -19,7 +19,7 @@ import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC
 /// @notice Lombard CCIP token pool.
 /// For v2 flows, token movement (burn/mint) is handled by the Lombard verifier,
 /// the pool performs validation, rate limiting, accounting and event emission.
-/// IPoolV2.lockOrBurn forwards tokens to the verifier.
+/// IPoolV2.lockOrBurn retains the bps fee in the pool and forwards only the post-fee amount to the verifier.
 /// IPoolV2.releaseOrMint does not move tokens, _releaseOrMint is a no-op.
 /// IPoolV1.lockOrBurn and IPoolV1.releaseOrMint make this pool backwards compatible with old lanes.
 contract LombardTokenPool is TokenPool, ITypeAndVersion {
@@ -127,8 +127,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   // │                        Lock or Burn                          │
   // ================================================================
 
-  /// @notice For IPoolV2.lockOrBurn call, this contract only forwards tokens to the verifier.
-  /// @dev Forward the net amount to the verifier; actual burn/bridge is done there.
+  /// @notice For IPoolV2.lockOrBurn call, this contract only forwards the post-fee amount to the verifier.
+  /// @dev The bps fee computed by `super.lockOrBurn` stays in the pool's own balance; only `destTokenAmount` is
+  /// forwarded to the verifier for it to bridge, so the verifier never holds a balance of its own.
   /// @param lockOrBurnIn The lock or burn input parameters.
   /// @param requestedFinalityConfig Requested finality encoding (see `FinalityCodec`).
   /// @param tokenArgs Additional token arguments.
@@ -143,11 +144,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       revert OutboundImplementationNotFoundForVerifier();
     }
 
-    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee
-    // destTokenAmount.
-    i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
+    (lockOrBurnOut, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, requestedFinalityConfig, tokenArgs);
 
-    return super.lockOrBurn(lockOrBurnIn, requestedFinalityConfig, tokenArgs);
+    i_token.safeTransfer(verifierImpl, destTokenAmount);
+
+    return (lockOrBurnOut, destTokenAmount);
   }
 
   /// @notice Backwards compatible lockOrBurn for lanes using the V1 flow.
