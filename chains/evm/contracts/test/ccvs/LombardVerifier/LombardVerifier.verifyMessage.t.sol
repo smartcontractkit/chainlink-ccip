@@ -241,6 +241,35 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }
 
+  function test_verifyMessage_RevertWhen_InvalidRemoteBridgeSender() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Generate a rawPayload with an envelope sender that is not the configured remote bridge for the source chain.
+    bytes32 wrongRemoteBridgeSender = bytes32(uint256(uint160(makeAddr("wrongRemoteBridgeSender"))));
+    bytes memory rawPayload = _generateRawPayload(
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount,
+      address(s_lombardVerifier),
+      wrongRemoteBridgeSender
+    );
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        LombardVerifier.InvalidRemoteBridgeSender.selector, REMOTE_BRIDGE_SENDER, wrongRemoteBridgeSender
+      )
+    );
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
   function test_verifyMessage_RevertWhen_InvalidReceiver() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));

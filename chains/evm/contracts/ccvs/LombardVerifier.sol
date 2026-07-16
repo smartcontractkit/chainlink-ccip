@@ -24,6 +24,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error ZeroBridge();
   error ZeroLombardChainId();
   error ZeroAllowedCaller();
+  error ZeroRemoteBridgeSender();
   error PathNotExist(uint64 remoteChainSelector);
   error ExecutionError();
   error InvalidMessageLength(uint256 expected, uint256 actual);
@@ -37,17 +38,26 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidToken(bytes32 expected, bytes32 actual);
   error InvalidSender(bytes32 expected, bytes32 actual);
   error InvalidDestinationCaller(address expected, address actual);
+  error InvalidRemoteBridgeSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
   /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
-  event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
+  /// @param remoteBridgeSender The address of the BridgeV2/AssetRouter on the remote chain expected to have
+  /// originated inbound GMP messages from that chain.
+  event PathSet(
+    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteBridgeSender
+  );
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
   /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
-  event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
+  /// @param remoteBridgeSender The address of the BridgeV2/AssetRouter on the remote chain expected to have
+  /// originated inbound GMP messages from that chain.
+  event PathRemoved(
+    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteBridgeSender
+  );
   event SupportedTokenRemoved(address token);
   event SupportedTokenSet(address localToken, address localAdapter);
   event RemoteAdapterSet(uint64 indexed remoteChainSelector, address indexed token, bytes32 remoteAdapter);
@@ -62,6 +72,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 allowedCaller;
     /// @notice Lombard chain id of destination chain.
     bytes32 lChainId;
+    /// @notice The address of the BridgeV2/AssetRouter on the remote chain expected to have originated inbound GMP
+    /// messages from that chain. Used to validate that an incoming GMP message followed the canonical
+    /// BridgeV2-to-BridgeV2 route, rather than some other message riding the same underlying mailbox.
+    bytes32 remoteBridgeSender;
   }
 
   struct RemoteAdapterArgs {
@@ -253,6 +267,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     _validatePayload(
       ccvData[PAYLOAD_START_INDEX:proofDataStartIndex], // rawPayload
+      message.sourceChainSelector,
       message.sender,
       message.tokenTransfer[0].destTokenAddress,
       message.tokenTransfer[0].tokenReceiver,
@@ -293,8 +308,40 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
   }
 
+  /// @notice Decodes the GMP envelope, validates that it was sent by the remote chain's canonical BridgeV2/
+  /// AssetRouter and addressed to this contract, and returns the inner token-transfer msgBody.
+  /// @dev Split out from _validatePayload to avoid stack-too-deep.
+  function _validateEnvelope(
+    bytes calldata rawPayload,
+    uint64 sourceChainSelector
+  ) internal view returns (bytes memory) {
+    bytes memory msgBody;
+    bytes32 envelopeSender;
+    address destinationCaller;
+    (,, envelopeSender,, destinationCaller, msgBody) =
+      abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+
+    // The envelope sender must be the remote chain's BridgeV2/AssetRouter. This establishes that the GMP message
+    // followed the canonical BridgeV2-to-BridgeV2 route, rather than relying on the mailbox's own sender
+    // configuration to prevent unrelated messages from producing a payload that matches a real CCIP transfer.
+    bytes32 expectedRemoteBridgeSender = s_chainSelectorToPath[sourceChainSelector].remoteBridgeSender;
+    if (envelopeSender != expectedRemoteBridgeSender) {
+      revert InvalidRemoteBridgeSender(expectedRemoteBridgeSender, envelopeSender);
+    }
+
+    // The destinationCaller must be this contract. Lombard's mailbox is a generic messaging layer that can carry
+    // messages other than token transfers, so this check is critical to ensure that we are processing a message
+    // addressed to the token bridge, and not some other message on the mailbox.
+    if (destinationCaller != address(this)) {
+      revert InvalidDestinationCaller(address(this), destinationCaller);
+    }
+
+    return msgBody;
+  }
+
   function _validatePayload(
     bytes calldata rawPayload,
+    uint64 sourceChainSelector,
     bytes calldata expectedSender,
     bytes calldata expectedToken,
     bytes calldata expectedReceiver,
@@ -304,24 +351,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 rawSender;
     bytes32 rawRecipient;
     uint256 amount;
-    address destinationCaller;
     {
-      bytes memory msgBody;
-      (,,,, destinationCaller, msgBody) =
-        abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+      bytes memory msgBody = _validateEnvelope(rawPayload, sourceChainSelector);
       assembly {
         rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
         rawSender := mload(add(msgBody, 0x41)) // bytes 33..64
         rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
         amount := mload(add(msgBody, 0x81)) // bytes 97..128
       }
-    }
-
-    // The destinationCaller must be this contract. Lombard's mailbox is a generic messaging layer that can carry
-    // messages other than token transfers, so this check is critical to ensure that we are processing a message
-    // addressed to the token bridge, and not some other message on the mailbox.
-    if (destinationCaller != address(this)) {
-      revert InvalidDestinationCaller(address(this), destinationCaller);
     }
 
     {
@@ -450,14 +487,17 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     return s_remoteAdapters[remoteChainSelector][token];
   }
 
-  /// @notice Sets the lChainId and allowed caller for a CCIP chain selector.
+  /// @notice Sets the lChainId, allowed caller, and remote bridge sender for a CCIP chain selector.
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
   /// @param allowedCaller The destination caller bytes. Must fit in 32 bytes and is left-padded for storage.
+  /// @param remoteBridgeSender The address of the BridgeV2/AssetRouter on the remote chain. Must fit in 32 bytes and
+  /// is left-padded for storage.
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes calldata allowedCaller
+    bytes calldata allowedCaller,
+    bytes calldata remoteBridgeSender
   ) external onlyOwner {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
@@ -468,10 +508,17 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       revert ZeroAllowedCaller();
     }
 
-    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller});
+    bytes32 leftPaddedRemoteBridgeSender = Internal._leftPadBytesToBytes32(remoteBridgeSender);
+    if (leftPaddedRemoteBridgeSender == bytes32(0)) {
+      revert ZeroRemoteBridgeSender();
+    }
+
+    s_chainSelectorToPath[remoteChainSelector] = Path({
+      lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller, remoteBridgeSender: leftPaddedRemoteBridgeSender
+    });
     s_supportedChains.add(uint256(remoteChainSelector));
 
-    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller);
+    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller, leftPaddedRemoteBridgeSender);
   }
 
   /// @notice Sets remote adapter token identifiers for (remote chain, token) pairs.
@@ -501,7 +548,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
       delete s_chainSelectorToPath[remoteChainSelector];
 
-      emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller);
+      emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteBridgeSender);
     }
   }
 

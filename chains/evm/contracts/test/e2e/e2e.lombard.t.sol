@@ -31,6 +31,7 @@ contract e2e_lombard is OnRampSetup {
   bytes4 internal constant LOMBARD_VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
   bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10_000));
+  bytes32 internal constant REMOTE_BRIDGE_SENDER = bytes32(uint256(0x999999));
 
   OffRampHelper internal s_offRamp;
   MockLombardBridge internal s_lombardBridge;
@@ -123,7 +124,10 @@ contract e2e_lombard is OnRampSetup {
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
-      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(bytes32(bytes20(address(s_destLombardVerifier))))
+      DEST_CHAIN_SELECTOR,
+      LOMBARD_CHAIN_ID,
+      abi.encodePacked(bytes32(bytes20(address(s_destLombardVerifier)))),
+      abi.encodePacked(REMOTE_BRIDGE_SENDER)
     );
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
@@ -144,6 +148,13 @@ contract e2e_lombard is OnRampSetup {
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
     s_destLombardVerifier.applyRemoteChainConfigUpdates(lombardSourceConfig);
+    // Configure the path back to the source chain, so that verifyMessage can validate the remote bridge sender.
+    s_destLombardVerifier.setPath(
+      SOURCE_CHAIN_SELECTOR,
+      LOMBARD_CHAIN_ID,
+      abi.encodePacked(bytes32(bytes20(address(s_sourceLombardVerifier)))),
+      abi.encodePacked(REMOTE_BRIDGE_SENDER)
+    );
 
     VersionedVerifierResolver lombardResolver = new VersionedVerifierResolver();
     VersionedVerifierResolver.OutboundImplementationArgs[] memory lombardOutbound =
@@ -450,7 +461,7 @@ contract e2e_lombard is OnRampSetup {
     bytes memory encodedData = abi.encode(
       LOMBARD_CHAIN_ID, // destinationChain
       uint256(1), // nonce
-      bytes32(uint256(uint160(OWNER))), // sender
+      REMOTE_BRIDGE_SENDER, // sender
       address(0), // recipient (not used in validation)
       address(s_destLombardVerifier), // destinationCaller
       msgBody

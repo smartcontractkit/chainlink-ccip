@@ -26,6 +26,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
 
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10000));
   bytes32 internal constant ALLOWED_CALLER = bytes32(uint256(0x123456));
+  bytes32 internal constant REMOTE_BRIDGE_SENDER = bytes32(uint256(0x999999));
   uint256 internal constant TRANSFER_AMOUNT = 1e18;
   address internal s_destToken = makeAddr("destToken");
 
@@ -72,7 +73,13 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER));
+    s_lombardVerifier.setPath(
+      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER), abi.encodePacked(REMOTE_BRIDGE_SENDER)
+    );
+    // Set the path for the source chain, so that incoming messages from it can be validated in verifyMessage tests.
+    s_lombardVerifier.setPath(
+      SOURCE_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER), abi.encodePacked(REMOTE_BRIDGE_SENDER)
+    );
 
     // Mock the router to return true for the valid offRamp.
     vm.mockCall(
@@ -145,13 +152,26 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   }
 
   /// @notice Generates a rawPayload with an explicit destinationCaller, for tests that need to exercise an invalid
-  /// destinationCaller.
+  /// destinationCaller. The envelope sender defaults to REMOTE_BRIDGE_SENDER (a valid value).
   function _generateRawPayload(
     bytes memory destToken,
     bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount,
     address destinationCaller
+  ) internal pure returns (bytes memory) {
+    return _generateRawPayload(destToken, sender, tokenReceiver, amount, destinationCaller, REMOTE_BRIDGE_SENDER);
+  }
+
+  /// @notice Generates a rawPayload with an explicit destinationCaller and envelope sender, for tests that need to
+  /// exercise an invalid remote bridge sender.
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller,
+    bytes32 envelopeSender
   ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
@@ -165,7 +185,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     bytes memory encodedData = abi.encode(
       bytes32(LOMBARD_CHAIN_ID), // destinationChain
       uint256(1), // nonce
-      bytes32(uint256(uint160(OWNER))), // sender
+      envelopeSender, // sender
       address(0), // recipient (not used in validation)
       destinationCaller,
       msgBody

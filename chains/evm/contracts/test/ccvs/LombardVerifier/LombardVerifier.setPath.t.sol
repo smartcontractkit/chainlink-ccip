@@ -9,16 +9,23 @@ contract LombardVerifier_setPath is LombardVerifierSetup {
   uint64 internal constant NEW_CHAIN_SELECTOR = 999;
   bytes32 internal constant NEW_LOMBARD_CHAIN_ID = bytes32(uint256(42));
   bytes32 internal constant NEW_ALLOWED_CALLER = bytes32(uint256(0xabcdef));
+  bytes32 internal constant NEW_REMOTE_BRIDGE_SENDER = bytes32(uint256(0xfedcba));
 
   function test_setPath() public {
     vm.expectEmit();
-    emit LombardVerifier.PathSet(NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, NEW_ALLOWED_CALLER);
+    emit LombardVerifier.PathSet(NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, NEW_ALLOWED_CALLER, NEW_REMOTE_BRIDGE_SENDER);
 
-    s_lombardVerifier.setPath(NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, abi.encodePacked(NEW_ALLOWED_CALLER));
+    s_lombardVerifier.setPath(
+      NEW_CHAIN_SELECTOR,
+      NEW_LOMBARD_CHAIN_ID,
+      abi.encodePacked(NEW_ALLOWED_CALLER),
+      abi.encodePacked(NEW_REMOTE_BRIDGE_SENDER)
+    );
 
     LombardVerifier.Path memory path = s_lombardVerifier.getPath(NEW_CHAIN_SELECTOR);
     assertEq(path.lChainId, NEW_LOMBARD_CHAIN_ID);
     assertEq(path.allowedCaller, NEW_ALLOWED_CALLER);
+    assertEq(path.remoteBridgeSender, NEW_REMOTE_BRIDGE_SENDER);
 
     // Verify chain is added to supported chains.
     uint64[] memory supportedChains = s_lombardVerifier.getSupportedChains();
@@ -34,18 +41,34 @@ contract LombardVerifier_setPath is LombardVerifierSetup {
 
   function test_setPath_RevertWhen_ZeroLombardChainId() public {
     vm.expectRevert(LombardVerifier.ZeroLombardChainId.selector);
-    s_lombardVerifier.setPath(NEW_CHAIN_SELECTOR, bytes32(0), abi.encodePacked(NEW_ALLOWED_CALLER));
+    s_lombardVerifier.setPath(
+      NEW_CHAIN_SELECTOR, bytes32(0), abi.encodePacked(NEW_ALLOWED_CALLER), abi.encodePacked(NEW_REMOTE_BRIDGE_SENDER)
+    );
   }
 
   function test_setPath_RevertWhen_ZeroAllowedCaller() public {
     vm.expectRevert(LombardVerifier.ZeroAllowedCaller.selector);
-    s_lombardVerifier.setPath(NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, new bytes(0));
+    s_lombardVerifier.setPath(
+      NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, new bytes(0), abi.encodePacked(NEW_REMOTE_BRIDGE_SENDER)
+    );
+  }
+
+  function test_setPath_RevertWhen_ZeroRemoteBridgeSender() public {
+    vm.expectRevert(LombardVerifier.ZeroRemoteBridgeSender.selector);
+    s_lombardVerifier.setPath(
+      NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, abi.encodePacked(NEW_ALLOWED_CALLER), new bytes(0)
+    );
   }
 
   function test_setPath_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_lombardVerifier.setPath(NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, abi.encodePacked(NEW_ALLOWED_CALLER));
+    s_lombardVerifier.setPath(
+      NEW_CHAIN_SELECTOR,
+      NEW_LOMBARD_CHAIN_ID,
+      abi.encodePacked(NEW_ALLOWED_CALLER),
+      abi.encodePacked(NEW_REMOTE_BRIDGE_SENDER)
+    );
   }
 }
