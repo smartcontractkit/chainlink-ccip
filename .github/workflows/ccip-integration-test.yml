@@ -64,15 +64,15 @@ jobs:
           - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
             run: "^Test_CCIPMessaging_EVM2Solana$"
             timeout: 30m
-            installLoopPlugins: true
+            installLoopPlugins: "solana"
           - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
             run: "^Test_CCIPMessaging_Solana2EVM$"
             timeout: 30m
-            installLoopPlugins: true
+            installLoopPlugins: "solana"
           - name: "Messaging Test Test_CCIPMessaging_MultiExecReports_EVM2Solana"
             run: "^Test_CCIPMessaging_MultiExecReports_EVM2Solana$"
             timeout: 35m
-            installLoopPlugins: true
+            installLoopPlugins: "solana"
           - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
             run: "Test_CCIPBatching_MaxBatchSizeEVM"
             timeout: 12m
@@ -110,15 +110,6 @@ jobs:
         uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
       - name: Checkout the chainlink-ccip repo
         uses: actions/checkout@v4
-      - name: Determine Go version
-        id: go_version
-        run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
-      - name: Setup Go ${{ env.GO_VERSION }}
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Display Go version
-        run: go version
       - name: Fetch latest pull request data
         id: fetch_pr_data
         uses: actions/github-script@v6
@@ -200,6 +191,13 @@ jobs:
           repository: smartcontractkit/chainlink
           ref: ${{ steps.get_chainlink_sha.outputs.ref }}
           path: chainlink
+      - name: Setup Go
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: '**/go.sum'
+      - name: Display Go version
+        run: go version
       - name: Get the correct chainlink-ccip commit SHA via GitHub API
         id: get_sha
         run: |
@@ -228,10 +226,14 @@ jobs:
 
           cd "$GITHUB_WORKSPACE/chainlink"
           update_ccip_modules
+          # chainlink-ccip upgrades pull juno via keystore, which bumps tablewriter to v1.x.
+          # chainlink-ccv still uses the v0.0.5 API; pin until chainlink-ccv migrates.
+          go mod edit -replace=github.com/olekukonko/tablewriter=github.com/olekukonko/tablewriter@v0.0.5
           make gomodtidy
 
           cd "$GITHUB_WORKSPACE/chainlink/integration-tests"
           update_ccip_modules
+          go mod edit -replace=github.com/olekukonko/tablewriter=github.com/olekukonko/tablewriter@v0.0.5
           go mod tidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
@@ -245,9 +247,27 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/chainlink
           go build -o ccip.test .
-      - name: Install LOOP plugins
+      - name: Get LOOP plugin info
         if: matrix.type.installLoopPlugins
+        id: loop_plugin_ref
         run: |
+          plugin='${{ matrix.type.installLoopPlugins }}'
+          file=$GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml
+          ref=$(yq ".plugins.${plugin}[0].gitRef" "$file")
+          binary=$(basename "$(yq ".plugins.${plugin}[0].installPath" "$file")")
+          echo "ref=$ref" >> $GITHUB_OUTPUT
+          echo "binary=$binary" >> $GITHUB_OUTPUT
+      - name: Cache LOOP plugin binary
+        if: matrix.type.installLoopPlugins
+        id: cache_loop_plugin
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/${{ steps.loop_plugin_ref.outputs.binary }}
+          key: ${{ runner.os }}-loop-plugin-${{ matrix.type.installLoopPlugins }}-${{ steps.loop_plugin_ref.outputs.ref }}
+      - name: Install LOOP plugins
+        if: matrix.type.installLoopPlugins && steps.cache_loop_plugin.outputs.cache-hit != 'true'
+        run: |
+          yq -i '.plugins = {"${{ matrix.type.installLoopPlugins }}": .plugins.${{ matrix.type.installLoopPlugins }}}' $GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml
           cd $GITHUB_WORKSPACE/chainlink
           make install-plugins-public
       - name: Setup DB

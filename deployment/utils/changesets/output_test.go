@@ -3,7 +3,6 @@ package changesets_test
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -69,7 +68,6 @@ func TestWithBatchOps(t *testing.T) {
 	out, err := b.WithBatchOps(batchOps).Build(mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           2756219818,
-		TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Description:          "Proposal",
 	})
@@ -120,7 +118,6 @@ func TestWithSingleBatchOpPerChain(t *testing.T) {
 	out, err := b.WithSingleBatchOpPerChain(batchOps).Build(mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           2756219818,
-		TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Description:          "Proposal",
 	})

@@ -45,13 +45,16 @@ func acceptOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *ch
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			// if partial refs are provided, resolve to full refs
 			for i, contractRef := range perChainInputs.ContractRef {
-				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
+				addrRef, err := TryNormalizeAddressRef(perChainInputs.ChainSelector, contractRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), perChainInputs.ChainSelector, err)
+				}
+				addrRef, err = resolveContractRef(e, perChainInputs.ChainSelector, addrRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, err
 				}
-				perChainInputs.ContractRef[i] = fullRef
+				perChainInputs.ContractRef[i] = addrRef
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SequenceAcceptOwnership(), e.BlockChains, perChainInputs)
 			if err != nil {
@@ -86,13 +89,16 @@ func transferOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			// if partial refs are provided, resolve to full refs
 			for i, contractRef := range perChainInputs.ContractRef {
-				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
+				addrRef, err := TryNormalizeAddressRef(perChainInputs.ChainSelector, contractRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize contract ref %s for chain %d: %w", datastore_utils.SprintRef(contractRef), perChainInputs.ChainSelector, err)
+				}
+				addrRef, err = resolveContractRef(e, perChainInputs.ChainSelector, addrRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, err
 				}
-				perChainInputs.ContractRef[i] = fullRef
+				perChainInputs.ContractRef[i] = addrRef
 			}
 			chainBatchOps, chainReports, err := transferAndAcceptOwnership(e, adapter, perChainInputs, input.MCMS)
 			if err != nil {
@@ -149,6 +155,27 @@ func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Inpu
 		ProposedOwner: timelockRef.Address,
 	}
 	return transferAndAcceptOwnership(e, adapter, ownershipInput, mcmsInput)
+}
+
+// resolveContractRef attempts to enrich ref with full metadata from the datastore.
+// *) 0 matches: error if ref.Address is "", otherwise warn and return the input ref as-is (Address is sufficient for the ownership sequence; Type is used only for logging)
+// *) >1 matches: always a hard error regardless of whether Address is set, since ambiguous results indicate a datastore inconsistency that should not be silently bypassed
+// *) =1 match: returns the enriched ref
+func resolveContractRef(e cldf.Environment, chainSelector uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
+	ref.ChainSelector = chainSelector
+	matches := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(ref)...)
+	switch len(matches) {
+	case 0:
+		if ref.Address != "" {
+			e.Logger.Warnf("contract ref %s not found in datastore for chain %d - using provided ref instead", datastore_utils.SprintRef(ref), chainSelector)
+			return ref, nil
+		}
+		return datastore.AddressRef{}, fmt.Errorf("contract ref %s not found in datastore for chain %d", datastore_utils.SprintRef(ref), chainSelector)
+	case 1:
+		return matches[0], nil
+	default:
+		return datastore.AddressRef{}, fmt.Errorf("ambiguous contract ref %s for chain %d: found %d matches in datastore, expected exactly 1", datastore_utils.SprintRef(ref), chainSelector, len(matches))
+	}
 }
 
 // transferAndAcceptOwnership executes the transfer ownership sequence via MCMS and,

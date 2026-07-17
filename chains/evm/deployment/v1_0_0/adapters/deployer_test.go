@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -66,15 +65,15 @@ func TestDeployMCMS(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(utils.CLLQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        new(utils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(utils.CLLQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        new(utils.CLLQualifier),
 			},
 		},
 	})
@@ -181,8 +180,8 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 					Canceller:        testhelpers.SingleGroupMCMS(),
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
-					TimelockMinDelay: big.NewInt(0),
-					Qualifier:        ptr.String(utils.CLLQualifier),
+					TimelockMinDelay: big.NewInt(1),
+					Qualifier:        utils.StringPtr(utils.CLLQualifier),
 				},
 			},
 		})
@@ -199,8 +198,8 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 					Canceller:        testhelpers.SingleGroupMCMS(),
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
-					TimelockMinDelay: big.NewInt(0),
-					Qualifier:        ptr.String("no-cllccip"),
+					TimelockMinDelay: big.NewInt(1),
+					Qualifier:        utils.StringPtr("no-cllccip"),
 				},
 			},
 		})
@@ -216,8 +215,8 @@ func TestDeployMCMS_TimelockAdminRoleTransfer(t *testing.T) {
 					Canceller:        testhelpers.SingleGroupMCMS(),
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
-					TimelockMinDelay: big.NewInt(0),
-					Qualifier:        ptr.String(utils.CLLQualifier),
+					TimelockMinDelay: big.NewInt(1),
+					Qualifier:        utils.StringPtr(utils.CLLQualifier),
 				},
 			},
 		})
@@ -273,7 +272,7 @@ func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new(utils.CLLQualifier),
 			},
 		},
@@ -299,7 +298,7 @@ func TestDeployMCMS_DefaultsToExistingCLLCCIPTimelock(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new(utils.RMNTimelockQualifier),
 			},
 		},
@@ -355,14 +354,14 @@ func TestUpdateMCMSConfig(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new("CLLCCIP"),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new("CLLCCIP"),
 			},
 		},
@@ -440,7 +439,6 @@ func TestUpdateMCMSConfig(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            "CLLCCIP",
 			Description:          "update mcms config test",
@@ -495,14 +493,14 @@ func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new(utils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new(utils.CLLQualifier),
 			},
 		},
@@ -532,14 +530,14 @@ func TestDeployMCMS_CLLCCIPAutoAdminMultiChain(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new("testQual"),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        new("testQual"),
 			},
 		},

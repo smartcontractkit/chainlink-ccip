@@ -94,8 +94,6 @@ var (
 			}
 			feeTokens := feetokenOut.Output
 			for remoteChainSelector, onRampAddress := range input.OnRampsPerRemoteChain {
-				remoteChainSelector := remoteChainSelector
-				onRampAddress := onRampAddress
 				outerGrp.Go(func() error {
 					sCfgOut, err := operations.ExecuteOperation(b, onramp.OnRampStaticConfig, chain, contract.FunctionInput[any]{
 						ChainSelector: chain.Selector,
@@ -135,7 +133,6 @@ var (
 					tokenGrp, _ := errgroup.WithContext(b.GetContext())
 					tokenGrp.SetLimit(10) // limit concurrency to avoid overwhelming the node with requests
 					for _, token := range input.SupportedTokensPerChain[remoteChainSelector] {
-						token := token
 						tokenGrp.Go(func() error {
 							ttfcOut, err := operations.ExecuteOperation(
 								b, onramp.OnRampGetTokenTransferFeeConfig, chain, contract.FunctionInput[common.Address]{

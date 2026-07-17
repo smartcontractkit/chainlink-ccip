@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -162,15 +161,15 @@ func TestFastCurse(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 		},
 	})
@@ -215,7 +214,6 @@ func TestFastCurse(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
@@ -250,7 +248,6 @@ func TestFastCurse(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
@@ -451,8 +448,8 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			Canceller:        testhelpers.SingleGroupMCMS(),
 			Bypasser:         testhelpers.SingleGroupMCMS(),
 			Proposer:         testhelpers.SingleGroupMCMS(),
-			TimelockMinDelay: big.NewInt(0),
-			Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+			TimelockMinDelay: big.NewInt(1),
+			Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 		}
 	}
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
@@ -511,7 +508,6 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
@@ -540,7 +536,6 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",
@@ -656,7 +651,6 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",

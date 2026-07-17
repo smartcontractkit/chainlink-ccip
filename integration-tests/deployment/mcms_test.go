@@ -107,7 +107,6 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "update mcms config test",

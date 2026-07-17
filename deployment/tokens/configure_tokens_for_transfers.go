@@ -45,11 +45,13 @@ type TokenTransferConfig struct {
 	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
 	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
-	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
-	// The old pool address is derived from the TokenAdminRegistry, and the timelock address from the MCMS config.
+	// When either field is set, a liquidity migration is triggered via TokenExpansion after UpdateAuthorities
+	// transfers pool and lockbox ownership to the MCMS timelock. Migration requires the timelock to own the v2
+	// lockbox (and the legacy pool for rebalancer/withdraw ops). Use TokenExpansion for connect/upgrade flows;
+	// ConfigureTokensForTransfers rejects these fields. For standalone step-2 drains, use MigrateLockReleasePoolLiquidity.
 	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount" json:"liquidityMigrationAmount"`
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with LiquidityMigrationAmount.
+	// Mutually exclusive with LiquidityMigrationAmount. See LiquidityMigrationAmount for ownership and entry-point requirements.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
 	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
@@ -105,8 +107,15 @@ func ConfigureTokensForTransfers(tokenRegistry *TokenAdapterRegistry, mcmsRegist
 }
 
 func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) error {
-	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
-		// TODO: implement
+	return func(_ cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
+		for _, token := range cfg.Tokens {
+			if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
+				return fmt.Errorf(
+					"liquidity migration on chain selector %d requires TokenExpansion, which runs migration after UpdateAuthorities transfers pool and lockbox ownership to the MCMS timelock",
+					token.ChainSelector,
+				)
+			}
+		}
 		return nil
 	}
 }
@@ -117,7 +126,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 		for _, config := range cfg.Tokens {
 			configs[config.ChainSelector] = config
 		}
-		batchOps, reports, ds, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, configs)
+		batchOps, reports, ds, err := processTokenConfigForChain(e, configs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
@@ -129,7 +138,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 	}
 }
 
-func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, mcmsInput mcms.Input, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
+func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
 	normalizerRegistry := deploy.GetAddressNormalizerRegistry()
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)
@@ -138,7 +147,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 
 	var err error
 	for selector, token := range cfg {
-		token.RegistryRef, err = TryNormalizeAddressRef(selector, token.RegistryRef)
+		token.RegistryRef, err = deploy.TryNormalizeAddressRef(selector, token.RegistryRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to normalize registry ref address for chain selector %d: %w", selector, err)
 		}
@@ -338,20 +347,6 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			}
 		}
 
-		// Resolve the timelock address if a liquidity migration is requested.
-		var timelockAddress string
-		if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
-			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
-			if !ok {
-				return nil, nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s' on chain %d", family, selector)
-			}
-			timelockRef, err := mcmsReader.GetTimelockRef(e, selector, mcmsInput)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to get timelock address from MCMS config on chain %d: %w", selector, err)
-			}
-			timelockAddress = timelockRef.Address
-		}
-
 		// NOTE: this changeset is already responsible for applying the fee configs
 		// so we set `TokenTransferFeeConfig` to nil BEFORE calling the lower-level
 		// ConfigureTokenForTransfersSequence - this prevents any type of duplicate
@@ -365,18 +360,15 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 		// Configure pool remotes (fee configs are excluded as they require
 		// special handling see comment below)
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-			ChainSelector:                 selector,
-			TokenPoolAddress:              tokenPool.Address,
-			RemoteChains:                  remoteChainsWithoutFeeConfigs,
-			ExternalAdmin:                 token.ExternalAdmin,
-			RegistryAddress:               registryAddr,
-			TokenRef:                      fullTokenRef,
-			PoolType:                      tokenPool.Type.String(),
-			ExistingDataStore:             e.DataStore,
-			AllowedFinalityConfig:         token.AllowedFinalityConfig,
-			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
-			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
-			TimelockAddress:               timelockAddress,
+			ChainSelector:         selector,
+			TokenPoolAddress:      tokenPool.Address,
+			RemoteChains:          remoteChainsWithoutFeeConfigs,
+			ExternalAdmin:         token.ExternalAdmin,
+			RegistryAddress:       registryAddr,
+			TokenRef:              fullTokenRef,
+			PoolType:              tokenPool.Type.String(),
+			ExistingDataStore:     e.DataStore,
+			AllowedFinalityConfig: token.AllowedFinalityConfig,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
@@ -685,7 +677,7 @@ func convertRemoteChainConfig(
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize outbound CCV ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -696,7 +688,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVs = append(outCfg.OutboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVs {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize inbound CCV ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -707,7 +699,7 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVs = append(outCfg.InboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.OutboundCCVsToAddAboveThreshold {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize outbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -718,7 +710,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVsToAddAboveThreshold = append(outCfg.OutboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVsToAddAboveThreshold {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize inbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
 		}

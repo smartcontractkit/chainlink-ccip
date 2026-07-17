@@ -79,6 +79,16 @@ func (c *USDCTokenPoolContract) ApplyAuthorizedCallerUpdates(opts *bind.Transact
 	return c.contract.Transact(opts, "applyAuthorizedCallerUpdates", args)
 }
 
+func (c *USDCTokenPoolContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 func (c *USDCTokenPoolContract) ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []ChainUpdate) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "applyChainUpdates", remoteChainSelectorsToRemove, chainsToAdd)
 }
@@ -214,6 +224,17 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 		args AuthorizedCallerArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *USDCTokenPoolContract]{
+	Name:         "usdc-token-pool:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolContract,
+	CallContract: func(c *USDCTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
 	},
 })
 

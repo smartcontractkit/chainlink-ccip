@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 
@@ -11,6 +12,7 @@ import (
 
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -352,7 +354,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token pool refs for chain selector %d: %w", selector, err)
 				}
-				mergedPool, err = TryNormalizeAddressRef(selector, mergedPool)
+				mergedPool, err = ccipdeploy.TryNormalizeAddressRef(selector, mergedPool)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize merged token pool ref address for chain selector %d: %w", selector, err)
 				}
@@ -364,7 +366,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
-				mergedToken, err = TryNormalizeAddressRef(selector, mergedToken)
+				mergedToken, err = ccipdeploy.TryNormalizeAddressRef(selector, mergedToken)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize merged token ref address for chain selector %d: %w", selector, err)
 				}
@@ -380,7 +382,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			if input.TokenTransferConfig != nil {
-				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
+				ttConfig := input.TokenTransferConfig
+				for remoteSelector, remoteConfig := range ttConfig.RemoteChains {
 					if _, exists := allRemotes[remoteSelector]; exists {
 						if remoteConfig.RemoteToken == nil {
 							remoteConfig.RemoteToken = allRemotes[remoteSelector].RemoteToken
@@ -396,34 +399,40 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// When no remote chains are given but `autoMigrateRemoteChains` is true, then we should still
 				// proceed to the configure step since remote chain configs (including legacy lane fees) will be
 				// auto-populated via the token pool migrator interface.
-				if len(input.TokenTransferConfig.RemoteChains) != 0 || input.TokenTransferConfig.AutoMigrateRemoteChains {
-					allTokenConfigs[selector] = *input.TokenTransferConfig
+				isLiquidityMigration := ttConfig.LiquidityMigrationAmount != nil || ttConfig.LiquidityMigrationBasisPoints != nil
+				if len(ttConfig.RemoteChains) != 0 || ttConfig.AutoMigrateRemoteChains || isLiquidityMigration {
+					allTokenConfigs[selector] = *ttConfig
 				}
 			}
 		}
 
+		legacyPools, err := snapshotLegacyPoolsForMigration(e, tokenPoolRegistry, allTokenConfigs)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to snapshot legacy pools for liquidity migration: %w", err)
+		}
+
 		// we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
-		transferOps, transferReports, tokends, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, allTokenConfigs)
+		transferOps, transferReports, tokenDS, err := processTokenConfigForChain(e, allTokenConfigs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
 		}
 		batchOps = append(batchOps, transferOps...)
 		reports = append(reports, transferReports...)
-		ds.Merge(tokends.Seal())
+		ds.Merge(tokenDS.Seal())
 		mergedDS := datastore.NewMemoryDataStore()
 		mergedDS.Merge(e.DataStore)
 		mergedDS.Merge(ds.Seal())
 		e.DataStore = mergedDS.Seal()
 
-		// finally, we update the authorities on the tokens if necessary
+		// update the authorities on the tokens if necessary
 		for selector, tokenConfig := range allTokenConfigs {
+			if cfg.TokenExpansionInputPerChain[selector].SkipOwnershipTransfer {
+				e.Logger.Infof("skipping ownership transfer for token pool on chain with selector %d", selector)
+				continue
+			}
 			tokenPoolAdapter, _, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, selector, tokenConfig.TokenPoolRef, tokenConfig.TokenRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve adapter and refs for chain selector %d: %w", selector, err)
-			}
-			if cfg.TokenExpansionInputPerChain[selector].SkipOwnershipTransfer {
-				e.Logger.Infof("skipping ownership transfer for token pool %s on chain with selector %d", fullPoolRef, selector)
-				continue
 			}
 			updateAuthoritiesInput := UpdateAuthoritiesInput{
 				TokenRef:      fullTokenRef,
@@ -438,6 +447,47 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			reports = append(reports, updateAuthoritiesReport.ExecutionReports...)
 		}
 
+		// if applicable, migrate lock release pool liquidity - the V2 EVM sequence expects the
+		// pool to be owned by the timelock, so we need to do this after the ownership transfer
+		for selector, tokenConfig := range allTokenConfigs {
+			if tokenConfig.LiquidityMigrationAmount == nil && tokenConfig.LiquidityMigrationBasisPoints == nil {
+				continue
+			}
+			if tokenConfig.LiquidityMigrationAmount != nil && tokenConfig.LiquidityMigrationBasisPoints != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("both LiquidityMigrationAmount and LiquidityMigrationBasisPoints are set for chain selector %d, only one can be set", selector)
+			}
+			if cfg.TokenExpansionInputPerChain[selector].SkipOwnershipTransfer {
+				return cldf.ChangesetOutput{}, fmt.Errorf(
+					"liquidity migration on chain selector %d requires UpdateAuthorities (skipOwnershipTransfer is set)",
+					selector,
+				)
+			}
+			tokenPoolAdapter, family, fullPoolRef, _, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, selector, tokenConfig.TokenPoolRef, tokenConfig.TokenRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve adapter and refs for liquidity migration on chain selector %d: %w", selector, err)
+			}
+			if !utils.IsLockReleasePoolType(fullPoolRef.Type.String()) {
+				e.Logger.Warnf("skipping liquidity migration on chain with selector %d because token pool type %s is not a LockRelease pool", selector, fullPoolRef.Type.String())
+				continue
+			}
+			migrationBatchOps, migrationReports, err := buildLiquidityMigrationBatchOps(
+				e,
+				mcmsRegistry,
+				cfg.MCMS,
+				selector,
+				tokenConfig,
+				tokenPoolAdapter,
+				family,
+				fullPoolRef,
+				legacyPools[selector],
+			)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to build liquidity migration on chain %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, migrationBatchOps...)
+			reports = append(reports, migrationReports...)
+		}
+
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithDataStore(ds).
@@ -449,39 +499,6 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 // ScaleTokenAmount scales the given amount by 10^decimals and returns the result as a *big.Int
 func ScaleTokenAmount(amount *big.Int, decimals uint8) *big.Int {
 	return new(big.Int).Mul(amount, new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(decimals)), nil))
-}
-
-// TryNormalizeAddressRef looks up AddressNormalizer registered for selector's chain family and canonicalizes ref.Address when set.
-func TryNormalizeAddressRef(chainSelector uint64, ref datastore.AddressRef) (datastore.AddressRef, error) {
-	if datastore_utils.IsAddressRefEmpty(ref) {
-		return ref, nil
-	} else {
-		// NOTE: `ref.ChainSelector` is intentionally ignored in favor of `chainSelector`
-		// which comes from the keys of `TokenExpansionInput.TokenExpansionInputPerChain`
-		ref.ChainSelector = chainSelector
-	}
-
-	normalized := ref.Clone()
-	if normalized.Address == "" {
-		return normalized, nil
-	}
-
-	family, err := chain_selectors.GetSelectorFamily(chainSelector)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("invalid chain selector %d: %w", chainSelector, err)
-	}
-
-	normalizer, ok := ccipdeploy.GetAddressNormalizerRegistry().GetAddressNormalizer(family)
-	if !ok {
-		return normalized, nil
-	}
-
-	normalized.Address, err = normalizer.NormalizeAddress(ref.Address)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address %s: %w", ref.Address, err)
-	}
-
-	return normalized, nil
 }
 
 // ResolveAdapterAndRefs resolves the token adapter, token pool ref, and token ref for the given
@@ -526,7 +543,7 @@ func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint
 	}
 
 	// Try to normalize ref.Address before doing any lookups
-	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
+	maybeNormalized, err := ccipdeploy.TryNormalizeAddressRef(sel, ref)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
@@ -568,7 +585,7 @@ func ResolveTokenRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint64, 
 	}
 
 	// Try to normalize ref.Address before doing any lookups
-	maybeNormalized, err := TryNormalizeAddressRef(sel, ref)
+	maybeNormalized, err := ccipdeploy.TryNormalizeAddressRef(sel, ref)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to normalize address ref (%s) for chain selector %d: %w", datastore_utils.SprintRef(ref), sel, err)
 	}
@@ -619,4 +636,117 @@ func ResolveAdapter(reg *TokenAdapterRegistry, sel uint64, tokenPoolVersion *sem
 	}
 
 	return adapter, family, nil
+}
+
+// snapshotLegacyPoolsForMigration records the pool currently registered in TAR for each
+// chain that will run liquidity migration. That address is the legacy pool we drain from.
+//
+// The order of operations in this changeset matters: migration runs after UpdateAuthorities
+// (the v2 pool and lockbox need to be timelock-owned), but by that point configure has
+// already registered the v2 pool on TAR. If we queried TAR again at migration time we'd
+// see the new pool and skip the drain.
+//
+// Reordering configure, authority transfer, and migration would be a bigger refactor, so
+// for now we snapshot the legacy pool addresses before configure runs, then use that
+// snapshot when building the migration batch.
+//
+// If TAR already points at the target pool (step-2 or re-run), we don't snapshot — use
+// standalone MigrateLockReleasePoolLiquidity with an explicit OldPoolRef instead.
+func snapshotLegacyPoolsForMigration(e cldf.Environment, reg *TokenAdapterRegistry, configs map[uint64]TokenTransferConfig) (map[uint64][]byte, error) {
+	legacyPools := make(map[uint64][]byte, len(configs))
+	for selector, token := range configs {
+		if token.LiquidityMigrationAmount == nil && token.LiquidityMigrationBasisPoints == nil {
+			continue
+		}
+
+		adapter, _, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, reg, selector, token.TokenPoolRef, token.TokenRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve adapter and refs for chain selector %d: %w", selector, err)
+		}
+
+		registryMigrator, ok := adapter.(TokenPoolMigrator)
+		if !ok {
+			return nil, fmt.Errorf(
+				"adapter for chain selector %d does not support reading active pool from registry, which is required for liquidity migration",
+				selector,
+			)
+		}
+
+		activePool, err := registryMigrator.GetActivePool(e, selector, token.RegistryRef, fullTokenRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get active pool for liquidity migration on chain selector %d: %w", selector, err)
+		}
+		if len(activePool) == 0 {
+			e.Logger.Infof("no legacy pool registered for liquidity migration on chain selector %d, skipping snapshot", selector)
+			continue
+		}
+
+		targetPoolBytes, err := adapter.AddressRefToBytes(fullPoolRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert target pool ref to bytes on chain selector %d: %w", selector, err)
+		}
+		if bytes.Equal(activePool, targetPoolBytes) {
+			e.Logger.Infof("legacy pool matches target on chain selector %d, skipping liquidity migration snapshot", selector)
+			continue
+		}
+
+		legacyPools[selector] = activePool
+	}
+
+	return legacyPools, nil
+}
+
+func buildLiquidityMigrationBatchOps(
+	e cldf.Environment,
+	mcmsRegistry *changesets.MCMSReaderRegistry,
+	mcmsInput mcms.Input,
+	selector uint64,
+	token TokenTransferConfig,
+	adapter TokenAdapter,
+	family string,
+	tokenPool datastore.AddressRef,
+	legacyPool []byte,
+) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+	if token.LiquidityMigrationAmount == nil && token.LiquidityMigrationBasisPoints == nil {
+		return nil, nil, nil
+	}
+	if len(legacyPool) == 0 {
+		e.Logger.Infof("no legacy pool snapshot for liquidity migration on chain selector %d, skipping liquidity migration", selector)
+		return nil, nil, nil
+	}
+
+	migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
+	if migrationSeq == nil {
+		return nil, nil, fmt.Errorf("adapter for chain selector %d does not support liquidity migration", selector)
+	}
+	mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+	if !ok {
+		return nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s' on chain %d", family, selector)
+	}
+	timelockRef, err := mcmsReader.GetTimelockRef(e, selector, mcmsInput)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get timelock address from MCMS config on chain %d: %w", selector, err)
+	}
+	normalizer, ok := ccipdeploy.GetAddressNormalizerRegistry().GetAddressNormalizer(family)
+	if !ok {
+		return nil, nil, fmt.Errorf("no address normalizer found for chain family %s on chain selector %d", family, selector)
+	}
+	oldPoolAddr, err := normalizer.BytesToString(legacyPool)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to normalize legacy pool address on chain selector %d: %w", selector, err)
+	}
+	migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
+		ChainSelector:   selector,
+		OldPoolAddress:  oldPoolAddr,
+		NewPoolAddress:  tokenPool.Address,
+		TimelockAddress: timelockRef.Address,
+		BasisPoints:     token.LiquidityMigrationBasisPoints,
+		Amount:          token.LiquidityMigrationAmount,
+		SetPoolConfig:   nil,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build liquidity migration on chain %d: %w", selector, err)
+	}
+
+	return migrationReport.Output.BatchOps, migrationReport.ExecutionReports, nil
 }
