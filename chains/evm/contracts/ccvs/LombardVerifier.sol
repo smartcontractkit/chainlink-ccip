@@ -37,6 +37,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
   error InvalidSender(bytes32 expected, bytes32 actual);
+  error InvalidRecipient(address expected, address actual);
   error InvalidRemoteBridgeSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
@@ -308,7 +309,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   }
 
   /// @notice Decodes the GMP envelope, validates that it was sent by the remote chain's canonical BridgeV2/
-  /// AssetRouter and addressed to this contract, and returns the inner token-transfer msgBody.
+  /// AssetRouter and addressed to this contract's local bridge, and returns the inner token-transfer msgBody.
   /// @dev Split out from _validatePayload to avoid stack-too-deep.
   function _validateEnvelope(
     bytes calldata rawPayload,
@@ -316,7 +317,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   ) internal view returns (bytes memory) {
     bytes memory msgBody;
     bytes32 envelopeSender;
-    (,, envelopeSender,,, msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+    address recipient;
+    (,, envelopeSender, recipient,, msgBody) =
+      abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
 
     // The envelope sender must be the remote chain's BridgeV2/AssetRouter. This establishes that the GMP message
     // followed the canonical BridgeV2-to-BridgeV2 route, rather than relying on the mailbox's own sender
@@ -324,6 +327,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 expectedRemoteBridgeSender = s_chainSelectorToPath[sourceChainSelector].remoteBridgeSender;
     if (envelopeSender != expectedRemoteBridgeSender) {
       revert InvalidRemoteBridgeSender(expectedRemoteBridgeSender, envelopeSender);
+    }
+
+    // The envelope recipient must be this chain's canonical BridgeV2/AssetRouter. The mailbox is a generic
+    // messaging layer that can carry messages for applications other than the token bridge, so this check is
+    // critical to ensure that we are processing a message addressed to the token bridge, and not some other
+    // message on the mailbox.
+    if (recipient != address(i_bridge)) {
+      revert InvalidRecipient(address(i_bridge), recipient);
     }
 
     return msgBody;

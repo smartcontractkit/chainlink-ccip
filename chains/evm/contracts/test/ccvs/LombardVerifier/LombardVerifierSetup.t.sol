@@ -151,20 +151,20 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier));
   }
 
-  /// @notice Generates a rawPayload with an explicit destinationCaller. The envelope sender defaults to
-  /// REMOTE_BRIDGE_SENDER (a valid value).
+  /// @notice Generates a rawPayload with an explicit destinationCaller. The envelope sender and recipient default to
+  /// REMOTE_BRIDGE_SENDER and the mock bridge address (valid values).
   function _generateRawPayload(
     bytes memory destToken,
     bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount,
     address destinationCaller
-  ) internal pure returns (bytes memory) {
+  ) internal view returns (bytes memory) {
     return _generateRawPayload(destToken, sender, tokenReceiver, amount, destinationCaller, REMOTE_BRIDGE_SENDER);
   }
 
   /// @notice Generates a rawPayload with an explicit destinationCaller and envelope sender, for tests that need to
-  /// exercise an invalid remote bridge sender.
+  /// exercise an invalid remote bridge sender. The recipient defaults to the mock bridge address (a valid value).
   function _generateRawPayload(
     bytes memory destToken,
     bytes memory sender,
@@ -172,6 +172,22 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     uint256 amount,
     address destinationCaller,
     bytes32 envelopeSender
+  ) internal view returns (bytes memory) {
+    return _generateRawPayload(
+      destToken, sender, tokenReceiver, amount, destinationCaller, envelopeSender, address(s_mockBridge)
+    );
+  }
+
+  /// @notice Generates a rawPayload with a fully explicit destinationCaller, envelope sender, and recipient, for
+  /// tests that need to exercise an invalid recipient.
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller,
+    bytes32 envelopeSender,
+    address recipient
   ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
@@ -186,7 +202,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       bytes32(LOMBARD_CHAIN_ID), // destinationChain
       uint256(1), // nonce
       envelopeSender, // sender
-      address(0), // recipient (not used in validation)
+      recipient,
       destinationCaller,
       msgBody
     );

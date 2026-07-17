@@ -242,6 +242,34 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }
 
+  function test_verifyMessage_RevertWhen_InvalidRecipient() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Generate a rawPayload with an envelope recipient that is not this chain's canonical bridge.
+    address wrongRecipient = makeAddr("wrongRecipient");
+    bytes memory rawPayload = _generateRawPayload(
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount,
+      address(s_lombardVerifier),
+      REMOTE_BRIDGE_SENDER,
+      wrongRecipient
+    );
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(LombardVerifier.InvalidRecipient.selector, address(s_mockBridge), wrongRecipient)
+    );
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
   function test_verifyMessage_RevertWhen_InvalidReceiver() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));

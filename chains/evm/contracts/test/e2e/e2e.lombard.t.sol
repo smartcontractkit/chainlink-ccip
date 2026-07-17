@@ -462,7 +462,7 @@ contract e2e_lombard is OnRampSetup {
       LOMBARD_CHAIN_ID, // destinationChain
       uint256(1), // nonce
       REMOTE_BRIDGE_SENDER, // sender
-      address(0), // recipient (not used in validation)
+      address(s_lombardBridge), // recipient
       address(s_destLombardVerifier), // destinationCaller
       msgBody
     );
