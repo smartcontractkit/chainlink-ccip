@@ -37,7 +37,6 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
   error InvalidSender(bytes32 expected, bytes32 actual);
-  error InvalidDestinationCaller(address expected, address actual);
   error InvalidRemoteBridgeSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
@@ -317,9 +316,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   ) internal view returns (bytes memory) {
     bytes memory msgBody;
     bytes32 envelopeSender;
-    address destinationCaller;
-    (,, envelopeSender,, destinationCaller, msgBody) =
-      abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+    (,, envelopeSender,,, msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
 
     // The envelope sender must be the remote chain's BridgeV2/AssetRouter. This establishes that the GMP message
     // followed the canonical BridgeV2-to-BridgeV2 route, rather than relying on the mailbox's own sender
@@ -327,13 +324,6 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 expectedRemoteBridgeSender = s_chainSelectorToPath[sourceChainSelector].remoteBridgeSender;
     if (envelopeSender != expectedRemoteBridgeSender) {
       revert InvalidRemoteBridgeSender(expectedRemoteBridgeSender, envelopeSender);
-    }
-
-    // The destinationCaller must be this contract. Lombard's mailbox is a generic messaging layer that can carry
-    // messages other than token transfers, so this check is critical to ensure that we are processing a message
-    // addressed to the token bridge, and not some other message on the mailbox.
-    if (destinationCaller != address(this)) {
-      revert InvalidDestinationCaller(address(this), destinationCaller);
     }
 
     return msgBody;

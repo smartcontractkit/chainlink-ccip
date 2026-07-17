@@ -151,8 +151,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier));
   }
 
-  /// @notice Generates a rawPayload with an explicit destinationCaller, for tests that need to exercise an invalid
-  /// destinationCaller. The envelope sender defaults to REMOTE_BRIDGE_SENDER (a valid value).
+  /// @notice Generates a rawPayload with an explicit destinationCaller. The envelope sender defaults to
+  /// REMOTE_BRIDGE_SENDER (a valid value).
   function _generateRawPayload(
     bytes memory destToken,
     bytes memory sender,
