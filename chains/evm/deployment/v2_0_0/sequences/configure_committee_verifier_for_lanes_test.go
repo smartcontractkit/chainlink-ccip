@@ -1,6 +1,7 @@
 package sequences_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -8,15 +9,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
@@ -169,9 +169,8 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			// Deploy chain contracts
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
@@ -202,16 +201,7 @@ func TestConfigureCommitteeVerifierAsSource(t *testing.T) {
 
 			for remoteSelector, remoteConfig := range input.RemoteChains {
 				// Check remote chain config on CommitteeVerifier
-				remoteChainConfigReport, err := operations.ExecuteOperation(
-					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.GetRemoteChainConfig,
-					evmChain,
-					contract.FunctionInput[uint64]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
-						Args:          remoteSelector,
-					},
-				)
+				remoteChainConfigReport, err := evmops.ExecuteRead(testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, common.HexToAddress(input.CommitteeVerifier[0].Address), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetRemoteChainConfig, remoteSelector)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				require.Equal(t, common.HexToAddress(input.Router), remoteChainConfigReport.Output.RemoteChainConfig.Router, "Router in remote chain config should match")
 				require.Equal(t, remoteConfig.AllowlistEnabled, remoteChainConfigReport.Output.RemoteChainConfig.AllowlistEnabled, "AllowlistEnabled should match")
@@ -326,9 +316,8 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			// Deploy chain contracts
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
@@ -359,16 +348,8 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 
 			for remoteSelector, remoteConfig := range input.RemoteChains {
 				// Check signature config on CommitteeVerifier
-				signatureConfigReport, err := operations.ExecuteOperation(
-					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.GetSignatureConfig,
-					evmChain,
-					contract.FunctionInput[uint64]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
-						Args:          remoteSelector,
-					},
-				)
+				signatureConfigReport, err := evmops.ExecuteRead(
+					testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, common.HexToAddress(input.CommitteeVerifier[0].Address), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetSignatureConfig, remoteSelector)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				require.Equal(t, remoteConfig.SignatureConfig.Threshold, signatureConfigReport.Output.Threshold, "Threshold should match")
 				expectedSigners := make([]common.Address, len(remoteConfig.SignatureConfig.Signers))
@@ -383,15 +364,8 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 					evmChain.Client,
 				)
 				require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
-				versionTagReport, err := operations.ExecuteOperation(
-					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.VersionTag,
-					evmChain,
-					contract.FunctionInput[struct{}]{
-						ChainSelector: evmChain.Selector,
-						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
-					},
-				)
+				versionTagReport, err := evmops.ExecuteRead(
+					testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, common.HexToAddress(input.CommitteeVerifier[0].Address), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadVersionTag, struct{}{})
 				require.NoError(t, err, "ExecuteOperation should not error")
 				inboundImpl, err := boundResolver.GetInboundImplementation(
 					&bind.CallOpts{Context: t.Context()},
@@ -494,9 +468,8 @@ func TestConfigureCommitteeVerifierAsSource_RevertWhen_InvalidSupportingContract
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			// Deploy chain contracts
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
@@ -614,9 +587,8 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			// Deploy chain contracts
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},

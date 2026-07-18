@@ -1,6 +1,9 @@
 package sequences
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	cv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"errors"
 	"fmt"
 
@@ -15,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/verifier_tags"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -44,18 +46,17 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 	"Deploys the CommitteeVerifier contract",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployCommitteeVerifierInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]contract_utils.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 
 		// Deploy CommitteeVerifier
 		var qualifierPtr *string
 		if input.Params.Qualifier != "" {
 			qualifierPtr = &input.Params.Qualifier
 		}
-		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract_utils.DeployInput[committee_verifier.ConstructorArgs]{
+		committeeVerifierRef, err := evmops.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
-			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
-				DynamicConfig: committee_verifier.DynamicConfig{
+				DynamicConfig: cv_bindings.CommitteeVerifierDynamicConfig{
 					FeeAggregator:  input.Params.FeeAggregator,
 					AllowlistAdmin: input.Params.AllowlistAdmin,
 				},
@@ -71,11 +72,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		addresses = append(addresses, committeeVerifierRef)
 
 		// Fetch dynamic config on the CommitteeVerifier
-		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
-			Args:          struct{}{},
-		})
+		dynamicConfigReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifierRef.Address), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetDynamicConfig, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config on CommitteeVerifier: %w", err)
 		}
@@ -90,13 +87,9 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			desiredAllowlistAdmin = input.Params.AllowlistAdmin
 		}
 		if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator || desiredAllowlistAdmin != dynamicConfigReport.Output.AllowlistAdmin {
-			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.DynamicConfig]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierRef.Address),
-				Args: committee_verifier.DynamicConfig{
-					AllowlistAdmin: desiredAllowlistAdmin,
-					FeeAggregator:  desiredFeeAggregator,
-				},
+			setDynamicConfigReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifierRef.Address), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewWriteSetDynamicConfig, cv_bindings.CommitteeVerifierDynamicConfig{
+				AllowlistAdmin: desiredAllowlistAdmin,
+				FeeAggregator:  desiredFeeAggregator,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on CommitteeVerifier: %w", err)
@@ -134,7 +127,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			writes = append(writes, deployVerifierResolverViaCREATE2Report.Output.Writes...)
 		}
 
-		batchOp, err := contract_utils.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

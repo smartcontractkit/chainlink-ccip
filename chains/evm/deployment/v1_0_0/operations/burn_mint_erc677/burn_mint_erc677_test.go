@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	wrappers "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 )
@@ -39,11 +38,7 @@ func TestResolveGrantMintAndBurnRolesAuthority_owner(t *testing.T) {
 	require.Equal(t, AuthorityOwner, auth.Kind)
 	require.Equal(t, chain.DeployerKey.From, auth.Owner)
 
-	writes, err := PrepareGrantMintAndBurnRoles(e.OperationsBundle, chain, contract.FunctionInput[common.Address]{
-		ChainSelector: selector,
-		Address:       tokenAddress,
-		Args:          pool,
-	}, common.Address{})
+	writes, err := PrepareGrantMintAndBurnRoles(e.OperationsBundle, chain, tokenAddress, pool, common.Address{})
 	require.NoError(t, err)
 	require.Len(t, writes, 1)
 
@@ -79,11 +74,7 @@ func TestResolveGrantMintAndBurnRolesAuthority_unauthorizedCaller(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, AuthorityUnauthorized, auth.Kind)
 
-	_, err = PrepareGrantMintAndBurnRoles(e.OperationsBundle, chain, contract.FunctionInput[common.Address]{
-		ChainSelector: selector,
-		Address:       tokenAddress,
-		Args:          pool,
-	}, stranger)
+	_, err = PrepareGrantMintAndBurnRoles(e.OperationsBundle, chain, tokenAddress, pool, stranger)
 	require.ErrorContains(t, err, "not the token owner")
 }
 
@@ -108,10 +99,6 @@ func TestPrepareGrantMintAndBurnRoles_timelockMustBeOwnerWhenSet(t *testing.T) {
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
 
-	_, err = PrepareGrantMintAndBurnRoles(e.OperationsBundle, chain, contract.FunctionInput[common.Address]{
-		ChainSelector: selector,
-		Address:       tokenAddress,
-		Args:          pool,
-	}, timelock)
+	_, err = PrepareGrantMintAndBurnRoles(e.OperationsBundle, chain, tokenAddress, pool, timelock)
 	require.ErrorContains(t, err, "not the token owner")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
@@ -18,6 +19,7 @@ import (
 	evmadaptersV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqV2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	tpopsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	tokenpoolbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_0_0/adapters"
 	soladaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -32,7 +34,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
@@ -720,25 +721,25 @@ func TestSetTokenPoolTokenTransferFeeV2_0_0(t *testing.T) {
 	env.OperationsBundle = operations.NewBundle(t.Context, env.OperationsBundle.Logger, operations.NewMemoryReporter())
 
 	// Check allowed finality config for pool A (BlockDepth=12 was set)
-	reportA, err := operations.ExecuteOperation(
-		env.OperationsBundle, tpopsV2_0_0.GetAllowedFinalityConfig, evmChainA,
-		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelA, Address: poolA, Args: struct{}{}},
+	reportA, err := evmops.ExecuteRead(
+		env.OperationsBundle, evmChainA, poolA, evmops.BindAs[tokenpoolbindings.TokenPoolInterface](tokenpoolbindings.NewTokenPool),
+		tpopsV2_0_0.NewReadGetAllowedFinalityConfig, struct{}{},
 	)
 	require.NoError(t, err)
 	require.Equal(t, finality.Config{BlockDepth: 12}.Raw(), reportA.Output)
 
 	// Check allowed finality config for pool B (not set, defaults to WaitForFinality)
-	reportB, err := operations.ExecuteOperation(
-		env.OperationsBundle, tpopsV2_0_0.GetAllowedFinalityConfig, evmChainB,
-		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelB, Address: poolB, Args: struct{}{}},
+	reportB, err := evmops.ExecuteRead(
+		env.OperationsBundle, evmChainB, poolB, evmops.BindAs[tokenpoolbindings.TokenPoolInterface](tokenpoolbindings.NewTokenPool),
+		tpopsV2_0_0.NewReadGetAllowedFinalityConfig, struct{}{},
 	)
 	require.NoError(t, err)
 	require.Equal(t, finality.RawWaitForFinality, reportB.Output)
 
 	// Check allowed finality config for pool C (explicitly set to 0, i.e. WaitForFinality)
-	reportC, err := operations.ExecuteOperation(
-		env.OperationsBundle, tpopsV2_0_0.GetAllowedFinalityConfig, evmChainC,
-		contract.FunctionInput[struct{}]{ChainSelector: evmChainSelC, Address: poolC, Args: struct{}{}},
+	reportC, err := evmops.ExecuteRead(
+		env.OperationsBundle, evmChainC, poolC, evmops.BindAs[tokenpoolbindings.TokenPoolInterface](tokenpoolbindings.NewTokenPool),
+		tpopsV2_0_0.NewReadGetAllowedFinalityConfig, struct{}{},
 	)
 	require.NoError(t, err)
 	require.Equal(t, finality.RawWaitForFinality, reportC.Output)

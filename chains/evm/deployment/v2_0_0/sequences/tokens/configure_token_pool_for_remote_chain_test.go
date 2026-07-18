@@ -1,6 +1,8 @@
 package tokens_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
@@ -9,13 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	contract_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	v1_5_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/burn_mint_token_pool"
 	v1_5_1_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
@@ -212,9 +214,8 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 				},
@@ -287,9 +288,8 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 
 	// Deploy chain (includes TokenAdminRegistry)
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
@@ -375,11 +375,14 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 
 	// Verify registration: GetTokenConfig(registry, tokenB) must return pool B as active pool (required for import).
 	// If not set, the framework may not execute RegisterToken's batch in this test env; skip the rest.
-	getCfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, e.BlockChains.EVMChains()[chainSel], contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       registryAddress,
-		Args:          tokenBAddress,
-	})
+	getCfgReport, err := evmops.ExecuteRead(
+		e.OperationsBundle,
+		e.BlockChains.EVMChains()[chainSel],
+		registryAddress,
+		tar_bindings.NewTokenAdminRegistry,
+		token_admin_registry.NewReadGetTokenConfig,
+		tokenBAddress,
+	)
 	require.NoError(t, err, "GetTokenConfig should not error")
 	if getCfgReport.Output.TokenPool != poolBAddress {
 		t.Skipf("Token B active pool not set in registry (got %s, expected %s); RegisterToken batch may not execute in this env. Skipping upgrade import assertions.", getCfgReport.Output.TokenPool, poolBAddress)
@@ -501,9 +504,8 @@ func TestConfigureTokenPoolForRemoteChainUpgradeMetadataLegacyInboundDecimals(t 
 	require.NoError(t, err, "Failed to create environment")
 	chain := e.BlockChains.EVMChains()[chainSel]
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
 		},
@@ -561,11 +563,14 @@ func TestConfigureTokenPoolForRemoteChainUpgradeMetadataLegacyInboundDecimals(t 
 		},
 	)
 	require.NoError(t, err, "RegisterToken should set the legacy pool as the active pool")
-	getCfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, chain, contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       registryAddress,
-		Args:          newPool.TokenAddress,
-	})
+	getCfgReport, err := evmops.ExecuteRead(
+		e.OperationsBundle,
+		chain,
+		registryAddress,
+		tar_bindings.NewTokenAdminRegistry,
+		token_admin_registry.NewReadGetTokenConfig,
+		newPool.TokenAddress,
+	)
 	require.NoError(t, err, "GetTokenConfig should not error")
 	if getCfgReport.Output.TokenPool != legacyPoolAddress {
 		t.Skipf("active pool not set in registry (got %s, expected %s); skipping legacy import assertions", getCfgReport.Output.TokenPool, legacyPoolAddress)
@@ -683,9 +688,8 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	require.NoError(t, err, "Failed to create environment")
 
 	// Deploy chain contracts
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
@@ -749,15 +753,13 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 	// ========================================
 	// Step 3: Set AllowedFinalityConfig to enable fast finality (non-zero value)
 	// ========================================
-	_, err = operations.ExecuteOperation(
+	_, err = evmops.ExecuteWrite(
 		e.OperationsBundle,
-		token_pool.SetAllowedFinalityConfig,
 		e.BlockChains.EVMChains()[chainSel],
-		contract_utils.FunctionInput[[4]byte]{
-			ChainSelector: chainSel,
-			Address:       tokenPoolAddress,
-			Args:          finality.Config{BlockDepth: 12}.Raw(),
-		},
+		tokenPoolAddress,
+		evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool),
+		token_pool.NewWriteSetAllowedFinalityConfig,
+		finality.Config{BlockDepth: 12}.Raw(),
 	)
 	require.NoError(t, err, "SetAllowedFinalityConfig should not error")
 

@@ -26,7 +26,7 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
-	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	onrampbinding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/hooks"
@@ -177,12 +177,12 @@ func TestProposalHookForCCIPSend(t *testing.T) {
 		sequences.FeeQuoterUpdatePricesSequenceInput{
 			Address:       fqAddr,
 			ChainSelector: srcSel,
-			UpdatesByChain: fq163ops.PriceUpdates{
-				TokenPriceUpdates: []fq163ops.TokenPriceUpdate{
+			UpdatesByChain: evmfq.InternalPriceUpdates{
+				TokenPriceUpdates: []evmfq.InternalTokenPriceUpdate{
 					{SourceToken: linkAddr, UsdPerToken: big.NewInt(1e18)},
 					{SourceToken: wethAddr, UsdPerToken: big.NewInt(2e18)},
 				},
-				GasPriceUpdates: []fq163ops.GasPriceUpdate{
+				GasPriceUpdates: []evmfq.InternalGasPriceUpdate{
 					{DestChainSelector: destSel, UsdPerUnitGas: big.NewInt(1e12)},
 				},
 			},

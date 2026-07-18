@@ -16,15 +16,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/ping_pong_dapp"
+	pingpongbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	onrampbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -157,13 +159,9 @@ var ConfigurePingPongSequence = operations.NewSequence(
 		// CCIP requires addresses to be 32-byte left-padded for cross-chain messaging
 		paddedDestAddr := common.LeftPadBytes(input.DestPingPongAddr, 32)
 
-		_, err := operations.ExecuteOperation(b, pingpongdapp.SetCounterpart, chain, contract.FunctionInput[pingpongdapp.SetCounterpartArgs]{
-			ChainSelector: input.SourceSelector,
-			Address:       common.BytesToAddress(input.SourcePingPongAddr),
-			Args: pingpongdapp.SetCounterpartArgs{
-				CounterpartChainSelector: input.DestSelector,
-				CounterpartAddress:       paddedDestAddr,
-			},
+		_, err := evmops.ExecuteWrite(b, chain, common.BytesToAddress(input.SourcePingPongAddr), pingpongbindings.NewPingPongDemo, pingpongdapp.NewWriteSetCounterpart, pingpongdapp.SetCounterpartArgs{
+			CounterpartChainSelector: input.DestSelector,
+			CounterpartAddress:       paddedDestAddr,
 		})
 		if err != nil {
 			return ccipapi.PingPongOutput{}, err
@@ -284,7 +282,7 @@ func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelect
 		return common.Address{}, nil, fmt.Errorf("chain selector %d not found in provided chains", chainSelector)
 	}
 
-	onrampContract, err := onramp.NewOnRampContract(common.BytesToAddress(onRampAddr), chain.Client)
+	onrampContract, err := onrampbindings.NewOnRamp(common.BytesToAddress(onRampAddr), chain.Client)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("failed to create onramp contract instance for chain selector %d: %w", chainSelector, err)
 	}

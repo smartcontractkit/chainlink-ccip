@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -18,7 +19,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -37,8 +39,8 @@ type PoolOps interface {
 	GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error)
 	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
-	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error)
+	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]contract.WriteOutput, error)
+	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
 	Version() *semver.Version
 }
@@ -88,12 +90,12 @@ func (a *EVMPoolAdapter) DeriveTokenDecimals(e deployment.Environment, chainSele
 	// Optimization: most tokens are ERC20s, so try to get the decimals directly from
 	// the token contract first instead of going through the datastore and token pool
 	// contract.
-	report, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle, erc20.GetDecimals, chain,
-		evm_contract.FunctionInput[struct{}]{
-			ChainSelector: chainSelector,
-			Address:       common.BytesToAddress(token),
-		},
+	report, err := evmops.ExecuteRead(
+		e.OperationsBundle, chain,
+		common.BytesToAddress(token),
+		erc20_bindings.NewERC20,
+		erc20.NewReadGetDecimals,
+		struct{}{},
 	)
 	if err == nil {
 		return report.Output, nil
@@ -176,7 +178,7 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 				return sequences.OnChainOutput{}, nil
 			}
 
-			batchOp, err := evm_contract.NewBatchOperationFromWrites(output)
+			batchOp, err := contract.NewBatchOperationFromWrites(output)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
 			}
@@ -329,7 +331,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				poolRef = out.Output.Addresses[0]
 			}
 
-			var writes []evm_contract.WriteOutput
+			var writes []contract.WriteOutput
 			if !datastore_utils.IsAddressRefEmpty(poolRef) {
 				poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
 				if err != nil {
@@ -366,7 +368,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			}
 
 			if len(writes) > 0 {
-				batchOp, bErr := evm_contract.NewBatchOperationFromWrites(writes)
+				batchOp, bErr := contract.NewBatchOperationFromWrites(writes)
 				if bErr != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for token role adjustments: %w", bErr)
 				}
@@ -388,7 +390,7 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 	poolAddr common.Address,
 	tokenAddr common.Address,
 	tokenImpl tokenimpl.Token,
-) ([]evm_contract.WriteOutput, error) {
+) ([]contract.WriteOutput, error) {
 	if a.IsBurnMintPoolType(input.PoolType) {
 		tokenCaps := tokenImpl.Capabilities()
 		if !tokenCaps.ParticipatesInPoolRoleGrant {
@@ -419,7 +421,7 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	input tokensapi.DeployTokenPoolInput,
 	tokenAddr common.Address,
 	tokenImpl tokenimpl.Token,
-) ([]evm_contract.WriteOutput, error) {
+) ([]contract.WriteOutput, error) {
 	tokenCaps := tokenImpl.Capabilities()
 	if !tokenCaps.SupportsAdminRole {
 		b.Logger.Warnf(

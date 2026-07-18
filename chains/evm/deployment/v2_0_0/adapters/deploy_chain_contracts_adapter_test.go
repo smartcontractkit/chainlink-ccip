@@ -9,6 +9,8 @@ import (
 	offrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -34,14 +36,14 @@ var (
 			Address:       "0x6666666666666666666666666666666666666666",
 			ChainSelector: 5009297550715157269,
 			Metadata: seq1_6.OnRampImportConfigSequenceOutput{
-				DestChainCfgs: map[uint64]onrampops_v160.GetDestChainConfigResult{},
-				StaticConfig: onrampops_v160.StaticConfig{
+				DestChainCfgs: map[uint64]onramp_bindings.GetDestChainConfig{},
+				StaticConfig: onramp_bindings.OnRampStaticConfig{
 					ChainSelector:      5009297550715157269,
 					RmnRemote:          common.HexToAddress("0x8888888888888888888888888888888888888888"),
 					NonceManager:       common.HexToAddress("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
 					TokenAdminRegistry: common.HexToAddress("0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"),
 				},
-				DynamicConfig: onrampops_v160.DynamicConfig{
+				DynamicConfig: onramp_bindings.OnRampDynamicConfig{
 					FeeQuoter:          common.HexToAddress("0x1111111111111111111111111111111111111111"),
 					FeeAggregator:      feeAggregatorAddress,
 					AllowlistAdmin:     common.Address{},
@@ -53,15 +55,15 @@ var (
 			Address:       "0x7777777777777777777777777777777777777777",
 			ChainSelector: 5009297550715157269,
 			Metadata: seq1_6.OffRampImportConfigSequenceOutput{
-				SourceChainCfgs: map[uint64]offrampops_v160.SourceChainConfig{},
-				StaticConfig: offrampops_v160.StaticConfig{
+				SourceChainCfgs: map[uint64]offramp_bindings.OffRampSourceChainConfig{},
+				StaticConfig: offramp_bindings.OffRampStaticConfig{
 					ChainSelector:        5009297550715157269,
 					GasForCallExactCheck: 6000,
 					RmnRemote:            common.HexToAddress("0x8888888888888888888888888888888888888888"),
 					TokenAdminRegistry:   common.HexToAddress("0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"),
 					NonceManager:         common.HexToAddress("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
 				},
-				DynamicConfig: offrampops_v160.DynamicConfig{},
+				DynamicConfig: offramp_bindings.OffRampDynamicConfig{},
 			},
 		},
 	}

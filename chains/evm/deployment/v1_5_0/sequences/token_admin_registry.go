@@ -6,7 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -49,35 +50,19 @@ var ManualRegistrationSequence = operations.NewSequence(
 		// multiple times without issue.
 		writes := make([]contract.WriteOutput, 0)
 		if cfg.Administrator == (common.Address{}) {
-			report, err := operations.ExecuteOperation(b,
-				tarops.ProposeAdministrator,
-				chain,
-				contract.FunctionInput[tarops.ProposeAdministratorArgs]{
-					Address:       input.Address,
-					ChainSelector: input.ChainSelector,
-					Args: tarops.ProposeAdministratorArgs{
-						Administrator: input.AdminAddress,
-						TokenAddress:  input.TokenAddress,
-					},
-				},
-			)
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, token_admin_registry.NewTokenAdminRegistry, tarops.NewWriteProposeAdministrator, tarops.ProposeAdministratorArgs{
+				Administrator: input.AdminAddress,
+				TokenAddress:  input.TokenAddress,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute ProposeAdministrator operation on %q: %w", chain, err)
 			}
 			writes = append(writes, report.Output)
 		} else {
-			report, err := operations.ExecuteOperation(b,
-				tarops.TransferAdminRole,
-				chain,
-				contract.FunctionInput[tarops.TransferAdminRoleArgs]{
-					Address:       input.Address,
-					ChainSelector: input.ChainSelector,
-					Args: tarops.TransferAdminRoleArgs{
-						Administrator: input.AdminAddress,
-						TokenAddress:  input.TokenAddress,
-					},
-				},
-			)
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, token_admin_registry.NewTokenAdminRegistry, tarops.NewWriteTransferAdminRole, tarops.TransferAdminRoleArgs{
+				Administrator: input.AdminAddress,
+				TokenAddress:  input.TokenAddress,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute TransferAdminRole operation on %q: %w", chain, err)
 			}

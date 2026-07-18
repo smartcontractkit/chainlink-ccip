@@ -1,6 +1,8 @@
 package adapters_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"fmt"
 	"testing"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
@@ -30,6 +31,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	committee_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
+	executor_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	fee_quoter_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
+	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -73,10 +80,7 @@ func requireExecutorProxyTargetInitialized(
 	executorProxyAddr string,
 ) {
 	t.Helper()
-	targetReport, err := operations.ExecuteOperation(b, proxy.GetTarget, evmChain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: evmChain.Selector,
-		Address:       common.HexToAddress(executorProxyAddr),
-	})
+	targetReport, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(executorProxyAddr), evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), proxy.NewReadGetTarget, struct{}{})
 	require.NoError(t, err)
 	require.NotEqual(t, common.Address{1}, targetReport.Output, "executor proxy target must be initialized to the implementation, not the deploy placeholder 0x01")
 }
@@ -90,11 +94,10 @@ func deployLaneContractsToDatastore(
 	t.Helper()
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
-	create2Ref, err := contract_utils.MaybeDeployContract(
+	create2Ref, err := evmops.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, evmChain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSelector,
 			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{evmChain.DeployerKey.From}},
 		}, nil,
 	)
@@ -189,9 +192,7 @@ func assertAdapterDefaultsOnChain(
 	cvDefaults := adapter.GetDefaultCommitteeVerifierRemoteChainConfig()
 	finalityDefaults := adapter.GetDefaultFinalityConfig()
 
-	srcCfg, err := operations.ExecuteOperation(b, offramp.GetSourceChainConfig, evmChain, contract_utils.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.offRamp), Args: remoteSelector,
-	})
+	srcCfg, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.offRamp), evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offramp.NewReadGetSourceChainConfig, remoteSelector)
 	require.NoError(t, err)
 	assert.Equal(t, remoteDefaults.AllowTrafficFrom, srcCfg.Output.IsEnabled)
 	assert.Equal(t, local.router, srcCfg.Output.Router.Hex())
@@ -201,9 +202,7 @@ func assertAdapterDefaultsOnChain(
 	// Empty lane config auto-resolves default inbound/outbound CCVs to the committee verifier resolver.
 	assert.Equal(t, local.committeeVerifierResolver, srcCfg.Output.DefaultCCVs[0].Hex())
 
-	destCfg, err := operations.ExecuteOperation(b, onramp.GetDestChainConfig, evmChain, contract_utils.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.onRamp), Args: remoteSelector,
-	})
+	destCfg, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.onRamp), evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewReadGetDestChainConfig, remoteSelector)
 	require.NoError(t, err)
 	assert.Equal(t, local.router, destCfg.Output.Router.Hex())
 	assert.Equal(t, common.HexToAddress(remote.offRamp).Bytes(), destCfg.Output.OffRamp)
@@ -216,18 +215,14 @@ func assertAdapterDefaultsOnChain(
 	assert.Equal(t, remoteDefaults.TokenNetworkFeeUSDCents, destCfg.Output.TokenNetworkFeeUSDCents)
 	assert.Equal(t, remoteDefaults.TokenReceiverAllowed, destCfg.Output.TokenReceiverAllowed)
 
-	executorDestChains, err := operations.ExecuteOperation(b, executor.GetDestChains, evmChain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.executor),
-	})
+	executorDestChains, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.executor), evmops.BindAs[executor_bindings.ExecutorInterface](executor_bindings.NewExecutor), executor.NewReadGetDestChains, struct{}{})
 	require.NoError(t, err)
 	require.Len(t, executorDestChains.Output, 1)
 	assert.Equal(t, remoteSelector, executorDestChains.Output[0].DestChainSelector)
 	assert.Equal(t, remoteDefaults.ExecutorDestChainConfig.USDCentsFee, executorDestChains.Output[0].Config.UsdCentsFee)
 	assert.Equal(t, remoteDefaults.ExecutorDestChainConfig.Enabled, executorDestChains.Output[0].Config.Enabled)
 
-	fqDestCfg, err := operations.ExecuteOperation(b, fee_quoter.GetDestChainConfig, evmChain, contract_utils.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.feeQuoter), Args: remoteSelector,
-	})
+	fqDestCfg, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.feeQuoter), evmops.BindAs[fee_quoter_bindings.FeeQuoterInterface](fee_quoter_bindings.NewFeeQuoter), fee_quoter.NewReadGetDestChainConfig, remoteSelector)
 	require.NoError(t, err)
 	require.NotNil(t, fqDefaults.IsEnabled)
 	require.NotNil(t, fqDefaults.MaxDataBytes)
@@ -251,31 +246,22 @@ func assertAdapterDefaultsOnChain(
 	assert.Equal(t, *fqDefaults.NetworkFeeUSDCents, fqDestCfg.Output.NetworkFeeUSDCents)
 	assert.Equal(t, *fqDefaults.LinkFeeMultiplierPercent, fqDestCfg.Output.LinkFeeMultiplierPercent)
 
-	verifierRemoteCfg, err := operations.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, evmChain, contract_utils.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
-	})
+	verifierRemoteCfg, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.committeeVerifier), evmops.BindAs[committee_verifier_bindings.CommitteeVerifierInterface](committee_verifier_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetRemoteChainConfig, remoteSelector)
 	require.NoError(t, err)
 	assert.Equal(t, local.router, verifierRemoteCfg.Output.RemoteChainConfig.Router.Hex())
 	assert.Equal(t, cvDefaults.AllowlistEnabled, verifierRemoteCfg.Output.RemoteChainConfig.AllowlistEnabled)
 
-	verifierFee, err := operations.ExecuteOperation(b, committee_verifier.GetFee, evmChain, contract_utils.FunctionInput[committee_verifier.GetFeeArgs]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier),
-		Args: committee_verifier.GetFeeArgs{DestChainSelector: remoteSelector},
-	})
+	verifierFee, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.committeeVerifier), evmops.BindAs[committee_verifier_bindings.CommitteeVerifierInterface](committee_verifier_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetFee, committee_verifier.GetFeeArgs{DestChainSelector: remoteSelector})
 	require.NoError(t, err)
 	assert.Equal(t, cvDefaults.FeeUSDCents, verifierFee.Output.FeeUSDCents)
 	assert.Equal(t, cvDefaults.GasForVerification, verifierFee.Output.GasForVerification)
 	assert.Equal(t, uint32(cvDefaults.PayloadSizeBytes), verifierFee.Output.PayloadSizeBytes)
 
-	finalityCfg, err := operations.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, evmChain, contract_utils.FunctionInput[struct{}]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier),
-	})
+	finalityCfg, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.committeeVerifier), evmops.BindAs[committee_verifier_bindings.CommitteeVerifierInterface](committee_verifier_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetAllowedFinalityConfig, struct{}{})
 	require.NoError(t, err)
 	assert.Equal(t, finalityDefaults.Raw(), finalityCfg.Output)
 
-	sigCfg, err := operations.ExecuteOperation(b, committee_verifier.GetSignatureConfig, evmChain, contract_utils.FunctionInput[uint64]{
-		ChainSelector: evmChain.Selector, Address: common.HexToAddress(local.committeeVerifier), Args: remoteSelector,
-	})
+	sigCfg, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(local.committeeVerifier), evmops.BindAs[committee_verifier_bindings.CommitteeVerifierInterface](committee_verifier_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetSignatureConfig, remoteSelector)
 	require.NoError(t, err)
 	require.Len(t, sigCfg.Output.Signers, 1)
 	assert.Equal(t, evmChain.DeployerKey.From, sigCfg.Output.Signers[0])
@@ -355,9 +341,8 @@ func TestChainFamilyAdapter(t *testing.T) {
 			// On each chain, deploy chain contracts
 			ds := datastore.NewMemoryDataStore()
 			for _, chainSel := range []uint64{chainA, chainB} {
-				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-					ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 					},

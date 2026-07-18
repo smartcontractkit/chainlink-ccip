@@ -31,8 +31,10 @@ import (
 
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	adaptersv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
@@ -49,9 +51,8 @@ func TestFastCurse(t *testing.T) {
 	var rmnAddress, rmnRemoteAddress common.Address
 	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
 	chain := env.BlockChains.EVMChains()[chain1]
-	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
+	deployRMNOp, err := evmops.ExecuteDeploy(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
-		ChainSelector:  chain.Selector,
 		Args: rmnops1_5.ConstructorArgs{
 			RMNConfig: rmn_contract.RMNConfig{
 				BlessWeightThreshold: 2,
@@ -79,9 +80,8 @@ func TestFastCurse(t *testing.T) {
 	rmnAddress = common.HexToAddress(deployRMNOp.Output.Address)
 	// deploy RMNRemote 1.6 on chain2
 	chain = env.BlockChains.EVMChains()[chain2]
-	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
+	deployRMNRemoteOp, err := evmops.ExecuteDeploy(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
-		ChainSelector:  chain.Selector,
 		Args: rmnremoteops1_6.ConstructorArgs{
 			LocalChainSelector: chain.Selector,
 			LegacyRMN:          utils.RandomAddress(),
@@ -102,8 +102,7 @@ func TestFastCurse(t *testing.T) {
 		wNative := utils.RandomAddress()
 		rmnProxy := utils.RandomAddress()
 
-		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
-			ChainSelector:  evmChain.Selector,
+		deployRouterOp, err := evmops.ExecuteDeploy(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
 			Args: routerops1_2.ConstructorArgs{
 				WrappedNative: wNative,
@@ -128,21 +127,17 @@ func TestFastCurse(t *testing.T) {
 		} else {
 			destChainSelector = chain1
 		}
-		_, err = cldf_ops.ExecuteOperation(bundle, routerops1_2.ApplyRampUpdates, evmChain, contract.FunctionInput[routerops1_2.ApplyRampsUpdatesArgs]{
-			Address:       common.HexToAddress(routerAddr),
-			ChainSelector: evmChain.Selector,
-			Args: routerops1_2.ApplyRampsUpdatesArgs{
-				OnRampUpdates: []routerops1_2.OnRamp{
-					{
-						DestChainSelector: destChainSelector,
-						OnRamp:            onRamp,
-					},
+		_, err = evmops.ExecuteWrite(bundle, evmChain, common.HexToAddress(routerAddr), router.NewRouter, routerops1_2.NewWriteApplyRampUpdates, routerops1_2.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []routerops1_2.OnRamp{
+				{
+					DestChainSelector: destChainSelector,
+					OnRamp:            onRamp,
 				},
-				OffRampAdds: []routerops1_2.OffRamp{
-					{
-						SourceChainSelector: destChainSelector,
-						OffRamp:             offRamp,
-					},
+			},
+			OffRampAdds: []routerops1_2.OffRamp{
+				{
+					SourceChainSelector: destChainSelector,
+					OffRamp:             offRamp,
 				},
 			},
 		})
@@ -317,9 +312,8 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	var rmnAddress common.Address
 	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
 	chain := env.BlockChains.EVMChains()[chain1]
-	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
+	deployRMNOp, err := evmops.ExecuteDeploy(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
-		ChainSelector:  chain.Selector,
 		Args: rmnops1_5.ConstructorArgs{
 			RMNConfig: rmn_contract.RMNConfig{
 				BlessWeightThreshold: 2,
@@ -349,9 +343,8 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	// deploy RMNRemote 1.6 on chain2 and chain 3
 	for _, chainSel := range []uint64{chain2, chain3} {
 		chain = env.BlockChains.EVMChains()[chainSel]
-		deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
+		deployRMNRemoteOp, err := evmops.ExecuteDeploy(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
-			ChainSelector:  chain.Selector,
 			Args: rmnremoteops1_6.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
 				LegacyRMN:          utils.RandomAddress(),
@@ -377,8 +370,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 		} else {
 			rmnAddr = rmnRemoteAddresses[sel]
 		}
-		deployRMNProxyOp, err := cldf_ops.ExecuteOperation(bundle, rmnproxyops.Deploy, evmChain, contract.DeployInput[rmnproxyops.ConstructorArgs]{
-			ChainSelector:  evmChain.Selector,
+		deployRMNProxyOp, err := evmops.ExecuteDeploy(bundle, rmnproxyops.Deploy, evmChain, contract.DeployInput[rmnproxyops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnproxyops.ContractType, *semver.MustParse("1.0.0")),
 			Args: rmnproxyops.ConstructorArgs{
 				RMN: rmnAddr,
@@ -392,8 +384,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			ChainSelector: sel,
 			Address:       rmnProxy,
 		}))
-		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
-			ChainSelector:  evmChain.Selector,
+		deployRouterOp, err := evmops.ExecuteDeploy(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
 			Args: routerops1_2.ConstructorArgs{
 				WrappedNative: wNative,
@@ -426,13 +417,9 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 				})
 			}
 		}
-		_, err = cldf_ops.ExecuteOperation(bundle, routerops1_2.ApplyRampUpdates, evmChain, contract.FunctionInput[routerops1_2.ApplyRampsUpdatesArgs]{
-			Address:       common.HexToAddress(routerAddr),
-			ChainSelector: evmChain.Selector,
-			Args: routerops1_2.ApplyRampsUpdatesArgs{
-				OnRampUpdates: onRampUpdates,
-				OffRampAdds:   offRampAdds,
-			},
+		_, err = evmops.ExecuteWrite(bundle, evmChain, common.HexToAddress(routerAddr), router.NewRouter, routerops1_2.NewWriteApplyRampUpdates, routerops1_2.ApplyRampsUpdatesArgs{
+			OnRampUpdates: onRampUpdates,
+			OffRampAdds:   offRampAdds,
 		})
 		require.NoError(t, err)
 	}

@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	cs_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -101,7 +101,7 @@ func makeApplyDeployVersionedVerifierResolver(
 			}
 
 			if len(report.Output.Writes) > 0 {
-				batchOp, err := contract_utils.NewBatchOperationFromWrites(report.Output.Writes)
+				batchOp, err := contract.NewBatchOperationFromWrites(report.Output.Writes)
 				if err != nil {
 					return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to build batch operation on chain %d: %w", chainSel, err)
 				}

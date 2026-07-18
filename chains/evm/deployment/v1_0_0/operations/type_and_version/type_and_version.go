@@ -8,9 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -60,28 +62,30 @@ type TypeAndVersion struct {
 	Version *semver.Version
 }
 
-var GetTypeAndVersion = contract.NewRead(contract.ReadParams[struct{}, TypeAndVersion, *TypeAndVersionContract]{
-	Name:         "type-and-version:get-type-and-version",
-	Version:      Version,
-	Description:  "Gets the type and version of the contract",
-	ContractType: ContractType,
-	NewContract:  NewTypeAndVersionContract,
-	CallContract: func(c *TypeAndVersionContract, opts *bind.CallOpts, args struct{}) (TypeAndVersion, error) {
-		typeAndVersion, err := c.TypeAndVersion(opts)
-		if err != nil {
-			return TypeAndVersion{}, err
-		}
-		typeAndVersionValues := strings.Split(typeAndVersion, " ")
-		if len(typeAndVersionValues) < 2 {
-			return TypeAndVersion{}, fmt.Errorf("invalid type and version %s, expected format: <type> <version>", typeAndVersion)
-		}
-		version, err := semver.NewVersion(typeAndVersionValues[1])
-		if err != nil {
-			return TypeAndVersion{}, fmt.Errorf("failed parsing version %s: %w", typeAndVersionValues[1], err)
-		}
-		return TypeAndVersion{
-			Type:    cldf_deployment.ContractType(typeAndVersionValues[0]),
-			Version: version,
-		}, nil
-	},
-})
+func NewReadGetTypeAndVersion(c *TypeAndVersionContract) *cld_ops.Operation[contract.FunctionInput[struct{}], TypeAndVersion, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[struct{}, TypeAndVersion, *TypeAndVersionContract]{
+		Name:         "type-and-version:get-type-and-version",
+		Version:      Version,
+		Description:  "Gets the type and version of the contract",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(c *TypeAndVersionContract, opts *bind.CallOpts, args struct{}) (TypeAndVersion, error) {
+			typeAndVersion, err := c.TypeAndVersion(opts)
+			if err != nil {
+				return TypeAndVersion{}, err
+			}
+			typeAndVersionValues := strings.Split(typeAndVersion, " ")
+			if len(typeAndVersionValues) < 2 {
+				return TypeAndVersion{}, fmt.Errorf("invalid type and version %s, expected format: <type> <version>", typeAndVersion)
+			}
+			version, err := semver.NewVersion(typeAndVersionValues[1])
+			if err != nil {
+				return TypeAndVersion{}, fmt.Errorf("failed parsing version %s: %w", typeAndVersionValues[1], err)
+			}
+			return TypeAndVersion{
+				Type:    cldf_deployment.ContractType(typeAndVersionValues[0]),
+				Version: version,
+			}, nil
+		},
+	})
+}

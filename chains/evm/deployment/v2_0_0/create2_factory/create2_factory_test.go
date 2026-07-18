@@ -1,6 +1,8 @@
 package create2_factory_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"context"
 	"math/big"
 	"testing"
@@ -8,12 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	create2_factory_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/create2_factory"
+	create2_factory_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,13 +70,8 @@ func TestCREATE2Factory(t *testing.T) {
 	evmChains := e.BlockChains.EVMChains()
 
 	// Deploy CREATE2Factory on chain1
-	factory1Report, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle,
-		create2_factory.Deploy,
-		evmChains[chain1Sel],
-		contract.DeployInput[create2_factory.ConstructorArgs]{
+	factory1Report, err := evmops.ExecuteDeploy(e.OperationsBundle, create2_factory.Deploy, evmChains[chain1Sel], contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chain1Sel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{evmChains[chain1Sel].DeployerKey.From},
 			},
@@ -98,13 +94,8 @@ func TestCREATE2Factory(t *testing.T) {
 	require.Greater(t, balance.Int64(), int64(0), "Deployer key should be funded on chain2")
 
 	// Deploy CREATE2Factory on chain2
-	factory2Report, err := cldf_ops.ExecuteOperation(
-		e.OperationsBundle,
-		create2_factory.Deploy,
-		evmChains[chain2Sel],
-		contract.DeployInput[create2_factory.ConstructorArgs]{
+	factory2Report, err := evmops.ExecuteDeploy(e.OperationsBundle, create2_factory.Deploy, evmChains[chain2Sel], contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chain2Sel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{prevChain2DeployerKey.From},
 			},
@@ -134,35 +125,30 @@ func TestCREATE2Factory(t *testing.T) {
 
 	// Now, create a contract via the factory on each chain
 	// The resulting addresses should be the same
-	_, err = cldf_ops.ExecuteOperation(
+	_, err = evmops.ExecuteWrite(
 		e.OperationsBundle,
-		create2_factory.CreateAndTransferOwnership,
 		evmChains[chain1Sel],
-		contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-			ChainSelector: chain1Sel,
-			Address:       common.HexToAddress(factory1Report.Output.Address),
-			Args: create2_factory.CreateAndTransferOwnershipArgs{
-				ComputeAddressArgs: create2_factory.ComputeAddressArgs{
-					ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,
-					Bin:             create2_factory_latest.CREATE2FactoryBin,
-					ConstructorArgs: []any{[]common.Address{}},
-					Salt:            "salt",
-				},
-				To: evmChains[chain1Sel].DeployerKey.From,
-			},
-		})
-	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain1")
-
-	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
-		ChainSelector: chain2Sel,
-		Address:       common.HexToAddress(factory2Report.Output.Address),
-		Args: create2_factory.CreateAndTransferOwnershipArgs{
+		common.HexToAddress(factory1Report.Output.Address),
+		create2_factory_bindings.NewCREATE2Factory,
+		create2_factory.NewWriteCreateAndTransferOwnership,
+		create2_factory.CreateAndTransferOwnershipArgs{
 			ComputeAddressArgs: create2_factory.ComputeAddressArgs{
 				ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,
 				Bin:             create2_factory_latest.CREATE2FactoryBin,
 				ConstructorArgs: []any{[]common.Address{}},
 				Salt:            "salt",
 			},
+			To: evmChains[chain1Sel].DeployerKey.From,
+		},
+	)
+	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain1")
+
+	_, err = evmops.ExecuteWrite(e.OperationsBundle, evmChains[chain2Sel], common.HexToAddress(factory2Report.Output.Address), create2_factory_bindings.NewCREATE2Factory, create2_factory.NewWriteCreateAndTransferOwnership, create2_factory.CreateAndTransferOwnershipArgs{
+		ComputeAddressArgs: create2_factory.ComputeAddressArgs{
+			ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,
+			Bin:             create2_factory_latest.CREATE2FactoryBin,
+			ConstructorArgs: []any{[]common.Address{}},
+			Salt:            "salt",
 		},
 	})
 	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain2")

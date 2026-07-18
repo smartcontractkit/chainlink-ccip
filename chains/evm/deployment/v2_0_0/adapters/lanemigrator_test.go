@@ -1,6 +1,8 @@
 package adapters_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -9,15 +11,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	fee_quoter_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -53,9 +54,8 @@ func TestLaneMigrator(t *testing.T) {
 			// On each chain, deploy chain contracts
 			ds := datastore.NewMemoryDataStore()
 			for _, chainSel := range []uint64{chainA, chainB} {
-				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-					ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 					},
@@ -145,11 +145,7 @@ func TestLaneMigrator(t *testing.T) {
 					Version: fee_quoter.Version,
 				}, chainA, evm_datastore_utils.ToEVMAddress)
 			require.NoError(t, err)
-			opOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fee_quoter.GetDestChainConfig, evmChain1, contract_utils.FunctionInput[uint64]{
-				ChainSelector: chainA,
-				Address:       feeQuoterAddr,
-				Args:          chainB,
-			})
+			opOut, err := evmops.ExecuteRead(e.OperationsBundle, evmChain1, feeQuoterAddr, evmops.BindAs[fee_quoter_bindings.FeeQuoterInterface](fee_quoter_bindings.NewFeeQuoter), fee_quoter.NewReadGetDestChainConfig, chainB)
 			require.NoError(t, err)
 			destConfig := opOut.Output
 			require.Equal(t, uint32(15_000_000), destConfig.MaxPerMsgGasLimit) // MaxPerMsgGasLimit should be 15 million for Arbitrum

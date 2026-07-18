@@ -1,13 +1,15 @@
 package create2_factory
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	create2_factory_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/create2_factory"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -58,13 +60,9 @@ var configureCREATE2Factory = cldf_ops.NewSequence(
 	"Configures the CREATE2Factory contract",
 	func(b operations.Bundle, chain evm.Chain, input ConfigureCREATE2FactoryInput[common.Address]) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)
-		configureReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ApplyAllowListUpdates, chain, contract.FunctionInput[create2_factory.ApplyAllowListUpdatesArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CREATE2Factory,
-			Args: create2_factory.ApplyAllowListUpdatesArgs{
-				Adds:    input.AllowListAdds,
+		configureReport, err := evmops.ExecuteWrite(b, chain, input.CREATE2Factory, create2_factory_bindings.NewCREATE2Factory, create2_factory.NewWriteApplyAllowListUpdates, create2_factory.ApplyAllowListUpdatesArgs{
+			Adds:    input.AllowListAdds,
 				Removes: input.AllowListRemoves,
-			},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure CREATE2Factory: %w", err)

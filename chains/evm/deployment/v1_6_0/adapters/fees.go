@@ -6,18 +6,21 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	adaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	fqbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	fqbindings163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -65,16 +68,7 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", src)
 	}
 
-	report, err := operations.ExecuteOperation(
-		b,
-		onramp.GetDynamicConfig,
-		chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: src,
-			Address:       onRampAddr,
-			Args:          struct{}{},
-		},
-	)
+	report, err := evmops.ExecuteRead(b, chain, onRampAddr, evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewReadGetDynamicConfig, struct{}{})
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to execute GetDynamicConfig operation for OnRamp at %s on chain selector %d with dst %d: %w", onRampAddr.Hex(), src, dst, err)
 	}
@@ -84,15 +78,7 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 		return datastore.AddressRef{}, fmt.Errorf("onRamp at %s on chain selector %d returned zero address for FeeQuoter for dst %d", onRampAddr.Hex(), src, dst)
 	}
 
-	tvReport, err := operations.ExecuteOperation(
-		b,
-		type_and_version.GetTypeAndVersion,
-		chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: src,
-			Address:       fqAddr,
-		},
-	)
+	tvReport, err := evmops.ExecuteRead(b, chain, fqAddr, type_and_version.NewTypeAndVersionContract, type_and_version.NewReadGetTypeAndVersion, struct{}{})
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to get typeAndVersion for FeeQuoter at %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -124,7 +110,7 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chai
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to convert FeeQuoter address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
-	fq, err := fee_quoter.NewFeeQuoterContract(fqAddr, chain.Client)
+	fq, err := fqbindings.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
 		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -182,7 +168,7 @@ func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastor
 					if feeCfg == nil || !feeCfg.IsEnabled {
 						val.TokensToUseDefaultFeeConfigs = append(
 							val.TokensToUseDefaultFeeConfigs,
-							fqops.TokenTransferFeeConfigRemoveArgs{
+							fqbindings163.FeeQuoterTokenTransferFeeConfigRemoveArgs{
 								DestChainSelector: dst,
 								Token:             token,
 							},
@@ -190,12 +176,12 @@ func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastor
 					} else {
 						val.TokenTransferFeeConfigArgs = append(
 							val.TokenTransferFeeConfigArgs,
-							fqops.TokenTransferFeeConfigArgs{
+							fqbindings163.FeeQuoterTokenTransferFeeConfigArgs{
 								DestChainSelector: dst,
-								TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
+								TokenTransferFeeConfigs: []fqbindings163.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 									{
 										Token: token,
-										TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+										TokenTransferFeeConfig: fqbindings163.FeeQuoterTokenTransferFeeConfig{
 											DestBytesOverhead: feeCfg.DestBytesOverhead,
 											DestGasOverhead:   feeCfg.DestGasOverhead,
 											MinFeeUSDCents:    feeCfg.MinFeeUSDCents,
@@ -255,7 +241,7 @@ func (a *FeesAdapter) GetOnchainDestChainConfig(b operations.Bundle, chains cldf
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to convert FeeQuoter address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
-	fq, err := fee_quoter.NewFeeQuoterContract(fqAddr, chain.Client)
+	fq, err := fqbindings.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
@@ -265,7 +251,7 @@ func (a *FeesAdapter) GetOnchainDestChainConfig(b operations.Bundle, chains cldf
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get dest chain config from FeeQuoter at %s for src %d, dst %d: %w", fqAddr.Hex(), src, dst, err)
 	}
 
-	return evmseqV1_6_0.ReverseTranslateFQ(fqops.DestChainConfig{
+	return evmseqV1_6_0.ReverseTranslateFQ(fqbindings163.FeeQuoterDestChainConfig{
 		IsEnabled:                         onchain.IsEnabled,
 		MaxNumberOfTokensPerMsg:           onchain.MaxNumberOfTokensPerMsg,
 		MaxDataBytes:                      onchain.MaxDataBytes,
@@ -306,9 +292,9 @@ func (a *FeesAdapter) ApplyDestChainConfigUpdates(_ datastore.DataStore, feeRef 
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert FeeQuoter address ref to EVM address: %w", err)
 			}
 
-			args := map[uint64][]fqops.DestChainConfigArgs{}
+			args := map[uint64][]fqbindings163.FeeQuoterDestChainConfigArgs{}
 			for dst, cfg := range input.Settings {
-				args[src] = append(args[src], fqops.DestChainConfigArgs{
+				args[src] = append(args[src], fqbindings163.FeeQuoterDestChainConfigArgs{
 					DestChainSelector: dst,
 					DestChainConfig:   evmseqV1_6_0.TranslateFQ(cfg),
 				})

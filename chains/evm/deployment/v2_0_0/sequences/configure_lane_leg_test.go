@@ -3,12 +3,20 @@ package sequences_test
 import (
 	"testing"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/stretchr/testify/require"
 
+	router_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	cv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
+	executor_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -16,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	onramp2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
@@ -24,10 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	onramp2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	onramp16_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/message_hasher"
 	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -54,9 +61,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 			evmChain2 := e.BlockChains.EVMChains()[remoteChainSelector]
 
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
@@ -102,9 +108,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				}
 			}
 
-			create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err = evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  remoteChainSelector,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain2.DeployerKey.From},
 				},
@@ -254,30 +259,18 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			require.NoError(t, err, "ConfigureLaneLegAsDest should not error")
 
 			// Check onRamps on router
-			onRampOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          remoteChainSelector,
-			})
+			onRampOnRouter, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(routerAddress), evmops.BindAs[router_bindings.RouterInterface](router_bindings.NewRouter), router.NewReadGetOnRamp, remoteChainSelector)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, onRampAddr, onRampOnRouter.Output.Hex(), "OnRamp address on router should match OnRamp address")
 
 			// Check offRamps on router
-			offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          nil,
-			})
+			offRampsOnRouter, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(routerAddress), router_bindings.NewRouter, router.NewReadGetOffRamps, struct{}{})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, offRampsOnRouter.Output, 1, "There should be one OffRamp on the router for the remote chain")
 			require.Equal(t, offRampAddr, offRampsOnRouter.Output[0].OffRamp.Hex(), "OffRamp address on router should match OffRamp address")
 
 			// Check sourceChainConfig on OffRamp
-			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(offRampAddr),
-				Args:          remoteChainSelector,
-			})
+			sourceChainConfig, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(offRampAddr), evmops.BindAs[offramp_bindings.OffRampInterface](offramp_bindings.NewOffRamp), offramp.NewReadGetSourceChainConfig, remoteChainSelector)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, common.LeftPadBytes(remoteChainDef.OnRamp, 32), sourceChainConfig.Output.OnRamps[0], "OnRamp in source chain config should match OnRamp address")
 			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
@@ -286,11 +279,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			require.Equal(t, routerAddress, sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
 			// Check destChainConfig on OnRamp
-			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(onRampAddr),
-				Args:          remoteChainSelector,
-			})
+			destChainConfig, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(onRampAddr), evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewReadGetDestChainConfig, remoteChainSelector)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, routerAddress, destChainConfig.Output.Router.Hex(), "Router in dest chain config should match Router address")
 			require.Equal(t, remoteChainDef.OffRamp, destChainConfig.Output.OffRamp, "OffRamp in dest chain config should match CCIPMessageDest")
@@ -299,21 +288,13 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			require.Equal(t, committeeVerifierAddr, destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
 
 			// Check destChainConfig on CommitteeVerifier
-			committeeVerifierRemoteChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
-				Args:          remoteChainSelector,
-			})
+			committeeVerifierRemoteChainConfig, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(committeeVerifierAddr), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetRemoteChainConfig, remoteChainSelector)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.RemoteChainConfig.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
 			require.False(t, committeeVerifierRemoteChainConfig.Output.RemoteChainConfig.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
 
 			// Check signature quorum on CommitteeVerifier
-			signatureQuorumReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
-				Args:          remoteChainSelector,
-			})
+			signatureQuorumReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(committeeVerifierAddr), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetSignatureConfig, remoteChainSelector)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, uint8(1), signatureQuorumReport.Output.Threshold, "Threshold in CommitteeVerifier signature config should be 1")
 			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
@@ -326,20 +307,14 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			require.Equal(t, committeeVerifierAddr, outboundImpl.Hex(), "Outbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
 			// Check inbound implementation on CommitteeVerifierResolver
-			versionTagReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.VersionTag, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(committeeVerifierAddr),
-			})
+			versionTagReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(committeeVerifierAddr), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadVersionTag, struct{}{})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			inboundImpl, err := boundResolver.GetInboundImplementation(&bind.CallOpts{Context: t.Context()}, versionTagReport.Output[:])
 			require.NoError(t, err, "GetInboundImplementationForVersion should not error")
 			require.Equal(t, committeeVerifierAddr, inboundImpl.Hex(), "Inbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
 			// Check dest chains on Executor
-			executorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(executorAddr),
-			})
+			executorDestChains, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(executorAddr), evmops.BindAs[executor_bindings.ExecutorInterface](executor_bindings.NewExecutor), executor.NewReadGetDestChains, struct{}{})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, executorDestChains.Output, 1, "There should be one dest chain on Executor")
 			expectedExecConfig := testsetup.CreateBasicExecutorDestChainConfig()
@@ -382,19 +357,11 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				},
 			}
 
-			fee, err := operations.ExecuteOperation(e.OperationsBundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          ccipSendArgs,
-			})
+			fee, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, common.HexToAddress(routerAddress), router_bindings.NewRouter, router.NewReadGetFee, ccipSendArgs)
 			require.NoError(t, err, "ExecuteOperation should not error")
 
 			ccipSendArgs.Value = fee.Output
-			_, err = operations.ExecuteOperation(e.OperationsBundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
-				ChainSelector: evmChain.Selector,
-				Address:       common.HexToAddress(routerAddress),
-				Args:          ccipSendArgs,
-			})
+			_, err = evmops.ExecuteWrite(e.OperationsBundle, evmChain, common.HexToAddress(routerAddress), router_bindings.NewRouter, router.NewWriteCCIPSend, ccipSendArgs)
 			require.NoError(t, err, "ExecuteOperation should not error")
 		})
 	}
@@ -412,9 +379,8 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 	evmChain2 := e.BlockChains.EVMChains()[remoteChainSelector]
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{evmChain.DeployerKey.From},
 		},
@@ -457,9 +423,8 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		}
 	}
 
-	create2FactoryRef, err = contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err = evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain2, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  remoteChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{evmChain2.DeployerKey.From},
 		},
@@ -587,17 +552,16 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		remoteChainDef.Router = common.HexToAddress(remoteRouterAddress).Bytes()
 		// add an onramp with version 1.6.0
 		// deploy onramp 1.6.0
-		out, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), onramp2.Deploy, evmChain, contract_utils.DeployInput[onramp2.ConstructorArgs]{
-			ChainSelector:  chainSelector,
+		out, err := evmops.ExecuteDeploy(testsetup.BundleWithFreshReporter(e.OperationsBundle), onramp2.Deploy, evmChain, contract.DeployInput[onramp2.ConstructorArgs]{
 			TypeAndVersion: onramp2.TypeAndVersion,
 			Args: onramp2.ConstructorArgs{
-				StaticConfig: onramp2.StaticConfig{
+				StaticConfig: onramp16_bindings.OnRampStaticConfig{
 					ChainSelector:      chainSelector,
 					RmnRemote:          utils.RandomAddress(),
 					NonceManager:       utils.RandomAddress(),
 					TokenAdminRegistry: utils.RandomAddress(),
 				},
-				DynamicConfig: onramp2.DynamicConfig{
+				DynamicConfig: onramp16_bindings.OnRampDynamicConfig{
 					FeeQuoter:     utils.RandomAddress(),
 					FeeAggregator: utils.RandomAddress(),
 				},
@@ -606,15 +570,11 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		require.NoError(t, err)
 		deployedOnRampAddr := common.HexToAddress(out.Output.Address)
 		// add this onramp to the router
-		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(routerAddress),
-			Args: router.ApplyRampsUpdatesArgs{
-				OnRampUpdates: []router.OnRamp{
-					{
-						DestChainSelector: remoteChainSelector,
-						OnRamp:            deployedOnRampAddr,
-					},
+		_, err = evmops.ExecuteWrite(testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, common.HexToAddress(routerAddress), router_bindings.NewRouter, router.NewWriteApplyRampUpdates, router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{
+				{
+					DestChainSelector: remoteChainSelector,
+					OnRamp:            deployedOnRampAddr,
 				},
 			},
 		})
@@ -627,15 +587,11 @@ func TestMaybeAddRouterOnRampsAddsConfigArg(t *testing.T) {
 		localChainDef.Router = common.HexToAddress(testRouterAddress).Bytes()
 		remoteChainDef.Router = common.HexToAddress(remoteTestRouterAddr).Bytes()
 
-		_, err = operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.ApplyRampUpdates, evmChain, contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
-			ChainSelector: chainSelector,
-			Address:       common.HexToAddress(testRouterAddress),
-			Args: router.ApplyRampsUpdatesArgs{
-				OnRampUpdates: []router.OnRamp{
-					{
-						DestChainSelector: remoteChainSelector,
-						OnRamp:            deployedOnRampAddr,
-					},
+		_, err = evmops.ExecuteWrite(testsetup.BundleWithFreshReporter(e.OperationsBundle), evmChain, common.HexToAddress(testRouterAddress), router_bindings.NewRouter, router.NewWriteApplyRampUpdates, router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{
+				{
+					DestChainSelector: remoteChainSelector,
+					OnRamp:            deployedOnRampAddr,
 				},
 			},
 		})

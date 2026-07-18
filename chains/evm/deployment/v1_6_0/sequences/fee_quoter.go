@@ -11,10 +11,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	gobindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -22,13 +24,13 @@ import (
 type FeeQuoterApplyDestChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []fqops.DestChainConfigArgs
+	UpdatesByChain []gobindings.FeeQuoterDestChainConfigArgs
 }
 
 type FeeQuoterUpdatePricesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain fqops.PriceUpdates
+	UpdatesByChain gobindings.InternalPriceUpdates
 }
 
 type FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput struct {
@@ -47,13 +49,13 @@ type FeeQuoterImportConfigSequenceInput struct {
 type FeeQuoterImportConfigSequenceOutput struct {
 	RemoteChainCfgs map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain
 	PriceUpdaters   []common.Address
-	StaticCfg       fqops.StaticConfig
+	StaticCfg       gobindings.FeeQuoterStaticConfig
 	TokenPrices     map[common.Address]*big.Int
 }
 
 type FeeQuoterImportConfigSequenceOutputPerRemoteChain struct {
-	DestChainCfg         fqops.DestChainConfig
-	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
+	DestChainCfg         gobindings.FeeQuoterDestChainConfig
+	TokenTransferFeeCfgs map[common.Address]gobindings.FeeQuoterTokenTransferFeeConfig
 	GasPrice             *big.Int
 }
 
@@ -68,11 +70,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
-			})
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewWriteApplyDestChainConfigUpdates, input.UpdatesByChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyDestChainConfigUpdatesOp on %s: %w", chain, err)
 			}
@@ -96,11 +94,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
-			})
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewWriteUpdatePrices, input.UpdatesByChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterUpdatePricesOp on %s: %w", chain, err)
 			}
@@ -124,11 +118,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, fqops.ApplyTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.Address,
-				Args:          input.UpdatesByChain,
-			})
+			report, err := evmops.ExecuteWrite(b, chain, input.Address, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewWriteApplyTokenTransferFeeConfigUpdates, input.UpdatesByChain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdatesOp on %s: %w", chain, err)
 			}
@@ -156,29 +146,21 @@ var (
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for FeeQuoter %s on chain %d (%s)", fqAddress.Hex(), chainSelector, evmChain.Name())
 			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain)
-			destChainConfigs := make(map[uint64]fqops.DestChainConfig)
+			destChainConfigs := make(map[uint64]gobindings.FeeQuoterDestChainConfig)
 			var destChainMu sync.Mutex
 			destGrp, _ := errgroup.WithContext(b.GetContext())
 			destGrp.SetLimit(10)
 			gasPricePerChain := make(map[uint64]*big.Int)
 			gasPriceMu := sync.Mutex{}
 			// fetch fee tokens
-			feeTokensRep, err := operations.ExecuteOperation(b, fqops.GetFeeTokens, evmChain, contract.FunctionInput[struct{}]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
-				Args:          struct{}{},
-			})
+			feeTokensRep, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetFeeTokens, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee tokens from feequoter %s on chain %s: %w",
 					fqAddress.Hex(), evmChain.String(), err)
 			}
 			for _, remoteChain := range in.RemoteChains {
 				destGrp.Go(func() error {
-					opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
-						Address:       fqAddress,
-						ChainSelector: chainSelector,
-						Args:          remoteChain,
-					})
+					opsOutput, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetDestChainConfig, remoteChain)
 					if err != nil {
 						return fmt.Errorf("failed to get dest chain config for "+
 							"remote chain %d from feequoter %s on chain %d: %w",
@@ -190,11 +172,7 @@ var (
 					destChainMu.Lock()
 					destChainConfigs[remoteChain] = opsOutput.Output
 					destChainMu.Unlock()
-					gasPriceOutput, err := operations.ExecuteOperation(b, fqops.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
-						Address:       fqAddress,
-						ChainSelector: chainSelector,
-						Args:          remoteChain,
-					})
+					gasPriceOutput, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetDestinationChainGasPrice, remoteChain)
 					if err != nil {
 						return fmt.Errorf("failed to get destination chain gas price for "+
 							"remote chain %d from feequoter %s on chain %d: %w",
@@ -210,7 +188,7 @@ var (
 				return sequences.OnChainOutput{}, err
 			}
 
-			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
+			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]gobindings.FeeQuoterTokenTransferFeeConfig)
 			var ttfcMu sync.Mutex
 			tokenGrp, _ := errgroup.WithContext(b.GetContext())
 			tokenGrp.SetLimit(10)
@@ -223,7 +201,7 @@ var (
 						return nil // skip if dest chain config is not enabled
 					}
 
-					tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
+					tokenTransferFeeCfgs := make(map[common.Address]gobindings.FeeQuoterTokenTransferFeeConfig)
 					var tokenTransferFeeCfgsMu sync.Mutex
 					innerTokenGrp, _ := errgroup.WithContext(b.GetContext())
 					innerTokenGrp.SetLimit(10)
@@ -232,14 +210,10 @@ var (
 							continue
 						}
 						innerTokenGrp.Go(func() error {
-							opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
-								contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
-									Address:       fqAddress,
-									ChainSelector: chainSelector,
-									Args: fqops.GetTokenTransferFeeConfigArgs{
-										Token:             token,
-										DestChainSelector: remoteChain,
-									},
+							opsOutput, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetTokenTransferFeeConfig,
+								fqops.GetTokenTransferFeeConfigArgs{
+									Token:             token,
+									DestChainSelector: remoteChain,
 								})
 							if err != nil {
 								return fmt.Errorf("failed to get token transfer fee config for "+
@@ -276,29 +250,19 @@ var (
 					GasPrice:             gasPricePerChain[remoteChain],
 				}
 			}
-			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[struct{}]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
-			})
+			staticCfgOutput, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetStaticConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
-			priceUpdaters, err := operations.ExecuteOperation(b, fqops.GetAllAuthorizedCallers, evmChain, contract.FunctionInput[struct{}]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
-			})
+			priceUpdaters, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetAllAuthorizedCallers, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get all authorized callers from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
 
 			// get token prices for fee tokens
-			tokenPrices, err := operations.ExecuteOperation(b, fqops.GetTokenPrices, evmChain, contract.FunctionInput[[]common.Address]{
-				Address:       fqAddress,
-				ChainSelector: chainSelector,
-				Args:          feeTokensRep.Output,
-			})
+			tokenPrices, err := evmops.ExecuteRead(b, evmChain, fqAddress, evmops.BindAs[gobindings.FeeQuoterInterface](gobindings.NewFeeQuoter), fqops.NewReadGetTokenPrices, feeTokensRep.Output)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token prices from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)

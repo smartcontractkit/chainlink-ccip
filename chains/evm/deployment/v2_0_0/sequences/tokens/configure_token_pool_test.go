@@ -1,13 +1,13 @@
 package tokens_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 )
 
 func TestConfigurePool(t *testing.T) {
@@ -52,9 +53,8 @@ func TestConfigurePool(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
-			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-				ChainSelector:  chainSel,
 				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 				},
@@ -96,14 +96,13 @@ func TestConfigurePool(t *testing.T) {
 			require.Len(t, configureReport.Output.Addresses, 0, "Expected 0 addresses in output")
 
 			// Check dynamic config
-			getDynamicConfigReport, err := operations.ExecuteOperation(
+			getDynamicConfigReport, err := evmops.ExecuteRead(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       input.TokenPoolAddress,
-				},
+				input.TokenPoolAddress,
+				evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool),
+				token_pool.NewReadGetDynamicConfig,
+				struct{}{},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.RouterAddress, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")

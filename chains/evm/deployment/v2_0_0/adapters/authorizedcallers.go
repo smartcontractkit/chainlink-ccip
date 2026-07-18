@@ -4,16 +4,18 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -41,41 +43,32 @@ const evmCallerLen = 20
 // without a fresh reporter the read would stay stuck at the first observed state.
 type EVMAuthorizedCallersAdapter struct {
 	addrCache map[string]common.Address
-	getAllOp  *cldf_ops.Operation[contract.FunctionInput[struct{}], []common.Address, cldf_evm.Chain]
-	// execApply executes the contract-specific applyAuthorizedCallerUpdates operation
-	// through the ops bundle so MCMS metadata is accurate.
-	execApply func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error)
+	execGetAll func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address) ([]common.Address, error)
+	execApply  func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error)
 }
 
 // NewEVMAuthorizedCallersAdapter constructs an EVMAuthorizedCallersAdapter backed by
-// per-contract generated operations. applyOp must be the generated
-// applyAuthorizedCallerUpdates write operation; getAllOp the generated
-// getAllAuthorizedCallers read operation; buildArgs converts chain-agnostic address
+// per-contract generated operations. newApplyOp must be the generated
+// applyAuthorizedCallerUpdates write factory; newGetAllOp the generated
+// getAllAuthorizedCallers read factory; buildArgs converts chain-agnostic address
 // slices into the contract-specific ARGS struct.
-//
-// Example (adapters/init.go):
-//
-//	NewEVMAuthorizedCallersAdapter(
-//	    rmnops.ApplyAuthorizedCallerUpdates,
-//	    rmnops.GetAllAuthorizedCallers,
-//	    func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-//	        return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
-//	    },
-//	)
-func NewEVMAuthorizedCallersAdapter[ARGS any](
-	applyOp *cldf_ops.Operation[contract.FunctionInput[ARGS], contract.WriteOutput, cldf_evm.Chain],
-	getAllOp *cldf_ops.Operation[contract.FunctionInput[struct{}], []common.Address, cldf_evm.Chain],
+func NewEVMAuthorizedCallersAdapter[C, ARGS any](
+	newContract func(common.Address, bind.ContractBackend) (C, error),
+	newApplyOp func(C) *cldf_ops.Operation[contract.FunctionInput[ARGS], contract.WriteOutput, cldf_evm.Chain],
+	newGetAllOp func(C) *cldf_ops.Operation[contract.FunctionInput[struct{}], []common.Address, cldf_evm.Chain],
 	buildArgs func(added, removed []common.Address) ARGS,
 ) *EVMAuthorizedCallersAdapter {
 	return &EVMAuthorizedCallersAdapter{
 		addrCache: make(map[string]common.Address),
-		getAllOp:  getAllOp,
+		execGetAll: func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address) ([]common.Address, error) {
+			report, err := evmops.ExecuteRead(b, chain, addr, newContract, newGetAllOp, struct{}{})
+			if err != nil {
+				return nil, fmt.Errorf("getAllAuthorizedCallers at %s: %w", addr.Hex(), err)
+			}
+			return report.Output, nil
+		},
 		execApply: func(b cldf_ops.Bundle, chain cldf_evm.Chain, addr common.Address, added, removed []common.Address) (sequtil.OnChainOutput, error) {
-			report, err := cldf_ops.ExecuteOperation(b, applyOp, chain, contract.FunctionInput[ARGS]{
-				ChainSelector: chain.Selector,
-				Address:       addr,
-				Args:          buildArgs(added, removed),
-			})
+			report, err := evmops.ExecuteWrite(b, chain, addr, newContract, newApplyOp, buildArgs(added, removed))
 			if err != nil {
 				return sequtil.OnChainOutput{}, fmt.Errorf("applyAuthorizedCallerUpdates on %s: %w", addr.Hex(), err)
 			}
@@ -128,19 +121,15 @@ func (a *EVMAuthorizedCallersAdapter) GetAllAuthorizedCallers(
 		return nil, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
 	readBundle := cldf_ops.NewBundle(e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
-	report, err := cldf_ops.ExecuteOperation(readBundle, a.getAllOp, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       addr,
-		Args:          struct{}{},
-	})
+	callers, err := a.execGetAll(readBundle, chain, addr)
 	if err != nil {
 		return nil, fmt.Errorf("getAllAuthorizedCallers at %s on chain %d: %w", addr.Hex(), selector, err)
 	}
-	callers := make([]api.Caller, len(report.Output))
-	for i, c := range report.Output {
-		callers[i] = c.Bytes()
+	out := make([]api.Caller, len(callers))
+	for i, c := range callers {
+		out[i] = c.Bytes()
 	}
-	return callers, nil
+	return out, nil
 }
 
 // ApplyAuthorizedCallerUpdates returns the sequence that calls applyAuthorizedCallerUpdates

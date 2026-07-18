@@ -1,6 +1,8 @@
 package adapters_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
@@ -10,12 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
 	burn_mint_token_pool_v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
@@ -104,9 +105,8 @@ func TestTokenAdapter(t *testing.T) {
 			// On each chain, deploy chain contracts & a token + token pool
 			ds := datastore.NewMemoryDataStore()
 			for _, chainSel := range []uint64{chainA, chainB} {
-				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-					ChainSelector:  chainSel,
 					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 					},
@@ -140,7 +140,6 @@ func TestTokenAdapter(t *testing.T) {
 							TokenSymbol:      "TEST",
 							Decimals:         18,
 							Router: datastore.AddressRef{
-								ChainSelector: chainSel,
 								Type:          datastore.ContractType(router.ContractType),
 								Version:       semver.MustParse("1.2.0"),
 							},
@@ -230,13 +229,15 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainA,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
-							Version:   burn_mint_token_pool.Version,
-							Qualifier: "TEST",
+							ChainSelector: chainA,
+							Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
+							Version:       burn_mint_token_pool.Version,
+							Qualifier:     "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
-							Type:    datastore.ContractType(token_admin_registry.ContractType),
-							Version: semver.MustParse("1.5.0"),
+							ChainSelector: chainA,
+							Type:          datastore.ContractType(token_admin_registry.ContractType),
+							Version:       semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							chainB: getRemoteChainConfig(remoteTokenForChainB, burn_mint_token_pool_v1_6_1.Version, []datastore.AddressRef{
@@ -250,13 +251,14 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainB,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType),
-							Version:   burn_mint_token_pool_v1_6_1.Version,
-							Qualifier: "TEST",
+							Type:          datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType),
+							Version:       burn_mint_token_pool_v1_6_1.Version,
+							Qualifier:     "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
-							Type:    datastore.ContractType(token_admin_registry.ContractType),
-							Version: semver.MustParse("1.5.0"),
+							ChainSelector: chainB,
+							Type:          datastore.ContractType(token_admin_registry.ContractType),
+							Version:       semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							chainA: getRemoteChainConfig(remoteTokenForChainA, burn_mint_token_pool.Version, nil),
@@ -289,44 +291,33 @@ func TestTokenAdapter(t *testing.T) {
 				}
 
 				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
 					Type:          tokenPoolType,
 					Version:       version,
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed token pool ref in datastore")
 				tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
 					Type:          tokenType,
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed token ref in datastore")
 				registryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
 					Type:          datastore.ContractType(token_admin_registry.ContractType),
 					Version:       semver.MustParse("1.5.0"),
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
 				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
 					Version:       committee_verifier.Version,
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
 
-				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       registryAddr,
-					Args:          tokenAddr,
-				})
+				tokenConfigReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, registryAddr, tar_bindings.NewTokenAdminRegistry, token_admin_registry.NewReadGetTokenConfig, tokenAddr)
 				require.NoError(t, err, "Failed to get token config from token admin registry")
 				require.Equal(t, tokenPoolAddr, tokenConfigReport.Output.TokenPool, "Token pool address in registry should match deployed token pool address")
 				require.Equal(t, evmChain.DeployerKey.From, tokenConfigReport.Output.Administrator, "Deployer should be the admin of the token in the registry")
 
-				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       tokenPoolAddr,
-				})
+				chainSupportReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, tokenPoolAddr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetSupportedChains, struct{}{})
 				require.NoError(t, err, "Failed to get supported chains from token pool")
 				require.Len(t, chainSupportReport.Output, 1, "There should be 1 supported remote chain in the token pool")
 				var remoteChainSel uint64
@@ -339,12 +330,8 @@ func TestTokenAdapter(t *testing.T) {
 
 				// GetCurrentRateLimiterState is only available in version 2.0.0+
 				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
-					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
-						ChainSelector: chainSel,
-						Address:       tokenPoolAddr,
-						Args: token_pool.GetCurrentRateLimiterStateArgs{
-							RemoteChainSelector: remoteChainSel,
-						},
+					rateLimiterStateReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, tokenPoolAddr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetCurrentRateLimiterState, token_pool.GetCurrentRateLimiterStateArgs{
+						RemoteChainSelector: remoteChainSel,
 					})
 					require.NoError(t, err, "Failed to get rate limiter config from token pool")
 					currentStates := rateLimiterStateReport.Output
@@ -391,9 +378,8 @@ func TestTokenExpansion(t *testing.T) {
 
 	ds := datastore.NewMemoryDataStore()
 	for _, chainSel := range []uint64{chainA, chainB} {
-		create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
@@ -471,7 +457,6 @@ func TestTokenExpansion(t *testing.T) {
 
 		// Verify token exists in datastore and on-chain
 		tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: chainSel,
 			Type:          datastore.ContractType(bnm_drip_v1_0.ContractType),
 			Qualifier:     data.symbol,
 		}, chainSel, evm_datastore_utils.ToEVMAddress)
@@ -495,7 +480,6 @@ func TestTokenExpansion(t *testing.T) {
 
 		// Verify token pool exists in datastore
 		poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: chainSel,
 			Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
 			Version:       burn_mint_token_pool.Version,
 			Qualifier:     data.symbol,
@@ -503,18 +487,12 @@ func TestTokenExpansion(t *testing.T) {
 		require.NoError(t, err, "Token pool should exist in datastore")
 
 		// Verify token pool points to the correct token
-		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
-		})
+		getTokenReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, poolAddr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetToken, struct{}{})
 		require.NoError(t, err)
 		require.Equal(t, tokenAddr, getTokenReport.Output, "Token pool should point to the deployed token")
 
 		// Verify token pool decimals
-		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
-		})
+		getDecimalsReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, poolAddr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetTokenDecimals, struct{}{})
 		require.NoError(t, err)
 		require.Equal(t, uint8(18), getDecimalsReport.Output, "Token pool decimals should match token decimals")
 
@@ -550,9 +528,8 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	mcmsRegistry := changesets.GetRegistry()
 	ds := datastore.NewMemoryDataStore()
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
@@ -574,13 +551,11 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 
 	// Resolve both routers up-front so we can assert against their addresses.
 	prodRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSel,
 		Type:          datastore.ContractType(router.ContractType),
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err, "production Router should be in datastore after DeployChainContracts")
 
 	testRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSel,
 		Type:          datastore.ContractType(router.TestRouterContractType),
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err, "TestRouter should be in datastore when DeployTestRouter=true")
@@ -648,19 +623,15 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	apply(t, reconcileOpts{}, true, "fresh TokenExpansion (no reconcile opts)")
 
 	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSel,
 		Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
 		Version:       burn_mint_token_pool.Version,
 		Qualifier:     symbol,
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
-	readDynamicConfig := func(t *testing.T) token_pool.GetDynamicConfigResult {
+	readDynamicConfig := func(t *testing.T) tp_bindings.GetDynamicConfig {
 		t.Helper()
-		report, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
-			ChainSelector: chainSel,
-			Address:       poolAddr,
-		})
+		report, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, poolAddr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetDynamicConfig, struct{}{})
 		require.NoError(t, err)
 		return report.Output
 	}
@@ -713,9 +684,8 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 	mcmsRegistry := changesets.GetRegistry()
 	ds := datastore.NewMemoryDataStore()
 
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSel,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
@@ -736,13 +706,11 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	prodRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSel,
 		Type:          datastore.ContractType(router.ContractType),
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
 	testRouter, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSel,
 		Type:          datastore.ContractType(router.TestRouterContractType),
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
@@ -788,17 +756,13 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
 
 	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSel,
 		Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
 		Version:       burn_mint_token_pool.Version,
 		Qualifier:     symbol,
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
-	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       poolAddr,
-	})
+	cfgReport, err := evmops.ExecuteRead(e.OperationsBundle, evmChain, poolAddr, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetDynamicConfig, struct{}{})
 	require.NoError(t, err)
 	require.Equal(t, testRouter, cfgReport.Output.Router, "freshly-deployed pool should be wired to TestRouter when RouterRef points at it")
 }
@@ -821,9 +785,8 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 	ds := datastore.NewMemoryDataStore()
 
 	for _, chainSel := range []uint64{chainA, chainB} {
-		create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-			ChainSelector:  chainSel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
@@ -928,8 +891,8 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 			_, confirmErr := evmChain.Confirm(tx)
 			require.NoError(t, confirmErr)
 			require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-				ChainSelector: tc.chainSel,
 				Address:       tokenAddr.Hex(),
+				ChainSelector: tc.chainSel,
 				Type:          tc.tokenRefType,
 				Version:       tc.tokenRefVersion,
 				Qualifier:     tc.tokenSymbol,
@@ -971,9 +934,10 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 					DeployTokenInput:      nil,
 					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
 						TokenRef: &datastore.AddressRef{
-							Type:      tc.tokenRefType,
-							Version:   tc.tokenRefVersion,
-							Qualifier: tc.tokenSymbol,
+							ChainSelector: tc.chainSel,
+							Type:          tc.tokenRefType,
+							Version:       tc.tokenRefVersion,
+							Qualifier:     tc.tokenSymbol,
 						},
 						PoolType:           tc.poolContractType,
 						TokenPoolQualifier: tc.tokenSymbol,
@@ -988,7 +952,6 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 		e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
 
 		tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: tc.chainSel,
 			Type:          tc.tokenRefType,
 			Version:       tc.tokenRefVersion,
 			Qualifier:     tc.tokenSymbol,
@@ -996,7 +959,6 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 		require.NoError(t, err)
 
 		poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: tc.chainSel,
 			Type:          datastore.ContractType(tc.poolContractType),
 			Version:       tc.poolVersion,
 			Qualifier:     tc.tokenSymbol,

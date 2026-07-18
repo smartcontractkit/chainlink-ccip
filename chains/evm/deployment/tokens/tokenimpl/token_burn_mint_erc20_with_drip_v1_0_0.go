@@ -8,10 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -71,10 +72,9 @@ func (tokenBurnMintERC20WithDripV1_0_0) Deploy(b operations.Bundle, chain evm.Ch
 		preMint = tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(*in.PreMint), in.Decimals)
 	}
 
-	ref, err := contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain,
+	ref, err := evmops.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain,
 		contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *utils.Version_1_0_0),
-			ChainSelector:  chain.Selector,
 			Qualifier:      &in.Symbol,
 			Args: burn_mint_erc20_with_drip.ConstructorArgs{
 				Name:      in.Name,

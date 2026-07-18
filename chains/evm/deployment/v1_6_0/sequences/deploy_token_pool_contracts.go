@@ -8,13 +8,14 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	adaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	v1_6_0_burn_mint_with_external_minter_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/burn_mint_with_external_minter_token_pool"
 	v1_6_0_hybrid_with_external_minter_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/hybrid_with_external_minter_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
@@ -112,9 +113,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		var poolRef datastore.AddressRef
 		switch typeAndVersion.String() {
 		case v1_6_1_burn_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_mint_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_burn_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -129,9 +129,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_from_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_from_mint_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_burn_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_from_mint_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -146,9 +145,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_mint_with_lock_release_flag_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_mint_with_lock_release_flag_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_burn_mint_with_lock_release_flag_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_mint_with_lock_release_flag_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -163,9 +161,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_to_address_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_to_address_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_burn_to_address_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_to_address_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -181,9 +178,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_burn_with_from_mint_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_burn_with_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_burn_with_from_mint_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_burn_with_from_mint_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -198,9 +194,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_lock_release_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_lock_release_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_lock_release_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_lock_release_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_lock_release_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -215,9 +210,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_1_siloed_lock_release_token_pool.TypeAndVersion.String():
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_1_siloed_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_siloed_lock_release_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_1_siloed_lock_release_token_pool.Deploy, chain, contract.DeployInput[v1_6_1_siloed_lock_release_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_1_siloed_lock_release_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_1_siloed_lock_release_token_pool.ConstructorArgs{
 					LocalTokenDecimals: tokenDecimals,
 					Token:              tokenAddress,
@@ -236,9 +230,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch token governor address: %w", err)
 			}
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_0_burn_mint_with_external_minter_token_pool.Deploy, chain, contract.DeployInput[v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_0_burn_mint_with_external_minter_token_pool.Deploy, chain, contract.DeployInput[v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_0_burn_mint_with_external_minter_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs{
 					Minter:             tokenGovernor,
 					LocalTokenDecimals: tokenDecimals,
@@ -258,9 +251,8 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch token governor address: %w", err)
 			}
-			poolRef, err = contract.MaybeDeployContract(b, v1_6_0_hybrid_with_external_minter_token_pool.Deploy, chain, contract.DeployInput[v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs]{
+			poolRef, err = evmops.MaybeDeployContract(b, v1_6_0_hybrid_with_external_minter_token_pool.Deploy, chain, contract.DeployInput[v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_0_hybrid_with_external_minter_token_pool.TypeAndVersion,
-				ChainSelector:  chain.Selector,
 				Args: v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs{
 					Minter:             tokenGovernor,
 					LocalTokenDecimals: tokenDecimals,

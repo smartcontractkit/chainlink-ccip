@@ -9,7 +9,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
@@ -32,13 +33,9 @@ var SeqCurse = cldf_ops.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Cursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Curse, chain, contract.FunctionInput[ops.CurseArgs]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
-			Args: ops.CurseArgs{
-				Subject: in.Subjects,
-				CurseID: in.CurseID,
-			},
+		opOutput, err := evmops.ExecuteWrite(b, chain, in.Addr, rmn_contract.NewRMNContract, ops.NewWriteCurse, ops.CurseArgs{
+			Subject: in.Subjects,
+			CurseID: in.CurseID,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
@@ -57,12 +54,8 @@ var SeqUncurse = cldf_ops.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Uncursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqUncurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Uncurse, chain, contract.FunctionInput[ops.UncurseArgs]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
-			Args: ops.UncurseArgs{
-				Requests: in.Requests,
-			},
+		opOutput, err := evmops.ExecuteWrite(b, chain, in.Addr, rmn_contract.NewRMNContract, ops.NewWriteUncurse, ops.UncurseArgs{
+			Requests: in.Requests,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMN at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)

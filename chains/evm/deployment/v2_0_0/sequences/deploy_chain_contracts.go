@@ -1,6 +1,15 @@
 package sequences
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	fq_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
+	mock_receiver_v2_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
+	onramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
+	offramp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/offramp"
+	executor_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
+	rmn_proxy_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
+	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	upstream "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -20,13 +28,13 @@ import (
 	proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	router_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
@@ -49,21 +57,23 @@ type proxyAcceptOwnershipArgs struct {
 	IsProposedOwner bool
 }
 
-var proxyAcceptOwnership = contract_utils.NewWrite(contract_utils.WriteParams[proxyAcceptOwnershipArgs, *proxy_bindings.Proxy]{
-	Name:         "proxy:accept-ownership",
-	Version:      proxy.Version,
-	Description:  "Accept ownership of the proxy",
-	ContractType: proxy.ContractType,
-	ContractABI:  proxy.ProxyABI,
-	NewContract:  proxy_bindings.NewProxy,
-	IsAllowedCaller: func(_ *proxy_bindings.Proxy, _ *bind.CallOpts, _ common.Address, args proxyAcceptOwnershipArgs) (bool, error) {
-		return args.IsProposedOwner, nil
-	},
-	Validate: func(proxyAcceptOwnershipArgs) error { return nil },
-	CallContract: func(p *proxy_bindings.Proxy, opts *bind.TransactOpts, _ proxyAcceptOwnershipArgs) (*types.Transaction, error) {
-		return p.AcceptOwnership(opts)
-	},
-})
+func newWriteProxyAcceptOwnership(c proxy_bindings.ProxyInterface) *cldf_ops.Operation[contract.FunctionInput[proxyAcceptOwnershipArgs], contract.WriteOutput, evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[proxyAcceptOwnershipArgs, proxy_bindings.ProxyInterface]{
+		Name:         "proxy:accept-ownership",
+		Version:      proxy.Version,
+		Description:  "Accept ownership of the proxy",
+		ContractType: proxy.ContractType,
+		ContractABI:  proxy_bindings.ProxyABI,
+		Contract:     c,
+		IsAllowedCaller: func(_ proxy_bindings.ProxyInterface, _ *bind.CallOpts, _ common.Address, args proxyAcceptOwnershipArgs) (bool, error) {
+			return args.IsProposedOwner, nil
+		},
+		Validate: func(proxyAcceptOwnershipArgs) error { return nil },
+		CallContract: func(p proxy_bindings.ProxyInterface, opts *bind.TransactOpts, _ proxyAcceptOwnershipArgs) (*types.Transaction, error) {
+			return p.AcceptOwnership(opts)
+		},
+	})
+}
 
 type MockReceiverParams struct {
 	Version *semver.Version
@@ -114,7 +124,7 @@ type FeeQuoterParams struct {
 type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
-	DynamicConfig executor.DynamicConfig
+	DynamicConfig executor_bindings.ExecutorDynamicConfig
 	Qualifier     string
 }
 
@@ -148,7 +158,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	"Deploys all required contracts for CCIP 2.0.0 to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployChainContractsInput) (output ccvadapters.DeployChainContractsOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]upstream.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 		ownableContracts := make([]datastore.AddressRef, 0)
 
 		var cllccipTimelockAddr, rmnTimelockAddr common.Address
@@ -164,9 +174,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy WETH
-		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
+		wethRef, err := evmops.MaybeDeployContract(b, weth.Deploy, chain, contract.DeployInput[weth.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *weth.Version),
-			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
@@ -174,9 +183,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract_utils.DeployInput[link.ConstructorArgs]{
+		linkRef, err := evmops.MaybeDeployContract(b, link.Deploy, chain, contract.DeployInput[link.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *link.Version),
-			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
@@ -184,9 +192,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, linkRef)
 
 		// Deploy RMNRemote
-		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract_utils.DeployInput[rmn_remote.ConstructorArgs]{
+		rmnRemoteRef, err := evmops.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
-			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
 				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
@@ -199,9 +206,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, rmnRemoteRef)
 
 		// Deploy RMNProxy
-		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
+		rmnProxyRef, err := evmops.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
 			},
@@ -213,22 +219,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, rmnProxyRef)
 
 		// Fetch the RMN contract address set on the RMNProxy
-		rmnAddressReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(rmnProxyRef.Address),
-		})
+		rmnAddressReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(rmnProxyRef.Address), rmn_proxy_contract.NewRMNProxy, rmn_proxy.NewReadGetRMN, struct{}{})
 		if err != nil {
 			return output, err
 		}
 
 		// Set the RMNRemote on the RMNProxy if diff exists
 		if rmnAddressReport.Output != common.HexToAddress(rmnRemoteRef.Address) {
-			setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract_utils.FunctionInput[rmn_proxy.SetRMNArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(rmnProxyRef.Address),
-				Args: rmn_proxy.SetRMNArgs{
-					RMN: common.HexToAddress(rmnRemoteRef.Address),
-				},
+			setRMNReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(rmnProxyRef.Address), rmn_proxy_contract.NewRMNProxy, rmn_proxy.NewWriteSetRMN, rmn_proxy.SetRMNArgs{
+				RMN: common.HexToAddress(rmnRemoteRef.Address),
 			})
 			if err != nil {
 				return output, err
@@ -237,9 +236,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy Router
-		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
+		routerRef, err := evmops.MaybeDeployContract(b, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
 				RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
@@ -252,21 +250,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, routerRef)
 
 		// Fetch the wrapped native address set on the Router
-		wrappedNativeAddressReport, err := cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(routerRef.Address),
-		})
+		wrappedNativeAddressReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(routerRef.Address), router_bindings.NewRouter, router.NewReadGetWrappedNative, struct{}{})
 		if err != nil {
 			return output, err
 		}
 
 		// Set wrapped native on the Router if diff exists
 		if wrappedNativeAddressReport.Output != common.HexToAddress(wethRef.Address) {
-			setWrappedNativeReport, err := cldf_ops.ExecuteOperation(b, router.SetWrappedNative, chain, contract_utils.FunctionInput[common.Address]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(routerRef.Address),
-				Args:          common.HexToAddress(wethRef.Address),
-			})
+			setWrappedNativeReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(routerRef.Address), router_bindings.NewRouter, router.NewWriteSetWrappedNative, common.HexToAddress(wethRef.Address))
 			if err != nil {
 				return output, err
 			}
@@ -275,9 +266,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy Test Router
 		if input.DeployTestRouter {
-			testRouterRef, err := contract_utils.MaybeDeployContract(b, router.DeployTestRouter, chain, contract_utils.DeployInput[router.ConstructorArgs]{
+			testRouterRef, err := evmops.MaybeDeployContract(b, router.DeployTestRouter, chain, contract.DeployInput[router.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(router.TestRouterContractType, *router.Version),
-				ChainSelector:  chain.Selector,
 				Args: router.ConstructorArgs{
 					WrappedNative: common.HexToAddress(wethRef.Address),
 					RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
@@ -289,21 +279,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, testRouterRef)
 
 			// Fetch the wrapped native address set on the Test Router
-			wrappedNativeAddressReport, err = cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(testRouterRef.Address),
-			})
+			wrappedNativeAddressReport, err = evmops.ExecuteRead(b, chain, common.HexToAddress(testRouterRef.Address), router_bindings.NewRouter, router.NewReadGetWrappedNative, struct{}{})
 			if err != nil {
 				return output, err
 			}
 
 			// Set wrapped native on the Test Router if diff exists
 			if wrappedNativeAddressReport.Output != common.HexToAddress(wethRef.Address) {
-				setWrappedNativeReport, err := cldf_ops.ExecuteOperation(b, router.SetWrappedNative, chain, contract_utils.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(testRouterRef.Address),
-					Args:          common.HexToAddress(wethRef.Address),
-				})
+				setWrappedNativeReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(testRouterRef.Address), router_bindings.NewRouter, router.NewWriteSetWrappedNative, common.HexToAddress(wethRef.Address))
 				if err != nil {
 					return output, err
 				}
@@ -312,9 +295,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy TokenAdminRegistry
-		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
+		tokenAdminRegistryRef, err := evmops.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
-			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
@@ -323,9 +305,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, tokenAdminRegistryRef)
 
 		// Deploy RegistryModuleOwnerCustom
-		registryModuleOwnerCustomRef, err := contract_utils.MaybeDeployContract(b, registry_module_owner_custom.Deploy, chain, contract_utils.DeployInput[registry_module_owner_custom.ConstructorArgs]{
+		registryModuleOwnerCustomRef, err := evmops.MaybeDeployContract(b, registry_module_owner_custom.Deploy, chain, contract.DeployInput[registry_module_owner_custom.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(registry_module_owner_custom.ContractType, *registry_module_owner_custom.Version),
-			ChainSelector:  chain.Selector,
 			Args: registry_module_owner_custom.ConstructorArgs{
 				TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
 			},
@@ -351,11 +332,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// deploy TokenPoolFactory
-		tokenPoolFactoryRef, err := contract_utils.MaybeDeployContract(
+		tokenPoolFactoryRef, err := evmops.MaybeDeployContract(
 			b, token_pool_factory.Deploy, chain,
-			upstream.DeployInput[token_pool_factory.ConstructorArgs]{
+			contract.DeployInput[token_pool_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(token_pool_factory.ContractType, *token_pool_factory.Version),
-				ChainSelector:  chain.Selector,
 				Args: token_pool_factory.ConstructorArgs{
 					TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
 					TokenAdminModule:   common.HexToAddress(registryModuleOwnerCustomRef.Address),
@@ -374,11 +354,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if cllccipTimelockAddr != (common.Address{}) {
 			priceUpdaters = append(priceUpdaters, cllccipTimelockAddr)
 		}
-		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
+		feeQuoterRef, err := evmops.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
-			ChainSelector:  chain.Selector,
 			Args: fee_quoter.ConstructorArgs{
-				StaticConfig: fee_quoter.StaticConfig{
+				StaticConfig: fq_bindings.FeeQuoterStaticConfig{
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
@@ -395,26 +374,22 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, feeQuoterRef)
 		ownableContracts = append(ownableContracts, feeQuoterRef)
 
-		var tokenPriceUpdates []fee_quoter.TokenPriceUpdate
+		var tokenPriceUpdates []fq_bindings.InternalTokenPriceUpdate
 		if input.ContractParams.FeeQuoter.USDPerLINK != nil {
-			tokenPriceUpdates = append(tokenPriceUpdates, fee_quoter.TokenPriceUpdate{
+			tokenPriceUpdates = append(tokenPriceUpdates, fq_bindings.InternalTokenPriceUpdate{
 				SourceToken: common.HexToAddress(linkRef.Address),
 				UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
 			})
 		}
 		if input.ContractParams.FeeQuoter.USDPerWETH != nil {
-			tokenPriceUpdates = append(tokenPriceUpdates, fee_quoter.TokenPriceUpdate{
+			tokenPriceUpdates = append(tokenPriceUpdates, fq_bindings.InternalTokenPriceUpdate{
 				SourceToken: common.HexToAddress(wethRef.Address),
 				UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
 			})
 		}
 		if len(tokenPriceUpdates) > 0 {
-			updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(feeQuoterRef.Address),
-				Args: fee_quoter.PriceUpdates{
-					TokenPriceUpdates: tokenPriceUpdates,
-				},
+			updatePricesReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(feeQuoterRef.Address), evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter), fee_quoter.NewWriteUpdatePrices, fq_bindings.InternalPriceUpdates{
+				TokenPriceUpdates: tokenPriceUpdates,
 			})
 			if err != nil {
 				return output, fmt.Errorf("failed to update token prices on FeeQuoter: %w", err)
@@ -423,11 +398,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy OffRamp
-		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
+		offRampRef, err := evmops.MaybeDeployContract(b, offramp.Deploy, chain, contract.DeployInput[offramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(offramp.ContractType, *input.ContractParams.OffRamp.Version),
-			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
-				StaticConfig: offramp.StaticConfig{
+				StaticConfig: offramp_bindings.OffRampStaticConfig{
 					LocalChainSelector:        chain.Selector,
 					RmnRemote:                 common.HexToAddress(rmnProxyRef.Address),
 					GasForCallExactCheck:      input.ContractParams.OffRamp.GasForCallExactCheck,
@@ -443,17 +417,16 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, offRampRef)
 
 		// Deploy OnRamp
-		onRampRef, err := contract_utils.MaybeDeployContract(b, onramp.Deploy, chain, contract_utils.DeployInput[onramp.ConstructorArgs]{
+		onRampRef, err := evmops.MaybeDeployContract(b, onramp.Deploy, chain, contract.DeployInput[onramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(onramp.ContractType, *input.ContractParams.OnRamp.Version),
-			ChainSelector:  chain.Selector,
 			Args: onramp.ConstructorArgs{
-				StaticConfig: onramp.StaticConfig{
+				StaticConfig: onramp_bindings.OnRampStaticConfig{
 					ChainSelector:         chain.Selector,
 					RmnRemote:             common.HexToAddress(rmnRemoteRef.Address),
 					TokenAdminRegistry:    common.HexToAddress(tokenAdminRegistryRef.Address),
 					MaxUSDCentsPerMessage: input.ContractParams.OnRamp.MaxUSDCentsPerMessage,
 				},
-				DynamicConfig: onramp.DynamicConfig{
+				DynamicConfig: onramp_bindings.OnRampDynamicConfig{
 					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),
 					FeeAggregator: input.ContractParams.OnRamp.FeeAggregator,
 				},
@@ -466,11 +439,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts = append(ownableContracts, onRampRef)
 
 		// Fetch the dynamic config on the OnRamp
-		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(onRampRef.Address),
-			Args:          struct{}{},
-		})
+		dynamicConfigReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(onRampRef.Address), evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewReadGetDynamicConfig, struct{}{})
 		if err != nil {
 			return output, fmt.Errorf("failed to get dynamic config on OnRamp: %w", err)
 		}
@@ -481,16 +450,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			desiredFeeAggregator = input.ContractParams.OnRamp.FeeAggregator
 		}
 		if dynamicConfigReport.Output.FeeQuoter != common.HexToAddress(feeQuoterRef.Address) || desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator {
-			desiredDynamicConfig := onramp.DynamicConfig{
+			desiredDynamicConfig := onramp_bindings.OnRampDynamicConfig{
 				FeeQuoter:              common.HexToAddress(feeQuoterRef.Address),
 				ReentrancyGuardEntered: false, // This should never be true.
 				FeeAggregator:          input.ContractParams.OnRamp.FeeAggregator,
 			}
-			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.DynamicConfig]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(onRampRef.Address),
-				Args:          desiredDynamicConfig,
-			})
+			setDynamicConfigReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(onRampRef.Address), evmops.BindAs[onramp_bindings.OnRampInterface](onramp_bindings.NewOnRamp), onramp.NewWriteSetDynamicConfig, desiredDynamicConfig)
 			if err != nil {
 				return output, fmt.Errorf("failed to set dynamic config on OnRamp: %w", err)
 			}
@@ -521,9 +486,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if executorParam.Qualifier != "" {
 				qualifierPtr = &executorParam.Qualifier
 			}
-			executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract_utils.DeployInput[executor.ConstructorArgs]{
+			executorRef, err := evmops.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *executorParam.Version),
-				ChainSelector:  chain.Selector,
 				Args: executor.ConstructorArgs{
 					MaxCCVsPerMsg: executorParam.MaxCCVsPerMsg,
 					DynamicConfig: executorParam.DynamicConfig,
@@ -537,11 +501,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ownableContracts = append(ownableContracts, executorRef)
 
 			// Fetch the dynamic config on the Executor
-			dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(executorRef.Address),
-				Args:          struct{}{},
-			})
+			dynamicConfigReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(executorRef.Address), evmops.BindAs[executor_bindings.ExecutorInterface](executor_bindings.NewExecutor), executor.NewReadGetDynamicConfig, struct{}{})
 			if err != nil {
 				return output, fmt.Errorf("failed to get dynamic config on Executor: %w", err)
 			}
@@ -554,14 +514,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
 				dynamicConfigReport.Output.AllowedFinalityConfig != executorParam.DynamicConfig.AllowedFinalityConfig ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.DynamicConfig]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorRef.Address),
-					Args: executor.DynamicConfig{
-						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
+				setDynamicConfigReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(executorRef.Address), evmops.BindAs[executor_bindings.ExecutorInterface](executor_bindings.NewExecutor), executor.NewWriteSetDynamicConfig, executor_bindings.ExecutorDynamicConfig{
+					FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
 						AllowedFinalityConfig: executorParam.DynamicConfig.AllowedFinalityConfig,
 						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
-					},
 				})
 				if err != nil {
 					return output, fmt.Errorf("failed to set dynamic config on Executor: %w", err)
@@ -585,13 +541,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					return output, fmt.Errorf("CREATE2Factory is required to deploy ExecutorProxy")
 				}
 				deployExecutorProxyViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployContractViaCREATE2, chain, DeployContractViaCREATE2Input{
-					ChainSelector:  chain.Selector,
 					Qualifier:      *qualifierPtr,
 					Type:           datastore.ContractType(ExecutorProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
-					ABI:            proxy.ProxyABI,
-					BIN:            proxy.ProxyBin,
+					ABI:            proxy_bindings.ProxyMetaData.ABI,
+					BIN:            proxy_bindings.ProxyMetaData.Bin,
 					ConstructorArgs: []any{
 						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
 						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.
@@ -611,12 +566,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				executorProxyRef = &deployExecutorProxyViaCREATE2Report.Output.Addresses[0]
 
 				// Accept ownership of the ExecutorProxy
-				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxyAcceptOwnership, chain, contract_utils.FunctionInput[proxyAcceptOwnershipArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args: proxyAcceptOwnershipArgs{
-						IsProposedOwner: true,
-					},
+				acceptOwnershipReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(executorProxyRef.Address), evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), newWriteProxyAcceptOwnership, proxyAcceptOwnershipArgs{
+					IsProposedOwner: true,
 				})
 				if err != nil {
 					return output, fmt.Errorf("failed to accept ownership of ExecutorProxy: %w", err)
@@ -626,21 +577,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ownableContracts = append(ownableContracts, *executorProxyRef)
 
 			// Fetch the target on the ExecutorProxy
-			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(executorProxyRef.Address),
-			})
+			targetReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(executorProxyRef.Address), evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), proxy.NewReadGetTarget, struct{}{})
 			if err != nil {
 				return output, fmt.Errorf("failed to get target on ExecutorProxy: %w", err)
 			}
 
 			// Set target on the ExecutorProxy if diff exists
 			if targetReport.Output != common.HexToAddress(executorRef.Address) {
-				setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.SetTarget, chain, contract_utils.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args:          common.HexToAddress(executorRef.Address),
-				})
+				setTargetReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(executorProxyRef.Address), evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), proxy.NewWriteSetTarget, common.HexToAddress(executorRef.Address))
 				if err != nil {
 					return output, fmt.Errorf("failed to set target on ExecutorProxy: %w", err)
 				}
@@ -648,21 +592,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 
 			// Fetch the fee aggregator on the ExecutorProxy
-			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(executorProxyRef.Address),
-			})
+			feeAggregatorReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(executorProxyRef.Address), evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), proxy.NewReadGetFeeAggregator, struct{}{})
 			if err != nil {
 				return output, fmt.Errorf("failed to get fee aggregator on ExecutorProxy: %w", err)
 			}
 
 			// Set fee aggregator on the ExecutorProxy if diff exists
 			if feeAggregatorReport.Output != executorParam.DynamicConfig.FeeAggregator {
-				setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(executorProxyRef.Address),
-					Args:          executorParam.DynamicConfig.FeeAggregator,
-				})
+				setFeeAggregatorReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(executorProxyRef.Address), evmops.BindAs[proxy_bindings.ProxyInterface](proxy_bindings.NewProxy), proxy.NewWriteSetFeeAggregator, executorParam.DynamicConfig.FeeAggregator)
 				if err != nil {
 					return output, fmt.Errorf("failed to set fee aggregator on ExecutorProxy: %w", err)
 				}
@@ -679,9 +616,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if mockReceiverParams.Qualifier != "" {
 				qualifierPtr = &mockReceiverParams.Qualifier
 			}
-			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
+			deployReceiverReport, err := evmops.ExecuteDeploy(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
-				ChainSelector:  chain.Selector,
 				Args: mock_receiver.ConstructorArgs{
 					Required:  requiredVerifiers,
 					Optional:  optionalVerifiers,
@@ -697,24 +633,16 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			// Set finality config on the MockReceiver if diff exists
 			if mockReceiverParams.AllowedFinalityConfig != finality.RawWaitForFinality {
 				// Get the current finality config on the MockReceiver
-				finalityConfigResult, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndFinalityConfig, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndFinalityConfigArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-					Args: mock_receiver_v2.GetCCVsAndFinalityConfigArgs{
-						Arg0: chain.Selector,
-						Arg1: []byte{},
-					},
+				finalityConfigResult, err := evmops.ExecuteRead(b, chain, common.HexToAddress(deployReceiverReport.Output.Address), evmops.BindAs[mock_receiver_v2_bindings.MockReceiverV2Interface](mock_receiver_v2_bindings.NewMockReceiverV2), mock_receiver_v2.NewReadGetCCVsAndFinalityConfig, mock_receiver_v2.GetCCVsAndFinalityConfigArgs{
+					Arg0: chain.Selector,
+					Arg1: []byte{},
 				})
 				if err != nil {
 					return output, fmt.Errorf("failed to get finality config on MockReceiver: %w", err)
 				}
 				if finalityConfigResult.Output.AllowedFinalityConfig != mockReceiverParams.AllowedFinalityConfig {
 					// Set the finality config on the MockReceiver
-					setFinalityConfigReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetAllowedFinalityConfig, chain, contract_utils.FunctionInput[[4]byte]{
-						ChainSelector: chain.Selector,
-						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-						Args:          mockReceiverParams.AllowedFinalityConfig,
-					})
+					setFinalityConfigReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(deployReceiverReport.Output.Address), evmops.BindAs[mock_receiver_v2_bindings.MockReceiverV2Interface](mock_receiver_v2_bindings.NewMockReceiverV2), mock_receiver_v2.NewWriteSetAllowedFinalityConfig, mockReceiverParams.AllowedFinalityConfig)
 					if err != nil {
 						return output, fmt.Errorf("failed to set finality config on MockReceiver: %w", err)
 					}
@@ -739,7 +667,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		var batchOps []mcms_types.BatchOperation
-		batchOp, err := upstream.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return output, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
@@ -984,30 +912,22 @@ func MaybeRegisterModuleOnTokenAdminRegistry(
 	chain evm.Chain,
 	tokenAdminRegistryAddress common.Address,
 	moduleAddress common.Address,
-) (contract_utils.WriteOutput, bool, error) {
+) (contract.WriteOutput, bool, error) {
 	// Check if the module is already registered.
-	isRegisteredReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.IsRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chain.Selector,
-		Address:       tokenAdminRegistryAddress,
-		Args:          moduleAddress,
-	})
+	isRegisteredReport, err := evmops.ExecuteRead(b, chain, tokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewReadIsRegistryModule, moduleAddress)
 	if err != nil {
-		return contract_utils.WriteOutput{}, false, fmt.Errorf("failed to check if module is registered: %w", err)
+		return contract.WriteOutput{}, false, fmt.Errorf("failed to check if module is registered: %w", err)
 	}
 
 	// If already registered, return without performing a write.
 	if isRegisteredReport.Output {
-		return contract_utils.WriteOutput{}, false, nil
+		return contract.WriteOutput{}, false, nil
 	}
 
 	// Add the module to the registry.
-	addRegistryModuleReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AddRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
-		ChainSelector: chain.Selector,
-		Address:       tokenAdminRegistryAddress,
-		Args:          moduleAddress,
-	})
+	addRegistryModuleReport, err := evmops.ExecuteWrite(b, chain, tokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewWriteAddRegistryModule, moduleAddress)
 	if err != nil {
-		return contract_utils.WriteOutput{}, false, fmt.Errorf("failed to add registry module: %w", err)
+		return contract.WriteOutput{}, false, fmt.Errorf("failed to add registry module: %w", err)
 	}
 
 	return addRegistryModuleReport.Output, true, nil

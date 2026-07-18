@@ -3,7 +3,7 @@ package registry_module_owner_custom
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/registry_module_owner_custom"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"

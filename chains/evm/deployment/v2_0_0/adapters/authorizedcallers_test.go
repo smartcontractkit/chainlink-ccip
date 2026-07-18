@@ -1,6 +1,8 @@
 package adapters_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,10 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmn_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
@@ -47,10 +48,11 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 
 	// Initialize the adapter.
 	adapter := adapters.NewEVMAuthorizedCallersAdapter(
-		rmnops.ApplyAuthorizedCallerUpdates,
-		rmnops.GetAllAuthorizedCallers,
-		func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-			return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
+		evmops.BindAs[rmn_bindings.RMNInterface](rmn_bindings.NewRMN),
+		rmnops.NewWriteApplyAuthorizedCallerUpdates,
+		rmnops.NewReadGetAllAuthorizedCallers,
+		func(added, removed []common.Address) rmn_bindings.AuthorizedCallersAuthorizedCallerArgs {
+			return rmn_bindings.AuthorizedCallersAuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
 		},
 	)
 	applyIn := api.ApplyInput{
@@ -171,10 +173,11 @@ func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
 	const secondType = "AuthorizedCallersV2"
 	reg := api.GetAuthorizedCallersRegistry()
 	reg.RegisterAdapter("evm", secondType, rmnops.Version, adapters.NewEVMAuthorizedCallersAdapter(
-		rmnops.ApplyAuthorizedCallerUpdates,
-		rmnops.GetAllAuthorizedCallers,
-		func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
-			return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
+		evmops.BindAs[rmn_bindings.RMNInterface](rmn_bindings.NewRMN),
+		rmnops.NewWriteApplyAuthorizedCallerUpdates,
+		rmnops.NewReadGetAllAuthorizedCallers,
+		func(added, removed []common.Address) rmn_bindings.AuthorizedCallersAuthorizedCallerArgs {
+			return rmn_bindings.AuthorizedCallersAuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
 		},
 	))
 
@@ -221,9 +224,8 @@ func deployRMNForTest(
 ) datastore.AddressRef {
 	t.Helper()
 
-	ref, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
+	ref, err := evmops.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
-		ChainSelector:  chain.Selector,
 		Args:           rmnops.ConstructorArgs{CurseAdmins: curseAdmins},
 	}, nil)
 	require.NoError(t, err)

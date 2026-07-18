@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"context"
 	"errors"
 	"fmt"
@@ -14,13 +15,13 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/changeset"
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fq1_6ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	price_registry_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
+	fq1_6_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	fq_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -281,11 +282,12 @@ func collectLegacyFeeTokens(
 }
 
 func queryPriceRegistryFeeTokens(e cldf_deployment.Environment, chain evm.Chain, priceRegistry common.Address) ([]common.Address, error) {
-	report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
-		ChainSelector: chain.Selector,
-		Address:       priceRegistry,
-		Args:          nil,
-	})
+	report, err := evmops.ExecuteRead(
+		e.OperationsBundle, chain, priceRegistry,
+		evmops.BindAs[price_registry_bindings.PriceRegistryInterface](price_registry_bindings.NewPriceRegistry),
+		priceregistryops.NewReadGetFeeToken,
+		struct{}{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee tokens from PriceRegistry %s on chain %d: %w",
 			priceRegistry.Hex(), chain.Selector, err)
@@ -294,11 +296,12 @@ func queryPriceRegistryFeeTokens(e cldf_deployment.Environment, chain evm.Chain,
 }
 
 func queryFeeQuoter16FeeTokens(e cldf_deployment.Environment, chain evm.Chain, feeQuoter common.Address) ([]common.Address, error) {
-	report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fq1_6ops.GetFeeTokens, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       feeQuoter,
-		Args:          struct{}{},
-	})
+	report, err := evmops.ExecuteRead(
+		e.OperationsBundle, chain, feeQuoter,
+		evmops.BindAs[fq1_6_bindings.FeeQuoterInterface](fq1_6_bindings.NewFeeQuoter),
+		fq1_6ops.NewReadGetFeeTokens,
+		struct{}{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee tokens from FeeQuoter 1.6 %s on chain %d: %w",
 			feeQuoter.Hex(), chain.Selector, err)
@@ -307,11 +310,12 @@ func queryFeeQuoter16FeeTokens(e cldf_deployment.Environment, chain evm.Chain, f
 }
 
 func queryFeeQuoter20FeeTokens(e cldf_deployment.Environment, chain evm.Chain, feeQuoter common.Address) ([]common.Address, error) {
-	report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, fqops.GetFeeTokens, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       feeQuoter,
-		Args:          struct{}{},
-	})
+	report, err := evmops.ExecuteRead(
+		e.OperationsBundle, chain, feeQuoter,
+		evmops.BindAs[fq_bindings.FeeQuoterInterface](fq_bindings.NewFeeQuoter),
+		fqops.NewReadGetFeeTokens,
+		struct{}{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee tokens from FeeQuoter 2.0 %s on chain %d: %w",
 			feeQuoter.Hex(), chain.Selector, err)

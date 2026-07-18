@@ -1,12 +1,15 @@
 package tokens
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	aph_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/advanced_pool_hooks"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -42,23 +45,16 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 	semver.MustParse("2.0.0"),
 	"Configures a token pool on an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
-		writes := make([]evm_contract.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 
 		// Set threshold amount for additional CCVs (if necessary)
 		if input.ThresholdAmountForAdditionalCCVs != nil {
-			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.AdvancedPoolHooks,
-			})
+			currentThresholdAmountReport, err := evmops.ExecuteRead(b, chain, input.AdvancedPoolHooks, evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks), advanced_pool_hooks.NewReadGetThresholdAmount, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
 			if currentThresholdAmountReport.Output.Cmp(input.ThresholdAmountForAdditionalCCVs) != 0 {
-				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.AdvancedPoolHooks,
-					Args:          input.ThresholdAmountForAdditionalCCVs,
-				})
+				setThresholdAmountReport, err := evmops.ExecuteWrite(b, chain, input.AdvancedPoolHooks, evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks), advanced_pool_hooks.NewWriteSetThresholdAmount, input.ThresholdAmountForAdditionalCCVs)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 				}
@@ -68,10 +64,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// Set dynamic config (if necessary)
 		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
-			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
+			currentDynamicConfigReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetDynamicConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current dynamic config from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
@@ -94,14 +87,10 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 
 			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args: token_pool.SetDynamicConfigArgs{
-						Router:         desiredRouter,
-						RateLimitAdmin: desiredRateLimitAdmin,
-						FeeAdmin:       desiredFeeAdmin,
-					},
+				setDynamicConfigReport, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewWriteSetDynamicConfig, token_pool.SetDynamicConfigArgs{
+					Router:         desiredRouter,
+					RateLimitAdmin: desiredRateLimitAdmin,
+					FeeAdmin:       desiredFeeAdmin,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -110,7 +99,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 		}
 
-		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

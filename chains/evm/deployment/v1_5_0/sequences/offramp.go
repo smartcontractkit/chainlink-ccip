@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -37,18 +37,12 @@ var OffRampImportConfigSequence = operations.NewSequence(
 		}
 		contractMeta := make([]datastore.ContractMetadata, 0)
 		for remoteChain, offRampAddress := range input.OffRampsPerRemoteChain {
-			sCfg, err := operations.ExecuteOperation(b, offrampops.OffRampStaticConfig, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       offRampAddress,
-			})
+			sCfg, err := evmops.ExecuteRead(b, chain, offRampAddress, evm_2_evm_offramp.NewEVM2EVMOffRamp, offrampops.NewReadOffRampStaticConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from OffRamp %s on chain %s "+
 					"for remote chain %d: %w", offRampAddress.Hex(), chain.String(), remoteChain, err)
 			}
-			dCfg, err := operations.ExecuteOperation(b, offrampops.OffRampDynamicConfig, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       offRampAddress,
-			})
+			dCfg, err := evmops.ExecuteRead(b, chain, offRampAddress, evm_2_evm_offramp.NewEVM2EVMOffRamp, offrampops.NewReadOffRampDynamicConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config from OffRamp %s "+
 					"on chain %s for remote chain %d: %w", offRampAddress.Hex(), chain.String(), remoteChain, err)

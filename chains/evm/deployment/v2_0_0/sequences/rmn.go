@@ -6,16 +6,19 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
+	rmn_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/rmn"
+	rmn_proxy_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -26,7 +29,7 @@ import (
 type ConfigureRMNCurseAdminsInput struct {
 	ChainSelector uint64
 	RMNAddress    common.Address
-	Args          rmnops.AuthorizedCallerArgs
+	Args          rmn_bindings.AuthorizedCallersAuthorizedCallerArgs
 }
 
 // ConfigureRMNCurseAdmins applies authorized caller (curse admin) updates to an already-deployed RMN contract.
@@ -42,13 +45,14 @@ var ConfigureRMNCurseAdmins = cldf_ops.NewSequence(
 		if len(input.Args.AddedCallers) == 0 && len(input.Args.RemovedCallers) == 0 {
 			return sequences.OnChainOutput{}, nil
 		}
-		report, err := cldf_ops.ExecuteOperation(
-			b, rmnops.ApplyAuthorizedCallerUpdates, chain,
-			contract.FunctionInput[rmnops.AuthorizedCallerArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.RMNAddress,
-				Args:          input.Args,
-			})
+		report, err := evmops.ExecuteWrite(
+			b,
+			chain,
+			input.RMNAddress,
+			evmops.BindAs[rmn_bindings.RMNInterface](rmn_bindings.NewRMN),
+			rmnops.NewWriteApplyAuthorizedCallerUpdates,
+			input.Args,
+		)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to RMN(%s) on chain %d: %w",
 				input.RMNAddress.Hex(), chain.Selector, err)
@@ -86,11 +90,7 @@ var RmnCurse = cldf_ops.NewSequence(
 	rmnops.Version,
 	"Cursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.RMNAddress,
-			ChainSelector: chain.Selector,
-			Args:          in.Subjects,
-		})
+		opOutput, err := evmops.ExecuteWrite(b, chain, in.RMNAddress, evmops.BindAs[rmn_bindings.RMNInterface](rmn_bindings.NewRMN), rmnops.NewWriteCurse0, in.Subjects)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMN at %s on chain %d: %w", in.RMNAddress.String(), chain.Selector, err)
 		}
@@ -107,11 +107,7 @@ var RmnUncurse = cldf_ops.NewSequence(
 	rmnops.Version,
 	"Uncursing subjects with RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, in SeqUncurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Uncurse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.RMNAddress,
-			ChainSelector: chain.Selector,
-			Args:          in.Subjects,
-		})
+		opOutput, err := evmops.ExecuteWrite(b, chain, in.RMNAddress, evmops.BindAs[rmn_bindings.RMNInterface](rmn_bindings.NewRMN), rmnops.NewWriteUncurse0, in.Subjects)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse with RMN at %s on chain %d: %w", in.RMNAddress.String(), chain.Selector, err)
 		}
@@ -168,9 +164,8 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		curseAdmins = append(curseAdmins, ultraFastCurseTimeLock)
 		curseAdmins = append(curseAdmins, input.CurseAdmins...)
 
-		rmnRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
+		rmnRef, err := evmops.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
-			ChainSelector:  chain.Selector,
 			Args: rmnops.ConstructorArgs{
 				CurseAdmins: curseAdmins,
 			},
@@ -230,11 +225,7 @@ func pointRMNProxyAtRMN(
 	if err != nil {
 		return nil, err
 	}
-	setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract.FunctionInput[rmn_proxy.SetRMNArgs]{
-		ChainSelector: chain.Selector,
-		Address:       rmnProxyAddr,
-		Args:          rmn_proxy.SetRMNArgs{RMN: rmnAddr},
-	})
+	setRMNReport, err := evmops.ExecuteWrite(b, chain, rmnProxyAddr, rmn_proxy_contract.NewRMNProxy, rmn_proxy.NewWriteSetRMN, rmn_proxy.SetRMNArgs{RMN: rmnAddr})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set RMN on RMNProxy on chain %d: %w", chain.Selector, err)
 	}

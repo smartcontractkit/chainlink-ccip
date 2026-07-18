@@ -1,6 +1,8 @@
 package adapters_test
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"math/big"
 	"testing"
 
@@ -10,11 +12,11 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	non_canonical_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
@@ -82,11 +84,11 @@ type cctpTestSetup struct {
 
 func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) cctpTestSetup {
 	chain := e.BlockChains.EVMChains()[chainSelector]
+	e.OperationsBundle = operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter())
 
 	// Deploy chain contracts
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	create2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  chainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{chain.DeployerKey.From},
 		},
@@ -97,7 +99,6 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSelector,
 			ContractParams:   testsetup.CreateBasicContractParams(),
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			DeployerKeyOwned: true, // Set DeployerKeyOwned to true to skip ownership transfer steps since this is a test environment and we don't have MCMS or timelocks set up
@@ -195,16 +196,15 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	require.NoError(t, err, "Failed to confirm MockE2EUSDCTokenMessenger V2 deployment")
 
 	// Deploy and register required CCTPMessageTransmitterProxy v1.6.2 for CCTP V1 wiring.
-	cctpV1ProxyRef, err := contract_utils.MaybeDeployContract(
+	cctpV1ProxyRef, err := evmops.MaybeDeployContract(
 		e.OperationsBundle,
 		cctp_message_transmitter_proxy_v1_6_2.Deploy,
 		chain,
-		contract_utils.DeployInput[cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs]{
+		contract.DeployInput[cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(
 				cctp_message_transmitter_proxy_v1_6_2.ContractType,
 				*cctp_message_transmitter_proxy_v1_6_2.Version,
 			),
-			ChainSelector: chainSelector,
 			Args: cctp_message_transmitter_proxy_v1_6_2.ConstructorArgs{
 				TokenMessenger: tokenMessengerV1Addr,
 			},
@@ -241,17 +241,15 @@ type nonCanonicalTestSetup struct {
 func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) nonCanonicalTestSetup {
 	chain := e.BlockChains.EVMChains()[chainSelector]
 
-	rmnProxyRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
+	rmnProxyRef, err := evmops.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
-		ChainSelector:  chainSelector,
 		Args:           rmn_proxy.ConstructorArgs{RMN: chain.DeployerKey.From},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy RMN proxy")
 	rmnAddr := common.HexToAddress(rmnProxyRef.Address)
 
-	routerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
+	routerRef, err := evmops.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-		ChainSelector:  chainSelector,
 		Args: router.ConstructorArgs{
 			WrappedNative: common.Address{},
 			RMNProxy:      rmnAddr,
@@ -260,9 +258,8 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	require.NoError(t, err, "Failed to deploy Router")
 	routerAddr := common.HexToAddress(routerRef.Address)
 
-	tarRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
+	tarRef, err := evmops.MaybeDeployContract(e.OperationsBundle, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
-		ChainSelector:  chainSelector,
 		Args:           token_admin_registry.ConstructorArgs{},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy TokenAdminRegistry")
@@ -289,7 +286,6 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	require.NoError(t, ds.Addresses().Add(routerRef))
 	require.NoError(t, ds.Addresses().Add(tarRef))
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-		ChainSelector: chainSelector,
 		Address:       usdcAddr.Hex(),
 		Type:          datastore.ContractType(burn_mint_erc20.ContractType),
 		Version:       semver.MustParse("1.0.0"),
@@ -342,16 +338,16 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	newDS := datastore.NewMemoryDataStore()
 
 	err = newDS.Addresses().Add(datastore.AddressRef{
-		ChainSelector: homeChainSelector,
 		Address:       homeCCTPV1Pool.Hex(),
+		ChainSelector: homeChainSelector,
 		Type:          datastore.ContractType("USDCTokenPool"),
 		Version:       semver.MustParse("1.6.2"),
 	})
 	require.NoError(t, err, "Failed to add home CCTP V1 pool to datastore")
 
 	err = newDS.Addresses().Add(datastore.AddressRef{
-		ChainSelector: nonHomeChainSelector,
 		Address:       nonHomeCCTPV1Pool.Hex(),
+		ChainSelector: nonHomeChainSelector,
 		Type:          datastore.ContractType("USDCTokenPool"),
 		Version:       semver.MustParse("1.6.2"),
 	})
@@ -379,18 +375,16 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	mcmsRegistry := changesets.GetRegistry()
 
 	// Get CREATE2Factory addresses for both chains
-	homeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, homeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	homeCreate2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, homeChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  homeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{homeChain.DeployerKey.From},
 		},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy CREATE2Factory on home chain")
 
-	nonHomeCreate2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, nonHomeChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+	nonHomeCreate2FactoryRef, err := evmops.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, nonHomeChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
-		ChainSelector:  nonHomeChainSelector,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{nonHomeChain.DeployerKey.From},
 		},
@@ -533,15 +527,13 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// ===== State Checks for Home Chain =====
 
 	// Check TokenAdminRegistry points to USDCTokenPoolProxy
-	tokenConfigReport, err := operations.ExecuteOperation(
+	tokenConfigReport, err := evmops.ExecuteRead(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		token_admin_registry.GetTokenConfig,
 		homeChain,
-		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: homeChainSelector,
-			Address:       homeSetup.TokenAdminRegistry,
-			Args:          homeSetup.USDCToken,
-		},
+		homeSetup.TokenAdminRegistry,
+		tar_bindings.NewTokenAdminRegistry,
+		token_admin_registry.NewReadGetTokenConfig,
+		homeSetup.USDCToken,
 	)
 	require.NoError(t, err, "Failed to get token config from token admin registry on home chain")
 	require.Equal(t, homeUSDCTokenPoolProxyAddr, tokenConfigReport.Output.TokenPool, "Token pool in registry should be the proxy on home chain")
@@ -709,15 +701,13 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// ===== State Checks for Non-Home Chain =====
 
 	// Check TokenAdminRegistry points to USDCTokenPool on non-home chain
-	nonHomeTokenConfigReport, err := operations.ExecuteOperation(
+	nonHomeTokenConfigReport, err := evmops.ExecuteRead(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		token_admin_registry.GetTokenConfig,
 		nonHomeChain,
-		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: nonHomeChainSelector,
-			Address:       nonHomeSetup.TokenAdminRegistry,
-			Args:          nonHomeSetup.USDCToken,
-		},
+		nonHomeSetup.TokenAdminRegistry,
+		tar_bindings.NewTokenAdminRegistry,
+		token_admin_registry.NewReadGetTokenConfig,
+		nonHomeSetup.USDCToken,
 	)
 	require.NoError(t, err, "Failed to get token config from token admin registry on non-home chain")
 	require.Equal(t, nonHomeCCTPV1Pool, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the CCTP V1 pool on non-home chain")
@@ -866,7 +856,6 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	newDS := datastore.NewMemoryDataStore()
 	require.NoError(t, newDS.Merge(e.DataStore))
 	require.NoError(t, newDS.Addresses().Add(datastore.AddressRef{
-		ChainSelector: canonicalChainSelector,
 		Address:       homeCCTPV1Pool.Hex(),
 		Type:          datastore.ContractType("USDCTokenPool"),
 		Version:       semver.MustParse("1.6.2"),
@@ -973,15 +962,13 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	require.NotEqual(t, common.Address{}, nonCanonicalPoolAddr, "Non-canonical chain should have BurnMintWithLockReleaseFlagTokenPool")
 
 	// Canonical: TokenAdminRegistry points to proxy
-	tokenConfigReport, err := operations.ExecuteOperation(
+	tokenConfigReport, err := evmops.ExecuteRead(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		token_admin_registry.GetTokenConfig,
 		canonicalChain,
-		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: canonicalChainSelector,
-			Address:       canonicalSetup.TokenAdminRegistry,
-			Args:          canonicalSetup.USDCToken,
-		},
+		canonicalSetup.TokenAdminRegistry,
+		tar_bindings.NewTokenAdminRegistry,
+		token_admin_registry.NewReadGetTokenConfig,
+		canonicalSetup.USDCToken,
 	)
 	require.NoError(t, err, "Failed to get token config on canonical chain")
 	require.Equal(t, canonicalProxyAddr, tokenConfigReport.Output.TokenPool, "Canonical TAR should point to proxy")
@@ -995,15 +982,13 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	require.Equal(t, expectedLockRelease, uint8(mechanism), "Canonical proxy should use LOCK_RELEASE for non-canonical remote")
 
 	// Non-canonical: TokenAdminRegistry points to BurnMintWithLockReleaseFlagTokenPool
-	nonCanonicalTokenConfigReport, err := operations.ExecuteOperation(
+	nonCanonicalTokenConfigReport, err := evmops.ExecuteRead(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		token_admin_registry.GetTokenConfig,
 		nonCanonicalChain,
-		contract_utils.FunctionInput[common.Address]{
-			ChainSelector: nonCanonicalChainSelector,
-			Address:       nonCanonicalSetup.TokenAdminRegistry,
-			Args:          nonCanonicalSetup.USDCToken,
-		},
+		nonCanonicalSetup.TokenAdminRegistry,
+		tar_bindings.NewTokenAdminRegistry,
+		token_admin_registry.NewReadGetTokenConfig,
+		nonCanonicalSetup.USDCToken,
 	)
 	require.NoError(t, err, "Failed to get token config on non-canonical chain")
 	require.Equal(t, nonCanonicalPoolAddr, nonCanonicalTokenConfigReport.Output.TokenPool, "Non-canonical TAR should point to lock-release pool")

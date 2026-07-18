@@ -2,6 +2,10 @@ package tokens
 
 import (
 	"fmt"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,7 +19,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -53,10 +56,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		if input.TokenAddress != "" {
 			tokenAddress = common.HexToAddress(input.TokenAddress)
 		} else {
-			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.TokenPoolAddress),
-			})
+			tokenAddrReport, err := evmops.ExecuteRead(b, evmChain, common.HexToAddress(input.TokenPoolAddress), evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetToken, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
 			}
@@ -68,12 +68,38 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			registryTokenPoolAddress = common.HexToAddress(input.RegistryTokenPoolAddress)
 		}
 
+		// If a liquidity migration is requested, derive the old pool from the TAR and run the migration sequence.
+		if input.LiquidityMigrationAmount != nil || input.LiquidityMigrationBasisPoints != nil {
+			if input.TimelockAddress == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("TimelockAddress is required when liquidity migration is requested")
+			}
+
+			tokenConfigReport, err := evmops.ExecuteRead(b, evmChain, registryAddress, tarbindings.NewTokenAdminRegistry, tar_ops.NewReadGetTokenConfig, tokenAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for token %s: %w", tokenAddress, err)
+			}
+			oldPoolAddress := tokenConfigReport.Output.TokenPool
+			if oldPoolAddress == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("no pool currently registered for token %s on chain %d", tokenAddress, input.ChainSelector)
+			}
+
+			migrationReport, err := cldf_ops.ExecuteSequence(b, MigrateLockReleasePoolLiquidity, chains, tokens.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   input.ChainSelector,
+				OldPoolAddress:  oldPoolAddress.Hex(),
+				NewPoolAddress:  input.TokenPoolAddress,
+				TimelockAddress: input.TimelockAddress,
+				Amount:          input.LiquidityMigrationAmount,
+				BasisPoints:     input.LiquidityMigrationBasisPoints,
+				SetPoolConfig:   nil,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute liquidity migration on chain %d: %w", input.ChainSelector, err)
+			}
+			ops = append(ops, migrationReport.Output.BatchOps...)
+		}
+
 		// Validate the pool supports the token
-		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, evmChain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenPoolAddress,
-			Args:          tokenAddress,
-		})
+		isSupported, err := evmops.ExecuteRead(b, evmChain, tokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadIsSupportedToken, tokenAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if token %s is supported by token pool %s on %s: %w", tokenAddress, tokenPoolAddress, evmChain, err)
 		}
@@ -83,23 +109,16 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 
 		if !input.AllowedFinalityConfig.IsZero() {
 			desiredFinalityConfig := input.AllowedFinalityConfig.Raw()
-			currentAllowedFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       tokenPoolAddress,
-			})
+			currentAllowedFinalityReport, err := evmops.ExecuteRead(b, evmChain, tokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetAllowedFinalityConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
 			}
 			if currentAllowedFinalityReport.Output != desiredFinalityConfig {
-				configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, evmChain, evm_contract.FunctionInput[[4]byte]{
-					ChainSelector: input.ChainSelector,
-					Address:       tokenPoolAddress,
-					Args:          desiredFinalityConfig,
-				})
+				configureMinBlockConfirmationReport, err := evmops.ExecuteWrite(b, evmChain, tokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewWriteSetAllowedFinalityConfig, desiredFinalityConfig)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
 				}
-				configureMinBlockConfirmationOps, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{configureMinBlockConfirmationReport.Output})
+				configureMinBlockConfirmationOps, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{configureMinBlockConfirmationReport.Output})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from write outputs: %w", err)
 				}
@@ -112,10 +131,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Get the advanced pool hooks address
-		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, evmChain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenPoolAddress,
-		})
+		advancedPoolHooksAddress, err := evmops.ExecuteRead(b, evmChain, tokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetAdvancedPoolHooks, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get advanced pool hooks address from token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
 		}

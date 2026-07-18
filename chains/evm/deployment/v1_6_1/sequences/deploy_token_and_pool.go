@@ -7,9 +7,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
+	bmBindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -36,11 +38,10 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 	"Deploys a token and its associated token pool to an EVM chain, granting rights to the token pool and minting initial supply",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployTokenAndPoolInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]evm_contract.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 
 		// Deploy burn mint token.
-		deployTokenReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.Deploy, chain, evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			ChainSelector:  input.DeployTokenPoolInput.ChainSel,
+		deployTokenReport, err := evmops.ExecuteDeploy(b, burn_mint_erc20_with_drip.Deploy, chain, contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
 			Args: burn_mint_erc20_with_drip.ConstructorArgs{
 				Name:   input.DeployTokenPoolInput.TokenSymbol,
@@ -78,22 +79,14 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		}
 
 		// Grant mint and burn roles to the token pool.
-		grantRolesReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
-			Args:          tokenPoolAddress,
-		})
+		grantRolesReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(deployTokenReport.Output.Address), bmBindings.NewBurnMintERC20WithDrip, burn_mint_erc20_with_drip.NewWriteGrantMintAndBurnRoles, tokenPoolAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool on %s: %w", chain, err)
 		}
 		writes = append(writes, grantRolesReport.Output)
 
 		// Grant roles to the deployer key so we can mint initial supply.
-		grantMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
-			Args:          chain.DeployerKey.From,
-		})
+		grantMintReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(deployTokenReport.Output.Address), bmBindings.NewBurnMintERC20WithDrip, burn_mint_erc20_with_drip.NewWriteGrantMintAndBurnRoles, chain.DeployerKey.From)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint role to deployer on %s: %w", chain, err)
 		}
@@ -101,13 +94,9 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 
 		// Mint initial supply to each account.
 		for account, amount := range input.Accounts {
-			mintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.Mint, chain, evm_contract.FunctionInput[burn_mint_erc20_with_drip.MintArgs]{
-				ChainSelector: input.DeployTokenPoolInput.ChainSel,
-				Address:       common.HexToAddress(deployTokenReport.Output.Address),
-				Args: burn_mint_erc20_with_drip.MintArgs{
-					Account: account,
-					Amount:  amount,
-				},
+			mintReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(deployTokenReport.Output.Address), bmBindings.NewBurnMintERC20WithDrip, burn_mint_erc20_with_drip.NewWriteMint, burn_mint_erc20_with_drip.MintArgs{
+				Account: account,
+				Amount:  amount,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint %s tokens to %s on %s: %w", amount.String(), account.Hex(), chain, err)
@@ -116,28 +105,20 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		}
 
 		// Revoke mint role from the deployer key for safety.
-		revokeMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.RevokeMintRole, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
-			Args:          chain.DeployerKey.From,
-		})
+		revokeMintReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(deployTokenReport.Output.Address), bmBindings.NewBurnMintERC20WithDrip, burn_mint_erc20_with_drip.NewWriteRevokeMintRole, chain.DeployerKey.From)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to revoke mint role from deployer on %s: %w", chain, err)
 		}
 		writes = append(writes, revokeMintReport.Output)
 
 		// Revoke burn role from the deployer key for safety.
-		revokeBurnReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20_with_drip.RevokeBurnRole, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.DeployTokenPoolInput.ChainSel,
-			Address:       common.HexToAddress(deployTokenReport.Output.Address),
-			Args:          chain.DeployerKey.From,
-		})
+		revokeBurnReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(deployTokenReport.Output.Address), bmBindings.NewBurnMintERC20WithDrip, burn_mint_erc20_with_drip.NewWriteRevokeBurnRole, chain.DeployerKey.From)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to revoke burn role from deployer on %s: %w", chain, err)
 		}
 		writes = append(writes, revokeBurnReport.Output)
 
-		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

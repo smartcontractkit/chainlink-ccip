@@ -17,7 +17,8 @@ import (
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -124,11 +125,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 		// A pool's type and version is immutable so we can safely use ExecuteOperation here
 		// without worrying about stale data from the cache.
-		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       input.TokenPoolAddress,
-			Args:          struct{}{},
-		})
+		tvReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, type_and_version.NewTypeAndVersionContract, type_and_version.NewReadGetTypeAndVersion, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
 		}
@@ -262,14 +259,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 				// If either rate limiter config is different, then update it
 				if !isOutboundEqual || !isInboundEqual {
-					report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
-						ChainSelector: chain.Selector,
-						Address:       input.TokenPoolAddress,
-						Args: tpops.SetChainRateLimiterConfigArgs{
-							OutboundRateLimitConfig: token_pool.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
-							InboundRateLimitConfig:  token_pool.RateLimiterConfig{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
-							RemoteChainSelector:     remoteCS,
-						},
+					report, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, token_pool.NewTokenPool, tpops.NewWriteSetChainRateLimiterConfig, tpops.SetChainRateLimiterConfigArgs{
+						OutboundRateLimitConfig: token_pool.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
+						InboundRateLimitConfig:  token_pool.RateLimiterConfig{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
+						RemoteChainSelector:     remoteCS,
 					})
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)
@@ -279,13 +272,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 				// If the exact 32-byte remote pool address is not registered, add it
 				if !hasRemoteTP {
-					report, err := cldf_ops.ExecuteOperation(b, tpops.AddRemotePool, chain, contract.FunctionInput[tpops.AddRemotePoolArgs]{
-						ChainSelector: chain.Selector,
-						Address:       input.TokenPoolAddress,
-						Args: tpops.AddRemotePoolArgs{
-							RemoteChainSelector: remoteCS,
-							RemotePoolAddress:   remoteTP,
-						},
+					report, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, token_pool.NewTokenPool, tpops.NewWriteAddRemotePool, tpops.AddRemotePoolArgs{
+						RemoteChainSelector: remoteCS,
+						RemotePoolAddress:   remoteTP,
 					})
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to add remote token pool: %w", err)
@@ -318,32 +307,28 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		//
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
-			applyChainUpdatesInput := contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
-				ChainSelector: chain.Selector,
-				Address:       input.TokenPoolAddress,
-				Args: tpops.ApplyChainUpdatesArgs{
-					RemoteChainSelectorsToRemove: remotesToDel,
-					ChainsToAdd: []token_pool.TokenPoolChainUpdate{
-						{
-							RemotePoolAddresses: [][]byte{paddedRemoteTokenPoolAddress},
-							RemoteChainSelector: input.RemoteChainSelector,
-							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
-							OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: inputORL.IsEnabled,
-								Capacity:  inputORL.Capacity,
-								Rate:      inputORL.Rate,
-							},
-							InboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: inputIRL.IsEnabled,
-								Capacity:  inputIRL.Capacity,
-								Rate:      inputIRL.Rate,
-							},
+			applyChainUpdatesArgs := tpops.ApplyChainUpdatesArgs{
+				RemoteChainSelectorsToRemove: remotesToDel,
+				ChainsToAdd: []token_pool.TokenPoolChainUpdate{
+					{
+						RemotePoolAddresses: [][]byte{paddedRemoteTokenPoolAddress},
+						RemoteChainSelector: input.RemoteChainSelector,
+						RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
+						OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
+							IsEnabled: inputORL.IsEnabled,
+							Capacity:  inputORL.Capacity,
+							Rate:      inputORL.Rate,
+						},
+						InboundRateLimiterConfig: token_pool.RateLimiterConfig{
+							IsEnabled: inputIRL.IsEnabled,
+							Capacity:  inputIRL.Capacity,
+							Rate:      inputIRL.Rate,
 						},
 					},
 				},
 			}
 
-			report, err := cldf_ops.ExecuteOperation(b, tpops.ApplyChainUpdates, chain, applyChainUpdatesInput)
+			report, err := evmops.ExecuteWrite(b, chain, input.TokenPoolAddress, token_pool.NewTokenPool, tpops.NewWriteApplyChainUpdates, applyChainUpdatesArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply chain updates: %w", err)
 			}

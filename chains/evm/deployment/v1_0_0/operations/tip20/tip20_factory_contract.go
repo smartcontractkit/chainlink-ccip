@@ -9,8 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var FactoryContractType deployment.ContractType = "TIP20Factory"
@@ -77,49 +79,55 @@ type GetTokenAddressArgs struct {
 	Salt   [32]byte
 }
 
-var CreateToken = contract.NewWrite(contract.WriteParams[CreateTokenArgs, *TIP20Factory]{
-	Name:            "tip20-factory:create-token",
-	Version:         Version,
-	Description:     "Creates a TIP-20 token via the Tempo TIP-20 factory precompile",
-	ContractType:    FactoryContractType,
-	ContractABI:     TIP20FactoryABI,
-	NewContract:     NewTIP20Factory,
-	IsAllowedCaller: contract.AllCallersAllowed[*TIP20Factory, CreateTokenArgs],
-	Validate: func(args CreateTokenArgs) error {
-		if args.Name == "" {
-			return errors.New("name is required")
-		}
-		if args.Symbol == "" {
-			return errors.New("symbol is required")
-		}
-		if args.Admin == (common.Address{}) {
-			return errors.New("admin is required")
-		}
-		return nil
-	},
-	CallContract: func(f *TIP20Factory, opts *bind.TransactOpts, args CreateTokenArgs) (*types.Transaction, error) {
-		return f.CreateToken(opts, args.Name, args.Symbol, args.Currency, args.QuoteToken, args.Admin, args.Salt)
-	},
-})
+func NewWriteCreateToken(c *TIP20Factory) *cld_ops.Operation[contract.FunctionInput[CreateTokenArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[CreateTokenArgs, *TIP20Factory]{
+		Name:            "tip20-factory:create-token",
+		Version:         Version,
+		Description:     "Creates a TIP-20 token via the Tempo TIP-20 factory precompile",
+		ContractType:    FactoryContractType,
+		ContractABI:     TIP20FactoryABI,
+		Contract:        c,
+		IsAllowedCaller: contract.AllCallersAllowed[*TIP20Factory, CreateTokenArgs],
+		Validate: func(args CreateTokenArgs) error {
+			if args.Name == "" {
+				return errors.New("name is required")
+			}
+			if args.Symbol == "" {
+				return errors.New("symbol is required")
+			}
+			if args.Admin == (common.Address{}) {
+				return errors.New("admin is required")
+			}
+			return nil
+		},
+		CallContract: func(f *TIP20Factory, opts *bind.TransactOpts, args CreateTokenArgs) (*types.Transaction, error) {
+			return f.CreateToken(opts, args.Name, args.Symbol, args.Currency, args.QuoteToken, args.Admin, args.Salt)
+		},
+	})
+}
 
-var GetTokenAddress = contract.NewRead(contract.ReadParams[GetTokenAddressArgs, common.Address, *TIP20Factory]{
-	Name:         "tip20-factory:get-token-address",
-	Version:      Version,
-	Description:  "Predicts the TIP-20 token address for a sender and salt",
-	ContractType: FactoryContractType,
-	NewContract:  NewTIP20Factory,
-	CallContract: func(f *TIP20Factory, opts *bind.CallOpts, args GetTokenAddressArgs) (common.Address, error) {
-		return f.GetTokenAddress(opts, args.Sender, args.Salt)
-	},
-})
+func NewReadGetTokenAddress(c *TIP20Factory) *cld_ops.Operation[contract.FunctionInput[GetTokenAddressArgs], common.Address, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[GetTokenAddressArgs, common.Address, *TIP20Factory]{
+		Name:         "tip20-factory:get-token-address",
+		Version:      Version,
+		Description:  "Predicts the TIP-20 token address for a sender and salt",
+		ContractType: FactoryContractType,
+		Contract:     c,
+		CallContract: func(f *TIP20Factory, opts *bind.CallOpts, args GetTokenAddressArgs) (common.Address, error) {
+			return f.GetTokenAddress(opts, args.Sender, args.Salt)
+		},
+	})
+}
 
-var IsTIP20 = contract.NewRead(contract.ReadParams[common.Address, bool, *TIP20Factory]{
-	Name:         "tip20-factory:is-tip20",
-	Version:      Version,
-	Description:  "Returns whether an address is a valid TIP-20 token",
-	ContractType: FactoryContractType,
-	NewContract:  NewTIP20Factory,
-	CallContract: func(f *TIP20Factory, opts *bind.CallOpts, token common.Address) (bool, error) {
-		return f.IsTIP20(opts, token)
-	},
-})
+func NewReadIsTIP20(c *TIP20Factory) *cld_ops.Operation[contract.FunctionInput[common.Address], bool, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[common.Address, bool, *TIP20Factory]{
+		Name:         "tip20-factory:is-tip20",
+		Version:      Version,
+		Description:  "Returns whether an address is a valid TIP-20 token",
+		ContractType: FactoryContractType,
+		Contract:     c,
+		CallContract: func(f *TIP20Factory, opts *bind.CallOpts, token common.Address) (bool, error) {
+			return f.IsTIP20(opts, token)
+		},
+	})
+}

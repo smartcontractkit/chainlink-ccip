@@ -5,7 +5,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	tpbinding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -44,14 +47,11 @@ var RegisterToken = cldf_ops.NewSequence(
 		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
-		writes := make([]evm_contract.WriteOutput, 0)
+		writes := make([]contract.WriteOutput, 0)
 
 		tokenAddress := input.TokenAddress
 		if tokenAddress == (common.Address{}) {
-			getTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
+			getTokenReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, tpbinding.NewTokenPool, token_pool.NewReadGetToken, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address: %w", err)
 			}
@@ -59,11 +59,7 @@ var RegisterToken = cldf_ops.NewSequence(
 		}
 
 		// Get the current token config from the token admin registry.
-		tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenAdminRegistryAddress,
-			Args:          tokenAddress,
-		})
+		tokenConfigReport, err := evmops.ExecuteRead(b, chain, input.TokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewReadGetTokenConfig, tokenAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config: %w", err)
 		}
@@ -72,10 +68,7 @@ var RegisterToken = cldf_ops.NewSequence(
 		tokenPoolSet := tokenConfigReport.Output.TokenPool
 
 		// Get the owner of the token admin registry.
-		ownerReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.Owner, chain, evm_contract.FunctionInput[any]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenAdminRegistryAddress,
-		})
+		ownerReport, err := evmops.ExecuteRead(b, chain, input.TokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewReadOwner, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get owner of token admin registry: %w", err)
 		}
@@ -88,13 +81,9 @@ var RegisterToken = cldf_ops.NewSequence(
 				// If no external admin is specified, we set the desired admin to the registry owner.
 				desiredAdmin = registryOwner
 			}
-			proposeAdminReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, chain, evm_contract.FunctionInput[token_admin_registry.ProposeAdministratorArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenAdminRegistryAddress,
-				Args: token_admin_registry.ProposeAdministratorArgs{
-					TokenAddress:  tokenAddress,
-					Administrator: desiredAdmin,
-				},
+			proposeAdminReport, err := evmops.ExecuteWrite(b, chain, input.TokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewWriteProposeAdministrator, token_admin_registry.ProposeAdministratorArgs{
+				TokenAddress:  tokenAddress,
+				Administrator: desiredAdmin,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to propose admin: %w", err)
@@ -105,12 +94,8 @@ var RegisterToken = cldf_ops.NewSequence(
 
 		// Accept the admin role if the registry owner is the pending admin.
 		if pendingAdmin == registryOwner {
-			acceptAdminReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, chain, evm_contract.FunctionInput[token_admin_registry.AcceptAdminRoleArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenAdminRegistryAddress,
-				Args: token_admin_registry.AcceptAdminRoleArgs{
-					TokenAddress: tokenAddress,
-				},
+			acceptAdminReport, err := evmops.ExecuteWrite(b, chain, input.TokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewWriteAcceptAdminRole, token_admin_registry.AcceptAdminRoleArgs{
+				TokenAddress: tokenAddress,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept admin role: %w", err)
@@ -121,13 +106,9 @@ var RegisterToken = cldf_ops.NewSequence(
 
 		// Set the token pool on the token admin registry if the registry owner is the admin and the pool is not set.
 		if admin == registryOwner && tokenPoolSet != input.TokenPoolAddress {
-			setPoolReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.SetPool, chain, evm_contract.FunctionInput[token_admin_registry.SetPoolArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenAdminRegistryAddress,
-				Args: token_admin_registry.SetPoolArgs{
-					TokenAddress:     tokenAddress,
-					TokenPoolAddress: input.TokenPoolAddress,
-				},
+			setPoolReport, err := evmops.ExecuteWrite(b, chain, input.TokenAdminRegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewWriteSetPool, token_admin_registry.SetPoolArgs{
+				TokenAddress:     tokenAddress,
+				TokenPoolAddress: input.TokenPoolAddress,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set token pool: %w", err)
@@ -135,7 +116,7 @@ var RegisterToken = cldf_ops.NewSequence(
 			writes = append(writes, setPoolReport.Output)
 		}
 
-		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

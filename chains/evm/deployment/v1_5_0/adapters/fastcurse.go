@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
@@ -136,10 +136,7 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 			}
 			// form the curse ID
 			// get config version
-			cfgDetailsOp, err := cldf_ops.ExecuteOperation(b, ops.GetConfigDetails, chain, contract.FunctionInput[any]{
-				Address:       rmnAddr,
-				ChainSelector: chain.Selector,
-			})
+			cfgDetailsOp, err := evmops.ExecuteRead(b, chain, rmnAddr, rmn_contract.NewRMNContract, ops.NewReadGetConfigDetails, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get config details for RMN at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 			}
@@ -186,11 +183,7 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 			// get the curse details
 			requests := make([]rmn_contract.RMNOwnerUnvoteToCurseRequest, 0)
 			for _, subject := range in.Subjects {
-				curseProgressRep, err := cldf_ops.ExecuteOperation(b, ops.GetCurseProgress, chain, contract.FunctionInput[api.Subject]{
-					Address:       rmnAddr,
-					ChainSelector: chain.Selector,
-					Args:          subject,
-				})
+				curseProgressRep, err := evmops.ExecuteRead(b, chain, rmnAddr, rmn_contract.NewRMNContract, ops.NewReadGetCurseProgress, subject)
 				if err != nil {
 					return sequences.OnChainOutput{},
 						fmt.Errorf("failed to get curse progress for subject %x on chain %d: %w", subject, chain.Selector, err)

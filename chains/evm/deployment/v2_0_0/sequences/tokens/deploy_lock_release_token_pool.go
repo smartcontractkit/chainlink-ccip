@@ -1,6 +1,10 @@
 package tokens
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	aph_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/advanced_pool_hooks"
+	elb_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
 	"fmt"
 	"slices"
 
@@ -12,7 +16,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
@@ -29,8 +32,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
 
-		lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+		lockBoxDeployReport, err := evmops.ExecuteDeploy(b, erc20_lock_box.Deploy, chain, contract.DeployInput[erc20_lock_box.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args: erc20_lock_box.ConstructorArgs{
 				Token: input.ConstructorArgs.Token,
@@ -41,8 +43,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 lock box to %s: %w", chain, err)
 		}
 
-		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+		hooksDeployReport, err := evmops.ExecuteDeploy(b, advanced_pool_hooks.Deploy, chain, contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
 				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
@@ -60,8 +61,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			deployment.ContractType(input.TokenPoolType),
 			*input.TokenPoolVersion,
 		)
-		tpDeployReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
+		tpDeployReport, err := evmops.ExecuteDeploy(b, lock_release_token_pool.Deploy, chain, contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
 			TypeAndVersion: typeAndVersion,
 			Args: lock_release_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
@@ -94,27 +94,20 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
-			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSel,
-				Address:       hooksAddr,
-			})
+			getAuthorizedCallersReport, err := evmops.ExecuteRead(b, chain, hooksAddr, evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks), advanced_pool_hooks.NewReadGetAllAuthorizedCallers, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
 			}
 
 			if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
-				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
-					ChainSelector: input.ChainSel,
-					Address:       hooksAddr,
-					Args: advanced_pool_hooks.AuthorizedCallerArgs{
-						AddedCallers: []common.Address{poolAddr},
-					},
+				applyAuthorizedCallerUpdatesReport, err := evmops.ExecuteWrite(b, chain, hooksAddr, evmops.BindAs[aph_bindings.AdvancedPoolHooksInterface](aph_bindings.NewAdvancedPoolHooks), advanced_pool_hooks.NewWriteApplyAuthorizedCallerUpdates, aph_bindings.AuthorizedCallersAuthorizedCallerArgs{
+					AddedCallers: []common.Address{poolAddr},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
 				}
 
-				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+				batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 				}
@@ -123,19 +116,15 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Add lock release token pool to the authorized callers of the lock box.
-		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-			ChainSelector: input.ChainSel,
-			Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
-			Args: erc20_lock_box.AuthorizedCallerArgs{
-				AddedCallers: []common.Address{
-					common.HexToAddress(tpDeployReport.Output.Address),
-				},
+		applyAuthorizedCallerUpdatesReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(lockBoxDeployReport.Output.Address), evmops.BindAs[elb_bindings.ERC20LockBoxInterface](elb_bindings.NewERC20LockBox), erc20_lock_box.NewWriteApplyAuthorizedCallerUpdates, elb_bindings.AuthorizedCallersAuthorizedCallerArgs{
+			AddedCallers: []common.Address{
+				common.HexToAddress(tpDeployReport.Output.Address),
 			},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to lock box on %s: %w", chain, err)
 		}
-		batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

@@ -1,13 +1,15 @@
 package sequences
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	vvr_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
+	cv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -72,11 +74,11 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		remoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
-		allowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
+		remoteChainConfigArgs := make([]cv_bindings.BaseVerifierRemoteChainConfigArgs, 0, len(input.RemoteChains))
+		allowlistArgs := make([]cv_bindings.BaseVerifierAllowlistConfigArgs, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
-			desiredRemoteChainArg := committee_verifier.RemoteChainConfigArgs{
+			desiredRemoteChainArg := cv_bindings.BaseVerifierRemoteChainConfigArgs{
 				Router:              common.HexToAddress(input.Router),
 				RemoteChainSelector: remoteSelector,
 				AllowlistEnabled:    remoteConfig.AllowlistEnabled,
@@ -85,11 +87,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				// TODO : standardise payload size
 				PayloadSizeBytes: remoteConfig.PayloadSizeBytes,
 			}
-			currentRemoteReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
-				Args:          remoteSelector,
-			})
+			currentRemoteReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetRemoteChainConfig, remoteSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote chain config for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
 			}
@@ -99,12 +97,8 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				currRemote.RemoteChainConfig.AllowlistEnabled != desiredRemoteChainArg.AllowlistEnabled {
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
-				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(committeeVerifier),
-					Args: committee_verifier.GetFeeArgs{
-						DestChainSelector: remoteSelector,
-					},
+				getFeeReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetFee, committee_verifier.GetFeeArgs{
+					DestChainSelector: remoteSelector,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
@@ -123,7 +117,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("invalid allowlist addresses for remote chain %d: %w", remoteSelector, err)
 			}
 			if len(toAdd) > 0 || len(toRemove) > 0 {
-				allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
+				allowlistArgs = append(allowlistArgs, cv_bindings.BaseVerifierAllowlistConfigArgs{
 					AllowlistEnabled:          remoteConfig.AllowlistEnabled,
 					AddedAllowlistedSenders:   toAdd,
 					RemovedAllowlistedSenders: toRemove,
@@ -133,10 +127,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 		}
 
 		// Build outbound implementation args only for remotes where on-chain verifier differs (idempotent).
-		currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
-		})
+		currentOutboundReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifierResolver), vvr_bindings.NewVersionedVerifierResolver, versioned_verifier_resolver.NewReadGetAllOutboundImplementations, nil)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get outbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
 		}
@@ -156,11 +147,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 		}
 
 		if len(remoteChainConfigArgs) > 0 {
-			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
-				Args:          remoteChainConfigArgs,
-			})
+			committeeVerifierReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewWriteApplyRemoteChainConfigUpdates, remoteChainConfigArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply remote chain config updates to CommitteeVerifier on chain %s: %w", chain, err)
 			}
@@ -168,11 +155,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 		}
 
 		if len(allowlistArgs) > 0 {
-			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
-				Args:          allowlistArgs,
-			})
+			committeeVerifierAllowlistReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewWriteApplyAllowlistUpdates, allowlistArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier on chain %s: %w", chain, err)
 			}
@@ -180,11 +163,7 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 		}
 
 		if len(outboundImplementationArgs) > 0 {
-			outboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierResolver),
-				Args:          outboundImplementationArgs,
-			})
+			outboundReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifierResolver), vvr_bindings.NewVersionedVerifierResolver, versioned_verifier_resolver.NewWriteApplyOutboundImplementationUpdates, outboundImplementationArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
 			}
@@ -193,19 +172,12 @@ var ConfigureCommitteeVerifierAsSource = cldf_ops.NewSequence(
 
 		if !input.AllowedFinalityConfig.IsZero() {
 			desiredFinality := input.AllowedFinalityConfig.Raw()
-			currentFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
-			})
+			currentFinalityReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetAllowedFinalityConfig, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed finality config from CommitteeVerifier on chain %s: %w", chain, err)
 			}
 			if currentFinalityReport.Output != desiredFinality {
-				setFinalityReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(committeeVerifier),
-					Args:          desiredFinality,
-				})
+				setFinalityReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewWriteSetAllowedFinalityConfig, desiredFinality)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set allowed finality config on CommitteeVerifier on chain %s: %w", chain, err)
 				}
@@ -242,23 +214,19 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		signatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(input.RemoteChains))
+		signatureConfigs := make([]cv_bindings.SignatureQuorumValidatorSignatureConfig, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			signers := make([]common.Address, 0, len(remoteConfig.SignatureConfig.Signers))
 			for _, signer := range remoteConfig.SignatureConfig.Signers {
 				signers = append(signers, common.HexToAddress(signer))
 			}
-			desiredSig := committee_verifier.SignatureConfig{
+			desiredSig := cv_bindings.SignatureQuorumValidatorSignatureConfig{
 				SourceChainSelector: remoteSelector,
 				Threshold:           remoteConfig.SignatureConfig.Threshold,
 				Signers:             signers,
 			}
-			currentSigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetSignatureConfig, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
-				Args:          remoteSelector,
-			})
+			currentSigReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadGetSignatureConfig, remoteSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get signature config for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
 			}
@@ -269,12 +237,8 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 		}
 
 		if len(signatureConfigs) > 0 {
-			signatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.ApplySignatureConfigsArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
-				Args: committee_verifier.ApplySignatureConfigsArgs{
-					SignatureConfigs: signatureConfigs,
-				},
+			signatureConfigReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewWriteApplySignatureConfigs, committee_verifier.ApplySignatureConfigsArgs{
+				SignatureConfigs: signatureConfigs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply signature configs to CommitteeVerifier on chain %s: %w", chain, err)
@@ -283,10 +247,7 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 		}
 
 		// Apply inbound implementation updates on CommitteeVerifierResolver only when not already set (idempotent).
-		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.VersionTag, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
-		})
+		committeeVerifierVersionTagReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifier), evmops.BindAs[cv_bindings.CommitteeVerifierInterface](cv_bindings.NewCommitteeVerifier), committee_verifier.NewReadVersionTag, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
 		}
@@ -294,10 +255,7 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 			Version:  committeeVerifierVersionTagReport.Output,
 			Verifier: common.HexToAddress(committeeVerifier),
 		}
-		currentInboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllInboundImplementations, chain, contract.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
-		})
+		currentInboundReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(committeeVerifierResolver), vvr_bindings.NewVersionedVerifierResolver, versioned_verifier_resolver.NewReadGetAllInboundImplementations, nil)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
 		}
@@ -309,11 +267,7 @@ var ConfigureCommitteeVerifierAsDest = cldf_ops.NewSequence(
 			}
 		}
 		if !inboundAlreadySet {
-			inboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierResolver),
-				Args:          []versioned_verifier_resolver.InboundImplementationArgs{desiredInbound},
-			})
+			inboundReport, err := evmops.ExecuteWrite(b, chain, common.HexToAddress(committeeVerifierResolver), vvr_bindings.NewVersionedVerifierResolver, versioned_verifier_resolver.NewWriteApplyInboundImplementationUpdates, []versioned_verifier_resolver.InboundImplementationArgs{desiredInbound})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply inbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
 			}

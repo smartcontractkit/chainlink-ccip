@@ -7,10 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -156,8 +158,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 
 			// deploy timelock — always use the deployer key as the initial admin
 			// so we can manage roles immediately after deployment
-			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
-				ChainSelector:  in.ChainSelector,
+			timelockAddr, err := evmops.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.RBACTimelock, *ops.MCMSVersion),
 				Args: ops.OpDeployTimelockInput{
@@ -175,8 +176,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			}
 			b.Logger.Infof("Deployed Timelock at address %s on chain %s", timelockAddr, evmChain.Name)
 			// deploy call proxy with timelock
-			callProxyAddr, err := contract.MaybeDeployContract(b, ops.OpDeployCallProxy, evmChain, contract.DeployInput[ops.OpDeployCallProxyInput]{
-				ChainSelector:  in.ChainSelector,
+			callProxyAddr, err := evmops.MaybeDeployContract(b, ops.OpDeployCallProxy, evmChain, contract.DeployInput[ops.OpDeployCallProxyInput]{
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.CallProxy, *ops.MCMSVersion),
 				Args: ops.OpDeployCallProxyInput{
@@ -190,13 +190,9 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			output.Addresses = append(output.Addresses, timelockAddr, callProxyAddr)
 
 			// now that call proxy is deployed, we can add it as executor to the timelock
-			_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, evmChain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
-				ChainSelector: in.ChainSelector,
-				Address:       common.HexToAddress(timelockAddr.Address),
-				Args: ops.OpGrantRoleTimelockInput{
-					RoleID:  ops.EXECUTOR_ROLE.ID,
-					Account: common.HexToAddress(callProxyAddr.Address),
-				},
+			_, err = evmops.ExecuteWrite(b, evmChain, common.HexToAddress(timelockAddr.Address), bindings.NewRBACTimelock, ops.NewWriteGrantRoleTimelock, ops.OpGrantRoleTimelockInput{
+				RoleID:  ops.EXECUTOR_ROLE.ID,
+				Account: common.HexToAddress(callProxyAddr.Address),
 			})
 			if err != nil {
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant executor role to call proxy on timelock on chain %d: %w", in.ChainSelector, err)

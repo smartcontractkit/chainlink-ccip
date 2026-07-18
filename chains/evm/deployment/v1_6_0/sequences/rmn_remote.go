@@ -9,7 +9,9 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	gobindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 
@@ -27,11 +29,7 @@ var SeqCurse = cldf_ops.NewSequence(
 	"Cursing subjects with RMNRemote",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
 		// Use Curse0 which takes an array of subjects
-		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Curse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
-			Args:          in.Subjects,
-		})
+		opOutput, err := evmops.ExecuteWrite(b, chain, in.Addr, evmops.BindAs[gobindings.RMNRemoteInterface](gobindings.NewRMNRemote), ops.NewWriteCurse0, in.Subjects)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse subjects with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
 		}
@@ -51,11 +49,7 @@ var SeqUncurse = cldf_ops.NewSequence(
 	"Uncursing subjects with RMNRemote",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
 		// Use Uncurse0 which takes an array of subjects
-		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Uncurse0, chain, contract.FunctionInput[[][16]byte]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
-			Args:          in.Subjects,
-		})
+		opOutput, err := evmops.ExecuteWrite(b, chain, in.Addr, evmops.BindAs[gobindings.RMNRemoteInterface](gobindings.NewRMNRemote), ops.NewWriteUncurse0, in.Subjects)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse subjects with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
 		}

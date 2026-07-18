@@ -1,6 +1,10 @@
 package tokens
 
 import (
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
+	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"fmt"
 	"maps"
 	"slices"
@@ -12,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -52,20 +55,13 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// pool, and #3 the active pool supports `getSupportedChains`. The operator can override the
 		// supported chains check entirely by setting SkipActivePoolSupportedChainsCheck to true.
 		if input.RegistryAddress != (common.Address{}) && input.TokenAddress != (common.Address{}) {
-			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.RegistryAddress,
-				Args:          input.TokenAddress,
-			}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[common.Address], evm.Chain]())
+			tokenConfigReport, err := evmops.ExecuteRead(b, chain, input.RegistryAddress, tarbindings.NewTokenAdminRegistry, token_admin_registry.NewReadGetTokenConfig, input.TokenAddress, cldf_ops.WithForceExecute[contract.FunctionInput[common.Address], evm.Chain]())
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for supported-chains check: %w", err)
 			}
 			activePool := tokenConfigReport.Output.TokenPool
 			if !input.SkipActivePoolSupportedChainsCheck && activePool != (common.Address{}) && activePool != input.TokenPoolAddress {
-				supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       activePool,
-				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
+				supportedChainsReport, err := evmops.ExecuteRead(b, chain, activePool, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetSupportedChains, struct{}{}, cldf_ops.WithForceExecute[contract.FunctionInput[struct{}], evm.Chain]())
 				if err == nil {
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
@@ -80,10 +76,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			}
 		}
 		ops := make([]mcms_types.BatchOperation, 0)
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-		})
+		supportedChainsReport, err := evmops.ExecuteRead(b, chain, input.TokenPoolAddress, evmops.BindAs[tp_bindings.TokenPoolInterface](tp_bindings.NewTokenPool), token_pool.NewReadGetSupportedChains, struct{}{})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from pool: %w", err)
 		}

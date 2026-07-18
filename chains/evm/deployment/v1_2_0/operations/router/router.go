@@ -7,9 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations2/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 )
 
@@ -68,101 +70,117 @@ var DeployTestRouter = contract.NewDeploy(contract.DeployParams[ConstructorArgs]
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesArgs, *router.Router]{
-	Name:            "router:apply-ramp-updates",
-	Version:         Version,
-	Description:     "Applies ramp updates to the Router",
-	ContractType:    ContractType,
-	ContractABI:     router.RouterABI,
-	NewContract:     router.NewRouter,
-	IsAllowedCaller: contract.OnlyOwner[*router.Router, ApplyRampsUpdatesArgs],
-	Validate:        func(ApplyRampsUpdatesArgs) error { return nil },
-	CallContract: func(router *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
-		return router.ApplyRampUpdates(opts, args.OnRampUpdates, args.OffRampRemoves, args.OffRampAdds)
-	},
-})
+func NewWriteApplyRampUpdates(c *router.Router) *cld_ops.Operation[contract.FunctionInput[ApplyRampsUpdatesArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesArgs, *router.Router]{
+		Name:            "router:apply-ramp-updates",
+		Version:         Version,
+		Description:     "Applies ramp updates to the Router",
+		ContractType:    ContractType,
+		ContractABI:     router.RouterABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*router.Router, ApplyRampsUpdatesArgs],
+		Validate:        func(ApplyRampsUpdatesArgs) error { return nil },
+		CallContract: func(r *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
+			return r.ApplyRampUpdates(opts, args.OnRampUpdates, args.OffRampRemoves, args.OffRampAdds)
+		},
+	})
+}
 
-var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Router]{
-	Name:            "router:ccip-send",
-	Version:         Version,
-	Description:     "Sends a CCIP message via the Router",
-	ContractType:    ContractType,
-	ContractABI:     router.RouterABI,
-	NewContract:     router.NewRouter,
-	IsAllowedCaller: contract.AllCallersAllowed[*router.Router, CCIPSendArgs],
-	Validate:        func(CCIPSendArgs) error { return nil },
-	CallContract: func(router *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
-		opts.Value = args.Value
-		defer func() { opts.Value = nil }()
-		return router.CcipSend(opts, args.DestChainSelector, args.EVM2AnyMessage)
-	},
-})
+func NewWriteCCIPSend(c *router.Router) *cld_ops.Operation[contract.FunctionInput[CCIPSendArgs], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Router]{
+		Name:            "router:ccip-send",
+		Version:         Version,
+		Description:     "Sends a CCIP message via the Router",
+		ContractType:    ContractType,
+		ContractABI:     router.RouterABI,
+		Contract:        c,
+		IsAllowedCaller: contract.AllCallersAllowed[*router.Router, CCIPSendArgs],
+		Validate:        func(CCIPSendArgs) error { return nil },
+		CallContract: func(r *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
+			opts.Value = args.Value
+			defer func() { opts.Value = nil }()
+			return r.CcipSend(opts, args.DestChainSelector, args.EVM2AnyMessage)
+		},
+	})
+}
 
-var GetOffRamps = contract.NewRead(contract.ReadParams[any, []OffRamp, *router.Router]{
-	Name:         "router:get-off-ramps",
-	Version:      Version,
-	Description:  "Gets all off ramps on the router",
-	ContractType: ContractType,
-	NewContract:  router.NewRouter,
-	CallContract: func(router *router.Router, opts *bind.CallOpts, args any) ([]OffRamp, error) {
-		return router.GetOffRamps(opts)
-	},
-})
+func NewReadGetOffRamps(c *router.Router) *cld_ops.Operation[contract.FunctionInput[struct{}], []OffRamp, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[struct{}, []OffRamp, *router.Router]{
+		Name:         "router:get-off-ramps",
+		Version:      Version,
+		Description:  "Gets all off ramps on the router",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(r *router.Router, opts *bind.CallOpts, args struct{}) ([]OffRamp, error) {
+			return r.GetOffRamps(opts)
+		},
+	})
+}
 
-var GetOnRamp = contract.NewRead(contract.ReadParams[uint64, common.Address, *router.Router]{
-	Name:         "router:get-on-ramp",
-	Version:      Version,
-	Description:  "Gets the on ramp for a given destination chain selector",
-	ContractType: ContractType,
-	NewContract:  router.NewRouter,
-	CallContract: func(router *router.Router, opts *bind.CallOpts, destChainSelector uint64) (common.Address, error) {
-		return router.GetOnRamp(opts, destChainSelector)
-	},
-})
+func NewReadGetOnRamp(c router.RouterInterface) *cld_ops.Operation[contract.FunctionInput[uint64], common.Address, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[uint64, common.Address, router.RouterInterface]{
+		Name:         "router:get-on-ramp",
+		Version:      Version,
+		Description:  "Gets the on ramp for a given destination chain selector",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(r router.RouterInterface, opts *bind.CallOpts, destChainSelector uint64) (common.Address, error) {
+			return r.GetOnRamp(opts, destChainSelector)
+		},
+	})
+}
 
-var GetFee = contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *router.Router]{
-	Name:         "router:get-fee",
-	Version:      Version,
-	Description:  "Gets the fee for a message",
-	ContractType: ContractType,
-	NewContract:  router.NewRouter,
-	CallContract: func(router *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (*big.Int, error) {
-		return router.GetFee(opts, args.DestChainSelector, args.EVM2AnyMessage)
-	},
-})
+func NewReadGetFee(c *router.Router) *cld_ops.Operation[contract.FunctionInput[CCIPSendArgs], *big.Int, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *router.Router]{
+		Name:         "router:get-fee",
+		Version:      Version,
+		Description:  "Gets the fee for a message",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(r *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (*big.Int, error) {
+			return r.GetFee(opts, args.DestChainSelector, args.EVM2AnyMessage)
+		},
+	})
+}
 
-var IsChainSupported = contract.NewRead(contract.ReadParams[uint64, bool, *router.Router]{
-	Name:         "router:isChainSupported",
-	Version:      Version,
-	Description:  "If the router supports a given destination chain selector",
-	ContractType: ContractType,
-	NewContract:  router.NewRouter,
-	CallContract: func(router *router.Router, opts *bind.CallOpts, args uint64) (bool, error) {
-		return router.IsChainSupported(opts, args)
-	},
-})
+func NewReadIsChainSupported(c *router.Router) *cld_ops.Operation[contract.FunctionInput[uint64], bool, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[uint64, bool, *router.Router]{
+		Name:         "router:isChainSupported",
+		Version:      Version,
+		Description:  "If the router supports a given destination chain selector",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(r *router.Router, opts *bind.CallOpts, args uint64) (bool, error) {
+			return r.IsChainSupported(opts, args)
+		},
+	})
+}
 
-var GetWrappedNative = contract.NewRead(contract.ReadParams[struct{}, common.Address, *router.Router]{
-	Name:         "router:get-wrapped-native",
-	Version:      Version,
-	Description:  "Gets the wrapped native address",
-	ContractType: ContractType,
-	NewContract:  router.NewRouter,
-	CallContract: func(router *router.Router, opts *bind.CallOpts, args struct{}) (common.Address, error) {
-		return router.GetWrappedNative(opts)
-	},
-})
+func NewReadGetWrappedNative(c *router.Router) *cld_ops.Operation[contract.FunctionInput[struct{}], common.Address, cldf_evm.Chain] {
+	return contract.NewRead(contract.ReadParams[struct{}, common.Address, *router.Router]{
+		Name:         "router:get-wrapped-native",
+		Version:      Version,
+		Description:  "Gets the wrapped native address",
+		ContractType: ContractType,
+		Contract:     c,
+		CallContract: func(r *router.Router, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+			return r.GetWrappedNative(opts)
+		},
+	})
+}
 
-var SetWrappedNative = contract.NewWrite(contract.WriteParams[common.Address, *router.Router]{
-	Name:            "router:set-wrapped-native",
-	Version:         Version,
-	Description:     "Sets the wrapped native address",
-	ContractType:    ContractType,
-	ContractABI:     router.RouterABI,
-	NewContract:     router.NewRouter,
-	IsAllowedCaller: contract.OnlyOwner[*router.Router, common.Address],
-	Validate:        func(common.Address) error { return nil },
-	CallContract: func(router *router.Router, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
-		return router.SetWrappedNative(opts, args)
-	},
-})
+func NewWriteSetWrappedNative(c *router.Router) *cld_ops.Operation[contract.FunctionInput[common.Address], contract.WriteOutput, cldf_evm.Chain] {
+	return contract.NewWrite(contract.WriteParams[common.Address, *router.Router]{
+		Name:            "router:set-wrapped-native",
+		Version:         Version,
+		Description:     "Sets the wrapped native address",
+		ContractType:    ContractType,
+		ContractABI:     router.RouterABI,
+		Contract:        c,
+		IsAllowedCaller: contract.OnlyOwner[*router.Router, common.Address],
+		Validate:        func(common.Address) error { return nil },
+		CallContract: func(r *router.Router, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+			return r.SetWrappedNative(opts, args)
+		},
+	})
+}

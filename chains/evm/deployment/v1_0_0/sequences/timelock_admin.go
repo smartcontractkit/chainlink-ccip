@@ -5,9 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 )
 
@@ -30,13 +31,9 @@ func GrantTimelockAdminRole(
 		b.Logger.Infof("Timelock %s is already admin on Timelock %s on chain %s", account, timelockAddr, chain.Name)
 		return nil
 	}
-	_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, chain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
-		ChainSelector: chainSelector,
-		Address:       timelockAddr,
-		Args: ops.OpGrantRoleTimelockInput{
-			RoleID:  ops.ADMIN_ROLE.ID,
-			Account: account,
-		},
+	_, err = evmops.ExecuteWrite(b, chain, timelockAddr, bindings.NewRBACTimelock, ops.NewWriteGrantRoleTimelock, ops.OpGrantRoleTimelockInput{
+		RoleID:  ops.ADMIN_ROLE.ID,
+		Account: account,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to grant admin role to %s on timelock %s on chain %d: %w", account, timelockAddr, chainSelector, err)
@@ -64,12 +61,8 @@ func RenounceDeployerTimelockAdmin(
 		b.Logger.Infof("Deployer is not admin on Timelock %s on chain %s, skipping renounce", timelockAddr, chain.Name)
 		return nil
 	}
-	_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, chain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
-		ChainSelector: chainSelector,
-		Address:       timelockAddr,
-		Args: ops.OpRenounceRoleTimelockInput{
-			RoleID: ops.ADMIN_ROLE.ID,
-		},
+	_, err = evmops.ExecuteWrite(b, chain, timelockAddr, bindings.NewRBACTimelock, ops.NewWriteRenounceRoleTimelock, ops.OpRenounceRoleTimelockInput{
+		RoleID: ops.ADMIN_ROLE.ID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to renounce admin role on timelock %s on chain %d: %w", timelockAddr, chainSelector, err)
