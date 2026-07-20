@@ -3,7 +3,6 @@ package changesets_test
 import (
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	rmn_proxy_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
@@ -65,7 +64,6 @@ func TestActivateRMN_Apply(t *testing.T) {
 		MCMS: mcms.Input{
 			Qualifier:      common_utils.RMNTimelockQualifier,
 			TimelockAction: mcms_types.TimelockActionSchedule,
-			TimelockDelay:  mcms_types.MustParseDuration("0s"),
 			ValidUntil:     3759765795,
 		},
 		Cfg: changesets.ActivateRMNCfg{
@@ -146,7 +144,6 @@ func TestActivateRMN_WithAdditionalCurseAdmins(t *testing.T) {
 		MCMS: mcms.Input{
 			Qualifier:      common_utils.RMNTimelockQualifier,
 			TimelockAction: mcms_types.TimelockActionSchedule,
-			TimelockDelay:  mcms_types.MustParseDuration("0s"),
 			ValidUntil:     3759765795,
 		},
 		Cfg: changesets.ActivateRMNCfg{
@@ -219,23 +216,6 @@ func TestActivateRMN_ValidateCurseAdmins(t *testing.T) {
 	})
 }
 
-func TestActivateRMN_ValidateCfgRejectsNegativeTimelockDelay(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector}),
-	)
-	require.NoError(t, err)
-
-	mcmsRegistry := cs_core.GetRegistry()
-	err = changesets.ActivateRMN(mcmsRegistry).VerifyPreconditions(*e, cs_core.WithMCMS[changesets.ActivateRMNCfg]{
-		Cfg: changesets.ActivateRMNCfg{
-			ChainSels:     []uint64{chainSelector},
-			TimelockDelay: -time.Hour,
-		},
-	})
-	require.ErrorContains(t, err, "TimelockDelay cannot be negative")
-}
-
 func TestActivateRMN_AccumulatesBatchOpsAcrossChains(t *testing.T) {
 	const (
 		chainSelectorA = uint64(5009297550715157269)
@@ -278,7 +258,6 @@ func TestActivateRMN_AccumulatesBatchOpsAcrossChains(t *testing.T) {
 		MCMS: mcms.Input{
 			Qualifier:      common_utils.RMNTimelockQualifier,
 			TimelockAction: mcms_types.TimelockActionSchedule,
-			TimelockDelay:  mcms_types.MustParseDuration("0s"),
 			ValidUntil:     3759765795,
 		},
 		Cfg: changesets.ActivateRMNCfg{
@@ -586,7 +565,6 @@ func transferProxyOwnershipToTimelockForTest(
 		Build(mcms.Input{
 			Qualifier:      mcmsQualifier,
 			TimelockAction: mcms_types.TimelockActionSchedule,
-			TimelockDelay:  mcms_types.MustParseDuration("0s"),
 			ValidUntil:     validUntil,
 		})
 	require.NoError(t, err)
@@ -668,7 +646,7 @@ func deployMCMSInstanceForTest(
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployTimelockInput{
-			TimelockMinDelay: big.NewInt(0),
+			TimelockMinDelay: big.NewInt(1),
 			Proposers:        []common.Address{common.HexToAddress(proposerReport.Output.Addresses[0].Address)},
 			Bypassers:        []common.Address{common.HexToAddress(bypasserReport.Output.Addresses[0].Address)},
 			Cancellers:       []common.Address{common.HexToAddress(cancellerReport.Output.Addresses[0].Address)},

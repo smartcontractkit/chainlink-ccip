@@ -427,7 +427,7 @@ func deployMCMSInstanceForTest(
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployTimelockInput{
-			TimelockMinDelay: big.NewInt(0),
+			TimelockMinDelay: big.NewInt(1),
 			Proposers:        []common.Address{common.HexToAddress(proposerReport.Output.Addresses[0].Address)},
 			Bypassers:        []common.Address{common.HexToAddress(bypasserReport.Output.Addresses[0].Address)},
 			Cancellers:       []common.Address{common.HexToAddress(cancellerReport.Output.Addresses[0].Address)},

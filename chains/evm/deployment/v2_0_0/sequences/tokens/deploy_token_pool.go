@@ -226,13 +226,13 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		// Deploy the desired pool contract
 		output := sequences.OnChainOutput{}
 		switch {
-		case poolutil.IsLockReleasePoolType(tokenPoolType.String()):
+		case utils.IsLockReleasePoolType(tokenPoolType.String()):
 			if report, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, internalInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool on chain %d: %w", chain.Selector, err)
 			} else {
 				output = report.Output
 			}
-		case poolutil.IsBurnMintPoolType(tokenPoolType.String()):
+		case utils.IsBurnMintPoolType(tokenPoolType.String()):
 			if report, err := cldf_ops.ExecuteSequence(b, DeployBurnMintTokenPool, chain, internalInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool on chain %d: %w", chain.Selector, err)
 			} else {

@@ -979,7 +979,12 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 		ChainFeeAsyncObserverDisabled:   true,
 		TokenPriceAsyncObserverDisabled: true,
-		DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
+		// Non-zero per-round observation timeouts so the async runner doesn't time out before the
+		// (synchronous, mocked) observers complete; production applies these defaults in config
+		// validation.
+		ChainFeeAsyncObserverSyncTimeout:   10 * time.Second,
+		TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
+		DonBreakingChangesVersion:          pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

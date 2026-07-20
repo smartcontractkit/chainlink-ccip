@@ -263,17 +263,6 @@ contracts:
       - name: removeFeeTokens
         access: owner
 
-  - contract_name: CrossChainToken
-    version: "2.0.0"
-    package_name: erc20
-    abi_file: cross_chain_token.json
-    no_deployment: true
-    functions:
-      - name: approve
-        access: public
-      - name: balanceOf
-        access: public
-
   - contract_name: AdvancedPoolHooks
     version: "2.0.0"
     functions:
@@ -463,6 +452,8 @@ contracts:
     functions:
       - name: applyAuthorizedCallerUpdates
         access: owner
+      - name: getAllAuthorizedCallers
+        access: public
 
   - contract_name: USDCTokenPoolProxy
     version: "2.0.0"
@@ -477,6 +468,8 @@ contracts:
         access: owner
       - name: setFeeAggregator
         access: owner
+      - name: getFeeAggregator
+        access: public
 
   - contract_name: AdvancedPoolHooksExtractor
     version: "2.0.0"

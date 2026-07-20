@@ -193,7 +193,6 @@ func (ma *transfersTest_MockTokenAdapter) MigrateLockReleasePoolLiquiditySequenc
 var basicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,
-	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
 }
 
@@ -846,7 +845,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				require.Equal(t, tt.cfg.MCMS.Description, proposal.Description)
 				require.Equal(t, tt.cfg.MCMS.OverridePreviousRoot, proposal.OverridePreviousRoot)
 				require.Equal(t, tt.cfg.MCMS.ValidUntil, proposal.ValidUntil)
-				require.Equal(t, tt.cfg.MCMS.TimelockDelay, proposal.Delay)
 				require.Equal(t, tt.cfg.MCMS.TimelockAction, proposal.Action)
 
 				require.Len(t, proposal.Operations, len(tt.cfg.Tokens))

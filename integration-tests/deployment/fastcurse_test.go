@@ -218,14 +218,14 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 			},
 			chain2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
+				TimelockMinDelay: big.NewInt(1),
 				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
 			},
 		},
@@ -272,7 +272,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership to timelock for fast curse test",
@@ -320,7 +319,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Curse proposal for fast curse test",

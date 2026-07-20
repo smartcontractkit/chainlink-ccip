@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/mcms/timelockdelay"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmsaptossdk "github.com/smartcontractkit/mcms/sdk/aptos"
@@ -69,7 +70,6 @@ func MCMSInputForQualifier(qualifier string) mcms_utils.Input {
 	return mcms_utils.Input{
 		Qualifier:      qualifier,
 		TimelockAction: mcmstypes.TimelockActionSchedule,
-		TimelockDelay:  mcmstypes.MustParseDuration("0s"),
 		ValidUntil:     3759765795,
 		Description:    "Accept MCM contract ownership on timelock",
 	}
@@ -395,6 +395,9 @@ func findCallProxyAddress(t *testing.T, env cldf.Environment, chainSelector uint
 }
 
 func ProcessTimelockProposals(t *testing.T, env cldf.Environment, proposals []mcmslib.TimelockProposal, realBackend bool) {
+	err := timelockdelay.CorrectTimelockDelays(env.GetContext(), env.Logger, env.BlockChains, proposals)
+	require.NoError(t, err, "failed to correct timelock proposal delays")
+
 	for _, prop := range proposals {
 		chains := mapset.NewSet[uint64]()
 		for _, op := range prop.Operations {

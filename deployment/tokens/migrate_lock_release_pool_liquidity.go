@@ -50,7 +50,30 @@ func MigrateLockReleasePoolLiquidity(tokenRegistry *TokenAdapterRegistry, mcmsRe
 }
 
 func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidityConfig) error {
-	return func(_ cldf.Environment, _ MigrateLockReleasePoolLiquidityConfig) error {
+	return func(_ cldf.Environment, cfg MigrateLockReleasePoolLiquidityConfig) error {
+		if len(cfg.Migrations) == 0 {
+			return fmt.Errorf("at least one migration is required")
+		}
+		for i, migration := range cfg.Migrations {
+			if migration.Amount != nil && migration.BasisPoints != nil {
+				return fmt.Errorf("migration[%d]: Amount and BasisPoints are mutually exclusive", i)
+			}
+			if migration.Amount == nil && migration.BasisPoints == nil {
+				return fmt.Errorf("migration[%d]: one of Amount or BasisPoints must be provided", i)
+			}
+			if migration.BasisPoints != nil {
+				bp := *migration.BasisPoints
+				if bp == 0 || bp > 10000 {
+					return fmt.Errorf("migration[%d]: BasisPoints must be between 1 and 10000, got %d", i, bp)
+				}
+			}
+			if migration.Amount != nil && migration.Amount.Sign() <= 0 {
+				return fmt.Errorf("migration[%d]: Amount must be positive", i)
+			}
+			if (migration.RegistryRef == nil) != (migration.TokenRef == nil) {
+				return fmt.Errorf("migration[%d]: RegistryRef and TokenRef must both be set or both be omitted", i)
+			}
+		}
 		return nil
 	}
 }

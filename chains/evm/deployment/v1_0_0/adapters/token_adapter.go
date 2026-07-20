@@ -169,7 +169,7 @@ func (a *EVMTokenBase) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain.
 	// all versions (v1.5.x, v1.6.x, v2.x.x) so we use the v1.5.x generated bindings
 	// here for simplicity instead of overcomplicating the code with a switch on the
 	// pool version.
-	qualifier := fmt.Sprintf("%s-%s", poolAddress, tv.Output.Type)
+	qualifier := cciputils.DefaultQualifier(poolAddress.Hex(), tv.Output.Type)
 	if token, err := cldf_ops.ExecuteOperation(b,
 		token_pool.GetToken, chain,
 		contract.FunctionInput[any]{
@@ -269,15 +269,12 @@ func (a *EVMTokenBase) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.De
 
 // IsBurnMintPoolType returns true if the pool type is one of the burn-mint variants (standard or with from-mint).
 func (a *EVMTokenBase) IsBurnMintPoolType(poolType string) bool {
-	return poolType == cciputils.BurnMintTokenPool.String() ||
-		poolType == cciputils.BurnFromMintTokenPool.String() ||
-		poolType == cciputils.BurnWithFromMintTokenPool.String()
+	return cciputils.IsBurnMintPoolType(poolType)
 }
 
 // IsLockReleasePoolType returns true if the pool type is one of the lock-release variants (standard or siloed).
 func (a *EVMTokenBase) IsLockReleasePoolType(poolType string) bool {
-	return poolType == cciputils.LockReleaseTokenPool.String() ||
-		poolType == cciputils.SiloedLockReleaseTokenPool.String()
+	return cciputils.IsLockReleasePoolType(poolType)
 }
 
 // IsBurnMintTokenType returns true if the token type is one of the burn-mint variants (ERC20 or ERC677).

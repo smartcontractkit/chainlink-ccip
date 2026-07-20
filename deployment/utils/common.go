@@ -60,6 +60,21 @@ const (
 	UltraFastCurseMCMSQualifier = "UltraFastCurse"
 )
 
+// IsLockReleasePoolType reports whether poolType is a standard or siloed lock-release pool.
+// HybridLockReleaseUSDCTokenPool and BurnMintWithLockReleaseFlag are intentionally excluded:
+// the former uses the CCTP hybrid migration path; the latter is not a lock-release pool.
+func IsLockReleasePoolType(poolType string) bool {
+	return poolType == LockReleaseTokenPool.String() ||
+		poolType == SiloedLockReleaseTokenPool.String()
+}
+
+// IsBurnMintPoolType reports whether poolType is a standard burn-mint pool variant.
+func IsBurnMintPoolType(poolType string) bool {
+	return poolType == BurnMintTokenPool.String() ||
+		poolType == BurnFromMintTokenPool.String() ||
+		poolType == BurnWithFromMintTokenPool.String()
+}
+
 // familySelectors is a concurrent-safe registry of chain family → 4-byte
 // on-chain selector. It is populated automatically when adapters that implement
 // ChainMetadataProvider are registered via LaneAdapterRegistry.RegisterLaneAdapter.
@@ -133,6 +148,13 @@ var (
 	Version_1_6_3 = semver.MustParse("1.6.3")
 	Version_2_0_0 = semver.MustParse("2.0.0")
 )
+
+// DefaultQualifier returns a synthetic qualifier constructed from an address and
+// contract type. Used when a qualifier cannot be obtained from the datastore,
+// e.g. when resolving contract refs from on-chain data via typeAndVersion().
+func DefaultQualifier(address string, contractType cldf.ContractType) string {
+	return fmt.Sprintf("%s-%s", address, contractType)
+}
 
 // StripPatchVersion returns a copy of the version with the patch component set
 // to 0, preserving major and minor. Useful for adapter registry lookups where
