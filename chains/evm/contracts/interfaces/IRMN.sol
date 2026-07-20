@@ -17,4 +17,15 @@ interface IRMN {
   function isCursed(
     bytes16 subject
   ) external view returns (bool);
+
+  /// @notice Legacy struct: used for blessings, kept to maintain compatibility with the IRMN interface.
+  struct TaggedRoot {
+    address commitStore;
+    bytes32 root;
+  }
+
+  /// @notice Legacy CCIP needs this function but blessings have been removed so it always returns true.
+  function isBlessed(
+    TaggedRoot calldata taggedRoot
+  ) external view returns (bool);
 }
