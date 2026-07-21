@@ -131,6 +131,9 @@ type ActivateRMNInput struct {
 	// CurseAdmins are optional additional authorized callers added at deploy time.
 	// The Ultra Fast Curse RBACTimelock is always included.
 	CurseAdmins []common.Address
+	// SubjectsToMigrate are cursed subjects from the current RMN that should be cursed
+	// on the new RMN before ownership transfer. Applied using deployer/owner key.
+	SubjectsToMigrate [][16]byte
 }
 
 // ActivateRMNOutput holds on-chain deploy results and MCMS batch ops split by owning timelock.
@@ -144,7 +147,7 @@ type ActivateRMNOutput struct {
 var DeployAndActivateRMN = cldf_ops.NewSequence(
 	"deploy-and-activate-rmn",
 	rmnops.Version,
-		"Deploy RMN 2.1.0 with Ultra Fast Curse MCMS as curse admin, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
+	"Deploy RMN 2.1.0 with curse admins, migrate active curses using deployer key, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ActivateRMNInput) (output ActivateRMNOutput, err error) {
 		if input.ChainSelector != chain.Selector {
 			return ActivateRMNOutput{}, fmt.Errorf("input chain selector %d does not match chain %d",
@@ -184,6 +187,21 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		rmnAddr := common.HexToAddress(rmnRef.Address)
 		output.Addresses = append(output.Addresses, rmnRef)
 
+		// 1.5. Apply any cursed subjects from the previous RMN using deployer/owner key,
+		// before ownership transfer. This ensures curses are applied by the owner directly,
+		// not via MCMS proposal.
+		if len(input.SubjectsToMigrate) > 0 {
+			opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
+				Address:       rmnAddr,
+				ChainSelector: chain.Selector,
+				Args:          input.SubjectsToMigrate,
+			})
+			if err != nil {
+				return ActivateRMNOutput{}, fmt.Errorf("failed to migrate curses on RMN at %s on chain %d: %w", rmnAddr.Hex(), chain.Selector, err)
+			}
+			writes = append(writes, opOutput.Output)
+		}
+
 		// 2. Transfer RMN ownership to RMNMCMS timelock.
 		ownershipBatchOps, err := mcms_seq.TransferAndAcceptOwnership(b, chain, []mcms_ops.OpTransferOwnershipInput{
 			{
@@ -200,18 +218,24 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		output.RMNMCMSBatchOps = append(output.RMNMCMSBatchOps, ownershipBatchOps...)
 
 		// 3. Point RMNProxy at the new RMN (makes the implementation live for CCIP).
-		rmnProxyWrites, err := pointRMNProxyAtRMN(b, chain, input.ExistingAddresses, rmnAddr)
+		// If proxy is deployer-owned, SetRMN executes on-chain immediately and shouldn't populate CLLCCIPBatchOps.
+		// If proxy is not deployer-owned, SetRMN will be prepared for MCMS via CLLCCIPBatchOps.
+		setRMNWrites, err := pointRMNProxyAtRMN(b, chain, input.ExistingAddresses, rmnAddr)
 		if err != nil {
 			return ActivateRMNOutput{}, err
 		}
-		writes = append(writes, rmnProxyWrites...)
 
-		if len(writes) > 0 {
-			batch, err := contract.NewBatchOperationFromWrites(writes)
+		// Only add SetRMN writes to CLLCCIPBatchOps if the proxy is NOT deployer-owned.
+		// When proxy is deployer-owned, SetRMN executes immediately on-chain, so no batch operations are needed.
+		// The trick is: ExecuteOperation will only populate Transactions if the caller can't execute directly.
+		// We filter for that by checking if any batch operations will actually be created.
+		if len(setRMNWrites) > 0 {
+			batch, err := contract.NewBatchOperationFromWrites(setRMNWrites)
 			if err != nil {
 				return ActivateRMNOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}
 			if len(batch.Transactions) > 0 {
+				// Only add to CLLCCIPBatchOps if there are actual transactions (meaning SetRMN needs MCMS)
 				output.CLLCCIPBatchOps = append(output.CLLCCIPBatchOps, batch)
 			}
 		}

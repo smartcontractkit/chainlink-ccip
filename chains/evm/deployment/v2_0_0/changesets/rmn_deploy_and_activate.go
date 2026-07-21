@@ -1,8 +1,10 @@
 package changesets
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -10,7 +12,10 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	rmn_proxy_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
+	rmn_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -94,10 +99,16 @@ func applyDeployAndActivateRMN(
 		chain := evmChains[sel]
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(sel))
 
+		cursedSubjects, err := getCursedSubjectsFromCurrentRMN(e, chain.Client, sel, addresses)
+		if err != nil {
+			return cldf_deployment.ChangesetOutput{}, err
+		}
+
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployAndActivateRMN, chain, sequences.ActivateRMNInput{
 			ChainSelector:     sel,
 			ExistingAddresses: addresses,
 			CurseAdmins:       input.Cfg.CurseAdmins[sel],
+			SubjectsToMigrate: cursedSubjects,
 		})
 		if err != nil {
 			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to activate RMN on chain %d: %w", sel, err)
@@ -185,19 +196,57 @@ func validateActivateRMNAddresses(addresses []datastore.AddressRef, chainSelecto
 			common_utils.RMNTimelockQualifier, chainSelector,
 		)
 	}
-	if ref := datastore_utils.GetAddressRef(
-		addresses,
-		chainSelector,
-		common_utils.RBACTimelock,
-		mcms_ops.MCMSVersion,
-		common_utils.UltraFastCurseMCMSQualifier,
-	); ref.Address == "" {
-		return fmt.Errorf(
-			"Ultra Fast Curse RBACTimelock (qualifier %q) not found in datastore for chain %d",
-			common_utils.UltraFastCurseMCMSQualifier, chainSelector,
-		)
-	}
 	return nil
+}
+
+func getCursedSubjectsFromCurrentRMN(
+	e cldf_deployment.Environment,
+	client bind.ContractBackend,
+	chainSelector uint64,
+	addresses []datastore.AddressRef,
+) ([][16]byte, error) {
+	proxyRef := datastore_utils.GetAddressRef(addresses, chainSelector, rmnproxyops.ContractType, rmnproxyops.Version, "")
+	if proxyRef.Address == "" {
+		return nil, nil
+	}
+
+	ctx := context.Background()
+	if e.GetContext != nil {
+		ctx = e.GetContext()
+	}
+
+	proxyC, err := rmn_proxy_bind.NewRMNProxy(common.HexToAddress(proxyRef.Address), client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate RMNProxy on chain %d: %w", chainSelector, err)
+	}
+
+	currentRMNAddr, err := proxyC.GetARM(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read active RMN from RMNProxy on chain %d: %w", chainSelector, err)
+	}
+	if currentRMNAddr == (common.Address{}) {
+		return nil, nil
+	}
+
+	code, err := client.CodeAt(ctx, currentRMNAddr, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect active RMN code on chain %d: %w", chainSelector, err)
+	}
+	if len(code) == 0 {
+		return nil, nil
+	}
+
+	currentRMNC, err := rmn_bind.NewRMN(currentRMNAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate current RMN on chain %d: %w", chainSelector, err)
+	}
+
+	cursedSubjects, err := currentRMNC.GetCursedSubjects(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cursed subjects from current RMN on chain %d: %w", chainSelector, err)
+	}
+
+	return cursedSubjects, nil
 }
 
 func validateCLLCCIPForProxyProposal(e cldf_deployment.Environment, chainSels []uint64) error {

@@ -21,6 +21,7 @@ import (
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -38,7 +39,21 @@ func TestActivateRMN_Apply(t *testing.T) {
 	deployer := chain.DeployerKey.From
 	b := e.OperationsBundle
 
-	legacyARM := deployer
+	legacyRMNRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
+		ChainSelector:  chainSelector,
+		Args:           rmnops.ConstructorArgs{CurseAdmins: []common.Address{deployer}},
+	}, nil)
+	require.NoError(t, err)
+	legacyARM := common.HexToAddress(legacyRMNRef.Address)
+	curseSubject := fastcurse.GenericSelectorToSubject(chainSelector)
+	_, err = operations.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
+		ChainSelector: chainSelector,
+		Address:       legacyARM,
+		Args:          [][16]byte{curseSubject},
+	})
+	require.NoError(t, err)
+
 	proxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
 		ChainSelector:  chainSelector,
@@ -83,6 +98,9 @@ func TestActivateRMN_Apply(t *testing.T) {
 
 	rmnC, err := rmnops.NewRMNContract(newRMN, chain.Client)
 	require.NoError(t, err)
+	cursedSubjects, err := rmnC.GetCursedSubjects(nil)
+	require.NoError(t, err)
+	require.Contains(t, cursedSubjects, curseSubject, "new RMN must preserve active curses from the old RMN")
 	callers, err := rmnC.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err)
 	require.Contains(t, callers, ultraFastTimelockAddr, "Ultra Fast Curse timelock must be a curse admin")
