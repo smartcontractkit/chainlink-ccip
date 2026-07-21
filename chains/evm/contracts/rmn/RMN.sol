@@ -21,7 +21,7 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
-  string public constant override typeAndVersion = "RMN 2.0.0";
+  string public constant override typeAndVersion = "RMN 2.1.0";
 
   EnumerableSet.Bytes16Set private s_cursedSubjects;
 
@@ -120,5 +120,12 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
       return false;
     }
     return s_cursedSubjects.contains(subject) || s_cursedSubjects.contains(GLOBAL_CURSE_SUBJECT);
+  }
+
+  /// @inheritdoc IRMN
+  function isBlessed(
+    TaggedRoot calldata // subject
+  ) external pure override returns (bool) {
+    return true;
   }
 }
