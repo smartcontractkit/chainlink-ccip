@@ -16,7 +16,7 @@ import (
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -62,7 +62,7 @@ var ConfigureRMNCurseAdmins = cldf_ops.NewSequence(
 	},
 )
 
-// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.0.0 contract.
+// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.1.0 contract.
 type SeqCurseInput struct {
 	// ChainSelector is added to make the input distinct from other chains that have the same RMN address and Subjects
 	// Without this distinction the sequence will trigger an cache hit in CLD and might not be executed.
@@ -71,7 +71,7 @@ type SeqCurseInput struct {
 	Subjects      [][16]byte
 }
 
-// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.0.0 contract.
+// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.1.0 contract.
 type SeqUncurseInput struct {
 	// ChainSelector is added to make the input distinct from other chains that have the same RMN address and Subjects
 	// Without this distinction the sequence will trigger an cache hit in CLD and might not be executed.
@@ -80,7 +80,7 @@ type SeqUncurseInput struct {
 	Subjects      [][16]byte
 }
 
-// RmnCurse curses one or more subjects on an RMN v2.0.0 contract.
+// RmnCurse curses one or more subjects on an RMN v2.1.0 contract.
 var RmnCurse = cldf_ops.NewSequence(
 	"rmn-curse",
 	rmnops.Version,
@@ -101,7 +101,7 @@ var RmnCurse = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	})
 
-// RmnUncurse uncurses one or more subjects on an RMN v2.0.0 contract.
+// RmnUncurse uncurses one or more subjects on an RMN v2.1.0 contract.
 var RmnUncurse = cldf_ops.NewSequence(
 	"rmn-uncurse",
 	rmnops.Version,
@@ -122,7 +122,7 @@ var RmnUncurse = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	})
 
-// ActivateRMNInput deploys RMN 2.0.0 with the Ultra Fast Curse RBACTimelock as an initial
+// ActivateRMNInput deploys RMN 2.1.0 with the Ultra Fast Curse RBACTimelock as an initial
 // curse admin, transfers RMN ownership to RMNMCMS, and points RMNProxy at the new RMN
 // implementation (final step — makes fast curse live for CCIP consumers).
 type ActivateRMNInput struct {
@@ -144,7 +144,7 @@ type ActivateRMNOutput struct {
 var DeployAndActivateRMN = cldf_ops.NewSequence(
 	"deploy-and-activate-rmn",
 	rmnops.Version,
-	"Deploy RMN 2.0.0 with Ultra Fast Curse MCMS as curse admin, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
+		"Deploy RMN 2.1.0 with Ultra Fast Curse MCMS as curse admin, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ActivateRMNInput) (output ActivateRMNOutput, err error) {
 		if input.ChainSelector != chain.Selector {
 			return ActivateRMNOutput{}, fmt.Errorf("input chain selector %d does not match chain %d",
@@ -163,7 +163,7 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			return ActivateRMNOutput{}, err
 		}
 
-		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
+		// 1. Deploy RMN 2.1.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
 		curseAdmins := make([]common.Address, 0, 1+len(input.CurseAdmins))
 		curseAdmins = append(curseAdmins, ultraFastCurseTimeLock)
 		curseAdmins = append(curseAdmins, input.CurseAdmins...)
