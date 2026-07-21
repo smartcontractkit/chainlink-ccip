@@ -190,7 +190,7 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		// before ownership transfer. This ensures curses are applied by the owner directly,
 		// not via MCMS proposal.
 		if len(input.SubjectsToMigrate) > 0 {
-			opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
+			opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0ByOwnerOrAuthorized, chain, contract.FunctionInput[[][16]byte]{
 				Address:       rmnAddr,
 				ChainSelector: chain.Selector,
 				Args:          input.SubjectsToMigrate,
