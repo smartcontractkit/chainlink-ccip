@@ -3,6 +3,7 @@ package changesets
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +16,7 @@ import (
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	rmn_proxy_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
+	rmn15_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	rmn_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -242,11 +244,75 @@ func getCursedSubjectsFromCurrentRMN(
 	}
 
 	cursedSubjects, err := currentRMNC.GetCursedSubjects(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cursed subjects from current RMN on chain %d: %w", chainSelector, err)
+	if err == nil {
+		return cursedSubjects, nil
 	}
 
-	return cursedSubjects, nil
+	legacyCursedSubjects, legacyErr := getCursedSubjectsFromRMN15(ctx, client, currentRMNAddr)
+	if legacyErr == nil {
+		return legacyCursedSubjects, nil
+	}
+
+	return nil, fmt.Errorf(
+		"failed to read cursed subjects from current RMN on chain %d (v2/v1.6 read: %w, v1.5 fallback: %v)",
+		chainSelector,
+		err,
+		legacyErr,
+	)
+}
+
+func getCursedSubjectsFromRMN15(
+	ctx context.Context,
+	client bind.ContractBackend,
+	rmnAddr common.Address,
+) ([][16]byte, error) {
+	rmn15C, err := rmn15_bind.NewRMNContract(rmnAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate RMN 1.5 contract: %w", err)
+	}
+
+	count, err := rmn15C.GetCursedSubjectsCount(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read RMN 1.5 cursed subject count: %w", err)
+	}
+	if count.Sign() == 0 {
+		return nil, nil
+	}
+
+	const pageSize int64 = 64
+	offset := big.NewInt(0)
+	limit := big.NewInt(pageSize)
+	knownSubjects := make(map[[16]byte]struct{})
+
+	for {
+		recordedOps, readErr := rmn15C.GetRecordedCurseRelatedOps(&bind.CallOpts{Context: ctx}, offset, limit)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read RMN 1.5 curse operation history: %w", readErr)
+		}
+		if len(recordedOps) == 0 {
+			break
+		}
+		for _, op := range recordedOps {
+			knownSubjects[op.Subject] = struct{}{}
+		}
+		offset.Add(offset, big.NewInt(int64(len(recordedOps))))
+		if len(recordedOps) < int(pageSize) {
+			break
+		}
+	}
+
+	activeCurses := make([][16]byte, 0, count.Int64())
+	for subject := range knownSubjects {
+		isCursed, cursedErr := rmn15C.IsCursed(&bind.CallOpts{Context: ctx}, subject)
+		if cursedErr != nil {
+			return nil, fmt.Errorf("failed to check RMN 1.5 curse state for subject %x: %w", subject, cursedErr)
+		}
+		if isCursed {
+			activeCurses = append(activeCurses, subject)
+		}
+	}
+
+	return activeCurses, nil
 }
 
 func validateCLLCCIPForProxyProposal(e cldf_deployment.Environment, chainSels []uint64) error {

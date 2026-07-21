@@ -153,7 +153,6 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			return ActivateRMNOutput{}, fmt.Errorf("input chain selector %d does not match chain %d",
 				input.ChainSelector, chain.Selector)
 		}
-		var writes []contract.WriteOutput
 
 		rmnTimelock, err := resolveTimelockAddress(input.ExistingAddresses, chain.Selector, common_utils.RMNTimelockQualifier)
 		if err != nil {
@@ -199,7 +198,9 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			if err != nil {
 				return ActivateRMNOutput{}, fmt.Errorf("failed to migrate curses on RMN at %s on chain %d: %w", rmnAddr.Hex(), chain.Selector, err)
 			}
-			writes = append(writes, opOutput.Output)
+			if !opOutput.Output.Executed() {
+				return ActivateRMNOutput{}, fmt.Errorf("curse migration on RMN at %s on chain %d was prepared for MCMS instead of executing on-chain", rmnAddr.Hex(), chain.Selector)
+			}
 		}
 
 		// 2. Transfer RMN ownership to RMNMCMS timelock.
@@ -218,26 +219,18 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		output.RMNMCMSBatchOps = append(output.RMNMCMSBatchOps, ownershipBatchOps...)
 
 		// 3. Point RMNProxy at the new RMN (makes the implementation live for CCIP).
-		// If proxy is deployer-owned, SetRMN executes on-chain immediately and shouldn't populate CLLCCIPBatchOps.
-		// If proxy is not deployer-owned, SetRMN will be prepared for MCMS via CLLCCIPBatchOps.
+		// pointRMNProxyAtRMN returns writes only when SetRMN must be proposed via MCMS.
 		setRMNWrites, err := pointRMNProxyAtRMN(b, chain, input.ExistingAddresses, rmnAddr)
 		if err != nil {
 			return ActivateRMNOutput{}, err
 		}
 
-		// Only add SetRMN writes to CLLCCIPBatchOps if the proxy is NOT deployer-owned.
-		// When proxy is deployer-owned, SetRMN executes immediately on-chain, so no batch operations are needed.
-		// The trick is: ExecuteOperation will only populate Transactions if the caller can't execute directly.
-		// We filter for that by checking if any batch operations will actually be created.
 		if len(setRMNWrites) > 0 {
 			batch, err := contract.NewBatchOperationFromWrites(setRMNWrites)
 			if err != nil {
 				return ActivateRMNOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}
-			if len(batch.Transactions) > 0 {
-				// Only add to CLLCCIPBatchOps if there are actual transactions (meaning SetRMN needs MCMS)
-				output.CLLCCIPBatchOps = append(output.CLLCCIPBatchOps, batch)
-			}
+			output.CLLCCIPBatchOps = append(output.CLLCCIPBatchOps, batch)
 		}
 
 		return output, nil
@@ -261,6 +254,9 @@ func pointRMNProxyAtRMN(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set RMN on RMNProxy on chain %d: %w", chain.Selector, err)
+	}
+	if setRMNReport.Output.Executed() {
+		return nil, nil
 	}
 	return []contract.WriteOutput{setRMNReport.Output}, nil
 }
