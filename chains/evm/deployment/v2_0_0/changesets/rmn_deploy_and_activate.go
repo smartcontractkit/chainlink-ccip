@@ -282,7 +282,7 @@ func getCursedSubjectsFromRMN15(
 	const pageSize int64 = 64
 	offset := big.NewInt(0)
 	limit := big.NewInt(pageSize)
-	knownSubjects := make(map[[16]byte]struct{})
+	latestCurseState := make(map[[16]byte]bool)
 
 	for {
 		recordedOps, readErr := rmn15C.GetRecordedCurseRelatedOps(&bind.CallOpts{Context: ctx}, offset, limit)
@@ -293,7 +293,9 @@ func getCursedSubjectsFromRMN15(
 			break
 		}
 		for _, op := range recordedOps {
-			knownSubjects[op.Subject] = struct{}{}
+			// Ops are returned in deterministic order for offset pagination.
+			// Overwriting per-subject state yields the latest known state by the end of the scan.
+			latestCurseState[op.Subject] = op.Cursed
 		}
 		offset.Add(offset, big.NewInt(int64(len(recordedOps))))
 		if len(recordedOps) < int(pageSize) {
@@ -302,11 +304,7 @@ func getCursedSubjectsFromRMN15(
 	}
 
 	activeCurses := make([][16]byte, 0, count.Int64())
-	for subject := range knownSubjects {
-		isCursed, cursedErr := rmn15C.IsCursed(&bind.CallOpts{Context: ctx}, subject)
-		if cursedErr != nil {
-			return nil, fmt.Errorf("failed to check RMN 1.5 curse state for subject %x: %w", subject, cursedErr)
-		}
+	for subject, isCursed := range latestCurseState {
 		if isCursed {
 			activeCurses = append(activeCurses, subject)
 		}
