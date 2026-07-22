@@ -58,6 +58,24 @@ var (
 		GlamsterdamValue: 85_000,
 		Fallback:         glamsterdamutils.ApplyRatio[uint32](75_000, 85_000),
 	}
+
+	// LombardTokenPoolDestGasOverhead is table row 9. Guesstimate value (real value needs
+	// testnet measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	LombardTokenPoolDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "TokenPool.TokenTransferFeeConfig.DestGasOverhead (Lombard)",
+		ExpectedPrague:   410_000,
+		GlamsterdamValue: 1_200_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](410_000, 1_200_000),
+	}
+
+	// USDCTokenPoolDestGasOverhead is table row 10. Guesstimate value (real value needs testnet
+	// measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	USDCTokenPoolDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "TokenPool.TokenTransferFeeConfig.DestGasOverhead (USDC)",
+		ExpectedPrague:   250_000,
+		GlamsterdamValue: 750_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](250_000, 750_000),
+	}
 )
 
 // OffRamp fields (table rows 6-7) are immutable, set only in the constructor, with no setter —
