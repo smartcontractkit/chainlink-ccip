@@ -24,6 +24,19 @@ var (
 		GlamsterdamValue: 270_000,
 		Fallback:         glamsterdamutils.ApplyRatio[uint32](90_000, 270_000),
 	}
+
+	// USDCTokenPoolDestGasOverhead is table row 5. The doc labels this "USDCTokenPool", but it is
+	// actually a FeeQuoter.TokenTransferFeeConfig.DestGasOverhead setting for v1.6, keyed by
+	// (destChainSelector, token) — see GLAMSTERDAM_GAS_UPDATE_PLAN.md §2.3. A single FeeQuoter
+	// setting governs the gas overhead for all v1.6 pools of that token on the lane; there is no
+	// per-pool override in v1.6. Guesstimate value (real value needs testnet measurement), applied
+	// as-is for the first (testnet) run.
+	USDCTokenPoolDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (USDC)",
+		ExpectedPrague:   180_000,
+		GlamsterdamValue: 540_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](180_000, 540_000),
+	}
 )
 
 // OffRamp.GasForCallExactCheck (table row 3) is immutable, set only in the constructor, with no
