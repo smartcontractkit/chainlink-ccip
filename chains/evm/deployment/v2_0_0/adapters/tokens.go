@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	siloed_lrtp_ops2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
@@ -60,7 +61,7 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 	return cldf_ops.NewSequence(
 		"evm-v2:update-authorities",
 		cciputils.Version_2_0_0,
-		"Transfer token pool and lock release lockbox(es) ownership to timelock on EVM chain",
+		"Transfer token pool, lock release lockbox(es), and AdvancedPoolHooks ownership to timelock on EVM chain",
 		func(b cldf_ops.Bundle, e *deployment.Environment, input tokens.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
 			chain, ok := e.BlockChains.EVMChains()[input.ChainSelector]
 			if !ok {
@@ -74,6 +75,13 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 			timelockAddr, err := t.GetTimelockAddressCLL(e.DataStore, chain.Selector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get timelock address for chain %d: %w", input.ChainSelector, err)
+			}
+			poolAddr, err := t.ParseNonZeroAddressRef(e.DataStore, input.TokenPoolRef, input.ChainSelector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"failed to parse pool address for %s on chain %d: %w",
+					datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector, err,
+				)
 			}
 
 			contractRefs := []datastore.AddressRef{input.TokenPoolRef}
@@ -98,13 +106,6 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 				}
 				contractRefs = append(contractRefs, lockboxRef)
 			case datastore.ContractType(cciputils.SiloedLockReleaseTokenPool):
-				poolAddr, err := t.ParseNonZeroAddressRef(e.DataStore, input.TokenPoolRef, input.ChainSelector)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf(
-						"failed to parse token pool address for siloed lock release pool %s on chain %d: %w",
-						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector, err,
-					)
-				}
 				lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops2_0_0.GetAllLockBoxConfigs, chain, contract.FunctionInput[struct{}]{
 					ChainSelector: input.ChainSelector,
 					Address:       poolAddr,
@@ -142,6 +143,29 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 						datastore_utils.SprintRef(input.TokenPoolRef), input.ChainSelector,
 					)
 				}
+			}
+
+			// AdvancedPoolHooks is optional on all v2.0.0 pool types. We query it directly
+			// from the pool instead of using the datastore - if no advanced pool hooks are
+			// configured, then `GetAdvancedPoolHooks` returns the zero address and we skip
+			// the ownership transfer.
+			hooksReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, chain, contract.FunctionInput[struct{}]{
+				ChainSelector: input.ChainSelector,
+				Address:       poolAddr,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"failed to get AdvancedPoolHooks for pool %s on chain %d: %w",
+					poolAddr.Hex(), input.ChainSelector, err,
+				)
+			}
+			if hooksAddr := hooksReport.Output; hooksAddr != (common.Address{}) {
+				contractRefs = append(contractRefs, datastore.AddressRef{
+					ChainSelector: input.ChainSelector,
+					Address:       hooksAddr.Hex(),
+					Type:          datastore.ContractType(advanced_pool_hooks.ContractType),
+					Version:       advanced_pool_hooks.Version,
+				})
 			}
 
 			ownershipInput := deployops.TransferOwnershipPerChainInput{
