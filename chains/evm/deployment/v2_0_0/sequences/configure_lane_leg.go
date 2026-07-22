@@ -16,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -80,32 +82,47 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 		}
-		if destChainSelectorsPerExecutor[getTargetReport.Output] == nil {
-			destChainSelectorsPerExecutor[getTargetReport.Output] = []ExecutorRemoteChainConfigArgs{}
-		}
-		destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
-			DestChainSelector: remoteSelector,
-			Config:            changesetadapters.ExecutorDestChainConfig(destChain.ExecutorDestChainConfig),
-		})
-		destChainSelectorsPerExecutor, err = FilterExecutorDestChains(b, chain, destChainSelectorsPerExecutor)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		for executorAddr, toAdd := range destChainSelectorsPerExecutor {
-			if len(toAdd) == 0 {
-				continue
-			}
+		if isCantonRemote(remoteSelector) && !destChain.ExecutorDestChainConfig.Enabled {
+			// Canton lanes are executor-less: remove the Canton destination from the EVM executor.
 			executorReport, err := cldf_ops.ExecuteOperation(b, ExecutorApplyDestChainUpdates, chain, contract.FunctionInput[ExecutorApplyDestChainUpdatesArgs]{
 				ChainSelector: chain.Selector,
-				Address:       executorAddr,
+				Address:       getTargetReport.Output,
 				Args: ExecutorApplyDestChainUpdatesArgs{
-					DestChainSelectorsToAdd: toAdd,
+					DestChainSelectorsToRemove: []uint64{remoteSelector},
 				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to Executor(%s) on chain %s: %w", executorAddr, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove Canton dest chain from Executor(%s) on chain %s: %w", getTargetReport.Output, chain, err)
 			}
 			writes = append(writes, executorReport.Output)
+		} else {
+			if destChainSelectorsPerExecutor[getTargetReport.Output] == nil {
+				destChainSelectorsPerExecutor[getTargetReport.Output] = []ExecutorRemoteChainConfigArgs{}
+			}
+			destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
+				DestChainSelector: remoteSelector,
+				Config:            changesetadapters.ExecutorDestChainConfig(destChain.ExecutorDestChainConfig),
+			})
+			destChainSelectorsPerExecutor, err = FilterExecutorDestChains(b, chain, destChainSelectorsPerExecutor)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			for executorAddr, toAdd := range destChainSelectorsPerExecutor {
+				if len(toAdd) == 0 {
+					continue
+				}
+				executorReport, err := cldf_ops.ExecuteOperation(b, ExecutorApplyDestChainUpdates, chain, contract.FunctionInput[ExecutorApplyDestChainUpdatesArgs]{
+					ChainSelector: chain.Selector,
+					Address:       executorAddr,
+					Args: ExecutorApplyDestChainUpdatesArgs{
+						DestChainSelectorsToAdd: toAdd,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to Executor(%s) on chain %s: %w", executorAddr, chain, err)
+				}
+				writes = append(writes, executorReport.Output)
+			}
 		}
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
@@ -604,6 +621,14 @@ func adapterDestChainConfigToFeeQuoter(cfg lanes.FeeQuoterDestChainConfig) fee_q
 		NetworkFeeUSDCents:          cfg.NetworkFeeUSDCents,
 		LinkFeeMultiplierPercent:    linkFeeMultiplierPercent,
 	}
+}
+
+func isCantonRemote(remoteChainSelector uint64) bool {
+	family, err := chainsel.GetSelectorFamily(remoteChainSelector)
+	if err != nil {
+		return false
+	}
+	return family == chainsel.FamilyCanton
 }
 
 func filterCommitteeVerifierForRemote(cv lanes.CommitteeVerifierConfig[datastore.AddressRef], remoteSelector uint64) changesetadapters.CommitteeVerifierConfig[datastore.AddressRef] {
