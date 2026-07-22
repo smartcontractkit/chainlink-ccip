@@ -76,7 +76,8 @@ func FieldResultString[T comparable](chainSelector uint64, result FieldResult[T]
 // expected Prague baseline, and which chains had a contract that couldn't be resolved. Intended
 // for inclusion in the resulting MCMS proposal's Description and/or logs.
 type Report struct {
-	lines []string
+	// Lines are the accumulated human-readable report lines, in the order they were recorded.
+	Lines []string
 }
 
 // NewReport returns an empty Report.
@@ -86,19 +87,19 @@ func NewReport() *Report {
 
 // AddSkipped records a chain that was unconditionally skipped via SkipChainSelectors.
 func (r *Report) AddSkipped(chainSelector uint64) {
-	r.lines = append(r.lines, fmt.Sprintf("chain %d: skipped (explicit SkipChainSelectors entry)", chainSelector))
+	r.Lines = append(r.Lines, fmt.Sprintf("chain %d: skipped (explicit SkipChainSelectors entry)", chainSelector))
 }
 
 // AddNoLane records a chain that was scanned but has no lane pointed at the target chain.
 func (r *Report) AddNoLane(chainSelector uint64) {
-	r.lines = append(r.lines, fmt.Sprintf("chain %d: no lane to target chain, skipped", chainSelector))
+	r.Lines = append(r.Lines, fmt.Sprintf("chain %d: no lane to target chain, skipped", chainSelector))
 }
 
 // AddUnresolvedContract records a chain where an expected contract could not be resolved from
 // the datastore. This chain is excluded from further processing, but the run continues for
 // every other chain.
 func (r *Report) AddUnresolvedContract(chainSelector uint64, contractName string) {
-	r.lines = append(r.lines, fmt.Sprintf(
+	r.Lines = append(r.Lines, fmt.Sprintf(
 		"chain %d: ERROR - could not resolve %s address, skipping this chain", chainSelector, contractName,
 	))
 }
@@ -106,7 +107,7 @@ func (r *Report) AddUnresolvedContract(chainSelector uint64, contractName string
 // AddLine appends an arbitrary pre-formatted line to the report, e.g. the output of
 // FieldResultString.
 func (r *Report) AddLine(line string) {
-	r.lines = append(r.lines, line)
+	r.Lines = append(r.Lines, line)
 }
 
 // AddField records the outcome of resolving a single FieldSpec on a given chain.
@@ -116,5 +117,5 @@ func AddField[T comparable](r *Report, chainSelector uint64, result FieldResult[
 
 // String joins all recorded lines into a single newline-separated report.
 func (r *Report) String() string {
-	return strings.Join(r.lines, "\n")
+	return strings.Join(r.Lines, "\n")
 }
