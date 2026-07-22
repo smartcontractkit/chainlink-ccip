@@ -186,15 +186,11 @@ func routerAddressOnChain(e cldf.Environment, selector uint64) (common.Address, 
 }
 
 func rmnAddressOnChain(e cldf.Environment, selector uint64) (common.Address, error) {
-	rmnRef := datastore.AddressRef{
-		Type:    datastore.ContractType(ops.ContractType),
-		Version: ops.Version,
-	}
-	rmnAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, rmnRef, selector, evmds.ToEVMAddress)
+	rmnAddr, err := utils.ActiveRMNAddress(e, selector)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to resolve RMN ref on chain with selector %d: %w", selector, err)
+		return common.Address{}, fmt.Errorf("failed to resolve active RMN address on chain with selector %d: %w", selector, err)
 	}
-	return rmnAddrRef, nil
+	return rmnAddr, nil
 }
 
 func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64) ([]uint64, error) {
