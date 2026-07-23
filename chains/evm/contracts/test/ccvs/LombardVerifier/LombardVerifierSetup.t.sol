@@ -26,6 +26,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
 
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10000));
   bytes32 internal constant ALLOWED_CALLER = bytes32(uint256(0x123456));
+  bytes32 internal constant REMOTE_BRIDGE_SENDER = bytes32(uint256(0x999999));
   uint256 internal constant TRANSFER_AMOUNT = 1e18;
   address internal s_destToken = makeAddr("destToken");
 
@@ -72,7 +73,13 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER));
+    s_lombardVerifier.setPath(
+      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER), abi.encodePacked(REMOTE_BRIDGE_SENDER)
+    );
+    // Set the path for the source chain, so that incoming messages from it can be validated in verifyMessage tests.
+    s_lombardVerifier.setPath(
+      SOURCE_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER), abi.encodePacked(REMOTE_BRIDGE_SENDER)
+    );
 
     // Mock the router to return true for the valid offRamp.
     vm.mockCall(
@@ -134,12 +141,53 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   /// @param sender The sender address.
   /// @param tokenReceiver The token receiver address.
   /// @param amount The amount to transfer.
-  /// @return rawPayload The encoded payload.
+  /// @return rawPayload The encoded payload, with destinationCaller set to the LombardVerifier under test.
   function _generateValidRawPayload(
     bytes memory destToken,
     bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount
+  ) internal view returns (bytes memory) {
+    return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier));
+  }
+
+  /// @notice Generates a rawPayload with an explicit destinationCaller. The envelope sender and recipient default to
+  /// REMOTE_BRIDGE_SENDER and the mock bridge address (valid values).
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller
+  ) internal view returns (bytes memory) {
+    return _generateRawPayload(destToken, sender, tokenReceiver, amount, destinationCaller, REMOTE_BRIDGE_SENDER);
+  }
+
+  /// @notice Generates a rawPayload with an explicit destinationCaller and envelope sender, for tests that need to
+  /// exercise an invalid remote bridge sender. The recipient defaults to the mock bridge address (a valid value).
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller,
+    bytes32 envelopeSender
+  ) internal view returns (bytes memory) {
+    return _generateRawPayload(
+      destToken, sender, tokenReceiver, amount, destinationCaller, envelopeSender, address(s_mockBridge)
+    );
+  }
+
+  /// @notice Generates a rawPayload with a fully explicit destinationCaller, envelope sender, and recipient, for
+  /// tests that need to exercise an invalid recipient.
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller,
+    bytes32 envelopeSender,
+    address recipient
   ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
@@ -153,9 +201,9 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     bytes memory encodedData = abi.encode(
       bytes32(LOMBARD_CHAIN_ID), // destinationChain
       uint256(1), // nonce
-      bytes32(uint256(uint160(OWNER))), // sender
-      address(0), // recipient (not used in validation)
-      address(0), // destinationCaller (not used in validation)
+      envelopeSender, // sender
+      recipient,
+      destinationCaller,
       msgBody
     );
 

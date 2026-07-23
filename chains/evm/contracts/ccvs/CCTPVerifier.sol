@@ -30,6 +30,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidMessageId(bytes32 expected, bytes32 got);
   error InvalidMessageSender(bytes32 expected, bytes32 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
+  error InvalidRecipient(bytes32 expected, bytes32 got);
+  error InvalidBurnMessageBodyVersion(uint32 expected, uint32 got);
   error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
   error InvalidVerifierArgsLength(uint256 length);
@@ -88,6 +90,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   string public constant override typeAndVersion = "CCTPVerifier 2.0.0";
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
   uint32 private constant SUPPORTED_CCTP_VERSION = 1;
+  /// @notice The only supported burn message body version.
+  /// @dev Used to confirm that the messageBody is actually a burn message, and not some other message type carried
+  /// over the same underlying CCTP message transmitter.
+  uint32 private constant SUPPORTED_BURN_MESSAGE_BODY_VERSION = 1;
   /// @notice The division factor for basis points. This also represents the maximum bps fee.
   uint16 private constant BPS_DIVIDER = 10_000;
   /// @notice The length of a CCTP message, including the message body + hook data expected by this verifier.
@@ -129,6 +135,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   uint256 private constant MINIMUM_VERIFIER_RESULT_SIZE = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65;
   /// @notice The starting index of the sourceDomain in the Verifier Results (CCTP message offset 4).
   uint256 private constant SOURCE_DOMAIN_START = VERIFIER_VERSION_SIZE + 4;
+  /// @notice The starting index of the recipient in the Verifier Results (CCTP message offset 76).
+  uint256 private constant RECIPIENT_START = VERIFIER_VERSION_SIZE + 76;
+  /// @notice The starting index of the burn message body version in the Verifier Results (CCTP message offset 148).
+  uint256 private constant BURN_MESSAGE_BODY_VERSION_START = VERIFIER_VERSION_SIZE + 148;
   /// @notice The starting index of the messageSender in the Verifier Results.
   uint256 private constant MESSAGE_SENDER_START = VERIFIER_VERSION_SIZE + 148 + 100;
   /// @notice The starting index of the verifier version (hook data location) in the Verifier Results.
@@ -321,6 +331,21 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint32 attestedSourceDomain = uint32(bytes4(verifierResults[SOURCE_DOMAIN_START:SOURCE_DOMAIN_START + 4]));
     if (attestedSourceDomain != sourceDomain.domainIdentifier) {
       revert InvalidSourceDomain(sourceDomain.domainIdentifier, attestedSourceDomain);
+    }
+
+    // The messaging-layer recipient must be the token messenger. CCTP's message transmitter is a generic messaging
+    // layer that can carry messages other than token transfers, so this check is critical to ensure that we are
+    // processing a message addressed to the token bridge, and not some other message on the message transmitter.
+    bytes32 recipient = bytes32(verifierResults[RECIPIENT_START:RECIPIENT_START + 32]);
+    bytes32 expectedRecipient = bytes32(uint256(uint160(address(i_tokenMessenger))));
+    if (recipient != expectedRecipient) revert InvalidRecipient(expectedRecipient, recipient);
+
+    // The burn message body version must be 1. This is a defense-in-depth check confirming that the messageBody is
+    // actually a burn message, and not some other message type carried over the same message transmitter.
+    uint32 bodyVersion =
+      uint32(bytes4(verifierResults[BURN_MESSAGE_BODY_VERSION_START:BURN_MESSAGE_BODY_VERSION_START + 4]));
+    if (bodyVersion != SUPPORTED_BURN_MESSAGE_BODY_VERSION) {
+      revert InvalidBurnMessageBodyVersion(SUPPORTED_BURN_MESSAGE_BODY_VERSION, bodyVersion);
     }
 
     // The messageSender property of the messageBody must align with the allowedCallerOnSource.

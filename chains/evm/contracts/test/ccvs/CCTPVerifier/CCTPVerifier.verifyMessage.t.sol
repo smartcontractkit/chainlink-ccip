@@ -227,6 +227,47 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
+  function test_verifyMessage_RevertWhen_InvalidRecipient() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes32 wrongRecipient = bytes32(abi.encode(makeAddr("wrongRecipient")));
+    s_baseCCTPMessage.header.recipient = wrongRecipient;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        CCTPVerifier.InvalidRecipient.selector, bytes32(abi.encode(s_mockTokenMessenger)), wrongRecipient
+      )
+    );
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidBurnMessageBodyVersion() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    s_baseCCTPMessage.body.version = 0;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidBurnMessageBodyVersion.selector, 1, 0));
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
   function test_verifyMessage_RevertWhen_InvalidMessageSender() public {
     bytes32 invalidMessageSender = keccak256("invalidMessageSender");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
