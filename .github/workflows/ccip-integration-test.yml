@@ -212,6 +212,7 @@ jobs:
           echo "::set-output name=sha::$COMMIT_SHA"
       - name: Update chainlink-ccip dependency in chainlink
         run: |
+          export GOPRIVATE=github.com/smartcontractkit/*
           ccip_sha="${{ steps.get_sha.outputs.sha }}"
           ccip_modules=(
             github.com/smartcontractkit/chainlink-ccip

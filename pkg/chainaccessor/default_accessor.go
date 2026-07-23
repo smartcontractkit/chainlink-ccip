@@ -160,8 +160,6 @@ func prepareDestChainRequest(
 		staticConfig          cciptypes.OffRampStaticChainConfig
 		dynamicConfig         cciptypes.OffRampDynamicChainConfig
 		rmnRemoteAddress      []byte
-		rmnDigestHeader       cciptypes.RMNDigestHeader
-		rmnVersionConfig      cciptypes.VersionedConfig
 		cursedSubjects        cciptypes.RMNCurseResponse
 	)
 
@@ -198,23 +196,11 @@ func prepareDestChainRequest(
 			Params:    map[string]any{},
 			ReturnVal: &rmnRemoteAddress,
 		}},
-		consts.ContractNameRMNRemote: {
-			{
-				ReadName:  consts.MethodNameGetReportDigestHeader,
-				Params:    map[string]any{},
-				ReturnVal: &rmnDigestHeader,
-			},
-			{
-				ReadName:  consts.MethodNameGetVersionedConfig,
-				Params:    map[string]any{},
-				ReturnVal: &rmnVersionConfig,
-			},
-			{
-				ReadName:  consts.MethodNameGetCursedSubjects,
-				Params:    map[string]any{},
-				ReturnVal: &cursedSubjects,
-			},
-		},
+		consts.ContractNameRMNRemote: {{
+			ReadName:  consts.MethodNameGetCursedSubjects,
+			Params:    map[string]any{},
+			ReturnVal: &cursedSubjects,
+		}},
 	}
 
 	// Get source chain config requests and append them to requests
