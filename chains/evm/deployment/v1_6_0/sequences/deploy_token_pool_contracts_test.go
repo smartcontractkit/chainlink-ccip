@@ -595,7 +595,3 @@ func deployTestToken(t *testing.T, chain evm.Chain, symbol string, decimals uint
 
 	return tokenAddr
 }
-
-func boolPtr(b bool) *bool {
-	return &b
-}

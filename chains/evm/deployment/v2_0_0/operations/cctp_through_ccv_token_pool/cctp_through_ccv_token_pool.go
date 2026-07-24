@@ -63,6 +63,16 @@ func (c *CCTPThroughCCVTokenPoolContract) ApplyAuthorizedCallerUpdates(opts *bin
 	return c.contract.Transact(opts, "applyAuthorizedCallerUpdates", args)
 }
 
+func (c *CCTPThroughCCVTokenPoolContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
@@ -108,5 +118,16 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 		args AuthorizedCallerArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *CCTPThroughCCVTokenPoolContract]{
+	Name:         "cctp-through-ccv-token-pool:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewCCTPThroughCCVTokenPoolContract,
+	CallContract: func(c *CCTPThroughCCVTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
 	},
 })

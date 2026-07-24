@@ -21,6 +21,11 @@ type ConstructorArgs struct {
 	Symbol string
 }
 
+type ApproveArgs struct {
+	Spender common.Address
+	Value   *big.Int
+}
+
 type TransferArgs struct {
 	Receiver common.Address
 	Amount   *big.Int
@@ -37,6 +42,17 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(args ConstructorArgs) error { return nil },
+})
+
+var BalanceOf = contract.NewRead(contract.ReadParams[common.Address, *big.Int, *erc20.ERC20]{
+	Name:         "erc20:balance-of",
+	Version:      utils.Version_1_0_0,
+	Description:  "Gets the ERC20 token balance of a specified address",
+	ContractType: ContractType,
+	NewContract:  erc20.NewERC20,
+	CallContract: func(token *erc20.ERC20, opts *bind.CallOpts, account common.Address) (*big.Int, error) {
+		return token.BalanceOf(opts, account)
+	},
 })
 
 var Transfer = contract.NewWrite(contract.WriteParams[TransferArgs, *erc20.ERC20]{
@@ -77,5 +93,52 @@ var GetDecimals = contract.NewRead(contract.ReadParams[struct{}, uint8, *erc20.E
 	NewContract:  erc20.NewERC20,
 	CallContract: func(token *erc20.ERC20, opts *bind.CallOpts, _ struct{}) (uint8, error) {
 		return token.Decimals(opts)
+	},
+})
+
+var Approve = contract.NewWrite(contract.WriteParams[ApproveArgs, *erc20.ERC20]{
+	Name:            "erc20:approve",
+	Version:         utils.Version_1_0_0,
+	Description:     "Approves a spender for ERC20 transfers",
+	ContractType:    ContractType,
+	ContractABI:     erc20.ERC20ABI,
+	NewContract:     erc20.NewERC20,
+	IsAllowedCaller: contract.AllCallersAllowed[*erc20.ERC20, ApproveArgs],
+	Validate: func(args ApproveArgs) error {
+		if args.Spender == (common.Address{}) {
+			return errors.New("spender address must be set")
+		}
+		if args.Value == nil || args.Value.Sign() <= 0 {
+			return errors.New("amount must be greater than zero")
+		}
+		return nil
+	},
+	CallContract: func(token *erc20.ERC20, opts *bind.TransactOpts, args ApproveArgs) (*types.Transaction, error) {
+		return token.Approve(opts, args.Spender, args.Value)
+	},
+})
+
+// ApproveProposalOnly is identical to Approve but forces the operation into a proposal
+// rather than executing directly. Use when the approve must be called by a timelock
+// as part of an atomic MCMS batch (e.g., withdraw → approve → deposit flows).
+var ApproveProposalOnly = contract.NewWrite(contract.WriteParams[ApproveArgs, *erc20.ERC20]{
+	Name:            "erc20:approve-proposal-only",
+	Version:         utils.Version_1_0_0,
+	Description:     "Approves a spender for ERC20 transfers (proposal-only, never executed directly)",
+	ContractType:    ContractType,
+	ContractABI:     erc20.ERC20ABI,
+	NewContract:     erc20.NewERC20,
+	IsAllowedCaller: contract.NoCallersAllowed[*erc20.ERC20, ApproveArgs],
+	Validate: func(args ApproveArgs) error {
+		if args.Spender == (common.Address{}) {
+			return errors.New("spender address must be set")
+		}
+		if args.Value == nil || args.Value.Sign() <= 0 {
+			return errors.New("amount must be greater than zero")
+		}
+		return nil
+	},
+	CallContract: func(token *erc20.ERC20, opts *bind.TransactOpts, args ApproveArgs) (*types.Transaction, error) {
+		return token.Approve(opts, args.Spender, args.Value)
 	},
 })

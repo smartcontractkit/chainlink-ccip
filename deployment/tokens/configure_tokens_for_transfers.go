@@ -45,18 +45,21 @@ type TokenTransferConfig struct {
 	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
 	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
 	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
-	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
-	// The old pool address is derived from the TokenAdminRegistry, and the timelock address from the MCMS config.
+	// When either field is set, a liquidity migration is triggered via TokenExpansion after UpdateAuthorities
+	// transfers pool and lockbox ownership to the MCMS timelock. Migration requires the timelock to own the v2
+	// lockbox (and the legacy pool for rebalancer/withdraw ops). Use TokenExpansion for connect/upgrade flows;
+	// ConfigureTokensForTransfers rejects these fields. For standalone step-2 drains, use MigrateLockReleasePoolLiquidity.
 	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount" json:"liquidityMigrationAmount"`
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with LiquidityMigrationAmount.
-	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
+	// Mutually exclusive with LiquidityMigrationAmount. See LiquidityMigrationAmount for ownership and entry-point requirements.
+	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints" json:"liquidityMigrationBasisPoints"`
 	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
-	// automatically with (token, pool, decimals). Legacy lane fees are read from the fee quoter or onramp (v1.5.x)
-	// and merged with any user-provided tokenTransferFeeConfig on each remote (set YAML fields win; unset fields
-	// are imported). Rate limits are imported later by ConfigureTokenPoolForRemoteChain from the active pool.
-	// Requires an adapter implementing the TokenPoolMigrator interface. This knob has no effect if any of the
+	// automatically with (token, pool, decimals, rate limits, and MigrationMetadata). Legacy lane fees are read
+	// from the fee quoter or onramp (v1.5.x) and merged with any user-provided tokenTransferFeeConfig on each
+	// remote (set YAML fields win; unset fields are imported). Resolved connectivity, rate limits, and migration
+	// metadata are passed to ConfigureTokenForTransfersSequence for on-chain apply.
+	// Requires an adapter implementing the TokenPoolMigrator and RateLimitReaderAdapter interfaces. This knob has no effect if any of the
 	// following are true:
 	//  (1) There is no active pool in TAR for the token
 	//  (2) The active pool in TAR is already the target pool (extend mode)
@@ -67,7 +70,7 @@ type TokenTransferConfig struct {
 	// Remove the flag after a one-time upgrade to avoid confusion.
 	//
 	// YAML precedence during upgrade (per remote chain):
-	//  - Remote not listed: fully discovered from the active pool (token, pool, decimals); fees are
+	//  - Remote not listed: fully discovered from the active pool (token, pool, decimals, rate limits); fees are
 	//    imported only when the legacy FeeQuoter/onRamp lane config is enabled for that token/lane.
 	//  - Remote listed with empty remoteToken AND empty remotePool: backfill token, pool, and decimals
 	//    from the active pool; YAML overrides fees and other fields when tokenTransferFeeConfig is set
@@ -104,8 +107,15 @@ func ConfigureTokensForTransfers(tokenRegistry *TokenAdapterRegistry, mcmsRegist
 }
 
 func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) error {
-	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
-		// TODO: implement
+	return func(_ cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
+		for _, token := range cfg.Tokens {
+			if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
+				return fmt.Errorf(
+					"liquidity migration on chain selector %d requires TokenExpansion, which runs migration after UpdateAuthorities transfers pool and lockbox ownership to the MCMS timelock",
+					token.ChainSelector,
+				)
+			}
+		}
 		return nil
 	}
 }
@@ -116,7 +126,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 		for _, config := range cfg.Tokens {
 			configs[config.ChainSelector] = config
 		}
-		batchOps, reports, ds, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, configs)
+		batchOps, reports, ds, err := processTokenConfigForChain(e, configs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
@@ -128,7 +138,7 @@ func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegis
 	}
 }
 
-func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, mcmsInput mcms.Input, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
+func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
 	normalizerRegistry := deploy.GetAddressNormalizerRegistry()
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)
@@ -137,7 +147,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 
 	var err error
 	for selector, token := range cfg {
-		token.RegistryRef, err = TryNormalizeAddressRef(selector, token.RegistryRef)
+		token.RegistryRef, err = deploy.TryNormalizeAddressRef(selector, token.RegistryRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to normalize registry ref address for chain selector %d: %w", selector, err)
 		}
@@ -191,8 +201,13 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get active pool for token pool on chain selector %d: %w", selector, err)
 			}
-			var legacyPoolMigrator TokenPoolMigrator
-			var allRemoteSelectors []uint64
+			var (
+				legacyRateLimitReader RateLimitReaderAdapter
+				legacyPoolMigrator    TokenPoolMigrator
+				allRemoteSelectors    []uint64
+				activePoolRef         datastore.AddressRef
+				localDecimals         uint8
+			)
 			if len(activePool) > 0 {
 				targetPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
 				if err != nil {
@@ -207,7 +222,7 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 					if err != nil {
 						return nil, nil, nil, fmt.Errorf("failed to normalize active pool address on chain selector %d: %w", selector, err)
 					}
-					activePoolRef, err := ResolveTokenPoolRef(e, tokenRegistry, selector, datastore.AddressRef{Address: activePoolAddr})
+					activePoolRef, err = ResolveTokenPoolRef(e, tokenRegistry, selector, datastore.AddressRef{Address: activePoolAddr})
 					if err != nil {
 						return nil, nil, nil, fmt.Errorf("failed to resolve active pool ref on chain selector %d: %w", selector, err)
 					}
@@ -219,12 +234,27 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 						if err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to resolve adapter for active pool on chain selector %d: %w", selector, err)
 						}
+						legacyRateLimitReader, ok = legacyAdapter.(RateLimitReaderAdapter)
+						if !ok {
+							return nil, nil, nil, fmt.Errorf(
+								"adapter for active pool version %s on chain selector %d does not implement RateLimitReaderAdapter",
+								activePoolRef.Version, selector,
+							)
+						}
 						legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator)
 						if !ok {
 							return nil, nil, nil, fmt.Errorf(
 								"adapter for active pool version %s on chain selector %d does not support token pool migration",
 								activePoolRef.Version, selector,
 							)
+						}
+						tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
+						if err != nil {
+							return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
+						}
+						localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
+						if err != nil {
+							return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
 						}
 						if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
@@ -278,16 +308,6 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to derive remote token decimals for remote chain selector %d: %w", remoteSelector, err)
 				}
-				feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, selector, remoteSelector)
-				if err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", selector, remoteSelector, err)
-				}
-				legacyTTFC, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, selector, remoteSelector, fullTokenRef.Address)
-				if err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to discover token transfer fee config for remote chain selector %d on chain selector %d: %w", remoteSelector, selector, err)
-				}
-
-				// Migrate remote pool + token + decimals
 				var rc RemoteChainConfig[[]byte, string]
 				if rc, ok = remoteChains[remoteSelector]; ok {
 					if len(rc.RemoteToken) == 0 && len(rc.RemotePool) == 0 {
@@ -297,71 +317,58 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 					}
 				} else {
 					rc = RemoteChainConfig[[]byte, string]{
-						// We only need to set a few fields here - rate limits will be imported later downstream
 						RemoteDecimals: remoteTokenDecimals,
 						RemoteToken:    remoteTokenBytes,
 						RemotePool:     remotePoolBytes,
 					}
 				}
-
-				// Migrate fee config
-				feeCfg, err := rc.TokenTransferFeeConfig.ResolveForAutoMigrate(TokenTransferFeeConfig{
-					DestGasOverhead:               legacyTTFC.DestGasOverhead,
-					DestBytesOverhead:             legacyTTFC.DestBytesOverhead,
-					DefaultFinalityFeeUSDCents:    legacyTTFC.MinFeeUSDCents,
-					CustomFinalityFeeUSDCents:     0,
-					DefaultFinalityTransferFeeBps: legacyTTFC.DeciBps,
-					CustomFinalityTransferFeeBps:  0,
-					IsEnabled:                     legacyTTFC.IsEnabled,
-				})
+				legacyRL, err := LegacyRateLimitsForAutoMigrate(e, legacyRateLimitReader, selector, remoteSelector, activePoolRef, fullTokenRef, localDecimals, rc)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf(
+						"failed to resolve auto-migrated rate limits for chain selector %d and remote chain selector %d: %w",
+						selector, remoteSelector, err,
+					)
+				}
+				legacyFC, err := LegacyFeesForAutoMigrate(e, selector, remoteSelector, fullTokenRef.Address, rc)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf(
 						"failed to resolve auto-migrated fee config for chain selector %d and remote chain selector %d: %w",
 						selector, remoteSelector, err,
 					)
 				}
-				rc.TokenTransferFeeConfig = feeCfg
+				rc.MigrationMetadata = MigrationMetadata{
+					LegacyPoolVersion:            activePoolRef.Version,
+					LegacyPoolType:               activePoolRef.Type.String(),
+					LegacyRemotePools:            remotePools,
+					LegacyTokenTransferFeeConfig: legacyFC,
+					LegacyRateLimits:             legacyRL,
+				}
 				remoteChains[remoteSelector] = rc
 			}
 		}
 
-		// Resolve the timelock address if a liquidity migration is requested.
-		var timelockAddress string
-		if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
-			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
-			if !ok {
-				return nil, nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s' on chain %d", family, selector)
-			}
-			timelockRef, err := mcmsReader.GetTimelockRef(e, selector, mcmsInput)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to get timelock address from MCMS config on chain %d: %w", selector, err)
-			}
-			timelockAddress = timelockRef.Address
-		}
-
-		// NOTE: this changeset already applies the fee configs so we set
-		// `TokenTransferFeeConfig` to nil BEFORE calling the lower-level
-		// sequence to prevent it from applying the fee configs again.
+		// NOTE: this changeset is already responsible for applying the fee configs
+		// so we set `TokenTransferFeeConfig` to nil BEFORE calling the lower-level
+		// ConfigureTokenForTransfersSequence - this prevents any type of duplicate
+		// work from being done at a lower-level.
 		remoteChainsWithoutFeeConfigs := make(map[uint64]RemoteChainConfig[[]byte, string], len(remoteChains))
 		for sel, rc := range remoteChains {
 			rc.TokenTransferFeeConfig = nil
 			remoteChainsWithoutFeeConfigs[sel] = rc
 		}
 
-		// Configure pool remotes (fees excluded)
+		// Configure pool remotes (fee configs are excluded as they require
+		// special handling see comment below)
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-			ChainSelector:                 selector,
-			TokenPoolAddress:              tokenPool.Address,
-			RemoteChains:                  remoteChainsWithoutFeeConfigs,
-			ExternalAdmin:                 token.ExternalAdmin,
-			RegistryAddress:               registryAddr,
-			TokenRef:                      fullTokenRef,
-			PoolType:                      tokenPool.Type.String(),
-			ExistingDataStore:             e.DataStore,
-			AllowedFinalityConfig:         token.AllowedFinalityConfig,
-			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
-			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
-			TimelockAddress:               timelockAddress,
+			ChainSelector:         selector,
+			TokenPoolAddress:      tokenPool.Address,
+			RemoteChains:          remoteChainsWithoutFeeConfigs,
+			ExternalAdmin:         token.ExternalAdmin,
+			RegistryAddress:       registryAddr,
+			TokenRef:              fullTokenRef,
+			PoolType:              tokenPool.Type.String(),
+			ExistingDataStore:     e.DataStore,
+			AllowedFinalityConfig: token.AllowedFinalityConfig,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
@@ -374,16 +381,30 @@ func processTokenConfigForChain(e cldf.Environment, mcmsRegistry *changesets.MCM
 			}
 		}
 
-		// Apply fee configs
+		// Fee configs require special handling - determining the correct
+		// fee contract to configure is a multi-step process that usually
+		// involves invoking the bindings for multiple contract versions.
+		// Technically speaking this could be done inside the lower level
+		// sequence, but it defeats the whole purpose of having versioned
+		// adapters (i.e. the v2 adapter would need to know how to do pre
+		// v2 operations). To avoid this anti-pattern, it would be better
+		// to do this type of resolution here, in the top level changeset
+		// as it's already responsible for multi-version orchestration.
 		for remoteSelector, inCfg := range remoteChains {
-			if inCfg.TokenTransferFeeConfig != nil {
+			var feeCfg *PartialTokenTransferFeeConfig
+			if inCfg.MigrationMetadata.IsPopulated() {
+				feeCfg = inCfg.MigrationMetadata.LegacyTokenTransferFeeConfig
+			} else {
+				feeCfg = inCfg.TokenTransferFeeConfig
+			}
+			if feeCfg != nil {
 				feeBatchOps, feeReports, err := applyTokenTransferFeeConfig(
 					e,
 					selector,
 					remoteSelector,
 					tokenPool,
 					fullTokenRef,
-					*inCfg.TokenTransferFeeConfig,
+					*feeCfg,
 				)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to apply token transfer fee config for remote chain selector %d: %w", remoteSelector, err)
@@ -656,7 +677,7 @@ func convertRemoteChainConfig(
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize outbound CCV ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -667,7 +688,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVs = append(outCfg.OutboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVs {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize inbound CCV ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -678,7 +699,7 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVs = append(outCfg.InboundCCVs, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.OutboundCCVsToAddAboveThreshold {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize outbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -689,7 +710,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVsToAddAboveThreshold = append(outCfg.OutboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVsToAddAboveThreshold {
-		ref, err := TryNormalizeAddressRef(chainSelector, ccvRef)
+		ref, err := deploy.TryNormalizeAddressRef(chainSelector, ccvRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to normalize inbound CCV-above-threshold ref address for chain selector %d: %w", chainSelector, err)
 		}
@@ -700,4 +721,136 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	return outCfg, nil
+}
+
+// LegacyFeesForAutoMigrate reads legacy lane fees from the fee quoter or onramp and resolves them
+// against rc's YAML input. When YAML specifies tokenTransferFeeConfig, fields merge with legacy;
+// when YAML omits fees, legacy is imported when enabled. Returns nil when legacy is disabled and
+// YAML omits fees. Partial YAML without isEnabled is rejected.
+func LegacyFeesForAutoMigrate[R any, CCV any](
+	e cldf.Environment,
+	localSelector uint64,
+	remoteSelector uint64,
+	tokenAddress string,
+	rc RemoteChainConfig[R, CCV],
+) (*PartialTokenTransferFeeConfig, error) {
+	input := rc.TokenTransferFeeConfig
+	if input != nil {
+		if enabled, ok := input.IsEnabled.Get(); ok && !enabled {
+			return input, nil
+		}
+	}
+
+	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w",
+			localSelector, remoteSelector, err,
+		)
+	}
+
+	legacyTTFC, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, localSelector, remoteSelector, tokenAddress)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to discover token transfer fee config for remote chain selector %d on chain selector %d: %w",
+			remoteSelector, localSelector, err,
+		)
+	}
+
+	legacy := TokenTransferFeeConfig{
+		DestGasOverhead:               legacyTTFC.DestGasOverhead,
+		DestBytesOverhead:             legacyTTFC.DestBytesOverhead,
+		DefaultFinalityFeeUSDCents:    legacyTTFC.MinFeeUSDCents,
+		CustomFinalityFeeUSDCents:     0,
+		DefaultFinalityTransferFeeBps: legacyTTFC.DeciBps,
+		CustomFinalityTransferFeeBps:  0,
+		IsEnabled:                     legacyTTFC.IsEnabled,
+	}
+
+	if legacy.IsEnabled {
+		var partial PartialTokenTransferFeeConfig
+		if input == nil {
+			partial = partial.Populate(legacy)
+			return &partial, nil
+		}
+		if _, ok := input.IsEnabled.Get(); ok {
+			partial = partial.Populate(input.MergeWith(legacy))
+			return &partial, nil
+		}
+		return nil, fmt.Errorf("tokenTransferFeeConfig must set isEnabled")
+	}
+	if input == nil {
+		return nil, nil
+	}
+	if _, ok := input.IsEnabled.Get(); !ok {
+		return nil, fmt.Errorf("tokenTransferFeeConfig must set isEnabled")
+	}
+
+	return input, nil
+}
+
+// LegacyRateLimitsForAutoMigrate reads default-bucket rate limits from the legacy active pool and
+// resolves them against rc's YAML input. When YAML specifies both directions, limits are validated
+// and nil is returned. When YAML omits both, on-chain limits are returned for MigrationMetadata
+// (bigint passthrough, including disabled or mixed enablement). Partial YAML is rejected.
+// legacyPoolRef supplies version/type for inbound decimal-basis normalization; rc supplies remote decimals.
+func LegacyRateLimitsForAutoMigrate[R any, CCV any](
+	e cldf.Environment,
+	reader RateLimitReaderAdapter,
+	localSelector uint64,
+	remoteSelector uint64,
+	legacyPoolRef datastore.AddressRef,
+	tokenRef datastore.AddressRef,
+	localDecimals uint8,
+	rc RemoteChainConfig[R, CCV],
+) (*OnchainRateLimits, error) {
+	defaultOutbound, defaultOutboundOk := rc.GetOutboundRateLimitBuckets().DefaultBucket()
+	defaultInbound, defaultInboundOk := rc.GetInboundRateLimitBuckets().DefaultBucket()
+	if defaultOutboundOk != defaultInboundOk {
+		return nil, fmt.Errorf(
+			"default outbound and inbound rate limits must both be specified together in deployment input or fully omitted",
+		)
+	}
+
+	if defaultOutboundOk && defaultInboundOk {
+		if err := defaultOutbound.RateLimit.Validate(); err != nil {
+			return nil, fmt.Errorf("outbound rate limiter config: %w", err)
+		}
+		if err := defaultInbound.RateLimit.Validate(); err != nil {
+			return nil, fmt.Errorf("inbound rate limiter config: %w", err)
+		}
+		return nil, nil
+	}
+
+	legacy, err := reader.GetOnchainRateLimits(
+		e.OperationsBundle,
+		e.BlockChains,
+		e.DataStore,
+		localSelector,
+		legacyPoolRef,
+		tokenRef,
+		remoteSelector,
+		false,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to read on-chain rate limits from legacy pool for remote chain %d: %w",
+			remoteSelector, err,
+		)
+	}
+
+	chainFamily, err := chain_selectors.GetSelectorFamily(localSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", localSelector, err)
+	}
+
+	inboundLegacy := legacy.Inbound
+	if !DoesPoolUseLocalDecimals(chainFamily, legacyPoolRef.Version, legacyPoolRef.Type.String()) && rc.RemoteDecimals != 0 {
+		inboundLegacy = RebaseRateLimiterConfig(legacy.Inbound, rc.RemoteDecimals, localDecimals)
+	}
+
+	return &OnchainRateLimits{
+		Outbound: legacy.Outbound,
+		Inbound:  inboundLegacy,
+	}, nil
 }

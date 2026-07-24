@@ -149,6 +149,9 @@ func MigrateChainLanesToV2(
 				Lanes:      lanes,
 				MCMS:       cfg.MCMS,
 				TestRouter: cfg.TestRouter,
+				// A migration's whole purpose is to swap each lane's pre-2.0 OnRamp for the CCIP 2.0
+				// OnRamp on the (prod) router, so it must be allowed to overwrite the existing mapping.
+				AllowOnrampOverride: true,
 			},
 		}
 		if err := underlying.VerifyPreconditions(e, resolvedCfg); err != nil {

@@ -1,8 +1,11 @@
 package changesets
 
 import (
+	"context"
 	"fmt"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -10,10 +13,15 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	rmn_proxy_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
+	rmn15_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
+	rmn_bind "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // ActivateRMNCfg configures the ActivateRMN changeset.
@@ -86,16 +94,23 @@ func applyDeployAndActivateRMN(
 ) (cldf_deployment.ChangesetOutput, error) {
 	evmChains := e.BlockChains.EVMChains()
 	outputDS := datastore.NewMemoryDataStore()
-	allBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
+	rmnBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
+	cllBatchOps := make([]mcms_types.BatchOperation, 0, len(input.Cfg.ChainSels))
 
 	for _, sel := range input.Cfg.ChainSels {
 		chain := evmChains[sel]
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(sel))
 
+		cursedSubjects, err := getCursedSubjectsFromCurrentRMN(e, chain.Client, sel, addresses)
+		if err != nil {
+			return cldf_deployment.ChangesetOutput{}, err
+		}
+
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployAndActivateRMN, chain, sequences.ActivateRMNInput{
 			ChainSelector:     sel,
 			ExistingAddresses: addresses,
 			CurseAdmins:       input.Cfg.CurseAdmins[sel],
+			SubjectsToMigrate: cursedSubjects,
 		})
 		if err != nil {
 			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to activate RMN on chain %d: %w", sel, err)
@@ -106,13 +121,68 @@ func applyDeployAndActivateRMN(
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to add address to datastore: %w", addErr)
 			}
 		}
-		allBatchOps = append(allBatchOps, report.Output.BatchOps...)
+		rmnBatchOps = append(rmnBatchOps, report.Output.RMNMCMSBatchOps...)
+		cllBatchOps = append(cllBatchOps, report.Output.CLLCCIPBatchOps...)
 	}
 
-	return changesets.NewOutputBuilder(e, mcmsRegistry).
-		WithDataStore(outputDS).
-		WithBatchOps(allBatchOps).
-		Build(input.MCMS)
+	var output cldf_deployment.ChangesetOutput
+	output.DataStore = outputDS
+
+	if err := input.MCMS.PopulateDefaults(); err != nil {
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to populate MCMS defaults: %w", err)
+	}
+	if len(rmnBatchOps) > 0 {
+		rmnOut, err := changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithDataStore(outputDS).
+			WithBatchOps(rmnBatchOps).
+			Build(mcmsInputForActivateRMN(
+				input.MCMS,
+				common_utils.RMNTimelockQualifier,
+				"Accept RMN 2.0 ownership on RMNMCMS timelock",
+			))
+		if err != nil {
+			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to build RMNMCMS proposal: %w", err)
+		}
+		output.MCMSTimelockProposals = append(output.MCMSTimelockProposals, rmnOut.MCMSTimelockProposals...)
+	}
+
+	// CLLCCIPBatchOps is only populated when SetRMN could not run on-chain (proxy not deployer-owned).
+	if len(cllBatchOps) > 0 {
+		cllChainSels := make([]uint64, 0, len(cllBatchOps))
+		for _, op := range cllBatchOps {
+			cllChainSels = append(cllChainSels, uint64(op.ChainSelector))
+		}
+		if err := validateCLLCCIPForProxyProposal(e, cllChainSels); err != nil {
+			return cldf_deployment.ChangesetOutput{}, err
+		}
+		cllOut, err := changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithDataStore(outputDS).
+			WithBatchOps(cllBatchOps).
+			Build(mcmsInputForActivateRMN(
+				input.MCMS,
+				common_utils.CLLQualifier,
+				"Point RMNProxy at RMN 2.0 on CLLCCIP timelock",
+			))
+		if err != nil {
+			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to build CLLCCIP proposal: %w", err)
+		}
+		output.MCMSTimelockProposals = append(output.MCMSTimelockProposals, cllOut.MCMSTimelockProposals...)
+	}
+
+	return output, nil
+}
+
+func mcmsInputForActivateRMN(
+	base mcms.Input,
+	qualifier, description string,
+) mcms.Input {
+	return mcms.Input{
+		OverridePreviousRoot: base.OverridePreviousRoot,
+		ValidUntil:           base.ValidUntil,
+		TimelockAction:       mcms_types.TimelockActionSchedule,
+		Qualifier:            qualifier,
+		Description:          description,
+	}
 }
 
 func validateActivateRMNAddresses(addresses []datastore.AddressRef, chainSelector uint64) error {
@@ -128,17 +198,136 @@ func validateActivateRMNAddresses(addresses []datastore.AddressRef, chainSelecto
 			common_utils.RMNTimelockQualifier, chainSelector,
 		)
 	}
-	if ref := datastore_utils.GetAddressRef(
-		addresses,
+	return nil
+}
+
+func getCursedSubjectsFromCurrentRMN(
+	e cldf_deployment.Environment,
+	client bind.ContractBackend,
+	chainSelector uint64,
+	addresses []datastore.AddressRef,
+) ([][16]byte, error) {
+	proxyRef := datastore_utils.GetAddressRef(addresses, chainSelector, rmnproxyops.ContractType, rmnproxyops.Version, "")
+	if proxyRef.Address == "" {
+		return nil, nil
+	}
+
+	ctx := context.Background()
+	if e.GetContext != nil {
+		ctx = e.GetContext()
+	}
+
+	proxyC, err := rmn_proxy_bind.NewRMNProxy(common.HexToAddress(proxyRef.Address), client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate RMNProxy on chain %d: %w", chainSelector, err)
+	}
+
+	currentRMNAddr, err := proxyC.GetARM(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read active RMN from RMNProxy on chain %d: %w", chainSelector, err)
+	}
+	if currentRMNAddr == (common.Address{}) {
+		return nil, nil
+	}
+
+	code, err := client.CodeAt(ctx, currentRMNAddr, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect active RMN code on chain %d: %w", chainSelector, err)
+	}
+	if len(code) == 0 {
+		return nil, nil
+	}
+
+	currentRMNC, err := rmn_bind.NewRMN(currentRMNAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate current RMN on chain %d: %w", chainSelector, err)
+	}
+
+	cursedSubjects, err := currentRMNC.GetCursedSubjects(&bind.CallOpts{Context: ctx})
+	if err == nil {
+		return cursedSubjects, nil
+	}
+
+	legacyCursedSubjects, legacyErr := getCursedSubjectsFromRMN15(ctx, client, currentRMNAddr)
+	if legacyErr == nil {
+		return legacyCursedSubjects, nil
+	}
+
+	return nil, fmt.Errorf(
+		"failed to read cursed subjects from current RMN on chain %d (v2/v1.6 read: %w, v1.5 fallback: %v)",
 		chainSelector,
-		common_utils.RBACTimelock,
-		mcms_ops.MCMSVersion,
-		common_utils.UltraFastCurseMCMSQualifier,
-	); ref.Address == "" {
-		return fmt.Errorf(
-			"Ultra Fast Curse RBACTimelock (qualifier %q) not found in datastore for chain %d",
-			common_utils.UltraFastCurseMCMSQualifier, chainSelector,
-		)
+		err,
+		legacyErr,
+	)
+}
+
+func getCursedSubjectsFromRMN15(
+	ctx context.Context,
+	client bind.ContractBackend,
+	rmnAddr common.Address,
+) ([][16]byte, error) {
+	rmn15C, err := rmn15_bind.NewRMNContract(rmnAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate RMN 1.5 contract: %w", err)
+	}
+
+	count, err := rmn15C.GetCursedSubjectsCount(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read RMN 1.5 cursed subject count: %w", err)
+	}
+	if count.Sign() == 0 {
+		return nil, nil
+	}
+
+	const pageSize int64 = 64
+	offset := big.NewInt(0)
+	limit := big.NewInt(pageSize)
+	latestCurseState := make(map[[16]byte]bool)
+
+	for {
+		recordedOps, readErr := rmn15C.GetRecordedCurseRelatedOps(&bind.CallOpts{Context: ctx}, offset, limit)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read RMN 1.5 curse operation history: %w", readErr)
+		}
+		if len(recordedOps) == 0 {
+			break
+		}
+		for _, op := range recordedOps {
+			// Ops are returned in deterministic order for offset pagination.
+			// Overwriting per-subject state yields the latest known state by the end of the scan.
+			latestCurseState[op.Subject] = op.Cursed
+		}
+		offset.Add(offset, big.NewInt(int64(len(recordedOps))))
+		if len(recordedOps) < int(pageSize) {
+			break
+		}
+	}
+
+	activeCurses := make([][16]byte, 0, count.Int64())
+	for subject, isCursed := range latestCurseState {
+		if isCursed {
+			activeCurses = append(activeCurses, subject)
+		}
+	}
+
+	return activeCurses, nil
+}
+
+func validateCLLCCIPForProxyProposal(e cldf_deployment.Environment, chainSels []uint64) error {
+	for _, sel := range chainSels {
+		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(sel))
+		if ref := datastore_utils.GetAddressRef(
+			addresses,
+			sel,
+			common_utils.RBACTimelock,
+			mcms_ops.MCMSVersion,
+			common_utils.CLLQualifier,
+		); ref.Address == "" {
+			return fmt.Errorf(
+				"RMNProxy.SetRMN requires CLLCCIP RBACTimelock (qualifier %q) in datastore for chain %d",
+				common_utils.CLLQualifier, sel,
+			)
+		}
 	}
 	return nil
 }

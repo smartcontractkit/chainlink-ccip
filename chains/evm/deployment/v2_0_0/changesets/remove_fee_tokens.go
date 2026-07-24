@@ -277,10 +277,7 @@ func collectLegacyFeeTokens(
 	}
 
 	feeTokens, err := queryPriceRegistryFeeTokens(e, chain, common.HexToAddress(priceRegistryRef.Address))
-	if err != nil {
-		return nil, err
-	}
-	return feeTokens, nil
+	return feeTokens, err
 }
 
 func queryPriceRegistryFeeTokens(e cldf_deployment.Environment, chain evm.Chain, priceRegistry common.Address) ([]common.Address, error) {

@@ -194,7 +194,6 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				MCMS: mcms.Input{
 					OverridePreviousRoot: true,
 					ValidUntil:           4126214326,
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       mcms_types.TimelockActionSchedule,
 					Description:          "Test Proposal",
 				},
@@ -212,7 +211,6 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				require.Len(t, out.MCMSTimelockProposals[0].Operations, 1)
 				require.Equal(t, out.MCMSTimelockProposals[0].OverridePreviousRoot, true)
 				require.Equal(t, out.MCMSTimelockProposals[0].ValidUntil, uint32(4126214326))
-				require.Equal(t, out.MCMSTimelockProposals[0].Delay, mcms_types.MustParseDuration("1h"))
 				require.Equal(t, out.MCMSTimelockProposals[0].Action, mcms_types.TimelockActionSchedule)
 				require.Equal(t, out.MCMSTimelockProposals[0].Description, "Test Proposal")
 				require.Equal(t, uint64(OP_COUNT), out.MCMSTimelockProposals[0].ChainMetadata[4340886533089894000].StartingOpCount)

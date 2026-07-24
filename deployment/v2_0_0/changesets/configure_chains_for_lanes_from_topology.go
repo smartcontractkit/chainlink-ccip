@@ -157,7 +157,7 @@ func ConfigureChainsForLanesFromTopology(
 		// JD calls that could fail if those NOPs don't exist in the node registry.
 		targetFamilies := deriveFamiliesFromChains(chains)
 		committeeNOPs := filterNOPsToCommitteeMembers(cfg.Topology.NOPTopology, chains)
-		signingKeysByNOP, rawPubKeyByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, targetFamilies)
+		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, targetFamilies)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
 		}
@@ -186,7 +186,6 @@ func ConfigureChainsForLanesFromTopology(
 						chainCfg.ChainSelector,
 						remoteSelector,
 						signingKeysByNOP,
-						rawPubKeyByNOP,
 					)
 					if err != nil {
 						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for lane local chain %d -> remote chain %d: %w", chainCfg.ChainSelector, remoteSelector, err)
@@ -240,7 +239,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter())
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter(), cfg.AllowOnrampOverride)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -265,6 +264,7 @@ func applyConfigureChains(
 	chains []enrichedChainConfig,
 	mcmsInput mcms.Input,
 	useTestRouter bool,
+	allowOnrampOverride bool,
 ) (deployment.ChangesetOutput, error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -344,8 +344,10 @@ func applyConfigureChains(
 
 		// ── Phase 3: Dispatch ──────────────────────────────────────────────
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-			ChainSelector:       chainCfg.ChainSelector,
-			AllowOnrampOverride: useTestRouter,
+			ChainSelector: chainCfg.ChainSelector,
+			// Overriding an existing prod-router OnRamp mapping is allowed either implicitly on the
+			// test router or explicitly via AllowOnrampOverride (set by migrate_chain_lanes_to_v2).
+			AllowOnrampOverride: useTestRouter || allowOnrampOverride,
 			Router:              routerBytes,
 			OnRamp:              onRampBytes,
 			CommitteeVerifiers:  committeeVerifiers,

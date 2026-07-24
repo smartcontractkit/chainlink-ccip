@@ -201,7 +201,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 
 		// If a legacy USDCTokenPool v1.6.2 exists on this chain, register each supported
 		// remote's USDCTokenPoolProxy on it via usdc_token_pool.AddRemotePool.
-		v162Writes, err := addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(b, chain, dep, input, remoteChainConfigs)
+		v162Writes, err := addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(b, chain, dep, input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -390,15 +390,14 @@ func resolveConfigureCCTPChainRefs(
 
 // addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool registers each remote chain's USDCTokenPoolProxy
 // on the legacy USDCTokenPool v1.6.2 via usdc_token_pool.AddRemotePool.
-// Skips when there is no v1.6.2 pool on this chain (net new lane), the remote's registered pool
-// ref is not a USDCTokenPoolProxy, the remote chain is not yet supported on the v1.6.2 pool, or the
+// Skips when there is no v1.6.2 pool on this chain (net new lane), the remote chain has no deployed
+// USDCTokenPoolProxy v2.0.0 yet, the remote chain is not yet supported on the v1.6.2 pool, or the
 // proxy is already listed as a remote pool.
 func addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	dep adapters.ConfigureCCTPChainForLanesDeps,
 	input adapters.ConfigureCCTPChainForLanesInput,
-	remoteChainConfigs map[uint64]tokens_core.RemoteChainConfig[[]byte, string],
 ) ([]contract_utils.WriteOutput, error) {
 	refs := dep.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -425,18 +424,23 @@ func addUSDCTokenPoolProxyAsRemotePoolOnLegacyPool(
 
 	var writes []contract_utils.WriteOutput
 	for remoteSel := range input.RemoteChains {
-		poolRef := input.RemoteRegisteredPoolRefs[remoteSel]
-		if poolRef.Type != datastore.ContractType(usdc_token_pool_proxy.ContractType) {
-			continue
-		}
-		cfg, ok := remoteChainConfigs[remoteSel]
-		if !ok {
-			return nil, fmt.Errorf("missing remote chain config for remote chain %d on chain %d", remoteSel, input.ChainSelector)
-		}
 		if !slices.Contains(supportedChains, remoteSel) {
 			continue
 		}
-		w, err := maybeAddRemotePoolUSDCTokenPoolV162(b, chain, input.ChainSelector, localV162, remoteSel, cfg.RemotePool)
+		remoteProxyRefs := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(remoteSel),
+			datastore.AddressRefByType(datastore.ContractType(usdc_token_pool_proxy.ContractType)),
+			datastore.AddressRefByVersion(usdc_token_pool_proxy.Version),
+		)
+		if len(remoteProxyRefs) == 0 {
+			continue
+		}
+		if len(remoteProxyRefs) > 1 {
+			return nil, fmt.Errorf("expected at most one USDCTokenPoolProxy v%s on chain %d, found %d", usdc_token_pool_proxy.Version.String(), remoteSel, len(remoteProxyRefs))
+		}
+		remoteProxyAddress := common.HexToAddress(remoteProxyRefs[0].Address)
+
+		w, err := maybeAddRemotePoolUSDCTokenPoolV162(b, chain, input.ChainSelector, localV162, remoteSel, common.LeftPadBytes(remoteProxyAddress.Bytes(), 32))
 		if err != nil {
 			return nil, err
 		}
@@ -564,7 +568,8 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
 			continue
 		}
-		if !isV2Mechanism(remoteChain.LockOrBurnMechanism) {
+		if !isEVMRemote(remoteChainSelector) {
+			// Non-EVM remotes (e.g. Solana) are not supported by CCIP 2.0 yet, so we don't configure it yet.
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)

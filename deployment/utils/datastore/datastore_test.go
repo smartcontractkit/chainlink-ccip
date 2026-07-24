@@ -99,12 +99,14 @@ func TestFindAndFormatRef(t *testing.T) {
 }
 
 func TestFindAndFormatFirstRef(t *testing.T) {
+	v := semver.MustParse("1.0.0")
 	// Setup datastore with multiple refs
 	ds := datastore.NewMemoryDataStore()
 	err := ds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: 111,
 		Address:       "0x01",
 		Type:          datastore.ContractType("TestContract1"),
+		Version:       v,
 		Qualifier:     "For testing",
 	})
 	require.NoError(t, err)
@@ -112,6 +114,7 @@ func TestFindAndFormatFirstRef(t *testing.T) {
 		ChainSelector: 111,
 		Address:       "0x02",
 		Type:          datastore.ContractType("TestContract2"),
+		Version:       v,
 		Qualifier:     "For testing",
 	})
 	require.NoError(t, err)
@@ -119,6 +122,7 @@ func TestFindAndFormatFirstRef(t *testing.T) {
 		ChainSelector: 222,
 		Address:       "0x03",
 		Type:          datastore.ContractType("TestContract3"),
+		Version:       v,
 		Qualifier:     "For testing",
 	})
 	require.NoError(t, err)

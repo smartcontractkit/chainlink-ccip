@@ -268,16 +268,25 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			writes = append(writes, siloedPoolWrites...)
 		}
 
-		// Set the fee aggregator on the USDCTokenPoolProxy
-		setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+		// Set the fee aggregator on the USDCTokenPoolProxy, if not already set to the desired address.
+		currentFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       usdcTokenPoolProxyAddress,
-			Args:          feeAggregatorAddress,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on USDCTokenPoolProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee aggregator from USDCTokenPoolProxy: %w", err)
 		}
-		writes = append(writes, setFeeAggregatorReport.Output)
+		if currentFeeAggregatorReport.Output != feeAggregatorAddress {
+			setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+				ChainSelector: chain.Selector,
+				Address:       usdcTokenPoolProxyAddress,
+				Args:          feeAggregatorAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on USDCTokenPoolProxy: %w", err)
+			}
+			writes = append(writes, setFeeAggregatorReport.Output)
+		}
 
 		authorizedCallerWrites, err := applyCCTPAuthorizedCallerWrites(
 			b,
@@ -528,42 +537,69 @@ func applyCCTPAuthorizedCallerWrites(
 	}
 
 	if enableCCTPV1 {
-		cctpV1TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool.AuthorizedCallerArgs]{
+		cctpV1PoolCurrentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       cctpV1PoolAddr,
-			Args: usdc_token_pool.AuthorizedCallerArgs{
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get authorized callers from USDCTokenPool: %w", err)
+		}
+		if !slices.Contains(cctpV1PoolCurrentReport.Output, proxyAddr) {
+			cctpV1TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool.AuthorizedCallerArgs]{
+				ChainSelector: chain.Selector,
+				Address:       cctpV1PoolAddr,
+				Args: usdc_token_pool.AuthorizedCallerArgs{
+					AddedCallers: []common.Address{proxyAddr},
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to apply authorized caller updates to USDCTokenPool: %w", err)
+			}
+			writes = append(writes, cctpV1TokenPoolReport.Output)
+		}
+	}
+
+	cctpV2ThroughCCVCurrentReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       cctpV2WithCCVsPoolAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authorized callers from CCTPThroughCCVTokenPool: %w", err)
+	}
+	if !slices.Contains(cctpV2ThroughCCVCurrentReport.Output, proxyAddr) {
+		cctpV2ThroughCCVTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_through_ccv_token_pool.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       cctpV2WithCCVsPoolAddr,
+			Args: cctp_through_ccv_token_pool.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{proxyAddr},
 			},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to apply authorized caller updates to USDCTokenPool: %w", err)
+			return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPThroughCCVTokenPool: %w", err)
 		}
-		writes = append(writes, cctpV1TokenPoolReport.Output)
+		writes = append(writes, cctpV2ThroughCCVTokenPoolReport.Output)
 	}
 
-	cctpV2ThroughCCVTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_through_ccv_token_pool.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       cctpV2WithCCVsPoolAddr,
-		Args: cctp_through_ccv_token_pool.AuthorizedCallerArgs{
-			AddedCallers: []common.Address{proxyAddr},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPThroughCCVTokenPool: %w", err)
-	}
-	writes = append(writes, cctpV2ThroughCCVTokenPoolReport.Output)
-
-	cctpV2TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerArgs]{
+	cctpV2PoolCurrentReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chain.Selector,
 		Address:       cctpV2PoolAddr,
-		Args: usdc_token_pool_cctp_v2.AuthorizedCallerArgs{
-			AddedCallers: []common.Address{proxyAddr},
-		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply authorized caller updates to USDCTokenPoolCCTPV2: %w", err)
+		return nil, fmt.Errorf("failed to get authorized callers from USDCTokenPoolCCTPV2: %w", err)
 	}
-	writes = append(writes, cctpV2TokenPoolReport.Output)
+	if !slices.Contains(cctpV2PoolCurrentReport.Output, proxyAddr) {
+		cctpV2TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       cctpV2PoolAddr,
+			Args: usdc_token_pool_cctp_v2.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{proxyAddr},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply authorized caller updates to USDCTokenPoolCCTPV2: %w", err)
+		}
+		writes = append(writes, cctpV2TokenPoolReport.Output)
+	}
 	return writes, nil
 }
 

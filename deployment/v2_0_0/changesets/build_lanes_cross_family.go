@@ -43,6 +43,9 @@ type BuildLanesCrossFamilyConfig struct {
 	Lanes      []CrossFamilyLanePair `json:"lanes" yaml:"lanes"`
 	MCMS       mcms.Input            `json:"mcms" yaml:"mcms"`
 	TestRouter *bool                 `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// AllowOnrampOverride permits replacing an existing OnRamp mapping in the production Router
+	// with a different OnRamp address. This should only be used for v2 migrations.
+	AllowOnrampOverride bool `json:"allowOnrampOverride,omitempty" yaml:"allowOnrampOverride,omitempty"`
 }
 
 // UseTestRouter reports whether the test router should be used instead of the production router.
@@ -56,6 +59,28 @@ func (c BuildLanesCrossFamilyConfig) UseTestRouter() bool {
 type ConfigureChainsForLanesFromTopologyConfig struct {
 	Topology *offchain.EnvironmentTopology `json:"topology" yaml:"topology"`
 	BuildLanesCrossFamilyConfig
+}
+
+// committeeQualifiersForLaneLeg returns the committee qualifiers that apply to the leg
+// from local → remote. A committee applies only if both the local and remote chain
+// selectors appear in its ChainConfigs — meaning the committee is configured for both
+// sides of the lane. When committees is nil, the single default qualifier is returned.
+func committeeQualifiersForLaneLeg(local, remote uint64, committees map[string]offchain.CommitteeConfig) ([]string, error) {
+	if committees == nil {
+		return []string{defaultQualifier}, nil
+	}
+	localKey := strconv.FormatUint(local, 10)
+	remoteKey := strconv.FormatUint(remote, 10)
+	qualifiers := make([]string, 0, len(committees))
+	for q, committee := range committees {
+		_, hasLocal := committee.ChainConfigs[localKey]
+		_, hasRemote := committee.ChainConfigs[remoteKey]
+		if hasLocal && hasRemote {
+			qualifiers = append(qualifiers, q)
+		}
+	}
+	sort.Strings(qualifiers)
+	return qualifiers, nil
 }
 
 // expandLanesToPartialChainConfigs converts bidirectional lane pairs into the internal
@@ -74,35 +99,14 @@ func expandLanesToPartialChainConfigs(lanes []CrossFamilyLanePair, committees ma
 			return nil, fmt.Errorf("lane %d: chainA and chainB must differ", i)
 		}
 		var qualifiers []string
-		remoteKey := strconv.FormatUint(lane.ChainB, 10)
-		for _, cvCfg := range committees {
-			if _, exists := cvCfg.ChainConfigs[remoteKey]; exists {
-				qualifiers = append(qualifiers, cvCfg.Qualifier)
-			}
-		}
-		sort.Strings(qualifiers)
-		if len(qualifiers) == 0 {
-			if len(committees) == 0 {
-				qualifiers = []string{defaultQualifier}
-			} else {
-				return nil, fmt.Errorf("lane %d: no committees have chain_config for remote chain %d", i, lane.ChainB)
-			}
+		qualifiers, err := committeeQualifiersForLaneLeg(lane.ChainA, lane.ChainB, committees)
+		if err != nil {
+			return nil, fmt.Errorf("lane %d: %w", i, err)
 		}
 		mergeLaneLeg(byChain, lane.ChainA, lane.ChainB, qualifiers, lane.ChainAOverrides)
-		qualifiers = nil
-		remoteKey = strconv.FormatUint(lane.ChainA, 10)
-		for _, cvCfg := range committees {
-			if _, exists := cvCfg.ChainConfigs[remoteKey]; exists {
-				qualifiers = append(qualifiers, cvCfg.Qualifier)
-			}
-		}
-		sort.Strings(qualifiers)
-		if len(qualifiers) == 0 {
-			if len(committees) == 0 {
-				qualifiers = []string{defaultQualifier}
-			} else {
-				return nil, fmt.Errorf("lane %d: no committees have chain_config for remote chain %d", i, lane.ChainA)
-			}
+		qualifiers, err = committeeQualifiersForLaneLeg(lane.ChainB, lane.ChainA, committees)
+		if err != nil {
+			return nil, fmt.Errorf("lane %d: %w", i, err)
 		}
 		mergeLaneLeg(byChain, lane.ChainB, lane.ChainA, qualifiers, lane.ChainBOverrides)
 	}

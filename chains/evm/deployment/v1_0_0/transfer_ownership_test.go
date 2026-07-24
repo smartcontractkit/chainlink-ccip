@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -57,15 +56,15 @@ func TestTransferOwnership(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.CLLQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
 			},
 		},
 	})
@@ -88,15 +87,15 @@ func TestTransferOwnership(t *testing.T) {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.RMNTimelockQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.RMNTimelockQualifier),
 			},
 			selector2: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
 				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(deploymentutils.RMNTimelockQualifier),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.RMNTimelockQualifier),
 			},
 		},
 	})
@@ -178,7 +177,6 @@ func TestTransferOwnership(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership test",
@@ -239,7 +237,6 @@ func TestTransferOwnership(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            deploymentutils.CLLQualifier,
 			Description:          "Transfer ownership test",
@@ -257,7 +254,6 @@ func TestTransferOwnership(t *testing.T) {
 	transferOwnershipInput.MCMS = mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           3759765795,
-		TimelockDelay:        mcms_types.MustParseDuration("0s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Qualifier:            deploymentutils.RMNTimelockQualifier,
 		Description:          "Transfer ownership test",

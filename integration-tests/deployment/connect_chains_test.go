@@ -334,7 +334,6 @@ func TestConnectChains_EVM2SVM_Lifecycle(t *testing.T) {
 		MCMS: mcms.Input{
 			OverridePreviousRoot: true,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            cciputils.CLLQualifier,
 			Description:          "Disable Lane",

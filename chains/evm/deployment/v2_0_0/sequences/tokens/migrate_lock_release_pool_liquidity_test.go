@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -19,13 +20,15 @@ import (
 	old_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	old_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	new_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -55,7 +58,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
 				Amount:          big.NewInt(100),
-				BasisPoints:     uint16Ptr(5000),
+				BasisPoints:     new(uint16(5000)),
 			},
 			expectedErr: "Amount and BasisPoints are mutually exclusive",
 		},
@@ -76,7 +79,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
-				BasisPoints:     uint16Ptr(0),
+				BasisPoints:     new(uint16(0)),
 			},
 			expectedErr: "BasisPoints must be between 1 and 10000",
 		},
@@ -87,7 +90,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
-				BasisPoints:     uint16Ptr(10001),
+				BasisPoints:     new(uint16(10001)),
 			},
 			expectedErr: "BasisPoints must be between 1 and 10000",
 		},
@@ -119,7 +122,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				ChainSelector:   chainSel,
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
-				BasisPoints:     uint16Ptr(10000),
+				BasisPoints:     new(uint16(10000)),
 			},
 			expectedErr: "OldPoolAddress and NewPoolAddress must be provided",
 		},
@@ -129,7 +132,7 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				ChainSelector:  chainSel,
 				OldPoolAddress: "0x0000000000000000000000000000000000000001",
 				NewPoolAddress: "0x0000000000000000000000000000000000000002",
-				BasisPoints:    uint16Ptr(10000),
+				BasisPoints:    new(uint16(10000)),
 			},
 			expectedErr: "TimelockAddress must be provided",
 		},
@@ -315,6 +318,56 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 	}
 }
 
+// executeMigrationSequence runs the liquidity migration sequence and sends any prepared
+// batch transactions using the chain deployer key (standing in for the timelock in tests).
+func executeMigrationSequence(
+	t *testing.T,
+	bundle operations.Bundle,
+	blockChains chain.BlockChains,
+	input tokens_core.MigrateLockReleasePoolLiquidityInput,
+) {
+	t.Helper()
+
+	report, err := operations.ExecuteSequence(
+		bundle,
+		tokens.MigrateLockReleasePoolLiquidity,
+		blockChains,
+		input,
+	)
+	require.NoError(t, err)
+
+	evmChain, ok := blockChains.EVMChains()[input.ChainSelector]
+	require.True(t, ok, "chain %d not found", input.ChainSelector)
+
+	for _, batch := range report.Output.BatchOps {
+		for _, mcmsTx := range batch.Transactions {
+			to := common.HexToAddress(mcmsTx.To)
+			nonce, err := evmChain.Client.PendingNonceAt(t.Context(), evmChain.DeployerKey.From)
+			require.NoError(t, err)
+
+			gasLimit, err := evmChain.Client.EstimateGas(t.Context(), ethereum.CallMsg{
+				From: evmChain.DeployerKey.From,
+				To:   &to,
+				Data: mcmsTx.Data,
+			})
+			require.NoError(t, err)
+
+			gasPrice, err := evmChain.Client.SuggestGasPrice(t.Context())
+			require.NoError(t, err)
+
+			tx := types.NewTransaction(nonce, to, big.NewInt(0), gasLimit, gasPrice, mcmsTx.Data)
+			signedTx, err := evmChain.DeployerKey.Signer(evmChain.DeployerKey.From, tx)
+			require.NoError(t, err)
+
+			err = evmChain.Client.SendTransaction(t.Context(), signedTx)
+			require.NoError(t, err)
+
+			_, err = evmChain.Confirm(signedTx)
+			require.NoError(t, err)
+		}
+	}
+}
+
 func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	totalLiquidity := big.NewInt(10000)
@@ -322,9 +375,8 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 	chain := s.env.BlockChains.EVMChains()[chainSel]
 
 	basisPoints := uint16(8000) // 80%
-	_, err := operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		s.env.OperationsBundle,
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -334,7 +386,6 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	expectedMigrated := new(big.Int).Div(
 		new(big.Int).Mul(totalLiquidity, big.NewInt(8000)),
@@ -404,9 +455,8 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
 	chain := s.env.BlockChains.EVMChains()[chainSel]
 
 	basisPoints := uint16(10000) // 100%
-	_, err := operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		s.env.OperationsBundle,
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -416,7 +466,6 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	oldPoolBal, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
@@ -452,9 +501,8 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 	chain := s.env.BlockChains.EVMChains()[chainSel]
 
 	exactAmount := big.NewInt(2500)
-	_, err := operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		s.env.OperationsBundle,
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -464,7 +512,6 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 			Amount:          exactAmount,
 		},
 	)
-	require.NoError(t, err)
 
 	expectedRemaining := new(big.Int).Sub(totalLiquidity, exactAmount)
 
@@ -519,9 +566,8 @@ func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
 	// Use a fresh reporter so the test setup's SetRebalancer report doesn't
 	// collide with the migration's restore-SetRebalancer call (same def+input hash).
 	freshBundle := testsetup.BundleWithFreshReporter(s.env.OperationsBundle)
-	_, err = operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		freshBundle,
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -531,7 +577,6 @@ func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	rebalancerReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
@@ -772,7 +817,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 			ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args:           erc20_lock_box.ConstructorArgs{Token: tokenAddr},
-			Qualifier:      strPtr("chain1"),
+			Qualifier:      new("chain1"),
 		})
 	require.NoError(t, err)
 	lockbox1Addr := common.HexToAddress(lockbox1Report.Output.Address)
@@ -782,7 +827,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 			ChainSelector:  chainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 			Args:           erc20_lock_box.ConstructorArgs{Token: tokenAddr},
-			Qualifier:      strPtr("chain2"),
+			Qualifier:      new("chain2"),
 		})
 	require.NoError(t, err)
 	lockbox2Addr := common.HexToAddress(lockbox2Report.Output.Address)
@@ -799,9 +844,8 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 
 	// Run migration (100% of all liquidity)
 	basisPoints := uint16(10000)
-	_, err = operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		e.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -811,7 +855,6 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	// Verify old pool is drained
 	oldPoolBal, err := operations.ExecuteOperation(
@@ -876,9 +919,8 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 
 	// Run migration with SetPoolConfig
 	basisPoints := uint16(10000)
-	_, err = operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -892,7 +934,6 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 			},
 		},
 	)
-	require.NoError(t, err)
 
 	// Verify the pool was set on the registry
 	tokenConfig, err := operations.ExecuteOperation(
@@ -941,9 +982,8 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 
 	// Run migration
 	basisPoints := uint16(10000)
-	_, err = operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -953,7 +993,6 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	// Verify pre-existing caller is still present after migration
 	postCallersReport, err := operations.ExecuteOperation(
@@ -976,9 +1015,8 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 
 	// Step 1: Migrate 50%
 	basisPoints := uint16(5000)
-	_, err := operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -988,7 +1026,6 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	// Verify 50% migrated
 	oldPoolBal1, err := operations.ExecuteOperation(
@@ -1005,9 +1042,8 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 
 	// Step 2: Migrate 100% of remaining
 	basisPoints = uint16(10000)
-	_, err = operations.ExecuteSequence(
+	executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -1017,7 +1053,6 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 			BasisPoints:     &basisPoints,
 		},
 	)
-	require.NoError(t, err)
 
 	// Verify all liquidity migrated
 	oldPoolBal2, err := operations.ExecuteOperation(
@@ -1039,12 +1074,4 @@ func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored after both migrations")
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
-func uint16Ptr(v uint16) *uint16 {
-	return &v
 }

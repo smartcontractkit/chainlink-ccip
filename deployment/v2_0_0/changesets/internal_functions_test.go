@@ -6,11 +6,8 @@ package changesets
 
 import (
 	"context"
-	"encoding/hex"
-	"strings"
 	"testing"
 
-	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -78,7 +75,7 @@ func TestSignerFromJDIfMissing_NotFoundInJD(t *testing.T) {
 
 func TestFetchSigningKeysForNOPsByFamilies_NilOffchain_ReturnsNil(t *testing.T) {
 	e := deployment.Environment{}
-	result, _, err := fetchSigningKeysForNOPsByFamilies(e, []offchain.NOPConfig{{Alias: "nop1"}}, []string{chainsel.FamilyEVM})
+	result, err := fetchSigningKeysForNOPsByFamilies(e, []offchain.NOPConfig{{Alias: "nop1"}}, []string{chainsel.FamilyEVM})
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -99,7 +96,7 @@ func TestFetchSigningKeysForNOPsByFamilies_AllSignersPresent_ReturnsNil(t *testi
 		{Alias: "nop1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xabc"}},
 		{Alias: "nop2", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xdef"}},
 	}
-	result, _, err := fetchSigningKeysForNOPsByFamilies(e, nops, []string{chainsel.FamilyEVM})
+	result, err := fetchSigningKeysForNOPsByFamilies(e, nops, []string{chainsel.FamilyEVM})
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -160,7 +157,7 @@ func TestFetchSigningKeysForNOPsByFamilies_CallsJD_WhenSignerMissing(t *testing.
 		{Alias: "nop1"},
 	}
 
-	result, _, err := fetchSigningKeysForNOPsByFamilies(e, nops, []string{chainsel.FamilyEVM})
+	result, err := fetchSigningKeysForNOPsByFamilies(e, nops, []string{chainsel.FamilyEVM})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Contains(t, result, "nop1")
@@ -206,7 +203,7 @@ func TestFetchSigningKeysForNOPsByFamilies_OnlyFetchesForNOPsMissingSigner(t *te
 		NodeIDs:          []string{"node-1", "node-2"},
 	}
 
-	result, _, err := fetchSigningKeysForNOPsByFamilies(e, []offchain.NOPConfig{
+	result, err := fetchSigningKeysForNOPsByFamilies(e, []offchain.NOPConfig{
 		{Alias: "nop1", SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xexisting"}},
 		{Alias: "nop2"},
 	}, []string{chainsel.FamilyEVM})
@@ -242,7 +239,7 @@ func TestSignerAddressForNOPAlias_TopologySignerTakesPrecedenceOverJD(t *testing
 		"nop1": {chainsel.FamilyEVM: jdSigner},
 	}
 
-	result, err := signerAddressForNOPAlias(e, topology, "nop1", chainsel.FamilyEVM, "test-committee", 1, jdKeys, "")
+	result, err := signerAddressForNOPAlias(e, topology, "nop1", chainsel.FamilyEVM, "test-committee", 1, jdKeys)
 	require.NoError(t, err)
 	assert.Equal(t, topologySigner, result, "topology signer must take precedence over JD-fetched key")
 }
@@ -265,88 +262,15 @@ func TestSignerAddressForNOPAlias_FallsBackToJDWhenTopologyMissing(t *testing.T)
 		"nop1": {chainsel.FamilyEVM: jdSigner},
 	}
 
-	result, err := signerAddressForNOPAlias(e, topology, "nop1", chainsel.FamilyEVM, "test-committee", 1, jdKeys, "")
+	result, err := signerAddressForNOPAlias(e, topology, "nop1", chainsel.FamilyEVM, "test-committee", 1, jdKeys)
 	require.NoError(t, err)
 	assert.Equal(t, jdSigner, result, "should fall back to JD key when topology signer is absent")
 }
 
-// ---- translateSignerAddress ----
-
-func TestTranslateSignerAddress_EVMToSolana(t *testing.T) {
-	// EVM and Solana addresses encode the identical 20 bytes; only string formatting differs.
-	translated, err := translateSignerAddress(chainsel.FamilyEVM, "0xAbC1230000000000000000000000000000000000", chainsel.FamilySolana)
-	require.NoError(t, err)
-	assert.Equal(t, "abc1230000000000000000000000000000000000", translated)
-}
-
-func TestTranslateSignerAddress_SolanaToEVM(t *testing.T) {
-	translated, err := translateSignerAddress(chainsel.FamilySolana, "abc1230000000000000000000000000000000000", chainsel.FamilyEVM)
-	require.NoError(t, err)
-	assert.Equal(t, "0xAbc1230000000000000000000000000000000000", translated)
-}
-
-func testRawPubKeyHex(t *testing.T) (hexKey string, evmAddress string) {
-	t.Helper()
-	privKey, err := gethcrypto.HexToECDSA(strings.Repeat("01", 32))
-	require.NoError(t, err)
-	pubKeyBytes := gethcrypto.FromECDSAPub(&privKey.PublicKey)
-	return hex.EncodeToString(pubKeyBytes), gethcrypto.PubkeyToAddress(privKey.PublicKey).Hex()
-}
-
-func TestTranslateSignerAddress_RawPubKeyFamiliesAreInterchangeable(t *testing.T) {
-	rawPubKey, _ := testRawPubKeyHex(t)
-	translated, err := translateSignerAddress(chainsel.FamilyAptos, rawPubKey, chainsel.FamilyStellar)
-	require.NoError(t, err)
-	assert.Equal(t, rawPubKey, translated)
-
-	translated, err = translateSignerAddress(chainsel.FamilyCanton, "0x"+rawPubKey, chainsel.FamilyAptos)
-	require.NoError(t, err)
-	assert.Equal(t, rawPubKey, translated, "0x prefix on a raw-pubkey-class value should be tolerated")
-}
-
-func TestTranslateSignerAddress_RawPubKeyToAddress(t *testing.T) {
-	// The derived address must match go-ethereum's own derivation so the destination
-	// contract can actually verify signatures produced by this key.
-	rawPubKey, wantAddress := testRawPubKeyHex(t)
-	translated, err := translateSignerAddress(chainsel.FamilyAptos, rawPubKey, chainsel.FamilyEVM)
-	require.NoError(t, err)
-	assert.Equal(t, wantAddress, translated)
-}
-
-func TestTranslateSignerAddress_AddressToRawPubKeyIsRejected(t *testing.T) {
-	_, err := translateSignerAddress(chainsel.FamilyEVM, "0xAbC1230000000000000000000000000000000000", chainsel.FamilyCanton)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not reversible")
-}
-
-// ---- translateFromKnownFamily / signerAddressForNOPAlias cross-family fallback ----
-
-func TestSignerAddressForNOPAlias_TranslatesFromSiblingFamily(t *testing.T) {
-	// Reproduces the reported bug: a standalone Solana verifier NOP only has a
-	// "solana" signer address in JD, but the lane's destination (local) chain is EVM.
-	lggr := logger.Test(t)
-	e := deployment.Environment{Logger: lggr}
-
-	topology := &offchain.EnvironmentTopology{
-		NOPTopology: &offchain.NOPTopology{
-			NOPs: []offchain.NOPConfig{
-				{Alias: "solana-verifier-1"},
-			},
-		},
-	}
-
-	jdKeys := fetch_signing_keys.SigningKeysByNOP{
-		"solana-verifier-1": {chainsel.FamilySolana: "abc1230000000000000000000000000000000000"},
-	}
-
-	result, err := signerAddressForNOPAlias(e, topology, "solana-verifier-1", chainsel.FamilyEVM, "default", 12463857294658392847, jdKeys, "")
-	require.NoError(t, err)
-	assert.Equal(t, "0xAbc1230000000000000000000000000000000000", result)
-}
-
-func TestSignerAddressForNOPAlias_TranslationFailureIsActionable(t *testing.T) {
-	// An EVM-only NOP with no raw public key on file cannot sign into a Canton-destination
-	// lane: an EVM address can't be un-hashed back into a raw public key.
+func TestSignerAddressForNOPAlias_MissingSignerForFamilyReturnsError(t *testing.T) {
+	// An EVM-only NOP with no Canton signer address in topology or JD returns an
+	// actionable error. With JD now pushing both variants at registration, this only
+	// happens when JD was never queried (nil keys) and topology doesn't have the family.
 	lggr := logger.Test(t)
 	e := deployment.Environment{Logger: lggr}
 
@@ -361,60 +285,9 @@ func TestSignerAddressForNOPAlias_TranslationFailureIsActionable(t *testing.T) {
 		},
 	}
 
-	_, err := signerAddressForNOPAlias(e, topology, "evm-only-verifier", chainsel.FamilyCanton, "default", 1, nil, "")
+	_, err := signerAddressForNOPAlias(e, topology, "evm-only-verifier", chainsel.FamilyCanton, "default", 1, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing signer_address for family canton")
-	assert.Contains(t, err.Error(), "not reversible")
-}
-
-func TestSignerAddressForNOPAlias_RawPubKeyUnblocksAddressToRawPubKeyDirection(t *testing.T) {
-	// Same setup as above, but the NOP's raw public key is now available — the previously
-	// unsupported EVM-address -> Canton-raw-pubkey direction is no longer needed because
-	// the raw key itself is on hand, so the lookup succeeds directly from it.
-	rawPubKey, _ := testRawPubKeyHex(t)
-	lggr := logger.Test(t)
-	e := deployment.Environment{Logger: lggr}
-
-	topology := &offchain.EnvironmentTopology{
-		NOPTopology: &offchain.NOPTopology{
-			NOPs: []offchain.NOPConfig{
-				{
-					Alias:                 "evm-only-verifier",
-					SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xAbC1230000000000000000000000000000000000"},
-				},
-			},
-		},
-	}
-
-	result, err := signerAddressForNOPAlias(e, topology, "evm-only-verifier", chainsel.FamilyCanton, "default", 1, nil, rawPubKey)
-	require.NoError(t, err)
-	assert.Equal(t, rawPubKey, result)
-}
-
-func TestSignerAddressForNOPAlias_RawPubKeyFromJDUnblocksSolanaToCanton(t *testing.T) {
-	// The scenario the user flagged: a solana-only NOP whose OnchainSigningAddress is
-	// EVM-style (un-hashable) needs to sign into a canton-destination lane. This only
-	// works because JD also carries the NOP's raw public key (RawPubKeyByNOP), pushed
-	// alongside every family bootstrap.go declares for the node.
-	rawPubKey, _ := testRawPubKeyHex(t)
-	lggr := logger.Test(t)
-	e := deployment.Environment{Logger: lggr}
-
-	topology := &offchain.EnvironmentTopology{
-		NOPTopology: &offchain.NOPTopology{
-			NOPs: []offchain.NOPConfig{
-				{Alias: "solana-verifier-1"},
-			},
-		},
-	}
-
-	jdKeys := fetch_signing_keys.SigningKeysByNOP{
-		"solana-verifier-1": {chainsel.FamilySolana: "abc1230000000000000000000000000000000000"},
-	}
-
-	result, err := signerAddressForNOPAlias(e, topology, "solana-verifier-1", chainsel.FamilyCanton, "default", 1, jdKeys, rawPubKey)
-	require.NoError(t, err)
-	assert.Equal(t, rawPubKey, result)
 }
 
 // ---- deriveFamiliesFromSelectors ----

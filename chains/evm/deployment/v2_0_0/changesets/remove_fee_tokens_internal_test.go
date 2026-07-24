@@ -22,7 +22,6 @@ func TestResolveRemoveFeeTokensCfg(t *testing.T) {
 			"OverridePreviousRoot": true,
 			"Qualifier":            "CLLCCIP",
 			"TimelockAction":       "schedule",
-			"TimelockDelay":        "5m0s",
 			"ValidUntil":           "1893456000"},
 	}
 	cfg, err := resolveRemoveFeeTokensCfg(input)

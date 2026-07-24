@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
@@ -31,6 +32,13 @@ type ConfigureTokenPoolForRemoteChainInput struct {
 	TokenPoolAddress    common.Address
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
+}
+
+func (c ConfigureTokenPoolForRemoteChainInput) Validate() error {
+	return evmutils.Wrap(
+		c.RemoteChainConfig.Validate(),
+		fmt.Sprintf("invalid remote chain config for remote chain selector %d", c.RemoteChainSelector),
+	)
 }
 
 // ConfigureTokenPoolForRemoteChains configures a token pool on an EVM chain for cross-
@@ -92,8 +100,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	tpops.Version,
 	"Configures a token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
-		if err := input.RemoteChainConfig.Validate(); err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("invalid remote chain config for remote chain selector %d: %w", input.RemoteChainSelector, err)
+		if err := input.Validate(); err != nil {
+			return sequences.OnChainOutput{}, err
 		}
 
 		// Below, we read onchain state directly from the contract binding. We intentionally

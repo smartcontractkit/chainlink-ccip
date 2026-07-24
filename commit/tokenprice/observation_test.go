@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -190,4 +192,7 @@ var defaultCfg = pluginconfig.CommitOffchainConfig{
 	PriceFeedChainSelector: feedChainSel,
 	// Have this disabled for testing purposes
 	TokenPriceAsyncObserverDisabled: true,
+	// Non-zero so the async runner's per-round timeout doesn't fire before the (fast) mock ops
+	// complete; production applies this default in config validation.
+	TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
 }

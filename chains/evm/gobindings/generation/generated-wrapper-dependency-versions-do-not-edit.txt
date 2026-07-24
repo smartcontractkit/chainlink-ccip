@@ -1,4 +1,4 @@
-GETH_VERSION: 1.17.2
+GETH_VERSION: 1.17.4
 advanced_pool_hooks: ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.abi.json ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.bin e4d6ba6ea452a63b709675d0f1e7ee3dc79036c0473f0e92ec2e61feaad1573d
 advanced_pool_hooks_extractor: ../solc/ccip/AdvancedPoolHooksExtractor/AdvancedPoolHooksExtractor.sol/AdvancedPoolHooksExtractor.abi.json ../solc/ccip/AdvancedPoolHooksExtractor/AdvancedPoolHooksExtractor.sol/AdvancedPoolHooksExtractor.bin 78a2f394b8aa5b6d00fc9e1d889b1a18034d7f6a1fb3ca0cc1e51b22eb9bcfa5
 burn_from_mint_token_pool: ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.abi.json ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.bin 66c9ad3ac53191d68936d6ac389c90e229cf7e4c606b5920099dcaf058684a25
@@ -35,7 +35,7 @@ onramp: ../solc/ccip/OnRamp/OnRamp.sol/OnRamp.abi.json ../solc/ccip/OnRamp/OnRam
 ping_pong_demo: ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.abi.json ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.bin e192d15c42dc8655806b487a4abeeb60f59f7d1d4f3a8b0a63052565d4afe039
 proxy: ../solc/ccip/Proxy/Proxy.sol/Proxy.abi.json ../solc/ccip/Proxy/Proxy.sol/Proxy.bin 96c64564909933986584e28f07ffeacd26a07be2b329145e93b3f85d59e4102a
 registry_module_owner_custom: ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.abi.json ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.bin ce04722cdea2e96d791e48c6a99f64559125d34cd24e19cfd5281892d2ed8ef0
-rmn: ../solc/ccip/RMN/RMN.sol/RMN.abi.json ../solc/ccip/RMN/RMN.sol/RMN.bin c2bc91e752ffb292a32e64fdec30ff81e85e30d1458a449c3d69bcc9ab6dde1b
+rmn: ../solc/ccip/RMN/RMN.sol/RMN.abi.json ../solc/ccip/RMN/RMN.sol/RMN.bin dc6dde05dd54fab0ee84ef4be9751a2481a3b2cf18e7256ea428d0baa34e6fb7
 rmn_proxy_contract: ../solc/ccip/RMNProxy/RMNProxy.sol/RMNProxy.abi.json ../solc/ccip/RMNProxy/RMNProxy.sol/RMNProxy.bin 4d06f9e5c6f72daef745e6114faed3bae57ad29758d75de5a4eefcd5f0172328
 rmn_remote: ../solc/ccip/RMNRemote/RMNRemote.sol/RMNRemote.abi.json ../solc/ccip/RMNRemote/RMNRemote.sol/RMNRemote.bin a09407e77c5b8655f55554c020d4086aea22e542cc333306138fe6caff6748bb
 router: ../solc/ccip/Router/Router.sol/Router.abi.json ../solc/ccip/Router/Router.sol/Router.bin 4048d8be7531670b5e054b7dc18aa8394f2b6dd44fd7fff83aa0cb4aeb38e926

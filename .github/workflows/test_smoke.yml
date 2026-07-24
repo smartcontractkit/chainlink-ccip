@@ -111,9 +111,17 @@ jobs:
         run: |
           export GOPRIVATE=github.com/smartcontractkit/*
           if [ -n "${{ inputs.ton_ref }}" ]; then
-            go get github.com/smartcontractkit/chainlink-ton/devenv@${{ inputs.ton_ref }}
-            go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }}
-            go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
+            # Clear any stale shallow VCS cache restored by setup-go to avoid
+            # "fatal: shallow file has changed since we read it" races. Retry max 3 times
+            rm -rf "$(go env GOMODCACHE)/cache/vcs" || true
+            for i in 1 2 3; do
+              go get github.com/smartcontractkit/chainlink-ton/devenv@${{ inputs.ton_ref }} \
+                && go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }} \
+                && go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }} \
+                && break
+              echo "retry $i - unshallow race on chainlink-ton, sleeping 5s"
+              sleep 5
+            done
             go mod tidy
           fi
           go mod download

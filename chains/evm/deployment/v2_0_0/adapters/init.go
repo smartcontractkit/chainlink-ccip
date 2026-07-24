@@ -37,7 +37,7 @@ import (
 	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -90,9 +90,11 @@ func init() {
 	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, v, NewFeeAggregatorAdapter())
 
 	curseRegistry := fastcurse.GetCurseRegistry()
+	// Keyed by RMN's own version (currently 2.1.0), not the surrounding EVM lane suite version `v`:
+	// RMN can be upgraded independently of the rest of the lane contracts behind the RMNProxy.
 	curseRegistry.RegisterNewCurse(fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      v,
+		CursingVersion:      rmnops.Version,
 		CurseAdapter:        NewCurseAdapter(),
 		CurseSubjectAdapter: NewCurseAdapter(),
 	})

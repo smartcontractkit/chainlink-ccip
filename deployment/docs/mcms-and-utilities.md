@@ -30,7 +30,6 @@ When a changeset produces write operations that the deployer key cannot execute 
 type Input struct {
     OverridePreviousRoot bool
     ValidUntil           uint32
-    TimelockDelay        mcms_types.Duration
     TimelockAction       mcms_types.TimelockAction
     Qualifier            string
     Description          string
@@ -41,7 +40,6 @@ type Input struct {
 |-------|------|-------------|
 | `OverridePreviousRoot` | `bool` | When `true`, overrides the existing root of the MCMS contract. Set this when a previous proposal was not executed and its root should be replaced. |
 | `ValidUntil` | `uint32` | Unix timestamp after which the proposal can no longer be set or executed. Acts as an expiration deadline. |
-| `TimelockDelay` | `mcms_types.Duration` | Minimum wait time between scheduling an operation and executing it. Enforced on-chain by the timelock contract. |
 | `TimelockAction` | `mcms_types.TimelockAction` | One of `schedule`, `bypass`, or `cancel`. Controls what the timelock does with the operations: queue them for delayed execution, execute immediately (bypasser role), or cancel previously scheduled operations. |
 | `Qualifier` | `string` | Qualifies which MCMS + Timelock contract addresses to use. Allows multiple MCMS deployments to coexist (e.g., `"CLLCCIP"` for CLL-managed CCIP contracts, `"RMNMCMS"` for RMN-specific governance). |
 | `Description` | `string` | Human-readable description included in the proposal for review by signers. |

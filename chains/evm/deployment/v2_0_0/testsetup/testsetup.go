@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"k8s.io/utils/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -52,17 +51,17 @@ func CreateBasicFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 // CreateBasicFeeQuoterDestChainConfigOverrides creates adapter-level FeeQuoter dest chain overrides for v2.0.0 lane tests.
 func CreateBasicFeeQuoterDestChainConfigOverrides() changesetadapters.FeeQuoterDestChainConfigOverrides {
 	return changesetadapters.FeeQuoterDestChainConfigOverrides{
-		IsEnabled:                   ptr.To(true),
-		MaxDataBytes:                ptr.To(uint32(30_000)),
-		MaxPerMsgGasLimit:           ptr.To(uint32(3_000_000)),
-		DestGasOverhead:             ptr.To(uint32(300_000)),
-		DefaultTokenFeeUSDCents:     ptr.To(uint16(25)),
-		DestGasPerPayloadByteBase:   ptr.To(uint8(16)),
-		DefaultTokenDestGasOverhead: ptr.To(uint32(90_000)),
-		DefaultTxGasLimit:           ptr.To(uint32(200_000)),
-		NetworkFeeUSDCents:          ptr.To(uint16(10)),
+		IsEnabled:                   new(true),
+		MaxDataBytes:                new(uint32(30_000)),
+		MaxPerMsgGasLimit:           new(uint32(3_000_000)),
+		DestGasOverhead:             new(uint32(300_000)),
+		DefaultTokenFeeUSDCents:     new(uint16(25)),
+		DestGasPerPayloadByteBase:   new(uint8(16)),
+		DefaultTokenDestGasOverhead: new(uint32(90_000)),
+		DefaultTxGasLimit:           new(uint32(200_000)),
+		NetworkFeeUSDCents:          new(uint16(10)),
 		ChainFamilySelector:         evmFamilySelector,
-		LinkFeeMultiplierPercent:    ptr.To(uint8(90)),
+		LinkFeeMultiplierPercent:    new(uint8(90)),
 	}
 }
 

@@ -163,7 +163,6 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 		SetDescription(input.Description).
 		SetOverridePreviousRoot(input.OverridePreviousRoot).
 		SetValidUntil(input.ValidUntil).
-		SetDelay(input.TimelockDelay).
 		SetAction(input.TimelockAction).
 		SetOperations(b.batchOps).
 		SetTimelockAddresses(timelockAddresses).

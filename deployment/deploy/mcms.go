@@ -373,7 +373,6 @@ func mcmsInputForDeployment(cfg MCMSDeploymentConfig, batchOps []mcmstypes.Batch
 	input := cfg.MCMS
 	if input.TimelockAction == "" {
 		input.TimelockAction = mcmstypes.TimelockActionSchedule
-		input.TimelockDelay = mcmstypes.MustParseDuration("0s")
 	}
 	if input.Qualifier == "" {
 		input.Qualifier = utils.CLLQualifier

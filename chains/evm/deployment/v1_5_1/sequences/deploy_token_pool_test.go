@@ -76,14 +76,14 @@ func TestDeployTokenPool(t *testing.T) {
 			name:                "LockReleaseTokenPool_v1_5_1_accept_liquidity",
 			poolType:            lock_release_token_pool.ContractType,
 			poolVersion:         utils.Version_1_5_1,
-			acceptLiquidity:     boolPtr(true),
+			acceptLiquidity:     new(true),
 			expectedTypeVersion: "LockReleaseTokenPool 1.5.1",
 		},
 		{
 			name:                "LockReleaseTokenPool_v1_5_1_no_liquidity",
 			poolType:            lock_release_token_pool.ContractType,
 			poolVersion:         utils.Version_1_5_1,
-			acceptLiquidity:     boolPtr(false),
+			acceptLiquidity:     new(false),
 			expectedTypeVersion: "LockReleaseTokenPool 1.5.1",
 		},
 	}
@@ -197,8 +197,4 @@ func deployTestToken(t *testing.T, chain evm.Chain, symbol string, decimals uint
 	require.NoError(t, err, "Failed to confirm test token deployment")
 
 	return tokenAddr
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

@@ -13,18 +13,18 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	erc20_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20"
-	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
-	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
-	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	erc20_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	lrtp_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	siloed_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
+	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
+	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
+	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
@@ -409,7 +409,7 @@ func migrateSiloedPool(
 	ops = append(ops, restoreUnsiloedReport.Output)
 
 	for lb := range usedLockboxes {
-		removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
+		removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdatesProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
 			ChainSelector: chainSel,
 			Address:       lb,
 			Args: lockbox_ops.AuthorizedCallerArgs{
@@ -480,7 +480,7 @@ func appendAuthApproveDeposit(
 	remoteChainSelector uint64,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
-	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
+	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdatesProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.AuthorizedCallerArgs{
@@ -493,7 +493,7 @@ func appendAuthApproveDeposit(
 	}
 	ops = append(ops, addAuthReport.Output)
 
-	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Approve, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
+	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.ApproveProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
 		ChainSelector: chainSel,
 		Address:       tokenAddr,
 		Args: erc20_ops.ApproveArgs{
@@ -530,7 +530,7 @@ func appendCleanup(
 	lockboxAddr, oldPoolAddr, timelockAddr, originalRebalancer common.Address,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
-	removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
+	removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdatesProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.AuthorizedCallerArgs{

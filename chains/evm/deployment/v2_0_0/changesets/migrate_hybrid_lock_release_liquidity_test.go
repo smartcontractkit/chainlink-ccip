@@ -27,7 +27,6 @@ func validMCMSInput() mcms.Input {
 	return mcms.Input{
 		TimelockAction: mcms_types.TimelockActionSchedule,
 		ValidUntil:     uint32(time.Now().Add(24 * time.Hour).UTC().Unix()),
-		TimelockDelay:  mcms_types.MustParseDuration("1h"),
 	}
 }
 

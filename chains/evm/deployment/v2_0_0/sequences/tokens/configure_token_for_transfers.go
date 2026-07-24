@@ -68,40 +68,6 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			registryTokenPoolAddress = common.HexToAddress(input.RegistryTokenPoolAddress)
 		}
 
-		// If a liquidity migration is requested, derive the old pool from the TAR and run the migration sequence.
-		if input.LiquidityMigrationAmount != nil || input.LiquidityMigrationBasisPoints != nil {
-			if input.TimelockAddress == "" {
-				return sequences.OnChainOutput{}, fmt.Errorf("TimelockAddress is required when liquidity migration is requested")
-			}
-
-			tokenConfigReport, err := cldf_ops.ExecuteOperation(b, tar_ops.GetTokenConfig, evmChain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       registryAddress,
-				Args:          tokenAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config from registry for token %s: %w", tokenAddress, err)
-			}
-			oldPoolAddress := tokenConfigReport.Output.TokenPool
-			if oldPoolAddress == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("no pool currently registered for token %s on chain %d", tokenAddress, input.ChainSelector)
-			}
-
-			migrationReport, err := cldf_ops.ExecuteSequence(b, MigrateLockReleasePoolLiquidity, chains, tokens.MigrateLockReleasePoolLiquidityInput{
-				ChainSelector:   input.ChainSelector,
-				OldPoolAddress:  oldPoolAddress.Hex(),
-				NewPoolAddress:  input.TokenPoolAddress,
-				TimelockAddress: input.TimelockAddress,
-				Amount:          input.LiquidityMigrationAmount,
-				BasisPoints:     input.LiquidityMigrationBasisPoints,
-				SetPoolConfig:   nil,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute liquidity migration on chain %d: %w", input.ChainSelector, err)
-			}
-			ops = append(ops, migrationReport.Output.BatchOps...)
-		}
-
 		// Validate the pool supports the token
 		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, evmChain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,

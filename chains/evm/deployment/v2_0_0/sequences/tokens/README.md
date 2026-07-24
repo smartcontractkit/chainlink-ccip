@@ -1,6 +1,6 @@
 # Token sequences (v2.0.0)
 
-This package contains the sequences used to configure tokens and token pools for CCIP transfers on EVM chains at version 2.0.0. It includes logic to **import configuration from a prior (active) pool** when upgrading a token to a new pool while keeping the same registry and token.
+This package contains the sequences used to configure tokens and token pools for CCIP transfers on EVM chains at version 2.0.0.
 
 ## Configure tokens for transfers: flow
 
@@ -8,50 +8,25 @@ This package contains the sequences used to configure tokens and token pools for
 
 2. **ConfigureTokenPoolForRemoteChains** – When `RegistryAddress` and `TokenAddress` are set and the active pool differs from `TokenPoolAddress` (upgrade path), validates that `RemoteChains` includes every chain currently supported by the **active pool** (the pool currently registered for that token). When the active pool is already the pool being configured (extend path), that check is skipped so you only need to list new remotes. Then calls **ConfigureTokenPoolForRemoteChain** once per remote chain.
 
-3. **ConfigureTokenPoolForRemoteChain** – For a single remote chain: optionally **imports rate limiter and remote pool config from the active pool**, then applies CCV config, rate limiters, and remote chain config (add/update chain, remote pools). When `tokenTransferFeeConfig` is set on the remote chain input, applies it on the **v2 token pool** only (merge with on-chain pool state or defaults; no legacy lane import). Fee config runs **after** the remote chain exists on the pool.
+3. **ConfigureTokenPoolForRemoteChain** – For a single remote chain: applies CCV config, rate limiters, and remote chain config (add/update chain, remote pools). Legacy upgrade baggage (rate limits, remote pool cutover) is consumed from **`MigrationMetadata`** on `RemoteChainConfig` when populated by the changeset. When `tokenTransferFeeConfig` is set on the remote chain input, applies it on the **v2 token pool** only (merge with on-chain pool state or defaults). Fee config runs **after** the remote chain exists on the pool.
 
    The **`ConfigureTokensForTransfers` changeset** strips fee config from sequence input and applies fees after configure (including legacy-lane discovery and merge when `autoMigrateRemoteChains` is enabled). Direct callers (e.g. CCTP) that invoke this sequence with explicit fee config still use the pool-only apply path above.
 
-## Importing config from prior pool versions
+## Migration metadata (upgrade path)
 
-When configuring a **new** 2.0.0 pool for a token that already has an **active pool** registered in the TokenAdminRegistry (e.g. upgrading from 1.5.1 or 1.6.1), the sequence can **import** rate limiter state and remote pool addresses from that active pool so you don’t have to re-specify everything.
+During a pre-v2 → v2 pool upgrade with `autoMigrateRemoteChains: true`, the **changeset** discovers legacy lane config and populates `RemoteChainConfig.MigrationMetadata` (rate limits, remote pools, pool version/type). The v2 sequence **consumes** that metadata at apply time; it does not read the legacy active pool itself.
 
-### When import runs
+### Rate limiters
 
-- **ConfigureTokenPoolForRemoteChain** receives `RegistryAddress` and `TokenAddress` (passed from ConfigureTokensForTransfers when `RegistryAddress` is set).
-- It calls **importConfigFromActivePool(registry, token, remoteChainSelector)**.
-- Import is skipped if registry or token is zero, or if the registry returns no active pool for that token, or if the active pool’s version is ≥ 2.0.0.
+Resolved in order:
 
-### What gets imported (per remote chain)
+1. Both default YAML buckets → `GenerateTPRLConfigs`
+2. `MigrationMetadata.LegacyRateLimits` → bigint passthrough (inbound already rebased at discovery)
+3. Both omitted → on-chain read when remote already supported, else disabled defaults
 
-For the given **remote chain selector**, the importer reads from the active pool (or its implementation, see below) and returns:
+### Remote pools
 
-| Field | Description |
-|-------|-------------|
-| **DefaultOutbound** | Outbound rate limiter config (capacity, rate, isEnabled) for that chain. |
-| **DefaultInbound**  | Inbound rate limiter config for that chain. |
-| **RemotePools**     | List of remote pool address(es) for that chain (1.5.0: single pool via `getRemotePool`; 1.6.1: full list via `getRemotePools`). |
-
-### How imported config is used
-
-- **Rate limiters** – If the **input** does not supply default finality rate limiter config (e.g. null or omitted), the sequence uses the **imported** default outbound/inbound config for the new pool. So prior pool’s rate limits are carried over by default unless you define a non-nil rate limit in the config.
-- **Remote pools** – When adding or updating the remote chain on the new pool, the sequence builds the remote pool list as: **active pool’s remote pools first** (from import), then the requested pool from config if not already present. That preserves existing remote pools during cutover (e.g. for in-flight messages) and adds the new pool’s counterpart.
-
-### Version-specific import paths
-
-The active pool’s **type and version** (from `typeAndVersion()`) decide which path runs:
-
-- **Active pool version &lt; 1.5.1** → **V150 path** (1.5.0 operations and bindings).
-  - If the pool type contains `"Proxy"`: the code resolves **previousPool** from the proxy. Rate limits are read from the **proxy** if previousPool version &lt; 1.4.0, otherwise from **previousPool**. Remote pool is always read from the **active pool** (proxy), which exposes `getRemotePool`.
-  - If not a proxy: rate limits and remote pool are read from the active pool using 1.5.0 ops.
-  - Uses: `GetInboundRateLimiterState`, `GetOutboundRateLimiterState`, `GetRemotePool` (1.5.0). Token bucket struct is converted to the shared `RateLimiterConfig` type.
-
-- **Active pool version ≥ 1.5.1 and &lt; 2.0.0** → **V161 path** (1.6.1 operations).
-  - Rate limits: `GetCurrentInboundRateLimiterState`, `GetCurrentOutboundRateLimiterState` on the active pool.
-  - Remote pools: `GetRemotePools` on the active pool (full list per chain).
-  - Token bucket is converted to the shared `RateLimiterConfig` type.
-
-- **Active pool version ≥ 2.0.0** → No import (returns `nil`).
+When adding or updating a remote chain, the sequence builds the remote pool list as: **`LegacyRemotePools` first** (cutover / inflight protection), then the requested `RemotePool` from config if not already present.
 
 ### Supported-chains validation (upgrade vs extend)
 
@@ -68,7 +43,7 @@ This keeps “configure for transfers” aligned with the active pool’s suppor
 
 ## Auto-migrate edge cases (`autoMigrateRemoteChains`)
 
-When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChains: true` during a pre-v2 → v2 pool upgrade, remote connectivity and legacy fees are discovered in the changeset (not in these sequences). Rate limits are still imported here via `importConfigFromActivePool` as described above. Fees are applied by the changeset after configure.
+When the **`ConfigureTokensForTransfers` changeset** sets `autoMigrateRemoteChains: true` during a pre-v2 → v2 pool upgrade, remote connectivity, rate limits, remote pools, and legacy fees are discovered in the changeset. The v2 sequence applies connectivity, RL, and remote pools from `RemoteChainConfig` + `MigrationMetadata`. Fees are applied by the changeset after configure.
 
 ### YAML precedence (per remote chain)
 

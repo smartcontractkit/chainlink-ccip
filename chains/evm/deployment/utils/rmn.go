@@ -36,25 +36,40 @@ func ActiveRMNVersion(e cldf.Environment, selector uint64) (*semver.Version, err
 	return activeRMNVersionFromDatastore(e, selector, chain)
 }
 
-func activeRMNVersionFromProxy(e cldf.Environment, selector uint64, chain cldf_evm.Chain) (*semver.Version, error) {
+// ActiveRMNAddress returns the address of the RMN implementation currently active behind the RMNProxy
+// on the given chain.
+func ActiveRMNAddress(e cldf.Environment, selector uint64) (common.Address, error) {
+	chain, ok := e.BlockChains.EVMChains()[selector]
+	if !ok {
+		return common.Address{}, fmt.Errorf("no EVM chain found for selector %d", selector)
+	}
+
 	rmnProxyRef := datastore.AddressRef{
 		Type:    datastore.ContractType(rmnproxyops.ContractType),
 		Version: semver.MustParse("1.0.0"),
 	}
 	rmnProxyAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, rmnProxyRef, selector, evmds.ToEVMAddress)
 	if err != nil {
-		return nil, err
+		return common.Address{}, err
 	}
 	rmnProxyC, err := rmn_proxy_contract.NewRMNProxy(rmnProxyAddr, chain.Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate RMNProxy contract at %s on chain %d: %w", rmnProxyAddr, selector, err)
+		return common.Address{}, fmt.Errorf("failed to instantiate RMNProxy contract at %s on chain %d: %w", rmnProxyAddr, selector, err)
 	}
 	rmnAddr, err := rmnProxyC.GetARM(&bind.CallOpts{Context: e.GetContext()})
 	if err != nil {
-		return nil, err
+		return common.Address{}, err
 	}
 	if rmnAddr == (common.Address{}) {
-		return nil, fmt.Errorf("RMNProxy on chain %d has no active RMN set", selector)
+		return common.Address{}, fmt.Errorf("RMNProxy on chain %d has no active RMN set", selector)
+	}
+	return rmnAddr, nil
+}
+
+func activeRMNVersionFromProxy(e cldf.Environment, selector uint64, chain cldf_evm.Chain) (*semver.Version, error) {
+	rmnAddr, err := ActiveRMNAddress(e, selector)
+	if err != nil {
+		return nil, err
 	}
 	_, version, err := TypeAndVersion(rmnAddr, chain.Client)
 	if err != nil {

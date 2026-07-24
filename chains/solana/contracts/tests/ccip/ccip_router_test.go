@@ -6477,7 +6477,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
 
 			// This token isn't registered as a billing token.
-			require.True(t, common.IsClosedAccount(ctx, solanaGoClient, token2.Billing[config.EvmChainSelector], config.DefaultCommitment))
+			require.True(t, common.IsClosedAccount(ctx, solanaGoClient, getFqTokenConfigPDA(token2.Mint), config.DefaultCommitment))
 
 			// Update prices
 			raw := fee_quoter.NewUpdatePricesInstruction(
@@ -6498,7 +6498,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqConfigPDA,
 			)
 			raw.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
-			raw.Append(solana.Meta(token2.Billing[config.EvmChainSelector]).WRITE())
+			raw.Append(solana.Meta(getFqTokenConfigPDA(token2.Mint)).WRITE())
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
@@ -6516,7 +6516,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, anotherTokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
 
 			// This token continues to be unregistered for billing.
-			require.True(t, common.IsClosedAccount(ctx, solanaGoClient, token2.Billing[config.EvmChainSelector], config.DefaultCommitment))
+			require.True(t, common.IsClosedAccount(ctx, solanaGoClient, getFqTokenConfigPDA(token2.Mint), config.DefaultCommitment))
 		})
 
 		t.Run("When a non-admin tries to remove a price updater, it fails", func(t *testing.T) {

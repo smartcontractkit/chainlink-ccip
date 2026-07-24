@@ -1383,7 +1383,7 @@ func TestTryNormalizeAddressRef(t *testing.T) {
 
 	t.Run("empty_address_returns_clone", func(t *testing.T) {
 		ref := datastore.AddressRef{ChainSelector: evmChainSel}
-		got, err := tokensapi.TryNormalizeAddressRef(evmChainSel, ref)
+		got, err := deployapi.TryNormalizeAddressRef(evmChainSel, ref)
 		require.NoError(t, err)
 		require.Empty(t, got.Address)
 	})
@@ -1393,7 +1393,7 @@ func TestTryNormalizeAddressRef(t *testing.T) {
 			Address:       "0xe939c02e92e9e66d1f0d8e4f099e7d3d269a8a11",
 			ChainSelector: 0,
 		}
-		_, err := tokensapi.TryNormalizeAddressRef(0, ref)
+		_, err := deployapi.TryNormalizeAddressRef(0, ref)
 		require.Error(t, err)
 	})
 
@@ -1403,7 +1403,7 @@ func TestTryNormalizeAddressRef(t *testing.T) {
 			Address:       lower,
 			ChainSelector: evmChainSel,
 		}
-		got, err := tokensapi.TryNormalizeAddressRef(evmChainSel, ref)
+		got, err := deployapi.TryNormalizeAddressRef(evmChainSel, ref)
 		require.NoError(t, err)
 		want := common.HexToAddress(lower).Hex()
 		require.Equal(t, want, got.Address)
@@ -1415,7 +1415,7 @@ func TestTryNormalizeAddressRef(t *testing.T) {
 			Address:       "not-valid-base58!!!",
 			ChainSelector: solChainSel,
 		}
-		_, err := tokensapi.TryNormalizeAddressRef(solChainSel, ref)
+		_, err := deployapi.TryNormalizeAddressRef(solChainSel, ref)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to normalize address")
 	})
@@ -1426,7 +1426,7 @@ func TestTryNormalizeAddressRef(t *testing.T) {
 			Address:       canon,
 			ChainSelector: solChainSel,
 		}
-		got, err := tokensapi.TryNormalizeAddressRef(solChainSel, ref)
+		got, err := deployapi.TryNormalizeAddressRef(solChainSel, ref)
 		require.NoError(t, err)
 		require.Equal(t, canon, got.Address)
 	})

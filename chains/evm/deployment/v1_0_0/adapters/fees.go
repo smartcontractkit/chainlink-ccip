@@ -10,8 +10,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
@@ -65,19 +67,29 @@ func (a *EVMFeeResolver) GetOnRampRef(b cldf_ops.Bundle, chains cldf_chain.Block
 	}
 
 	// NOTE: the OnRamp ContractType varies between v1.5 and v1.6. For v1.5 it's `EVM2EVMOnRamp` and
-	// for v1.6 it's `OnRamp`, so we should avoid filtering on the ContractType otherwise the search
-	// may be too restrictive and this call will incorrectly fail
+	// for v1.6 it's `OnRamp`, so we use `typeAndVersion()` to resolve the type and version directly
+	// from on-chain data rather than relying on the datastore.
 	b.Logger.Infof("Found OnRamp address %s for src %d and dst %d", onRampAddr.Hex(), src, dst)
-	onRampRef, err := datastore_utils.FindAndFormatRef(
-		ds,
-		datastore.AddressRef{ChainSelector: src, Address: onRampAddr.Hex()},
-		src,
-		datastore_utils.FullRef,
+	tvReport, err := cldf_ops.ExecuteOperation(
+		b,
+		type_and_version.GetTypeAndVersion,
+		srcChain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: src,
+			Address:       onRampAddr,
+		},
 	)
 	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to find OnRamp address ref for address %s on chain selector %d: %w", getOnRampReport.Output.Hex(), src, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to get typeAndVersion for OnRamp at %s on chain selector %d: %w", onRampAddr.Hex(), src, err)
 	}
 
+	onRampRef := datastore.AddressRef{
+		ChainSelector: src,
+		Qualifier:     cciputils.DefaultQualifier(onRampAddr.Hex(), tvReport.Output.Type),
+		Type:          datastore.ContractType(tvReport.Output.Type),
+		Version:       tvReport.Output.Version,
+		Address:       onRampAddr.Hex(),
+	}
 	b.Logger.Infof(
 		"OnRamp ref for src %d and dst %d: %s",
 		src, dst, datastore_utils.SprintRef(onRampRef),

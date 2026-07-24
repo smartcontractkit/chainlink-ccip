@@ -58,12 +58,15 @@ func (t *protoTranslator) merkleRootsFromProto(
 		if len(mr.MerkleRoot) != 32 {
 			return nil, fmt.Errorf("merkle root must be 32 bytes: %v", mr.MerkleRoot)
 		}
+		if mr.GetSeqNumsRange() == nil {
+			return nil, fmt.Errorf("merkle root chain missing sequence number range, chain: %d", mr.GetChainSel())
+		}
 		merkleRoots[i] = cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(mr.ChainSel),
 			OnRampAddress: mr.OnRampAddress,
 			SeqNumsRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(mr.SeqNumsRange.MinMsgNr),
-				cciptypes.SeqNum(mr.SeqNumsRange.MaxMsgNr),
+				cciptypes.SeqNum(mr.GetSeqNumsRange().GetMinMsgNr()),
+				cciptypes.SeqNum(mr.GetSeqNumsRange().GetMaxMsgNr()),
 			),
 			MerkleRoot: cciptypes.Bytes32(mr.MerkleRoot),
 		}
@@ -245,8 +248,8 @@ func (t *protoTranslator) chainFeeUpdatesFromProto(
 	for k, v := range pbUpdates {
 		chainFeeUpdates[cciptypes.ChainSelector(k)] = chainfee.Update{
 			ChainFee: chainfee.ComponentsUSDPrices{
-				ExecutionFeePriceUSD: big.NewInt(0).SetBytes(v.ChainFee.ExecutionFeePriceUsd),
-				DataAvFeePriceUSD:    big.NewInt(0).SetBytes(v.ChainFee.DataAvFeePriceUsd),
+				ExecutionFeePriceUSD: big.NewInt(0).SetBytes(v.GetChainFee().GetExecutionFeePriceUsd()),
+				DataAvFeePriceUSD:    big.NewInt(0).SetBytes(v.GetChainFee().GetDataAvFeePriceUsd()),
 			},
 			Timestamp: v.Timestamp.AsTime(),
 		}
@@ -315,22 +318,27 @@ func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange)
 	return rangesSelectedForReport
 }
 
-func (t *protoTranslator) chainRangeFromProto(pbChainRange []*ocrtypecodecpb.ChainRange) []plugintypes.ChainRange {
+func (t *protoTranslator) chainRangeFromProto(
+	pbChainRange []*ocrtypecodecpb.ChainRange,
+) ([]plugintypes.ChainRange, error) {
 	var rangesSelectedForReport []plugintypes.ChainRange
 	if len(pbChainRange) > 0 {
 		rangesSelectedForReport = make([]plugintypes.ChainRange, len(pbChainRange))
 	}
 
 	for i, r := range pbChainRange {
+		if r.GetSeqNumRange() == nil {
+			return nil, fmt.Errorf("chain range missing sequence number range, chain: %d", r.GetChainSel())
+		}
 		rangesSelectedForReport[i] = plugintypes.ChainRange{
 			ChainSel: cciptypes.ChainSelector(r.ChainSel),
 			SeqNumRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(r.SeqNumRange.MinMsgNr),
-				cciptypes.SeqNum(r.SeqNumRange.MaxMsgNr),
+				cciptypes.SeqNum(r.GetSeqNumRange().GetMinMsgNr()),
+				cciptypes.SeqNum(r.GetSeqNumRange().GetMaxMsgNr()),
 			),
 		}
 	}
-	return rangesSelectedForReport
+	return rangesSelectedForReport, nil
 }
 
 func (t *protoTranslator) gasPriceChainToProto(gpc []cciptypes.GasPriceChain) []*ocrtypecodecpb.GasPriceChain {
@@ -844,7 +852,7 @@ func (t *protoTranslator) decodeMessages(messages []*ocrtypecodecpb.Message) ([]
 }
 
 func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) (cciptypes.Message, error) {
-	header, err := t.decodeMessageHeader(msg.Header)
+	header, err := t.decodeMessageHeader(msg.GetHeader())
 	if err != nil {
 		return cciptypes.Message{}, err
 	}
@@ -863,19 +871,19 @@ func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) (cciptypes.
 
 func (t *protoTranslator) decodeMessageHeader(
 	header *ocrtypecodecpb.RampMessageHeader) (cciptypes.RampMessageHeader, error) {
-	if len(header.MessageId) != 32 {
-		return cciptypes.RampMessageHeader{}, fmt.Errorf("message id length is not 32: %d", len(header.MessageId))
+	if len(header.GetMessageId()) != 32 {
+		return cciptypes.RampMessageHeader{}, fmt.Errorf("message id length is not 32: %d", len(header.GetMessageId()))
 	}
-	if len(header.MsgHash) != 32 {
-		return cciptypes.RampMessageHeader{}, fmt.Errorf("msg hash length is not 32: %d", len(header.MsgHash))
+	if len(header.GetMsgHash()) != 32 {
+		return cciptypes.RampMessageHeader{}, fmt.Errorf("msg hash length is not 32: %d", len(header.GetMsgHash()))
 	}
 	return cciptypes.RampMessageHeader{
-		MessageID:           cciptypes.Bytes32(header.MessageId),
-		SourceChainSelector: cciptypes.ChainSelector(header.SourceChainSelector),
-		DestChainSelector:   cciptypes.ChainSelector(header.DestChainSelector),
-		SequenceNumber:      cciptypes.SeqNum(header.SequenceNumber),
+		MessageID:           cciptypes.Bytes32(header.GetMessageId()),
+		SourceChainSelector: cciptypes.ChainSelector(header.GetSourceChainSelector()),
+		DestChainSelector:   cciptypes.ChainSelector(header.GetDestChainSelector()),
+		SequenceNumber:      cciptypes.SeqNum(header.GetSequenceNumber()),
 		Nonce:               header.GetNonce(),
-		MsgHash:             cciptypes.Bytes32(header.MsgHash),
+		MsgHash:             cciptypes.Bytes32(header.GetMsgHash()),
 		OnRamp:              header.GetOnRamp(),
 		TxHash:              header.GetTxHash(),
 	}, nil

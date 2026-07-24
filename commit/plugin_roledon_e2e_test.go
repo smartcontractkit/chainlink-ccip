@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"slices"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -409,7 +411,12 @@ func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID, in
 			MerkleRootAsyncObserverDisabled: true,
 			ChainFeeAsyncObserverDisabled:   true,
 			TokenPriceAsyncObserverDisabled: true,
-			DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
+			// Non-zero per-round observation timeouts so the async runner doesn't time out before
+			// the (synchronous, mocked) observers complete; production defaults these in config
+			// validation.
+			ChainFeeAsyncObserverSyncTimeout:   10 * time.Second,
+			TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
+			DonBreakingChangesVersion:          pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 		},
 		s.destChain,
 		deps.ccipReader,

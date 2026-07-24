@@ -2,6 +2,7 @@ package sequences_test
 
 import (
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -426,7 +427,7 @@ func deployMCMSInstanceForTest(
 		Qualifier:      qualifierPtr,
 		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
 		Args: mcms_ops.OpDeployTimelockInput{
-			TimelockMinDelay: big.NewInt(0),
+			TimelockMinDelay: big.NewInt(1),
 			Proposers:        []common.Address{common.HexToAddress(proposerReport.Output.Addresses[0].Address)},
 			Bypassers:        []common.Address{common.HexToAddress(bypasserReport.Output.Addresses[0].Address)},
 			Cancellers:       []common.Address{common.HexToAddress(cancellerReport.Output.Addresses[0].Address)},
@@ -498,10 +499,8 @@ func requireContractOwner(
 	require.NoError(t, err, "LoadOwnableContract for %s/%s at %s", ct, qualifier, addr)
 	owner, err := ownable.Owner(nil)
 	require.NoError(t, err, "Owner() for %s/%s at %s", ct, qualifier, addr)
-	for _, vo := range validOwners {
-		if owner == vo {
-			return
-		}
+	if slices.Contains(validOwners, owner) {
+		return
 	}
 	require.Failf(t, "unexpected owner",
 		"%s/%s at %s: owner %s not in valid set %v", ct, qualifier, addr, owner, validOwners)

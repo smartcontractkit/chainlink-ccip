@@ -61,7 +61,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 					Canceller:        testhelpers.SingleGroupMCMS(),
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
-					TimelockMinDelay: big.NewInt(0),
+					TimelockMinDelay: big.NewInt(1),
 					Qualifier:        ptr.String(qualifier),
 				},
 			},
@@ -80,7 +80,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 					Canceller:        testhelpers.SingleGroupMCMS(),
 					Bypasser:         testhelpers.SingleGroupMCMS(),
 					Proposer:         testhelpers.SingleGroupMCMS(),
-					TimelockMinDelay: big.NewInt(0),
+					TimelockMinDelay: big.NewInt(1),
 					Qualifier:        ptr.String(qualifier),
 				},
 			},
@@ -169,7 +169,6 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            common_utils.CLLQualifier,
 			Description:          "Transfer ownership test",
@@ -264,7 +263,6 @@ func SolanaTransferMCMSContracts(t *testing.T, e *cldf_deployment.Environment, s
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            qualifier,
 			Description:          "Transfer ownership test",
@@ -293,7 +291,6 @@ func SolanaTransferMCMSContracts(t *testing.T, e *cldf_deployment.Environment, s
 			MCMS: mcms.Input{
 				OverridePreviousRoot: false,
 				ValidUntil:           3759765795,
-				TimelockDelay:        mcms_types.MustParseDuration("1s"),
 				TimelockAction:       mcms_types.TimelockActionSchedule,
 				Qualifier:            qualifier,
 				Description:          "Transfer ownership back test",
@@ -389,7 +386,6 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            common_utils.CLLQualifier,
 			Description:          "Transfer ownership test",
@@ -492,7 +488,6 @@ func NewDefaultInputForMCMS(desc string, overrides ...func(*mcms.Input)) mcms.In
 	in := mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           math.MaxUint32,
-		TimelockDelay:        mcms_types.MustParseDuration("1s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Qualifier:            common_utils.CLLQualifier,
 		Description:          desc,

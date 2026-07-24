@@ -36,34 +36,33 @@ var SetAllowedFinalityConfigForTokenPools = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("invalid finality config for pool %s for src %d: %w", pool, input.Selector, err)
 			}
 
-			selector := chain.Selector
 			if !common.IsHexAddress(pool) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for src %d: %s", selector, pool)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for src %d: %s", chain.Selector, pool)
 			}
 
 			addr := common.HexToAddress(pool)
 			if addr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", selector)
+				return sequences.OnChainOutput{}, fmt.Errorf("pool address cannot be the zero address for src %d", chain.Selector)
 			}
 
 			currentFinalityConfigReport, err := operations.ExecuteOperation(b, token_pool.GetAllowedFinalityConfig, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: selector,
+				ChainSelector: chain.Selector,
 				Address:       addr,
 				Args:          struct{}{},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current finality config for token pool at address %s on chain %d: %w", addr.Hex(), selector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current finality config for token pool at address %s on chain %d: %w", addr.Hex(), chain.Selector, err)
 			}
 
 			requestedFinalityConfig := finalityConfig.Raw()
 			if !bytes.Equal(currentFinalityConfigReport.Output[:], requestedFinalityConfig[:]) {
 				write, err := operations.ExecuteOperation(b, token_pool.SetAllowedFinalityConfig, chain, contract.FunctionInput[[4]byte]{
-					ChainSelector: selector,
+					ChainSelector: chain.Selector,
 					Address:       addr,
 					Args:          requestedFinalityConfig,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set finality config for token pool at address %s on chain %d: %w", addr.Hex(), selector, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set finality config for token pool at address %s on chain %d: %w", addr.Hex(), chain.Selector, err)
 				}
 				writes = append(writes, write.Output)
 			}

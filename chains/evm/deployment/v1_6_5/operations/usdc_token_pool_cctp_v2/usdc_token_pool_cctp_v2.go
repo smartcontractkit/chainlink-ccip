@@ -79,6 +79,16 @@ func (c *USDCTokenPoolCCTPV2Contract) ApplyAuthorizedCallerUpdates(opts *bind.Tr
 	return c.contract.Transact(opts, "applyAuthorizedCallerUpdates", args)
 }
 
+func (c *USDCTokenPoolCCTPV2Contract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 func (c *USDCTokenPoolCCTPV2Contract) ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []ChainUpdate) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "applyChainUpdates", remoteChainSelectorsToRemove, chainsToAdd)
 }
@@ -123,16 +133,6 @@ func (c *USDCTokenPoolCCTPV2Contract) GetRemotePools(opts *bind.CallOpts, args u
 		return zero, err
 	}
 	return *abi.ConvertType(out[0], new([][]byte)).(*[][]byte), nil
-}
-
-func (c *USDCTokenPoolCCTPV2Contract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
-	var out []any
-	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
-	if err != nil {
-		var zero []common.Address
-		return zero, err
-	}
-	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
 }
 
 type AuthorizedCallerArgs struct {
@@ -256,6 +256,17 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	},
 })
 
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *USDCTokenPoolCCTPV2Contract]{
+	Name:         "usdc-token-pool-cctp-v2:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
+	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
+	},
+})
+
 var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdatesArgs, *USDCTokenPoolCCTPV2Contract]{
 	Name:            "usdc-token-pool-cctp-v2:apply-chain-updates",
 	Version:         Version,
@@ -358,16 +369,5 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *USD
 	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
 	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args uint64) ([][]byte, error) {
 		return c.GetRemotePools(opts, args)
-	},
-})
-
-var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *USDCTokenPoolCCTPV2Contract]{
-	Name:         "usdc-token-pool-cctp-v2:get-all-authorized-callers",
-	Version:      Version,
-	Description:  "Calls getAllAuthorizedCallers on the contract",
-	ContractType: ContractType,
-	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
-	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
-		return c.GetAllAuthorizedCallers(opts)
 	},
 })

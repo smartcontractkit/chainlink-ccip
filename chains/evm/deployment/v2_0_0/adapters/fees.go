@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	v1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
@@ -14,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -79,22 +79,31 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 		return datastore.AddressRef{}, fmt.Errorf("failed to execute GetDynamicConfig operation for OnRamp at %s on chain selector %d with dst %d: %w", onRampAddr.Hex(), src, dst, err)
 	}
 
-	// NOTE: version is omitted intentionally here - we could have a v2.0 OnRamp connected to a v1.6 FQ for example
-	fqRef, err := datastore_utils.FindAndFormatRef(
-		ds,
-		datastore.AddressRef{
-			ChainSelector: src,
-			Address:       report.Output.FeeQuoter.Hex(),
-			Type:          datastore.ContractType(fqops.ContractType),
-		},
-		src,
-		datastore_utils.FullRef,
-	)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to find FeeQuoter address ref in datastore for address %s on chain selector %d: %w", report.Output.FeeQuoter.Hex(), src, err)
+	fqAddr := report.Output.FeeQuoter
+	if fqAddr == (common.Address{}) {
+		return datastore.AddressRef{}, fmt.Errorf("onRamp at %s on chain selector %d returned zero address for FeeQuoter for dst %d", onRampAddr.Hex(), src, dst)
 	}
 
-	return fqRef, nil
+	tvReport, err := operations.ExecuteOperation(
+		b,
+		type_and_version.GetTypeAndVersion,
+		chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: src,
+			Address:       fqAddr,
+		},
+	)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to get typeAndVersion for FeeQuoter at %s on chain selector %d: %w", fqAddr.Hex(), src, err)
+	}
+
+	return datastore.AddressRef{
+		ChainSelector: src,
+		Qualifier:     utils.DefaultQualifier(fqAddr.Hex(), tvReport.Output.Type),
+		Type:          datastore.ContractType(tvReport.Output.Type),
+		Version:       tvReport.Output.Version,
+		Address:       fqAddr.Hex(),
+	}, nil
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
@@ -202,7 +211,8 @@ func (a *FeesAdapter) SetTokenTransferFee(_ datastore.DataStore, feeRef datastor
 
 			var res sequences.OnChainOutput
 			for selector, updatesByChain := range args {
-				res, err = sequences.RunAndMergeSequence(b, chains,
+				res, err = sequences.RunAndMergeSequence(
+					b, chains,
 					evmseq.SequenceFeeQuoterUpdate,
 					evmseq.FeeQuoterUpdate{
 						ExistingAddresses:             []datastore.AddressRef{feeRef},

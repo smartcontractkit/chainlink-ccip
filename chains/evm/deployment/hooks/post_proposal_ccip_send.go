@@ -74,10 +74,7 @@ func (e *EVMPostProposalCCIPSend) PreSendValidation(env cldf.Environment, srcSel
 // resolvable lane version from the source selector.
 func (e *EVMPostProposalCCIPSend) SupportedDestinations(env cldf.Environment, srcSel uint64) ([]uint64, error) {
 	allDests, err := e.supportedRemoteChainsWithVersions(env, srcSel)
-	if err != nil {
-		return nil, err
-	}
-	return maps.Keys(allDests), nil
+	return maps.Keys(allDests), err
 }
 
 // AdapterVersionForLane returns the adapter version for the srcSel -> destSel lane.

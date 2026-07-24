@@ -64,3 +64,4 @@ devenv/env-out.toml
 operations-gen
 .agents/
 AGENTS.md
+/.gocache
