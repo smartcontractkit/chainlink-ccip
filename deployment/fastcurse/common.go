@@ -26,6 +26,14 @@ func GlobalCurseSubject() Subject {
 	return Subject{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 }
 
+// FiredrillSubject is a hardcoded, inert subject used only to exercise the
+// curse/uncurse changeset flow end-to-end. It is not derived from any chain
+// selector and is not the GlobalCurseSubject, so cursing/uncursing it has no
+// effect on real lanes or the global curse state.
+func FiredrillSubject() Subject {
+	return Subject{0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFD}
+}
+
 func GenericSelectorToSubject(selector uint64) Subject {
 	var b Subject
 	binary.BigEndian.PutUint64(b[8:], selector)
