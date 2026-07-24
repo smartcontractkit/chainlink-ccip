@@ -87,6 +87,12 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 				return fmt.Errorf("no pools provided for chain selector %d", chainCfg.ChainSelector)
 			}
 			for _, pool := range chainCfg.Pools {
+				if datastore_utils.IsAddressRefEmpty(pool.TokenPoolRef) {
+					return fmt.Errorf("pool entry on chain selector %d has an empty tokenPoolRef", chainCfg.ChainSelector)
+				}
+				if pool.TokenPoolRef.ChainSelector != 0 && pool.TokenPoolRef.ChainSelector != chainCfg.ChainSelector {
+					return fmt.Errorf("pool entry %s has tokenPoolRef.chainSelector %d that does not match the enclosing chain selector %d", datastore_utils.SprintRef(pool.TokenPoolRef), pool.TokenPoolRef.ChainSelector, chainCfg.ChainSelector)
+				}
 				if pool.FinalityConfig == nil && pool.RateLimitAdmin == nil && pool.FeeAdmin == nil && len(pool.Remotes) == 0 {
 					return fmt.Errorf("pool entry %s on chain selector %d has no fields to update", datastore_utils.SprintRef(pool.TokenPoolRef), chainCfg.ChainSelector)
 				}

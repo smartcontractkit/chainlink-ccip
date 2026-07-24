@@ -72,6 +72,19 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"no pools provided"},
 		},
 		{
+			name:   "rejects_empty_pool_ref",
+			input:  singlePoolInput(tokensapi.PoolConfigUpdate{FeeAdmin: new("0x2222222222222222222222222222222222222222")}),
+			errors: []string{"empty tokenPoolRef"},
+		},
+		{
+			name: "rejects_mismatched_pool_ref_chain_selector",
+			input: singlePoolInput(tokensapi.PoolConfigUpdate{
+				TokenPoolRef: datastore.AddressRef{Address: poolRef.Address, ChainSelector: dst},
+				FeeAdmin:     new("0x2222222222222222222222222222222222222222"),
+			}),
+			errors: []string{"does not match the enclosing chain selector"},
+		},
+		{
 			name:   "rejects_empty_pool_update",
 			input:  singlePoolInput(tokensapi.PoolConfigUpdate{TokenPoolRef: poolRef}),
 			errors: []string{"no fields to update"},
