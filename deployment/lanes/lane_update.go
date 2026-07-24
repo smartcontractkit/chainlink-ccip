@@ -93,6 +93,9 @@ type ChainDefinition struct {
 type CantonLaneConfig struct {
 	// GlobalConfig is the Canton global config control contract address.
 	GlobalConfig datastore.AddressRef
+	// FeeQuoterRef is the Canton FeeQuoter contract address reference.
+	// This includes the raw instance address needed for MCMS operations.
+	FeeQuoterRef datastore.AddressRef
 }
 
 type FeeQuoterDestChainConfig struct {
