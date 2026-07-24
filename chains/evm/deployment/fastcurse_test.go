@@ -657,6 +657,271 @@ func TestFastCurseFiredrill(t *testing.T) {
 	require.Contains(t, err.Error(), "uncurse skipped all actions")
 }
 
+// TestFastCurseSubjectOverridesLaneAndGlobal shows that the explicit Subject field is a
+// general-purpose replacement for SubjectChainSelector (lane curses) and IsGlobalCurse
+// (the well-known global subject), not just a firedrill-only mechanism. It curses a real
+// lane subject and a global curse using the "normal" fields, then uncurses both purely by
+// passing their literal Subject bytes - proving the same on-chain state can be reached and
+// reversed through Subject alone.
+func TestFastCurseSubjectOverridesLaneAndGlobal(t *testing.T) {
+	chain1 := chainsel.TEST_90000010.Selector
+	chain2 := chainsel.TEST_90000011.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chain1, chain2}),
+	)
+	require.NoError(t, err)
+	bundle := env.OperationsBundle
+	var rmnAddress, rmnRemoteAddress common.Address
+	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
+	chain := env.BlockChains.EVMChains()[chain1]
+	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
+		ChainSelector:  chain.Selector,
+		Args: rmnops1_5.ConstructorArgs{
+			RMNConfig: rmn_contract.RMNConfig{
+				BlessWeightThreshold: 2,
+				CurseWeightThreshold: 2,
+				// setting dummy voters
+				Voters: []rmn_contract.RMNVoter{
+					{
+						BlessWeight:   2,
+						CurseWeight:   2,
+						BlessVoteAddr: utils.RandomAddress(),
+						CurseVoteAddr: utils.RandomAddress(),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnops1_5.ContractType),
+		Version:       semver.MustParse("1.5.0"),
+		ChainSelector: chain1,
+		Address:       deployRMNOp.Output.Address,
+	}))
+	rmnAddress = common.HexToAddress(deployRMNOp.Output.Address)
+	// deploy RMNRemote 1.6 on chain2
+	chain = env.BlockChains.EVMChains()[chain2]
+	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
+		ChainSelector:  chain.Selector,
+		Args: rmnremoteops1_6.ConstructorArgs{
+			LocalChainSelector: chain.Selector,
+			LegacyRMN:          utils.RandomAddress(),
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnremoteops1_6.ContractType),
+		Version:       semver.MustParse("1.6.0"),
+		ChainSelector: chain2,
+		Address:       deployRMNRemoteOp.Output.Address,
+	}))
+	rmnRemoteAddress = common.HexToAddress(deployRMNRemoteOp.Output.Address)
+	// deploy router in both chains. No ramp updates are configured, so neither chain is
+	// "connected" to the other from the router's point of view - that's the point: the
+	// Subject field bypasses IsChainConnectedToTargetChain entirely, so the lane curse
+	// below still succeeds even without any ramps set up.
+	for _, sel := range []uint64{chain1, chain2} {
+		evmChain := env.BlockChains.EVMChains()[sel]
+		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
+			ChainSelector:  evmChain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
+			Args: routerops1_2.ConstructorArgs{
+				WrappedNative: utils.RandomAddress(),
+				RMNProxy:      utils.RandomAddress(),
+			},
+		})
+		require.NoError(t, err)
+		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+			Type:          datastore.ContractType(routerops1_2.ContractType),
+			Version:       semver.MustParse("1.2.0"),
+			ChainSelector: sel,
+			Address:       deployRouterOp.Output.Address,
+		}))
+	}
+
+	// deploy mcms
+	cs := deploy.DeployMCMS(deploy.GetRegistry(), nil)
+	evmChain1 := env.BlockChains.EVMChains()[chain1]
+	evmChain2 := env.BlockChains.EVMChains()[chain2]
+	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
+		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
+			chain1: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
+			},
+			chain2: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
+			},
+		},
+	})
+	require.NoError(t, err)
+	// store addresses in ds
+	allAddrRefs, err := output.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	timelockAddrs := make(map[uint64]string)
+	for _, addrRef := range allAddrRefs {
+		require.NoError(t, ds.Addresses().Add(addrRef))
+		if addrRef.Type == datastore.ContractType(deploymentutils.RBACTimelock) {
+			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
+		}
+	}
+	// update env datastore
+	env.DataStore = ds.Seal()
+	// transfer ownership of RMN and RMNRemote to respective MCMS
+	transferOwnershipInput := deploy.TransferOwnershipInput{
+		ChainInputs: []deploy.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: chain1,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnops1_5.ContractType),
+						Version: semver.MustParse("1.5.0"),
+					},
+				},
+				ProposedOwner: timelockAddrs[chain1],
+			},
+			{
+				ChainSelector: chain2,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnremoteops1_6.ContractType),
+						Version: semver.MustParse("1.6.0"),
+					},
+				},
+				ProposedOwner: timelockAddrs[chain2],
+			},
+		},
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            deploymentutils.CLLQualifier,
+			Description:          "Transfer ownership to timelock for fast curse subject-override test",
+		},
+	}
+
+	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(deploy.GetTransferOwnershipRegistry(), changesets.GetRegistry())
+	output, err = transferOwnershipChangeset.Apply(*env, transferOwnershipInput)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	t.Logf("Transferred ownership of RMN and RMNRemote to respective MCMS")
+
+	// Curse a real lane subject on chain1 via the literal Subject field instead of
+	// SubjectChainSelector, and put a global curse on chain2 via the normal IsGlobalCurse
+	// flag. Note the lane action doesn't need a reverse-direction pair the way
+	// SubjectChainSelector-based lane curses do: Subject actions are exempt from the
+	// bidirectional-lane validation entirely.
+	globalSubject := fastcurse.GlobalCurseSubject()
+	laneSubject := fastcurse.GenericSelectorToSubject(chain2)
+	curseCfg := fastcurse.RMNCurseConfig{
+		CurseActions: []fastcurse.CurseActionInput{
+			{
+				ChainSelector: chain1,
+				Subject:       &laneSubject,
+				Version:       semver.MustParse("1.5.0"),
+			},
+			{
+				ChainSelector: chain2,
+				Subject:       &globalSubject,
+				Version:       semver.MustParse("1.6.0"),
+			},
+		},
+		Force: false,
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            deploymentutils.CLLQualifier,
+			Description:          "Subject-override curse proposal for fast curse test",
+		},
+	}
+
+	curseChangeset := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
+	output, err = curseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	rmnC, err := rmn_contract.NewRMNContract(rmnAddress, evmChain1.Client)
+	require.NoError(t, err)
+	isCursed, err := rmnC.IsCursed(nil, laneSubject)
+	require.NoError(t, err)
+	require.True(t, isCursed, "lane subject cursed via Subject field should be cursed on rmn in chain1")
+
+	rmnRemoteC, err := rmn_remote.NewRMNRemote(rmnRemoteAddress, evmChain2.Client)
+	require.NoError(t, err)
+	isCursed, err = rmnRemoteC.IsCursed(nil, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.True(t, isCursed, "global curse should be cursed on rmnremote in chain2")
+	t.Logf("Lane subject %x cursed via Subject field on chain1 %d, global curse applied on chain2 %d", laneSubject, chain1, chain2)
+
+	// Now uncurse both purely through the Subject field: the lane subject bytes for
+	// chain1, and the well-known GlobalCurseSubject() bytes (instead of IsGlobalCurse) for
+	// chain2 - showing Subject can address and remove the global curse too.
+	uncurseCfg := fastcurse.RMNCurseConfig{
+		CurseActions: []fastcurse.CurseActionInput{
+			{
+				ChainSelector: chain1,
+				Subject:       &laneSubject,
+				Version:       semver.MustParse("1.5.0"),
+			},
+			{
+				ChainSelector: chain2,
+				Subject:       &globalSubject,
+				Version:       semver.MustParse("1.6.0"),
+			},
+		},
+		Force: false,
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            deploymentutils.CLLQualifier,
+			Description:          "Subject-override uncurse proposal for fast curse test",
+		},
+	}
+
+	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
+	uncurseChangeset := fastcurse.UncurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
+	output, err = uncurseChangeset.Apply(*env, uncurseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	isCursed, err = rmnC.IsCursed(nil, laneSubject)
+	require.NoError(t, err)
+	require.False(t, isCursed, "lane subject should be uncursed on rmn in chain1")
+
+	isCursed, err = rmnRemoteC.IsCursed(nil, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.False(t, isCursed, "global curse should be uncursed on rmnremote in chain2, having been removed via the Subject field")
+	t.Logf("Lane subject %x and global curse on chain2 %d both uncursed via the Subject field", laneSubject, chain2)
+
+	// Uncursing again should fail because nothing is cursed on chain.
+	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
+	_, err = uncurseChangeset.Apply(*env, uncurseCfg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "uncurse skipped all actions")
+}
+
 func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	chain1 := chainsel.TEST_90000004.Selector
 	chain2 := chainsel.TEST_90000005.Selector
