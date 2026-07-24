@@ -36,6 +36,13 @@ type CurseActionInput struct {
 	ChainSelector        uint64
 	SubjectChainSelector uint64
 	Version              *semver.Version
+	// Subject, if set, is used verbatim as the curse subject instead of deriving one
+	// from SubjectChainSelector. This bypasses the IsChainConnectedToTargetChain
+	// connectivity check, so it can be used both for hardcoded test subjects (see
+	// FiredrillSubject) and for real, selector-derived subjects when the target
+	// chain's connectivity can't be confirmed (e.g. unreachable or stalled chain).
+	// Mutually exclusive with IsGlobalCurse and SubjectChainSelector.
+	Subject *Subject
 }
 
 type curseActionDetails struct {

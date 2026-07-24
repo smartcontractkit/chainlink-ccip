@@ -36,6 +36,8 @@ import (
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	adaptersv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	rmnops2_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 )
 
 func TestFastCurse(t *testing.T) {
@@ -297,6 +299,356 @@ func TestFastCurse(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, isCursed, "subject on chain1 should be uncursed on rmnremote in chain2")
 	t.Logf("Subjects successfully uncursed %x on chain1 %d and %x on chain2 %d", adv1_5_0.SelectorToSubject(chain2), chain1, adv1_6_0.SelectorToSubject(chain1), chain2)
+
+	// Uncursing again should fail because nothing is cursed on chain.
+	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
+	_, err = uncurseChangeset.Apply(*env, curseCfg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "uncurse skipped all actions")
+}
+
+func TestFastCurseFiredrill(t *testing.T) {
+	chain1 := chainsel.TEST_90000007.Selector
+	chain2 := chainsel.TEST_90000008.Selector
+	chain3 := chainsel.TEST_90000009.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chain1, chain2, chain3}),
+	)
+	require.NoError(t, err)
+	bundle := env.OperationsBundle
+	var rmnRemoteAddress, rmnAddress2_1 common.Address
+	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
+	chain := env.BlockChains.EVMChains()[chain1]
+	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
+		ChainSelector:  chain.Selector,
+		Args: rmnops1_5.ConstructorArgs{
+			RMNConfig: rmn_contract.RMNConfig{
+				BlessWeightThreshold: 2,
+				CurseWeightThreshold: 2,
+				// setting dummy voters
+				Voters: []rmn_contract.RMNVoter{
+					{
+						BlessWeight:   2,
+						CurseWeight:   2,
+						BlessVoteAddr: utils.RandomAddress(),
+						CurseVoteAddr: utils.RandomAddress(),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnops1_5.ContractType),
+		Version:       semver.MustParse("1.5.0"),
+		ChainSelector: chain1,
+		Address:       deployRMNOp.Output.Address,
+	}))
+	// deploy RMNRemote 1.6 on chain2
+	chain = env.BlockChains.EVMChains()[chain2]
+	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
+		ChainSelector:  chain.Selector,
+		Args: rmnremoteops1_6.ConstructorArgs{
+			LocalChainSelector: chain.Selector,
+			LegacyRMN:          utils.RandomAddress(),
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnremoteops1_6.ContractType),
+		Version:       semver.MustParse("1.6.0"),
+		ChainSelector: chain2,
+		Address:       deployRMNRemoteOp.Output.Address,
+	}))
+	rmnRemoteAddress = common.HexToAddress(deployRMNRemoteOp.Output.Address)
+	// deploy router in both chains
+	for _, sel := range []uint64{chain1, chain2} {
+		evmChain := env.BlockChains.EVMChains()[sel]
+		// mock wrapped native and rmnproxy address
+		wNative := utils.RandomAddress()
+		rmnProxy := utils.RandomAddress()
+
+		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
+			ChainSelector:  evmChain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
+			Args: routerops1_2.ConstructorArgs{
+				WrappedNative: wNative,
+				RMNProxy:      rmnProxy,
+			},
+		})
+		require.NoError(t, err)
+		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+			Type:          datastore.ContractType(routerops1_2.ContractType),
+			Version:       semver.MustParse("1.2.0"),
+			ChainSelector: sel,
+			Address:       deployRouterOp.Output.Address,
+		}))
+		routerAddr := deployRouterOp.Output.Address
+		// add some dummy onramps to the router so that chain is supported,
+		// on chain1, add chain2 as supported dest chain and vice versa
+		onRamp := utils.RandomAddress()
+		offRamp := utils.RandomAddress()
+		var destChainSelector uint64
+		if sel == chain1 {
+			destChainSelector = chain2
+		} else {
+			destChainSelector = chain1
+		}
+		_, err = cldf_ops.ExecuteOperation(bundle, routerops1_2.ApplyRampUpdates, evmChain, contract.FunctionInput[routerops1_2.ApplyRampsUpdatesArgs]{
+			Address:       common.HexToAddress(routerAddr),
+			ChainSelector: evmChain.Selector,
+			Args: routerops1_2.ApplyRampsUpdatesArgs{
+				OnRampUpdates: []routerops1_2.OnRamp{
+					{
+						DestChainSelector: destChainSelector,
+						OnRamp:            onRamp,
+					},
+				},
+				OffRampAdds: []routerops1_2.OffRamp{
+					{
+						SourceChainSelector: destChainSelector,
+						OffRamp:             offRamp,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// deploy RMN 2.1.0 on chain3, along with an RMNProxy pointing at it (required for the
+	// v2.1.0 fastcurse adapter, which resolves the active RMN via the proxy) and a router
+	// (required by CurseAdapter.Initialize, same as for chain1/chain2 above).
+	chain = env.BlockChains.EVMChains()[chain3]
+	deployRMN2_1Op, err := cldf_ops.ExecuteOperation(bundle, rmnops2_1.Deploy, chain, contract.DeployInput[rmnops2_1.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops2_1.ContractType, *rmnops2_1.Version),
+		ChainSelector:  chain.Selector,
+		Args:           rmnops2_1.ConstructorArgs{CurseAdmins: []common.Address{}},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnops2_1.ContractType),
+		Version:       rmnops2_1.Version,
+		ChainSelector: chain3,
+		Address:       deployRMN2_1Op.Output.Address,
+	}))
+	rmnAddress2_1 = common.HexToAddress(deployRMN2_1Op.Output.Address)
+
+	deployRMNProxy3Op, err := cldf_ops.ExecuteOperation(bundle, rmnproxyops.Deploy, chain, contract.DeployInput[rmnproxyops.ConstructorArgs]{
+		ChainSelector:  chain.Selector,
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnproxyops.ContractType, *semver.MustParse("1.0.0")),
+		Args:           rmnproxyops.ConstructorArgs{RMN: rmnAddress2_1},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnproxyops.ContractType),
+		Version:       semver.MustParse("1.0.0"),
+		ChainSelector: chain3,
+		Address:       deployRMNProxy3Op.Output.Address,
+	}))
+
+	deployRouter3Op, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, chain, contract.DeployInput[routerops1_2.ConstructorArgs]{
+		ChainSelector:  chain.Selector,
+		TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
+		Args: routerops1_2.ConstructorArgs{
+			WrappedNative: utils.RandomAddress(),
+			RMNProxy:      common.HexToAddress(deployRMNProxy3Op.Output.Address),
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(routerops1_2.ContractType),
+		Version:       semver.MustParse("1.2.0"),
+		ChainSelector: chain3,
+		Address:       deployRouter3Op.Output.Address,
+	}))
+
+	// deploy mcms
+	cs := deploy.DeployMCMS(deploy.GetRegistry(), nil)
+	evmChain2 := env.BlockChains.EVMChains()[chain2]
+	evmChain3 := env.BlockChains.EVMChains()[chain3]
+	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
+		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
+			chain1: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
+			},
+			chain2: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
+			},
+			chain3: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
+			},
+		},
+	})
+	require.NoError(t, err)
+	// store addresses in ds
+	allAddrRefs, err := output.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	timelockAddrs := make(map[uint64]string)
+	for _, addrRef := range allAddrRefs {
+		require.NoError(t, ds.Addresses().Add(addrRef))
+		if addrRef.Type == datastore.ContractType(deploymentutils.RBACTimelock) {
+			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
+		}
+	}
+	// update env datastore
+	env.DataStore = ds.Seal()
+	// transfer ownership of RMN and RMNRemote to respective MCMS
+	transferOwnershipInput := deploy.TransferOwnershipInput{
+		ChainInputs: []deploy.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: chain1,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnops1_5.ContractType),
+						Version: semver.MustParse("1.5.0"),
+					},
+				},
+				ProposedOwner: timelockAddrs[chain1],
+			},
+			{
+				ChainSelector: chain2,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnremoteops1_6.ContractType),
+						Version: semver.MustParse("1.6.0"),
+					},
+				},
+				ProposedOwner: timelockAddrs[chain2],
+			},
+			{
+				ChainSelector: chain3,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnops2_1.ContractType),
+						Version: rmnops2_1.Version,
+					},
+				},
+				ProposedOwner: timelockAddrs[chain3],
+			},
+		},
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            deploymentutils.CLLQualifier,
+			Description:          "Transfer ownership to timelock for fast curse firedrill test",
+		},
+	}
+
+	// register chain adapter
+	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(deploy.GetTransferOwnershipRegistry(), changesets.GetRegistry())
+	output, err = transferOwnershipChangeset.Apply(*env, transferOwnershipInput)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	t.Logf("Transferred ownership of RMN and RMNRemote to respective MCMS")
+
+	// curse the hardcoded, inert firedrill subject on chain2 - it doesn't correspond to
+	// any real chain selector and isn't the global curse subject, so it has no effect on
+	// real lane curses.
+	firedrillSubject := fastcurse.FiredrillSubject()
+	curseCfg := fastcurse.RMNCurseConfig{
+		CurseActions: []fastcurse.CurseActionInput{
+			{
+				ChainSelector: chain2,
+				Subject:       &firedrillSubject,
+				Version:       semver.MustParse("1.6.0"),
+			},
+			{
+				ChainSelector: chain3,
+				Subject:       &firedrillSubject,
+				Version:       rmnops2_1.Version,
+			},
+		},
+		Force: false,
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            deploymentutils.CLLQualifier,
+			Description:          "Firedrill curse proposal for fast curse test",
+		},
+	}
+
+	curseChangeset := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
+	output, err = curseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// check that the firedrill subject was actually cursed, and nothing else was affected
+	rmnRemoteC, err := rmn_remote.NewRMNRemote(rmnRemoteAddress, evmChain2.Client)
+	require.NoError(t, err)
+	isCursed, err := rmnRemoteC.IsCursed(nil, firedrillSubject)
+	require.NoError(t, err)
+	require.True(t, isCursed, "firedrill subject should be cursed on rmnremote in chain2")
+
+	isCursed, err = rmnRemoteC.IsCursed(nil, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.False(t, isCursed, "global curse subject should not be cursed on rmnremote in chain2")
+
+	isCursed, err = rmnRemoteC.IsCursed(nil, adaptersv1_6_0.NewCurseAdapter().SelectorToSubject(chain1))
+	require.NoError(t, err)
+	require.False(t, isCursed, "real subject for chain1 should not be cursed on rmnremote in chain2")
+	t.Logf("Firedrill subject %x successfully cursed on chain2 %d", firedrillSubject, chain2)
+
+	// check that the firedrill subject was also cursed on the RMN 2.1.0 deployment, and
+	// nothing else was affected there either
+	rmn2_1C, err := rmnops2_1.NewRMNContract(rmnAddress2_1, evmChain3.Client)
+	require.NoError(t, err)
+	isCursed, err = rmn2_1C.IsCursed(nil, firedrillSubject)
+	require.NoError(t, err)
+	require.True(t, isCursed, "firedrill subject should be cursed on rmn 2.1.0 in chain3")
+
+	isCursed, err = rmn2_1C.IsCursed(nil, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.False(t, isCursed, "global curse subject should not be cursed on rmn 2.1.0 in chain3")
+
+	isCursed, err = rmn2_1C.IsCursed(nil, adaptersv1_6_0.NewCurseAdapter().SelectorToSubject(chain1))
+	require.NoError(t, err)
+	require.False(t, isCursed, "real subject for chain1 should not be cursed on rmn 2.1.0 in chain3")
+	t.Logf("Firedrill subject %x successfully cursed on chain3 %d", firedrillSubject, chain3)
+
+	// Now uncurse the firedrill subject
+	// reset the operation bundle to clear any cached values
+	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
+	uncurseChangeset := fastcurse.UncurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
+	output, err = uncurseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// check that the firedrill subject was actually uncursed
+	isCursed, err = rmnRemoteC.IsCursed(nil, firedrillSubject)
+	require.NoError(t, err)
+	require.False(t, isCursed, "firedrill subject should be uncursed on rmnremote in chain2")
+	t.Logf("Firedrill subject %x successfully uncursed on chain2 %d", firedrillSubject, chain2)
+
+	isCursed, err = rmn2_1C.IsCursed(nil, firedrillSubject)
+	require.NoError(t, err)
+	require.False(t, isCursed, "firedrill subject should be uncursed on rmn 2.1.0 in chain3")
+	t.Logf("Firedrill subject %x successfully uncursed on chain3 %d", firedrillSubject, chain3)
 
 	// Uncursing again should fail because nothing is cursed on chain.
 	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
