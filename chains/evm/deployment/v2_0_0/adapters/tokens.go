@@ -31,9 +31,10 @@ import (
 )
 
 var (
-	_ tokens.TokenPoolMigrator = &TokenAdapter{}
-	_ tokens.TokenFeeAdapter   = &TokenAdapter{}
-	_ tokens.TokenAdapter      = &TokenAdapter{}
+	_ tokens.TokenPoolAdminAdapter = &TokenAdapter{}
+	_ tokens.TokenPoolMigrator     = &TokenAdapter{}
+	_ tokens.TokenFeeAdapter       = &TokenAdapter{}
+	_ tokens.TokenAdapter          = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 2.0.0.
@@ -204,6 +205,10 @@ func (t *TokenAdapter) SetAllowedFinalityConfig(e *deployment.Environment) *cldf
 
 func (t *TokenAdapter) SetTokenTransferFee(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.SetTokenTransferFeeConfigForTokenPools
+}
+
+func (t *TokenAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokens.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.SetTokenPoolAdmins
 }
 
 func (t *TokenAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) tokens.TokenTransferFeeConfig {
